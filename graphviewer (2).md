@@ -1,0 +1,344 @@
+# ButterflyDreaming — Graph Viewer
+## Claude Code Project Brief
+**File:** graphviewer.md
+**Date:** 15 May 2026
+**Version:** 1.0
+**Author:** William Stewart with Claude (Anthropic)
+
+---
+
+## 1. Project Context
+
+ButterflyDreaming is a non-commercial social media platform that pairs two anonymous users in a temporary one-to-one encounter, mediated by a shared body of symbolic text — poetry, myth, folktale, and philosophy. The two users collaboratively draft a short new text (a "child node") that captures something of their encounter. This is saved permanently to a growing public graph of co-created symbolic content called the Text-Graph.
+
+This viewer is the first real UI component of the platform. It is a browser-based graph visualisation tool built on Cytoscape.js, connecting to a local Neo4j database. It serves two purposes:
+
+1. **Development tool** — for exploring and validating the graph schema during the design phase
+2. **Prototype UI** — the foundation of the "Butterfly Browser" concept that will eventually become the platform's primary navigation interface
+
+---
+
+## 2. Technology Stack
+
+- **Language:** JavaScript (vanilla JS for this viewer — no framework)
+- **Graph visualisation:** Cytoscape.js (MIT licensed, free)
+- **Graph layout:** fCoSE plugin for Cytoscape.js (force-directed, natural family groupings)
+- **Database:** Neo4j (local instance, Community/Enterprise developer licence)
+- **Driver:** Neo4j JavaScript driver (`neo4j-driver` npm package)
+- **Dev server:** live-server (`npx live-server .` from project root)
+- **Connection:** Bolt protocol, `neo4j://127.0.0.1:7687`
+
+**Neo4j credentials:** username `neo4j` — password to be supplied separately, not stored in code.
+
+---
+
+## 3. Development Environment Setup
+
+```bash
+# Install dependencies (once only)
+npm install neo4j-driver
+npm install -g live-server
+
+# Start dev server (each session, from project root)
+npx live-server .
+```
+
+The dev server runs at `http://localhost:8080`, serves `index.html` automatically, and auto-refreshes on file save. Leave it running for the whole session.
+
+**File structure:**
+```
+graphviewer1/
+  index.html
+  viewer.js
+  style.css
+  cursor-wings.svg  ← custom cursor asset
+  graphviewer.md    ← this file
+  package.json
+```
+
+---
+
+## 4. Database Schema
+
+### 4.1 Node Types
+
+**Family** — top-level archetype groupings. 6 nodes.
+Properties: `name`, `colour`, `hex`, `description`
+
+**Cluster** — archetype clusters within families. 64 nodes.
+Properties: `name`, `family_primary`
+
+**TextNode** — symbolic text fragments (corpus and co-created).
+Properties: `url` (UUID-based, primary app handle), `text`, `raw_text`, `source` ('seed'|'dyad_child'), `lang`, `created_at`, `tagging_status`, `root` (true on seed nodes with no TextNode parent)
+
+### 4.2 Relationship Types — Cluster to Family
+
+| Relationship | Meaning | Colour | Width |
+|---|---|---|---|
+| RESONATES_WITH | Primary belonging | #4A90D9 soft blue | 2px |
+| BRIDGES_TO | Cross-family connector | #E8A838 amber | 4px |
+| ECHOES | Faint surface recall | #9B59B6 muted violet | 1px |
+
+All carry a `weight` property (Float, 0.0–1.0). Weights sum to 1.0 per cluster across all its family connections.
+
+### 4.3 Relationship Types — TextNode Level
+
+| Relationship | Meaning | Colour | Width |
+|---|---|---|---|
+| TAGGED_AS | Cluster tag | #888888 grey | 1px |
+| CHILD | Genealogical lineage | #4A8C4F green | 2px |
+| GIVES | One thing enables another | #E85A38 warm orange | 2px |
+| RESONATES_WITH | Thematic affinity | #4A90D9 soft blue | 2px |
+| BRIDGES_TO | Cross-cluster bridge | #E8A838 amber | 4px |
+| ECHOES | Surface recall | #9B59B6 muted violet | 1px |
+
+CHILD carries: `weight` (Float), `source` ('sequence'|'dyad'|'editorial'), `created_at` (datetime)
+
+### 4.4 Family Colours
+
+```
+Nature      #4A8C4F    forest green
+Emotion     #C0504D    warm red
+Reason      #4A7BC0    clear blue
+Spirit      #9B6B9B    muted violet
+Symbolic    #C09A3A    amber / gold
+Arts        #C47A5A    terracotta
+```
+
+### 4.5 Current Data State
+
+- 6 Family nodes, 64 Cluster nodes, 191 cluster-to-family relationships loaded
+- 2 TextNodes loaded: Tao Te Ching Chapters 1 and 2 (McDonald 1996 translation)
+- Ch1 → Ch2 connected by CHILD {weight: 0.75, source: 'sequence'}
+- Both TextNodes tagged with TAGGED_AS, BRIDGES_TO, ECHOES, GIVES relationships to Clusters
+
+---
+
+## 5. Visual Design
+
+### 5.1 Canvas
+
+- **Background:** Black (`#000000`)
+- **Text:** White (`#ffffff`)
+- **Secondary text / labels:** Light grey (`#cccccc`)
+
+### 5.2 Node Styling
+
+**Root node:**
+- Small circle, bright gold (`#FFD700`)
+- No label visible by default
+- Label appears on hover dwell
+
+**Family nodes:**
+- Circle, coloured per family hex (see 4.4)
+- Medium size
+- No label by default — appears on hover dwell
+
+**Cluster nodes:**
+- Circle, slightly smaller than family nodes
+- Coloured per their `family_primary` family colour, slightly desaturated
+- No label by default — appears on hover dwell
+
+**TextNodes:**
+- Distinct shape or style from Family/Cluster — e.g. rounded rectangle or softer circle
+- Neutral colour (white outline, dark fill) — not family-coloured
+- No label by default
+
+### 5.3 Hover Behaviour — Dwell Time
+
+Labels and previews do not appear immediately on mouseover. A dwell timer fires after **400ms** of sustained hover. If the mouse leaves before 400ms, nothing appears.
+
+```javascript
+let dwellTimer = null;
+
+cy.on('mouseover', 'node', (event) => {
+    const node = event.target;
+    dwellTimer = setTimeout(() => showLabel(node), 400);
+});
+
+cy.on('mouseout', 'node', () => {
+    clearTimeout(dwellTimer);
+    hideLabel();
+});
+```
+
+**What appears on dwell:**
+- Root node → its `name` property ("ButterflyDreaming")
+- Family node → family name
+- Cluster node → cluster name
+- TextNode → preview of `text` property, truncated to approximately 6 short lines
+
+### 5.4 Custom Cursor
+
+A custom SVG cursor is used across the entire canvas. Two small triangles pointing upward with a gap between them, suggesting wings in silhouette — abstract, not literal. White on transparent background, 32x32px.
+
+```css
+#cy {
+    cursor: url('cursor-wings.svg') 16 16, auto;
+}
+```
+
+The two numbers after the URL are the hotspot coordinates — the pixel that registers as the click point. `16 16` centres it. `auto` is the fallback if the SVG fails to load.
+
+**cursor-wings.svg** — create as part of step 1:
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Left wing triangle — pointing up, left of centre -->
+  <polygon points="8,24 14,8 14,24" fill="white" opacity="0.85"/>
+  <!-- Right wing triangle — pointing up, right of centre -->
+  <polygon points="18,24 18,8 24,24" fill="white" opacity="0.85"/>
+</svg>
+```
+
+Adjust triangle geometry to taste — the gap between `14` and `18` creates the wing separation.
+
+### 6.1 Core Rule — Click Behaviour
+
+**On clicking any node: show only that node and its immediate one-hop neighbours. All other nodes vanish.**
+
+This rule applies uniformly at every level — root, family, cluster, TextNode. No special cases.
+
+### 6.2 Step-by-Step Interaction Flow
+
+**State 0 — Initial**
+Canvas is black. Single small root node centred. No labels. User sees a quiet, minimal starting point.
+
+**State 1 — Root hovered**
+After 400ms dwell: root node label appears ("ButterflyDreaming" or equivalent). Disappears on mouseout.
+
+**State 2 — Root clicked**
+6 Family nodes appear arranged around the root. Root remains visible. All family nodes shown in their colours, no labels yet. All other nodes hidden.
+
+**State 3 — Family node hovered**
+After 400ms dwell: family name appears.
+
+**State 4 — Family node clicked**
+Clicked family node + its connected cluster nodes remain visible. All other nodes (other families, root) vanish. Clusters appear arranged around the family node.
+
+**State 5 — Cluster node hovered**
+After 400ms dwell: cluster name appears.
+
+**State 6 — Cluster node clicked**
+Clicked cluster + all its one-hop neighbours remain visible: its connected family nodes, and any connected TextNodes (seed nodes). All other nodes vanish.
+
+**State 7 — TextNode hovered**
+After 400ms dwell: text preview appears — first ~6 lines of the `text` property, truncated with ellipsis if longer.
+
+**State 8 — TextNode clicked**
+Clicked TextNode + its one-hop neighbours remain visible: connected clusters (via TAGGED_AS etc.) and any CHILD relationships to/from other TextNodes. One level of children visible.
+
+**Subsequent TextNode clicks**
+Each click on a TextNode expands one further level of CHILD relationships. One level at a time.
+
+### 6.3 Collapse
+
+A second click on the currently active node collapses one level — returning to the previous state. Collapse is one level at a time, not full subtree collapse.
+
+### 6.4 Reset
+
+A **Reset** button returns the canvas to State 0 — root node only, all else hidden. Positioned unobtrusively (e.g. top-right corner, small, low contrast until hovered).
+
+---
+
+## 7. Layout
+
+- **fCoSE layout** for the cluster-family graph — produces natural family groupings through force-direction
+- On each click-expand, new nodes animate into position (Cytoscape.js handles this natively)
+- The canvas should support pan and zoom — Cytoscape.js default behaviour, do not disable
+
+---
+
+## 8. Implementation Notes
+
+### 8.1 Disconnected Subgraphs
+
+A single query may return two or more disconnected subgraphs (e.g. the cluster-family graph and a set of TextNodes not yet connected to it). Cytoscape renders all of them on the same canvas. This is expected behaviour — do not treat it as an error.
+
+### 8.2 Show/Hide Pattern
+
+Rather than re-querying Neo4j on each click, load the full relevant subgraph on initialisation and use Cytoscape's `show()` / `hide()` methods to reveal nodes progressively. This avoids repeated round-trips to the database and makes transitions faster.
+
+Initial load query:
+```cypher
+MATCH (n)-[r]->(m)
+RETURN n, r, m
+```
+
+Then manage visibility client-side via Cytoscape's element filtering.
+
+### 8.3 Neo4j Driver Connection
+
+```javascript
+import neo4j from 'neo4j-driver';
+
+const driver = neo4j.driver(
+    'neo4j://127.0.0.1:7687',
+    neo4j.auth.basic('neo4j', PASSWORD)
+);
+
+const session = driver.session({ database: 'neo4j' });
+```
+
+Password should be passed via a simple prompt or environment config — not hardcoded in source.
+
+---
+
+## 9. Future Directions
+### (Design intent — not for current implementation)
+
+### 9.1 Dual-User Buddy Browsing
+
+In the live platform, two users browse the graph simultaneously in a dyadic session. Each user's current node and primary path will be rendered in a distinct colour — one per user. The two coloured threads coexist on the same canvas.
+
+**User colours** (to be decided — must be distinct from all 6 family colours): likely light/bright tones against the dark background, e.g. white and pale cyan.
+
+### 9.2 Primary Path and Buddy Path
+
+Every TextNode has a primary path — its lineage back through CHILD relationships to a root seed node. This path is inherited: a child node's primary path is its parent's path extended by one step. The primary path determines which cluster territory "owns" that node.
+
+The buddy's primary path — determined by which seed node they entered through — arrives as a second coloured thread. This is the secondary path, dynamically defined by the pairing, not pre-assigned. The metaphor: each user arrives carrying the pollen of their own path, and the encounter is where cross-pollination happens. The child node that emerges carries traces of both lineages.
+
+Shared nodes — where both paths overlap — represent the forming gravity well.
+
+### 9.3 Attention and Dwell as Signals
+
+The 400ms dwell timer is not just a UX mechanism. In the live platform, sustained hover events (post-dwell) become attention signals fed into the gravity well scoring function:
+
+```
+score(node) = wA × attentionA(node) + wB × attentionB(node) + wAB × overlap(node)
+```
+
+The dwell threshold for local tooltip display and the threshold for broadcasting an attention signal to the partner may differ — local feedback warrants a shorter dwell; committing a signal to the partner's view warrants a longer one.
+
+### 9.4 Click as Shared Signal
+
+In buddy browsing mode, a click on a TextNode may carry additional meaning beyond local navigation — it may signal candidate interest in that node as a shared starting point for the Weave phase. This requires further design work. The current click model (show one-hop neighbourhood) should be designed with this extension in mind.
+
+### 9.5 WebSocket Integration
+
+Real-time buddy browsing requires a WebSocket connection broadcasting dwell and click events between paired users. A WebSocket dyadic test has already been prototyped in the ButterflyDreaming codebase. The graph viewer will eventually consume these events and render the buddy's attention state on the local canvas.
+
+### 9.6 Reset Button
+
+The current Reset button is a development convenience. In the live platform, session reset and navigation will be handled by the broader UI shell. The Reset button should be easy to remove or replace.
+
+---
+
+## 10. What to Build First
+
+1. `cursor-wings.svg` — create the wing cursor asset; `index.html` — basic page structure, black background, Cytoscape.js canvas filling the viewport, cursor applied to canvas via CSS
+2. `viewer.js` — Neo4j connection, load full graph, render all nodes hidden except root
+3. Click handler implementing the one-hop show/hide rule
+4. Hover dwell timer with label display
+5. Family node colours applied
+6. Relationship colours and widths applied
+7. TextNode hover text preview
+8. fCoSE layout applied
+9. Reset button
+10. TextNode CHILD expansion (one level per click)
+
+Build and test each step before moving to the next.
+
+---
+
+*ButterflyDreaming graphviewer.md v1.0 — 15 May 2026*
