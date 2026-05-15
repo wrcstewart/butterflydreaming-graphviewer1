@@ -342,3 +342,72 @@ Build and test each step before moving to the next.
 ---
 
 *ButterflyDreaming graphviewer.md v1.0 — 15 May 2026*
+
+# Amendment 1 — graphviewer.md — 15 May 2026
+
+## A. Section 4.1 — TextNode properties (replace existing TextNode line)
+
+**TextNode** — symbolic text fragments (corpus and co-created).
+Properties: `url` (UUID-based, primary app handle), `text`, `raw_text`, `source` ('seed'|'dyad_child'), `lang`, `created_at`, `tagging_status`, `gateway` (boolean, present on all TextNodes — `true` if node has no incoming CHILD relationship, set at CREATE time; `false` if node has a TextNode parent)
+
+## B. Section 5.2 — add after TextNode styling block
+
+**Gateway vs non-gateway TextNodes**
+
+When TextNodes appear following a cluster click, `gateway` status is communicated through line weight alone — no colour change, no size difference:
+
+| Property | gateway: true | gateway: false |
+|---|---|---|
+| Node border | 3px | 1px |
+| Connecting line from cluster | 4px | 1px |
+
+Gateway nodes are entry points into a lineage — thicker treatment signals "start a journey here". Non-gateway nodes are children passing through this cluster's territory — present but not originating here.
+
+## C. Section 6.4 — replace existing reset line
+
+### 6.4 Reset
+
+A **Reset** button returns the canvas to State 0 — root node only, all else hidden.
+
+- Positioned top-right corner
+- Small, low contrast at rest — brightens on hover/focus
+- Works on both mouse click and touch tap
+- In the future production UI this will be replaced by broader session navigation — design it to be easy to remove
+
+## D. New section 6.5 — add after 6.4
+
+### 6.5 Mobile and Touch Screen Support
+
+The viewer must support touch screens from the start — not retrofitted later.
+
+**Event model — Pointer Events API**
+
+Use the Pointer Events API as the primary event model. It unifies mouse and touch into a single event set:
+
+```javascript
+cy.on('pointerdown', 'node', startDwell);
+cy.on('pointerup', 'node', cancelDwell);
+cy.on('pointermove', cancelDwell);
+```
+
+**Dwell on touch**
+Touch-and-hold (pointerdown held for 400ms without pointermove) replaces hover dwell. Same timer logic, same threshold.
+
+**Tap behaviour**
+Single tap shows label/preview. Second tap triggers navigation. Avoids touch users never seeing labels.
+
+**Touch-friendly node sizes**
+Minimum tap target 44x44px per mobile UX guidelines.
+
+**CSS touch fixes**
+```css
+#cy {
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+* {
+    touch-action: manipulation;
+}
+```
+
+**Hammer.js** — noted as future option if gesture complexity grows. Not needed for initial build.

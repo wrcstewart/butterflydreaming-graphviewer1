@@ -1,7 +1,5 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
-const ROOT_ID = '__root__';
-
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
   Emotion:  '#C0504D',
@@ -113,6 +111,11 @@ function buildNodeData(n) {
       { id, type: 'TextNode', label: props.text || '', colour: '#111111' }
     );
   }
+  if (labels.includes('Root')) {
+    return Object.assign({}, props,
+      { id, type: 'root', label: props.name || 'ButterflyDreaming', colour: '#FFD700' }
+    );
+  }
   return Object.assign({}, props, { id, type: 'Unknown', label: '', colour: '#555555' });
 }
 
@@ -142,7 +145,7 @@ function buildStyle() {
         'background-color': 'data(colour)',
         'label': '',
         'border-width': 0,
-        'overlay-padding': 8,
+        'overlay-padding': 15,
       }
     },
     {
@@ -174,9 +177,18 @@ function buildStyle() {
         'height': 22,
         'background-color': '#111111',
         'border-color': '#aaaaaa',
-        'border-width': 1.5,
+        'border-width': 1,
         'shape': 'round-rectangle',
       }
+    },
+    {
+      // Gateway TextNodes are lineage entry points — thicker border signals "start here"
+      selector: 'node[type="TextNode"][gateway]',
+      style: { 'border-width': 3 }
+    },
+    {
+      selector: 'node[type="TextNode"][!gateway]',
+      style: { 'border-width': 1 }
     },
     {
       selector: 'edge',
@@ -211,7 +223,7 @@ function runLayout(cy) {
     name: 'fcose',
     animate: true,
     animationDuration: 450,
-    randomize: false,
+    randomize: true,
     fit: true,
     padding: 60,
     nodeSeparation: 75,
@@ -223,11 +235,20 @@ function runLayout(cy) {
 
 // --- Interactions ---
 
+function isTouchEvent(evt) {
+  const orig = evt.originalEvent;
+  if (!orig) return false;
+  if (orig.pointerType === 'touch') return true;
+  if (orig.touches && orig.touches.length > 0) return true;
+  return false;
+}
+
 function setupInteractions(cy) {
   const tooltip = document.getElementById('label-tooltip');
   let dwellTimer = null;
   const history = [];
   let activeNodeId = null;
+  let touchPendingNodeId = null;
 
   // Tooltip
 
@@ -268,20 +289,40 @@ function setupInteractions(cy) {
     tooltip.style.display = 'none';
   }
 
-  cy.on('mouseover', 'node', evt => {
+  function startDwell(node, x, y) {
     clearTimeout(dwellTimer);
+    dwellTimer = setTimeout(() => showTooltip(node, x, y), 400);
+  }
+
+  function cancelDwell() {
+    clearTimeout(dwellTimer);
+    dwellTimer = null;
+  }
+
+  // Desktop hover dwell
+  cy.on('mouseover', 'node', evt => {
     const rp = evt.renderedPosition;
-    dwellTimer = setTimeout(() => showTooltip(evt.target, rp.x, rp.y), 400);
+    startDwell(evt.target, rp.x, rp.y);
   });
 
   cy.on('mousemove', 'node', evt => {
-    const rp = evt.renderedPosition;
-    if (tooltip.style.display !== 'none') {
-      positionTooltip(rp.x, rp.y);
-    }
+    if (tooltip.style.display !== 'none') positionTooltip(evt.renderedPosition.x, evt.renderedPosition.y);
   });
 
-  cy.on('mouseout', 'node', () => hideTooltip());
+  cy.on('mouseout', 'node', () => { cancelDwell(); hideTooltip(); });
+
+  // Touch hold dwell (pointerdown held 400ms)
+  cy.on('tapstart', 'node', evt => {
+    if (!isTouchEvent(evt)) return;
+    const rp = evt.renderedPosition;
+    startDwell(evt.target, rp.x, rp.y);
+  });
+
+  cy.on('tapend', 'node', evt => {
+    if (isTouchEvent(evt)) cancelDwell();
+  });
+
+  cy.on('tapdrag', evt => { if (isTouchEvent(evt)) cancelDwell(); });
 
   // History (for collapse)
 
@@ -305,16 +346,13 @@ function setupInteractions(cy) {
     activeNodeId = node.id();
     cy.elements().hide();
 
-    if (node.id() === ROOT_ID) {
-      // Root state: show root, synthetic edges (for layout), all Family nodes
-      node.show();
-      cy.edges('[type="__root_edge__"]').show();
-      cy.nodes('[type="Family"]').show();
+    if (node.data('type') === 'root') {
+      // Root click: show root + its real Neo4j neighbours (Family nodes + invisible edges)
+      node.closedNeighborhood().show();
     } else {
-      // One-hop rule: show node + immediate neighbours, excluding root and synthetic edges
+      // One-hop rule: show node + immediate neighbours
       node.show();
       node.closedNeighborhood()
-        .filter(el => el.id() !== ROOT_ID)
         .filter(el => el.data('type') !== '__root_edge__')
         .show();
     }
@@ -335,12 +373,8 @@ function setupInteractions(cy) {
 
   // Tap handler
 
-  cy.on('tap', 'node', evt => {
-    hideTooltip();
-    const node = evt.target;
-
+  function handleNodeTap(node) {
     if (node.id() === activeNodeId) {
-      // Second tap on active node
       if (node.data('type') === 'TextNode') {
         expandChildLevel();
       } else {
@@ -349,8 +383,32 @@ function setupInteractions(cy) {
       }
       return;
     }
-
     expandToNode(node);
+  }
+
+  cy.on('tap', 'node', evt => {
+    const node = evt.target;
+
+    if (isTouchEvent(evt)) {
+      cancelDwell();
+      if (touchPendingNodeId === node.id() && tooltip.style.display !== 'none') {
+        // Second tap on same node — navigate
+        hideTooltip();
+        touchPendingNodeId = null;
+        handleNodeTap(node);
+      } else {
+        // First tap — show label, wait for second tap to navigate
+        hideTooltip();
+        touchPendingNodeId = node.id();
+        showTooltip(node, evt.renderedPosition.x, evt.renderedPosition.y);
+      }
+      return;
+    }
+
+    // Desktop click — navigate immediately
+    hideTooltip();
+    touchPendingNodeId = null;
+    handleNodeTap(node);
   });
 
   // Reset button
@@ -360,7 +418,7 @@ function setupInteractions(cy) {
     history.length = 0;
     activeNodeId = null;
     cy.elements().hide();
-    const root = cy.getElementById(ROOT_ID);
+    const root = cy.nodes('[type="root"]').first();
     root.show();
     cy.fit(root, 120);
   });
@@ -416,26 +474,21 @@ async function init() {
     if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, n, m));
   }
 
-  // Assemble Cytoscape elements
-  const elements = [
-    { data: { id: ROOT_ID, type: 'root', label: 'ButterflyDreaming', colour: '#FFD700' } },
-  ];
-
-  let syntheticIdx = 0;
-  nodesById.forEach(nd => {
-    elements.push({ data: nd });
-    if (nd.type === 'Family') {
-      elements.push({ data: {
-        id: '__root_edge_' + (syntheticIdx++),
-        source: ROOT_ID,
-        target: nd.id,
-        type: '__root_edge__',
-        colour: '#000000',
-        width: 0,
-      }});
+  // Post-process edges
+  edgesById.forEach(ed => {
+    const src = nodesById.get(ed.source);
+    const tgt = nodesById.get(ed.target);
+    // Gateway TextNode↔Cluster edge widths
+    const textNode    = (src && src.type === 'TextNode') ? src : (tgt && tgt.type === 'TextNode') ? tgt : null;
+    const clusterNode = (src && src.type === 'Cluster')  ? src : (tgt && tgt.type === 'Cluster')  ? tgt : null;
+    if (textNode && clusterNode) {
+      ed.width = textNode.gateway ? 4 : 1;
     }
   });
 
+  // Assemble Cytoscape elements from real Neo4j data only
+  const elements = [];
+  nodesById.forEach(nd => elements.push({ data: nd }));
   edgesById.forEach(ed => elements.push({ data: ed }));
 
   // Init Cytoscape
@@ -450,7 +503,7 @@ async function init() {
   });
 
   cy.elements().hide();
-  const root = cy.getElementById(ROOT_ID);
+  const root = cy.nodes('[type="root"]').first();
   root.show();
   cy.fit(root, 120);
 
