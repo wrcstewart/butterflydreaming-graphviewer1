@@ -446,6 +446,15 @@ function setupInteractions(cy) {
     handleNodeTap(node);
   });
 
+  // Keep butterfly cursor — Cytoscape resets it during its own mouseover pipeline,
+  // so we re-apply on every mousemove, which fires after Cytoscape's handlers settle.
+  const butterflyCursor = "url('cursor-wings.svg') 16 16, auto";
+  cy.container().addEventListener('mousemove', () => {
+    cy.container().querySelectorAll('canvas').forEach(c => {
+      if (c.style.cursor !== butterflyCursor) c.style.cursor = butterflyCursor;
+    });
+  }, { passive: true });
+
   // Reset button
 
   document.getElementById('reset-btn').addEventListener('click', () => {
