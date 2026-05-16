@@ -411,3 +411,68 @@ Minimum tap target 44x44px per mobile UX guidelines.
 ```
 
 **Hammer.js** — noted as future option if gesture complexity grows. Not needed for initial build.
+# Amendment 2 — graphviewer.md — 15 May 2026
+
+## Section 5.2 — Node label rendering
+
+### Terminology note
+Cytoscape.js uses the term "label" for the text rendered inside a node. 
+To avoid confusion with our database property also called `label`, this 
+document uses the following conventions throughout:
+
+- **`display_name`** — our database property — the short formatted text 
+  rendered inside the node on the canvas at all times
+- **`label`** — our database property — the full original cluster name, 
+  used only in the hover dwell tooltip, never passed to Cytoscape's label field
+- **Cytoscape label** — Cytoscape's internal rendering field — always fed 
+  from our `display_name` property, never from our `label` property
+
+---
+
+All nodes display a persistent in-node text in the smallest clearly readable 
+white font, centred within the node. Text sits inside the node boundary — 
+it does not float below. The node must be sized to contain its text 
+comfortably with minimal padding.
+
+**Text content by node type:**
+- Root node — `name` property ("ButterflyDreaming")
+- Family nodes — `name` property (single word, e.g. "Nature")
+- Cluster nodes — `display_name` property (one or two words with line wrap, 
+  e.g. "Water\nReflection", "Liminal")
+- Gateway TextNodes — first 4-5 words of `text` property followed by ellipsis
+- Non-gateway TextNodes — first 4-5 words of `text` property followed by ellipsis
+
+**Cytoscape.js styling — feeding display_name into Cytoscape's label field:**
+```javascript
+'label': 'data(display_name)',  // Cytoscape label fed from our display_name property
+'text-valign': 'center',
+'text-halign': 'center',
+'text-wrap': 'wrap',
+'text-max-width': '80px',       // adjust per node size
+'font-size': '9px',
+'color': '#ffffff',
+```
+
+**Hover dwell tooltip — using our label property:**
+On 400ms dwell, read the node's `label` property and display it as a tooltip 
+overlay (e.g. "Water/Reflection", "The Liminal", "The Unknown Other"). 
+This is handled in the dwell event handler — our `label` property is never 
+passed to Cytoscape's label field.
+
+```javascript
+cy.on('pointerdown', 'node', (event) => {
+    const node = event.target;
+    dwellTimer = setTimeout(() => {
+        showTooltip(node.data('label'));  // our label property → tooltip
+    }, 400);
+});
+```
+
+---
+
+**Future schema note:**
+In a future version `display_name` should become the primary node identifier 
+replacing `name`, and `label` should be renamed `hover_preview` to eliminate 
+the naming conflict with Cytoscape's label field. Current `name` is kept 
+unchanged for backward compatibility as it is the structural key underpinning 
+all 191 cluster-to-family relationships.
