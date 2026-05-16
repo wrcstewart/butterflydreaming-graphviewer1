@@ -20,6 +20,10 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+#cy canvas {
+  cursor: url('cursor-wings.svg') 16 16, auto !important;
+}
+
 #reset-btn {
   position: fixed;
   top: 16px;

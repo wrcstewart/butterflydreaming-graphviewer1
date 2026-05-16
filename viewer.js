@@ -90,33 +90,51 @@ function flattenProps(props) {
 
 // --- Neo4j → Cytoscape element builders ---
 
+function shortText(text, wordCount) {
+  const words = (text || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  return words.length <= wordCount
+    ? words.join(' ')
+    : words.slice(0, wordCount).join(' ') + '…';
+}
+
 function buildNodeData(n) {
   const labels = n.labels || [];
   const props = flattenProps(n.properties || {});
   const id = getElementId(n);
 
   if (labels.includes('Family')) {
-    return Object.assign({}, props,
-      { id, type: 'Family', label: props.name || '', colour: FAMILY_COLOURS[props.name] || '#aaaaaa' }
-    );
+    return Object.assign({}, props, {
+      id, type: 'Family',
+      display_name: props.name || '',
+      colour: FAMILY_COLOURS[props.name] || '#aaaaaa',
+    });
   }
   if (labels.includes('Cluster')) {
     const fc = FAMILY_COLOURS[props.family_primary];
-    return Object.assign({}, props,
-      { id, type: 'Cluster', label: props.name || '', colour: fc ? desaturate(fc) : '#666666' }
-    );
+    return Object.assign({}, props, {
+      id, type: 'Cluster',
+      // display_name: short form for in-node rendering (Neo4j property, 1-2 words)
+      // label:        full name for tooltip (Neo4j property, preserved from props)
+      display_name: props.display_name || props.name || '',
+      colour: fc ? desaturate(fc) : '#666666',
+    });
   }
   if (labels.includes('TextNode')) {
-    return Object.assign({}, props,
-      { id, type: 'TextNode', label: props.text || '', colour: '#111111' }
-    );
+    return Object.assign({}, props, {
+      id, type: 'TextNode',
+      display_name: shortText(props.text, 5),
+      colour: '#111111',
+    });
   }
   if (labels.includes('Root')) {
-    return Object.assign({}, props,
-      { id, type: 'root', label: props.name || 'ButterflyDreaming', colour: '#FFD700' }
-    );
+    return Object.assign({}, props, {
+      id, type: 'root',
+      display_name: props.name || 'ButterflyDreaming',
+      colour: '#FFD700',
+    });
   }
-  return Object.assign({}, props, { id, type: 'Unknown', label: '', colour: '#555555' });
+  return Object.assign({}, props, { id, type: 'Unknown', display_name: '', colour: '#555555' });
 }
 
 function buildEdgeData(r, n, m) {
@@ -143,42 +161,56 @@ function buildStyle() {
       selector: 'node',
       style: {
         'background-color': 'data(colour)',
-        'label': '',
+        'label': 'data(display_name)',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-wrap': 'wrap',
+        'font-size': '9px',
+        'color': '#ffffff',
         'border-width': 0,
-        'overlay-padding': 15,
+        'overlay-padding': 10,
       }
     },
     {
       selector: 'node[type="root"]',
       style: {
-        'width': 14,
-        'height': 14,
+        'width': 50,
+        'height': 50,
         'background-color': '#FFD700',
+        'color': '#000000',
+        'font-size': '4px',
+        'text-max-width': '44px',
       }
     },
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 40,
-        'height': 40,
+        'width': 52,
+        'height': 52,
+        'text-max-width': '46px',
       }
     },
     {
       selector: 'node[type="Cluster"]',
       style: {
-        'width': 26,
-        'height': 26,
+        'width': 55,
+        'height': 34,
+        'shape': 'round-rectangle',
+        'text-max-width': '49px',
+        'font-size': '8px',
       }
     },
     {
       selector: 'node[type="TextNode"]',
       style: {
-        'width': 22,
-        'height': 22,
+        'width': 100,
+        'height': 28,
         'background-color': '#111111',
         'border-color': '#aaaaaa',
         'border-width': 1,
         'shape': 'round-rectangle',
+        'text-max-width': '94px',
+        'font-size': '8px',
       }
     },
     {
@@ -256,9 +288,12 @@ function setupInteractions(cy) {
     const type = node.data('type');
     let content = '';
     if (type === 'root') {
-      content = 'ButterflyDreaming';
-    } else if (type === 'Family' || type === 'Cluster') {
-      content = node.data('name') || node.data('label') || '';
+      content = node.data('name') || 'ButterflyDreaming';
+    } else if (type === 'Family') {
+      content = node.data('name') || '';
+    } else if (type === 'Cluster') {
+      // label = full name (Neo4j property); display_name = short form shown in node
+      content = node.data('label') || node.data('name') || '';
     } else if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
