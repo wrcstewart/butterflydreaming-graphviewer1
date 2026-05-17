@@ -211,12 +211,12 @@ function buildStyle() {
         'text-max-width': '94px',
         'font-size': '8px',
         'border-width': function(node) {
-          if (node.data('gateway')) return 2;
-          if (node.data('source') === 'seed') return 1;
-          return 0.6;
+          if (node.data('gateway')) return 1;
+          if (node.data('source') === 'seed') return 0.5;
+          return 0.3;
         },
         'border-color': function(node) {
-          return node.data('source') === 'dyad' ? '#888888' : '#ffffff';
+          return node.data('gateway') ? '#ffffff' : '#888888';
         },
       }
     },
@@ -234,20 +234,26 @@ function buildStyle() {
       selector: 'edge[type="CHILD"]',
       style: {
         'target-arrow-shape': 'triangle',
-        'arrow-scale': 1.2,
+        'arrow-scale': 0.6,
         'opacity': 1,
         'width': function(edge) {
           const isGateway = edge.source().data('gateway');
           const rs = edge.data('rel_source');
-          if (isGateway && rs === 'sequence') return 1.5;
+          if (isGateway && rs === 'sequence') return 1.0;
           if (rs === 'dyad') return 0.6;
-          return 1.0;
+          return 0.7;
         },
         'line-color': function(edge) {
-          return edge.data('rel_source') === 'dyad' ? '#888888' : '#ffffff';
+          const rs = edge.data('rel_source');
+          if (rs === 'dyad') return '#888888';
+          if (edge.source().data('gateway')) return '#ffffff';
+          return '#aaaaaa';
         },
         'target-arrow-color': function(edge) {
-          return edge.data('rel_source') === 'dyad' ? '#888888' : '#ffffff';
+          const rs = edge.data('rel_source');
+          if (rs === 'dyad') return '#888888';
+          if (edge.source().data('gateway')) return '#ffffff';
+          return '#aaaaaa';
         },
       }
     },

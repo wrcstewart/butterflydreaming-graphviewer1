@@ -882,3 +882,155 @@ types as first-class signals in scoring and recommendation algorithms.
 Any viewer code reading this document should not attempt to display 
 relationship types visually.
 
+Here is Amendment 8:
+
+---
+
+```markdown
+## Amendment 8 — graphviewer.md — 16 May 2026
+
+## CHILD relationship styling — TextNode to TextNode
+
+### Decision
+CHILD relationship lines between TextNodes are styled by two factors:
+the gateway status of the source node and the `source` property of 
+the relationship. All CHILD relationships carry a triangle arrowhead 
+pointing from parent to child (per Amendment 4).
+
+### Styling rules
+
+| From | To | source | Width | Colour |
+|---|---|---|---|---|
+| Gateway TextNode | Ordinary TextNode | seed | 1.5px | #ffffff white |
+| Gateway TextNode | Ordinary TextNode | dyad | 0.6px | #888888 medium grey |
+| Ordinary TextNode | Ordinary TextNode | seed | 1.0px | #ffffff white |
+| Ordinary TextNode | Ordinary TextNode | dyad | 0.6px | #888888 medium grey |
+
+### Key points
+- Arrow colour matches line colour — white arrow on white line, 
+  grey arrow on grey line
+- `source` property on the CHILD relationship determines seed vs dyad
+- `gateway` property on the source TextNode determines gateway vs ordinary
+- Weight-proportional thickness (Amendment 5b) does not apply to 
+  CHILD relationships — fixed widths per this table take precedence
+- These rules apply regardless of how deep in the lineage the nodes sit
+
+### Cytoscape.js implementation note
+CC will need to evaluate both the source node's `gateway` property 
+and the edge's `source` property to apply the correct style. 
+This requires a function-based style selector rather than a 
+static CSS selector:
+
+```javascript
+{
+    selector: 'edge[type="CHILD"]',
+    style: {
+        'width': function(edge) {
+            const isGateway = edge.source().data('gateway');
+            const source = edge.data('source');
+            if (isGateway && source === 'seed') return 1.5;
+            if (isGateway && source === 'dyad') return 0.6;
+            if (!isGateway && source === 'seed') return 1.0;
+            return 0.6; // ordinary to ordinary, dyad
+        },
+        'line-color': function(edge) {
+            return edge.data('source') === 'seed' ? '#ffffff' : '#888888';
+        },
+        'target-arrow-color': function(edge) {
+            return edge.data('source') === 'seed' ? '#ffffff' : '#888888';
+        },
+        'target-arrow-shape': 'triangle'
+    }
+}
+```
+```
+
+### Implementation notes — CC session 17 May 2026
+
+**Data correction:** The CHILD relationship `source` property value is
+`'sequence'` in Neo4j, not `'seed'` as the spec assumed. The dyad value
+is `'dyad'` as specified. All checks updated accordingly.
+
+**Naming collision fix:** Cytoscape's required `source` field (source node
+ID) overwrites the Neo4j `source` property during edge construction. The
+Neo4j value is preserved as `rel_source` in Cytoscape edge data.
+
+**Opacity fix:** CHILD edges inherit `opacity: 0.65` from the base edge
+style. Added `opacity: 1` to the CHILD selector so white lines render as
+true white.
+
+**Final implemented widths and colours:**
+
+| From | To | rel_source | Width | Colour |
+|---|---|---|---|---|
+| Gateway TextNode | Ordinary TextNode | sequence | 1.0px | #ffffff white |
+| Gateway TextNode | Ordinary TextNode | dyad | 0.6px | #888888 medium grey |
+| Ordinary TextNode | Ordinary TextNode | sequence | 0.7px | #aaaaaa light grey |
+| Ordinary TextNode | Ordinary TextNode | dyad | 0.6px | #888888 medium grey |
+
+Arrow scale: 0.6 (spec said 1.2 — halved after visual review).
+
+---
+
+Here is Amendment 9:
+
+---
+
+```markdown
+## Amendment 9 — graphviewer.md — 16 May 2026
+
+## TextNode border styling — gateway status and source
+
+### Decision
+TextNode borders reflect gateway status and source property using the 
+same visual language as CHILD relationship lines (Amendment 8).
+
+### Border styling rules
+
+| Node type | Border width | Border colour |
+|---|---|---|
+| Gateway TextNode | 2px | #ffffff white |
+| Ordinary TextNode (seed) | 1px | #ffffff white |
+| Ordinary TextNode (dyad) | 0.6px | #888888 medium grey |
+
+### Cytoscape.js implementation
+
+```javascript
+{
+    selector: 'node[type="TextNode"]',
+    style: {
+        'border-width': function(node) {
+            if (node.data('gateway') === true) return 2;
+            if (node.data('source') === 'seed') return 1;
+            return 0.6;
+        },
+        'border-color': function(node) {
+            if (node.data('source') === 'dyad') return '#888888';
+            return '#ffffff';
+        }
+    }
+}
+```
+
+### Note
+If CC is currently deriving CHILD edge colours from node border colours, 
+correcting the border styling per this amendment may also correct the 
+edge colouring without further changes. Check edge colours after 
+applying this amendment before investigating further.
+```
+
+### Implementation notes — CC session 17 May 2026
+
+**Colour rule simplified:** All ordinary TextNodes (gateway=false) use
+grey border regardless of seed/dyad. Only gateway nodes get white.
+
+**Final implemented values:**
+
+| Node type | Border width | Border colour |
+|---|---|---|
+| Gateway TextNode | 1px | #ffffff white |
+| Ordinary TextNode (seed) | 0.5px | #888888 grey |
+| Ordinary TextNode (dyad) | 0.3px | #888888 grey |
+
+Original spec widths (2px / 1px / 0.6px) halved after visual review.
+`gateway` check uses truthy evaluation, not strict `=== true`.
