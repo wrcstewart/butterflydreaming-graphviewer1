@@ -527,6 +527,7 @@ async function init() {
 
   let driver;
   let records;
+  let clusterColourRecords;
 
   try {
     driver = neo4j.driver(
@@ -537,6 +538,13 @@ async function init() {
     try {
       const result = await session.run('MATCH (n)-[r]->(m) RETURN n, r, m');
       records = result.records;
+      const colourResult = await session.run(
+        'MATCH (c:Cluster)-[r]->(f:Family) ' +
+        'WITH c, f, r.weight AS w ORDER BY w DESC ' +
+        'WITH c, collect(f)[0] AS pf ' +
+        'RETURN c.name AS name, pf.hex AS colour'
+      );
+      clusterColourRecords = colourResult.records;
     } finally {
       await session.close();
     }
@@ -564,6 +572,19 @@ async function init() {
     if (!nodesById.has(mId)) nodesById.set(mId, buildNodeData(m));
     if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, n, m));
   }
+
+  // Post-process cluster colours from highest-weighted family connection
+  const clusterColours = new Map();
+  for (const rec of clusterColourRecords) {
+    const name = rec.get('name');
+    const colour = rec.get('colour');
+    if (name && colour) clusterColours.set(name, colour);
+  }
+  nodesById.forEach(nd => {
+    if (nd.type === 'Cluster' && clusterColours.has(nd.name)) {
+      nd.colour = clusterColours.get(nd.name);
+    }
+  });
 
   // Post-process edges
   edgesById.forEach(ed => {
