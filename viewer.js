@@ -233,6 +233,14 @@ function buildStyle() {
       }
     },
     {
+      selector: 'edge[type="CHILD"]',
+      style: {
+        'target-arrow-shape': 'triangle',
+        'target-arrow-color': '#4A8C4F',
+        'arrow-scale': 1.2,
+      }
+    },
+    {
       // Synthetic root→family edges: invisible but present for fCoSE layout
       selector: 'edge[type="__root_edge__"]',
       style: {
@@ -468,6 +476,45 @@ function setupInteractions(cy) {
   });
 }
 
+// --- n_r badge overlay ---
+
+function setupNrBadges(cy) {
+  const container = document.getElementById('cy');
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:1;';
+  container.appendChild(overlay);
+
+  const badges = new Map();
+
+  cy.nodes().forEach(node => {
+    const nr = node.data('n_r');
+    if (!nr || nr <= 0) return;
+    if (node.data('type') === 'root') return;
+    const div = document.createElement('div');
+    div.textContent = String(nr);
+    div.style.cssText = 'position:absolute;font-size:9px;font-family:sans-serif;line-height:1;display:none;transform:translate(-50%,-100%);';
+    div.style.color = 'rgba(255,255,255,0.65)';
+    overlay.appendChild(div);
+    badges.set(node.id(), div);
+  });
+
+  function updatePositions() {
+    const fontSize = Math.max(5, 9 * cy.zoom()) + 'px';
+    badges.forEach((div, id) => {
+      const node = cy.getElementById(id);
+      if (!node.length || !node.visible()) { div.style.display = 'none'; return; }
+      const bb = node.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
+      div.style.display = 'block';
+      div.style.fontSize = fontSize;
+      const cx = (bb.x1 + bb.x2) / 2;
+      div.style.left = cx + 'px';
+      div.style.top  = (bb.y2 - 4) + 'px';
+    });
+  }
+
+  cy.on('render', updatePositions);
+}
+
 // --- Boot ---
 
 async function init() {
@@ -552,6 +599,7 @@ async function init() {
   cy.fit(root, 120);
 
   setupInteractions(cy);
+  setupNrBadges(cy);
 }
 
 window.addEventListener('DOMContentLoaded', init);
