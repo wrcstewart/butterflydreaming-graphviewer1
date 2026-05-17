@@ -148,7 +148,7 @@ function buildEdgeData(r, n, m) {
     source: getElementId(n),
     target: getElementId(m),
     type,
-    colour: EDGE_COLOURS[type] || '#666666',
+    colour: props.family_colour || EDGE_COLOURS[type] || '#666666',
     width: EDGE_WIDTHS[type] || 1,
   });
 }
@@ -226,7 +226,7 @@ function buildStyle() {
       selector: 'edge',
       style: {
         'line-color': 'data(colour)',
-        'width': 'data(width)',
+        'width': function(edge) { return Math.max(0.5, (edge.data('weight') || 0) * 2.5); },
         'curve-style': 'bezier',
         'opacity': 0.65,
         'target-arrow-shape': 'none',
