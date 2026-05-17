@@ -147,6 +147,7 @@ function buildEdgeData(r, n, m) {
     id: getElementId(r),
     source: getElementId(n),
     target: getElementId(m),
+    rel_source: props.source,  // preserve Neo4j 'source' prop ('seed'/'dyad') before Cytoscape overwrites it
     type,
     colour: props.family_colour || EDGE_COLOURS[type] || '#666666',
     width: EDGE_WIDTHS[type] || 1,
@@ -236,8 +237,20 @@ function buildStyle() {
       selector: 'edge[type="CHILD"]',
       style: {
         'target-arrow-shape': 'triangle',
-        'target-arrow-color': '#4A8C4F',
         'arrow-scale': 1.2,
+        'width': function(edge) {
+          const isGateway = edge.source().data('gateway');
+          const rs = edge.data('rel_source');
+          if (isGateway && rs === 'seed') return 1.5;
+          if (rs === 'dyad') return 0.6;
+          return 1.0;
+        },
+        'line-color': function(edge) {
+          return edge.data('rel_source') === 'dyad' ? '#888888' : '#ffffff';
+        },
+        'target-arrow-color': function(edge) {
+          return edge.data('rel_source') === 'dyad' ? '#888888' : '#ffffff';
+        },
       }
     },
     {
