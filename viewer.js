@@ -211,7 +211,7 @@ function buildStyle() {
         'text-max-width': '94px',
         'font-size': '8px',
         'border-width': function(node) {
-          if (node.data('gateway') === true) return 2;
+          if (node.data('gateway')) return 2;
           if (node.data('source') === 'seed') return 1;
           return 0.6;
         },
@@ -235,10 +235,11 @@ function buildStyle() {
       style: {
         'target-arrow-shape': 'triangle',
         'arrow-scale': 1.2,
+        'opacity': 1,
         'width': function(edge) {
           const isGateway = edge.source().data('gateway');
           const rs = edge.data('rel_source');
-          if (isGateway && rs === 'seed') return 1.5;
+          if (isGateway && rs === 'sequence') return 1.5;
           if (rs === 'dyad') return 0.6;
           return 1.0;
         },
