@@ -207,21 +207,18 @@ function buildStyle() {
         'width': 100,
         'height': 28,
         'background-color': '#111111',
-        'border-color': '#aaaaaa',
-        'border-width': 1,
         'shape': 'round-rectangle',
         'text-max-width': '94px',
         'font-size': '8px',
+        'border-width': function(node) {
+          if (node.data('gateway') === true) return 2;
+          if (node.data('source') === 'seed') return 1;
+          return 0.6;
+        },
+        'border-color': function(node) {
+          return node.data('source') === 'dyad' ? '#888888' : '#ffffff';
+        },
       }
-    },
-    {
-      // Gateway TextNodes are lineage entry points — thicker border signals "start here"
-      selector: 'node[type="TextNode"][gateway]',
-      style: { 'border-width': 3 }
-    },
-    {
-      selector: 'node[type="TextNode"][!gateway]',
-      style: { 'border-width': 1 }
     },
     {
       selector: 'edge',
