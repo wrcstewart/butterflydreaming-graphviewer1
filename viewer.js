@@ -300,7 +300,9 @@ function isTouchEvent(evt) {
   const orig = evt.originalEvent;
   if (!orig) return false;
   if (orig.pointerType === 'touch') return true;
+  if (typeof TouchEvent !== 'undefined' && orig instanceof TouchEvent) return true;
   if (orig.touches && orig.touches.length > 0) return true;
+  if (orig.changedTouches && orig.changedTouches.length > 0) return true;
   return false;
 }
 
@@ -311,6 +313,14 @@ function setupInteractions(cy) {
   let activeNodeId = null;
   let touchPendingNodeId = null;
   let tapResetTimer = null;
+  let recentTouch = false;
+  let recentTouchTimer = null;
+
+  function markRecentTouch() {
+    recentTouch = true;
+    clearTimeout(recentTouchTimer);
+    recentTouchTimer = setTimeout(() => { recentTouch = false; }, 600);
+  }
 
   // Tooltip
 
@@ -378,21 +388,27 @@ function setupInteractions(cy) {
     dwellTimer = null;
   }
 
-  // Desktop hover dwell
+  // Desktop hover dwell — skipped if a touch event recently fired
   cy.on('mouseover', 'node', evt => {
+    if (recentTouch) return;
     const rp = evt.renderedPosition;
     startDwell(evt.target, rp.x, rp.y, false);
   });
 
   cy.on('mousemove', 'node', evt => {
+    if (recentTouch) return;
     if (tooltip.style.display !== 'none') positionTooltip(evt.renderedPosition.x, evt.renderedPosition.y);
   });
 
-  cy.on('mouseout', 'node', () => { cancelDwell(); hideTooltip(); });
+  cy.on('mouseout', 'node', () => {
+    if (recentTouch) return;
+    cancelDwell(); hideTooltip();
+  });
 
   // Touch hold dwell (tapstart held 400ms without move)
   cy.on('tapstart', 'node', evt => {
     if (!isTouchEvent(evt)) return;
+    markRecentTouch();
     const rp = evt.renderedPosition;
     startDwell(evt.target, rp.x, rp.y, true);
   });
@@ -469,6 +485,7 @@ function setupInteractions(cy) {
     const node = evt.target;
 
     if (isTouchEvent(evt)) {
+      markRecentTouch();
       cancelDwell();
       clearTimeout(tapResetTimer);
       if (touchPendingNodeId === node.id() && tooltip.style.display !== 'none') {
