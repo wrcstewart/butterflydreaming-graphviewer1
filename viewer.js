@@ -327,7 +327,7 @@ function setupInteractions(cy) {
 
   function buildTooltipContent(node) {
     const type = node.data('type');
-    if (type === 'root')     return node.data('name') || 'ButterflyDreaming';
+    if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
     if (type === 'Family')   return node.data('name') || '';
     if (type === 'Cluster')  return node.data('label') || node.data('name') || '';
     if (type === 'TextNode') {
