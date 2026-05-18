@@ -313,6 +313,7 @@ function setupInteractions(cy) {
   let activeNodeId = null;
   let touchPendingNodeId = null;
   let tapResetTimer = null;
+  let tooltipNodeId = null;
   let recentTouch = false;
   let recentTouchTimer = null;
 
@@ -368,6 +369,7 @@ function setupInteractions(cy) {
     if (!content) return;
     tooltip.textContent = content;
     tooltip.style.display = 'block';
+    tooltipNodeId = node.id();
     if (isTouch) positionTooltipTouch(node);
     else positionTooltip(x, y);
   }
@@ -376,6 +378,7 @@ function setupInteractions(cy) {
     clearTimeout(dwellTimer);
     dwellTimer = null;
     tooltip.style.display = 'none';
+    tooltipNodeId = null;
   }
 
   function startDwell(node, x, y, isTouch) {
@@ -487,18 +490,28 @@ function setupInteractions(cy) {
     if (isTouchEvent(evt)) {
       markRecentTouch();
       cancelDwell();
+
+      const sameNode    = touchPendingNodeId === node.id();
+      const withinWindow = tapResetTimer !== null;
       clearTimeout(tapResetTimer);
-      if (touchPendingNodeId === node.id() && tooltip.style.display !== 'none') {
-        // Second tap on same node — navigate
+      tapResetTimer = null;
+
+      if (sameNode && withinWindow) {
+        // Double tap (two taps within 800ms) — navigate regardless of tooltip state
         hideTooltip();
         touchPendingNodeId = null;
         handleNodeTap(node);
+      } else if (tooltipNodeId === node.id()) {
+        // Tap same node while its tooltip is showing — dismiss
+        hideTooltip();
+        touchPendingNodeId = node.id();
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       } else {
-        // First tap — show tooltip above node, wait for second tap to navigate
+        // Show tooltip for this node
         hideTooltip();
         touchPendingNodeId = node.id();
         showTooltip(node, 0, 0, true);
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; }, 800);
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       }
       return;
     }
@@ -515,6 +528,7 @@ function setupInteractions(cy) {
     if (isTouchEvent(evt)) {
       hideTooltip();
       clearTimeout(tapResetTimer);
+      tapResetTimer = null;
       touchPendingNodeId = null;
     }
   });
