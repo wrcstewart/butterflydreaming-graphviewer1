@@ -85,7 +85,7 @@ wss.on('connection', (ws) => {
         await session.close();
       }
     } catch (err) {
-      console.error('Query error:', err);
+      console.error('Query error:', err.message);
       ws.send(JSON.stringify({ type, error: err.message }));
     }
   });
