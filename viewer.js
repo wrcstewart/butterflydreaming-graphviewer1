@@ -589,7 +589,6 @@ async function init() {
     alert('Could not load graph data. See browser console for details.');
     return;
   }
-
   // Build element maps (deduplicate nodes and edges by ID)
   const nodesById = new Map();
   const edgesById = new Map();
