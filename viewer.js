@@ -310,29 +310,23 @@ function setupInteractions(cy) {
   const history = [];
   let activeNodeId = null;
   let touchPendingNodeId = null;
+  let tapResetTimer = null;
 
   // Tooltip
 
-  function showTooltip(node, x, y) {
+  function buildTooltipContent(node) {
     const type = node.data('type');
-    let content = '';
-    if (type === 'root') {
-      content = node.data('name') || 'ButterflyDreaming';
-    } else if (type === 'Family') {
-      content = node.data('name') || '';
-    } else if (type === 'Cluster') {
-      // label = full name (Neo4j property); display_name = short form shown in node
-      content = node.data('label') || node.data('name') || '';
-    } else if (type === 'TextNode') {
+    if (type === 'root')     return node.data('name') || 'ButterflyDreaming';
+    if (type === 'Family')   return node.data('name') || '';
+    if (type === 'Cluster')  return node.data('label') || node.data('name') || '';
+    if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
-      content = lines.slice(0, 6).join('\n');
+      let content = lines.slice(0, 6).join('\n');
       if (lines.length > 6) content += '\n…';
+      return content;
     }
-    if (!content) return;
-    tooltip.textContent = content;
-    tooltip.style.display = 'block';
-    positionTooltip(x, y);
+    return '';
   }
 
   function positionTooltip(x, y) {
@@ -343,8 +337,29 @@ function setupInteractions(cy) {
     let top  = y + pad;
     if (left + tw > window.innerWidth  - pad) left = x - tw - pad;
     if (top  + th > window.innerHeight - pad) top  = y - th - pad;
+    if (top < pad) top = y + pad;
     tooltip.style.left = left + 'px';
     tooltip.style.top  = top  + 'px';
+  }
+
+  function positionTooltipTouch(node) {
+    const pos = node.renderedPosition();
+    const tw = tooltip.offsetWidth;
+    let top  = pos.y - 80;
+    let left = pos.x + 10;
+    if (top < 10) top = pos.y + 80;
+    if (left + tw > window.innerWidth - 10) left = pos.x - tw - 10;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  }
+
+  function showTooltip(node, x, y, isTouch) {
+    const content = buildTooltipContent(node);
+    if (!content) return;
+    tooltip.textContent = content;
+    tooltip.style.display = 'block';
+    if (isTouch) positionTooltipTouch(node);
+    else positionTooltip(x, y);
   }
 
   function hideTooltip() {
@@ -353,9 +368,9 @@ function setupInteractions(cy) {
     tooltip.style.display = 'none';
   }
 
-  function startDwell(node, x, y) {
+  function startDwell(node, x, y, isTouch) {
     clearTimeout(dwellTimer);
-    dwellTimer = setTimeout(() => showTooltip(node, x, y), DWELL_MS);
+    dwellTimer = setTimeout(() => showTooltip(node, x, y, isTouch), DWELL_MS);
   }
 
   function cancelDwell() {
@@ -366,7 +381,7 @@ function setupInteractions(cy) {
   // Desktop hover dwell
   cy.on('mouseover', 'node', evt => {
     const rp = evt.renderedPosition;
-    startDwell(evt.target, rp.x, rp.y);
+    startDwell(evt.target, rp.x, rp.y, false);
   });
 
   cy.on('mousemove', 'node', evt => {
@@ -375,11 +390,11 @@ function setupInteractions(cy) {
 
   cy.on('mouseout', 'node', () => { cancelDwell(); hideTooltip(); });
 
-  // Touch hold dwell (pointerdown held 400ms)
+  // Touch hold dwell (tapstart held 400ms without move)
   cy.on('tapstart', 'node', evt => {
     if (!isTouchEvent(evt)) return;
     const rp = evt.renderedPosition;
-    startDwell(evt.target, rp.x, rp.y);
+    startDwell(evt.target, rp.x, rp.y, true);
   });
 
   cy.on('tapend', 'node', evt => {
@@ -455,16 +470,18 @@ function setupInteractions(cy) {
 
     if (isTouchEvent(evt)) {
       cancelDwell();
+      clearTimeout(tapResetTimer);
       if (touchPendingNodeId === node.id() && tooltip.style.display !== 'none') {
         // Second tap on same node — navigate
         hideTooltip();
         touchPendingNodeId = null;
         handleNodeTap(node);
       } else {
-        // First tap — show label, wait for second tap to navigate
+        // First tap — show tooltip above node, wait for second tap to navigate
         hideTooltip();
         touchPendingNodeId = node.id();
-        showTooltip(node, evt.renderedPosition.x, evt.renderedPosition.y);
+        showTooltip(node, 0, 0, true);
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; }, 800);
       }
       return;
     }
@@ -473,6 +490,16 @@ function setupInteractions(cy) {
     hideTooltip();
     touchPendingNodeId = null;
     handleNodeTap(node);
+  });
+
+  // Tap on empty canvas — hide tooltip and reset touch state
+  cy.on('tap', evt => {
+    if (evt.target !== cy) return;
+    if (isTouchEvent(evt)) {
+      hideTooltip();
+      clearTimeout(tapResetTimer);
+      touchPendingNodeId = null;
+    }
   });
 
   // Keep butterfly cursor — Cytoscape resets it during its own mouseover pipeline,
