@@ -540,7 +540,8 @@ function setupNrBadges(cy) {
 
 function connectWS() {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket('ws://localhost:8080');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
     ws.onopen  = () => resolve(ws);
     ws.onerror = ()  => reject(new Error('WebSocket connection failed'));
   });
