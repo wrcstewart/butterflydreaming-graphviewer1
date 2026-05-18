@@ -16,6 +16,7 @@ const EDGE_COLOURS = {
   TAGGED_AS:      '#888888',
   CHILD:          '#4A8C4F',
   GIVES:          '#E85A38',
+  CONTAINS:       '#444444',
 };
 
 const EDGE_WIDTHS = {
@@ -538,7 +539,7 @@ async function init() {
   const stored = (typeof NEO4J_PASSWORD !== 'undefined') ? NEO4J_PASSWORD : '';
   const password = (stored && stored !== 'change_me')
     ? stored
-    : window.prompt('Neo4j password:');
+    : window.prompt('Memgraph password:');
 
   if (!password) return;
 
@@ -548,10 +549,10 @@ async function init() {
 
   try {
     driver = neo4j.driver(
-      'neo4j://127.0.0.1:7687',
-      neo4j.auth.basic('neo4j', password)
+      'bolt://localhost:7687',
+      neo4j.auth.basic('memgraph', password)
     );
-    const session = driver.session({ database: 'neo4j' });
+    const session = driver.session({ database: 'memgraph' });
     try {
       const result = await session.run('MATCH (n)-[r]->(m) RETURN n, r, m');
       records = result.records;
