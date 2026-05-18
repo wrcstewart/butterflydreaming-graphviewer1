@@ -1,5 +1,8 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
+const DWELL_MS   = 400;   // ms before tooltip displays
+const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
+
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
   Emotion:  '#C0504D',
@@ -352,7 +355,7 @@ function setupInteractions(cy) {
 
   function startDwell(node, x, y) {
     clearTimeout(dwellTimer);
-    dwellTimer = setTimeout(() => showTooltip(node, x, y), 400);
+    dwellTimer = setTimeout(() => showTooltip(node, x, y), DWELL_MS);
   }
 
   function cancelDwell() {
@@ -533,56 +536,67 @@ function setupNrBadges(cy) {
   cy.on('render', updatePositions);
 }
 
+// --- WebSocket helpers ---
+
+function connectWS() {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket('ws://localhost:8080');
+    ws.onopen  = () => resolve(ws);
+    ws.onerror = ()  => reject(new Error('WebSocket connection failed'));
+  });
+}
+
+function queryWS(ws, type, query, params = {}) {
+  return new Promise((resolve, reject) => {
+    function handler(event) {
+      const msg = JSON.parse(event.data);
+      if (msg.type !== type) return;
+      ws.removeEventListener('message', handler);
+      if (msg.error) reject(new Error(msg.error));
+      else resolve(msg.records);
+    }
+    ws.addEventListener('message', handler);
+    ws.send(JSON.stringify({ type, query, params }));
+  });
+}
+
 // --- Boot ---
 
 async function init() {
-  const stored = (typeof NEO4J_PASSWORD !== 'undefined') ? NEO4J_PASSWORD : '';
-  const password = (stored && stored !== 'change_me')
-    ? stored
-    : window.prompt('Memgraph password:');
-
-  if (!password) return;
-
-  let driver;
-  let records;
-  let clusterColourRecords;
-
+  let ws;
   try {
-    driver = neo4j.driver(
-      'bolt://localhost:7687',
-      neo4j.auth.basic('memgraph', password)
-    );
-    const session = driver.session({ database: 'memgraph' });
-    try {
-      const result = await session.run('MATCH (n)-[r]->(m) RETURN n, r, m');
-      records = result.records;
-      const colourResult = await session.run(
-        'MATCH (c:Cluster)-[r]->(f:Family) ' +
-        'WITH c, f, r.weight AS w ORDER BY w DESC ' +
-        'WITH c, collect(f)[0] AS pf ' +
-        'RETURN c.name AS name, pf.hex AS colour'
-      );
-      clusterColourRecords = colourResult.records;
-    } finally {
-      await session.close();
-    }
+    ws = await connectWS();
   } catch (err) {
-    console.error('Neo4j error:', err);
-    alert('Could not connect to Neo4j.\n\nIs it running on bolt://127.0.0.1:7687?\nSee the browser console for details.');
-    if (driver) await driver.close().catch(() => {});
+    console.error('Server connection error:', err);
+    alert('Could not connect to server.\n\nIs server.js running?\n  node server.js');
     return;
   }
 
-  await driver.close().catch(() => {});
+  let records, clusterColourRecords;
+  try {
+    [records, clusterColourRecords] = await Promise.all([
+      queryWS(ws, 'graph',
+        'MATCH (n)-[r]->(m) RETURN n, r, m'),
+      queryWS(ws, 'clusterColours',
+        'MATCH (c:Cluster)-[r]->(f:Family) ' +
+        'WITH c, f, r.weight AS w ORDER BY w DESC ' +
+        'WITH c, collect(f)[0] AS pf ' +
+        'RETURN c.name AS name, pf.hex AS colour'),
+    ]);
+  } catch (err) {
+    console.error('Query error:', err);
+    alert('Could not load graph data. See browser console for details.');
+    return;
+  }
 
   // Build element maps (deduplicate nodes and edges by ID)
   const nodesById = new Map();
   const edgesById = new Map();
 
   for (const rec of records) {
-    const n = rec.get('n');
-    const r = rec.get('r');
-    const m = rec.get('m');
+    const n = rec.n;
+    const r = rec.r;
+    const m = rec.m;
     const nId = getElementId(n);
     const mId = getElementId(m);
     const rId = getElementId(r);
@@ -594,8 +608,8 @@ async function init() {
   // Post-process cluster colours from highest-weighted family connection
   const clusterColours = new Map();
   for (const rec of clusterColourRecords) {
-    const name = rec.get('name');
-    const colour = rec.get('colour');
+    const name = rec.name;
+    const colour = rec.colour;
     if (name && colour) clusterColours.set(name, colour);
   }
   nodesById.forEach(nd => {
