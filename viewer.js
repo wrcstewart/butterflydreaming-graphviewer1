@@ -549,7 +549,8 @@ function connectWS() {
 function queryWS(ws, type, query, params = {}) {
   return new Promise((resolve, reject) => {
     function handler(event) {
-      const msg = JSON.parse(event.data);
+      let msg;
+      try { msg = JSON.parse(event.data); } catch (e) { return; }
       if (msg.type !== type) return;
       ws.removeEventListener('message', handler);
       if (msg.error) reject(new Error(msg.error));
