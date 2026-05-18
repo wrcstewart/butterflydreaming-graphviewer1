@@ -328,8 +328,8 @@ function setupInteractions(cy) {
   function buildTooltipContent(node) {
     const type = node.data('type');
     if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
-    if (type === 'Family')   return node.data('name') || '';
-    if (type === 'Cluster')  return node.data('label') || node.data('name') || '';
+    if (type === 'Family')   return node.data('text') || node.data('name') || '';
+    if (type === 'Cluster')  return node.data('text') || node.data('label') || node.data('name') || '';
     if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
