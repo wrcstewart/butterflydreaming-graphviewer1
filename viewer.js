@@ -341,19 +341,33 @@ function setupInteractions(cy) {
   // Tooltip
 
   function buildTooltipContent(node) {
-    const type = node.data('type');
-    if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
-    if (type === 'Entry')    return node.data('text') || node.data('name') || '';
-    if (type === 'Family')   return node.data('text') || node.data('name') || '';
-    if (type === 'Cluster')  return node.data('text') || node.data('label') || node.data('name') || '';
-    if (type === 'TextNode') {
-      const text = node.data('text') || '';
-      const lines = text.split('\n').filter(l => l.trim());
-      let content = lines.slice(0, 6).join('\n');
-      if (lines.length > 6) content += '\n…';
-      return content;
+    function esc(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
-    return '';
+
+    const type = node.data('type');
+    let text = '';
+
+    if      (type === 'root')     text = node.data('text') || node.data('name') || 'ButterflyDreaming';
+    else if (type === 'Entry')    text = node.data('text') || node.data('name') || '';
+    else if (type === 'Family')   text = node.data('text') || node.data('name') || '';
+    else if (type === 'Cluster')  text = node.data('text') || node.data('label') || node.data('name') || '';
+    else if (type === 'TextNode') {
+      const raw = node.data('text') || '';
+      const lines = raw.split('\n').filter(l => l.trim());
+      text = lines.slice(0, 6).join('\n');
+      if (lines.length > 6) text += '\n…';
+    }
+
+    if (!text) return '';
+
+    let html = `<div class="tooltip-text">${esc(text)}</div>`;
+
+    if (node.data('name') === 'Settling') {
+      html += `<audio controls style="width:100%;margin-top:8px;"><source src="" type="audio/mpeg"></audio>`;
+    }
+
+    return html;
   }
 
   function positionTooltip(x, y) {
@@ -383,7 +397,10 @@ function setupInteractions(cy) {
   function showTooltip(node, x, y, isTouch) {
     const content = buildTooltipContent(node);
     if (!content) return;
-    tooltip.textContent = content;
+    const isMedia = node.data('name') === 'Settling';
+    tooltip.innerHTML = content;
+    tooltip.style.minWidth  = isMedia ? '280px' : '';
+    tooltip.style.pointerEvents = isMedia ? 'auto' : 'none';
     tooltip.style.display = 'block';
     tooltipNodeId = node.id();
     if (isTouch) positionTooltipTouch(node);
@@ -421,8 +438,13 @@ function setupInteractions(cy) {
 
   cy.on('mouseout', 'node', () => {
     if (recentTouch) return;
-    cancelDwell(); hideTooltip();
+    // Delay so cursor can move onto an interactive tooltip without it disappearing
+    setTimeout(() => {
+      if (!tooltip.matches(':hover')) { cancelDwell(); hideTooltip(); }
+    }, 100);
   });
+
+  tooltip.addEventListener('mouseleave', () => { cancelDwell(); hideTooltip(); });
 
   // Touch hold dwell (tapstart held 400ms without move)
   cy.on('tapstart', 'node', evt => {
