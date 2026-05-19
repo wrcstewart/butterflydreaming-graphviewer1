@@ -555,7 +555,7 @@ function setupInteractions(cy) {
     }
 
     if (node.data('name') === 'Settling') {
-      toggleMediaBar('Settling', '');
+      toggleMediaBar('Settling', 'bass_recorder_C3.mp3');
     }
   }
 
