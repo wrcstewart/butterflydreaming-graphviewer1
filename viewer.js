@@ -534,7 +534,7 @@ function setupInteractions(cy) {
     if (node.data('name') === 'Settling') {
       toggleMediaBar(
         'Settling — mindfulness audio',
-        `<audio controls style="width:260px"><source src="" type="audio/mpeg"></audio>`
+        `<audio controls style="width:320px"><source src="" type="audio/mpeg"></audio>`
       );
     }
   }
