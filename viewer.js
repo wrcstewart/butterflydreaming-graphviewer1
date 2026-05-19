@@ -341,33 +341,19 @@ function setupInteractions(cy) {
   // Tooltip
 
   function buildTooltipContent(node) {
-    function esc(s) {
-      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
     const type = node.data('type');
-    let text = '';
-
-    if      (type === 'root')     text = node.data('text') || node.data('name') || 'ButterflyDreaming';
-    else if (type === 'Entry')    text = node.data('text') || node.data('name') || '';
-    else if (type === 'Family')   text = node.data('text') || node.data('name') || '';
-    else if (type === 'Cluster')  text = node.data('text') || node.data('label') || node.data('name') || '';
-    else if (type === 'TextNode') {
-      const raw = node.data('text') || '';
-      const lines = raw.split('\n').filter(l => l.trim());
-      text = lines.slice(0, 6).join('\n');
-      if (lines.length > 6) text += '\n…';
+    if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
+    if (type === 'Entry')    return node.data('text') || node.data('name') || '';
+    if (type === 'Family')   return node.data('text') || node.data('name') || '';
+    if (type === 'Cluster')  return node.data('text') || node.data('label') || node.data('name') || '';
+    if (type === 'TextNode') {
+      const text = node.data('text') || '';
+      const lines = text.split('\n').filter(l => l.trim());
+      let content = lines.slice(0, 6).join('\n');
+      if (lines.length > 6) content += '\n…';
+      return content;
     }
-
-    if (!text) return '';
-
-    let html = `<div class="tooltip-text">${esc(text)}</div>`;
-
-    if (node.data('name') === 'Settling') {
-      html += `<audio controls style="width:100%;margin-top:8px;"><source src="" type="audio/mpeg"></audio>`;
-    }
-
-    return html;
+    return '';
   }
 
   function positionTooltip(x, y) {
@@ -397,10 +383,7 @@ function setupInteractions(cy) {
   function showTooltip(node, x, y, isTouch) {
     const content = buildTooltipContent(node);
     if (!content) return;
-    const isMedia = node.data('name') === 'Settling';
-    tooltip.innerHTML = content;
-    tooltip.style.minWidth  = isMedia ? '280px' : '';
-    tooltip.style.pointerEvents = isMedia ? 'auto' : 'none';
+    tooltip.textContent = content;
     tooltip.style.display = 'block';
     tooltipNodeId = node.id();
     if (isTouch) positionTooltipTouch(node);
@@ -507,6 +490,33 @@ function setupInteractions(cy) {
     runLayout(cy);
   }
 
+  // Media bar
+
+  const mediaBar = document.getElementById('media-bar');
+
+  function toggleMediaBar(label, contentHtml) {
+    if (mediaBar.classList.contains('active') && mediaBar.dataset.node === label) {
+      mediaBar.classList.remove('active');
+      mediaBar.dataset.node = '';
+      mediaBar.innerHTML = '';
+    } else {
+      mediaBar.innerHTML =
+        `<span class="media-label">${label}</span>` +
+        contentHtml +
+        `<button class="media-close" aria-label="close">✕</button>`;
+      mediaBar.dataset.node = label;
+      mediaBar.classList.add('active');
+    }
+  }
+
+  mediaBar.addEventListener('click', evt => {
+    if (evt.target.classList.contains('media-close')) {
+      mediaBar.classList.remove('active');
+      mediaBar.dataset.node = '';
+      mediaBar.innerHTML = '';
+    }
+  });
+
   // Tap handler
 
   function handleNodeTap(node) {
@@ -517,9 +527,16 @@ function setupInteractions(cy) {
         restoreState();
         activeNodeId = null;
       }
-      return;
+    } else {
+      expandToNode(node);
     }
-    expandToNode(node);
+
+    if (node.data('name') === 'Settling') {
+      toggleMediaBar(
+        'Settling — mindfulness audio',
+        `<audio controls><source src="" type="audio/mpeg"></audio>`
+      );
+    }
   }
 
   cy.on('tap', 'node', evt => {
