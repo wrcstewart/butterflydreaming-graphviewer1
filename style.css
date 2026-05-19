@@ -54,7 +54,7 @@ html, body {
 
 #media-bar {
   display: none;
-  background: #8b0000;
+  background: #1a5c1a;
   border: 1px solid #444;
   border-radius: 8px;
   padding: 6px 12px;
@@ -81,6 +81,30 @@ html, body {
 
 .media-close:hover {
   color: #fff;
+}
+
+.mp-btn {
+  background: none;
+  border: 1px solid #888;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 8px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.mp-btn:hover {
+  border-color: #fff;
+}
+
+.mp-time {
+  font-size: 11px;
+  color: #ccc;
+  font-family: monospace;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 #label-tooltip {

@@ -494,18 +494,41 @@ function setupInteractions(cy) {
 
   const mediaBar = document.getElementById('media-bar');
 
-  function toggleMediaBar(label, contentHtml) {
+  function fmtTime(s) {
+    if (!isFinite(s)) return '–:––';
+    const m = Math.floor(s / 60);
+    return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  }
+
+  function toggleMediaBar(label, audioSrc) {
     if (mediaBar.classList.contains('active') && mediaBar.dataset.node === label) {
+      const audio = mediaBar.querySelector('audio');
+      if (audio) { audio.pause(); audio.src = ''; }
       mediaBar.classList.remove('active');
       mediaBar.dataset.node = '';
       mediaBar.innerHTML = '';
     } else {
       mediaBar.innerHTML =
         `<span class="media-label">${label}</span>` +
-        contentHtml +
+        `<button class="mp-btn" aria-label="play">▶</button>` +
+        `<span class="mp-time">–:–– / –:––</span>` +
+        `<audio src="${audioSrc}"></audio>` +
         `<button class="media-close" aria-label="close">✕</button>`;
       mediaBar.dataset.node = label;
       mediaBar.classList.add('active');
+
+      const audio = mediaBar.querySelector('audio');
+      const btn   = mediaBar.querySelector('.mp-btn');
+      const time  = mediaBar.querySelector('.mp-time');
+
+      btn.addEventListener('click', () => {
+        if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
+        else              { audio.pause(); btn.textContent = '▶'; }
+      });
+      audio.addEventListener('timeupdate', () => {
+        time.textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
+      });
+      audio.addEventListener('ended', () => { btn.textContent = '▶'; });
     }
   }
 
@@ -532,10 +555,7 @@ function setupInteractions(cy) {
     }
 
     if (node.data('name') === 'Settling') {
-      toggleMediaBar(
-        'Settling — mindfulness audio',
-        `<audio controls style="width:320px"><source src="" type="audio/mpeg"></audio>`
-      );
+      toggleMediaBar('Settling', '');
     }
   }
 
