@@ -131,6 +131,13 @@ function buildNodeData(n) {
       colour: '#111111',
     });
   }
+  if (labels.includes('Entry')) {
+    return Object.assign({}, props, {
+      id, type: 'Entry',
+      display_name: props.name || '',
+      colour: props.colour || '#888888',
+    });
+  }
   if (labels.includes('Root')) {
     return Object.assign({}, props, {
       id, type: 'root',
@@ -185,6 +192,14 @@ function buildStyle() {
         'color': '#000000',
         'font-size': '4px',
         'text-max-width': '44px',
+      }
+    },
+    {
+      selector: 'node[type="Entry"]',
+      style: {
+        'width': 62,
+        'height': 62,
+        'text-max-width': '56px',
       }
     },
     {
@@ -328,6 +343,7 @@ function setupInteractions(cy) {
   function buildTooltipContent(node) {
     const type = node.data('type');
     if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
+    if (type === 'Entry')    return node.data('text') || node.data('name') || '';
     if (type === 'Family')   return node.data('text') || node.data('name') || '';
     if (type === 'Cluster')  return node.data('text') || node.data('label') || node.data('name') || '';
     if (type === 'TextNode') {
