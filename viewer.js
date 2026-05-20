@@ -230,7 +230,7 @@ function buildStyle() {
         'text-max-width': '94px',
         'font-size': '8px',
         'border-width': function(node) {
-          if (node.data('gateway')) return 1;
+          if (node.data('gateway')) return 2;
           if (node.data('source') === 'seed') return 0.5;
           return 0.3;
         },
@@ -266,13 +266,13 @@ function buildStyle() {
           const rs = edge.data('rel_source');
           if (rs === 'dyad') return '#888888';
           if (edge.source().data('gateway')) return '#ffffff';
-          return '#aaaaaa';
+          return '#cccccc';
         },
         'target-arrow-color': function(edge) {
           const rs = edge.data('rel_source');
           if (rs === 'dyad') return '#888888';
           if (edge.source().data('gateway')) return '#ffffff';
-          return '#aaaaaa';
+          return '#cccccc';
         },
       }
     },
