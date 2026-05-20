@@ -186,28 +186,44 @@ function buildStyle() {
     {
       selector: 'node[type="root"]',
       style: {
-        'width': 50,
-        'height': 50,
+        'width': 70,
+        'height': 70,
         'background-color': '#FFD700',
         'color': '#000000',
         'font-size': '4px',
-        'text-max-width': '44px',
+        'text-max-width': '64px',
       }
     },
     {
       selector: 'node[type="Entry"]',
       style: {
-        'width': 62,
-        'height': 62,
-        'text-max-width': '56px',
+        'width': 46,
+        'height': 46,
+        'text-max-width': '40px',
+      }
+    },
+    {
+      selector: 'node[type="Entry"][name="Settling"]',
+      style: {
+        'width': 58,
+        'height': 58,
+        'text-max-width': '52px',
+      }
+    },
+    {
+      selector: 'node[type="Entry"][name="Conversations"]',
+      style: {
+        'width': 46,
+        'height': 46,
+        'text-max-width': '40px',
       }
     },
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 52,
-        'height': 52,
-        'text-max-width': '46px',
+        'width': 38,
+        'height': 38,
+        'text-max-width': '32px',
       }
     },
     {
