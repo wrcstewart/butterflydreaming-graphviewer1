@@ -253,7 +253,7 @@ function buildStyle() {
       selector: 'edge[type="CHILD"]',
       style: {
         'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
+        'arrow-scale': 1.2,
         'opacity': 1,
         'width': function(edge) {
           const isGateway = edge.source().data('gateway');
