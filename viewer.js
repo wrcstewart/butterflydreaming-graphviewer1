@@ -312,7 +312,7 @@ function buildStyle() {
       }
     },
     {
-      selector: 'edge[type="HAS_SEARCH_CW"]',
+      selector: 'edge[type="HAS_SEARCH_CW"], edge[type="SCW_LINK"]',
       style: {
         'line-color': '#aaaaaa',
         'width': 1,
@@ -380,6 +380,7 @@ function setupInteractions(cy, ws, addBadge) {
   let recentTouchTimer = null;
   let lastClusterNode = null;
   let currentClusterColour = null;
+  let lastSearchCWNode = null;
   let syntheticEdgeIds = new Set();
 
   function markRecentTouch() {
@@ -547,6 +548,7 @@ function setupInteractions(cy, ws, addBadge) {
     cy.$('[type="Search_CW"]').remove();
     syntheticEdgeIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.remove(); });
     syntheticEdgeIds.clear();
+    lastSearchCWNode = null;
   }
 
   async function expandToCluster(clusterNode) {
@@ -651,6 +653,7 @@ function setupInteractions(cy, ws, addBadge) {
       }
     }
 
+    lastSearchCWNode = node;
     saveState();
     activeNodeId = node.id();
     cy.elements().hide();
@@ -742,8 +745,24 @@ function setupInteractions(cy, ws, addBadge) {
       if (type === 'Cluster') {
         expandToCluster(node);
       } else {
-        expandToNode(node);
-        updateSearchCWVisibility(node);
+        const prevEl = activeNodeId ? cy.getElementById(activeNodeId) : null;
+        const fromSearchCW = lastSearchCWNode && prevEl.length && prevEl.data('type') === 'Search_CW';
+
+        if (fromSearchCW && type === 'TextNode') {
+          // Add edge before expandToNode so Search_CW appears as a neighbour in the one-hop view
+          const synId = 'syn_scw_' + node.id();
+          if (!cy.getElementById(synId).length) {
+            cy.add({ group: 'edges', data: {
+              id: synId, source: lastSearchCWNode.id(), target: node.id(),
+              type: 'SCW_LINK', colour: '#aaaaaa',
+            }});
+            syntheticEdgeIds.add(synId);
+          }
+          expandToNode(node);
+        } else {
+          expandToNode(node);
+          updateSearchCWVisibility(node);
+        }
       }
     }
 
