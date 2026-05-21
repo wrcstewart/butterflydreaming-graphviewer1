@@ -314,10 +314,10 @@ function buildStyle() {
     {
       selector: 'edge[type="HAS_SEARCH_CW"]',
       style: {
-        'line-color': '#555555',
-        'width': 0.5,
+        'line-color': '#aaaaaa',
+        'width': 1,
         'line-style': 'dashed',
-        'opacity': 0.4,
+        'opacity': 0.75,
         'target-arrow-shape': 'none',
       }
     },
@@ -629,7 +629,11 @@ function setupInteractions(cy, ws, addBadge) {
     activeNodeId = node.id();
     cy.elements().hide();
     showIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.show(); });
-    cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
+    // Show non-CHILD edges between visible nodes (cluster↔gateway, chapter↔cluster, etc.)
+    // CHILD sequence arrows suppressed — too many for corpus navigation context
+    cy.edges().filter(e =>
+      e.source().visible() && e.target().visible() && e.data('type') !== 'CHILD'
+    ).show();
     runLayout(cy);
   }
 
