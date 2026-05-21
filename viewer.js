@@ -312,11 +312,21 @@ function buildStyle() {
       }
     },
     {
-      selector: 'edge[type="HAS_SEARCH_CW"], edge[type="HAS_GATEWAY"]',
+      selector: 'edge[type="HAS_SEARCH_CW"]',
       style: {
         'line-color': '#aaaaaa',
         'width': 1,
         'line-style': 'dashed',
+        'opacity': 0.75,
+        'target-arrow-shape': 'none',
+      }
+    },
+    {
+      selector: 'edge[type="HAS_GATEWAY"]',
+      style: {
+        'line-color': '#aaaaaa',
+        'width': 1,
+        'line-style': 'solid',
         'opacity': 0.75,
         'target-arrow-shape': 'none',
       }
