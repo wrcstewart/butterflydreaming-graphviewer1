@@ -312,7 +312,7 @@ function buildStyle() {
       }
     },
     {
-      selector: 'edge[type="HAS_SEARCH_CW"]',
+      selector: 'edge[type="HAS_SEARCH_CW"], edge[type="HAS_GATEWAY"]',
       style: {
         'line-color': '#aaaaaa',
         'width': 1,
@@ -370,6 +370,7 @@ function setupInteractions(cy, ws, addBadge) {
   let recentTouchTimer = null;
   let lastClusterNode = null;
   let currentClusterColour = null;
+  let syntheticEdgeIds = new Set();
 
   function markRecentTouch() {
     recentTouch = true;
@@ -534,6 +535,8 @@ function setupInteractions(cy, ws, addBadge) {
 
   function clearSearchCWNodes() {
     cy.$('[type="Search_CW"]').remove();
+    syntheticEdgeIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.remove(); });
+    syntheticEdgeIds.clear();
   }
 
   async function expandToCluster(clusterNode) {
@@ -620,9 +623,22 @@ function setupInteractions(cy, ws, addBadge) {
     }
 
     const showIds = new Set([node.id(), lastClusterNode.id()]);
+    let gwId = null;
     for (const rec of records) {
-      if (rec.gw) showIds.add(getElementId(rec.gw));
+      if (rec.gw) { const id = getElementId(rec.gw); showIds.add(id); if (!gwId) gwId = id; }
       if (rec.n)  showIds.add(getElementId(rec.n));
+    }
+
+    // Guarantee a visible line from cluster to gateway even if no direct relationship exists
+    if (gwId) {
+      const synId = 'syn_gw_' + gwId;
+      if (!cy.getElementById(synId).length) {
+        cy.add({ group: 'edges', data: {
+          id: synId, source: lastClusterNode.id(), target: gwId,
+          type: 'HAS_GATEWAY', colour: '#aaaaaa',
+        }});
+        syntheticEdgeIds.add(synId);
+      }
     }
 
     saveState();
