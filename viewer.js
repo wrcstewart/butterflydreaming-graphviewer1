@@ -300,6 +300,27 @@ function buildStyle() {
         'events': 'no',
       }
     },
+    {
+      selector: 'node[type="Search_CW"]',
+      style: {
+        'shape': 'octagon',
+        'width': 70,
+        'height': 70,
+        'border-width': 1,
+        'border-color': '#ffffff',
+        'text-max-width': '62px',
+      }
+    },
+    {
+      selector: 'edge[type="HAS_SEARCH_CW"]',
+      style: {
+        'line-color': '#555555',
+        'width': 0.5,
+        'line-style': 'dashed',
+        'opacity': 0.4,
+        'target-arrow-shape': 'none',
+      }
+    },
   ];
 }
 
@@ -337,7 +358,7 @@ function isTouchEvent(evt) {
   return false;
 }
 
-function setupInteractions(cy) {
+function setupInteractions(cy, ws, addBadge) {
   const tooltip = document.getElementById('label-tooltip');
   let dwellTimer = null;
   const history = [];
@@ -347,6 +368,8 @@ function setupInteractions(cy) {
   let tooltipNodeId = null;
   let recentTouch = false;
   let recentTouchTimer = null;
+  let lastClusterNode = null;
+  let currentClusterColour = null;
 
   function markRecentTouch() {
     recentTouch = true;
@@ -361,7 +384,8 @@ function setupInteractions(cy) {
     if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
     if (type === 'Entry')    return node.data('text') || node.data('name') || '';
     if (type === 'Family')   return node.data('text') || node.data('name') || '';
-    if (type === 'Cluster')  return node.data('text') || node.data('label') || node.data('name') || '';
+    if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
+    if (type === 'Search_CW') return node.data('name') || '';
     if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
@@ -506,6 +530,117 @@ function setupInteractions(cy) {
     runLayout(cy);
   }
 
+  // Search_CW — virtual cluster-work navigation nodes
+
+  function clearSearchCWNodes() {
+    cy.$('[type="Search_CW"]').remove();
+  }
+
+  async function expandToCluster(clusterNode) {
+    lastClusterNode = clusterNode;
+    currentClusterColour = clusterNode.data('colour');
+    clearSearchCWNodes();
+    saveState();
+    activeNodeId = clusterNode.id();
+    cy.elements().hide();
+
+    clusterNode.show();
+    clusterNode.connectedEdges().forEach(edge => {
+      const other = edge.source().id() === clusterNode.id() ? edge.target() : edge.source();
+      if (other.data('type') === 'Family') { edge.show(); other.show(); }
+    });
+    runLayout(cy);
+
+    const clusterName = clusterNode.data('name');
+    let records;
+    try {
+      records = await queryWS(ws, 'scwCreate',
+        'MATCH (n:TextNode)-[]->(c:Cluster {name: $clusterName}) ' +
+        'WHERE n.gateway = false ' +
+        'RETURN DISTINCT n.source_text AS work, count(n) AS chapterCount ' +
+        'ORDER BY chapterCount DESC',
+        { clusterName }
+      );
+    } catch (err) {
+      console.error('[BD] Search_CW create error:', err);
+      return;
+    }
+
+    if (!records.length) return;
+
+    for (const rec of records) {
+      const work = rec.work;
+      const count = Number(rec.chapterCount || 0);
+      if (!work) continue;
+      const nodeId = 'search_cw_' + work.replace(/\W+/g, '_');
+      cy.add([
+        {
+          group: 'nodes',
+          data: {
+            id: nodeId,
+            type: 'Search_CW',
+            name: work,
+            display_name: work,
+            colour: currentClusterColour,
+            n_r: count,
+            source_text: work,
+          }
+        },
+        {
+          group: 'edges',
+          data: {
+            id: 'scw_edge_' + nodeId,
+            source: clusterNode.id(),
+            target: nodeId,
+            type: 'HAS_SEARCH_CW',
+            colour: '#666666',
+          }
+        }
+      ]);
+      addBadge(cy.getElementById(nodeId));
+    }
+    runLayout(cy);
+  }
+
+  async function handleSearchCWTap(node) {
+    if (!lastClusterNode) return;
+    const work = node.data('source_text');
+    const clusterName = lastClusterNode.data('name');
+    let records;
+    try {
+      records = await queryWS(ws, 'scwClick',
+        'MATCH (gw:TextNode {source_text: $work, gateway: true}) ' +
+        'OPTIONAL MATCH (n:TextNode {source_text: $work, gateway: false})-[]->(c:Cluster {name: $clusterName}) ' +
+        'RETURN gw, n',
+        { work, clusterName }
+      );
+    } catch (err) {
+      console.error('[BD] Search_CW click error:', err);
+      return;
+    }
+
+    const showIds = new Set([node.id(), lastClusterNode.id()]);
+    for (const rec of records) {
+      if (rec.gw) showIds.add(getElementId(rec.gw));
+      if (rec.n)  showIds.add(getElementId(rec.n));
+    }
+
+    saveState();
+    activeNodeId = node.id();
+    cy.elements().hide();
+    showIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.show(); });
+    cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
+    runLayout(cy);
+  }
+
+  function updateSearchCWVisibility(node) {
+    const scwNodes = cy.$('[type="Search_CW"]');
+    if (!scwNodes.length || !lastClusterNode) return;
+    const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
+    scwNodes[connected ? 'show' : 'hide']();
+    cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
+  }
+
   // Media bar
 
   const mediaBar = document.getElementById('media-bar');
@@ -559,15 +694,27 @@ function setupInteractions(cy) {
   // Tap handler
 
   function handleNodeTap(node) {
+    const type = node.data('type');
+
+    if (type === 'Search_CW') {
+      handleSearchCWTap(node);
+      return;
+    }
+
     if (node.id() === activeNodeId) {
-      if (node.data('type') === 'TextNode') {
+      if (type === 'TextNode') {
         expandChildLevel();
       } else {
         restoreState();
         activeNodeId = null;
       }
     } else {
-      expandToNode(node);
+      if (type === 'Cluster') {
+        expandToCluster(node);
+      } else {
+        expandToNode(node);
+        updateSearchCWVisibility(node);
+      }
     }
 
     if (node.data('name') === 'Settling') {
@@ -639,6 +786,9 @@ function setupInteractions(cy) {
     hideTooltip();
     history.length = 0;
     activeNodeId = null;
+    lastClusterNode = null;
+    currentClusterColour = null;
+    clearSearchCWNodes();
     cy.elements().hide();
     const root = cy.nodes('[type="root"]').first();
     root.show();
@@ -683,6 +833,19 @@ function setupNrBadges(cy) {
   }
 
   cy.on('render', updatePositions);
+
+  function addBadge(node) {
+    const nr = node.data('n_r');
+    if (!nr || nr <= 0) return;
+    const div = document.createElement('div');
+    div.textContent = String(nr);
+    div.style.cssText = 'position:absolute;font-size:9px;font-family:sans-serif;line-height:1;display:none;transform:translate(-50%,-100%);';
+    div.style.color = 'rgba(255,255,255,0.65)';
+    overlay.appendChild(div);
+    badges.set(node.id(), div);
+  }
+
+  return { addBadge };
 }
 
 // --- WebSocket helpers ---
@@ -801,8 +964,8 @@ async function init() {
   root.show();
   cy.fit(root, 120);
 
-  setupInteractions(cy);
-  setupNrBadges(cy);
+  const { addBadge } = setupNrBadges(cy);
+  setupInteractions(cy, ws, addBadge);
 }
 
 window.addEventListener('DOMContentLoaded', init);
