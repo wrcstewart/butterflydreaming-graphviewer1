@@ -304,11 +304,11 @@ function buildStyle() {
       selector: 'node[type="Search_CW"]',
       style: {
         'shape': 'octagon',
-        'width': 70,
-        'height': 70,
+        'width': 49,
+        'height': 49,
         'border-width': 1,
         'border-color': '#ffffff',
-        'text-max-width': '62px',
+        'text-max-width': '43px',
       }
     },
     {
