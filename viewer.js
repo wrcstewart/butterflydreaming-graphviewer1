@@ -676,17 +676,16 @@ function setupInteractions(cy, ws, addBadge) {
 
   function updateSearchCWVisibility(node) {
     if (!lastClusterNode) return;
-    const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
     if (searchBar.classList.contains('active')) {
-      // Phase 2 — button mode
-      connected ? showSearchButton(lastSearchCWNode.data('name'), lastSearchCWNode.data('colour')) : hideSearchButton();
-    } else {
-      // Phase 1 — graph node mode
-      const scwNodes = cy.$('[type="Search_CW"]');
-      if (!scwNodes.length) return;
-      scwNodes[connected ? 'show' : 'hide']();
-      cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
+      // Phase 2 — button is a persistent context control; only reset/new cluster hide it
+      return;
     }
+    // Phase 1 — show/hide octagon graph nodes with cluster territory
+    const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
+    const scwNodes = cy.$('[type="Search_CW"]');
+    if (!scwNodes.length) return;
+    scwNodes[connected ? 'show' : 'hide']();
+    cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
   }
 
   // Search bar button (Search_CW phase 2 — fixed UI button)

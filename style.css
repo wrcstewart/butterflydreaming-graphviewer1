@@ -92,7 +92,7 @@ html, body {
   width: 49px;
   height: 49px;
   clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
-  filter: drop-shadow(0 0 1px rgba(255,255,255,0.7));
+  filter: drop-shadow(0 0 3px rgba(255,255,255,0.85));
   color: #ffffff;
   font-size: 8px;
   font-family: sans-serif;
