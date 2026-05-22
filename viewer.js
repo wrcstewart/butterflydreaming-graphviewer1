@@ -586,34 +586,38 @@ function setupInteractions(cy, ws, addBadge) {
 
     if (!records.length) return;
 
-    // Create hidden cy nodes (needed for handleSearchCWTap data), no graph edges
-    let firstNodeId = null;
     for (const rec of records) {
       const work = rec.work;
       const count = Number(rec.chapterCount || 0);
       if (!work) continue;
       const nodeId = 'search_cw_' + work.replace(/\W+/g, '_');
-      cy.add({
-        group: 'nodes',
-        data: {
-          id: nodeId,
-          type: 'Search_CW',
-          name: work,
-          display_name: work,
-          colour: currentClusterColour,
-          n_r: count,
-          source_text: work,
+      cy.add([
+        {
+          group: 'nodes',
+          data: {
+            id: nodeId,
+            type: 'Search_CW',
+            name: work,
+            display_name: work,
+            colour: currentClusterColour,
+            n_r: count,
+            source_text: work,
+          }
+        },
+        {
+          group: 'edges',
+          data: {
+            id: 'scw_edge_' + nodeId,
+            source: clusterNode.id(),
+            target: nodeId,
+            type: 'HAS_SEARCH_CW',
+            colour: '#666666',
+          }
         }
-      });
-      cy.getElementById(nodeId).hide();
-      if (!firstNodeId) firstNodeId = nodeId;
+      ]);
+      addBadge(cy.getElementById(nodeId));
     }
-
-    if (firstNodeId) {
-      const firstNode = cy.getElementById(firstNodeId);
-      lastSearchCWNode = firstNode;
-      showSearchButton(firstNode.data('name'), firstNode.data('colour'));
-    }
+    runLayout(cy);
   }
 
   async function handleSearchCWTap(node) {
@@ -653,6 +657,9 @@ function setupInteractions(cy, ws, addBadge) {
     }
 
     lastSearchCWNode = node;
+
+    // Promote to fixed button; hide octagon graph nodes
+    cy.$('[type="Search_CW"]').hide();
     showSearchButton(node.data('name'), node.data('colour'));
 
     saveState();
@@ -668,9 +675,18 @@ function setupInteractions(cy, ws, addBadge) {
   }
 
   function updateSearchCWVisibility(node) {
-    if (!lastSearchCWNode) return;
+    if (!lastClusterNode) return;
     const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
-    connected ? showSearchButton(lastSearchCWNode.data('name'), lastSearchCWNode.data('colour')) : hideSearchButton();
+    if (searchBar.classList.contains('active')) {
+      // Phase 2 — button mode
+      connected ? showSearchButton(lastSearchCWNode.data('name'), lastSearchCWNode.data('colour')) : hideSearchButton();
+    } else {
+      // Phase 1 — graph node mode
+      const scwNodes = cy.$('[type="Search_CW"]');
+      if (!scwNodes.length) return;
+      scwNodes[connected ? 'show' : 'hide']();
+      cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
+    }
   }
 
   // Search bar button (Search_CW phase 2 — fixed UI button)
