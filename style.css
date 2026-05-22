@@ -89,12 +89,12 @@ html, body {
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  width: 49px;
-  height: 49px;
+  width: 98px;
+  height: 98px;
   clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
   filter: drop-shadow(0 0 3px rgba(255,255,255,0.85));
   color: #ffffff;
-  font-size: 8px;
+  font-size: 11px;
   font-family: sans-serif;
   cursor: pointer;
   align-items: center;
