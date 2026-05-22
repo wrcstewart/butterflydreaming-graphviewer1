@@ -637,7 +637,7 @@ function setupInteractions(cy, ws, addBadge) {
       return;
     }
 
-    const showIds = new Set([node.id(), lastClusterNode.id()]);
+    const showIds = new Set([lastClusterNode.id()]);
     let gwId = null;
     for (const rec of records) {
       if (rec.gw) { const id = getElementId(rec.gw); showIds.add(id); if (!gwId) gwId = id; }
