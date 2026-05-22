@@ -36,9 +36,9 @@ html, body {
 }
 
 #reset-btn {
-  background: transparent;
-  border: 1px solid #333;
-  color: #888;
+  background: #1a3a6b;
+  border: 1px solid #3a6abf;
+  color: #aac4ff;
   padding: 5px 11px;
   font-size: 11px;
   font-family: sans-serif;
@@ -81,6 +81,38 @@ html, body {
 
 .media-close:hover {
   color: #fff;
+}
+
+#search-bar {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 49px;
+  height: 49px;
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  filter: drop-shadow(0 0 1px rgba(255,255,255,0.7));
+  color: #ffffff;
+  font-size: 8px;
+  font-family: sans-serif;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+  padding: 8px;
+  word-break: break-word;
+  overflow: hidden;
+  z-index: 10;
+}
+
+#search-bar.active {
+  display: flex;
+}
+
+#search-bar:hover {
+  filter: drop-shadow(0 0 3px rgba(255,255,255,0.9));
 }
 
 .mp-btn {

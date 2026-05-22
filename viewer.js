@@ -312,7 +312,7 @@ function buildStyle() {
       }
     },
     {
-      selector: 'edge[type="HAS_SEARCH_CW"], edge[type="SCW_LINK"]',
+      selector: 'edge[type="HAS_SEARCH_CW"]',
       style: {
         'line-color': '#aaaaaa',
         'width': 1,
@@ -415,6 +415,7 @@ function setupInteractions(cy, ws, addBadge) {
     let left = x + pad;
     let top  = y + pad;
     if (left + tw > window.innerWidth  - pad) left = x - tw - pad;
+    if (left < pad) left = pad;
     if (top  + th > window.innerHeight - pad) top  = y - th - pad;
     if (top < pad) top = y + pad;
     tooltip.style.left = left + 'px';
@@ -428,6 +429,7 @@ function setupInteractions(cy, ws, addBadge) {
     let left = pos.x + 10;
     if (top < 10) top = pos.y + 80;
     if (left + tw > window.innerWidth - 10) left = pos.x - tw - 10;
+    if (left < 10) left = 10;
     tooltip.style.left = left + 'px';
     tooltip.style.top  = top  + 'px';
   }
@@ -549,6 +551,7 @@ function setupInteractions(cy, ws, addBadge) {
     syntheticEdgeIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.remove(); });
     syntheticEdgeIds.clear();
     lastSearchCWNode = null;
+    hideSearchButton();
   }
 
   async function expandToCluster(clusterNode) {
@@ -583,38 +586,34 @@ function setupInteractions(cy, ws, addBadge) {
 
     if (!records.length) return;
 
+    // Create hidden cy nodes (needed for handleSearchCWTap data), no graph edges
+    let firstNodeId = null;
     for (const rec of records) {
       const work = rec.work;
       const count = Number(rec.chapterCount || 0);
       if (!work) continue;
       const nodeId = 'search_cw_' + work.replace(/\W+/g, '_');
-      cy.add([
-        {
-          group: 'nodes',
-          data: {
-            id: nodeId,
-            type: 'Search_CW',
-            name: work,
-            display_name: work,
-            colour: currentClusterColour,
-            n_r: count,
-            source_text: work,
-          }
-        },
-        {
-          group: 'edges',
-          data: {
-            id: 'scw_edge_' + nodeId,
-            source: clusterNode.id(),
-            target: nodeId,
-            type: 'HAS_SEARCH_CW',
-            colour: '#666666',
-          }
+      cy.add({
+        group: 'nodes',
+        data: {
+          id: nodeId,
+          type: 'Search_CW',
+          name: work,
+          display_name: work,
+          colour: currentClusterColour,
+          n_r: count,
+          source_text: work,
         }
-      ]);
-      addBadge(cy.getElementById(nodeId));
+      });
+      cy.getElementById(nodeId).hide();
+      if (!firstNodeId) firstNodeId = nodeId;
     }
-    runLayout(cy);
+
+    if (firstNodeId) {
+      const firstNode = cy.getElementById(firstNodeId);
+      lastSearchCWNode = firstNode;
+      showSearchButton(firstNode.data('name'), firstNode.data('colour'));
+    }
   }
 
   async function handleSearchCWTap(node) {
@@ -654,6 +653,8 @@ function setupInteractions(cy, ws, addBadge) {
     }
 
     lastSearchCWNode = node;
+    showSearchButton(node.data('name'), node.data('colour'));
+
     saveState();
     activeNodeId = node.id();
     cy.elements().hide();
@@ -667,12 +668,29 @@ function setupInteractions(cy, ws, addBadge) {
   }
 
   function updateSearchCWVisibility(node) {
-    const scwNodes = cy.$('[type="Search_CW"]');
-    if (!scwNodes.length || !lastClusterNode) return;
+    if (!lastSearchCWNode) return;
     const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
-    scwNodes[connected ? 'show' : 'hide']();
-    cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
+    connected ? showSearchButton(lastSearchCWNode.data('name'), lastSearchCWNode.data('colour')) : hideSearchButton();
   }
+
+  // Search bar button (Search_CW phase 2 — fixed UI button)
+
+  const searchBar = document.getElementById('search-bar');
+
+  function showSearchButton(label, colour) {
+    searchBar.textContent = label;
+    searchBar.style.background = colour || '#888888';
+    searchBar.classList.add('active');
+  }
+
+  function hideSearchButton() {
+    searchBar.classList.remove('active');
+    searchBar.textContent = '';
+  }
+
+  searchBar.addEventListener('click', () => {
+    if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
+  });
 
   // Media bar
 
@@ -745,24 +763,8 @@ function setupInteractions(cy, ws, addBadge) {
       if (type === 'Cluster') {
         expandToCluster(node);
       } else {
-        const prevEl = activeNodeId ? cy.getElementById(activeNodeId) : null;
-        const fromSearchCW = lastSearchCWNode && prevEl.length && prevEl.data('type') === 'Search_CW';
-
-        if (fromSearchCW && type === 'TextNode') {
-          // Add edge before expandToNode so Search_CW appears as a neighbour in the one-hop view
-          const synId = 'syn_scw_' + node.id();
-          if (!cy.getElementById(synId).length) {
-            cy.add({ group: 'edges', data: {
-              id: synId, source: lastSearchCWNode.id(), target: node.id(),
-              type: 'SCW_LINK', colour: '#aaaaaa',
-            }});
-            syntheticEdgeIds.add(synId);
-          }
-          expandToNode(node);
-        } else {
-          expandToNode(node);
-          updateSearchCWVisibility(node);
-        }
+        expandToNode(node);
+        updateSearchCWVisibility(node);
       }
     }
 
