@@ -1034,3 +1034,1020 @@ grey border regardless of seed/dyad. Only gateway nodes get white.
 
 Original spec widths (2px / 1px / 0.6px) halved after visual review.
 `gateway` check uses truthy evaluation, not strict `=== true`.
+## DDR-3: n_r on TextNodes counts outgoing CHILD relationships only
+**Date:** 16 May 2026
+**Status:** Implemented
+
+### Decision
+The `n_r` property on TextNodes counts only outgoing CHILD relationships 
+— the number of direct text descendants. It does not count cluster tag 
+relationships (TAGGED_AS, BRIDGES_TO, ECHOES, RESONATES_WITH, GIVES) 
+which would inflate the number and mislead the user.
+
+This makes `n_r` meaningful on TextNodes — it tells the user how many 
+text children this node has, which is useful for navigation and 
+indicates how much has grown from this point in the lineage.
+
+### Distinction from Cluster and Family nodes
+On Cluster and Family nodes `n_r` counts all non-Family, non-Root 
+connections per DDR-1. On TextNodes `n_r` counts outgoing CHILD 
+only. The property has different semantics by node type.
+
+### Query applied
+```cypher
+MATCH (n:TextNode)
+WITH n, COUNT { (n)-[:CHILD]->() } AS child_count
+SET n.n_r = child_count
+```
+
+### Programmatic creation rule
+When a new CHILD relationship is created from a TextNode, increment 
+`n_r` on the parent TextNode only — not the child, and not via the 
+general n_r rule in DDR-1. The child starts with n_r = 0.
+
+### Current values
+- Gateway TextNode (Tao Te Ching description) — n_r: 1
+- Chapter 1 — n_r: 1  
+- Chapter 2 — n_r: 0
+## DDR-3: n_r on TextNodes counts outgoing CHILD relationships only
+**Date:** 16 May 2026
+**Status:** Implemented
+
+### Decision
+The `n_r` property on TextNodes counts only outgoing CHILD relationships 
+— the number of direct text descendants. It does not count cluster tag 
+relationships (TAGGED_AS, BRIDGES_TO, ECHOES, RESONATES_WITH, GIVES) 
+which would inflate the number and mislead the user.
+
+This makes `n_r` meaningful on TextNodes — it tells the user how many 
+text children this node has, which is useful for navigation and 
+indicates how much has grown from this point in the lineage.
+
+### Distinction from Cluster and Family nodes
+On Cluster and Family nodes `n_r` counts all non-Family, non-Root 
+connections per DDR-1. On TextNodes `n_r` counts outgoing CHILD 
+only. The property has different semantics by node type.
+
+### Query applied
+```cypher
+MATCH (n:TextNode)
+WITH n, COUNT { (n)-[:CHILD]->() } AS child_count
+SET n.n_r = child_count
+```
+
+### Programmatic creation rule
+When a new CHILD relationship is created from a TextNode, increment 
+`n_r` on the parent TextNode only — not the child, and not via the 
+general n_r rule in DDR-1. The child starts with n_r = 0.
+
+### Current values
+- Gateway TextNode (Tao Te Ching description) — n_r: 1
+- Chapter 1 — n_r: 1  
+- Chapter 2 — n_r: 0
+## Amendment 10 — graphviewer.md — 18 May 2026
+
+## Database migration — Neo4j to Memgraph
+
+### Current state
+The viewer was built against Neo4j Desktop (local, port 7687, bolt protocol).
+The canonical database has now moved to Memgraph running in Docker.
+CC should update the database connection to point at Memgraph.
+
+### New connection details
+
+```javascript
+const driver = neo4j.driver(
+    'bolt://localhost:7687',
+    neo4j.auth.basic('memgraph', 'memgraph')
+);
+```
+
+The port is the same (7687 Bolt) and the neo4j-driver npm package works 
+with both Neo4j and Memgraph — no driver change needed. Only the 
+credentials change.
+
+### Why the move
+Memgraph is the planned production database for ButterflyDreaming.
+Neo4j Desktop was used for schema design and experimentation only.
+The Memgraph instance is a corrected, canonical version of the data:
+
+- Root node connects to Family nodes via CONTAINS relationships 
+  (not CHILD — that was an error in Neo4j corrected in Memgraph)
+- All TextNode properties normalised across all three nodes
+- No spurious Root→Family CHILD relationships
+- Datetime formats corrected for Memgraph compatibility
+
+### Memgraph infrastructure
+- Database container: `memgraph-dev` (Docker, named volume `mg_lib`)
+- Lab UI: `http://localhost:3000` (Docker container `memgraph-lab`)
+- Network: `memgraph-net` (shared Docker network)
+- Backup: cron every 3 hours → Dropbox/memgraphback
+
+### CONTAINS relationship
+The Root node connects to all 6 Family nodes via a CONTAINS relationship.
+This is the navigation relationship that allows the viewer to show all 
+Family nodes when Root is clicked — consistent with the one-hop rule.
+
+```cypher
+MATCH (r:Root)-[:CONTAINS]->(f:Family)
+RETURN f
+```
+
+This replaces the incorrect CHILD relationships CC created in Neo4j 
+between Root and Family nodes. The viewer click handler for the Root 
+node should follow CONTAINS relationships to find Family nodes, not CHILD.
+
+### Neo4j Desktop
+Neo4j Desktop remains installed and running for reference. Do not 
+delete it. It may be useful for schema experimentation. The viewer 
+should no longer connect to it.
+
+Here is Amendment 11:
+
+---
+
+```markdown
+## Amendment 11 — graphviewer.md — 18 May 2026
+
+## Architecture change — Express server + WebSocket
+
+### Overview
+The viewer is extended from a browser-only Cytoscape app to a 
+client-server architecture. An Express server serves index.html 
+and handles all Memgraph queries server-side. The browser 
+communicates with the server exclusively over WebSocket.
+
+This is the foundation for Cloudflare tunnel access and future 
+dyadic real-time features (buddy browsing, gravity well, attention 
+signals). All real-time events — hover, click, query, attention — 
+travel on the same WebSocket connection.
+
+### Project structure — extend existing, do not start fresh
+
+```
+butterflydreaming_graphviewer1/
+  index.html          ← existing, load from Express not live-server
+  viewer.js           ← existing, replace neo4j-driver with WebSocket client
+  style.css           ← existing, unchanged
+  cursor-wings.svg    ← existing, unchanged
+  server.js           ← NEW
+  package.json        ← update: add express, ws
+  graphviewer.md      ← this file
+```
+
+### server.js responsibilities
+- Serve `index.html` statically via Express
+- Connect to Memgraph via neo4j-driver (server-side only)
+- Accept WebSocket connections from browser clients
+- Receive query requests over WebSocket
+- Execute queries against Memgraph
+- Return results over WebSocket
+
+```javascript
+const express = require('express');
+const { WebSocketServer } = require('ws');
+const neo4j = require('neo4j-driver');
+
+const app = express();
+app.use(express.static('.'));
+
+const driver = neo4j.driver(
+    'bolt://localhost:7687',
+    neo4j.auth.basic('memgraph', 'memgraph')
+);
+
+const server = app.listen(8080);
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+    ws.on('message', async (message) => {
+        const { type, query, params } = JSON.parse(message);
+        const session = driver.session();
+        try {
+            const result = await session.run(query, params);
+            ws.send(JSON.stringify({ type, data: result.records }));
+        } finally {
+            await session.close();
+        }
+    });
+});
+```
+
+### viewer.js changes
+Remove direct neo4j-driver connection. Replace with WebSocket client:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080');
+
+function queryGraph(type, query, params = {}) {
+    ws.send(JSON.stringify({ type, query, params }));
+}
+
+ws.onmessage = (event) => {
+    const { type, data } = JSON.parse(event.data);
+    handleQueryResult(type, data);
+};
+```
+
+All Cypher queries currently run client-side move to server-side. 
+The browser sends a query request, the server runs it and returns 
+results. The browser never connects to Memgraph directly.
+
+### Dwell threshold — configurable constant
+
+The dwell timer fires the WebSocket query before the threshold 
+completes, so the result arrives in time to display at the threshold:
+
+```
+t=0      mouse enters node — dwell timer starts
+t=DWELL_FIRE   query fired over WebSocket
+t=DWELL_FIRE + round_trip   result arrives
+t=DWELL_MS     text displays (if result already arrived)
+```
+
+Define two constants at the top of viewer.js:
+
+```javascript
+const DWELL_MS = 400;       // threshold for display (ms)
+const DWELL_FIRE = 300;     // fire query this many ms into dwell (ms)
+```
+
+Local (Memgraph on same machine): round-trip ~50ms — DWELL_FIRE 300ms 
+gives result at ~350ms, well before DWELL_MS.
+
+Cloudflare tunnel: round-trip ~150-200ms — reduce DWELL_FIRE to 150ms, 
+result arrives at ~330ms, still before DWELL_MS.
+
+DWELL_MS stays constant at 400ms — perceived response time is consistent 
+regardless of network. Only DWELL_FIRE needs tuning per environment.
+
+### Package updates
+
+```bash
+npm install express ws
+```
+
+neo4j-driver remains in package.json — now used server-side only.
+
+### Starting the server
+
+Replace live-server with:
+
+```bash
+node server.js
+```
+
+Access at `http://localhost:8080`. Auto-restart during development 
+with nodemon:
+
+```bash
+npm install -g nodemon
+nodemon server.js
+```
+
+### Cloudflare tunnel (future)
+When ready for external access, point the Cloudflare tunnel at 
+`http://localhost:8080`. No changes to server.js needed — the 
+tunnel sits in front of Express. The WebSocket connection upgrades 
+automatically through the tunnel.
+
+### Neo4j Desktop
+No longer used by the viewer. Neo4j Desktop remains installed for 
+schema experimentation only.
+```
+
+that is working please make a note
+Here is Amendment 12:
+
+---
+
+```markdown
+## Amendment 12 — graphviewer.md — 18 May 2026
+
+## Mobile touch fixes
+
+### Problem 1 — Single tap triggering navigation
+A single tap fires touchstart then touchend on the same point, which 
+is being interpreted as a click/navigation event. On touch devices 
+navigation should require a deliberate double-tap.
+
+**Fix — double-tap pattern for touch devices:**
+
+- First tap on a node → show tooltip/preview only (equivalent to 
+  hover dwell on desktop). Do not navigate.
+- Second tap on same node → trigger navigation action (equivalent 
+  to click on desktop).
+- Tap on different node → show that node's tooltip, reset tap state.
+- Tap on empty canvas → hide tooltip, reset tap state.
+
+Implementation — track last-tapped node and tap counter:
+
+```javascript
+let lastTappedNode = null;
+let tapCount = 0;
+let tapResetTimer = null;
+
+cy.on('tap', 'node', (event) => {
+    const node = event.target;
+    clearTimeout(tapResetTimer);
+
+    if (lastTappedNode && lastTappedNode.id() === node.id()) {
+        tapCount++;
+    } else {
+        tapCount = 1;
+        lastTappedNode = node;
+        showTooltip(node);
+    }
+
+    if (tapCount >= 2) {
+        triggerNavigation(node);
+        tapCount = 0;
+        lastTappedNode = null;
+    } else {
+        tapResetTimer = setTimeout(() => {
+            tapCount = 0;
+            lastTappedNode = null;
+        }, 800);
+    }
+});
+```
+
+---
+
+### Problem 2 — Finger obscures tooltip
+On touch devices the tooltip appears at or near the node, directly 
+under the user's finger. It must appear above the finger.
+
+**Fix — offset tooltip 80px above node centre on touch devices:**
+
+Detect touch device and apply different tooltip positioning:
+
+```javascript
+const isTouchDevice = ('ontouchstart' in window);
+
+function positionTooltip(node) {
+    const pos = node.renderedPosition();
+    const offset = isTouchDevice ? -80 : 10;
+    let top = pos.y + offset;
+    let left = pos.x + 10;
+
+    // Bounds check — see Problem 3
+    if (top < 10) {
+        top = pos.y + 80; // flip below if too close to top
+    }
+
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+}
+```
+
+On desktop the tooltip appears adjacent to the cursor as before.
+On touch devices it appears 80px above the node centre.
+
+---
+
+### Problem 3 — Tooltip clipped at top in landscape mode
+In landscape orientation on mobile, nodes near the top of the canvas 
+cause the tooltip to appear above the viewport and get clipped.
+
+**Fix — bounds check before positioning, flip below if clipped:**
+
+Included in the `positionTooltip` function above:
+
+```javascript
+if (top < 10) {
+    top = pos.y + 80; // flip to below node
+}
+```
+
+If the calculated top position is within 10px of the viewport top 
+edge, the tooltip flips to appear 80px below the node centre instead.
+
+Also check right edge to prevent horizontal clipping:
+
+```javascript
+const tooltipWidth = tooltip.offsetWidth;
+if (left + tooltipWidth > window.innerWidth - 10) {
+    left = pos.x - tooltipWidth - 10; // flip to left of node
+}
+```
+
+---
+
+### Summary of touch behaviour after fixes
+
+| Action | Desktop | Touch |
+|---|---|---|
+| Hover/dwell | Show tooltip | — |
+| First tap | — | Show tooltip |
+| Second tap same node | — | Navigate |
+| Click | Navigate | — |
+| Tap different node | — | Show new tooltip, reset |
+| Tap empty canvas | — | Hide tooltip, reset |
+
+---
+
+### Note on pointer events
+These fixes use Cytoscape's `tap` event which abstracts both mouse 
+click and touch tap. The existing pointer events implementation 
+(Amendment 3, section 6.5) should be reviewed to ensure tap and 
+click events are not both firing on touch devices — if so, suppress 
+the click handler on touch devices using `isTouchDevice`.
+```
+Here is Amendment 14:
+
+---
+
+```markdown
+## Amendment 14 — graphviewer.md — 19 May 2026
+
+## Hover tooltip — media functions and controls
+
+### Principle
+The hover tooltip is the general surface for revealing all available 
+functions associated with a node — not just text. When a node is 
+hovered, the tooltip shows:
+
+1. The node's text (existing behaviour)
+2. Any media controls or functions associated with that node
+
+This is the foundation for the %%bd_ directive system described in 
+the main ButterflyDreaming handover — nodes will eventually carry 
+embedded directives that trigger media modules (audio, music, 
+visual, XR). Hover is the natural moment to surface these.
+
+### Current implementation — Settling node audio player
+
+The Settling Entry node is the first media-enabled node. When 
+hovered it shows its text plus a compact HTML5 audio player:
+
+```html
+<div class="tooltip-text">node text here</div>
+<audio controls style="width:100%; margin-top:8px;">
+  <source src="" type="audio/mpeg">
+</audio>
+```
+
+The audio source is a placeholder — the mindfulness recording 
+URL will be added when the audio file is ready.
+
+The Settling tooltip should be wider than standard to accommodate 
+the player — approximately 280px minimum width.
+
+### Detecting media-enabled nodes
+For now detect by node name — hardcode the audio player for 
+the Settling node specifically:
+
+```javascript
+function buildTooltipContent(node) {
+    let html = `<div class="tooltip-text">${node.data('text')}</div>`;
+    
+    if (node.data('name') === 'Settling') {
+        html += `
+            <audio controls style="width:100%; margin-top:8px;">
+                <source src="" type="audio/mpeg">
+            </audio>`;
+    }
+    
+    return html;
+}
+```
+
+### Future — %%bd_ directive system
+In a future version, media modules will be triggered by directives 
+embedded in node text using the %%bd_ prefix (e.g. 
+%%bd_audio_src, %%bd_music, %%bd_visual). The tooltip builder 
+will parse these directives and load the appropriate module. 
+For now hardcoding by node name is sufficient.
+
+### Pattern for future media nodes
+Any node that should surface media controls on hover:
+1. Add the relevant %%bd_ directive to its text property 
+   (future) or detect by name (current)
+2. Add the corresponding HTML control to buildTooltipContent()
+3. Keep controls compact — the tooltip should not dominate 
+   the canvas
+
+### Mobile behaviour
+Audio controls are touch-friendly natively in HTML5. No 
+additional touch handling needed for the player itself. 
+The tooltip positioning rules from Amendment 12 apply — 
+the wider Settling tooltip should also be bounds-checked 
+against the viewport edges.
+```
+## Amendment 15 — graphviewer.md — 19 May 2026
+
+# Amendment 15 — graphviewer.md — 19 May 2026
+
+## Media controls — screen-fixed position, activated by node click
+
+### Problem with Amendment 14
+Placing interactive controls (audio player) in the hover tooltip 
+means the tooltip disappears when the cursor moves to click the 
+controls. Hover is suitable for read-only content only — text, 
+labels, previews. Interactive controls must live outside the tooltip.
+
+### Revised principle
+**Hover** — text and read-only preview only. No interactive controls.
+**Click** — activates any media players or renderers associated 
+with the node. Controls appear in a fixed screen position and 
+persist until dismissed.
+
+### Media control bar
+A fixed media control bar sits in the top bar of the screen, 
+to the right of the Reset button. It is hidden by default and 
+appears when a media-enabled node is clicked.
+[ Reset ]  [ ▶ Settling — mindfulness audio  ✕ ]
+
+The bar contains:
+- Node name label
+- Relevant media control (audio player, music player etc.)
+- Close button (✕) to dismiss
+
+### Settling node implementation
+When the Settling node is clicked:
+- The media bar appears with a compact HTML5 audio player
+- The bar remains visible while the user browses freely
+- Clicking ✕ dismisses the bar
+- Clicking Settling again while bar is visible dismisses it (toggle)
+
+```javascript
+function handleNodeClick(node) {
+    // existing one-hop navigation...
+    
+    // check for media
+    if (node.data('name') === 'Settling') {
+        toggleMediaBar({
+            label: 'Settling — mindfulness audio',
+            html: `<audio controls>
+                     <source src="" type="audio/mpeg">
+                   </audio>`
+        });
+    }
+}
+
+function toggleMediaBar(content) {
+    const bar = document.getElementById('media-bar');
+    if (bar.classList.contains('active') && 
+        bar.dataset.node === content.label) {
+        // same node clicked again — dismiss
+        bar.classList.remove('active');
+        bar.dataset.node = '';
+    } else {
+        bar.innerHTML = `
+            <span class="media-label">${content.label}</span>
+            ${content.html}
+            <button class="media-close" onclick="dismissMediaBar()">✕</button>`;
+        bar.dataset.node = content.label;
+        bar.classList.add('active');
+    }
+}
+
+function dismissMediaBar() {
+    const bar = document.getElementById('media-bar');
+    bar.classList.remove('active');
+    bar.dataset.node = '';
+}
+```
+
+### HTML structure
+Add to index.html alongside the reset button:
+
+```html
+<div id="top-bar">
+    <button id="reset-btn">Reset</button>
+    <div id="media-bar"></div>
+</div>
+```
+
+### CSS
+Media bar hidden by default, appears inline with reset button:
+
+```css
+#top-bar {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+}
+
+#media-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: white;
+    font-size: 12px;
+}
+
+#media-bar.active {
+    display: flex;
+}
+```
+
+### Future — general mechanism
+When any node is clicked, the click handler should check for 
+associated media or renderers and activate them in the media bar. 
+In a future version this will be driven by %%bd_ directives 
+parsed from node text. For now detect by node name.
+
+Multiple media bars may eventually be needed for different 
+renderer types (audio, music, visual) — for now one bar 
+handles all.
+
+### Amendment 14 — partial revert
+Remove the audio player from the hover tooltip for Settling. 
+Hover returns to text-only for all nodes. The buildTooltipContent 
+function should no longer add audio controls for any node.
+
+Understood — here is Amendment 16 in full:
+
+---
+
+## Amendment 16 — graphviewer.md — 21 May 2026
+
+## Search_CW Node — Virtual Cluster-Work Navigation Node
+
+### Before implementing — check node data properties
+
+Before writing any code for this amendment, check what data
+properties are currently set on nodes in the Cytoscape instance.
+In the browser console run:
+
+```javascript
+cy.nodes().first().data()
+```
+
+Then check specifically for type properties across all nodes:
+
+```javascript
+cy.nodes().filter('[type]').map(n => n.data('type'))
+```
+
+If `type` is not currently set on nodes, it must be added to
+the node data when the graph is loaded from Memgraph — before
+any Search_CW logic is implemented. The `type` property is
+required for all selector logic in this amendment.
+
+Report findings before proceeding.
+
+---
+
+### Background and design rationale
+
+As the corpus grows, clicking a cluster would reveal dozens or hundreds
+of directly connected TextNodes — unnavigable on screen. A filtering
+layer is needed between the cluster and individual TextNodes.
+
+The solution is a virtual navigation node called **Search_CW**
+(Search Cluster-Work). It is not stored in Memgraph — it exists only
+in the viewer's Cytoscape instance as a temporary node for the duration
+of a user's navigation context. This is a deliberate architectural decision:
+
+- The Memgraph graph remains a pure shared corpus — no user-specific or session-specific data
+- Each user's viewer constructs their own Search_CW nodes independently
+- The node's content is always dynamically constructed from Memgraph at the moment it is needed
+- When the session ends or context changes the nodes are removed
+
+This distinction between the shared persistent graph (Memgraph) and ephemeral session state (viewer memory) is fundamental to the platform's privacy architecture. No user journey is stored.
+
+### What Search_CW represents
+
+One Search_CW node appears per corpus work when a cluster is clicked. It represents the intersection of:
+- A specific corpus work (e.g. Tao Te Ching)
+- The currently active cluster (e.g. Paradox)
+
+Its content — the TextNodes it reveals — is the set of chapters from that work connected to the active cluster, constructed dynamically by a Memgraph query at click time.
+
+### Navigation flow
+
+```
+Cluster clicked
+  → All existing Search_CW nodes removed
+  → Memgraph queried for works with chapters connected to this cluster
+  → New Search_CW node(s) created in Cytoscape — one per work found
+  → User clicks Search_CW
+    → Memgraph query returns: all TextNodes from that work
+      connected to lastClusterNode + the Gateway node for that work
+    → Results rendered in Cytoscape alongside Search_CW node
+  → User clicks a TextNode
+    → Standard one-hop neighbourhood displayed
+    → Search_CW remains visible while current node connects to lastClusterNode
+    → Search_CW hidden (not removed) when user navigates to a node
+      with no connection to lastClusterNode
+  → User clicks Search_CW again
+    → Reruns query using current lastClusterNode — usually same result
+      but may differ if user has clicked a different cluster since
+  → User clicks a new Cluster
+    → All Search_CW nodes removed
+    → New Search_CW nodes created for new cluster context
+```
+
+### lastClusterNode — session state variable
+
+A single variable maintained in viewer.js:
+
+```javascript
+let lastClusterNode = null; // the Cluster node most recently clicked
+let currentClusterColour = null; // its family colour
+```
+
+Set when any Cluster node is clicked:
+
+```javascript
+cy.on('tap', 'node', (event) => {
+    const node = event.target;
+    if (node.data('type') === 'Cluster') {
+        lastClusterNode = node;
+        currentClusterColour = node.data('colour');
+    }
+});
+```
+
+This variable drives:
+- Which Search_CW nodes to create and display
+- The colour of Search_CW nodes (cluster's family colour)
+- The Memgraph query when Search_CW is clicked
+- Whether Search_CW remains visible as the user navigates
+
+### Search_CW node — visual specification
+
+- **Shape:** octagon — visually distinct from all other node types
+- **Colour:** family colour of lastClusterNode at time of creation
+- **Label:** work name e.g. "Tao Te Ching" — centred inside node, white text
+- **n_r display:** count of TextNodes from this work connected to lastClusterNode — shown top right as per other nodes
+- **Border:** 1px white
+
+### Search_CW node — lifecycle in Cytoscape
+
+The Search_CW node is a temporary Cytoscape node. It must be explicitly created and destroyed by the viewer at the right moments. CC must implement this lifecycle carefully — Cytoscape will not manage it automatically.
+
+**Creation — when a Cluster is clicked:**
+1. Remove any existing Search_CW nodes from the Cytoscape instance
+2. Run the Memgraph query to find works connected to this cluster
+3. For each work returned, add a new Search_CW node to Cytoscape
+4. Add edges between the clicked Cluster node and each Search_CW node
+5. Apply layout update to position the new nodes naturally
+
+**Persistence — while user navigates TextNodes:**
+Search_CW nodes remain in the Cytoscape instance. They stay visible or hidden according to the breadcrumb rule but are not removed from Cytoscape until a new cluster is clicked or reset.
+
+**Hiding vs removal:**
+- **Hide** (cy.hide()) when breadcrumb trail expires — user has navigated away from cluster territory. Node stays in Cytoscape in case user returns
+- **Remove** (cy.remove()) when a new cluster is clicked or reset button pressed — clean slate for new context
+
+**Destruction — when any of these occur:**
+- A new Cluster node is clicked — remove all Search_CW nodes, create new ones for the new cluster
+- Reset button clicked — remove all Search_CW nodes
+- Session ends — Cytoscape instance destroyed, all nodes gone
+
+**Why temporary Cytoscape nodes rather than pure DOM:**
+Cytoscape manages all layout, positioning, zoom, pan, and interaction consistently across node types. Adding Search_CW as a proper Cytoscape node means it participates in the force layout naturally, responds to zoom and pan correctly, and handles touch events through the same event system as all other nodes. Managing it as a separate DOM element would require duplicating all of that handling.
+
+### Search_CW node — creation query
+
+When a Cluster is clicked, query Memgraph for all works that have TextNodes connected to that cluster:
+
+```javascript
+const query = `
+    MATCH (n:TextNode)-[r]->(c:Cluster {name: $clusterName})
+    WHERE n.gateway = false
+    RETURN n.source_text AS work, count(n) AS chapterCount
+    ORDER BY chapterCount DESC
+`;
+```
+
+For each result, create a temporary Cytoscape node:
+
+```javascript
+cy.add({
+    group: 'nodes',
+    data: {
+        id: `search_cw_${work.replace(/\s+/g, '_')}`,
+        type: 'Search_CW',
+        name: work,
+        colour: currentClusterColour,
+        n_r: chapterCount,
+        source_text: work
+    }
+});
+
+// Add edge from clicked cluster to Search_CW node
+cy.add({
+    group: 'edges',
+    data: {
+        source: lastClusterNode.id(),
+        target: `search_cw_${work.replace(/\s+/g, '_')}`,
+        type: 'HAS_SEARCH_CW'
+    }
+});
+```
+
+### Search_CW node — click behaviour
+
+When a Search_CW node is clicked, run the dynamic Memgraph query:
+
+```javascript
+const query = `
+    MATCH (gw:TextNode {source_text: $work, gateway: true})
+    OPTIONAL MATCH (gw)-[:CHILD*]->(n:TextNode)-[r]->(c:Cluster {name: $clusterName})
+    RETURN gw, n, r
+`;
+```
+
+This returns:
+- The Gateway node (always — sequential entry point to the work)
+- All TextNodes from that work connected to lastClusterNode
+- The relationships (for colour and weight styling)
+
+Render these in Cytoscape alongside the Search_CW node, following the standard one-hop display rules.
+
+### Search_CW persistence — breadcrumb trail
+
+After a Search_CW click, as the user navigates into TextNodes, on each node click check whether the current node has any relationship to lastClusterNode:
+
+```javascript
+function checkSearchCWVisibility(clickedNode) {
+    if (!lastClusterNode) return;
+    const clusterName = lastClusterNode.data('name');
+    const connected = clickedNode.neighborhood()
+        .filter(n => n.data('name') === clusterName)
+        .length > 0;
+    if (connected) {
+        cy.$('[type="Search_CW"]').show();
+    } else {
+        cy.$('[type="Search_CW"]').hide();
+    }
+}
+```
+
+### Future — User node
+
+A future implementation will introduce a User node in Memgraph to record the session path through real and virtual nodes:
+
+```
+(:User {
+    websocket_id: 'ws-abc123',
+    path: [...node urls visited...],
+    current_cluster: 'Paradox'
+})
+```
+
+This will support gravity well scoring, dyadic pairing, and optional research/moderation logging. For now lastClusterNode in viewer.js is sufficient.
+
+### Note for CC and future developers
+
+The Search_CW node is the first example of a virtual/temporary node in the ButterflyDreaming viewer — a Cytoscape node with no Memgraph counterpart. This pattern will recur as the dyadic phase develops. Virtual nodes always:
+- Have a `type` property identifying them as virtual (type: 'Search_CW')
+- Are created and destroyed by viewer logic, never persisted to Memgraph
+- Derive their content from Memgraph queries using session state variables
+- Do not follow the standard one-hop click rule — they have their own defined click behaviour as specified above
+- Participate fully in Cytoscape layout, zoom, pan, and touch handling
+
+The separation between Memgraph (shared permanent corpus) and viewer session state (ephemeral, user-specific) must be maintained. Never store user navigation state in Memgraph.
+
+### Works currently in Memgraph
+- Tao Te Ching (McDonald 1996) — 82 nodes (1 gateway + 81 chapters)
+
+### This structure is designed to scale
+When new corpus works are added to Memgraph, Search_CW nodes for those works will appear automatically when their chapters share cluster connections with the active cluster. No viewer code changes are needed — the creation query finds all works dynamically.
+
+---
+
+## Amendment 17 — graphviewer.md — 22–23 May 2026
+
+## Search_CW two-phase migration, audio player, visual refinements, and bug fixes
+
+---
+
+### 17.1 — Search_CW two-phase implementation
+
+The design from Amendment 16 was implemented and refined into a two-phase interaction model.
+
+**Phase 1 — Graph node (octagon in graph)**
+
+When the user clicks a Cluster node, one octagon Search_CW node is created per matching work and added to the Cytoscape graph, connected to the cluster by a dashed `HAS_SEARCH_CW` edge. The octagon inherits the cluster's family colour. An `n_r` badge showing chapter count is overlaid on the node. The octagon is positioned by the fCoSE layout alongside the cluster and its Family neighbours.
+
+**Phase 2 — Fixed button (migrated to UI)**
+
+When the user clicks an octagon node in the graph, the octagon disappears from the graph and reappears as a fixed-position button at the top of the screen, retaining its octagon shape, family colour, and label. The chapter results (gateway + matching TextNodes) are simultaneously shown in the graph, with a solid synthetic `HAS_GATEWAY` edge guaranteeing a visible line from the cluster to the gateway node.
+
+The Phase 2 button is a **persistent context control**: it stays visible while the user navigates chapter nodes and does not hide until the user clicks a different cluster or presses Reset. This means the user can repeatedly re-run the chapter search from the button without losing their place.
+
+Clicking the button re-runs `handleSearchCWTap` on the stored `lastSearchCWNode`, re-querying and re-displaying the chapter results.
+
+**Session state variables**
+
+```javascript
+let lastClusterNode    = null;  // the last cluster whose Search_CW nodes are active
+let currentClusterColour = null;  // colour passed to new Search_CW nodes
+let lastSearchCWNode   = null;  // the node that migrated to the Phase 2 button
+let syntheticEdgeIds   = new Set();  // HAS_GATEWAY edges to clean up on reset
+```
+
+**Lifecycle**
+
+| Event | Effect |
+|---|---|
+| Cluster clicked | clearSearchCWNodes → new octagon nodes added to graph (Phase 1) |
+| Octagon clicked | Graph nodes hidden; button appears (Phase 2) |
+| Button clicked | Chapter results re-queried and shown; button stays visible |
+| Non-TextNode tapped (Phase 1) | Octagon nodes hidden in graph |
+| TextNode connected to cluster (Phase 1) | Octagon nodes shown |
+| TextNode not connected (Phase 1) | Octagon nodes hidden |
+| Any node tapped (Phase 2) | Button unchanged |
+| Reset pressed | clearSearchCWNodes → button hidden, nodes removed |
+| Different cluster clicked | clearSearchCWNodes → new octagons for new cluster |
+
+---
+
+### 17.2 — Search_CW button — visual specification
+
+The Phase 2 button is a DOM `<div>` with the same octagon shape as the Cytoscape graph node, using CSS `clip-path`:
+
+```css
+#search-bar {
+  position: fixed;
+  top: 16px;
+  left: 30%;
+  transform: translateX(-50%);
+  width: 98px;
+  height: 98px;
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  filter: drop-shadow(0 0 3px rgba(255,255,255,0.85));
+  color: #ffffff;
+  font-size: 11px;
+  display: none;   /* hidden by default */
+  z-index: 10;
+}
+#search-bar.active { display: flex; }
+```
+
+The background colour is set dynamically from `node.data('colour')` (the cluster's family colour). The `filter: drop-shadow` provides a visible white glow outline — `border` and `outline` are clipped by `clip-path` and cannot be used.
+
+**Placement:** centred at 30% from the left edge of the screen (not the full centre) to avoid overlapping the media player bar in the top-right on narrow phone screens.
+
+---
+
+### 17.3 — Custom HTML5 audio player (Amendment 15 replacement)
+
+The native `<audio controls>` element was replaced by a custom player to fix a Chrome/Safari shadow DOM rendering defect in which the rounded-rectangle play button control obscured the time readout. The custom player is injected into `#media-bar`:
+
+```javascript
+function toggleMediaBar(label, audioSrc) {
+  // Creates: [label] [▶/⏸ button] [time display] [✕ close]
+  // Audio element is managed in JS, not rendered as a native control
+}
+```
+
+Time display uses `fmtTime(s)` → `m:ss` format. The player currently loads `bass_recorder_C3.mp3` (a test file in the project root) for the Settling node. The player is served via `express.static('.')` from `server.js` — no special route needed.
+
+---
+
+### 17.4 — Visual refinements
+
+| Change | Before | After |
+|---|---|---|
+| Arrowhead size | `arrow-scale: 0.6` | `arrow-scale: 1.2` (doubled) |
+| Inter-TextNode edge colour | `#aaaaaa` | `#cccccc` (brighter but not white) |
+| Gateway node border width | 1px | 2px (doubled) |
+| Conversations cluster size | undersized | 60px (contains label) |
+| n_r badge drop-shadow | none | `rgba(255,255,255,0.65)` subtle white |
+
+---
+
+### 17.5 — Bug fixes
+
+**Bug: Search_CW node re-appearing after migration**
+
+`showIds` in `handleSearchCWTap` included `node.id()` (the virtual Search_CW node). After `cy.elements().hide()`, `showIds.forEach(el.show())` immediately re-showed it, undoing the octagon hide. Fixed by removing the virtual node's ID from `showIds`.
+
+**Bug: Octagons appearing when Family node clicked**
+
+`updateSearchCWVisibility` checked whether the tapped node was a neighbour of `lastClusterNode`. Family nodes are direct Cytoscape neighbours of Cluster nodes, so `connected` was always `true` for Family taps, incorrectly re-showing the octagons. Fixed by gating the show logic on `node.data('type') === 'TextNode'` — any other node type hides the octagons.
+
+**Bug: Phase 2 button disappearing when non-cluster nodes tapped**
+
+`updateSearchCWVisibility` was hiding the Phase 2 button when the user tapped a gateway node (which has no direct Cytoscape edge to the cluster). Fixed by making Phase 2 a no-op in `updateSearchCWVisibility` — the button is now persistent and is only cleared by `clearSearchCWNodes` (reset or new cluster click).
+
+**Bug: Tooltip cut off at left screen edge on narrow devices**
+
+`positionTooltip` clamped right and bottom overflow but not left. Fixed by adding `if (left < pad) left = pad` in both mouse and touch positioning functions.
+
+---
+
+### 17.6 — Cypher corpus file
+
+The 14 individual `.cypher` files from the Tao Te Ching corpus were concatenated into a single file `TaoTeChing11_81.cypher` for easier loading into Memgraph. This file is in the project root and is not committed to GitHub (it is too large and Memgraph-specific).
+
+---
+
+### 17.7 — Server
+
+`server.js` was migrated from `neo4j-driver` targeting a local Neo4j instance to `neo4j-driver` targeting a local **Memgraph** instance (`bolt://localhost:7687`, credentials `memgraph`/`memgraph`, database `memgraph`). The serialisation layer (`serializeValue`, `serializeProps`, `serializeEntity`) handles Memgraph's typed return values (Integer, DateTime, Node, Relationship) and converts them to plain JS before JSON serialisation.
