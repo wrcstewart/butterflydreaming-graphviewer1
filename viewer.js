@@ -1,6 +1,6 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
-const DWELL_MS   = 400;   // ms before tooltip displays
+const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 const FAMILY_COLOURS = {
@@ -482,7 +482,13 @@ function setupInteractions(cy, wsRef, addBadge) {
 
   cy.on('mousemove', 'node', evt => {
     if (recentTouch) return;
-    if (tooltip.style.display !== 'none') positionTooltip(evt.renderedPosition.x, evt.renderedPosition.y);
+    if (tooltip.style.display !== 'none') {
+      positionTooltip(evt.renderedPosition.x, evt.renderedPosition.y);
+    } else if (!dwellTimer) {
+      // mouseover can be missed on fast entry — mousemove rescues it
+      const rp = evt.renderedPosition;
+      startDwell(evt.target, rp.x, rp.y, false);
+    }
   });
 
   cy.on('mouseout', 'node', () => {
