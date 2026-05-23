@@ -14,12 +14,18 @@
   </div>
   <div id="search-bar"></div>
   <div id="label-tooltip"></div>
+  <div id="session-expired">
+    <div id="session-expired-box">
+      <p>Your session has expired due to inactivity — please reload to start a new session.</p>
+      <button onclick="location.reload()">Reload</button>
+    </div>
+  </div>
 
   <!-- CDN libraries: load order matters — fcose registers itself against cytoscape -->
   <script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script src="viewer.js?v=65"></script>
+  <script src="viewer.js?v=66"></script>
 </body>
 </html>

@@ -368,6 +368,10 @@ function isTouchEvent(evt) {
   return false;
 }
 
+function showSessionExpired() {
+  document.getElementById('session-expired').classList.add('active');
+}
+
 function setupInteractions(cy, wsRef, addBadge) {
 
   async function safeQuery(type, query, params = {}) {
@@ -589,7 +593,7 @@ function setupInteractions(cy, wsRef, addBadge) {
       );
     } catch (err) {
       if (err.message === 'session_expired') {
-        alert('Session ended — please reload the page to continue.');
+        showSessionExpired();
       } else {
         console.error('[BD] Search_CW create error:', err);
       }
@@ -646,7 +650,7 @@ function setupInteractions(cy, wsRef, addBadge) {
       );
     } catch (err) {
       if (err.message === 'session_expired') {
-        alert('Session ended — please reload the page to continue.');
+        showSessionExpired();
       } else {
         console.error('[BD] Search_CW click error:', err);
       }
@@ -1064,6 +1068,7 @@ async function init() {
   const pingTimer = setInterval(() => {
     if (Date.now() - wsRef.lastActivity > MAX_IDLE_MS) {
       clearInterval(pingTimer);
+      showSessionExpired();
       return;
     }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

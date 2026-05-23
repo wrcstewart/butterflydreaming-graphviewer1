@@ -139,6 +139,52 @@ html, body {
   white-space: nowrap;
 }
 
+#session-expired {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+
+#session-expired.active {
+  display: flex;
+}
+
+#session-expired-box {
+  background: #111;
+  border: 1px solid #444;
+  padding: 28px 32px;
+  text-align: center;
+  font-family: sans-serif;
+  max-width: 300px;
+}
+
+#session-expired-box p {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+#session-expired-box button {
+  background: #1a3a6b;
+  border: 1px solid #3a6abf;
+  color: #aac4ff;
+  padding: 6px 18px;
+  font-size: 12px;
+  font-family: sans-serif;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+#session-expired-box button:hover {
+  color: #fff;
+  border-color: #6a9adf;
+}
+
 #label-tooltip {
   position: fixed;
   background: rgba(0, 0, 0, 0.88);
