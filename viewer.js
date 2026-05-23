@@ -680,10 +680,15 @@ function setupInteractions(cy, ws, addBadge) {
       // Phase 2 — button is a persistent context control; only reset/new cluster hide it
       return;
     }
-    // Phase 1 — show/hide octagon graph nodes with cluster territory
-    const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
+    // Phase 1 — octagons only valid in cluster/TextNode context, not Family or root
     const scwNodes = cy.$('[type="Search_CW"]');
     if (!scwNodes.length) return;
+    if (node.data('type') !== 'TextNode') {
+      scwNodes.hide();
+      cy.$('[type="HAS_SEARCH_CW"]').hide();
+      return;
+    }
+    const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
     scwNodes[connected ? 'show' : 'hide']();
     cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
   }
