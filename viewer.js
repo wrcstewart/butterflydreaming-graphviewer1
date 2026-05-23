@@ -725,6 +725,7 @@ function setupInteractions(cy, wsRef, addBadge) {
   }
 
   searchBar.addEventListener('click', () => {
+    wsRef.lastActivity = Date.now();
     if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
   });
 
@@ -781,6 +782,7 @@ function setupInteractions(cy, wsRef, addBadge) {
   // Tap handler
 
   function handleNodeTap(node) {
+    wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
     if (type === 'Search_CW') {
@@ -1053,17 +1055,19 @@ async function init() {
 
   const wsRef = { current: ws };
 
-  // Keepalive ping every 30 s — keeps the connection alive for up to ~1 hour of use.
-  // After that, if the socket closes naturally the session is considered ended and the
-  // user should reload. We do not auto-reconnect (future user-identity work requires
+  // Keepalive ping every 30 s — fires only while the user has been active within the
+  // last 60 minutes. Idle time is measured from the last tap/click, not from page load.
+  // We do not auto-reconnect when the socket closes (future user-identity work requires
   // a deliberate re-authentication, not a silent new anonymous connection).
-  const MAX_PINGS = 120; // 120 × 30 s = 60 min
-  let pingCount = 0;
+  const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
+  wsRef.lastActivity = Date.now();
   const pingTimer = setInterval(() => {
-    if (pingCount >= MAX_PINGS) { clearInterval(pingTimer); return; }
+    if (Date.now() - wsRef.lastActivity > MAX_IDLE_MS) {
+      clearInterval(pingTimer);
+      return;
+    }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: '_ping' }));
-      pingCount++;
     }
   }, 30000);
 
