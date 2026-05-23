@@ -368,7 +368,14 @@ function isTouchEvent(evt) {
   return false;
 }
 
-function setupInteractions(cy, ws, addBadge) {
+function setupInteractions(cy, wsRef, addBadge) {
+
+  async function safeQuery(type, query, params = {}) {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      wsRef.current = await connectWS();
+    }
+    return queryWS(wsRef.current, type, query, params);
+  }
   const tooltip = document.getElementById('label-tooltip');
   let dwellTimer = null;
   const history = [];
@@ -572,7 +579,7 @@ function setupInteractions(cy, ws, addBadge) {
     const clusterName = clusterNode.data('name');
     let records;
     try {
-      records = await queryWS(ws, 'scwCreate',
+      records = await safeQuery('scwCreate',
         'MATCH (n:TextNode)-[]->(c:Cluster {name: $clusterName}) ' +
         'WHERE n.gateway = false ' +
         'RETURN DISTINCT n.source_text AS work, count(n) AS chapterCount ' +
@@ -626,7 +633,7 @@ function setupInteractions(cy, ws, addBadge) {
     const clusterName = lastClusterNode.data('name');
     let records;
     try {
-      records = await queryWS(ws, 'scwClick',
+      records = await safeQuery('scwClick',
         'MATCH (gw:TextNode {source_text: $work, gateway: true}) ' +
         'OPTIONAL MATCH (n:TextNode {source_text: $work, gateway: false})-[]->(c:Cluster {name: $clusterName}) ' +
         'RETURN gw, n',
@@ -1035,8 +1042,17 @@ async function init() {
   root.show();
   cy.fit(root, 120);
 
+  const wsRef = { current: ws };
+
+  // Keepalive ping every 25 s — prevents OS/server idle timeout dropping the connection
+  setInterval(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: '_ping' }));
+    }
+  }, 25000);
+
   const { addBadge } = setupNrBadges(cy);
-  setupInteractions(cy, ws, addBadge);
+  setupInteractions(cy, wsRef, addBadge);
 }
 
 window.addEventListener('DOMContentLoaded', init);
