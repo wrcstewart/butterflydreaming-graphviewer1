@@ -817,7 +817,7 @@ function setupInteractions(cy, wsRef, addBadge) {
     }
 
     if (node.data('name') === 'Settling') {
-      toggleMediaBar('Settling', 'bass_recorder_C3.mp3');
+      toggleMediaBar('Settling', 'ChineseSad1.mp3');
     }
   }
 
