@@ -372,7 +372,8 @@ function setupInteractions(cy, wsRef, addBadge) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      wsRef.current = await connectWS();
+      // Session has expired — do not reconnect silently (future: user identity lives on server)
+      throw new Error('session_expired');
     }
     return queryWS(wsRef.current, type, query, params);
   }
@@ -587,7 +588,11 @@ function setupInteractions(cy, wsRef, addBadge) {
         { clusterName }
       );
     } catch (err) {
-      console.error('[BD] Search_CW create error:', err);
+      if (err.message === 'session_expired') {
+        alert('Session ended — please reload the page to continue.');
+      } else {
+        console.error('[BD] Search_CW create error:', err);
+      }
       return;
     }
 
@@ -640,7 +645,11 @@ function setupInteractions(cy, wsRef, addBadge) {
         { work, clusterName }
       );
     } catch (err) {
-      console.error('[BD] Search_CW click error:', err);
+      if (err.message === 'session_expired') {
+        alert('Session ended — please reload the page to continue.');
+      } else {
+        console.error('[BD] Search_CW click error:', err);
+      }
       return;
     }
 
@@ -1044,12 +1053,19 @@ async function init() {
 
   const wsRef = { current: ws };
 
-  // Keepalive ping every 25 s — prevents OS/server idle timeout dropping the connection
-  setInterval(() => {
+  // Keepalive ping every 30 s — keeps the connection alive for up to ~1 hour of use.
+  // After that, if the socket closes naturally the session is considered ended and the
+  // user should reload. We do not auto-reconnect (future user-identity work requires
+  // a deliberate re-authentication, not a silent new anonymous connection).
+  const MAX_PINGS = 120; // 120 × 30 s = 60 min
+  let pingCount = 0;
+  const pingTimer = setInterval(() => {
+    if (pingCount >= MAX_PINGS) { clearInterval(pingTimer); return; }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: '_ping' }));
+      pingCount++;
     }
-  }, 25000);
+  }, 30000);
 
   const { addBadge } = setupNrBadges(cy);
   setupInteractions(cy, wsRef, addBadge);
