@@ -77,6 +77,7 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(raw);
       type = msg.type;
+      if (!msg.query) return;  // ignore keepalive pings and other non-query messages
       const session = driver.session({ database: 'memgraph' });
       try {
         const result = await session.run(msg.query, msg.params || {});
