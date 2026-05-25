@@ -72,6 +72,14 @@ function serializeRecord(rec) {
 // --- WebSocket handler ---
 
 wss.on('connection', (ws) => {
+  // Server-side WebSocket protocol ping every 25 s — browser replies with pong automatically
+  // at the protocol layer, keeping the connection alive without any client JS timer.
+  const keepAlive = setInterval(() => {
+    if (ws.readyState === ws.OPEN) ws.ping();
+    else clearInterval(keepAlive);
+  }, 25000);
+  ws.on('close', () => clearInterval(keepAlive));
+
   ws.on('message', async (raw) => {
     let type;
     try {

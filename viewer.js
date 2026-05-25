@@ -1078,20 +1078,16 @@ async function init() {
   const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
   const wsRef = { current: ws, lastActivity: Date.now(), maxIdleMs: MAX_IDLE_MS };
 
-  // Keepalive ping every 30 s — fires only while the user has been active within the
-  // last 60 minutes. Idle time is measured from the last tap/click, not from page load.
-  // Mobile browsers may suspend timers and drop the socket when backgrounded; safeQuery
-  // handles silent reconnection within the idle window, so pings are best-effort only.
-  const pingTimer = setInterval(() => {
+  // Idle-timeout check — runs every minute, shows session-expired overlay once the
+  // user has been inactive for 60 min. Connection keepalive is now handled entirely
+  // server-side via WebSocket protocol ping/pong (see server.js), which is more
+  // reliable than a JS timer and works even when the browser throttles background tabs.
+  const idleTimer = setInterval(() => {
     if (Date.now() - wsRef.lastActivity > MAX_IDLE_MS) {
-      clearInterval(pingTimer);
+      clearInterval(idleTimer);
       showSessionExpired();
-      return;
     }
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: '_ping' }));
-    }
-  }, 30000);
+  }, 60000);
 
   const { addBadge } = setupNrBadges(cy);
   setupInteractions(cy, wsRef, addBadge);
