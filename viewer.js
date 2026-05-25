@@ -102,6 +102,13 @@ function shortText(text, wordCount) {
     : words.slice(0, wordCount).join(' ') + '…';
 }
 
+function getTextNodeLabel(props) {
+  const seq = props.seq;
+  const title = props.title;
+  if (seq !== undefined && seq !== null && title) return `${seq}: ${title}`;
+  return shortText(props.text, 5);
+}
+
 function buildNodeData(n) {
   const labels = n.labels || [];
   const props = flattenProps(n.properties || {});
@@ -127,7 +134,7 @@ function buildNodeData(n) {
   if (labels.includes('TextNode')) {
     return Object.assign({}, props, {
       id, type: 'TextNode',
-      display_name: shortText(props.text, 5),
+      display_name: getTextNodeLabel(props),
       colour: '#111111',
     });
   }
