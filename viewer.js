@@ -383,8 +383,13 @@ function setupInteractions(cy, wsRef, addBadge) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      // Session has expired — do not reconnect silently (future: user identity lives on server)
-      throw new Error('session_expired');
+      if (Date.now() - wsRef.lastActivity > wsRef.maxIdleMs) {
+        // Truly idle for > 60 min — session ended
+        throw new Error('session_expired');
+      }
+      // Socket dropped (e.g. mobile background/screen lock) but within session window
+      // — reconnect transparently so the user can continue without interruption
+      wsRef.current = await connectWS();
     }
     return queryWS(wsRef.current, type, query, params);
   }
@@ -1070,14 +1075,13 @@ async function init() {
   root.show();
   cy.fit(root, 120);
 
-  const wsRef = { current: ws };
+  const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
+  const wsRef = { current: ws, lastActivity: Date.now(), maxIdleMs: MAX_IDLE_MS };
 
   // Keepalive ping every 30 s — fires only while the user has been active within the
   // last 60 minutes. Idle time is measured from the last tap/click, not from page load.
-  // We do not auto-reconnect when the socket closes (future user-identity work requires
-  // a deliberate re-authentication, not a silent new anonymous connection).
-  const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
-  wsRef.lastActivity = Date.now();
+  // Mobile browsers may suspend timers and drop the socket when backgrounded; safeQuery
+  // handles silent reconnection within the idle window, so pings are best-effort only.
   const pingTimer = setInterval(() => {
     if (Date.now() - wsRef.lastActivity > MAX_IDLE_MS) {
       clearInterval(pingTimer);
