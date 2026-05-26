@@ -1091,16 +1091,18 @@ async function init() {
     return;
   }
 
-  let records, clusterColourRecords;
+  let records, clusterColourRecords, cfRecords;
   try {
-    [records, clusterColourRecords] = await Promise.all([
+    [records, clusterColourRecords, cfRecords] = await Promise.all([
       queryWS(ws, 'graph',
         'MATCH (n)-[r]->(m) RETURN n, r, m'),
       queryWS(ws, 'clusterColours',
-        'MATCH (c:Cluster)-[r]->(f:Family) ' +
+        'MATCH (c:Cluster)-[r]-(f:Family) ' +
         'WITH c, f, r.weight AS w ORDER BY w DESC ' +
         'WITH c, collect(f)[0] AS pf ' +
         'RETURN c.name AS name, pf.hex AS colour'),
+      queryWS(ws, 'clusterFamily',
+        'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
     ]);
   } catch (err) {
     console.error('Query error:', err);
@@ -1121,6 +1123,15 @@ async function init() {
     if (!nodesById.has(nId)) nodesById.set(nId, buildNodeData(n));
     if (!nodesById.has(mId)) nodesById.set(mId, buildNodeData(m));
     if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, n, m));
+  }
+
+  // Ensure all Cluster-Family edges are present regardless of stored direction
+  for (const rec of cfRecords) {
+    const c = rec.c, r = rec.r, f = rec.f;
+    const cId = getElementId(c), fId = getElementId(f), rId = getElementId(r);
+    if (!nodesById.has(cId)) nodesById.set(cId, buildNodeData(c));
+    if (!nodesById.has(fId)) nodesById.set(fId, buildNodeData(f));
+    if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, c, f));
   }
 
   // Post-process cluster colours from highest-weighted family connection
