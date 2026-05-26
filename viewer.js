@@ -1125,13 +1125,32 @@ async function init() {
     if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, n, m));
   }
 
-  // Ensure all Cluster-Family edges are present regardless of stored direction
+  // Ensure all Cluster-Family edges are present.
+  // Some Cluster-Family edges are missing from the main query due to elementId
+  // inconsistency in Memgraph — the same node returns different elementIds in
+  // different query contexts. Resolve by name so edges always connect to the
+  // nodes already registered in nodesById.
+  const clusterIdByName = new Map();
+  const familyIdByName  = new Map();
+  nodesById.forEach(nd => {
+    if (nd.type === 'Cluster') clusterIdByName.set(nd.name, nd.id);
+    if (nd.type === 'Family')  familyIdByName.set(nd.name, nd.id);
+  });
+
   for (const rec of cfRecords) {
     const c = rec.c, r = rec.r, f = rec.f;
-    const cId = getElementId(c), fId = getElementId(f), rId = getElementId(r);
+    const cProps = flattenProps(c.properties || {});
+    const fProps = flattenProps(f.properties || {});
+    const rId = getElementId(r);
+    const cId = clusterIdByName.get(cProps.name) || getElementId(c);
+    const fId = familyIdByName.get(fProps.name)  || getElementId(f);
     if (!nodesById.has(cId)) nodesById.set(cId, buildNodeData(c));
     if (!nodesById.has(fId)) nodesById.set(fId, buildNodeData(f));
-    if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, c, f));
+    // Always overwrite so any previously-stored edge with wrong IDs gets corrected
+    const ed = buildEdgeData(r, c, f);
+    ed.source = cId;
+    ed.target = fId;
+    edgesById.set(rId, ed);
   }
 
   // Post-process cluster colours from highest-weighted family connection
