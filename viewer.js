@@ -200,6 +200,8 @@ function buildStyle() {
         'color': '#000000',
         'font-size': '4px',
         'text-max-width': '70px',
+        'border-width': 5,
+        'border-color': '#90EE90',
       }
     },
     {
