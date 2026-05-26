@@ -259,9 +259,9 @@ function buildStyle() {
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 38,
+        'width': 46,
         'height': 38,
-        'text-max-width': '32px',
+        'text-max-width': '40px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
