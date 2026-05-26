@@ -203,11 +203,6 @@ function buildStyle() {
         'border-width': 2,
         'border-color': '#FFEB80',
         'border-opacity': 0.5,
-        'shadow-blur': 8,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
       }
     },
     {
