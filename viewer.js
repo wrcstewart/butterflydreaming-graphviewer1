@@ -448,14 +448,12 @@ function setupInteractions(cy, wsRef, addBadge) {
 
   function positionTooltipTouch(node) {
     const pos = node.renderedPosition();
-    const tw = tooltip.offsetWidth;
-    let top  = pos.y - 80;
-    let left = pos.x + 10;
+    const th = tooltip.offsetHeight;
+    let top = pos.y - 80;
     if (top < 10) top = pos.y + 80;
-    if (left + tw > window.innerWidth - 10) left = pos.x - tw - 10;
-    if (left < 10) left = 10;
-    tooltip.style.left = left + 'px';
-    tooltip.style.top  = top  + 'px';
+    if (top + th > window.innerHeight - 10) top = window.innerHeight - th - 10;
+    tooltip.style.left = '14px';
+    tooltip.style.top  = top + 'px';
   }
 
   function showTooltip(node, x, y, isTouch) {
