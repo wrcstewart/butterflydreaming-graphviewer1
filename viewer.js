@@ -202,6 +202,11 @@ function buildStyle() {
         'text-max-width': '70px',
         'border-width': 5,
         'border-color': '#90EE90',
+        'shadow-blur': 10,
+        'shadow-color': '#90EE90',
+        'shadow-opacity': 0.6,
+        'shadow-offset-x': 0,
+        'shadow-offset-y': 0,
       }
     },
     {
