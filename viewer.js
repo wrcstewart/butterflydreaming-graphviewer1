@@ -232,10 +232,14 @@ function buildStyle() {
         'width': 38,
         'height': 38,
         'text-max-width': '32px',
-        'ghost': 'yes',
-        'ghost-opacity': 0.35,
-        'ghost-offset-x': 4,
-        'ghost-offset-y': 4,
+        'border-width': 2,
+        'border-color': '#ffffff',
+        'border-opacity': 0.5,
+        'shadow-blur': 8,
+        'shadow-color': '#ffffff',
+        'shadow-opacity': 0.3,
+        'shadow-offset-x': 0,
+        'shadow-offset-y': 0,
       }
     },
     {
