@@ -180,6 +180,7 @@ function buildStyle() {
       selector: 'node',
       style: {
         'background-color': 'data(colour)',
+        'background-opacity': 0.7,
         'label': 'data(display_name)',
         'text-valign': 'center',
         'text-halign': 'center',
