@@ -195,7 +195,7 @@ html, body {
   font-family: sans-serif;
   line-height: 1.6;
   white-space: pre-wrap;
-  max-width: 364px;
+  max-width: min(382px, calc(100vw - 28px));
   pointer-events: none;
   display: none;
   z-index: 100;
