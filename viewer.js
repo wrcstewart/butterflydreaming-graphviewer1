@@ -627,10 +627,6 @@ function setupInteractions(cy, wsRef, addBadge) {
   function expandToNode(node) {
     saveState();
     activeNodeId = node.id();
-    if (node.data('type') === 'Family') {
-      const nb = node.closedNeighborhood().not('[type="__root_edge__"]');
-      console.log('[BD] Family', node.data('name'), 'neighbourhood:', nb.nodes().map(n => n.data('name') + '(' + n.data('type') + ')'));
-    }
     cy.elements().hide();
 
     if (node.data('type') === 'root') {
@@ -678,11 +674,6 @@ function setupInteractions(cy, wsRef, addBadge) {
 
     clusterNode.show();
     const connEdges = clusterNode.connectedEdges();
-    console.log('[BD] Cluster', clusterNode.data('name'), '— connectedEdges:', connEdges.length,
-      '— neighbour types:', connEdges.map(e => {
-        const o = e.source().id() === clusterNode.id() ? e.target() : e.source();
-        return o.data('type');
-      }));
     connEdges.forEach(edge => {
       const other = edge.source().id() === clusterNode.id() ? edge.target() : edge.source();
       if (other.data('type') === 'Family') { edge.show(); other.show(); }
@@ -1146,11 +1137,17 @@ async function init() {
     const fId = familyIdByName.get(fProps.name)  || getElementId(f);
     if (!nodesById.has(cId)) nodesById.set(cId, buildNodeData(c));
     if (!nodesById.has(fId)) nodesById.set(fId, buildNodeData(f));
-    // Always overwrite so any previously-stored edge with wrong IDs gets corrected
+    // Prefix with 'cf_' to avoid ID collision: Memgraph shares the integer namespace
+    // between nodes and relationships, so rId may equal an existing TextNode's id.
+    // Nodes are added to Cytoscape first; without the prefix, Cytoscape silently
+    // drops the edge because the ID is already taken by a node.
+    const cfEdgeId = 'cf_' + rId;
     const ed = buildEdgeData(r, c, f);
+    ed.id = cfEdgeId;
     ed.source = cId;
     ed.target = fId;
-    edgesById.set(rId, ed);
+    edgesById.delete(rId);   // remove raw-rId entry that Cytoscape would drop anyway
+    edgesById.set(cfEdgeId, ed);
   }
 
   // Post-process cluster colours from highest-weighted family connection
@@ -1182,8 +1179,6 @@ async function init() {
   const elements = [];
   nodesById.forEach(nd => elements.push({ data: nd }));
   edgesById.forEach(ed => elements.push({ data: ed }));
-  console.log('[BD] Loaded:', nodesById.size, 'nodes,', edgesById.size, 'edges');
-  console.log('[BD] Clusters:', [...nodesById.values()].filter(n => n.type === 'Cluster').map(n => n.name));
 
   // Init Cytoscape
   const cy = cytoscape({
