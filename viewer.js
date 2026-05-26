@@ -745,8 +745,12 @@ function setupInteractions(cy, wsRef, addBadge) {
     searchBar.textContent = '';
   }
 
+  let lastSearchBarTap = 0;
   searchBar.addEventListener('click', () => {
-    wsRef.lastActivity = Date.now();
+    const now = Date.now();
+    if (now - lastSearchBarTap < 400) return;
+    lastSearchBarTap = now;
+    wsRef.lastActivity = now;
     if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
   });
 
