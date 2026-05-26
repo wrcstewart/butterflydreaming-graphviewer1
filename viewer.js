@@ -233,7 +233,13 @@ function buildStyle() {
         'height': 38,
         'text-max-width': '32px',
         'border-width': 2,
-        'border-color': '#ffffff',
+        'border-color': function(node) {
+          const hex = (node.data('colour') || '#666666').replace('#', '');
+          const r = Math.round(parseInt(hex.slice(0,2), 16) / 3).toString(16).padStart(2,'0');
+          const g = Math.round(parseInt(hex.slice(2,4), 16) / 3).toString(16).padStart(2,'0');
+          const b = Math.round(parseInt(hex.slice(4,6), 16) / 3).toString(16).padStart(2,'0');
+          return `#${r}${g}${b}`;
+        },
         'border-opacity': 0.5,
         'shadow-blur': 8,
         'shadow-color': '#ffffff',
