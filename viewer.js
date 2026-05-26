@@ -233,9 +233,9 @@ function buildStyle() {
         'height': 38,
         'text-max-width': '32px',
         'ghost': 'yes',
-        'ghost-opacity': 0.2,
-        'ghost-offset-x': 3,
-        'ghost-offset-y': 3,
+        'ghost-opacity': 0.5,
+        'ghost-offset-x': 5,
+        'ghost-offset-y': 5,
       }
     },
     {
