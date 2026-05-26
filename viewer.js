@@ -217,6 +217,7 @@ function buildStyle() {
       style: {
         'width': 68,
         'height': 68,
+        'shape': 'round-triangle',
         'text-max-width': '62px',
         'border-width': 2,
         'border-color': function(node) {
