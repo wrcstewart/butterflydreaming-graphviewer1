@@ -201,7 +201,7 @@ function buildStyle() {
         'font-size': '4px',
         'text-max-width': '70px',
         'border-width': 2,
-        'border-color': '#553800',
+        'border-color': '#FFEB80',
         'border-opacity': 0.5,
         'shadow-blur': 8,
         'shadow-color': '#ffffff',
