@@ -677,7 +677,13 @@ function setupInteractions(cy, wsRef, addBadge) {
     cy.elements().hide();
 
     clusterNode.show();
-    clusterNode.connectedEdges().forEach(edge => {
+    const connEdges = clusterNode.connectedEdges();
+    console.log('[BD] Cluster', clusterNode.data('name'), '— connectedEdges:', connEdges.length,
+      '— neighbour types:', connEdges.map(e => {
+        const o = e.source().id() === clusterNode.id() ? e.target() : e.source();
+        return o.data('type');
+      }));
+    connEdges.forEach(edge => {
       const other = edge.source().id() === clusterNode.id() ? edge.target() : edge.source();
       if (other.data('type') === 'Family') { edge.show(); other.show(); }
     });
