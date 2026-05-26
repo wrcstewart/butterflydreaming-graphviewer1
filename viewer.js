@@ -232,6 +232,10 @@ function buildStyle() {
         'width': 38,
         'height': 38,
         'text-max-width': '32px',
+        'ghost': 'yes',
+        'ghost-opacity': 0.2,
+        'ghost-offset-x': 3,
+        'ghost-offset-y': 3,
       }
     },
     {
