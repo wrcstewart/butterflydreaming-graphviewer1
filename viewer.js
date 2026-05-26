@@ -330,9 +330,9 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"][?gateway]',
       style: {
-        'shadow-blur': 8,
+        'shadow-blur': 12,
         'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
+        'shadow-opacity': 0.6,
         'shadow-offset-x': 0,
         'shadow-offset-y': 0,
       }
