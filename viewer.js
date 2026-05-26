@@ -627,6 +627,10 @@ function setupInteractions(cy, wsRef, addBadge) {
   function expandToNode(node) {
     saveState();
     activeNodeId = node.id();
+    if (node.data('type') === 'Family') {
+      const nb = node.closedNeighborhood().not('[type="__root_edge__"]');
+      console.log('[BD] Family', node.data('name'), 'neighbourhood:', nb.nodes().map(n => n.data('name') + '(' + n.data('type') + ')'));
+    }
     cy.elements().hide();
 
     if (node.data('type') === 'root') {
@@ -1142,6 +1146,8 @@ async function init() {
   const elements = [];
   nodesById.forEach(nd => elements.push({ data: nd }));
   edgesById.forEach(ed => elements.push({ data: ed }));
+  console.log('[BD] Loaded:', nodesById.size, 'nodes,', edgesById.size, 'edges');
+  console.log('[BD] Clusters:', [...nodesById.values()].filter(n => n.type === 'Cluster').map(n => n.name));
 
   // Init Cytoscape
   const cy = cytoscape({
