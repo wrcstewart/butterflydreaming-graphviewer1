@@ -2197,4 +2197,101 @@ This is a platform-wide concern. Any future code creating Cytoscape elements fro
 
 ---
 
+## DDR-5: Search_CW contextual tooltip and forward design — scrolling breadcrumbs for two users
+**Date:** 27 May 2026
+**Status:** Implemented (phase 1); forward design captured
+
+---
+
+### 5.1 — Contextual tooltip for Search_CW nodes
+
+#### Problem
+
+Search_CW nodes (the small rectangular "work" nodes that appear below a Cluster when it is expanded) previously showed only the bare work title as a tooltip. The breadcrumb bar button (`#search-bar`) showed the same plain title. Neither surface gave the user context about *why* that work was surfaced — i.e. which cluster filter produced it.
+
+#### Decision
+
+Generate the tooltip text programmatically at display time using both the work name stored on the node and the `lastClusterNode` that is already maintained in the interaction layer:
+
+```
+<work name> : filtered by: <cluster name>
+```
+
+Example: `Tao Te Ching : filtered by: Transformation`
+
+This applies uniformly to:
+
+1. **Cytoscape graph nodes** — `buildTooltipContent()` constructs the string for any `Search_CW` node.
+2. **`#search-bar` DOM button** (breadcrumb phase 2) — a `searchBarTooltipLabel()` helper reads `searchBar.textContent` (the work name) and `lastClusterNode.data('name')` and constructs the same string.
+
+Both surfaces follow the same interaction contract: **hover / first mobile touch shows the tooltip; click / second mobile touch navigates.**
+
+#### Implementation
+
+`buildTooltipContent` (viewer.js):
+
+```javascript
+if (type === 'Search_CW') {
+  const work = node.data('name') || '';
+  const cluster = lastClusterNode ? lastClusterNode.data('name') : '';
+  return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
+}
+```
+
+`#search-bar` mouseenter and touchstart use a shared helper:
+
+```javascript
+function searchBarTooltipLabel() {
+  const work = searchBar.textContent.trim();
+  const cluster = lastClusterNode ? lastClusterNode.data('name') : '';
+  return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
+}
+```
+
+---
+
+### 5.2 — Forward design: scrolling breadcrumbs for two users
+
+#### Context
+
+The breadcrumb bar concept (currently a single `#search-bar` button showing the most recent work selection) is the seed of a richer navigation history surface. The next phase of development extends this into a **scrolling breadcrumb trail** that records a user's navigation path through the graph.
+
+The viewer will eventually support two concurrent users:
+
+- **"you"** — the local user navigating on the current device
+- **"buddy"** — a remote user whose navigation state is transmitted to the local view
+
+Both users will have their own breadcrumb trail. The "you" trail is implemented first.
+
+#### Scrolling breadcrumbs — "you"
+
+Each time the local user selects a work from a cluster (i.e. taps/clicks a Search_CW node and confirms navigation), a breadcrumb entry is appended to the trail. An entry records at minimum:
+
+- The work title
+- The cluster context at the time of selection (the "filtered by" cluster)
+
+The trail is displayed as a horizontally scrollable row of labelled chips or buttons, most-recent on the right. Tapping/clicking a breadcrumb replays that navigation step — returning to the work in its cluster context.
+
+The tooltip format introduced in DDR-5.1 (`<work> : filtered by: <cluster>`) is the natural text for each breadcrumb chip. The chip label may be shortened (work title only) with the full contextual string appearing on hover/touch.
+
+#### Two-user model — "buddy"
+
+The "buddy" breadcrumb trail is displayed in a second row (or a visually distinct band within the same row). Buddy's trail represents navigation performed on a separate device or session, transmitted to the local view in near-real time.
+
+**The hover/touch interaction on a buddy breadcrumb chip is the primary mechanism by which the two users come together during the navigation phase.** When the local user hovers over (desktop) or first-touches (mobile) a buddy chip, the graph can shift to highlight or surface the work that buddy is currently viewing — creating a shared moment of attention without requiring either user to explicitly synchronise.
+
+This "hover to converge" model means:
+
+- Neither user is forced to follow the other's path
+- The act of noticing and hovering on a buddy chip is a deliberate, low-friction gesture of interest
+- It maps naturally onto the existing first-touch = tooltip, second-touch = navigate contract already established for Search_CW nodes
+
+#### Implementation order
+
+1. **"you" breadcrumb trail** — local, single-user, no server changes required. Append to trail on `handleSearchCWTap`; render as scrollable chip row above or below the current `#search-bar` position; wire tap/click to replay navigation.
+
+2. **"buddy" breadcrumb trail** — requires a server-side session and broadcast mechanism (WebSocket fan-out). Buddy navigation events are received as messages and appended to the buddy row. Hover/touch on a buddy chip triggers the graph convergence interaction.
+
+---
+
 *Amendment 18 — 26–27 May 2026*
