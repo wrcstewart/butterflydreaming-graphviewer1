@@ -2051,3 +2051,150 @@ The 14 individual `.cypher` files from the Tao Te Ching corpus were concatenated
 ### 17.7 — Server
 
 `server.js` was migrated from `neo4j-driver` targeting a local Neo4j instance to `neo4j-driver` targeting a local **Memgraph** instance (`bolt://localhost:7687`, credentials `memgraph`/`memgraph`, database `memgraph`). The serialisation layer (`serializeValue`, `serializeProps`, `serializeEntity`) handles Memgraph's typed return values (Integer, DateTime, Node, Relationship) and converts them to plain JS before JSON serialisation.
+
+---
+
+## Amendment 18 — graphviewer.md — 26–27 May 2026
+
+## Missing Cluster-Family edges, visual cleanup, and UI layout overhaul
+
+---
+
+### 18.1 — Visual style: shadow properties removed
+
+Cytoscape.js does not support the `shadow-blur`, `shadow-color`, `shadow-opacity`, `shadow-offset-x`, `shadow-offset-y` style properties. These were applied in earlier sessions to Family, Cluster, Settling, Conversations, gateway TextNode, and Search_CW nodes. They generated a console warning on every page load and had no visual effect.
+
+All shadow properties were removed from `buildStyle()`. Node visual depth is now achieved through borders only (see Amendment 17 visual refinements). The border settings are unchanged:
+
+- Family, Cluster, Settling, Conversations, Search_CW: `border-width: 2`, `border-color` at 1/3 colour intensity, `border-opacity: 0.5`
+- Root: `border-width: 5`, `border-color: #90EE90` (light green, no shadow — glow effect tried and rejected as "too designed")
+
+---
+
+### 18.2 — UI layout overhaul: top bar reorganisation
+
+The fixed top-bar controls were reorganised to make space for the tracker button concept (see 18.3):
+
+| Control | Before | After |
+|---|---|---|
+| Reset button | Top-right | Top-left |
+| Media player bar | Inside top-bar (below reset) | Top-right, independently positioned |
+| Tracker button | Top-left (single position) | Second row, centered (`top: 52px; left: 50%`) |
+
+The `#media-bar` element was moved out of `#top-bar` in `index.html` and given its own `position: fixed` at `top: 16px; right: 16px`. Both the reset button and media bar now sit at the same vertical level at opposite ends of the screen.
+
+The tracker button (`#search-bar`) sits on a second visual row at `top: 52px`, centered horizontally. This positions it below the reset/player row and reserves space for future breadcrumb expansion (see 18.3).
+
+---
+
+### 18.3 — Tracker button concept: Search_CW shape change and row layout
+
+The Search_CW nodes were changed from octagon to rectangle (`shape: 'rectangle'`, `width: 90`, `height: 28`) to match the visual weight of the reset button and to introduce the tracker button concept more deliberately.
+
+**Tracker button concept.** These nodes represent the user's in-session navigation context — which corpus works are relevant to the current cluster. As the platform develops toward cooperative browsing (dyadic sessions), these will become a breadcrumb row: a horizontal strip of small rectangular buttons recording the path through the corpus. One button per work visited during the session. For now a single tracker button appears when a cluster is activated.
+
+**Horizontal row positioning.** After the fCoSE layout settles (500ms delay), Search_CW nodes are repositioned into a horizontal row 150px below the cluster node, centered on the cluster's x-position with 110px spacing between nodes:
+
+```javascript
+setTimeout(() => {
+  const trackers = cy.nodes('[type="Search_CW"]:visible');
+  if (!trackers.length) return;
+  const rowX = clusterNode.position().x - ((trackers.length - 1) * 110) / 2;
+  const rowY = clusterNode.position().y + 150;
+  trackers.forEach((n, i) => n.position({ x: rowX + i * 110, y: rowY }));
+  cy.fit(cy.elements(':visible'), 60);
+}, 500);
+```
+
+The Phase 2 tracker button (DOM element `#search-bar`) retains the work name and cluster colour but is now styled as a plain rectangle matching the reset button (same padding, font size, letter spacing). It sits centered on the second row.
+
+---
+
+### 18.4 — Media player: remove toggle-close behaviour
+
+The media player previously closed when the Settling node was tapped a second time (toggle behaviour). This caused a state-machine problem: if the player had been dismissed and the user tapped Settling, the tap could be interpreted as a second tap on an already-active node and no-op, making the player impossible to reopen without navigating away.
+
+The toggle-close branch was removed. The player now only opens (or does nothing if the same track is already showing). The only way to close the player is the `✕` button:
+
+```javascript
+function toggleMediaBar(label, audioSrc) {
+  if (mediaBar.classList.contains('active') && mediaBar.dataset.node === label) {
+    return;  // already open — only ✕ closes the player
+  }
+  // open or switch track...
+}
+```
+
+---
+
+## DDR-4: Missing Cluster-Family edges — Memgraph integer ID namespace collision
+**Date:** 26 May 2026
+**Status:** Resolved
+
+### The problem
+
+When clicking a Family node, some Cluster nodes that should appear in its neighbourhood were absent — despite all 76 clusters being present in the Cytoscape graph. The missing clusters (Paradox, Order/Chaos, Naming/Becoming, and others) could be reached via TextNode clicks but not via Family clicks, meaning their Cluster-Family edges were absent from Cytoscape while their Cluster-TextNode edges were present.
+
+### Investigation
+
+Three rounds of diagnostic logging were added across two sessions.
+
+**Round 1** confirmed all 76 clusters loaded into `nodesById`. The missing clusters existed in the graph but had no Family connections.
+
+**Round 2** (name-based resolution fix) added a second query `MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f` and built a name→id lookup to resolve the known Memgraph elementId inconsistency (the same node returning different elementIds in different query contexts). The fix ran correctly but the missing edges were still absent.
+
+**Round 3** added targeted logging inside the cfRecords loop and a post-init check on Cytoscape's actual edge state for the Paradox cluster. The logs revealed:
+
+```
+[BD] cf: Paradox → Reason | cResolved: true | fResolved: true | cId: "120" | fId: "85" | rId: "314"
+[BD] Paradox connectedEdges: 127  — ALL have tgt:120, NONE have src:120
+```
+
+The cfRecords loop was correctly resolving IDs and storing the edge with `source: "120"` (Paradox), `target: "85"` (Reason). Yet the edge never appeared in Cytoscape.
+
+### Root cause
+
+**Memgraph shares its integer ID namespace across both nodes and relationships.**
+
+A node and a relationship can have the same integer ID — e.g. TextNode node `315` and the Paradox-Spirit Cluster-Family relationship `315` are two entirely different objects that happen to share the same integer identifier.
+
+Cytoscape.js requires all elements (nodes and edges) to have unique `id` values across the entire graph. In `init()`, nodes are added to the elements array before edges:
+
+```javascript
+nodesById.forEach(nd => elements.push({ data: nd }));   // nodes first
+edgesById.forEach(ed => elements.push({ data: ed }));   // edges second
+```
+
+When Cytoscape processes this array, it registers the TextNode with id `"315"` first. When it then encounters the Cluster-Family edge with id `"315"`, the ID is already taken — Cytoscape silently discards the edge.
+
+This affected only the Cluster-Family edges because those are the only edges whose relationship IDs collide with node IDs in the data as it currently stands. TextNode→Cluster relationship IDs happen to not collide — so the majority of the graph worked correctly.
+
+### Fix
+
+Prefix every Cluster-Family edge ID with `"cf_"` before storing it in `edgesById`:
+
+```javascript
+const cfEdgeId = 'cf_' + rId;
+const ed = buildEdgeData(r, c, f);
+ed.id = cfEdgeId;
+ed.source = cId;
+ed.target = fId;
+edgesById.delete(rId);    // remove any raw-rId entry that would be dropped anyway
+edgesById.set(cfEdgeId, ed);
+```
+
+The prefix guarantees the ID can never collide with a Memgraph integer node ID. The `edgesById.delete(rId)` removes any entry stored under the raw relationship ID by the main query, which would have been silently dropped by Cytoscape anyway.
+
+### Standing rule for future development
+
+**Memgraph does not guarantee unique IDs across node and relationship objects.** Any code that stores both nodes and relationships in a shared namespace (such as Cytoscape's element ID space, a JavaScript Map, or any other keyed collection that mixes both) must prefix or namespace the keys to avoid collisions.
+
+Recommended prefixes:
+- Node IDs: use as-is (numeric strings from Memgraph `elementId`)
+- Relationship IDs where used as element IDs: prefix with a type-specific tag (e.g. `cf_` for Cluster-Family, `cw_` for cluster-work edges)
+
+This is a platform-wide concern. Any future code creating Cytoscape elements from Memgraph data must apply this rule.
+
+---
+
+*Amendment 18 — 26–27 May 2026*
