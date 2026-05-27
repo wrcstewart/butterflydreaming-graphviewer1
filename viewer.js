@@ -103,9 +103,9 @@ function shortText(text, wordCount) {
 }
 
 function getTextNodeLabel(props) {
+  const src = props.source_text;
   const seq = props.seq;
-  const title = props.title;
-  if (seq !== undefined && seq !== null && title) return `${seq}: ${title}`;
+  if (src && seq !== undefined && seq !== null) return `${src}: ${seq}`;
   return shortText(props.text, 5);
 }
 
@@ -475,11 +475,12 @@ function setupInteractions(cy, wsRef, addBadge) {
       return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
     }
     if (type === 'TextNode') {
+      const title = node.data('title') || '';
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
-      let content = lines.slice(0, 6).join('\n');
-      if (lines.length > 6) content += '\n…';
-      return content;
+      let body = lines.slice(0, 6).join('\n');
+      if (lines.length > 6) body += '\n…';
+      return title ? `${title}\n${body}` : body;
     }
     return '';
   }
