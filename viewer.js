@@ -364,6 +364,7 @@ function buildStyle() {
         'border-opacity': 0.6,
         'font-size': '8px',
         'text-max-width': '84px',
+        'overlay-opacity': 0,
       }
     },
     {
@@ -563,6 +564,7 @@ function setupInteractions(cy, wsRef, addBadge) {
   cy.on('tapstart', 'node', evt => {
     if (!isTouchEvent(evt)) return;
     markRecentTouch();
+    if (!buildTooltipContent(evt.target)) return;
     const rp = evt.renderedPosition;
     startDwell(evt.target, rp.x, rp.y, true);
   });
