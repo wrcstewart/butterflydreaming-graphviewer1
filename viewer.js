@@ -469,7 +469,7 @@ function setupInteractions(cy, wsRef, addBadge) {
     if (type === 'Entry')    return node.data('text') || node.data('name') || '';
     if (type === 'Family')   return node.data('text') || node.data('name') || '';
     if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
-    if (type === 'Search_CW') return node.data('name') || '';
+    if (type === 'Search_CW') return '';
     if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
@@ -898,6 +898,17 @@ function setupInteractions(cy, wsRef, addBadge) {
     if (isTouchEvent(evt)) {
       markRecentTouch();
       cancelDwell();
+
+      // Nodes with no tooltip content navigate immediately on first tap —
+      // the tooltip step is a hover-equivalent; skip it when there's nothing to show
+      if (!buildTooltipContent(node)) {
+        hideTooltip();
+        touchPendingNodeId = null;
+        clearTimeout(tapResetTimer);
+        tapResetTimer = null;
+        handleNodeTap(node);
+        return;
+      }
 
       const sameNode    = touchPendingNodeId === node.id();
       const withinWindow = tapResetTimer !== null;
