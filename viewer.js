@@ -469,7 +469,11 @@ function setupInteractions(cy, wsRef, addBadge) {
     if (type === 'Entry')    return node.data('text') || node.data('name') || '';
     if (type === 'Family')   return node.data('text') || node.data('name') || '';
     if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
-    if (type === 'Search_CW') return node.data('name') || '';
+    if (type === 'Search_CW') {
+      const work = node.data('name') || '';
+      const cluster = lastClusterNode ? lastClusterNode.data('name') : '';
+      return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
+    }
     if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
@@ -805,8 +809,14 @@ function setupInteractions(cy, wsRef, addBadge) {
     searchBar.textContent = '';
   }
 
+  function searchBarTooltipLabel() {
+    const work = searchBar.textContent.trim();
+    const cluster = lastClusterNode ? lastClusterNode.data('name') : '';
+    return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
+  }
+
   searchBar.addEventListener('mouseenter', () => {
-    const label = searchBar.textContent.trim();
+    const label = searchBarTooltipLabel();
     if (!label || recentTouch) return;
     tooltip.textContent = label;
     tooltip.style.display = 'block';
@@ -821,7 +831,7 @@ function setupInteractions(cy, wsRef, addBadge) {
   let searchBarTouchTimer = null;
   searchBar.addEventListener('touchstart', evt => {
     evt.preventDefault();
-    const label = searchBar.textContent.trim();
+    const label = searchBarTooltipLabel();
     if (!label) return;
     markRecentTouch();
     wsRef.lastActivity = Date.now();
