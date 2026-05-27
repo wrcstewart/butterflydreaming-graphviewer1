@@ -350,10 +350,10 @@ function buildStyle() {
     {
       selector: 'node[type="Search_CW"]',
       style: {
-        'shape': 'octagon',
-        'width': 49,
-        'height': 49,
-        'border-width': 2,
+        'shape': 'rectangle',
+        'width': 90,
+        'height': 28,
+        'border-width': 1,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
           const r = Math.round(parseInt(hex.slice(0,2), 16) / 3).toString(16).padStart(2,'0');
@@ -361,8 +361,9 @@ function buildStyle() {
           const b = Math.round(parseInt(hex.slice(4,6), 16) / 3).toString(16).padStart(2,'0');
           return `#${r}${g}${b}`;
         },
-        'border-opacity': 0.5,
-        'text-max-width': '43px',
+        'border-opacity': 0.6,
+        'font-size': '8px',
+        'text-max-width': '84px',
       }
     },
     {
@@ -698,6 +699,17 @@ function setupInteractions(cy, wsRef, addBadge) {
       addBadge(cy.getElementById(nodeId));
     }
     runLayout(cy);
+
+    // After fCoSE settles, arrange tracker nodes in a horizontal row below the cluster
+    setTimeout(() => {
+      const trackers = cy.nodes('[type="Search_CW"]:visible');
+      if (!trackers.length) return;
+      const spacing = 110;
+      const rowX = clusterNode.position().x - ((trackers.length - 1) * spacing) / 2;
+      const rowY = clusterNode.position().y + 150;
+      trackers.forEach((n, i) => n.position({ x: rowX + i * spacing, y: rowY }));
+      cy.fit(cy.elements(':visible'), 60);
+    }, 500);
   }
 
   async function handleSearchCWTap(node) {
@@ -813,34 +825,31 @@ function setupInteractions(cy, wsRef, addBadge) {
 
   function toggleMediaBar(label, audioSrc) {
     if (mediaBar.classList.contains('active') && mediaBar.dataset.node === label) {
-      const audio = mediaBar.querySelector('audio');
-      if (audio) { audio.pause(); audio.src = ''; }
-      mediaBar.classList.remove('active');
-      mediaBar.dataset.node = '';
-      mediaBar.innerHTML = '';
-    } else {
-      mediaBar.innerHTML =
-        `<span class="media-label">${label}</span>` +
-        `<button class="mp-btn" aria-label="play">▶</button>` +
-        `<span class="mp-time">–:–– / –:––</span>` +
-        `<audio src="${audioSrc}"></audio>` +
-        `<button class="media-close" aria-label="close">✕</button>`;
-      mediaBar.dataset.node = label;
-      mediaBar.classList.add('active');
-
-      const audio = mediaBar.querySelector('audio');
-      const btn   = mediaBar.querySelector('.mp-btn');
-      const time  = mediaBar.querySelector('.mp-time');
-
-      btn.addEventListener('click', () => {
-        if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
-        else              { audio.pause(); btn.textContent = '▶'; }
-      });
-      audio.addEventListener('timeupdate', () => {
-        time.textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
-      });
-      audio.addEventListener('ended', () => { btn.textContent = '▶'; });
+      return;  // already open — only ✕ closes the player
     }
+    const existingAudio = mediaBar.querySelector('audio');
+    if (existingAudio) { existingAudio.pause(); existingAudio.src = ''; }
+    mediaBar.innerHTML =
+      `<span class="media-label">${label}</span>` +
+      `<button class="mp-btn" aria-label="play">▶</button>` +
+      `<span class="mp-time">–:–– / –:––</span>` +
+      `<audio src="${audioSrc}"></audio>` +
+      `<button class="media-close" aria-label="close">✕</button>`;
+    mediaBar.dataset.node = label;
+    mediaBar.classList.add('active');
+
+    const audio = mediaBar.querySelector('audio');
+    const btn   = mediaBar.querySelector('.mp-btn');
+    const time  = mediaBar.querySelector('.mp-time');
+
+    btn.addEventListener('click', () => {
+      if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
+      else              { audio.pause(); btn.textContent = '▶'; }
+    });
+    audio.addEventListener('timeupdate', () => {
+      time.textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
+    });
+    audio.addEventListener('ended', () => { btn.textContent = '▶'; });
   }
 
   mediaBar.addEventListener('click', evt => {
