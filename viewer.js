@@ -228,11 +228,6 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.5,
-        'shadow-blur': 8,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
       }
     },
     {
@@ -250,11 +245,6 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.5,
-        'shadow-blur': 8,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
       }
     },
     {
@@ -272,11 +262,6 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.5,
-        'shadow-blur': 8,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
       }
     },
     {
@@ -296,11 +281,6 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.5,
-        'shadow-blur': 8,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
       }
     },
     {
@@ -320,16 +300,6 @@ function buildStyle() {
         'border-color': function(node) {
           return node.data('gateway') ? '#ffffff' : '#888888';
         },
-      }
-    },
-    {
-      selector: 'node[type="TextNode"][?gateway]',
-      style: {
-        'shadow-blur': 18,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.85,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
       }
     },
     {
@@ -392,11 +362,6 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.5,
-        'shadow-blur': 8,
-        'shadow-color': '#ffffff',
-        'shadow-opacity': 0.3,
-        'shadow-offset-x': 0,
-        'shadow-offset-y': 0,
         'text-max-width': '43px',
       }
     },
