@@ -364,7 +364,6 @@ function buildStyle() {
         'border-opacity': 0.6,
         'font-size': '8px',
         'text-max-width': '84px',
-        'overlay-opacity': 0,
       }
     },
     {
@@ -470,7 +469,7 @@ function setupInteractions(cy, wsRef, addBadge) {
     if (type === 'Entry')    return node.data('text') || node.data('name') || '';
     if (type === 'Family')   return node.data('text') || node.data('name') || '';
     if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
-    if (type === 'Search_CW') return '';
+    if (type === 'Search_CW') return node.data('name') || '';
     if (type === 'TextNode') {
       const text = node.data('text') || '';
       const lines = text.split('\n').filter(l => l.trim());
@@ -806,12 +805,44 @@ function setupInteractions(cy, wsRef, addBadge) {
     searchBar.textContent = '';
   }
 
-  let lastSearchBarTap = 0;
+  searchBar.addEventListener('mouseenter', () => {
+    const label = searchBar.textContent.trim();
+    if (!label || recentTouch) return;
+    tooltip.textContent = label;
+    tooltip.style.display = 'block';
+    const rect = searchBar.getBoundingClientRect();
+    positionTooltip(rect.left + rect.width / 2, rect.bottom);
+  });
+  searchBar.addEventListener('mouseleave', () => {
+    setTimeout(() => { if (!tooltip.matches(':hover')) hideTooltip(); }, 100);
+  });
+
+  let searchBarTouchPending = false;
+  let searchBarTouchTimer = null;
+  searchBar.addEventListener('touchstart', evt => {
+    evt.preventDefault();
+    const label = searchBar.textContent.trim();
+    if (!label) return;
+    markRecentTouch();
+    wsRef.lastActivity = Date.now();
+    if (searchBarTouchPending) {
+      clearTimeout(searchBarTouchTimer);
+      searchBarTouchPending = false;
+      hideTooltip();
+      if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
+    } else {
+      tooltip.textContent = label;
+      tooltip.style.display = 'block';
+      const rect = searchBar.getBoundingClientRect();
+      tooltip.style.left = '14px';
+      tooltip.style.top = (rect.bottom + 6) + 'px';
+      searchBarTouchPending = true;
+      searchBarTouchTimer = setTimeout(() => { searchBarTouchPending = false; }, 800);
+    }
+  }, { passive: false });
+
   searchBar.addEventListener('click', () => {
-    const now = Date.now();
-    if (now - lastSearchBarTap < 400) return;
-    lastSearchBarTap = now;
-    wsRef.lastActivity = now;
+    wsRef.lastActivity = Date.now();
     if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
   });
 
