@@ -899,14 +899,20 @@ function setupInteractions(cy, wsRef, addBadge) {
       markRecentTouch();
       cancelDwell();
 
-      // Nodes with no tooltip content navigate immediately on first tap —
-      // the tooltip step is a hover-equivalent; skip it when there's nothing to show
+      // Nodes with no tooltip content: first touch is a silent no-op (like desktop hover),
+      // second touch within 800ms navigates — same double-tap gate, no visible feedback
       if (!buildTooltipContent(node)) {
-        hideTooltip();
-        touchPendingNodeId = null;
+        const sameNode     = touchPendingNodeId === node.id();
+        const withinWindow = tapResetTimer !== null;
         clearTimeout(tapResetTimer);
         tapResetTimer = null;
-        handleNodeTap(node);
+        if (sameNode && withinWindow) {
+          touchPendingNodeId = null;
+          handleNodeTap(node);
+        } else {
+          touchPendingNodeId = node.id();
+          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
+        }
         return;
       }
 
