@@ -432,7 +432,7 @@ function showSessionExpired() {
   document.getElementById('session-expired').classList.add('active');
 }
 
-function setupInteractions(cy, wsRef, addBadge) {
+function setupInteractions(cy, wsRef, addBadge, youCy) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -459,6 +459,51 @@ function setupInteractions(cy, wsRef, addBadge) {
   let currentClusterColour = null;
   let lastSearchCWNode = null;
   let syntheticEdgeIds = new Set();
+
+  // --- You breadcrumb chips ---
+  let youChipCount = 0;
+  let youChipX = 0;
+  let lastYouChipId = null;
+
+  function chipWidth(type) {
+    if (type === 'Family')    return 44;
+    if (type === 'TextNode')  return 100;
+    if (type === 'Search_CW') return 90;
+    return 55; // Cluster
+  }
+
+  function addYouChip(node) {
+    const type = node.data('type');
+    const w    = chipWidth(type);
+    const id   = 'you_' + (youChipCount++);
+    youCy.add({
+      group: 'nodes',
+      data: {
+        id,
+        type,
+        display_name: node.data('display_name') || node.data('name') || '',
+        colour:       node.data('colour') || '#444444',
+        name:         node.data('name') || '',
+        url:          node.data('url') || null,
+        mainId:       node.id(),
+      },
+      position: { x: youChipX + w / 2, y: 15 }
+    });
+    if (lastYouChipId) {
+      youCy.add({
+        group: 'edges',
+        data: {
+          id: 'you_e_' + id,
+          source: lastYouChipId,
+          target: id,
+          colour: '#333333',
+          weight: 0.2,
+        }
+      });
+    }
+    youChipX    += w + 6;
+    lastYouChipId = id;
+  }
 
   function markRecentTouch() {
     recentTouch = true;
@@ -915,6 +960,10 @@ function setupInteractions(cy, wsRef, addBadge) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
+    if (type === 'Family' || type === 'Cluster' || type === 'TextNode') {
+      addYouChip(node);
+    }
+
     if (type === 'Search_CW') {
       handleSearchCWTap(node);
       return;
@@ -1238,10 +1287,6 @@ async function init() {
     }
   }, 60000);
 
-  const { addBadge } = setupNrBadges(cy);
-  setupInteractions(cy, wsRef, addBadge);
-
-  // Breadcrumb canvases — empty for now, chips added in next phase
   const youCy = cytoscape({
     container: document.getElementById('cy-you'),
     elements: [],
@@ -1263,6 +1308,9 @@ async function init() {
     userPanningEnabled: false,
     boxSelectionEnabled: false,
   });
+
+  const { addBadge } = setupNrBadges(cy);
+  setupInteractions(cy, wsRef, addBadge, youCy);
 }
 
 window.addEventListener('DOMContentLoaded', init);
