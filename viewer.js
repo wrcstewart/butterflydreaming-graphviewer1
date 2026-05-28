@@ -250,8 +250,9 @@ function buildStyle() {
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 46,
-        'height': 38,
+        'width': 44,
+        'height': 22,
+        'font-size': '7px',
         'text-max-width': '40px',
         'border-width': 2,
         'border-color': function(node) {
