@@ -481,11 +481,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
       data: {
         id,
         type,
-        display_name: node.data('display_name') || node.data('name') || '',
-        colour:       node.data('colour') || '#444444',
-        name:         node.data('name') || '',
-        url:          node.data('url') || null,
-        mainId:       node.id(),
+        display_name:  node.data('display_name') || node.data('name') || '',
+        colour:        node.data('colour') || '#444444',
+        name:          node.data('name') || '',
+        url:           node.data('url') || null,
+        mainId:        node.id(),
+        source_text:   node.data('source_text') || null,
+        clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
       },
       position: { x: youChipX + w / 2, y: 18 }
     });
@@ -514,8 +516,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
   youCy.on('mouseover', 'node', evt => {
     if (recentTouch) return;
     const chip = evt.target;
-    const main = cy.getElementById(chip.data('mainId'));
-    if (!main.length) return;
+    let main = cy.getElementById(chip.data('mainId'));
+    if (!main.length) {
+      if (chip.data('type') !== 'Search_CW') return;
+      const d = { type: 'Search_CW', source_text: chip.data('source_text'), name: chip.data('name'), colour: chip.data('colour') };
+      main = { data: k => d[k], id: () => chip.data('mainId') };
+    }
     const content = buildTooltipContent(main);
     if (!content) return;
     tooltip.textContent = content;
@@ -529,8 +535,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
 
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
-    const main = cy.getElementById(chip.data('mainId'));
-    if (!main.length) return;
+
+    // Resolve main graph node — for Search_CW the original may have been cleared,
+    // so fall back to a data proxy carrying stored source_text/name/colour
+    let main = cy.getElementById(chip.data('mainId'));
+    if (!main.length) {
+      if (chip.data('type') === 'Search_CW') {
+        const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
+        if (clusterNode.length) lastClusterNode = clusterNode;
+        const d = {
+          type: 'Search_CW',
+          source_text: chip.data('source_text'),
+          name:        chip.data('name'),
+          colour:      chip.data('colour'),
+        };
+        main = { data: k => d[k], id: () => chip.data('mainId') };
+      } else {
+        return;
+      }
+    } else if (chip.data('type') === 'Search_CW') {
+      const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
+      if (clusterNode.length) lastClusterNode = clusterNode;
+    }
 
     if (isTouchEvent(evt)) {
       markRecentTouch();
@@ -541,7 +567,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
       if (same && inWindow) {
         youTouchPending = null;
         hideTooltip();
-        handleNodeTap(main);
+        handleNodeTap(main, false);
       } else {
         const content = buildTooltipContent(main);
         if (content) {
@@ -558,7 +584,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     }
 
     hideTooltip();
-    handleNodeTap(main);
+    handleNodeTap(main, false);
   });
 
   function markRecentTouch() {
@@ -1012,11 +1038,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
 
   // Tap handler
 
-  function handleNodeTap(node) {
+  function handleNodeTap(node, addChip = true) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
-    if (type === 'Family' || type === 'Cluster' || type === 'TextNode') {
+    if (addChip && (type === 'Family' || type === 'Cluster' || type === 'TextNode' || type === 'Search_CW')) {
       addYouChip(node);
     }
 
