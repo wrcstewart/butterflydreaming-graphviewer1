@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 132; // bc-spacer(50) + cy-buddy(36) + gap(10) + cy-you(36)
+let BARS_BOTTOM = 96; // unpaired: bc-spacer(50) + cy-you(36) + margin(10); 132 when paired
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -444,7 +444,7 @@ function showSessionExpired() {
   document.getElementById('session-expired').classList.add('active');
 }
 
-function setupInteractions(cy, wsRef, addBadge, youCy) {
+function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -521,6 +521,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
       });
     }
     youCy.getElementById(id).addClass('latest');
+    if (pairingState.active) {
+      const sendWs = wsRef.current;
+      if (sendWs && sendWs.readyState === WebSocket.OPEN) {
+        sendWs.send(JSON.stringify({
+          type: 'breadcrumb',
+          data: {
+            type,
+            display_name:  node.data('display_name') || node.data('name') || '',
+            colour:        node.data('colour') || '#444444',
+            name:          node.data('name') || '',
+            mainId:        node.id(),
+            source_text:   node.data('source_text') || null,
+            gateway:       node.data('gateway') || false,
+            clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
+          }
+        }));
+      }
+    }
     youChipX    += w + 7;
     lastYouChipId = id;
     panYouCyToLatest();
@@ -535,6 +553,119 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
   }
 
   window.addEventListener('resize', panYouCyToLatest);
+
+  // --- buddyCy chip trail ---
+
+  let buddyChipCount = 0;
+  let buddyChipX = 0;
+  let lastBuddyChipId = null;
+
+  function appendBuddyChip(data) {
+    const type = data.type;
+    const w    = chipWidth(type);
+    const id   = 'buddy_' + (buddyChipCount++);
+    if (lastBuddyChipId) {
+      const prev = buddyCy.getElementById(lastBuddyChipId);
+      if (prev.length) prev.removeClass('latest');
+    }
+    buddyCy.add({
+      group: 'nodes',
+      data: {
+        id,
+        type,
+        display_name:  data.display_name || data.name || '',
+        colour:        data.colour || '#444444',
+        name:          data.name || '',
+        mainId:        data.mainId || null,
+        source_text:   data.source_text || null,
+        gateway:       data.gateway || false,
+        clusterNodeId: data.clusterNodeId || null,
+      },
+      position: { x: buddyChipX + w / 2, y: 18 }
+    });
+    if (lastBuddyChipId) {
+      buddyCy.add({
+        group: 'edges',
+        data: { id: 'buddy_e_' + id, source: lastBuddyChipId, target: id, colour: '#333333', weight: 0.2 }
+      });
+    }
+    buddyCy.getElementById(id).addClass('latest');
+    buddyChipX    += w + 7;
+    lastBuddyChipId = id;
+    panBuddyCyToLatest();
+  }
+
+  function panBuddyCyToLatest() {
+    if (buddyChipCount === 0) return;
+    const containerWidth = document.getElementById('cy-buddy').offsetWidth;
+    const rightEdge = buddyChipX - 7;
+    const panX = Math.min(0, containerWidth - rightEdge - 12);
+    buddyCy.pan({ x: panX, y: 0 });
+  }
+
+  window.addEventListener('resize', panBuddyCyToLatest);
+
+  // --- buddyCy chip interactions ---
+
+  const buddyContainer = document.getElementById('cy-buddy');
+  let buddyTouchPending = null;
+  let buddyTouchTimer   = null;
+
+  function buildBuddyChipTooltip(chip) {
+    if (chip.data('type') === 'Search_CW') {
+      const work        = chip.data('name') || '';
+      const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
+      const clusterName = clusterNode.length ? clusterNode.data('name') : '';
+      return (work && clusterName) ? `${work} : filtered by: ${clusterName}` : work;
+    }
+    return chip.data('display_name') || chip.data('name') || '';
+  }
+
+  buddyCy.on('mouseover', 'node', evt => {
+    if (recentTouch) return;
+    const chip    = evt.target;
+    const content = buildBuddyChipTooltip(chip);
+    if (!content) return;
+    tooltip.textContent = content;
+    tooltip.style.display = 'block';
+    const rect = buddyContainer.getBoundingClientRect();
+    const bb   = chip.renderedBoundingBox();
+    positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
+  });
+
+  buddyCy.on('mouseout', 'node', () => hideTooltip());
+
+  buddyCy.on('tap', 'node', evt => {
+    const chip = evt.target;
+    const main = cy.getElementById(chip.data('mainId'));
+
+    if (isTouchEvent(evt)) {
+      markRecentTouch();
+      const same     = buddyTouchPending === chip.id();
+      const inWindow = buddyTouchTimer !== null;
+      clearTimeout(buddyTouchTimer);
+      buddyTouchTimer = null;
+      if (same && inWindow) {
+        buddyTouchPending = null;
+        hideTooltip();
+        if (main.length) handleNodeTap(main, false);
+      } else {
+        const content = buildBuddyChipTooltip(chip);
+        if (content) {
+          tooltip.textContent = content;
+          tooltip.style.display = 'block';
+          tooltip.style.left = '14px';
+          tooltip.style.top  = (buddyContainer.getBoundingClientRect().bottom + 6) + 'px';
+        }
+        buddyTouchPending = chip.id();
+        buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
+      }
+      return;
+    }
+
+    hideTooltip();
+    if (main.length) handleNodeTap(main, false);
+  });
 
   // --- youCy chip interactions ---
 
@@ -1107,7 +1238,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     });
   }, { passive: true });
 
-  // Reset button
+  return { appendBuddyChip };
 
 }
 
@@ -1351,8 +1482,36 @@ async function init() {
     boxSelectionEnabled: false,
   });
 
-  const { addBadge } = setupNrBadges(cy);
-  setupInteractions(cy, wsRef, addBadge, youCy);
+  const pairingState = { active: false };
+
+  const pairBtn    = document.getElementById('pair-btn');
+  const pairStatus = document.getElementById('pair-status');
+
+  pairBtn.addEventListener('click', () => {
+    wsRef.lastActivity = Date.now();
+    pairBtn.disabled = true;
+    ws.send(JSON.stringify({ type: 'ready_to_pair' }));
+  });
+
+  const { addBadge }      = setupNrBadges(cy);
+  const { appendBuddyChip } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+
+  ws.addEventListener('message', event => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+    if (msg.type === 'wait_state') {
+      pairStatus.textContent = 'Waiting...';
+    } else if (msg.type === 'paired') {
+      pairBtn.style.display = 'none';
+      pairStatus.textContent = 'Paired';
+      document.getElementById('cy-buddy').classList.add('active');
+      buddyCy.resize();
+      BARS_BOTTOM = 132;
+      pairingState.active = true;
+    } else if (msg.type === 'buddy_breadcrumb') {
+      appendBuddyChip(msg.data);
+    }
+  });
 }
 
 window.addEventListener('DOMContentLoaded', init);

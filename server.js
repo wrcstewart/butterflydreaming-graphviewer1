@@ -18,6 +18,19 @@ const server = app.listen(8080, () =>
 
 const wss = new WebSocketServer({ server });
 
+// --- Pairing state ---
+
+const sessions    = new Map();  // userId → ws
+let   waitingUser = null;        // { userId, ws } | null
+const pairedWith  = new Map();  // userId → buddyUserId
+
+function sendToBuddy(userId, msg) {
+  const buddyId = pairedWith.get(userId);
+  if (!buddyId) return;
+  const buddyWs = sessions.get(buddyId);
+  if (buddyWs && buddyWs.readyState === 1 /* OPEN */) buddyWs.send(JSON.stringify(msg));
+}
+
 // --- Serialisation ---
 // neo4j-driver returns typed objects (Integer, DateTime, Node, Relationship).
 // These must be converted to plain JS before JSON.stringify.
@@ -85,6 +98,7 @@ wss.on('connection', async (ws) => {
         'RETURN u.viewer_id AS viewer_id'
       );
       ws.userId = result.records[0]?.get('viewer_id') ?? null;
+      if (ws.userId) sessions.set(ws.userId, ws);
       console.log(`[BD] User created: ${ws.userId}`);
     } finally {
       await s.close();
@@ -102,6 +116,12 @@ wss.on('connection', async (ws) => {
 
   ws.on('close', async () => {
     clearInterval(keepAlive);
+    if (ws.userId) {
+      sessions.delete(ws.userId);
+      if (waitingUser?.userId === ws.userId) waitingUser = null;
+      const buddyId = pairedWith.get(ws.userId);
+      if (buddyId) { pairedWith.delete(ws.userId); pairedWith.delete(buddyId); }
+    }
     if (!ws.userId) return;
     try {
       const s = driver.session({ database: 'memgraph' });
@@ -124,6 +144,27 @@ wss.on('connection', async (ws) => {
     try {
       const msg = JSON.parse(raw);
       type = msg.type;
+      if (msg.type === 'ready_to_pair') {
+        if (!ws.userId) return;
+        if (waitingUser === null) {
+          waitingUser = { userId: ws.userId, ws };
+          ws.send(JSON.stringify({ type: 'wait_state' }));
+          console.log(`[BD] Waiting: ${ws.userId}`);
+        } else {
+          const buddy = waitingUser;
+          waitingUser = null;
+          pairedWith.set(ws.userId, buddy.userId);
+          pairedWith.set(buddy.userId, ws.userId);
+          ws.send(JSON.stringify({ type: 'paired', buddyId: buddy.userId }));
+          buddy.ws.send(JSON.stringify({ type: 'paired', buddyId: ws.userId }));
+          console.log(`[BD] Paired: ${ws.userId} ↔ ${buddy.userId}`);
+        }
+        return;
+      }
+      if (msg.type === 'breadcrumb') {
+        if (ws.userId) sendToBuddy(ws.userId, { type: 'buddy_breadcrumb', data: msg.data });
+        return;
+      }
       if (!msg.query) return;  // ignore keepalive pings and other non-query messages
       const session = driver.session({ database: 'memgraph' });
       try {
