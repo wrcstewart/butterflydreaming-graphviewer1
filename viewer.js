@@ -269,7 +269,7 @@ function buildStyle() {
       selector: 'node[type="Cluster"]',
       style: {
         'width': 55,
-        'height': 34,
+        'height': 28,
         'shape': 'round-rectangle',
         'text-max-width': '49px',
         'font-size': '8px',
