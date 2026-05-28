@@ -299,13 +299,10 @@ function buildStyle() {
         'text-max-width': '113px',
         'font-size': '10px',
         'border-width': function(node) {
-          if (node.data('gateway')) return 2;
           if (node.data('source') === 'seed') return 0.5;
           return 0.3;
         },
-        'border-color': function(node) {
-          return node.data('gateway') ? '#ffffff' : '#888888';
-        },
+        'border-color': '#888888',
       }
     },
     {
@@ -390,6 +387,20 @@ function buildStyle() {
         'line-style': 'solid',
         'opacity': 0.75,
         'target-arrow-shape': 'none',
+      }
+    },
+    {
+      selector: 'node[type="TextNode"][?gateway]',
+      style: {
+        'text-transform': 'uppercase',
+      }
+    },
+    {
+      selector: 'node.latest',
+      style: {
+        'border-width': 2,
+        'border-color': '#ffffff',
+        'border-opacity': 1,
       }
     },
   ];
@@ -477,6 +488,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     const type = node.data('type');
     const w    = chipWidth(type);
     const id   = 'you_' + (youChipCount++);
+    if (lastYouChipId) {
+      const prev = youCy.getElementById(lastYouChipId);
+      if (prev.length) prev.removeClass('latest');
+    }
     youCy.add({
       group: 'nodes',
       data: {
@@ -505,6 +520,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
         }
       });
     }
+    youCy.getElementById(id).addClass('latest');
     youChipX    += w + 7;
     lastYouChipId = id;
     panYouCyToLatest();
