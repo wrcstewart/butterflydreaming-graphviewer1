@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-let BARS_BOTTOM = 96; // unpaired: bc-spacer(50) + cy-you(36) + margin(10); 132 when paired
+const BARS_BOTTOM = 132; // bc-spacer(50) + cy-buddy(36) + gap(10) + cy-you(36)
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -1504,10 +1504,6 @@ async function init() {
     } else if (msg.type === 'paired') {
       pairBtn.style.display = 'none';
       pairStatus.textContent = 'Paired';
-      document.getElementById('cy-buddy').classList.add('active');
-      buddyCy.resize();
-      cy.resize();
-      BARS_BOTTOM = 132;
       pairingState.active = true;
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);

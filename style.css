@@ -20,17 +20,12 @@ html, body {
 }
 
 #cy-buddy {
-  display: none;
   width: 100%;
   height: 36px;
   flex-shrink: 0;
   background: #001f4d;
   margin-bottom: 10px;
   cursor: url('cursor-wings.svg') 16 16, auto;
-}
-
-#cy-buddy.active {
-  display: block;
 }
 
 #pair-control {
