@@ -273,6 +273,7 @@ function buildStyle() {
         'shape': 'round-rectangle',
         'text-max-width': '49px',
         'font-size': '8px',
+        'text-margin-y': -3,
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
