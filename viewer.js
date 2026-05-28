@@ -1249,6 +1249,27 @@ async function init() {
 
   const { addBadge } = setupNrBadges(cy);
   setupInteractions(cy, wsRef, addBadge);
+
+  // Breadcrumb canvases — empty for now, chips added in next phase
+  const youCy = cytoscape({
+    container: document.getElementById('cy-you'),
+    elements: [],
+    style: buildStyle(),
+    layout: { name: 'preset' },
+    userZoomingEnabled: false,
+    userPanningEnabled: false,
+    boxSelectionEnabled: false,
+  });
+
+  const buddyCy = cytoscape({
+    container: document.getElementById('cy-buddy'),
+    elements: [],
+    style: buildStyle(),
+    layout: { name: 'preset' },
+    userZoomingEnabled: false,
+    userPanningEnabled: false,
+    boxSelectionEnabled: false,
+  });
 }
 
 window.addEventListener('DOMContentLoaded', init);

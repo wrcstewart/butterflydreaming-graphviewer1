@@ -10,11 +10,27 @@ html, body {
   height: 100%;
   background: #000;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#cy-buddy {
+  width: 100%;
+  height: 30px;
+  flex-shrink: 0;
+  background: #00091a;
+}
+
+#cy-you {
+  width: 100%;
+  height: 30px;
+  flex-shrink: 0;
+  background: #1a1200;
 }
 
 #cy {
   width: 100%;
-  height: 100%;
+  flex: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
