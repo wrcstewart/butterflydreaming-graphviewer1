@@ -2683,3 +2683,250 @@ The 2px white border is now used exclusively by the `node.latest` class (§20.5)
 ---
 
 *Amendment 20 — 28 May 2026*
+
+Good. Here is Amendment 21 for CC:
+
+---
+
+```markdown
+## Amendment 21 — graphviewer.md — 28 May 2026
+
+## Dyadic Pairing and Remote Breadcrumb Trail
+
+### Overview
+
+This amendment adds the pairing mechanism and remote breadcrumb trail.
+noye Cluade chat who prepared this might not be totallu to date with what has been done recently so use your own knowledge if in doubt as you are the source of truth on the code.
+The local breadcrumb trail (youCy) is already implemented. This amendment
+adds the buddy breadcrumb trail (buddyCy) and the server-side pairing logic.
+
+---
+
+### 19.1 Pairing Button and Status Display
+
+Add a "Ready to pair" button and a status indicator to the UI.
+
+**HTML additions:**
+```html
+<button id="pair-btn">Ready to pair</button>
+<div id="pair-status"></div>
+```
+
+**Positioning:** pair-btn near top-left. pair-status immediately to its
+right, to the left of the media player.
+
+**States:**
+
+| State | pair-btn | pair-status |
+|---|---|---|
+| Arrived, unpaired, not signalled | visible, active | empty |
+| Signalled, waiting | visible, dimmed/disabled | "Waiting..." |
+| Paired | hidden | "Paired" |
+
+**Button behaviour:**
+- Click → send `{ type: 'ready_to_pair' }` to server via WebSocket
+- Button dims/disables — user is now in wait state
+- Cannot un-signal (no cancel — keeps server logic simple for now)
+
+---
+
+### 19.2 Server-Side Pairing Logic
+
+The server maintains a single waiting slot. At most one user can be
+waiting at any time — if two users signal, they are paired immediately.
+
+```javascript
+let waitingUser = null; // { sessionId, ws } or null
+
+// Handle ready_to_pair message
+function handleReadyToPair(sessionId, ws) {
+    if (waitingUser === null) {
+        // No one waiting — enter wait state
+        waitingUser = { sessionId, ws };
+        ws.send(JSON.stringify({ type: 'wait_state' }));
+    } else {
+        // Someone waiting — pair immediately
+        const buddy = waitingUser;
+        waitingUser = null;
+
+        // Record pairing in sessions
+        sessions[sessionId].pairedWith = buddy.sessionId;
+        sessions[buddy.sessionId].pairedWith = sessionId;
+
+        // Notify both
+        ws.send(JSON.stringify({
+            type: 'paired',
+            buddyId: buddy.sessionId
+        }));
+        buddy.ws.send(JSON.stringify({
+            type: 'paired',
+            buddyId: sessionId
+        }));
+    }
+}
+
+// On WebSocket disconnect — clear waiting slot if it was this user
+ws.on('close', () => {
+    if (waitingUser?.sessionId === sessionId) {
+        waitingUser = null;
+    }
+    // existing User node cleanup...
+});
+```
+
+---
+
+### 19.3 Client Response to Pairing Messages
+
+```javascript
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === 'wait_state') {
+        // Update UI — waiting
+        document.getElementById('pair-btn').disabled = true;
+        document.getElementById('pair-status').textContent = 'Waiting...';
+    }
+
+    if (msg.type === 'paired') {
+        // Update UI — paired
+        document.getElementById('pair-btn').style.display = 'none';
+        document.getElementById('pair-status').textContent = 'Paired';
+
+        // Activate buddyCy canvas
+        document.getElementById('cy-buddy').style.display = 'block';
+
+        // Begin transmitting local breadcrumb events to server
+        breadcrumbTransmissionActive = true;
+    }
+};
+```
+
+**Important:** `breadcrumbTransmissionActive` flag controls whether local
+breadcrumb events are sent to the server. It is false on arrival and
+only set true on confirmed pairing. No breadcrumb data is transmitted
+before pairing is confirmed. No backfilling of pre-pairing history.
+
+---
+
+### 19.4 Breadcrumb Transmission — Local to Server
+
+Add transmission calls to the three existing breadcrumb append functions.
+Each fires only if `breadcrumbTransmissionActive === true`.
+
+```javascript
+// When cluster chip appended to youCy:
+if (breadcrumbTransmissionActive) {
+    ws.send(JSON.stringify({
+        type: 'breadcrumb',
+        event: 'cluster',
+        data: { name: clusterName, colour: clusterColour }
+    }));
+}
+
+// When work (Search_CW) chip appended:
+if (breadcrumbTransmissionActive) {
+    ws.send(JSON.stringify({
+        type: 'breadcrumb',
+        event: 'work',
+        data: { name: workName, colour: currentClusterColour }
+    }));
+}
+
+// When TextNode chip appended:
+if (breadcrumbTransmissionActive) {
+    ws.send(JSON.stringify({
+        type: 'breadcrumb',
+        event: 'textnode',
+        data: { seq: seq, url: url }
+    }));
+}
+```
+
+---
+
+### 19.5 Server — Forward Breadcrumb to Buddy
+
+```javascript
+if (msg.type === 'breadcrumb') {
+    // Forward to paired buddy only — not broadcast
+    sendToBuddy(sessionId, {
+        type: 'buddy_breadcrumb',
+        event: msg.event,
+        data: msg.data
+    });
+}
+```
+
+---
+
+### 19.6 Client — Receive and Render Buddy Breadcrumbs
+
+On receiving a `buddy_breadcrumb` message, append a chip to buddyCy
+using identical chip structure and styling to youCy chips.
+
+```javascript
+if (msg.type === 'buddy_breadcrumb') {
+    appendBuddyChip(msg.event, msg.data);
+}
+
+function appendBuddyChip(event, data) {
+    // Identical chip structure to local chips
+    // event: 'cluster' | 'work' | 'textnode'
+    // data: same structure as local breadcrumb data
+    // Append to buddyCy using same logic as appendYouChip()
+}
+```
+
+**The interaction code for buddy chips is identical to local chips:**
+- Hover → highlight corresponding node in mainCy
+- Click → centre mainCy on that node, call handleNodeTap()
+- The only difference is which canvas the chip lives in
+
+---
+
+### 19.7 buddyCy Canvas
+
+buddyCy is a third Cytoscape instance, displayed below youCy.
+Hidden until pairing is confirmed — `display: none` until `paired` message received.
+
+```html
+<div id="cy-you"   style="height: 60px; width: 100%;"></div>
+<div id="cy-buddy" style="height: 60px; width: 100%; display: none;"></div>
+```
+
+Same layout, styling, and event handling as youCy.
+Label the row so users know which is which — small text label left of each strip:
+- "You:" left of youCy
+- "Buddy:" left of buddyCy
+
+---
+
+### 19.8 Privacy and Scope — Standing Rules
+
+These rules apply to all current and future code:
+
+- **No breadcrumb transmission before pairing confirmed.** The
+  `breadcrumbTransmissionActive` flag must be false until the `paired`
+  message is received from the server.
+- **No backfilling.** Pre-pairing breadcrumb history is private.
+  Buddy sees only what happens after pairing is confirmed.
+- **Buddy-only transmission.** Breadcrumb events go only to the
+  paired buddy via `sendToBuddy()`. Never broadcast to all clients.
+- **Pairing is voluntary.** Neither user is paired until both have
+  actively pressed the button. The server never pairs users without
+  both having signalled.
+- **At most one waiting user.** The server waiting slot holds at most
+  one user. If a waiting user disconnects, the slot clears.
+
+---
+
+### 19.9 Out of Scope for This Amendment
+
+- Gravity well scoring
+- Node editing during session
+- IP-based user distinction (two browser tabs on same machine
+  are treated as independent users — sufficient for development)
+- Cancel/unpair mechanism
+- What happens if paired user disconnects mid-session
+```
