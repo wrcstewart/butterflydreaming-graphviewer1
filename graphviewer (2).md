@@ -2565,3 +2565,121 @@ The same stylesheet (`buildStyle()`) is used across all three Cytoscape instance
 ---
 
 *Amendment 19 — 28 May 2026*
+
+---
+
+## Amendment 20 — graphviewer.md — 28 May 2026
+
+### 20.1 — Node size revision and breadcrumb bar adjustments
+
+All node types were increased by 20% for desktop readability (breadcrumb bars and main graph share the same stylesheet). Final sizes:
+
+| Node type | Width | Height | Font |
+|---|---|---|---|
+| Family | 53 | 22 | 10px |
+| Cluster | 66 | 34 | 10px, `text-margin-y: -3` |
+| TextNode | 120 | 34 | 10px |
+| Search_CW | 108 | 34 | 10px |
+| Entry (Settling, Conversations) | 68 | 68 | 10px |
+| Entry / Settling override | 76 | 76 | 10px, `shape: round-triangle` |
+| root | 76 | 76 | 4px |
+
+Entry/Settling/Conversations were given an explicit `font-size: 10px` override (previously inheriting the global 11px) and sizes were increased 60→68 / 68→76 to stop text overflowing the shapes, particularly the round-triangle.
+
+Inter-bar gap (between `#cy-buddy` and `#cy-you`) increased to **10px** (`margin-bottom` on `#cy-buddy`) to make clear to the user that the two bars represent independent users. `BARS_BOTTOM` updated to **132** (50 + 36 + 10 + 36) to keep tooltips below both bars.
+
+---
+
+### 20.2 — youCy breadcrumb chip trail
+
+Chips are appended to the `youCy` canvas as the user navigates. Each chip is a Cytoscape node using the same `buildStyle()` rules as the main graph. Supported types: `Family`, `Cluster`, `TextNode`, `Search_CW`.
+
+Chip data carried:
+
+| Field | Purpose |
+|---|---|
+| `type` | Drives Cytoscape style selector |
+| `display_name`, `name`, `colour` | Visual rendering and tooltip |
+| `mainId` | Back-reference to the main graph node id |
+| `source_text`, `gateway` | TextNode-specific display |
+| `clusterNodeId` | Search_CW: which cluster was active when filter was set |
+
+Thin synthetic edges (`colour: #333333`, `weight: 0.2`) link consecutive chips.
+
+`chipWidth(type)` returns the pixel width matching each node type, used to place the chip at `x = youChipX + w/2` and advance `youChipX += w + 7` after each addition.
+
+`handleNodeTap` takes an `addChip = true` parameter. Chip replay from the breadcrumb calls `handleNodeTap(main, false)` to prevent duplicate chips.
+
+---
+
+### 20.3 — Search_CW proxy pattern
+
+Search_CW nodes are virtual — they exist only in Cytoscape, not in Memgraph, and are cleared from the main graph after being tapped. When a cleared Search_CW chip is tapped in youCy, the original node is gone. A proxy is constructed to allow `buildTooltipContent` and `handleNodeTap` to operate normally:
+
+```javascript
+const d = { type: 'Search_CW', source_text: chip.data('source_text'),
+            name: chip.data('name'), colour: chip.data('colour') };
+main = { data: k => d[k], id: () => chip.data('mainId') };
+```
+
+`clusterNodeId` stored in the chip is used to restore `lastClusterNode` before replay so the contextual tooltip (`<work> : filtered by: <cluster>`) remains accurate.
+
+---
+
+### 20.4 — Auto-scroll: keep latest chip visible
+
+`panYouCyToLatest()` is called after every chip addition and on `window.resize` (which fires on phone orientation change):
+
+```javascript
+function panYouCyToLatest() {
+  if (youChipCount === 0) return;
+  const containerWidth = document.getElementById('cy-you').offsetWidth;
+  const rightEdge = youChipX - 7;
+  const panX = Math.min(0, containerWidth - rightEdge - 12);
+  youCy.pan({ x: panX, y: 0 });
+}
+```
+
+`userPanningEnabled: false` blocks user drag but `cy.pan()` still works programmatically. When all chips fit within the container width, `panX ≥ 0` clamps to 0 (no pan). When chips overflow, the strip scrolls left to keep the newest chip 12px from the right edge. Rotation between portrait and landscape recalculates automatically via the resize listener.
+
+---
+
+### 20.5 — Latest chip marker
+
+The most recent chip in `youCy` carries the Cytoscape class `latest`. When a new chip is added, `latest` is removed from the previous chip and added to the new one:
+
+```javascript
+if (lastYouChipId) youCy.getElementById(lastYouChipId).removeClass('latest');
+// ... add chip ...
+youCy.getElementById(id).addClass('latest');
+```
+
+Style rule (appended last in `buildStyle()` so it overrides type-specific rules):
+
+```javascript
+{ selector: 'node.latest', style: { 'border-width': 2, 'border-color': '#ffffff', 'border-opacity': 1 } }
+```
+
+---
+
+### 20.6 — Gateway nodes: uppercase label replaces thick border
+
+Gateway TextNodes previously used a 2px white border to signal their status. This was replaced by `text-transform: uppercase` on the label — uppercase signals "title" semantically without consuming the visual affordance of a thick border.
+
+```javascript
+{ selector: 'node[type="TextNode"][?gateway]', style: { 'text-transform': 'uppercase' } }
+```
+
+The 2px white border is now used exclusively by the `node.latest` class (§20.5) as a "current position" marker in the breadcrumb bar.
+
+---
+
+### 20.7 — Removals and minor fixes
+
+- **`#search-bar` DOM button removed.** The top-centre fixed button that showed the active Search_CW work title is retired. Its role is fully replaced by the Search_CW chip in the `youCy` breadcrumb trail. All associated JS (show/hideSearchButton, searchBarTooltipLabel, event listeners) and CSS removed. `updateSearchCWVisibility` now uses `lastSearchCWNode !== null` as the phase-2 guard in place of checking `searchBar.classList.contains('active')`.
+
+- **Butterfly cursor extended to breadcrumb bars.** `cursor: url('cursor-wings.svg') 16 16, auto` added to `#cy-buddy` and `#cy-you` so the custom cursor persists across the full page.
+
+---
+
+*Amendment 20 — 28 May 2026*
