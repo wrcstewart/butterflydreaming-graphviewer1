@@ -507,7 +507,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     }
     youChipX    += w + 7;
     lastYouChipId = id;
+    panYouCyToLatest();
   }
+
+  function panYouCyToLatest() {
+    if (youChipCount === 0) return;
+    const containerWidth = document.getElementById('cy-you').offsetWidth;
+    const rightEdge = youChipX - 7;
+    const panX = Math.min(0, containerWidth - rightEdge - 12);
+    youCy.pan({ x: panX, y: 0 });
+  }
+
+  window.addEventListener('resize', panYouCyToLatest);
 
   // --- youCy chip interactions ---
 
