@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 128; // bc-spacer(50) + cy-buddy(36) + gap(6) + cy-you(36)
+const BARS_BOTTOM = 132; // bc-spacer(50) + cy-buddy(36) + gap(10) + cy-you(36)
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -210,18 +210,19 @@ function buildStyle() {
     {
       selector: 'node[type="Entry"]',
       style: {
-        'width': 60,
-        'height': 60,
-        'text-max-width': '54px',
+        'width': 68,
+        'height': 68,
+        'font-size': '10px',
+        'text-max-width': '62px',
       }
     },
     {
       selector: 'node[type="Entry"][name="Settling"]',
       style: {
-        'width': 68,
-        'height': 68,
+        'width': 76,
+        'height': 76,
         'shape': 'round-triangle',
-        'text-max-width': '62px',
+        'text-max-width': '70px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
@@ -236,9 +237,9 @@ function buildStyle() {
     {
       selector: 'node[type="Entry"][name="Conversations"]',
       style: {
-        'width': 60,
-        'height': 60,
-        'text-max-width': '54px',
+        'width': 68,
+        'height': 68,
+        'text-max-width': '62px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
@@ -488,6 +489,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
         mainId:        node.id(),
         source_text:   node.data('source_text') || null,
         clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
+        gateway:       node.data('gateway') || false,
       },
       position: { x: youChipX + w / 2, y: 18 }
     });
@@ -765,7 +767,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     syntheticEdgeIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.remove(); });
     syntheticEdgeIds.clear();
     lastSearchCWNode = null;
-    hideSearchButton();
   }
 
   async function expandToCluster(clusterNode) {
@@ -891,10 +892,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     }
 
     lastSearchCWNode = node;
-
-    // Promote to fixed button; hide octagon graph nodes
     cy.$('[type="Search_CW"]').hide();
-    showSearchButton(node.data('name'), node.data('colour'));
 
     saveState();
     activeNodeId = node.id();
@@ -910,10 +908,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
 
   function updateSearchCWVisibility(node) {
     if (!lastClusterNode) return;
-    if (searchBar.classList.contains('active')) {
-      // Phase 2 — button is a persistent context control; only reset/new cluster hide it
-      return;
-    }
+    if (lastSearchCWNode !== null) return;
     // Phase 1 — octagons only valid in cluster/TextNode context, not Family or root
     const scwNodes = cy.$('[type="Search_CW"]');
     if (!scwNodes.length) return;
@@ -926,68 +921,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     scwNodes[connected ? 'show' : 'hide']();
     cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
   }
-
-  // Search bar button (Search_CW phase 2 — fixed UI button)
-
-  const searchBar = document.getElementById('search-bar');
-
-  function showSearchButton(label, colour) {
-    searchBar.textContent = label;
-    searchBar.style.background = colour || '#888888';
-    searchBar.classList.add('active');
-  }
-
-  function hideSearchButton() {
-    searchBar.classList.remove('active');
-    searchBar.textContent = '';
-  }
-
-  function searchBarTooltipLabel() {
-    const work = searchBar.textContent.trim();
-    const cluster = lastClusterNode ? lastClusterNode.data('name') : '';
-    return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
-  }
-
-  searchBar.addEventListener('mouseenter', () => {
-    const label = searchBarTooltipLabel();
-    if (!label || recentTouch) return;
-    tooltip.textContent = label;
-    tooltip.style.display = 'block';
-    const rect = searchBar.getBoundingClientRect();
-    positionTooltip(rect.left + rect.width / 2, rect.bottom);
-  });
-  searchBar.addEventListener('mouseleave', () => {
-    setTimeout(() => { if (!tooltip.matches(':hover')) hideTooltip(); }, 100);
-  });
-
-  let searchBarTouchPending = false;
-  let searchBarTouchTimer = null;
-  searchBar.addEventListener('touchstart', evt => {
-    evt.preventDefault();
-    const label = searchBarTooltipLabel();
-    if (!label) return;
-    markRecentTouch();
-    wsRef.lastActivity = Date.now();
-    if (searchBarTouchPending) {
-      clearTimeout(searchBarTouchTimer);
-      searchBarTouchPending = false;
-      hideTooltip();
-      if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
-    } else {
-      tooltip.textContent = label;
-      tooltip.style.display = 'block';
-      const rect = searchBar.getBoundingClientRect();
-      tooltip.style.left = '14px';
-      tooltip.style.top = (rect.bottom + 6) + 'px';
-      searchBarTouchPending = true;
-      searchBarTouchTimer = setTimeout(() => { searchBarTouchPending = false; }, 800);
-    }
-  }, { passive: false });
-
-  searchBar.addEventListener('click', () => {
-    wsRef.lastActivity = Date.now();
-    if (lastSearchCWNode) handleSearchCWTap(lastSearchCWNode);
-  });
 
   // Media bar
 
