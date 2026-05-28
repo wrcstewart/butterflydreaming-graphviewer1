@@ -1506,6 +1506,7 @@ async function init() {
       pairStatus.textContent = 'Paired';
       document.getElementById('cy-buddy').classList.add('active');
       buddyCy.resize();
+      cy.resize();
       BARS_BOTTOM = 132;
       pairingState.active = true;
     } else if (msg.type === 'buddy_breadcrumb') {
