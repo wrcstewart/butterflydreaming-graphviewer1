@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 113; // bc-spacer(50) + cy-buddy(30) + gap(3) + cy-you(30)
+const BARS_BOTTOM = 126; // bc-spacer(50) + cy-buddy(36) + gap(4) + cy-you(36)
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -188,7 +188,7 @@ function buildStyle() {
         'text-valign': 'center',
         'text-halign': 'center',
         'text-wrap': 'wrap',
-        'font-size': '9px',
+        'font-size': '11px',
         'color': '#ffffff',
         'border-width': 0,
         'overlay-padding': 10,
@@ -253,10 +253,10 @@ function buildStyle() {
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 44,
-        'height': 18,
-        'font-size': '8px',
-        'text-max-width': '40px',
+        'width': 53,
+        'height': 22,
+        'font-size': '10px',
+        'text-max-width': '48px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
@@ -271,11 +271,11 @@ function buildStyle() {
     {
       selector: 'node[type="Cluster"]',
       style: {
-        'width': 55,
-        'height': 28,
+        'width': 66,
+        'height': 34,
         'shape': 'round-rectangle',
-        'text-max-width': '49px',
-        'font-size': '8px',
+        'text-max-width': '59px',
+        'font-size': '10px',
         'text-margin-y': -3,
         'border-width': 2,
         'border-color': function(node) {
@@ -291,12 +291,12 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"]',
       style: {
-        'width': 100,
-        'height': 28,
+        'width': 120,
+        'height': 34,
         'background-color': '#111111',
         'shape': 'round-rectangle',
-        'text-max-width': '94px',
-        'font-size': '8px',
+        'text-max-width': '113px',
+        'font-size': '10px',
         'border-width': function(node) {
           if (node.data('gateway')) return 2;
           if (node.data('source') === 'seed') return 0.5;
@@ -356,8 +356,8 @@ function buildStyle() {
       selector: 'node[type="Search_CW"]',
       style: {
         'shape': 'rectangle',
-        'width': 90,
-        'height': 28,
+        'width': 108,
+        'height': 34,
         'border-width': 1,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
@@ -367,8 +367,8 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.6,
-        'font-size': '8px',
-        'text-max-width': '84px',
+        'font-size': '10px',
+        'text-max-width': '101px',
       }
     },
     {
@@ -466,10 +466,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
   let lastYouChipId = null;
 
   function chipWidth(type) {
-    if (type === 'Family')    return 44;
-    if (type === 'TextNode')  return 100;
-    if (type === 'Search_CW') return 90;
-    return 55; // Cluster
+    if (type === 'Family')    return 53;
+    if (type === 'TextNode')  return 120;
+    if (type === 'Search_CW') return 108;
+    return 66; // Cluster
   }
 
   function addYouChip(node) {
@@ -487,7 +487,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
         url:          node.data('url') || null,
         mainId:       node.id(),
       },
-      position: { x: youChipX + w / 2, y: 15 }
+      position: { x: youChipX + w / 2, y: 18 }
     });
     if (lastYouChipId) {
       youCy.add({
@@ -501,7 +501,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
         }
       });
     }
-    youChipX    += w + 6;
+    youChipX    += w + 7;
     lastYouChipId = id;
   }
 

@@ -21,15 +21,15 @@ html, body {
 
 #cy-buddy {
   width: 100%;
-  height: 30px;
+  height: 36px;
   flex-shrink: 0;
   background: #001f4d;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 #cy-you {
   width: 100%;
-  height: 30px;
+  height: 36px;
   flex-shrink: 0;
   background: #3d2e00;
 }
