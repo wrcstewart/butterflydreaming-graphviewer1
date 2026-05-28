@@ -2295,3 +2295,273 @@ This "hover to converge" model means:
 ---
 
 *Amendment 18 — 26–27 May 2026*
+
+```
+ ButterflyDreaming — Corpus Loading Amendment
+```
+## TextNode Display Format and Backfill — Issue and Fix
+**Date:** 27 May 2026
+**Prepared by:** Claude (Anthropic) with William Stewart
+**Relates to:** Corpus Loading Handover v1.2 (25 May 2026)
+**For:** Viewer/Software chat
+
+---
+
+## 1. What We Were Trying to Achieve
+
+A consistent display format for all TextNodes across all corpora, supporting a breadcrumb navigation row in the viewer UI.
+
+### 1.1 Breadcrumb row design
+
+The Search rectangle (previously octagon) for a corpus appears as the anchor label in the breadcrumb row, showing the corpus name only:
+
+```
+Tao Te Ching
+```
+
+Followed by a row of numbered buttons, one per node the user has visited, showing only the seq number:
+
+```
+[0]  [1]  [2]  [7]  [14] ...
+```
+
+Pressing a button returns the user to that node. This keeps the breadcrumb compact regardless of how many nodes have been visited.
+
+### 1.2 Node display format
+
+Every TextNode should display as follows:
+
+**Main first line** (always visible, built from data):
+```
+Tao Te Ching: 1
+```
+Format: `source_text + ': ' + toString(seq)`
+
+**Hover subtitle line** (first line of hover, from `title` property):
+```
+Chapter 1
+```
+
+**Hover text line** (second line of hover, from `text` property):
+```
+The tao that can be described is not the eternal Tao...
+```
+
+### 1.3 Gateway nodes specifically
+
+Gateway nodes (seq: 0) follow the same format:
+
+**Main first line:**
+```
+Tao Te Ching: 0
+```
+
+**Hover subtitle line:**
+```
+Gateway
+```
+
+**Hover text line:**
+```
+[gateway description text]
+```
+
+The word Gateway appears as the subtitle on all gateway nodes across all corpora. There is enough vertical space on the gateway node for this to display comfortably.
+
+---
+
+## 2. The Data Model
+
+Three properties on every TextNode drive the display:
+
+| Property      | Type    | Role                                 | Example          |
+| ------------- | ------- | ------------------------------------ | ---------------- |
+| `source_text` | String  | Breadcrumb anchor + main line prefix | `'Tao Te Ching'` |
+| `seq`         | Integer | Button number + main line suffix     | `1`              |
+| `title`       | String  | Hover subtitle                       | `'Chapter 1'`    |
+
+These are in addition to the existing `text` property which provides the hover body text.
+
+---
+
+## 3. Cypher Backfill Issued for TTC
+
+The following two Cypher statements were run in Memgraph Lab to backfill `seq` and `title` on the Tao Te Ching nodes, which were loaded before these properties were introduced:
+
+```cypher
+MATCH (n:TextNode {source_text: 'Tao Te Ching'})
+WHERE n.chapter IS NOT NULL AND n.gateway = false
+SET n.seq = n.chapter,
+    n.title = 'Chapter ' + toString(n.chapter);
+
+MATCH (n:TextNode {source_text: 'Tao Te Ching', gateway: true})
+SET n.seq = 0,
+    n.title = 'Gateway';
+```
+
+**Why this approach:** The TTC nodes already had a `chapter` property storing an integer (1-81). Setting `seq = chapter` reuses this without re-entering data. The gateway has `chapter: null` so it is matched separately by `gateway: true`.
+
+**Verification before running:** A check query confirmed:
+- `chapter` is stored as an integer on all chapter nodes
+- `gateway: true` is correctly set on the gateway node
+- `seq` and `title` were null on all nodes — clean slate
+
+---
+
+## 4. Results
+
+The Cypher ran successfully and set the properties correctly. However the viewer rendered them incorrectly.
+
+### 4.1 Problem 1 — Chapter nodes
+
+**Actual display:** `61: Chapter 61`
+**Expected display:** `Tao Te Ching: 61` (main line) / `Chapter 61` (hover subtitle)
+
+**Cause:** The viewer is concatenating `seq` and `title` for the main display line rather than building it from `source_text + ': ' + seq`. The `title` property is appearing on the main line rather than as the hover subtitle.
+
+### 4.2 Problem 2 — Gateway node
+
+**Actual display:** `): Gateway`
+**Expected display:** `Tao Te Ching: 0` (main line) / `Gateway` (hover subtitle)
+
+**Cause:** The `)` character suggests the viewer has a format like `(seq): title` and seq=0 is being dropped or rendered incorrectly, or the bracket format is not handling zero correctly.
+
+---
+
+## 5. Suggested Fix for Viewer
+
+The data is correct. Both issues are in the viewer rendering logic.
+
+**The viewer needs to:**
+
+1. Build the main display line from: `node.source_text + ': ' + toString(node.seq)`
+   2. This should always give e.g. `Tao Te Ching: 61` or `Tao Te Ching: 0`
+
+2. Show `node.title` as the hover subtitle line
+   2. This gives `Chapter 61` or `Gateway`
+
+3. Show `node.text` as the hover body text
+
+**The viewer should NOT:**
+- Concatenate `seq` and `title` on the main line
+- Use a `(seq)` bracket format that breaks on zero
+- Put `title` on the main display line
+
+---
+
+## 6. Properties Reference — All Corpora
+
+For completeness, the `seq` and `title` values across all loaded corpora:
+
+| source\_text              | seq 0 title | seq N title format                      |
+| ------------------------- | ----------- | --------------------------------------- |
+| Tao Te Ching              | Gateway     | Chapter N                               |
+| Zhuangzi (Inner Chapters) | Gateway     | The Peng Bird (part 1) etc.             |
+| Leaves of Grass           | Gateway     | Song of Myself, Section 6 (part 1) etc. |
+| Grimm's Fairy Tales       | Gateway     | Clever Elsie (part 1) etc.              |
+
+The Zhuangzi, Leaves of Grass and Grimm nodes already have `seq` and `title` set correctly from their load files. Only the TTC required backfilling.
+
+---
+
+*ButterflyDreaming Corpus Loading Amendment — 27 May 2026 — Prepared with Claude (Anthropic)*
+
+---
+
+## Amendment 19 — graphviewer.md — 28 May 2026
+
+### 19.1 — TextNode label and tooltip fix
+
+The `getTextNodeLabel` function was building the in-node label as `seq: title` (e.g. `61: Chapter 61`), and the gateway node with seq=0 rendered as `): Gateway` due to JavaScript treating `0` as falsy. Both were wrong.
+
+Fixed to use `source_text` and `seq`:
+
+```javascript
+function getTextNodeLabel(props) {
+  const src = props.source_text;
+  const seq = props.seq;
+  if (src && seq !== undefined && seq !== null) return `${src}: ${seq}`;
+  return shortText(props.text, 5);
+}
+```
+
+Result: `Tao Te Ching: 61`, `Tao Te Ching: 0` (gateway). Falls back to `shortText` for nodes without these properties.
+
+The tooltip (`buildTooltipContent` for TextNode) was also updated to prepend `title` as a subtitle line:
+
+```javascript
+if (type === 'TextNode') {
+  const title = node.data('title') || '';
+  const text = node.data('text') || '';
+  const lines = text.split('\n').filter(l => l.trim());
+  let body = lines.slice(0, 6).join('\n');
+  if (lines.length > 6) body += '\n…';
+  return title ? `${title}\n${body}` : body;
+}
+```
+
+Result: tooltip first line is `Chapter 61` or `Gateway`, followed by the text body. All four corpora display correctly — the fix is purely property-driven (`source_text`, `seq`, `title`) with no corpus-specific logic.
+
+---
+
+### 19.2 — Ephemeral User node in Memgraph
+
+An ephemeral `User` node is created in Memgraph when a WebSocket connection is established, and deleted when the connection closes. This enables server-side graph queries that span user session state and corpus data (e.g. overlap detection between two users' navigation paths).
+
+ID scheme: `viewer_id = 'N_' + toString(id(u))` — the Memgraph integer node ID prefixed with `N_` to prevent collision with any other ID in the system (same principle as the `cf_` prefix for Cluster-Family edges — see DDR-4).
+
+```javascript
+// On connect
+CREATE (u:User {created_at: datetime()})
+WITH u, 'N_' + toString(id(u)) AS vid
+SET u.viewer_id = vid
+RETURN u.viewer_id AS viewer_id
+
+// On close
+MATCH (u:User {viewer_id: $uid}) DETACH DELETE u
+```
+
+`ws.userId` stores the assigned ID against the socket for the duration of the session. Server logs `[BD] User created: N_xxx` and `[BD] User deleted: N_xxx`.
+
+**Standing rule:** User nodes are ephemeral and invisible to the viewer UI. They must be deleted before the WebSocket closes. The breadcrumb chip trail is the user's visible presence — the User node exists only for server-side graph queries.
+
+**Note:** Safari's speculative preconnect may briefly create a User node before the tab loads — this resolves itself immediately when the speculative connection drops.
+
+---
+
+### 19.3 — Three-canvas layout and node size adjustments
+
+#### Canvas architecture
+
+The page now uses three vertically stacked elements below the fixed top bar:
+
+```
+[fixed top bar: reset + media player]
+[bc-spacer: 50px — clears fixed bar]
+[#cy-buddy: 30px — buddyCy, near-black navy #001f4d]
+[#cy-you:   30px — youCy, dark amber #3d2e00]
+[#cy:       flex:1 — main graph, fills remaining height]
+```
+
+`html` and `body` use `display: flex; flex-direction: column`. `#cy` changed from `height: 100%` to `flex: 1`.
+
+Both breadcrumb Cytoscape instances are initialised at `zoom: 1` with zoom and pan disabled. At zoom 1.0, node pixel dimensions match their CSS values exactly, ensuring chips fit the 30px strip.
+
+#### Node size changes for breadcrumb compatibility
+
+All node types are now sized to fit within a 30px strip at zoom 1.0:
+
+| Node type | Previous | New | Notes |
+|---|---|---|---|
+| Family | 46×38, 9px | 44×18, 8px | Slim oval |
+| Cluster | 55×34, 8px | 55×28, 8px, `text-margin-y: -3` | Reduced height; text nudged up to clear n_r badge |
+| TextNode | 100×28, 8px | unchanged | Already correct |
+| Search_CW | 90×28, 8px | unchanged | Already correct |
+
+The same stylesheet (`buildStyle()`) is used across all three Cytoscape instances — no separate breadcrumb stylesheet. The n_r badge (DOM overlay) will require a parallel implementation for the breadcrumb canvases when chips are added.
+
+**`text-margin-y: -3` on Cluster nodes:** the n_r count badge is a DOM overlay positioned at `bb.y2 - 4` (near the bottom of the node). With the reduced height of 28px, the centered two-line label was merging with the badge on mobile. A -3px vertical text offset creates clearance.
+
+---
+
+*Amendment 19 — 28 May 2026*
