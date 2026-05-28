@@ -15,7 +15,7 @@ html, body {
 }
 
 #bc-spacer {
-  height: 32px;
+  height: 50px;
   flex-shrink: 0;
 }
 
