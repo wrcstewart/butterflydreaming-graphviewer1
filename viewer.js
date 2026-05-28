@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 126; // bc-spacer(50) + cy-buddy(36) + gap(4) + cy-you(36)
+const BARS_BOTTOM = 128; // bc-spacer(50) + cy-buddy(36) + gap(6) + cy-you(36)
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -504,6 +504,62 @@ function setupInteractions(cy, wsRef, addBadge, youCy) {
     youChipX    += w + 7;
     lastYouChipId = id;
   }
+
+  // --- youCy chip interactions ---
+
+  const youContainer = document.getElementById('cy-you');
+  let youTouchPending = null;
+  let youTouchTimer   = null;
+
+  youCy.on('mouseover', 'node', evt => {
+    if (recentTouch) return;
+    const chip = evt.target;
+    const main = cy.getElementById(chip.data('mainId'));
+    if (!main.length) return;
+    const content = buildTooltipContent(main);
+    if (!content) return;
+    tooltip.textContent = content;
+    tooltip.style.display = 'block';
+    const rect = youContainer.getBoundingClientRect();
+    const bb   = chip.renderedBoundingBox();
+    positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
+  });
+
+  youCy.on('mouseout', 'node', () => hideTooltip());
+
+  youCy.on('tap', 'node', evt => {
+    const chip = evt.target;
+    const main = cy.getElementById(chip.data('mainId'));
+    if (!main.length) return;
+
+    if (isTouchEvent(evt)) {
+      markRecentTouch();
+      const same     = youTouchPending === chip.id();
+      const inWindow = youTouchTimer !== null;
+      clearTimeout(youTouchTimer);
+      youTouchTimer = null;
+      if (same && inWindow) {
+        youTouchPending = null;
+        hideTooltip();
+        handleNodeTap(main);
+      } else {
+        const content = buildTooltipContent(main);
+        if (content) {
+          tooltip.textContent = content;
+          tooltip.style.display = 'block';
+          const rect = youContainer.getBoundingClientRect();
+          tooltip.style.left = '14px';
+          tooltip.style.top  = (rect.bottom + 6) + 'px';
+        }
+        youTouchPending = chip.id();
+        youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
+      }
+      return;
+    }
+
+    hideTooltip();
+    handleNodeTap(main);
+  });
 
   function markRecentTouch() {
     recentTouch = true;
