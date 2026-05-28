@@ -14,18 +14,23 @@ html, body {
   flex-direction: column;
 }
 
+#bc-spacer {
+  height: 50px;
+  flex-shrink: 0;
+}
+
 #cy-buddy {
   width: 100%;
   height: 30px;
   flex-shrink: 0;
-  background: #00091a;
+  background: #002299;
 }
 
 #cy-you {
   width: 100%;
   height: 30px;
   flex-shrink: 0;
-  background: #1a1200;
+  background: #cc9900;
 }
 
 #cy {
