@@ -71,14 +71,53 @@ function serializeRecord(rec) {
 
 // --- WebSocket handler ---
 
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws) => {
+  // Create ephemeral User node — viewer_id = 'N_<memgraph integer id>'
+  // Prevents any ID collision with corpus nodes (same N_ prefix rule as cf_ for edges).
+  ws.userId = null;
+  try {
+    const s = driver.session({ database: 'memgraph' });
+    try {
+      const result = await s.run(
+        'CREATE (u:User {created_at: datetime()}) ' +
+        "WITH u, 'N_' + toString(id(u)) AS vid " +
+        'SET u.viewer_id = vid ' +
+        'RETURN u.viewer_id AS viewer_id'
+      );
+      ws.userId = result.records[0]?.get('viewer_id') ?? null;
+      console.log(`[BD] User created: ${ws.userId}`);
+    } finally {
+      await s.close();
+    }
+  } catch (err) {
+    console.error('[BD] User create error:', err.message);
+  }
+
   // Server-side WebSocket protocol ping every 25 s — browser replies with pong automatically
   // at the protocol layer, keeping the connection alive without any client JS timer.
   const keepAlive = setInterval(() => {
     if (ws.readyState === ws.OPEN) ws.ping();
     else clearInterval(keepAlive);
   }, 25000);
-  ws.on('close', () => clearInterval(keepAlive));
+
+  ws.on('close', async () => {
+    clearInterval(keepAlive);
+    if (!ws.userId) return;
+    try {
+      const s = driver.session({ database: 'memgraph' });
+      try {
+        await s.run(
+          'MATCH (u:User {viewer_id: $uid}) DETACH DELETE u',
+          { uid: ws.userId }
+        );
+        console.log(`[BD] User deleted: ${ws.userId}`);
+      } finally {
+        await s.close();
+      }
+    } catch (err) {
+      console.error('[BD] User delete error:', err.message);
+    }
+  });
 
   ws.on('message', async (raw) => {
     let type;
