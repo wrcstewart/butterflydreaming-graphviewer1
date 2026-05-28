@@ -1015,18 +1015,6 @@ function setupInteractions(cy, wsRef, addBadge) {
 
   // Reset button
 
-  document.getElementById('reset-btn').addEventListener('click', () => {
-    hideTooltip();
-    history.length = 0;
-    activeNodeId = null;
-    lastClusterNode = null;
-    currentClusterColour = null;
-    clearSearchCWNodes();
-    cy.elements().hide();
-    const root = cy.nodes('[type="root"]').first();
-    root.show();
-    cy.fit(root, 120);
-  });
 }
 
 // --- n_r badge overlay ---
