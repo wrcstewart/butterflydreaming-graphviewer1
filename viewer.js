@@ -3,6 +3,9 @@
 const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
+// Vertical top of main graph canvas — tooltips must not appear above this line
+const BARS_BOTTOM = 113; // bc-spacer(50) + cy-buddy(30) + gap(3) + cy-you(30)
+
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
   Emotion:  '#C0504D',
@@ -496,7 +499,7 @@ function setupInteractions(cy, wsRef, addBadge) {
     if (left + tw > window.innerWidth  - pad) left = x - tw - pad;
     if (left < pad) left = pad;
     if (top  + th > window.innerHeight - pad) top  = y - th - pad;
-    if (top < pad) top = y + pad;
+    if (top < BARS_BOTTOM) top = BARS_BOTTOM;
     tooltip.style.left = left + 'px';
     tooltip.style.top  = top  + 'px';
   }
@@ -505,7 +508,7 @@ function setupInteractions(cy, wsRef, addBadge) {
     const pos = node.renderedPosition();
     const th = tooltip.offsetHeight;
     let top = pos.y - 80;
-    if (top < 10) top = pos.y + 80;
+    if (top < BARS_BOTTOM) top = pos.y + 80;
     if (top + th > window.innerHeight - 10) top = window.innerHeight - th - 10;
     tooltip.style.left = '14px';
     tooltip.style.top  = top + 'px';
