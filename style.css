@@ -25,6 +25,7 @@ html, body {
   flex-shrink: 0;
   background: #001f4d;
   margin-bottom: 10px;
+  cursor: url('cursor-wings.svg') 16 16, auto;
 }
 
 #cy-you {
@@ -32,6 +33,7 @@ html, body {
   height: 36px;
   flex-shrink: 0;
   background: #3d2e00;
+  cursor: url('cursor-wings.svg') 16 16, auto;
 }
 
 #cy {
