@@ -2930,3 +2930,61 @@ These rules apply to all current and future code:
 - Cancel/unpair mechanism
 - What happens if paired user disconnects mid-session
 ```
+
+---
+
+## Amendment 22 — graphviewer.md — 29 May 2026
+
+## TextNode Chip Abbreviation and Buddy Disconnect Handling
+
+---
+
+### 22.1 — TextNode chip abbreviation in breadcrumb bars
+
+**Problem:** When navigating deep into a single work (source_text), the breadcrumb bar fills with identical-label TextNode chips, wasting horizontal space.
+
+**Solution:** When a new TextNode chip would be placed immediately after another TextNode chip from the same `source_text`, show only the `seq` number in a compact 40×34px chip instead of the full label.
+
+**Detection:** Each bar tracks `lastYouSourceText` / `lastBuddySourceText`. On each new chip, if `type === 'TextNode'` and `source_text === last*SourceText`, the chip is abbreviated. The tracker resets to `null` on any non-TextNode chip, so abbreviation only applies to consecutive same-work runs.
+
+**Styling:** A new `.abbreviated` class is applied to abbreviated chips:
+```javascript
+{ selector: 'node[type="TextNode"].abbreviated', style: { 'width': 40, 'height': 34, 'text-max-width': '34px' } }
+```
+
+**Breadcrumb transmission:** The `seq` field is included in all breadcrumb messages so the remote buddy bar can apply the same abbreviation logic independently.
+
+**Both bars:** `addYouChip` and `appendBuddyChip` apply the same logic — each bar tracks its own last source_text autonomously.
+
+---
+
+### 22.2 — Buddy disconnect and auto-requeue
+
+**Problem:** When a paired buddy disconnects, the surviving user's UI was left in a broken paired state with no indication anything had changed.
+
+**Server change:** In `ws.on('close')`, after removing pairing map entries, the server notifies the surviving user:
+```javascript
+if (buddyId) {
+  pairedWith.delete(ws.userId);
+  pairedWith.delete(buddyId);
+  const buddyWs = sessions.get(buddyId);
+  if (buddyWs && buddyWs.readyState === 1)
+    buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
+}
+```
+
+**Client on `buddy_disconnected`:**
+1. `pairingState.active = false` — stops breadcrumb transmission
+2. `buddyCy.nodes().addClass('buddy-gone')` — dims all existing chips to 30% opacity, signalling the old conversation without erasing it
+3. Status text → "Waiting..."
+4. Auto-sends `{ type: 'ready_to_pair' }` — rejoins the queue without requiring manual button click
+
+**On new `paired` message:** `resetBuddyBar()` clears all dimmed chips and resets all buddy bar state (`buddyChipCount`, `buddyChipX`, `lastBuddyChipId`, `lastBuddySourceText`, pan position). The bar starts completely fresh, making the partner change visually unambiguous.
+
+**Design rationale:** Auto-requeue is appropriate because the user was already in a paired session and presumably wants to continue. Dimming rather than immediately clearing gives a brief moment of visual continuity. Clearing on new pairing makes the partner change impossible to miss.
+
+**Privacy rule maintained:** No breadcrumb history is shared with the new buddy — `pairingState.active` is false during the wait period, so no transmissions occur until the new `paired` confirmation arrives.
+
+---
+
+*Amendment 22 — 29 May 2026*
