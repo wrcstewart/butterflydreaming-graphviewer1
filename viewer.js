@@ -1421,6 +1421,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     if (node.id() === activeNodeId) {
       if (type === 'TextNode') {
         expandChildLevel();
+      } else if (type === 'Family') {
+        expandToFamily(node);  // re-randomise jitter on repeat tap
       } else {
         restoreState();
         activeNodeId = null;
