@@ -1343,10 +1343,16 @@ function queryWS(ws, type, query, params = {}) {
 // --- Boot ---
 
 async function init() {
+  // Auto-reload if the initial data load hangs (e.g. cold Memgraph connection
+  // on first server start). Server warms up the pool on startup so the second
+  // load should be instant.
+  const loadWatchdog = setTimeout(() => location.reload(), 10000);
+
   let ws;
   try {
     ws = await connectWS();
   } catch (err) {
+    clearTimeout(loadWatchdog);
     console.error('Server connection error:', err);
     alert('Could not connect to server.\n\nIs server.js running?\n  node server.js');
     return;
@@ -1366,10 +1372,13 @@ async function init() {
         'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
     ]);
   } catch (err) {
+    clearTimeout(loadWatchdog);
     console.error('Query error:', err);
     alert('Could not load graph data. See browser console for details.');
     return;
   }
+
+  clearTimeout(loadWatchdog);
   // Build element maps (deduplicate nodes and edges by ID)
   const nodesById = new Map();
   const edgesById = new Map();

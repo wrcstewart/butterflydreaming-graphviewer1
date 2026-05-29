@@ -16,6 +16,19 @@ const server = app.listen(8080, () =>
   console.log('ButterflyDreaming viewer running at http://localhost:8080')
 );
 
+// Warm up Memgraph connection pool immediately on startup so the first
+// client query doesn't hit a cold bolt connection.
+(async () => {
+  try {
+    const s = driver.session({ database: 'memgraph' });
+    await s.run('RETURN 1');
+    await s.close();
+    console.log('[BD] Memgraph connection warmed up');
+  } catch (err) {
+    console.error('[BD] Memgraph warmup error:', err.message);
+  }
+})();
+
 const wss = new WebSocketServer({ server });
 
 // --- Pairing state ---
