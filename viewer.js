@@ -1196,6 +1196,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     }
     if (!gwId) return;
 
+    lastSearchCWNode = node;
+    cy.$('[type="Search_CW"]').hide();
+
     saveState();
     readModeActive = true;
     activeNodeId   = null;
