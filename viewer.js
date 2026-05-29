@@ -1229,7 +1229,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         'height':             nodeH,
         'font-size':          fontSize + 'px',
         'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
-        'background-opacity': linked && clusterColour ? 0.3 : 1,
+        'background-opacity': linked && clusterColour ? 0.65 : 1,
       });
     });
 
