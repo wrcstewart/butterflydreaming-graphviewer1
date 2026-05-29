@@ -408,6 +408,16 @@ function buildStyle() {
       style: { 'opacity': 0.3 }
     },
     {
+      selector: 'node.read-mode-section',
+      style: {
+        'width': 40,
+        'height': 34,
+        'label': 'data(seq)',
+        'text-max-width': '34px',
+        'font-size': '10px',
+      }
+    },
+    {
       selector: 'node.latest',
       style: {
         'border-width': 2,
@@ -456,7 +466,7 @@ function showSessionExpired() {
   document.getElementById('session-expired').classList.add('active');
 }
 
-function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
+function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, readModeState) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -483,6 +493,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let currentClusterColour = null;
   let lastSearchCWNode = null;
   let syntheticEdgeIds = new Set();
+  let readModeActive   = false;
 
   // --- You breadcrumb chips ---
   let youChipCount = 0;
@@ -1129,6 +1140,118 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     runLayout(cy);
   }
 
+  function exitReadMode() {
+    if (!readModeActive) return;
+    readModeActive = false;
+    cy.$('.read-mode-section').forEach(n => {
+      n.removeClass('read-mode-section');
+      n.removeStyle('background-color');
+      n.removeStyle('background-opacity');
+    });
+  }
+
+  async function handleReadModeTap(node) {
+    const work = node.data('source_text') || node.data('name');
+    if (!work) return;
+
+    const clusterNode   = lastClusterNode;
+    const clusterName   = clusterNode ? clusterNode.data('name')   : null;
+    const clusterColour = clusterNode ? clusterNode.data('colour') : null;
+
+    let records;
+    try {
+      records = await safeQuery('readModeSeq',
+        'MATCH (n:TextNode {source_text: $work}) RETURN n ORDER BY n.seq',
+        { work }
+      );
+    } catch (err) {
+      if (err.message === 'session_expired') showSessionExpired();
+      else console.error('[BD] Read mode error:', err);
+      return;
+    }
+
+    let clusterLinkedUrls = new Set();
+    if (clusterName) {
+      try {
+        const cr = await safeQuery('readModeCluster',
+          'MATCH (n:TextNode {source_text: $work})-[]->(c:Cluster {name: $clusterName}) ' +
+          'WHERE n.gateway = false RETURN n.url AS url',
+          { work, clusterName }
+        );
+        clusterLinkedUrls = new Set(cr.map(r => r.url).filter(Boolean));
+      } catch (err) {
+        console.error('[BD] Read mode cluster error:', err);
+      }
+    }
+
+    let gwId = null;
+    const sectionIds = [];
+    for (const rec of records) {
+      if (!rec.n) continue;
+      const id = getElementId(rec.n);
+      if (rec.n.properties && rec.n.properties.gateway) {
+        if (!gwId) gwId = id;
+      } else {
+        sectionIds.push(id);
+      }
+    }
+    if (!gwId) return;
+
+    saveState();
+    readModeActive = true;
+    activeNodeId   = null;
+    cy.elements().hide();
+
+    if (clusterNode && clusterNode.length) clusterNode.show();
+    const gwEl = cy.getElementById(gwId);
+    if (gwEl.length) gwEl.show();
+
+    sectionIds.forEach(id => {
+      const n = cy.getElementById(id);
+      if (!n.length) return;
+      n.show();
+      n.addClass('read-mode-section');
+      const linked = clusterLinkedUrls.has(n.data('url'));
+      if (linked && clusterColour) {
+        n.style({ 'background-color': clusterColour, 'background-opacity': 0.3 });
+      } else {
+        n.style({ 'background-color': '#1a1a1a', 'background-opacity': 1 });
+      }
+    });
+
+    // Horizontal snake layout
+    const positions = {};
+    const y        = cy.height() / 2;
+    let   x        = 60;
+    const spacing  = 44;
+
+    if (clusterNode && clusterNode.length) {
+      positions[clusterNode.id()] = { x, y };
+      x += spacing * 2;
+    }
+    positions[gwId] = { x, y };
+    x += spacing * 1.5;
+
+    const seqNodes = sectionIds
+      .map(id => cy.getElementById(id))
+      .filter(n => n.length)
+      .sort((a, b) => (a.data('seq') ?? 0) - (b.data('seq') ?? 0));
+
+    seqNodes.forEach(n => {
+      positions[n.id()] = { x, y };
+      x += spacing;
+    });
+
+    cy.layout({
+      name: 'preset',
+      positions,
+      animate: true,
+      animationDuration: 400,
+      fit: true,
+      padding: 40,
+    }).run();
+  }
+
   function updateSearchCWVisibility(node) {
     if (!lastClusterNode) return;
     if (lastSearchCWNode !== null) return;
@@ -1198,12 +1321,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
+    if (readModeActive && type !== 'Search_CW') exitReadMode();
+
     if (addChip && (type === 'Family' || type === 'Cluster' || type === 'TextNode' || type === 'Search_CW')) {
       addYouChip(node);
     }
 
     if (type === 'Search_CW') {
-      handleSearchCWTap(node);
+      if (readModeState.enabled) {
+        handleReadModeTap(node);
+      } else {
+        handleSearchCWTap(node);
+      }
       return;
     }
 
@@ -1556,10 +1685,13 @@ async function init() {
     boxSelectionEnabled: false,
   });
 
-  const pairingState = { active: false };
+  const pairingState  = { active: false };
+  const readModeState = { enabled: false };
 
-  const pairBtn    = document.getElementById('pair-btn');
-  const pairStatus = document.getElementById('pair-status');
+  const pairBtn        = document.getElementById('pair-btn');
+  const pairStatus     = document.getElementById('pair-status');
+  const readModeToggle = document.getElementById('read-mode-toggle');
+  readModeToggle.addEventListener('change', () => { readModeState.enabled = readModeToggle.checked; });
 
   pairBtn.addEventListener('click', () => {
     wsRef.lastActivity = Date.now();
@@ -1568,7 +1700,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, readModeState);
 
   ws.addEventListener('message', event => {
     let msg;
