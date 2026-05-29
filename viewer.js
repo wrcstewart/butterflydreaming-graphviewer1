@@ -623,19 +623,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return chip.data('display_name') || chip.data('name') || '';
   }
 
-  buddyCy.on('mouseover', 'node', evt => {
+  let buddyHoveredId = null;
+  buddyContainer.addEventListener('mousemove', evt => {
     if (recentTouch) return;
-    const chip    = evt.target;
-    const content = buildBuddyChipTooltip(chip);
-    if (!content) return;
+    const rect    = buddyContainer.getBoundingClientRect();
+    const pan     = buddyCy.pan();
+    const canvasX = evt.clientX - rect.left - pan.x;
+    const canvasY = evt.clientY - rect.top  - pan.y;
+    const hit = buddyCy.nodes().filter(n => {
+      const bb = n.boundingBox();
+      return canvasX >= bb.x1 && canvasX <= bb.x2 && canvasY >= bb.y1 && canvasY <= bb.y2;
+    }).first();
+    if (!hit.length) { buddyHoveredId = null; hideTooltip(); return; }
+    if (hit.id() === buddyHoveredId) return;
+    buddyHoveredId = hit.id();
+    const content = buildBuddyChipTooltip(hit);
+    if (!content) { hideTooltip(); return; }
     tooltip.textContent = content;
     tooltip.style.display = 'block';
-    const rect = buddyContainer.getBoundingClientRect();
-    const bb   = chip.renderedBoundingBox();
+    const bb = hit.renderedBoundingBox();
     positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
   });
-
-  buddyCy.on('mouseout', 'node', () => hideTooltip());
+  buddyContainer.addEventListener('mouseleave', () => { buddyHoveredId = null; hideTooltip(); });
 
   buddyCy.on('tap', 'node', evt => {
     const chip = evt.target;
@@ -675,25 +684,34 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let youTouchPending = null;
   let youTouchTimer   = null;
 
-  youCy.on('mouseover', 'node', evt => {
+  let youHoveredId = null;
+  youContainer.addEventListener('mousemove', evt => {
     if (recentTouch) return;
-    const chip = evt.target;
-    let main = cy.getElementById(chip.data('mainId'));
+    const rect    = youContainer.getBoundingClientRect();
+    const pan     = youCy.pan();
+    const canvasX = evt.clientX - rect.left - pan.x;
+    const canvasY = evt.clientY - rect.top  - pan.y;
+    const hit = youCy.nodes().filter(n => {
+      const bb = n.boundingBox();
+      return canvasX >= bb.x1 && canvasX <= bb.x2 && canvasY >= bb.y1 && canvasY <= bb.y2;
+    }).first();
+    if (!hit.length) { youHoveredId = null; hideTooltip(); return; }
+    if (hit.id() === youHoveredId) return;
+    youHoveredId = hit.id();
+    let main = cy.getElementById(hit.data('mainId'));
     if (!main.length) {
-      if (chip.data('type') !== 'Search_CW') return;
-      const d = { type: 'Search_CW', source_text: chip.data('source_text'), name: chip.data('name'), colour: chip.data('colour') };
-      main = { data: k => d[k], id: () => chip.data('mainId') };
+      if (hit.data('type') !== 'Search_CW') { hideTooltip(); return; }
+      const d = { type: 'Search_CW', source_text: hit.data('source_text'), name: hit.data('name'), colour: hit.data('colour') };
+      main = { data: k => d[k], id: () => hit.data('mainId') };
     }
     const content = buildTooltipContent(main);
-    if (!content) return;
+    if (!content) { hideTooltip(); return; }
     tooltip.textContent = content;
     tooltip.style.display = 'block';
-    const rect = youContainer.getBoundingClientRect();
-    const bb   = chip.renderedBoundingBox();
+    const bb = hit.renderedBoundingBox();
     positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
   });
-
-  youCy.on('mouseout', 'node', () => hideTooltip());
+  youContainer.addEventListener('mouseleave', () => { youHoveredId = null; hideTooltip(); });
 
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
