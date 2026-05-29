@@ -410,11 +410,11 @@ function buildStyle() {
     {
       selector: 'node.read-mode-section',
       style: {
-        'width': 40,
-        'height': 34,
+        'width': 70,
+        'height': 40,
         'label': 'data(seq)',
-        'text-max-width': '34px',
-        'font-size': '10px',
+        'text-max-width': '64px',
+        'font-size': '12px',
       }
     },
     {
@@ -1219,27 +1219,40 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
       }
     });
 
-    // Horizontal snake layout
-    const positions = {};
-    const y        = cy.height() / 2;
-    let   x        = 60;
-    const spacing  = 44;
-
-    if (clusterNode && clusterNode.length) {
-      positions[clusterNode.id()] = { x, y };
-      x += spacing * 2;
-    }
-    positions[gwId] = { x, y };
-    x += spacing * 1.5;
-
+    // Snake grid layout
     const seqNodes = sectionIds
       .map(id => cy.getElementById(id))
       .filter(n => n.length)
       .sort((a, b) => (a.data('seq') ?? 0) - (b.data('seq') ?? 0));
 
-    seqNodes.forEach(n => {
-      positions[n.id()] = { x, y };
-      x += spacing;
+    const count   = seqNodes.length;
+    const cols    = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
+    const nodeW   = 70;
+    const nodeH   = 40;
+    const gapX    = 10;
+    const gapY    = 10;
+    const stepX   = nodeW + gapX;
+    const stepY   = nodeH + gapY;
+    const originX = 50;
+    const headerY = 30;
+
+    const positions = {};
+
+    // Header row: cluster then gateway
+    let hx = originX;
+    if (clusterNode && clusterNode.length) {
+      positions[clusterNode.id()] = { x: hx, y: headerY };
+      hx += stepX * 2;
+    }
+    positions[gwId] = { x: hx, y: headerY };
+
+    // Snake grid: odd rows run right-to-left
+    const gridY = headerY + stepY * 2;
+    seqNodes.forEach((n, i) => {
+      const row      = Math.floor(i / cols);
+      const col      = i % cols;
+      const snakeCol = (row % 2 === 0) ? col : (cols - 1 - col);
+      positions[n.id()] = { x: originX + snakeCol * stepX, y: gridY + row * stepY };
     });
 
     cy.layout({
