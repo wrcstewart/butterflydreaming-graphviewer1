@@ -133,7 +133,13 @@ wss.on('connection', async (ws) => {
       sessions.delete(ws.userId);
       if (waitingUser?.userId === ws.userId) waitingUser = null;
       const buddyId = pairedWith.get(ws.userId);
-      if (buddyId) { pairedWith.delete(ws.userId); pairedWith.delete(buddyId); }
+      if (buddyId) {
+        pairedWith.delete(ws.userId);
+        pairedWith.delete(buddyId);
+        const buddyWs = sessions.get(buddyId);
+        if (buddyWs && buddyWs.readyState === 1)
+          buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
+      }
     }
     if (!ws.userId) return;
     try {

@@ -404,6 +404,10 @@ function buildStyle() {
       }
     },
     {
+      selector: 'node.buddy-gone',
+      style: { 'opacity': 0.3 }
+    },
+    {
       selector: 'node.latest',
       style: {
         'border-width': 2,
@@ -628,6 +632,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const rightEdge = buddyChipX - 7;
     const panX = Math.min(0, containerWidth - rightEdge - 12);
     buddyCy.pan({ x: panX, y: 0 });
+  }
+
+  function resetBuddyBar() {
+    buddyCy.elements().remove();
+    buddyChipCount      = 0;
+    buddyChipX          = 0;
+    lastBuddyChipId     = null;
+    lastBuddySourceText = null;
+    buddyCy.pan({ x: 0, y: 0 });
   }
 
   window.addEventListener('resize', panBuddyCyToLatest);
@@ -1290,7 +1303,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
   }, { passive: true });
 
-  return { appendBuddyChip };
+  return { appendBuddyChip, resetBuddyBar };
 
 }
 
@@ -1555,7 +1568,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   ws.addEventListener('message', event => {
     let msg;
@@ -1563,9 +1576,15 @@ async function init() {
     if (msg.type === 'wait_state') {
       pairStatus.textContent = 'Waiting...';
     } else if (msg.type === 'paired') {
+      resetBuddyBar();
       pairBtn.style.display = 'none';
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
+    } else if (msg.type === 'buddy_disconnected') {
+      pairingState.active = false;
+      buddyCy.nodes().addClass('buddy-gone');
+      pairStatus.textContent = 'Waiting...';
+      ws.send(JSON.stringify({ type: 'ready_to_pair' }));
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
     }
