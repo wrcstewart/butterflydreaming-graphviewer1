@@ -409,7 +409,7 @@ function buildStyle() {
     },
     {
       selector: 'node.family-view',
-      style: { 'opacity': 0.5 }
+      style: { 'background-opacity': 0.35, 'text-opacity': 0.6 }
     },
     {
       selector: 'node.read-mode-section',
