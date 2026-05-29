@@ -1145,8 +1145,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     readModeActive = false;
     cy.$('.read-mode-section').forEach(n => {
       n.removeClass('read-mode-section');
-      n.removeStyle('background-color');
-      n.removeStyle('background-opacity');
+      n.removeStyle('background-color background-opacity width height font-size');
     });
   }
 
@@ -1206,30 +1205,34 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     const gwEl = cy.getElementById(gwId);
     if (gwEl.length) gwEl.show();
 
+    // Snake grid layout — sizing must come first so inline styles apply before positioning
+    const seqNodes = sectionIds
+      .map(id => cy.getElementById(id))
+      .filter(n => n.length)
+      .sort((a, b) => (a.data('seq') ?? 0) - (b.data('seq') ?? 0));
+
+    const count    = seqNodes.length;
+    const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
+    const nodeW    = Math.max(40, Math.min(70, Math.round(640 / cols)));
+    const nodeH    = Math.round(nodeW * 0.57);
+    const fontSize = nodeW >= 60 ? 12 : nodeW >= 50 ? 11 : 10;
+    const gapX     = 10;
+
     sectionIds.forEach(id => {
       const n = cy.getElementById(id);
       if (!n.length) return;
       n.show();
       n.addClass('read-mode-section');
       const linked = clusterLinkedUrls.has(n.data('url'));
-      if (linked && clusterColour) {
-        n.style({ 'background-color': clusterColour, 'background-opacity': 0.3 });
-      } else {
-        n.style({ 'background-color': '#1a1a1a', 'background-opacity': 1 });
-      }
+      n.style({
+        'width':              nodeW,
+        'height':             nodeH,
+        'font-size':          fontSize + 'px',
+        'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
+        'background-opacity': linked && clusterColour ? 0.3 : 1,
+      });
     });
 
-    // Snake grid layout
-    const seqNodes = sectionIds
-      .map(id => cy.getElementById(id))
-      .filter(n => n.length)
-      .sort((a, b) => (a.data('seq') ?? 0) - (b.data('seq') ?? 0));
-
-    const count   = seqNodes.length;
-    const cols    = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
-    const nodeW   = 70;
-    const nodeH   = 40;
-    const gapX    = 10;
     const gapY    = 10;
     const stepX   = nodeW + gapX;
     const stepY   = nodeH + gapY;
