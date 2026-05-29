@@ -612,6 +612,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let buddyTouchTimer   = null;
 
   function buildBuddyChipTooltip(chip) {
+    const main = cy.getElementById(chip.data('mainId'));
+    if (main.length) return buildTooltipContent(main);
     if (chip.data('type') === 'Search_CW') {
       const work        = chip.data('name') || '';
       const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
