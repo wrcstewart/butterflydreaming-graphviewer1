@@ -1706,7 +1706,8 @@ async function init() {
 
   const pairBtn        = document.getElementById('pair-btn');
   const pairStatus     = document.getElementById('pair-status');
-  const readModeToggle = document.getElementById('read-mode-toggle');
+  const readModeToggle  = document.getElementById('read-mode-toggle');
+  readModeState.enabled = readModeToggle.checked;
   readModeToggle.addEventListener('change', () => { readModeState.enabled = readModeToggle.checked; });
 
   pairBtn.addEventListener('click', () => {
