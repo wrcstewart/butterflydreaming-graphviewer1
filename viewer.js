@@ -983,6 +983,56 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     runLayout(cy);
   }
 
+  function expandToFamily(familyNode) {
+    saveState();
+    activeNodeId = familyNode.id();
+    cy.elements().hide();
+    familyNode.show();
+    familyNode.closedNeighborhood()
+      .filter(el => el.data('type') !== '__root_edge__')
+      .show();
+
+    const key          = familyNode.data('name').toLowerCase();
+    const canvasWidth  = cy.width();
+    const canvasHeight = cy.height();
+
+    function scaleCoord(value, dim) {
+      const margin = dim * 0.1;
+      return margin + ((value + 1) / 2) * (dim * 0.8);
+    }
+
+    const fixedPositions = [];
+    cy.nodes('[type="Cluster"]:visible').forEach(n => {
+      const x = n.data(`${key}_x`);
+      const y = n.data(`${key}_y`);
+      if (x != null && y != null) {
+        fixedPositions.push({
+          nodeId: n.id(),
+          position: { x: scaleCoord(x, canvasWidth), y: scaleCoord(y, canvasHeight) },
+        });
+      }
+    });
+
+    if (fixedPositions.length === 0) {
+      runLayout(cy);
+      return;
+    }
+
+    cy.layout({
+      name: 'fcose',
+      fixedNodeConstraint: fixedPositions,
+      animate: true,
+      animationDuration: 450,
+      randomize: false,
+      fit: true,
+      padding: 60,
+      nodeSeparation: 75,
+      idealEdgeLength: 100,
+      nodeRepulsion: 4500,
+      gravity: 0.25,
+    }).run();
+  }
+
   function expandChildLevel() {
     // For a TextNode repeated click: reveal one more level of CHILD relationships
     saveState();
@@ -1365,6 +1415,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     } else {
       if (type === 'Cluster') {
         expandToCluster(node);
+      } else if (type === 'Family') {
+        expandToFamily(node);
       } else {
         expandToNode(node);
         updateSearchCWVisibility(node);
