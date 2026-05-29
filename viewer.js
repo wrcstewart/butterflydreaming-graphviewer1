@@ -1017,7 +1017,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
       const x = n.data(`${key}_x`);
       const y = n.data(`${key}_y`);
       if (x != null && y != null) {
-        const jitter = () => (Math.random() - 0.5) * 60;
+        const jitter = () => (Math.random() - 0.5) * (20 + Math.random() * 80);
         fixedPositions.push({
           nodeId: n.id(),
           position: { x: scaleCoord(x, canvasWidth) + jitter(), y: scaleCoord(y, canvasHeight) + jitter() },
