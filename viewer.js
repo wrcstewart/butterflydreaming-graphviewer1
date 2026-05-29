@@ -408,6 +408,10 @@ function buildStyle() {
       style: { 'opacity': 0.3 }
     },
     {
+      selector: 'node.family-view',
+      style: { 'opacity': 0.5 }
+    },
+    {
       selector: 'node.read-mode-section',
       style: {
         'width': 70,
@@ -964,7 +968,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
 
   // Expand
 
+  function clearFamilyView() {
+    cy.$('.family-view').removeClass('family-view');
+  }
+
   function expandToNode(node) {
+    clearFamilyView();
     saveState();
     activeNodeId = node.id();
     cy.elements().hide();
@@ -991,6 +1000,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     familyNode.closedNeighborhood()
       .filter(el => el.data('type') !== '__root_edge__')
       .show();
+
+    cy.nodes('[type="Cluster"]:visible').addClass('family-view');
 
     const key          = familyNode.data('name').toLowerCase();
     const canvasWidth  = cy.width();
@@ -1054,6 +1065,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
   }
 
   async function expandToCluster(clusterNode) {
+    clearFamilyView();
     lastClusterNode = clusterNode;
     currentClusterColour = clusterNode.data('colour');
     clearSearchCWNodes();
