@@ -272,10 +272,10 @@ function buildStyle() {
     {
       selector: 'node[type="Cluster"]',
       style: {
-        'width': 66,
+        'width': 70,
         'height': 34,
         'shape': 'round-rectangle',
-        'text-max-width': '59px',
+        'text-max-width': '63px',
         'font-size': '10px',
         'text-margin-y': -3,
         'border-width': 2,
@@ -505,7 +505,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     if (type === 'Family')    return 53;
     if (type === 'TextNode')  return 120;
     if (type === 'Search_CW') return 108;
-    return 66; // Cluster
+    return 70; // Cluster
   }
 
   function addYouChip(node) {
