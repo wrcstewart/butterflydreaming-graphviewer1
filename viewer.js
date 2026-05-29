@@ -698,13 +698,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!hit.length) { youHoveredId = null; hideTooltip(); return; }
     if (hit.id() === youHoveredId) return;
     youHoveredId = hit.id();
-    let main = cy.getElementById(hit.data('mainId'));
-    if (!main.length) {
-      if (hit.data('type') !== 'Search_CW') { hideTooltip(); return; }
-      const d = { type: 'Search_CW', source_text: hit.data('source_text'), name: hit.data('name'), colour: hit.data('colour') };
-      main = { data: k => d[k], id: () => hit.data('mainId') };
+    let content;
+    if (hit.data('type') === 'Search_CW') {
+      // Use stored clusterNodeId — not lastClusterNode which reflects current nav state
+      const work        = hit.data('name') || '';
+      const clusterNode = cy.getElementById(hit.data('clusterNodeId'));
+      const clusterName = clusterNode.length ? clusterNode.data('name') : '';
+      content = (work && clusterName) ? `${work} : filtered by: ${clusterName}` : work;
+    } else {
+      const main = cy.getElementById(hit.data('mainId'));
+      if (!main.length) { hideTooltip(); return; }
+      content = buildTooltipContent(main);
     }
-    const content = buildTooltipContent(main);
     if (!content) { hideTooltip(); return; }
     tooltip.textContent = content;
     tooltip.style.display = 'block';
