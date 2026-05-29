@@ -997,9 +997,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     const canvasHeight = cy.height();
 
     function scaleCoord(value, dim) {
-      const edge = dim * 0.05;
-      const raw  = (dim / 2) + value * dim; // 2× virtual canvas, centred
-      return Math.max(edge, Math.min(dim - edge, raw));
+      const margin = dim * 0.1;
+      return margin + ((value + 1) / 2) * (dim * 0.8);
     }
 
     const fixedPositions = [];
