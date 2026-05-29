@@ -396,6 +396,14 @@ function buildStyle() {
       }
     },
     {
+      selector: 'node[type="TextNode"].abbreviated',
+      style: {
+        'width': 40,
+        'height': 34,
+        'text-max-width': '34px',
+      }
+    },
+    {
       selector: 'node.latest',
       style: {
         'border-width': 2,
@@ -476,6 +484,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let youChipCount = 0;
   let youChipX = 0;
   let lastYouChipId = null;
+  let lastYouSourceText = null;
 
   function chipWidth(type) {
     if (type === 'Family')    return 53;
@@ -485,9 +494,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function addYouChip(node) {
-    const type = node.data('type');
-    const w    = chipWidth(type);
-    const id   = 'you_' + (youChipCount++);
+    const type       = node.data('type');
+    const sourceText = type === 'TextNode' ? (node.data('source_text') || null) : null;
+    const seq        = node.data('seq') ?? null;
+    const abbreviated = type === 'TextNode' && sourceText !== null && sourceText === lastYouSourceText;
+    const w           = abbreviated ? 40 : chipWidth(type);
+    const displayName = abbreviated ? String(seq ?? '?') : (node.data('display_name') || node.data('name') || '');
+
+    const id = 'you_' + (youChipCount++);
     if (lastYouChipId) {
       const prev = youCy.getElementById(lastYouChipId);
       if (prev.length) prev.removeClass('latest');
@@ -497,17 +511,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       data: {
         id,
         type,
-        display_name:  node.data('display_name') || node.data('name') || '',
+        display_name:  displayName,
         colour:        node.data('colour') || '#444444',
         name:          node.data('name') || '',
         url:           node.data('url') || null,
         mainId:        node.id(),
-        source_text:   node.data('source_text') || null,
+        source_text:   sourceText,
+        seq,
         clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
         gateway:       node.data('gateway') || false,
       },
       position: { x: youChipX + w / 2, y: 18 }
     });
+    if (abbreviated) youCy.getElementById(id).addClass('abbreviated');
+    lastYouSourceText = type === 'TextNode' ? sourceText : null;
     if (lastYouChipId) {
       youCy.add({
         group: 'edges',
@@ -533,6 +550,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             name:          node.data('name') || '',
             mainId:        node.id(),
             source_text:   node.data('source_text') || null,
+            seq:           node.data('seq') ?? null,
             gateway:       node.data('gateway') || false,
             clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
           }
@@ -559,11 +577,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let buddyChipCount = 0;
   let buddyChipX = 0;
   let lastBuddyChipId = null;
+  let lastBuddySourceText = null;
 
   function appendBuddyChip(data) {
-    const type = data.type;
-    const w    = chipWidth(type);
-    const id   = 'buddy_' + (buddyChipCount++);
+    const type        = data.type;
+    const sourceText  = type === 'TextNode' ? (data.source_text || null) : null;
+    const seq         = data.seq ?? null;
+    const abbreviated = type === 'TextNode' && sourceText !== null && sourceText === lastBuddySourceText;
+    const w           = abbreviated ? 40 : chipWidth(type);
+    const displayName = abbreviated ? String(seq ?? '?') : (data.display_name || data.name || '');
+
+    const id = 'buddy_' + (buddyChipCount++);
     if (lastBuddyChipId) {
       const prev = buddyCy.getElementById(lastBuddyChipId);
       if (prev.length) prev.removeClass('latest');
@@ -573,11 +597,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       data: {
         id,
         type,
-        display_name:  data.display_name || data.name || '',
+        display_name:  displayName,
         colour:        data.colour || '#444444',
         name:          data.name || '',
         mainId:        data.mainId || null,
-        source_text:   data.source_text || null,
+        source_text:   sourceText,
+        seq,
         gateway:       data.gateway || false,
         clusterNodeId: data.clusterNodeId || null,
       },
@@ -589,7 +614,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         data: { id: 'buddy_e_' + id, source: lastBuddyChipId, target: id, colour: '#333333', weight: 0.2 }
       });
     }
+    if (abbreviated) buddyCy.getElementById(id).addClass('abbreviated');
     buddyCy.getElementById(id).addClass('latest');
+    lastBuddySourceText = type === 'TextNode' ? sourceText : null;
     buddyChipX    += w + 7;
     lastBuddyChipId = id;
     panBuddyCyToLatest();
