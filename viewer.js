@@ -1026,7 +1026,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
       randomize: false,
       fit: true,
       padding: 60,
-      nodeSeparation: 75,
+      nodeSeparation: 150,
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
       gravity: 0.25,
