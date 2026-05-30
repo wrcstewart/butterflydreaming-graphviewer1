@@ -3530,3 +3530,212 @@ After implementing, confirm the following navigation paths work:
 - Bud click → existing one-hop behaviour unchanged
 - Settling click → existing behaviour unchanged
 ```
+Here is Amendment 27:
+
+---
+
+```markdown
+## Amendment 27 — graphviewer.md — 30 May 2026
+
+## Colour Blending — Weighted Arithmetic Mean
+
+### Overview
+
+All nodes downstream of Conversations derive their colour by
+weighted arithmetic mean blending of their immediate parent
+colours. TextNodes remain black (dark fill) with white/grey
+borders as previously specified — they are excluded from
+colour blending.
+
+---
+
+### 27.1 Blending Function
+
+```javascript
+function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    return { r, g, b };
+}
+
+function blendColours(parents) {
+    // parents: array of { hex, weight }
+    // weights already normalised to sum to 1.0
+    let r = 0, g = 0, b = 0;
+
+    parents.forEach(p => {
+        const rgb = hexToRgb(p.hex);
+        r += p.weight * rgb.r;
+        g += p.weight * rgb.g;
+        b += p.weight * rgb.b;
+    });
+
+    return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+```
+
+---
+
+### 27.2 Apply To — Node Types and Rules
+
+**Family nodes (top level):**
+Fixed hex colours as defined. No blending. Full opacity.
+Parents are Entry nodes — Entry colours are not used for blending.
+
+| Family | Hex |
+|---|---|
+| Nature | #4A8C4F |
+| Emotion | #C0504D |
+| Reason | #4A7BC0 |
+| Spirit | #9B6B9B |
+| Symbolic | #C09A3A |
+| Arts | #C47A5A |
+
+**SubFamily nodes (Family nodes with a Family parent):**
+Blend immediate parent Family colours using DESCENDS_FROM weights.
+
+**Bud nodes (Cluster nodes):**
+Blend immediate parent Family colours using DESCENDS_FROM weights.
+Each Bud has exactly one DESCENDS_FROM relationship per parent Family,
+with normalised weights summing to 1.0.
+
+**TextNode nodes:**
+Not blended. Dark fill, white or grey border as per existing
+styling rules (Amendment 8). Excluded from this blending scheme.
+
+**Root, Entry nodes:**
+Fixed colours as defined. Not blended.
+
+---
+
+### 27.3 Implementation
+
+At graph load time, after all nodes are added to Cytoscape,
+compute blended colours for all SubFamily and Bud nodes:
+
+```javascript
+function computeBlendedColours(cy) {
+    // Process SubFamily nodes first, then Buds
+    // so SubFamily colours are available when Buds are processed
+
+    // SubFamily = Family node whose immediate parent is also Family
+    cy.nodes('[type="Family"]').forEach(node => {
+        const parentFamilies = node
+            .incomers('edge[type="DESCENDS_FROM"]')
+            .sources()
+            .filter(p => p.data('type') === 'Family');
+
+        if (parentFamilies.length === 0) return; // top-level Family — skip
+
+        const parents = parentFamilies.map(p => {
+            const edge = p.edgesTo(node).filter('[type="DESCENDS_FROM"]').first();
+            return {
+                hex: p.data('hex'),
+                weight: edge.data('weight') || 1
+            };
+        });
+
+        const colour = blendColours(parents);
+        node.data('blendedColour', colour);
+        node.style('background-color', colour);
+    });
+
+    // Bud nodes (Cluster)
+    cy.nodes('[type="Cluster"]').forEach(node => {
+        const parentFamilies = node
+            .incomers('edge[type="DESCENDS_FROM"]')
+            .sources();
+
+        if (parentFamilies.length === 0) return;
+
+        const parents = parentFamilies.map(p => {
+            const edge = p.edgesTo(node).filter('[type="DESCENDS_FROM"]').first();
+            const hex = p.data('hex') || p.data('blendedColour');
+            return {
+                hex: hex,
+                weight: edge.data('weight') || 1
+            };
+        });
+
+        const colour = blendColours(parents);
+        node.data('blendedColour', colour);
+        node.style('background-color', colour);
+    });
+}
+```
+
+Call `computeBlendedColours(cy)` once after the initial graph
+load completes — before the first render.
+
+---
+
+### 27.4 Edge Colours
+
+DESCENDS_FROM edge colours should also reflect the blended
+colour of the child node — consistent with the existing rule
+that edge colour reflects the node it points toward:
+
+```javascript
+cy.edges('[type="DESCENDS_FROM"]').forEach(edge => {
+    const targetColour = edge.target().data('blendedColour')
+        || edge.target().data('hex')
+        || '#444444';
+    edge.style('line-color', targetColour);
+});
+```
+
+---
+
+### 27.5 White Text Legibility
+
+All blended colours use full opacity (rgb, not rgba).
+White text labels should remain legible against all blended
+colours since the source family colours are all mid-tone.
+If any blended colour proves too light, reduce brightness:
+
+```javascript
+function darkenIfNeeded(r, g, b) {
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    if (brightness > 160) {
+        // too light for white text — darken by 40%
+        return `rgb(${Math.round(r*0.6)}, ${Math.round(g*0.6)}, ${Math.round(b*0.6)})`;
+    }
+    return `rgb(${r}, ${g}, ${b})`;
+}
+```
+
+Apply this check inside `blendColours()` before returning.
+
+---
+
+### 27.6 Previous Colour Logic
+
+The previous dynamic colour derivation for Cluster nodes
+(highest weighted Family connection) is superseded by this
+amendment. Remove that logic and replace entirely with
+`computeBlendedColours()`.
+```
+
+
+
+
+Good forward thinking. Here is the corrected line for section 27.1 — just the return statement:
+
+```javascript
+return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 1.0)`;
+```
+
+And update 27.5 accordingly — the brightness check return statements:
+
+```javascript
+return `rgba(${Math.round(r*0.6)}, ${Math.round(g*0.6)}, ${Math.round(b*0.6)}, 1.0)`;
+```
+
+And the fallback in 27.4:
+
+```javascript
+|| '#444444';  // leave this as hex — it's a fallback only
+```
+
+Tell CC to use `rgba(..., 1.0)` throughout the blending function so the alpha channel is always present and easily adjustable in future.

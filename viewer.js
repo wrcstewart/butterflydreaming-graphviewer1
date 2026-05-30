@@ -76,6 +76,88 @@ function desaturate(hex, amount) {
   return '#' + toHex(nr) + toHex(ng) + toHex(nb);
 }
 
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+function colourToRgb(str) {
+  if (!str) return null;
+  if (str.startsWith('#')) return hexToRgb(str);
+  const m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (m) return { r: +m[1], g: +m[2], b: +m[3] };
+  return null;
+}
+
+function blendColours(parents) {
+  let r = 0, g = 0, b = 0;
+  parents.forEach(p => {
+    const rgb = colourToRgb(p.hex);
+    if (!rgb) return;
+    r += p.weight * rgb.r;
+    g += p.weight * rgb.g;
+    b += p.weight * rgb.b;
+  });
+  r = Math.round(r); g = Math.round(g); b = Math.round(b);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  if (brightness > 160) {
+    return `rgba(${Math.round(r * 0.6)}, ${Math.round(g * 0.6)}, ${Math.round(b * 0.6)}, 1.0)`;
+  }
+  return `rgba(${r}, ${g}, ${b}, 1.0)`;
+}
+
+function rgbaToHex(rgba) {
+  const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return rgba;
+  const toHex = x => parseInt(x).toString(16).padStart(2, '0');
+  return '#' + toHex(m[1]) + toHex(m[2]) + toHex(m[3]);
+}
+
+function computeBlendedColours(cy) {
+  // SubFamily nodes first (Family nodes whose immediate parent is also Family)
+  cy.nodes('[type="Family"]').forEach(node => {
+    const descEdges = node.connectedEdges('[type="DESCENDS_FROM"]')
+      .filter(e => e.source().id() === node.id());
+    const parents = descEdges.targets().filter(p => p.data('type') === 'Family');
+    if (parents.length === 0) return;
+
+    const blendInputs = parents.map(p => {
+      const edge = descEdges.filter(e => e.target().id() === p.id()).first();
+      return { hex: p.data('hex') || p.data('colour'), weight: edge.data('weight') || 1 };
+    });
+    const colour = blendColours(blendInputs);
+    node.data('colour', rgbaToHex(colour));
+    node.data('blendedColour', colour);
+  });
+
+  // Bud nodes (Cluster) — blend immediate parent Family colours
+  cy.nodes('[type="Cluster"]').forEach(node => {
+    const descEdges = node.connectedEdges('[type="DESCENDS_FROM"]')
+      .filter(e => e.source().id() === node.id());
+    const parents = descEdges.targets();
+    if (parents.length === 0) return;
+
+    const blendInputs = parents.map(p => {
+      const edge = descEdges.filter(e => e.target().id() === p.id()).first();
+      const hex = p.data('hex') || p.data('blendedColour') || p.data('colour');
+      return { hex, weight: edge.data('weight') || 1 };
+    });
+    const colour = blendColours(blendInputs);
+    node.data('colour', rgbaToHex(colour));
+    node.data('blendedColour', colour);
+  });
+
+  // Colour DESCENDS_FROM edges to match their child (source) node
+  cy.edges('[type="DESCENDS_FROM"]').forEach(edge => {
+    const childColour = edge.source().data('blendedColour')
+      || edge.source().data('colour')
+      || '#444444';
+    edge.style('line-color', childColour);
+  });
+}
+
 function toPlain(val) {
   if (val === null || val === undefined) return val;
   if (typeof val === 'object' && typeof val.toNumber === 'function') return val.toNumber();
@@ -119,20 +201,19 @@ function buildNodeData(n) {
   const id = getElementId(n);
 
   if (labels.includes('Family')) {
+    const familyColour = FAMILY_COLOURS[props.name] || '#aaaaaa';
     return Object.assign({}, props, {
       id, type: 'Family',
       display_name: props.name || '',
-      colour: FAMILY_COLOURS[props.name] || '#aaaaaa',
+      colour: familyColour,
+      hex: familyColour,
     });
   }
   if (labels.includes('Cluster')) {
-    const fc = FAMILY_COLOURS[props.family_primary];
     return Object.assign({}, props, {
       id, type: 'Cluster',
-      // display_name: short form for in-node rendering (Neo4j property, 1-2 words)
-      // label:        full name for tooltip (Neo4j property, preserved from props)
       display_name: props.display_name || props.name || '',
-      colour: fc ? desaturate(fc) : '#666666',
+      colour: '#666666',
     });
   }
   if (labels.includes('TextNode')) {
@@ -1587,16 +1668,11 @@ async function init() {
     return;
   }
 
-  let records, clusterColourRecords, cfRecords;
+  let records, cfRecords;
   try {
-    [records, clusterColourRecords, cfRecords] = await Promise.all([
+    [records, cfRecords] = await Promise.all([
       queryWS(ws, 'graph',
         'MATCH (n)-[r]->(m) RETURN n, r, m'),
-      queryWS(ws, 'clusterColours',
-        'MATCH (c:Cluster)-[r]-(f:Family) ' +
-        'WITH c, f, r.weight AS w ORDER BY w DESC ' +
-        'WITH c, collect(f)[0] AS pf ' +
-        'RETURN c.name AS name, pf.hex AS colour'),
       queryWS(ws, 'clusterFamily',
         'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
     ]);
@@ -1658,19 +1734,6 @@ async function init() {
     edgesById.set(cfEdgeId, ed);
   }
 
-  // Post-process cluster colours from highest-weighted family connection
-  const clusterColours = new Map();
-  for (const rec of clusterColourRecords) {
-    const name = rec.name;
-    const colour = rec.colour;
-    if (name && colour) clusterColours.set(name, colour);
-  }
-  nodesById.forEach(nd => {
-    if (nd.type === 'Cluster' && clusterColours.has(nd.name)) {
-      nd.colour = clusterColours.get(nd.name);
-    }
-  });
-
   // Post-process edges
   edgesById.forEach(ed => {
     const src = nodesById.get(ed.source);
@@ -1699,6 +1762,7 @@ async function init() {
     wheelSensitivity: 0.3,
   });
 
+  computeBlendedColours(cy);
   cy.elements().hide();
   const root = cy.nodes('[type="root"]').first();
   root.show();
