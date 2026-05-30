@@ -153,12 +153,10 @@ function computeBlendedColours(cy) {
     node.data('blendedColour', colour);
   });
 
-  // Colour DESCENDS_FROM edges to match their child (source) node
+  // Colour DESCENDS_FROM edges by parent (target) Family colour
   cy.edges('[type="DESCENDS_FROM"]').forEach(edge => {
-    const childColour = edge.source().data('blendedColour')
-      || edge.source().data('colour')
-      || '#444444';
-    edge.style('line-color', childColour);
+    const parentColour = edge.target().data('colour') || '#444444';
+    edge.style('line-color', parentColour);
   });
 }
 
