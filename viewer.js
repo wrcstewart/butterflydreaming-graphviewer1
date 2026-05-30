@@ -1004,10 +1004,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     cy.elements().hide();
     familyNode.show();
 
-    // Show outgoing DESCENDS_FROM edges and their targets (Buds / SubFamilies)
-    const descEdges = cy.edges('[type="DESCENDS_FROM"]').filter(e => e.source().id() === familyNode.id());
+    // Show all DESCENDS_FROM edges connected to this family (both directions)
+    // and their neighbouring nodes — gives Conversations context above and Buds below
+    const descEdges = familyNode.connectedEdges('[type="DESCENDS_FROM"]');
     descEdges.show();
-    descEdges.targets().show();
+    descEdges.connectedNodes().show();
 
     cy.nodes('[type="Cluster"]:visible').addClass('family-view');
     runLayout(cy);
