@@ -123,10 +123,12 @@ function computeBlendedColours(cy) {
     const parents = descEdges.targets().filter(p => p.data('type') === 'Family');
     if (parents.length === 0) return;
 
-    const blendInputs = parents.map(p => {
+    const rawInputs = parents.map(p => {
       const edge = descEdges.filter(e => e.target().id() === p.id()).first();
       return { hex: p.data('hex') || p.data('colour'), weight: edge.data('weight') || 1 };
     });
+    const total = rawInputs.reduce((s, p) => s + p.weight, 0);
+    const blendInputs = rawInputs.map(p => ({ ...p, weight: p.weight / total }));
     const colour = blendColours(blendInputs);
     node.data('colour', rgbaToHex(colour));
     node.data('blendedColour', colour);
@@ -139,11 +141,13 @@ function computeBlendedColours(cy) {
     const parents = descEdges.targets();
     if (parents.length === 0) return;
 
-    const blendInputs = parents.map(p => {
+    const rawInputs = parents.map(p => {
       const edge = descEdges.filter(e => e.target().id() === p.id()).first();
       const hex = p.data('hex') || p.data('blendedColour') || p.data('colour');
       return { hex, weight: edge.data('weight') || 1 };
     });
+    const total = rawInputs.reduce((s, p) => s + p.weight, 0);
+    const blendInputs = rawInputs.map(p => ({ ...p, weight: p.weight / total }));
     const colour = blendColours(blendInputs);
     node.data('colour', rgbaToHex(colour));
     node.data('blendedColour', colour);
@@ -265,7 +269,7 @@ function buildStyle() {
       selector: 'node',
       style: {
         'background-color': 'data(colour)',
-        'background-opacity': 0.8,
+        'background-opacity': 1,
         'label': 'data(display_name)',
         'text-valign': 'center',
         'text-halign': 'center',
