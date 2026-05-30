@@ -2988,3 +2988,545 @@ if (buddyId) {
 ---
 
 *Amendment 22 — 29 May 2026*
+
+
+Here is Amendment 23:
+
+---
+
+```markdown
+## Amendment 23 — graphviewer.md — 29 May 2026
+
+## Read Mode — Linear Sequence View
+
+### Overview
+
+Read Mode presents a corpus work as a linear snake when a Search_CW
+chip is clicked, rather than the standard one-hop cluster-filtered view.
+It is introduced as a development option via a tick box, with a view
+to making it the default behaviour if it proves successful.
+
+---
+
+### 23.1 Read Mode Toggle
+
+A tick box positioned to the right of the pairing button:
+
+```html
+<label>
+  <input type="checkbox" id="read-mode-toggle"> Read mode
+</label>
+```
+
+When ticked: Search_CW chip clicks trigger the linear snake view.
+When unticked: Search_CW chip clicks use the existing one-hop
+cluster-filtered behaviour.
+
+Read Mode state persists for the session — survives navigation
+within the graph. Does not reset when Reset button is pressed.
+
+---
+
+### 23.2 Linear Snake Layout
+
+When Read Mode is active and a Search_CW chip is clicked, render
+the entire work in sequence as a horizontal snake:
+
+```
+[Cluster] → [Gateway] → [1] [2] [3] [4] [5] ... [81]
+```
+
+**Node order:** Cluster chip (from breadcrumb context) first,
+then Gateway node, then all TextNodes in ascending seq order.
+
+**Layout:** Use Cytoscape `preset` layout with calculated positions —
+nodes placed in a horizontal row at fixed intervals. Force-directed
+(fCoSE) is not used for Read Mode — sequence order must be exact.
+
+```javascript
+const positions = {};
+let x = 60;
+const y = mainCy.height() / 2;
+const spacing = 44;
+
+// Cluster node first
+positions[clusterNodeId] = { x, y };
+x += spacing * 2;
+
+// Gateway node
+positions[gatewayNodeId] = { x, y };
+x += spacing;
+
+// All sections in seq order
+seqNodes.forEach(node => {
+    positions[node.id()] = { x, y };
+    x += spacing;
+});
+
+mainCy.layout({
+    name: 'preset',
+    positions,
+    animate: true,
+    animationDuration: 400
+}).run();
+```
+
+**Edges:** Draw simple sequential CHILD edges between nodes
+in the snake — left to right arrows only. Do not show
+cluster relationship edges in Read Mode.
+
+---
+
+### 23.3 Node Styling in Read Mode
+
+**Gateway node:** full size, normal styling — entry point to work.
+
+**Section nodes (TextNode, gateway: false):**
+- Smaller than normal — compact, numbered only
+- Label: seq number only (no title in snake view — space is limited)
+- Default background: dark, neutral
+
+**Cluster tinting:**
+Section nodes with a relationship to the active cluster receive
+a low-opacity tint of the cluster's family colour as background:
+
+```javascript
+// On rendering each section node:
+const hasClusterLink = node
+    .neighborhood('edge')
+    .filter(e => e.target().data('name') === activeClusterName)
+    .length > 0;
+
+if (hasClusterLink) {
+    node.style('background-color', hexToRgba(clusterFamilyColour, 0.3));
+} else {
+    node.style('background-color', '#1a1a1a'); // dark neutral
+}
+```
+
+`hexToRgba()` converts a hex colour to rgba with the given opacity.
+Opacity 0.3 (30%) — subtle heat map, not garish.
+
+**The tint does not appear in the breadcrumb bars.**
+
+---
+
+### 23.4 Hover in Read Mode
+
+Hover/dwell behaviour is unchanged — 400ms dwell shows the
+node's full text as tooltip in the standard position.
+On touch: first tap shows tooltip, second tap navigates (see 23.5).
+
+---
+
+### 23.5 Clicking a Section Node in Read Mode
+
+First click/tap on any section node in the snake:
+- Exit Read Mode snake view
+- Switch to standard one-hop view for that node
+- Show all cluster connections, CHILD relationships etc.
+- Snake disappears — normal graph navigation resumes
+
+Return to snake: click the Search_CW chip in the youCy
+breadcrumb bar. This re-runs the chapter query and
+re-renders the snake. The breadcrumb is the return mechanism
+— no separate "Back to sequence" button needed.
+
+Reset button: full graph reset. Read Mode tick box state
+is preserved — snake does not re-render automatically,
+but next Search_CW click will render it again if ticked.
+
+---
+
+### 23.6 Query for Read Mode
+
+When Read Mode is active and a Search_CW chip is clicked,
+run this query to get all sections of the work in sequence:
+
+```javascript
+const query = `
+    MATCH (gw:TextNode {source_text: $work, gateway: true})
+    OPTIONAL MATCH (gw)-[:CHILD*]->(n:TextNode)
+    RETURN gw, n
+    ORDER BY n.seq
+`;
+```
+
+Then separately check which returned nodes have a relationship
+to the active cluster — used for tinting:
+
+```javascript
+const clusterQuery = `
+    MATCH (n:TextNode {source_text: $work})-[r]->(c:Cluster {name: $clusterName})
+    WHERE n.gateway = false
+    RETURN n.url
+`;
+```
+
+Store the cluster-linked URLs in a Set for O(1) lookup
+when styling each node.
+
+---
+
+### 23.7 Design Notes and Future Direction
+
+- The tick box is a development feature to allow comparison
+  between Read Mode and the existing one-hop behaviour.
+  If Read Mode proves the better default, the tick box is
+  removed and Read Mode becomes the behaviour on all
+  Search_CW chip clicks.
+
+- The tint heat map could in future show multiple cluster
+  tints simultaneously (e.g. a node linked to both Paradox
+  and Impermanence shows a blended colour). Not needed now.
+
+- On mobile the snake may need to wrap to multiple rows
+  for long works (81 TTC chapters). A simple row-wrap
+  at a fixed column count (e.g. 20 per row) would handle
+  this. Not needed for initial implementation — test on
+  desktop first.
+
+- The Read Mode snake is local only — buddy's snake is
+  not transmitted. Breadcrumb chips are transmitted as
+  normal (cluster, work, textnode) but the snake rendering
+  is each user's own view.
+```
+Here is the corrected Amendment 24 — axis meanings table removed:
+
+---
+
+```markdown
+## Amendment 24 — graphviewer.md — 29 May 2026
+
+## Cluster Semantic Positioning — Family-Specific Coordinate Axes
+
+### Overview
+
+Each Cluster node in Memgraph now carries coordinate properties for
+each Family view it appears in. These replace the purely force-directed
+fCoSE positioning when a Family node is clicked, giving each Family
+view a semantically meaningful 2D layout where cluster position
+reflects its character relative to that family's conceptual axes.
+
+---
+
+### 24.1 New Cluster Properties
+
+Each cluster may carry up to 6 pairs of coordinate properties:
+
+```
+nature_x,   nature_y
+emotion_x,  emotion_y
+reason_x,   reason_y
+spirit_x,   spirit_y
+symbolic_x, symbolic_y
+arts_x,     arts_y
+```
+
+Values range from -1.0 to +1.0. A null/absent value means the cluster
+does not have a defined position in that family view.
+
+Not all clusters have coordinates for all families — only those where
+the cluster has a meaningful relationship to that family.
+
+---
+
+### 24.2 Applying Coordinates in the Viewer
+
+When a Family node is clicked and its cluster neighbours are displayed,
+apply the family-specific coordinates as fixed position constraints
+rather than letting fCoSE place them freely.
+
+**Step 1 — Determine which coordinate pair to use:**
+
+```javascript
+function getFamilyCoordKey(familyName) {
+    return familyName.toLowerCase();
+    // returns 'emotion', 'nature', 'reason' etc.
+}
+```
+
+**Step 2 — Scale from -1/+1 to canvas pixels:**
+
+```javascript
+function scaleCoord(value, canvasDimension) {
+    // value is -1 to +1
+    // scale to 80% of canvas dimension, centred
+    const margin = canvasDimension * 0.1;
+    const range = canvasDimension * 0.8;
+    return margin + ((value + 1) / 2) * range;
+}
+
+const canvasWidth  = mainCy.width();
+const canvasHeight = mainCy.height();
+```
+
+**Step 3 — Build position constraints for fCoSE:**
+
+```javascript
+const key = getFamilyCoordKey(clickedFamily.data('name'));
+const fixedPositions = [];
+
+clusterNeighbours.forEach(node => {
+    const x = node.data(`${key}_x`);
+    const y = node.data(`${key}_y`);
+
+    if (x !== null && x !== undefined &&
+        y !== null && y !== undefined) {
+        fixedPositions.push({
+            nodeId: node.id(),
+            position: {
+                x: scaleCoord(x, canvasWidth),
+                y: scaleCoord(y, canvasHeight)
+            }
+        });
+    }
+});
+```
+
+**Step 4 — Run fCoSE with fixed constraints:**
+
+```javascript
+mainCy.layout({
+    name: 'fcose',
+    fixedNodeConstraint: fixedPositions,
+    animate: true,
+    animationDuration: 400,
+    randomize: false
+}).run();
+```
+
+Clusters with no coordinate for this family (null) are not included
+in `fixedPositions` — fCoSE places them freely using force-directed
+physics. They will naturally gravitate toward clusters they are
+connected to.
+
+---
+
+### 24.3 Fallback
+
+If a family has no coordinate data at all (unlikely but possible),
+fall back to the existing pure fCoSE layout with no constraints.
+
+```javascript
+if (fixedPositions.length === 0) {
+    mainCy.layout({ name: 'fcose', animate: true }).run();
+}
+```
+
+---
+
+### 24.4 Important Notes
+
+- Coordinates are loaded from Memgraph as part of the normal graph
+  load at startup — no extra query needed. They arrive as node
+  properties on Cluster nodes.
+
+- The y axis is inverted in Cytoscape (y increases downward).
+  The scaleCoord function above handles this correctly since it
+  maps -1 (bottom of semantic axis) to a high pixel y value
+  and +1 (top of semantic axis) to a low pixel y value.
+  **Check this inversion is correct visually after implementation
+  and flip if needed.**
+
+- The coordinate system is per-family-view. The same cluster node
+  may appear at very different positions in different family views —
+  this is correct and intentional.
+
+- Do not apply these coordinates in Read Mode snake layout —
+  Read Mode uses sequential preset positions only.
+
+
+```
+## Amendment 25 — graphviewer.md — 30 May 2026
+
+## Hierarchy Restructure — SubFamily nodes, Bud rename, Colour Blending
+
+### Overview
+
+This amendment introduces three related changes:
+
+1. Cluster nodes are renamed to Bud nodes conceptually
+   (label remains Cluster in Memgraph for now — see 25.1)
+2. Family nodes can now link to child Family nodes (SubFamilies)
+   creating a navigable hierarchy of arbitrary depth
+3. Node colours for SubFamily and Bud nodes are derived by
+   geometric mean blending of immediate parent colours
+4. The coordinate positioning system (Amendment 24) is retired —
+   spring-loaded fCoSE with manageable node counts per view
+   replaces it
+
+---
+
+### 25.1 Cluster → Bud Rename
+
+The conceptual rename from Cluster to Bud is adopted in all
+documentation and UI labels going forward. The database label
+remains `:Cluster` for now to avoid a migration — this will
+be updated in a future schema cleanup pass.
+
+In viewer.js and any UI text, refer to these nodes as Buds.
+The in-node display_name and label properties are unchanged.
+
+---
+
+### 25.2 Family → SubFamily → Bud Hierarchy
+
+Family nodes can now connect to child Family nodes (SubFamilies)
+via CONTAINS relationships, in addition to connecting directly
+to Bud nodes. The hierarchy can be as deep as needed.
+Here is Amendment 26:
+
+---
+
+```markdown
+## Amendment 26 — graphviewer.md — 30 May 2026
+
+## Navigation Update — DESCENDS_FROM Relationship
+
+### Overview
+
+The navigation hierarchy now uses DESCENDS_FROM relationships
+instead of CONTAINS for all content navigation from Conversations
+downward. CONTAINS is retained only for Root→Entry navigation.
+
+This amendment covers navigation changes only. Colour blending
+based on DESCENDS_FROM weights is deferred to a subsequent amendment.
+
+---
+
+### 26.1 Relationship Changes in Memgraph
+
+The following relationships now exist in the database:
+
+```
+CONTAINS:      Root -> Entry (Settling, Conversations)
+               — unchanged, navigation only
+
+DESCENDS_FROM: Conversations -> Family (weight: 0.17 each)
+               Family -> Bud/Cluster (normalised weights summing to 1.0)
+               — new, replaces Conversations->Family CONTAINS
+               — new, structural navigation for Bud layer
+```
+
+CHILD remains unchanged for TextNode lineage.
+
+---
+
+
+### 26.2 Graph Load Query Update
+
+Update the initial graph load query in server.js to include
+DESCENDS_FROM relationships:
+
+```javascript
+const query = `
+    MATCH (n)-[r]->(m)
+    WHERE type(r) IN ['CONTAINS', 'DESCENDS_FROM', 'CHILD',
+                      'RESONATES_WITH', 'BRIDGES_TO', 'ECHOES',
+                      'TAGGED_AS', 'GIVES']
+    RETURN n, r, m
+`;
+```
+
+---
+
+### 26.3 Click Navigation — Use DESCENDS_FROM
+
+When any node is clicked, the one-hop neighbourhood query must
+follow DESCENDS_FROM for Family and Bud navigation:
+
+```javascript
+function getNavigationNeighbours(node) {
+    const type = node.data('type');
+
+    if (type === 'Entry' && node.data('name') === 'Conversations') {
+        // Follow DESCENDS_FROM to Family nodes
+        return node.outgoers('edge[type="DESCENDS_FROM"]').targets();
+    }
+
+    if (type === 'Family') {
+        // Follow DESCENDS_FROM to SubFamily or Bud nodes
+        return node.outgoers('edge[type="DESCENDS_FROM"]').targets();
+    }
+
+    if (type === 'Root') {
+        // Follow CONTAINS to Entry nodes — unchanged
+        return node.outgoers('edge[type="CONTAINS"]').targets();
+    }
+
+    if (type === 'Entry' && node.data('name') === 'Settling') {
+        // Follow CONTAINS to Conversations — unchanged
+        return node.outgoers('edge[type="CONTAINS"]').targets();
+    }
+
+    // TextNode, Bud — existing one-hop logic unchanged
+    return node.neighbourhood();
+}
+```
+
+---
+
+### 26.4 Edge Styling — DESCENDS_FROM
+
+DESCENDS_FROM edges in the navigation hierarchy should be styled
+consistently. For now use a neutral styling — colour and weight
+blending will be updated in the next amendment once the colour
+algorithm is finalised:
+
+```javascript
+{
+    selector: 'edge[type="DESCENDS_FROM"]',
+    style: {
+        'line-color': '#444444',
+        'width': 1,
+        'target-arrow-shape': 'none',
+        'opacity': 0.5
+    }
+}
+```
+
+---
+
+### 26.5 CONTAINS Edge Styling Update
+
+CONTAINS edges now only appear between Root and Entry nodes.
+Update the CONTAINS selector to reflect this limited scope:
+
+```javascript
+{
+    selector: 'edge[type="CONTAINS"]',
+    style: {
+        'line-color': '#444444',
+        'width': 1,
+        'target-arrow-shape': 'none',
+        'opacity': 0.5
+    }
+}
+```
+
+---
+
+### 26.6 Colour Blending — Deferred
+
+The DESCENDS_FROM relationships carry normalised weight properties
+summing to 1.0 per Bud across all its parent Family nodes. These
+weights will drive colour blending in the next amendment once the
+blending algorithm is confirmed.
+
+For now Bud node colours continue to use the existing dynamic
+colour derivation (highest weighted Family connection). This will
+be replaced when the blending amendment is issued.
+
+---
+
+### 26.7 Verification
+
+After implementing, confirm the following navigation paths work:
+
+- Root click → Settling and Conversations appear
+- Conversations click → 6 Family nodes appear
+- Family click → Bud nodes appear (via DESCENDS_FROM)
+- Bud click → existing one-hop behaviour unchanged
+- Settling click → existing behaviour unchanged
+```
