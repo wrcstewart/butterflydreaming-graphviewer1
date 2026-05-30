@@ -1095,7 +1095,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     descEdges.show();
     descEdges.connectedNodes().show();
 
-    cy.nodes('[type="Cluster"]:visible').addClass('family-view');
     runLayout(cy);
   }
 
