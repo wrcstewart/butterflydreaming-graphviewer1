@@ -23,6 +23,7 @@ const EDGE_COLOURS = {
   CHILD:          '#4A8C4F',
   GIVES:          '#E85A38',
   CONTAINS:       '#444444',
+  DESCENDS_FROM:  '#444444',
 };
 
 const EDGE_WIDTHS = {
@@ -388,6 +389,10 @@ function buildStyle() {
         'opacity': 0.75,
         'target-arrow-shape': 'none',
       }
+    },
+    {
+      selector: 'edge[type="DESCENDS_FROM"]',
+      style: { 'opacity': 0.5, 'target-arrow-shape': 'none' }
     },
     {
       selector: 'node[type="TextNode"][?gateway]',
@@ -993,56 +998,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
   }
 
   function expandToFamily(familyNode) {
+    clearFamilyView();
     saveState();
     activeNodeId = familyNode.id();
     cy.elements().hide();
     familyNode.show();
-    familyNode.closedNeighborhood()
-      .filter(el => el.data('type') !== '__root_edge__')
-      .show();
+
+    // Show outgoing DESCENDS_FROM edges and their targets (Buds / SubFamilies)
+    const descEdges = cy.edges('[type="DESCENDS_FROM"]').filter(e => e.source().id() === familyNode.id());
+    descEdges.show();
+    descEdges.targets().show();
 
     cy.nodes('[type="Cluster"]:visible').addClass('family-view');
-
-    const key          = familyNode.data('name').toLowerCase();
-    const canvasWidth  = cy.width();
-    const canvasHeight = cy.height();
-
-    function scaleCoord(value, dim) {
-      const margin = dim * 0.1;
-      return margin + ((value + 1) / 2) * (dim * 0.8);
-    }
-
-    const fixedPositions = [];
-    cy.nodes('[type="Cluster"]:visible').forEach(n => {
-      const x = n.data(`${key}_x`);
-      const y = n.data(`${key}_y`);
-      if (x != null && y != null) {
-        const jitter = () => (Math.random() - 0.5) * (20 + Math.random() * 80);
-        fixedPositions.push({
-          nodeId: n.id(),
-          position: { x: scaleCoord(x, canvasWidth) + jitter(), y: scaleCoord(y, canvasHeight) + jitter() },
-        });
-      }
-    });
-
-    if (fixedPositions.length === 0) {
-      runLayout(cy);
-      return;
-    }
-
-    cy.layout({
-      name: 'fcose',
-      fixedNodeConstraint: fixedPositions,
-      animate: true,
-      animationDuration: 450,
-      randomize: false,
-      fit: true,
-      padding: 60,
-      nodeSeparation: 300,
-      idealEdgeLength: 100,
-      nodeRepulsion: 4500,
-      gravity: 0.25,
-    }).run();
+    runLayout(cy);
   }
 
   function expandChildLevel() {
@@ -1422,7 +1390,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
       if (type === 'TextNode') {
         expandChildLevel();
       } else if (type === 'Family') {
-        expandToFamily(node);  // re-randomise jitter on repeat tap
+        expandToFamily(node);  // re-run layout on repeat tap (fCoSE randomize:true gives new arrangement)
       } else {
         restoreState();
         activeNodeId = null;
