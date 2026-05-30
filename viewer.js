@@ -113,8 +113,9 @@ function hslToHex(h, s, l) {
 
 function blendColours(parents) {
   // parents: [{ hex, weight }] — weights normalised to sum 1.0
-  // Hue: weighted circular mean (preserves hue across complementary pairs)
-  // Saturation, Lightness: weighted arithmetic mean
+  // Hue: weighted circular mean via sin/cos vectors
+  // Saturation scaled by vector magnitude — opposing hues reduce toward grey
+  // rather than tipping randomly to one side of the colour wheel
   let sinSum = 0, cosSum = 0, sSum = 0, lSum = 0;
   parents.forEach(p => {
     const hsl = hexToHsl(p.hex);
@@ -124,9 +125,10 @@ function blendColours(parents) {
     sSum   += p.weight * hsl.s;
     lSum   += p.weight * hsl.l;
   });
+  const magnitude = Math.sqrt(sinSum * sinSum + cosSum * cosSum);
   let h = Math.atan2(sinSum, cosSum) * 180 / Math.PI;
   if (h < 0) h += 360;
-  return hslToHex(h, sSum, lSum);
+  return hslToHex(h, sSum * magnitude, lSum);
 }
 
 function computeBlendedColours(cy) {
