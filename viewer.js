@@ -76,43 +76,57 @@ function desaturate(hex, amount) {
   return '#' + toHex(nr) + toHex(ng) + toHex(nb);
 }
 
-function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return { r, g, b };
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return { h: h * 360, s, l };
 }
 
-function colourToRgb(str) {
-  if (!str) return null;
-  if (str.startsWith('#')) return hexToRgb(str);
-  const m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (m) return { r: +m[1], g: +m[2], b: +m[3] };
-  return null;
+function hslToHex(h, s, l) {
+  if (s === 0) {
+    const v = Math.round(l * 255).toString(16).padStart(2, '0');
+    return `#${v}${v}${v}`;
+  }
+  function hue2rgb(p, q, t) {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  }
+  h /= 360;
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return '#' + toHex(hue2rgb(p, q, h + 1/3)) + toHex(hue2rgb(p, q, h)) + toHex(hue2rgb(p, q, h - 1/3));
 }
 
 function blendColours(parents) {
-  let r = 0, g = 0, b = 0;
+  // parents: [{ hex, weight }] — weights normalised to sum 1.0
+  // Hue: weighted circular mean (preserves hue across complementary pairs)
+  // Saturation, Lightness: weighted arithmetic mean
+  let sinSum = 0, cosSum = 0, sSum = 0, lSum = 0;
   parents.forEach(p => {
-    const rgb = colourToRgb(p.hex);
-    if (!rgb) return;
-    r += p.weight * rgb.r;
-    g += p.weight * rgb.g;
-    b += p.weight * rgb.b;
+    const hsl = hexToHsl(p.hex);
+    const hRad = hsl.h * Math.PI / 180;
+    sinSum += p.weight * Math.sin(hRad);
+    cosSum += p.weight * Math.cos(hRad);
+    sSum   += p.weight * hsl.s;
+    lSum   += p.weight * hsl.l;
   });
-  r = Math.round(r); g = Math.round(g); b = Math.round(b);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  if (brightness > 160) {
-    return `rgba(${Math.round(r * 0.6)}, ${Math.round(g * 0.6)}, ${Math.round(b * 0.6)}, 1.0)`;
-  }
-  return `rgba(${r}, ${g}, ${b}, 1.0)`;
-}
-
-function rgbaToHex(rgba) {
-  const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!m) return rgba;
-  const toHex = x => parseInt(x).toString(16).padStart(2, '0');
-  return '#' + toHex(m[1]) + toHex(m[2]) + toHex(m[3]);
+  let h = Math.atan2(sinSum, cosSum) * 180 / Math.PI;
+  if (h < 0) h += 360;
+  return hslToHex(h, sSum, lSum);
 }
 
 function computeBlendedColours(cy) {
@@ -130,7 +144,7 @@ function computeBlendedColours(cy) {
     const total = rawInputs.reduce((s, p) => s + p.weight, 0);
     const blendInputs = rawInputs.map(p => ({ ...p, weight: p.weight / total }));
     const colour = blendColours(blendInputs);
-    node.data('colour', rgbaToHex(colour));
+    node.data('colour', colour);
     node.data('blendedColour', colour);
   });
 
@@ -143,13 +157,13 @@ function computeBlendedColours(cy) {
 
     const rawInputs = parents.map(p => {
       const edge = descEdges.filter(e => e.target().id() === p.id()).first();
-      const hex = p.data('hex') || p.data('blendedColour') || p.data('colour');
+      const hex = p.data('hex') || p.data('colour');
       return { hex, weight: edge.data('weight') || 1 };
     });
     const total = rawInputs.reduce((s, p) => s + p.weight, 0);
     const blendInputs = rawInputs.map(p => ({ ...p, weight: p.weight / total }));
     const colour = blendColours(blendInputs);
-    node.data('colour', rgbaToHex(colour));
+    node.data('colour', colour);
     node.data('blendedColour', colour);
   });
 
