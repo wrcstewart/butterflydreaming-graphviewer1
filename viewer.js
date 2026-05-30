@@ -153,9 +153,9 @@ function computeBlendedColours(cy) {
     node.data('blendedColour', colour);
   });
 
-  // Colour DESCENDS_FROM edges by parent (target) Family colour
+  // Colour DESCENDS_FROM edges by parent (target) Family background colour
   cy.edges('[type="DESCENDS_FROM"]').forEach(edge => {
-    const parentColour = edge.target().data('colour') || '#444444';
+    const parentColour = edge.target().data('hex') || edge.target().data('colour') || '#444444';
     edge.style('line-color', parentColour);
   });
 }
@@ -475,7 +475,7 @@ function buildStyle() {
     },
     {
       selector: 'edge[type="DESCENDS_FROM"]',
-      style: { 'opacity': 0.5, 'target-arrow-shape': 'none' }
+      style: { 'opacity': 0.85, 'target-arrow-shape': 'none' }
     },
     {
       selector: 'node[type="TextNode"][?gateway]',
