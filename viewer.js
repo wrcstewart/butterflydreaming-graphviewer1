@@ -497,6 +497,8 @@ function buildStyle() {
       selector: 'node[type="TextNode"][?gateway]',
       style: {
         'text-transform': 'uppercase',
+        'background-color': '#ffffff',
+        'color': '#000000',
       }
     },
     {
