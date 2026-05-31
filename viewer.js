@@ -283,7 +283,7 @@ function buildStyle() {
       selector: 'node',
       style: {
         'background-color': 'data(colour)',
-        'background-opacity': 1,
+        'background-opacity': 0.7,
         'label': 'data(display_name)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -411,7 +411,7 @@ function buildStyle() {
         'line-color': 'data(colour)',
         'width': function(edge) { return Math.max(0.5, (edge.data('weight') || 0) * 2.5); },
         'curve-style': 'bezier',
-        'opacity': 0.65,
+        'opacity': 0.7,
         'target-arrow-shape': 'none',
       }
     },
@@ -420,7 +420,7 @@ function buildStyle() {
       style: {
         'target-arrow-shape': 'triangle',
         'arrow-scale': 1.2,
-        'opacity': 1,
+        'opacity': 0.7,
         'width': function(edge) {
           const isGateway = edge.source().data('gateway');
           const rs = edge.data('rel_source');
@@ -475,7 +475,7 @@ function buildStyle() {
         'line-color': '#aaaaaa',
         'width': 1,
         'line-style': 'dashed',
-        'opacity': 0.75,
+        'opacity': 0.7,
         'target-arrow-shape': 'none',
       }
     },
@@ -485,13 +485,13 @@ function buildStyle() {
         'line-color': '#aaaaaa',
         'width': 1,
         'line-style': 'solid',
-        'opacity': 0.75,
+        'opacity': 0.7,
         'target-arrow-shape': 'none',
       }
     },
     {
       selector: 'edge[type="DESCENDS_FROM"]',
-      style: { 'opacity': 0.85, 'target-arrow-shape': 'none' }
+      style: { 'opacity': 0.7, 'target-arrow-shape': 'none' }
     },
     {
       selector: 'node[type="TextNode"][?gateway]',
@@ -1364,7 +1364,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         'height':             nodeH,
         'font-size':          fontSize + 'px',
         'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
-        'background-opacity': linked && clusterColour ? 0.65 : 1,
+        'background-opacity': linked && clusterColour ? 0.7 : 0.7,
       });
     });
 
