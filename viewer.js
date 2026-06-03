@@ -139,6 +139,8 @@ function computeBlendedColours(cy) {
     const parents = descEdges.targets().filter(p => p.data('type') === 'Family');
     if (parents.length === 0) return;
 
+    node.addClass('subfamily');
+
     const rawInputs = parents.map(p => {
       const edge = descEdges.filter(e => e.target().id() === p.id()).first();
       return { hex: p.data('hex') || p.data('colour'), weight: edge.data('weight') || 1 };
@@ -367,6 +369,15 @@ function buildStyle() {
           return `#${r}${g}${b}`;
         },
         'border-opacity': 0.5,
+      }
+    },
+    {
+      selector: 'node[type="Family"].subfamily',
+      style: {
+        'width': 35,
+        'height': 15,
+        'font-size': '8px',
+        'text-max-width': '30px',
       }
     },
     {
