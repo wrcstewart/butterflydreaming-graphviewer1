@@ -160,6 +160,36 @@ html, body {
   white-space: nowrap;
 }
 
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+
+#loading-overlay.active {
+  display: flex;
+}
+
+#loading-box {
+  background: #111;
+  border: 1px solid #444;
+  padding: 28px 32px;
+  text-align: center;
+  font-family: sans-serif;
+  max-width: 300px;
+}
+
+#loading-box p {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+}
+
 #session-expired {
   display: none;
   position: fixed;

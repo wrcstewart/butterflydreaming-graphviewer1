@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=26">
+  <link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
   <div id="bc-spacer"></div>
@@ -18,6 +18,11 @@
     <span id="pair-status"></span>
     <label id="read-mode-label"><input type="checkbox" id="read-mode-toggle"> Read</label>
   </div>
+  <div id="loading-overlay">
+    <div id="loading-box">
+      <p id="loading-msg">Connecting…</p>
+    </div>
+  </div>
   <div id="session-expired">
     <div id="session-expired-box">
       <p>Your session has expired due to inactivity — please reload to start a new session.</p>
@@ -30,6 +35,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script src="viewer.js?v=175"></script>
+  <script src="viewer.js?v=177"></script>
 </body>
 </html>

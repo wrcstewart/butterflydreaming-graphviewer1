@@ -1700,40 +1700,53 @@ function queryWS(ws, type, query, params = {}) {
 
 // --- Boot ---
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 async function init() {
-  // Auto-reload if the initial data load hangs (e.g. cold Memgraph connection
-  // on first server start). Server warms up the pool on startup so the second
-  // load should be instant.
-  const loadWatchdog = setTimeout(() => location.reload(), 10000);
+  const overlay = document.getElementById('loading-overlay');
+  const msgEl   = document.getElementById('loading-msg');
+  const setMsg  = t => { msgEl.textContent = t; };
 
-  let ws;
-  try {
-    ws = await connectWS();
-  } catch (err) {
-    clearTimeout(loadWatchdog);
-    console.error('Server connection error:', err);
-    alert('Could not connect to server.\n\nIs server.js running?\n  node server.js');
-    return;
+  overlay.classList.add('active');
+  setMsg('Connecting…');
+
+  // Retry loop — keeps trying until both the WebSocket and the graph queries
+  // succeed. Handles cold Docker / Memgraph / Cloudflare start-up gracefully
+  // without blocking alerts or silent reloads.
+  let ws, records, cfRecords, sfRecords;
+  for (let attempt = 1; ; attempt++) {
+    // Connect (or reconnect) WebSocket
+    while (true) {
+      try { ws = await connectWS(); break; }
+      catch {
+        setMsg(`Waiting for server… (${attempt})`);
+        await sleep(3000);
+      }
+    }
+
+    // Run queries with a 15-second timeout per attempt
+    setMsg(attempt === 1 ? 'Loading graph…' : `Loading graph… (attempt ${attempt})`);
+    try {
+      [records, cfRecords, sfRecords] = await Promise.race([
+        Promise.all([
+          queryWS(ws, 'graph',
+            'MATCH (n)-[r]->(m) RETURN n, r, m'),
+          queryWS(ws, 'clusterFamily',
+            'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
+          queryWS(ws, 'subfamilyLinks',
+            'MATCH (sf:Family)-[r:DESCENDS_FROM]->(f:Family) RETURN sf, r, f'),
+        ]),
+        sleep(15000).then(() => { throw new Error('timeout'); }),
+      ]);
+      break; // success
+    } catch (err) {
+      console.warn('Load attempt', attempt, 'failed:', err.message);
+      ws.close(); // close so stale message listeners are dropped
+      await sleep(2000);
+    }
   }
 
-  let records, cfRecords, sfRecords;
-  try {
-    [records, cfRecords, sfRecords] = await Promise.all([
-      queryWS(ws, 'graph',
-        'MATCH (n)-[r]->(m) RETURN n, r, m'),
-      queryWS(ws, 'clusterFamily',
-        'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
-      queryWS(ws, 'subfamilyLinks',
-        'MATCH (sf:Family)-[r:DESCENDS_FROM]->(f:Family) RETURN sf, r, f'),
-    ]);
-  } catch (err) {
-    clearTimeout(loadWatchdog);
-    console.error('Query error:', err);
-    alert('Could not load graph data. See browser console for details.');
-    return;
-  }
-
-  clearTimeout(loadWatchdog);
+  overlay.classList.remove('active');
   // Build element maps (deduplicate nodes and edges by ID)
   const nodesById = new Map();
   const edgesById = new Map();
@@ -1913,59 +1926,4 @@ async function init() {
   });
 }
 
-function showColourSwatches() {
-  const existing = document.getElementById('colour-swatch-wrapper');
-  if (existing) { existing.remove(); return; }
-
-  const wrapper = document.createElement('div');
-  wrapper.id = 'colour-swatch-wrapper';
-  wrapper.style.cssText = [
-    'position:fixed', 'top:140px', 'right:20px', 'z-index:9999',
-    'display:flex', 'flex-direction:column', 'gap:10px',
-  ].join(';');
-
-  function makePanel(withText) {
-    const panel = document.createElement('div');
-    panel.style.cssText = [
-      'background:rgba(0,0,0,0.9)', 'border:1px solid #666',
-      'border-radius:8px', 'padding:10px 12px',
-      'display:flex', 'flex-direction:column', 'gap:6px',
-    ].join(';');
-
-    Object.values(FAMILY_COLOURS).forEach(colour => {
-      const swatch = document.createElement('div');
-      swatch.style.cssText = [
-        `width:160px`, `height:50px`, `background:${colour}`,
-        'border-radius:50%',
-        'display:flex', 'align-items:center', 'justify-content:center',
-      ].join(';');
-      if (withText) {
-        swatch.textContent = 'ABC';
-        swatch.style.color = '#ffffff';
-        swatch.style.fontSize = '10px';
-        swatch.style.fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
-        swatch.style.fontWeight = 'normal';
-        swatch.style.letterSpacing = '1px';
-      }
-      panel.appendChild(swatch);
-    });
-
-    return panel;
-  }
-
-  wrapper.appendChild(makePanel(false));
-  wrapper.appendChild(makePanel(true));
-
-  const btn = document.createElement('button');
-  btn.textContent = 'close';
-  btn.style.cssText = 'cursor:pointer;font-size:11px;align-self:center;';
-  btn.onclick = () => wrapper.remove();
-  wrapper.appendChild(btn);
-
-  document.body.appendChild(wrapper);
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  init();
-  showColourSwatches();
-});
+window.addEventListener('DOMContentLoaded', init);
