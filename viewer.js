@@ -1518,7 +1518,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
 
     if (node.id() === activeNodeId) {
       if (type === 'TextNode') {
-        expandChildLevel();
+        expandToNode(node);
       } else if (type === 'Family') {
         expandToFamily(node);  // re-run layout on repeat tap (fCoSE randomize:true gives new arrangement)
       } else {
