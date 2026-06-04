@@ -132,18 +132,26 @@ function blendColours(parents) {
 }
 
 function computeBlendedColours(cy) {
-  // SubFamily nodes first (Family nodes whose immediate parent is also Family)
+  // SubFamily nodes: Family nodes whose name is NOT in the top-level FAMILY_COLOURS palette.
+  // Top-level Family nodes are identified by FAMILY_COLOURS[name] — they are never blended,
+  // regardless of what DESCENDS_FROM edges exist (DB direction for SubFamily edges may vary).
   cy.nodes('[type="Family"]').forEach(node => {
-    const descEdges = node.connectedEdges('[type="DESCENDS_FROM"]')
-      .filter(e => e.source().id() === node.id());
-    const parents = descEdges.targets().filter(p => p.data('type') === 'Family');
+    if (FAMILY_COLOURS[node.data('name')]) return; // top-level Family — preserve its colour
+
+    // Use direction-agnostic connected-edge lookup so DB edge direction doesn't matter
+    const descEdges = node.connectedEdges('[type="DESCENDS_FROM"]');
+    const parents = descEdges.connectedNodes().filter(p =>
+      p.data('type') === 'Family' && FAMILY_COLOURS[p.data('name')]
+    );
     if (parents.length === 0) return;
 
     node.addClass('subfamily');
 
     const rawInputs = parents.map(p => {
-      const edge = descEdges.filter(e => e.target().id() === p.id()).first();
-      return { hex: p.data('hex') || p.data('colour'), weight: edge.data('weight') || 1 };
+      const edge = descEdges.filter(e =>
+        e.source().id() === p.id() || e.target().id() === p.id()
+      ).first();
+      return { hex: p.data('colour'), weight: edge.data('weight') || 1 };
     });
     const total = rawInputs.reduce((s, p) => s + p.weight, 0);
     const blendInputs = rawInputs.map(p => ({ ...p, weight: p.weight / total }));
@@ -152,17 +160,17 @@ function computeBlendedColours(cy) {
     node.data('blendedColour', colour);
   });
 
-  // Bud nodes (Cluster) — blend immediate parent Family colours
+  // Bud/Cluster nodes — direction-agnostic lookup for parent Family nodes
   cy.nodes('[type="Cluster"]').forEach(node => {
-    const descEdges = node.connectedEdges('[type="DESCENDS_FROM"]')
-      .filter(e => e.source().id() === node.id());
-    const parents = descEdges.targets();
+    const descEdges = node.connectedEdges('[type="DESCENDS_FROM"]');
+    const parents = descEdges.connectedNodes().filter(p => p.data('type') === 'Family');
     if (parents.length === 0) return;
 
     const rawInputs = parents.map(p => {
-      const edge = descEdges.filter(e => e.target().id() === p.id()).first();
-      const hex = p.data('hex') || p.data('colour');
-      return { hex, weight: edge.data('weight') || 1 };
+      const edge = descEdges.filter(e =>
+        e.source().id() === p.id() || e.target().id() === p.id()
+      ).first();
+      return { hex: p.data('colour'), weight: edge.data('weight') || 1 };
     });
     const total = rawInputs.reduce((s, p) => s + p.weight, 0);
     const blendInputs = rawInputs.map(p => ({ ...p, weight: p.weight / total }));
@@ -171,11 +179,16 @@ function computeBlendedColours(cy) {
     node.data('blendedColour', colour);
   });
 
-  // Colour DESCENDS_FROM edges by parent (target) Family background colour
+  // Colour DESCENDS_FROM edges — find the top-level Family endpoint (direction-agnostic)
   cy.edges('[type="DESCENDS_FROM"]').forEach(edge => {
-    const parentColour = edge.target().data('hex') || edge.target().data('colour') || '#444444';
+    const src = edge.source(), tgt = edge.target();
+    const topFamily = FAMILY_COLOURS[src.data('name')] ? src
+                    : FAMILY_COLOURS[tgt.data('name')] ? tgt
+                    : (src.data('type') === 'Family' ? src : tgt);
+    const parentColour = topFamily.data('colour') || '#444444';
     edge.style('line-color', parentColour);
   });
+
 }
 
 function toPlain(val) {
@@ -356,13 +369,18 @@ function buildStyle() {
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 53,
-        'height': 22,
+        'width': 80,
+        'height': 33,
+        'background-color': function(node) {
+          const name = node.data('name');
+          return FAMILY_COLOURS[name] || node.data('colour') || '#aaaaaa';
+        },
+        'background-opacity': 1,
         'font-size': '10px',
-        'text-max-width': '48px',
+        'text-max-width': '72px',
         'border-width': 2,
         'border-color': function(node) {
-          const hex = (node.data('colour') || '#666666').replace('#', '');
+          const hex = (FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#666666').replace('#', '');
           const r = Math.round(parseInt(hex.slice(0,2), 16) / 3).toString(16).padStart(2,'0');
           const g = Math.round(parseInt(hex.slice(2,4), 16) / 3).toString(16).padStart(2,'0');
           const b = Math.round(parseInt(hex.slice(4,6), 16) / 3).toString(16).padStart(2,'0');
@@ -374,10 +392,10 @@ function buildStyle() {
     {
       selector: 'node[type="Family"].subfamily',
       style: {
-        'width': 35,
-        'height': 15,
+        'width': 53,
+        'height': 22,
         'font-size': '8px',
-        'text-max-width': '30px',
+        'text-max-width': '48px',
       }
     },
     {
@@ -1698,13 +1716,15 @@ async function init() {
     return;
   }
 
-  let records, cfRecords;
+  let records, cfRecords, sfRecords;
   try {
-    [records, cfRecords] = await Promise.all([
+    [records, cfRecords, sfRecords] = await Promise.all([
       queryWS(ws, 'graph',
         'MATCH (n)-[r]->(m) RETURN n, r, m'),
       queryWS(ws, 'clusterFamily',
         'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
+      queryWS(ws, 'subfamilyLinks',
+        'MATCH (sf:Family)-[r:DESCENDS_FROM]->(f:Family) RETURN sf, r, f'),
     ]);
   } catch (err) {
     clearTimeout(loadWatchdog);
@@ -1762,6 +1782,26 @@ async function init() {
     ed.target = fId;
     edgesById.delete(rId);   // remove raw-rId entry that Cytoscape would drop anyway
     edgesById.set(cfEdgeId, ed);
+  }
+
+  // Ensure all SubFamily→Family DESCENDS_FROM edges are present.
+  // Same elementId inconsistency as Cluster-Family edges; resolve by name.
+  for (const rec of sfRecords) {
+    const sf = rec.sf, r = rec.r, f = rec.f;
+    const sfProps = flattenProps(sf.properties || {});
+    const fProps  = flattenProps(f.properties  || {});
+    const rId  = getElementId(r);
+    const sfId = familyIdByName.get(sfProps.name) || getElementId(sf);
+    const fId  = familyIdByName.get(fProps.name)  || getElementId(f);
+    if (!nodesById.has(sfId)) nodesById.set(sfId, buildNodeData(sf));
+    if (!nodesById.has(fId))  nodesById.set(fId,  buildNodeData(f));
+    const sfEdgeId = 'sf_' + rId;
+    const ed = buildEdgeData(r, sf, f);
+    ed.id = sfEdgeId;
+    ed.source = sfId;
+    ed.target = fId;
+    edgesById.delete(rId);
+    edgesById.set(sfEdgeId, ed);
   }
 
   // Post-process edges
@@ -1873,4 +1913,59 @@ async function init() {
   });
 }
 
-window.addEventListener('DOMContentLoaded', init);
+function showColourSwatches() {
+  const existing = document.getElementById('colour-swatch-wrapper');
+  if (existing) { existing.remove(); return; }
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'colour-swatch-wrapper';
+  wrapper.style.cssText = [
+    'position:fixed', 'top:140px', 'right:20px', 'z-index:9999',
+    'display:flex', 'flex-direction:column', 'gap:10px',
+  ].join(';');
+
+  function makePanel(withText) {
+    const panel = document.createElement('div');
+    panel.style.cssText = [
+      'background:rgba(0,0,0,0.9)', 'border:1px solid #666',
+      'border-radius:8px', 'padding:10px 12px',
+      'display:flex', 'flex-direction:column', 'gap:6px',
+    ].join(';');
+
+    Object.values(FAMILY_COLOURS).forEach(colour => {
+      const swatch = document.createElement('div');
+      swatch.style.cssText = [
+        `width:160px`, `height:50px`, `background:${colour}`,
+        'border-radius:50%',
+        'display:flex', 'align-items:center', 'justify-content:center',
+      ].join(';');
+      if (withText) {
+        swatch.textContent = 'ABC';
+        swatch.style.color = '#ffffff';
+        swatch.style.fontSize = '10px';
+        swatch.style.fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+        swatch.style.fontWeight = 'normal';
+        swatch.style.letterSpacing = '1px';
+      }
+      panel.appendChild(swatch);
+    });
+
+    return panel;
+  }
+
+  wrapper.appendChild(makePanel(false));
+  wrapper.appendChild(makePanel(true));
+
+  const btn = document.createElement('button');
+  btn.textContent = 'close';
+  btn.style.cssText = 'cursor:pointer;font-size:11px;align-self:center;';
+  btn.onclick = () => wrapper.remove();
+  wrapper.appendChild(btn);
+
+  document.body.appendChild(wrapper);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  init();
+  showColourSwatches();
+});
