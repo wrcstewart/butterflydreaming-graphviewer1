@@ -226,7 +226,7 @@ function getTextNodeLabel(props) {
   if (props.section_title && props.title) return props.title;
   const src = props.source_text;
   const seq = props.seq;
-  if (src && seq !== undefined && seq !== null) return `${src}: ${seq}`;
+  if (src && seq !== undefined && seq !== null) return `${seq}: ${src}`;
   return shortText(props.text, 5);
 }
 
