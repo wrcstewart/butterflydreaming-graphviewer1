@@ -3739,3 +3739,97 @@ And the fallback in 27.4:
 ```
 
 Tell CC to use `rgba(..., 1.0)` throughout the blending function so the alpha channel is always present and easily adjustable in future.
+
+Here is Amendment 28:
+
+---
+
+```markdown
+## Amendment 28 — graphviewer.md — 31 May 2026
+
+## TextNode Visual Distinction — Three Node Types
+
+### Overview
+
+TextNodes now have three visually distinct types based on their
+role in the corpus structure. All three retain the existing
+round-rectangle shape — colour alone carries the distinction.
+
+---
+
+### 28.1 The Three Types
+
+| Type | Detection | Background | Text colour |
+|---|---|---|---|
+| Gateway | gateway: true | #ffffff white | #1a1a1a dark |
+| Title page | section_title: true, gateway: false | #cccccc light grey | #1a1a1a dark |
+| Ordinary | gateway: false, no section_title | #1a1a2e dark | #ffffff white |
+
+**Gateway nodes** — the collection entry point. One per corpus work.
+Describes the work and its context. White signals "start here".
+
+**Title page nodes** — story/poem entry points within a collection.
+Identified by `section_title: true` in the database. One per story
+or poem within a collection (e.g. Clever Elsie, Snow White within
+Grimm's Fairy Tales; Song of Myself within Leaves of Grass).
+Grey signals "new section begins here".
+
+**Ordinary TextNodes** — corpus content fragments. Dark fill
+unchanged from previous implementation.
+
+---
+
+### 28.2 Cytoscape Style Selectors
+
+Add these three selectors in this order in the stylesheet.
+Order matters — later selectors override earlier ones for
+matching nodes:
+
+```javascript
+{ selector: 'node[type="TextNode"][gateway=true]',
+  style: {
+    'background-color': '#ffffff',
+    'color': '#1a1a1a'
+  }
+},
+{ selector: 'node[type="TextNode"][section_title=true]',
+  style: {
+    'background-color': '#cccccc',
+    'color': '#1a1a1a'
+  }
+},
+{ selector: 'node[type="TextNode"][gateway=false][!section_title]',
+  style: {
+    'background-color': '#1a1a2e',
+    'color': '#ffffff'
+  }
+}
+```
+
+`[!section_title]` — Cytoscape selector meaning "section_title
+property is absent or false". Ensures ordinary TextNodes receive
+dark fill without conflicting with title page nodes.
+
+---
+
+### 28.3 Current Title Page Nodes in Database
+
+```
+Tao Te Ching          seq 1   title: Tao Te Ching
+Zhuangzi              seq 1   title: Zhuangzi — Inner Chapters
+Leaves of Grass       seq 1   title: Song of Myself
+Grimm's Fairy Tales   seq 1   title: Clever Elsie
+Grimm's Fairy Tales   seq 8   title: Snow White
+```
+
+All have `section_title: true` in Memgraph.
+
+---
+
+### 28.4 Future Title Pages
+
+As new stories and poems are added to collections, each will
+have `section_title: true` set in the corpus load file. No
+viewer code changes needed — the selector handles all current
+and future title page nodes automatically.
+```

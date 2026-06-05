@@ -222,6 +222,7 @@ function shortText(text, wordCount) {
 }
 
 function getTextNodeLabel(props) {
+  if (props.section_title && props.title) return props.title;
   const src = props.source_text;
   const seq = props.seq;
   if (src && seq !== undefined && seq !== null) return `${src}: ${seq}`;
@@ -423,7 +424,8 @@ function buildStyle() {
       style: {
         'width': 120,
         'height': 34,
-        'background-color': '#111111',
+        'background-color': '#1a1a2e',
+        'color': '#ffffff',
         'shape': 'round-rectangle',
         'text-max-width': '113px',
         'font-size': '10px',
@@ -523,10 +525,18 @@ function buildStyle() {
       style: { 'opacity': 0.7, 'target-arrow-shape': 'none' }
     },
     {
+      selector: 'node[type="TextNode"][?section_title]',
+      style: {
+        'background-color': '#cccccc',
+        'color': '#1a1a1a',
+      }
+    },
+    {
       selector: 'node[type="TextNode"][?gateway]',
       style: {
         'text-transform': 'uppercase',
         'background-color': '#ffffff',
+        'background-opacity': 0.85,
         'color': '#000000',
       }
     },
