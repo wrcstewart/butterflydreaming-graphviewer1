@@ -222,6 +222,7 @@ function shortText(text, wordCount) {
 }
 
 function getTextNodeLabel(props) {
+  if (props.gateway) return props.source_text || shortText(props.text, 5);
   if (props.section_title && props.title) return props.title;
   const src = props.source_text;
   const seq = props.seq;
@@ -1647,7 +1648,7 @@ function setupNrBadges(cy) {
     const div = document.createElement('div');
     div.textContent = String(nr);
     div.style.cssText = 'position:absolute;font-size:9px;font-family:sans-serif;line-height:1;display:none;transform:translate(-50%,-100%);';
-    div.style.color = 'rgba(255,255,255,0.65)';
+    div.style.color = node.data('gateway') ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.65)';
     overlay.appendChild(div);
     badges.set(node.id(), div);
   });
@@ -1674,7 +1675,7 @@ function setupNrBadges(cy) {
     const div = document.createElement('div');
     div.textContent = String(nr);
     div.style.cssText = 'position:absolute;font-size:9px;font-family:sans-serif;line-height:1;display:none;transform:translate(-50%,-100%);';
-    div.style.color = 'rgba(255,255,255,0.65)';
+    div.style.color = node.data('gateway') ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.65)';
     overlay.appendChild(div);
     badges.set(node.id(), div);
   }
