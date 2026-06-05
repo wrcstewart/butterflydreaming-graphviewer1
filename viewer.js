@@ -683,8 +683,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         mainId:        node.id(),
         source_text:   sourceText,
         seq,
-        clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
-        gateway:       node.data('gateway') || false,
+        clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
+        gateway:        node.data('gateway') || false,
+        section_title:  node.data('section_title') || false,
       },
       position: { x: youChipX + w / 2, y: 18 }
     });
@@ -716,8 +717,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
             mainId:        node.id(),
             source_text:   node.data('source_text') || null,
             seq:           node.data('seq') ?? null,
-            gateway:       node.data('gateway') || false,
-            clusterNodeId: lastClusterNode ? lastClusterNode.id() : null,
+            gateway:        node.data('gateway') || false,
+            section_title:  node.data('section_title') || false,
+            clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
           }
         }));
       }
@@ -768,8 +770,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         mainId:        data.mainId || null,
         source_text:   sourceText,
         seq,
-        gateway:       data.gateway || false,
-        clusterNodeId: data.clusterNodeId || null,
+        gateway:        data.gateway || false,
+        section_title:  data.section_title || false,
+        clusterNodeId:  data.clusterNodeId || null,
       },
       position: { x: buddyChipX + w / 2, y: 18 }
     });
