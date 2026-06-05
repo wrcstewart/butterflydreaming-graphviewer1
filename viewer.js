@@ -651,19 +651,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
   let lastYouChipId = null;
   let lastYouSourceText = null;
 
-  function chipWidth(type) {
-    if (type === 'Family')    return 53;
-    if (type === 'TextNode')  return 120;
-    if (type === 'Search_CW') return 108;
-    return 70; // Cluster
-  }
-
   function addYouChip(node) {
-    const type       = node.data('type');
-    const sourceText = type === 'TextNode' ? (node.data('source_text') || null) : null;
-    const seq        = node.data('seq') ?? null;
+    const type        = node.data('type');
+    const sourceText  = type === 'TextNode' ? (node.data('source_text') || null) : null;
+    const seq         = node.data('seq') ?? null;
     const abbreviated = type === 'TextNode' && sourceText !== null && sourceText === lastYouSourceText;
-    const w           = abbreviated ? 40 : chipWidth(type);
+    const isSubfamily = node.hasClass('subfamily');
     const displayName = abbreviated ? String(seq ?? '?') : (node.data('display_name') || node.data('name') || '');
 
     const id = 'you_' + (youChipCount++);
@@ -686,10 +679,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
         gateway:        node.data('gateway') || false,
         section_title:  node.data('section_title') || false,
+        subfamily:      isSubfamily,
       },
-      position: { x: youChipX + w / 2, y: 18 }
+      position: { x: 0, y: 18 }
     });
-    if (abbreviated) youCy.getElementById(id).addClass('abbreviated');
+    const chip = youCy.getElementById(id);
+    if (abbreviated)  chip.addClass('abbreviated');
+    if (isSubfamily)  chip.addClass('subfamily');
+    const w = chip.width();
+    chip.position({ x: youChipX + w / 2, y: 18 });
+
     lastYouSourceText = type === 'TextNode' ? sourceText : null;
     if (lastYouChipId) {
       youCy.add({
@@ -703,7 +702,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         }
       });
     }
-    youCy.getElementById(id).addClass('latest');
+    chip.addClass('latest');
     if (pairingState.active) {
       const sendWs = wsRef.current;
       if (sendWs && sendWs.readyState === WebSocket.OPEN) {
@@ -719,6 +718,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
             seq:           node.data('seq') ?? null,
             gateway:        node.data('gateway') || false,
             section_title:  node.data('section_title') || false,
+            subfamily:      isSubfamily,
             clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
           }
         }));
@@ -751,7 +751,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     const sourceText  = type === 'TextNode' ? (data.source_text || null) : null;
     const seq         = data.seq ?? null;
     const abbreviated = type === 'TextNode' && sourceText !== null && sourceText === lastBuddySourceText;
-    const w           = abbreviated ? 40 : chipWidth(type);
+    const isSubfamily = data.subfamily || false;
     const displayName = abbreviated ? String(seq ?? '?') : (data.display_name || data.name || '');
 
     const id = 'buddy_' + (buddyChipCount++);
@@ -772,18 +772,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         seq,
         gateway:        data.gateway || false,
         section_title:  data.section_title || false,
+        subfamily:      isSubfamily,
         clusterNodeId:  data.clusterNodeId || null,
       },
-      position: { x: buddyChipX + w / 2, y: 18 }
+      position: { x: 0, y: 18 }
     });
+    const chip = buddyCy.getElementById(id);
+    if (abbreviated)  chip.addClass('abbreviated');
+    if (isSubfamily)  chip.addClass('subfamily');
+    const w = chip.width();
+    chip.position({ x: buddyChipX + w / 2, y: 18 });
+
     if (lastBuddyChipId) {
       buddyCy.add({
         group: 'edges',
         data: { id: 'buddy_e_' + id, source: lastBuddyChipId, target: id, colour: '#333333', weight: 0.2 }
       });
     }
-    if (abbreviated) buddyCy.getElementById(id).addClass('abbreviated');
-    buddyCy.getElementById(id).addClass('latest');
+    chip.addClass('latest');
     lastBuddySourceText = type === 'TextNode' ? sourceText : null;
     buddyChipX    += w + 7;
     lastBuddyChipId = id;
