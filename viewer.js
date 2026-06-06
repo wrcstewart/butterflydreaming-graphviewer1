@@ -4,7 +4,9 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 132; // bc-spacer(50) + cy-buddy(36) + gap(10) + cy-you(36)
+const BARS_BOTTOM = 158; // bc-spacer(50) + help-bar(26) + cy-buddy(36) + gap(10) + cy-you(36)
+
+const isTouchDevice = navigator.maxTouchPoints > 0;
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -1659,6 +1661,10 @@ function queryWS(ws, type, query, params = {}) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function init() {
+  document.getElementById('help-text').textContent = isTouchDevice
+    ? 'Single tap any node to read — double tap to navigate.'
+    : 'Hover any node to read — click to navigate.';
+
   const overlay = document.getElementById('loading-overlay');
   const msgEl   = document.getElementById('loading-msg');
   const setMsg  = t => { msgEl.textContent = t; };
