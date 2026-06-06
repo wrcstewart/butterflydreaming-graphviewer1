@@ -428,9 +428,9 @@ function buildStyle() {
     {
       selector: 'node[type="Cluster"].active-cluster',
       style: {
-        'width': 91,
-        'height': 44,
-        'text-max-width': '84px',
+        'width': 98,
+        'height': 48,
+        'text-max-width': '91px',
         'font-size': '11px',
       }
     },
