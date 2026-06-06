@@ -1511,7 +1511,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const helpEl = document.getElementById('help-text');
     if (node.data('name') === 'Settling') {
       toggleMediaBar('Settling', 'ChineseSad1.mp3');
-      helpEl.textContent = 'Use the player at the top right';
+      helpEl.textContent = 'Optionally, use the player at the top right.';
     } else {
       helpEl.textContent = helpText;
     }
