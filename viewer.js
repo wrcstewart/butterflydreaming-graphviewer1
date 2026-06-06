@@ -1514,6 +1514,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       helpEl.textContent = 'Optionally, use the player at the top right.';
     } else if (type === 'Cluster') {
       helpEl.textContent = 'Enter one of the Works shown';
+    } else if (type === 'TextNode' && !node.data('section_title')) {
+      helpEl.textContent = 'Enter the grey section title to see the whole story/poem etc';
     } else if (type === 'Family' && node.hasClass('subfamily')) {
       helpEl.textContent = 'Keep browsing or, enter a rectangle.';
     } else if (type === 'Family') {
