@@ -426,6 +426,15 @@ function buildStyle() {
       }
     },
     {
+      selector: 'node[type="Cluster"].active-cluster',
+      style: {
+        'width': 91,
+        'height': 44,
+        'text-max-width': '84px',
+        'font-size': '11px',
+      }
+    },
+    {
       selector: 'node[type="TextNode"]',
       style: {
         'width': 120,
@@ -1190,6 +1199,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   async function expandToCluster(clusterNode) {
     clearFamilyView();
+    cy.$('node[type="Cluster"].active-cluster').removeClass('active-cluster');
+    clusterNode.addClass('active-cluster');
     lastClusterNode = clusterNode;
     currentClusterColour = clusterNode.data('colour');
     clearSearchCWNodes();
