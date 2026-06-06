@@ -19,6 +19,11 @@ html, body {
   flex-shrink: 0;
 }
 
+@keyframes help-pulse {
+  0%, 100% { color: #cccccc; }
+  50%       { color: #FFD700; }
+}
+
 #help-bar {
   width: 100%;
   padding: 4px 12px;
@@ -31,6 +36,7 @@ html, body {
   text-overflow: ellipsis;
   flex-shrink: 0;
   text-align: center;
+  animation: help-pulse 0.5s ease-in-out 10;
 }
 
 #cy-buddy {
