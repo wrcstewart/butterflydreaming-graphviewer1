@@ -1512,6 +1512,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (node.data('name') === 'Settling') {
       toggleMediaBar('Settling', 'ChineseSad1.mp3');
       helpEl.textContent = 'Optionally, use the player at the top right.';
+    } else if (type === 'Cluster') {
+      helpEl.textContent = 'Enter one of the Works shown';
     } else if (type === 'Family' && node.hasClass('subfamily')) {
       helpEl.textContent = 'Keep browsing or, enter a rectangle.';
     } else if (type === 'Family') {
