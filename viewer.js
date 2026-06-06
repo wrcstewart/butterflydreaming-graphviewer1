@@ -558,7 +558,7 @@ function buildStyle() {
       style: { 'background-opacity': 0.35, 'text-opacity': 0.6 }
     },
     {
-      selector: 'node.read-mode-section',
+      selector: 'node.snake-section',
       style: {
         'width': 70,
         'height': 40,
@@ -616,7 +616,7 @@ function showSessionExpired() {
   document.getElementById('session-expired').classList.add('active');
 }
 
-function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, readModeState) {
+function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -643,7 +643,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
   let currentClusterColour = null;
   let lastSearchCWNode = null;
   let syntheticEdgeIds = new Set();
-  let readModeActive   = false;
 
   // --- You breadcrumb chips ---
   let youChipCount = 0;
@@ -1129,6 +1128,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
 
   function expandToNode(node) {
     clearFamilyView();
+    exitSnakeView();
     saveState();
     activeNodeId = node.id();
     cy.elements().hide();
@@ -1273,9 +1273,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     let records;
     try {
       records = await safeQuery('scwClick',
-        'MATCH (gw:TextNode {source_text: $work, gateway: true}) ' +
-        'OPTIONAL MATCH (n:TextNode {source_text: $work, gateway: false})-[]->(c:Cluster {name: $clusterName}) ' +
-        'RETURN gw, n',
+        'MATCH (n:TextNode {source_text: $work, gateway: false})-[r]->(c:Cluster {name: $clusterName}) ' +
+        'RETURN n, r',
         { work, clusterName }
       );
     } catch (err) {
@@ -1288,154 +1287,91 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     }
 
     const showIds = new Set([lastClusterNode.id()]);
-    let gwId = null;
     for (const rec of records) {
-      if (rec.gw) { const id = getElementId(rec.gw); showIds.add(id); if (!gwId) gwId = id; }
-      if (rec.n)  showIds.add(getElementId(rec.n));
-    }
-
-    // Guarantee a visible line from cluster to gateway even if no direct relationship exists
-    if (gwId) {
-      const synId = 'syn_gw_' + gwId;
-      if (!cy.getElementById(synId).length) {
-        cy.add({ group: 'edges', data: {
-          id: synId, source: lastClusterNode.id(), target: gwId,
-          type: 'HAS_GATEWAY', colour: '#aaaaaa',
-        }});
-        syntheticEdgeIds.add(synId);
-      }
+      if (rec.n) showIds.add(getElementId(rec.n));
     }
 
     lastSearchCWNode = node;
     cy.$('[type="Search_CW"]').hide();
 
+    exitSnakeView();
     saveState();
     activeNodeId = node.id();
     cy.elements().hide();
     showIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.show(); });
-    // Show non-CHILD edges between visible nodes (cluster↔gateway, chapter↔cluster, etc.)
-    // CHILD sequence arrows suppressed — too many for corpus navigation context
     cy.edges().filter(e =>
       e.source().visible() && e.target().visible() && e.data('type') !== 'CHILD'
     ).show();
     runLayout(cy);
   }
 
-  function exitReadMode() {
-    if (!readModeActive) return;
-    readModeActive = false;
-    cy.$('.read-mode-section').forEach(n => {
-      n.removeClass('read-mode-section');
+  function exitSnakeView() {
+    cy.$('.snake-section').forEach(n => {
+      n.removeClass('snake-section');
       n.removeStyle('background-color background-opacity width height font-size');
     });
   }
 
-  async function handleReadModeTap(node) {
-    const work = node.data('source_text') || node.data('name');
-    if (!work) return;
-
+  function handleTitlePageTap(titlePage) {
     const clusterNode   = lastClusterNode;
-    const clusterName   = clusterNode ? clusterNode.data('name')   : null;
-    const clusterColour = clusterNode ? clusterNode.data('colour') : null;
+    const clusterColour = currentClusterColour;
 
-    let records;
-    try {
-      records = await safeQuery('readModeSeq',
-        'MATCH (n:TextNode {source_text: $work}) RETURN n ORDER BY n.seq',
-        { work }
-      );
-    } catch (err) {
-      if (err.message === 'session_expired') showSessionExpired();
-      else console.error('[BD] Read mode error:', err);
+    // Get all content parts that belong to this title page via PART_OF
+    const parts = titlePage.connectedEdges('[type="PART_OF"]')
+      .connectedNodes()
+      .filter(n => n.data('type') === 'TextNode' && !n.data('section_title') && !n.data('gateway'))
+      .sort((a, b) => (a.data('seq') ?? 0) - (b.data('seq') ?? 0));
+
+    if (!parts.length) {
+      expandToNode(titlePage);
       return;
     }
 
-    let clusterLinkedUrls = new Set();
-    if (clusterName) {
-      try {
-        const cr = await safeQuery('readModeCluster',
-          'MATCH (n:TextNode {source_text: $work})-[]->(c:Cluster {name: $clusterName}) ' +
-          'WHERE n.gateway = false RETURN n.url AS url',
-          { work, clusterName }
-        );
-        clusterLinkedUrls = new Set(cr.map(r => r.url).filter(Boolean));
-      } catch (err) {
-        console.error('[BD] Read mode cluster error:', err);
-      }
-    }
-
-    let gwId = null;
-    const sectionIds = [];
-    for (const rec of records) {
-      if (!rec.n) continue;
-      const id = getElementId(rec.n);
-      if (rec.n.properties && rec.n.properties.gateway) {
-        if (!gwId) gwId = id;
-      } else {
-        sectionIds.push(id);
-      }
-    }
-    if (!gwId) return;
-
-    lastSearchCWNode = node;
+    exitSnakeView();
     cy.$('[type="Search_CW"]').hide();
-
     saveState();
-    readModeActive = true;
-    activeNodeId   = null;
+    activeNodeId = titlePage.id();
     cy.elements().hide();
 
     if (clusterNode && clusterNode.length) clusterNode.show();
-    const gwEl = cy.getElementById(gwId);
-    if (gwEl.length) gwEl.show();
+    titlePage.show();
 
-    // Snake grid layout — sizing must come first so inline styles apply before positioning
-    const seqNodes = sectionIds
-      .map(id => cy.getElementById(id))
-      .filter(n => n.length)
-      .sort((a, b) => (a.data('seq') ?? 0) - (b.data('seq') ?? 0));
-
-    const count    = seqNodes.length;
+    const count    = parts.length;
     const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
     const nodeW    = Math.max(40, Math.min(70, Math.round(640 / cols)));
     const nodeH    = Math.round(nodeW * 0.57);
     const fontSize = nodeW >= 60 ? 12 : nodeW >= 50 ? 11 : 10;
     const gapX     = 10;
+    const gapY     = 10;
+    const stepX    = nodeW + gapX;
+    const stepY    = nodeH + gapY;
+    const originX  = 50;
+    const headerY  = 30;
 
-    sectionIds.forEach(id => {
-      const n = cy.getElementById(id);
-      if (!n.length) return;
+    parts.forEach(n => {
       n.show();
-      n.addClass('read-mode-section');
-      const linked = clusterLinkedUrls.has(n.data('url'));
+      n.addClass('snake-section');
+      const linked = clusterNode && n.connectedEdges()
+        .connectedNodes().filter(nb => nb.id() === clusterNode.id()).length > 0;
       n.style({
         'width':              nodeW,
         'height':             nodeH,
         'font-size':          fontSize + 'px',
         'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
-        'background-opacity': linked && clusterColour ? 0.7 : 0.7,
+        'background-opacity': 0.7,
       });
     });
 
-    const gapY    = 10;
-    const stepX   = nodeW + gapX;
-    const stepY   = nodeH + gapY;
-    const originX = 50;
-    const headerY = 30;
-
     const positions = {};
-
-    // Header row: cluster then gateway
     let hx = originX;
     if (clusterNode && clusterNode.length) {
       positions[clusterNode.id()] = { x: hx, y: headerY };
       hx += stepX * 2;
     }
-    positions[gwId] = { x: hx, y: headerY };
+    positions[titlePage.id()] = { x: hx, y: headerY };
 
-    // Snake grid: odd rows run right-to-left
     const gridY = headerY + stepY * 2;
-    seqNodes.forEach((n, i) => {
+    parts.forEach((n, i) => {
       const row      = Math.floor(i / cols);
       const col      = i % cols;
       const snakeCol = (row % 2 === 0) ? col : (cols - 1 - col);
@@ -1521,24 +1457,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
-    if (readModeActive && type !== 'Search_CW') exitReadMode();
-
     if (addChip && (type === 'Family' || type === 'Cluster' || type === 'TextNode' || type === 'Search_CW')) {
       addYouChip(node);
     }
 
     if (type === 'Search_CW') {
-      if (readModeState.enabled) {
-        handleReadModeTap(node);
-      } else {
-        handleSearchCWTap(node);
-      }
+      handleSearchCWTap(node);
       return;
     }
 
     if (node.id() === activeNodeId) {
       if (type === 'TextNode') {
-        expandToNode(node);
+        if (node.data('section_title')) {
+          handleTitlePageTap(node);
+        } else {
+          expandToNode(node);
+        }
       } else if (type === 'Family') {
         expandToFamily(node);  // re-run layout on repeat tap (fCoSE randomize:true gives new arrangement)
       } else {
@@ -1550,6 +1484,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, re
         expandToCluster(node);
       } else if (type === 'Family') {
         expandToFamily(node);
+      } else if (type === 'TextNode' && node.data('section_title')) {
+        handleTitlePageTap(node);
       } else {
         expandToNode(node);
         updateSearchCWVisibility(node);
@@ -1907,14 +1843,10 @@ async function init() {
     boxSelectionEnabled: false,
   });
 
-  const pairingState  = { active: false };
-  const readModeState = { enabled: false };
+  const pairingState = { active: false };
 
-  const pairBtn        = document.getElementById('pair-btn');
-  const pairStatus     = document.getElementById('pair-status');
-  const readModeToggle  = document.getElementById('read-mode-toggle');
-  readModeState.enabled = readModeToggle.checked;
-  readModeToggle.addEventListener('change', () => { readModeState.enabled = readModeToggle.checked; });
+  const pairBtn    = document.getElementById('pair-btn');
+  const pairStatus = document.getElementById('pair-status');
 
   pairBtn.addEventListener('click', () => {
     wsRef.lastActivity = Date.now();
@@ -1923,7 +1855,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, readModeState);
+  const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   ws.addEventListener('message', event => {
     let msg;
