@@ -7,6 +7,9 @@ const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 const BARS_BOTTOM = 158; // bc-spacer(50) + help-bar(26) + cy-buddy(36) + gap(10) + cy-you(36)
 
 const isTouchDevice = navigator.maxTouchPoints > 0;
+const helpText = isTouchDevice
+  ? 'Single tap any node to read — double tap to navigate.'
+  : 'Hover any node to read — click to navigate.';
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -1494,8 +1497,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
     }
 
+    const helpEl = document.getElementById('help-text');
     if (node.data('name') === 'Settling') {
       toggleMediaBar('Settling', 'ChineseSad1.mp3');
+      helpEl.textContent = 'Use the player at the top right';
+    } else {
+      helpEl.textContent = helpText;
     }
   }
 
@@ -1661,9 +1668,7 @@ function queryWS(ws, type, query, params = {}) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function init() {
-  document.getElementById('help-text').textContent = isTouchDevice
-    ? 'Single tap any node to read — double tap to navigate.'
-    : 'Hover any node to read — click to navigate.';
+  document.getElementById('help-text').textContent = helpText;
 
   const overlay = document.getElementById('loading-overlay');
   const msgEl   = document.getElementById('loading-msg');
