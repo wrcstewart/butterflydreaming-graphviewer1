@@ -16,18 +16,19 @@ const server = app.listen(8080, () =>
   console.log('ButterflyDreaming viewer running at http://localhost:8080')
 );
 
-// Warm up Memgraph connection pool immediately on startup so the first
-// client query doesn't hit a cold bolt connection.
-(async () => {
+// Warm up Memgraph on startup and then keep it warm every 5 minutes,
+// independent of any client sessions, so navigations never hit a cold start.
+async function pingMemgraph() {
   try {
     const s = driver.session({ database: 'memgraph' });
     await s.run('RETURN 1');
     await s.close();
-    console.log('[BD] Memgraph connection warmed up');
   } catch (err) {
-    console.error('[BD] Memgraph warmup error:', err.message);
+    console.error('[BD] Memgraph keepalive error:', err.message);
   }
-})();
+}
+pingMemgraph().then(() => console.log('[BD] Memgraph connection warmed up'));
+setInterval(pingMemgraph, 5 * 60 * 1000);
 
 const wss = new WebSocketServer({ server });
 

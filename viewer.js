@@ -1692,7 +1692,7 @@ async function init() {
           queryWS(ws, 'subfamilyLinks',
             'MATCH (sf:Family)-[r:DESCENDS_FROM]->(f:Family) RETURN sf, r, f'),
         ]),
-        sleep(15000).then(() => { throw new Error('timeout'); }),
+        sleep(8000).then(() => { throw new Error('timeout'); }),
       ]);
       break; // success
     } catch (err) {
