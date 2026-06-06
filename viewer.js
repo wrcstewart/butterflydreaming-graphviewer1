@@ -1515,7 +1515,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else if (type === 'Cluster') {
       helpEl.textContent = 'Enter one of the Works shown';
     } else if (type === 'TextNode' && node.data('section_title')) {
-      helpEl.textContent = 'To return enter a text node or search rectangle';
+      helpEl.textContent = 'To return enter a text node, search rectangle or breadcrumb';
     } else if (type === 'TextNode') {
       helpEl.textContent = 'Enter the grey section title to see the whole story/poem etc';
     } else if (type === 'Family' && node.hasClass('subfamily')) {
