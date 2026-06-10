@@ -1178,7 +1178,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const showIds = new Set([lastClusterNode.id(), node.id()]);
     for (const rec of records) {
-      if (rec.n) showIds.add(getElementId(rec.n));
+      if (!rec.n) continue;
+      const id = getElementId(rec.n);
+      showIds.add(id);
+      // Also include the title page (section_title node) connected via PART_OF
+      // so the user can tap it to enter snake view
+      const contentNode = cy.getElementById(id);
+      if (contentNode.length) {
+        contentNode.connectedEdges('[type="PART_OF"]').targets().forEach(tp => showIds.add(tp.id()));
+      }
     }
 
     exitSnakeView();
