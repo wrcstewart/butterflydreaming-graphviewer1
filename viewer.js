@@ -1601,23 +1601,45 @@ async function init() {
     const m = rec.m;
     const nId = getElementId(n);
     const mId = getElementId(m);
-    const rId = getElementId(r);
+    // Prefix all relationship IDs with 'r_' to avoid Cytoscape silently dropping edges
+    // whose integer ID happens to equal a node's integer ID (Memgraph shares the
+    // integer namespace between nodes and relationships).
+    const rId = 'r_' + getElementId(r);
     if (!nodesById.has(nId)) nodesById.set(nId, buildNodeData(n));
     if (!nodesById.has(mId)) nodesById.set(mId, buildNodeData(m));
-    if (!edgesById.has(rId)) edgesById.set(rId, buildEdgeData(r, n, m));
+    if (!edgesById.has(rId)) {
+      const ed = buildEdgeData(r, n, m);
+      ed.id = rId;
+      edgesById.set(rId, ed);
+    }
   }
 
-  // Ensure all Cluster-Family edges are present.
-  // Some Cluster-Family edges are missing from the main query due to elementId
-  // inconsistency in Memgraph — the same node returns different elementIds in
-  // different query contexts. Resolve by name so edges always connect to the
-  // nodes already registered in nodesById.
+  // Memgraph elementId inconsistency: the same Cluster or Family node can return
+  // different elementIds in different query contexts. Deduplicate by name (first-seen
+  // wins), fix all edge source/target references to the canonical ID, and remove the
+  // phantom duplicate nodes. Without this, TextNode→Cluster edges that landed on a
+  // duplicate Cluster ID produce disconnected components in fCoSE, which grids them
+  // into a "neat table" alongside the gateway.
   const clusterIdByName = new Map();
   const familyIdByName  = new Map();
+  const canonicalNodeId = new Map(); // duplicateId → canonicalId
   nodesById.forEach(nd => {
-    if (nd.type === 'Cluster') clusterIdByName.set(nd.name, nd.id);
-    if (nd.type === 'Family')  familyIdByName.set(nd.name, nd.id);
+    if (nd.type === 'Cluster') {
+      if (clusterIdByName.has(nd.name)) canonicalNodeId.set(nd.id, clusterIdByName.get(nd.name));
+      else clusterIdByName.set(nd.name, nd.id);
+    }
+    if (nd.type === 'Family') {
+      if (familyIdByName.has(nd.name)) canonicalNodeId.set(nd.id, familyIdByName.get(nd.name));
+      else familyIdByName.set(nd.name, nd.id);
+    }
   });
+  if (canonicalNodeId.size > 0) {
+    edgesById.forEach(ed => {
+      if (canonicalNodeId.has(ed.source)) ed.source = canonicalNodeId.get(ed.source);
+      if (canonicalNodeId.has(ed.target)) ed.target = canonicalNodeId.get(ed.target);
+    });
+    canonicalNodeId.forEach((_, dupId) => nodesById.delete(dupId));
+  }
 
   for (const rec of cfRecords) {
     const c = rec.c, r = rec.r, f = rec.f;
@@ -1637,7 +1659,7 @@ async function init() {
     ed.id = cfEdgeId;
     ed.source = cId;
     ed.target = fId;
-    edgesById.delete(rId);   // remove raw-rId entry that Cytoscape would drop anyway
+    edgesById.delete('r_' + rId);  // remove main-loop entry (r_-prefixed) if present
     edgesById.set(cfEdgeId, ed);
   }
 
@@ -1657,7 +1679,7 @@ async function init() {
     ed.id = sfEdgeId;
     ed.source = sfId;
     ed.target = fId;
-    edgesById.delete(rId);
+    edgesById.delete('r_' + rId);  // remove main-loop entry (r_-prefixed) if present
     edgesById.set(sfEdgeId, ed);
   }
 
