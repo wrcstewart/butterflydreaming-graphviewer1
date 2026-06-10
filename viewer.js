@@ -1368,7 +1368,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       helpEl.textContent = 'Enter one of the Works shown';
     } else if (type === 'TextNode' && node.data('section_title')) {
       helpEl.textContent = 'To return enter a text node, search rectangle or breadcrumb';
-    } else if (type === 'TextNode') {
+    } else if (type === 'TextNode' && !node.data('gateway')) {
       helpEl.textContent = 'Enter the grey section title to see the whole story/poem etc';
     } else if (type === 'Family' && node.hasClass('subfamily')) {
       helpEl.textContent = 'Keep browsing or, enter a rectangle.';
