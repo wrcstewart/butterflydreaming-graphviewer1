@@ -497,43 +497,8 @@ function buildStyle() {
       }
     },
     {
-      selector: 'node[type="Search_CW"]',
-      style: {
-        'shape': 'rectangle',
-        'width': 108,
-        'height': 34,
-        'border-width': 1,
-        'border-color': function(node) {
-          const hex = (node.data('colour') || '#666666').replace('#', '');
-          const r = Math.round(parseInt(hex.slice(0,2), 16) / 3).toString(16).padStart(2,'0');
-          const g = Math.round(parseInt(hex.slice(2,4), 16) / 3).toString(16).padStart(2,'0');
-          const b = Math.round(parseInt(hex.slice(4,6), 16) / 3).toString(16).padStart(2,'0');
-          return `#${r}${g}${b}`;
-        },
-        'border-opacity': 0.6,
-        'font-size': '10px',
-        'text-max-width': '101px',
-      }
-    },
-    {
-      selector: 'edge[type="HAS_SEARCH_CW"]',
-      style: {
-        'line-color': '#aaaaaa',
-        'width': 1,
-        'line-style': 'dashed',
-        'opacity': 0.7,
-        'target-arrow-shape': 'none',
-      }
-    },
-    {
-      selector: 'edge[type="HAS_GATEWAY"]',
-      style: {
-        'line-color': '#aaaaaa',
-        'width': 1,
-        'line-style': 'solid',
-        'opacity': 0.7,
-        'target-arrow-shape': 'none',
-      }
+      selector: 'edge[type="CONTAINS_CLUSTER"]',
+      style: { 'opacity': 0, 'events': 'no' }
     },
     {
       selector: 'edge[type="DESCENDS_FROM"]',
@@ -655,8 +620,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let recentTouchTimer = null;
   let lastClusterNode = null;
   let currentClusterColour = null;
-  let lastSearchCWNode = null;
-  let syntheticEdgeIds = new Set();
 
   // --- You breadcrumb chips ---
   let youChipCount = 0;
@@ -837,12 +800,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function buildBuddyChipTooltip(chip) {
     const main = cy.getElementById(chip.data('mainId'));
     if (main.length) return buildTooltipContent(main);
-    if (chip.data('type') === 'Search_CW') {
-      const work        = chip.data('name') || '';
-      const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
-      const clusterName = clusterNode.length ? clusterNode.data('name') : '';
-      return (work && clusterName) ? `${work} : filtered by: ${clusterName}` : work;
-    }
     return chip.data('display_name') || chip.data('name') || '';
   }
 
@@ -921,18 +878,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!hit.length) { youHoveredId = null; hideTooltip(); return; }
     if (hit.id() === youHoveredId) return;
     youHoveredId = hit.id();
-    let content;
-    if (hit.data('type') === 'Search_CW') {
-      // Use stored clusterNodeId — not lastClusterNode which reflects current nav state
-      const work        = hit.data('name') || '';
-      const clusterNode = cy.getElementById(hit.data('clusterNodeId'));
-      const clusterName = clusterNode.length ? clusterNode.data('name') : '';
-      content = (work && clusterName) ? `${work} : filtered by: ${clusterName}` : work;
-    } else {
-      const main = cy.getElementById(hit.data('mainId'));
-      if (!main.length) { hideTooltip(); return; }
-      content = buildTooltipContent(main);
-    }
+    const main = cy.getElementById(hit.data('mainId'));
+    if (!main.length) { hideTooltip(); return; }
+    const content = buildTooltipContent(main);
     if (!content) { hideTooltip(); return; }
     tooltip.textContent = content;
     tooltip.style.display = 'block';
@@ -944,27 +892,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
 
-    // Resolve main graph node — for Search_CW the original may have been cleared,
-    // so fall back to a data proxy carrying stored source_text/name/colour
-    let main = cy.getElementById(chip.data('mainId'));
-    if (!main.length) {
-      if (chip.data('type') === 'Search_CW') {
-        const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
-        if (clusterNode.length) lastClusterNode = clusterNode;
-        const d = {
-          type: 'Search_CW',
-          source_text: chip.data('source_text'),
-          name:        chip.data('name'),
-          colour:      chip.data('colour'),
-        };
-        main = { data: k => d[k], id: () => chip.data('mainId') };
-      } else {
-        return;
-      }
-    } else if (chip.data('type') === 'Search_CW') {
-      const clusterNode = cy.getElementById(chip.data('clusterNodeId'));
-      if (clusterNode.length) lastClusterNode = clusterNode;
-    }
+    const main = cy.getElementById(chip.data('mainId'));
+    if (!main.length) return;
 
     if (isTouchEvent(evt)) {
       markRecentTouch();
@@ -1009,11 +938,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (type === 'Entry')    return node.data('text') || node.data('name') || '';
     if (type === 'Family')   return node.data('text') || node.data('name') || '';
     if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
-    if (type === 'Search_CW') {
-      const work = node.data('name') || '';
-      const cluster = lastClusterNode ? lastClusterNode.data('name') : '';
-      return (work && cluster) ? `${work} : filtered by: ${cluster}` : work;
-    }
     if (type === 'TextNode') {
       const title = node.data('title') || '';
       const text = node.data('text') || '';
@@ -1188,127 +1112,74 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     runLayout(cy);
   }
 
-  // Search_CW — virtual cluster-work navigation nodes
-
-  function clearSearchCWNodes() {
-    cy.$('[type="Search_CW"]').remove();
-    syntheticEdgeIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.remove(); });
-    syntheticEdgeIds.clear();
-    lastSearchCWNode = null;
-  }
-
-  async function expandToCluster(clusterNode) {
+  function expandToCluster(clusterNode) {
     clearFamilyView();
+    exitSnakeView();
     cy.$('node[type="Cluster"].active-cluster').removeClass('active-cluster');
     clusterNode.addClass('active-cluster');
     lastClusterNode = clusterNode;
     currentClusterColour = clusterNode.data('colour');
-    clearSearchCWNodes();
     saveState();
     activeNodeId = clusterNode.id();
     cy.elements().hide();
 
     clusterNode.show();
-    const connEdges = clusterNode.connectedEdges();
-    connEdges.forEach(edge => {
+    clusterNode.connectedEdges().forEach(edge => {
       const other = edge.source().id() === clusterNode.id() ? edge.target() : edge.source();
       if (other.data('type') === 'Family') { edge.show(); other.show(); }
     });
+
+    // Show gateway nodes connected via CONTAINS_CLUSTER, with chapter counts as badges
+    const gwEdges = clusterNode.incomers('edge[type="CONTAINS_CLUSTER"]');
+    gwEdges.forEach(edge => {
+      const gw = edge.source();
+      gw.show();
+      gw.data('n_r', edge.data('count') || 0);
+      addBadge(gw);
+    });
+
+    cy.edges().filter(e =>
+      e.source().visible() && e.target().visible() && e.data('type') !== 'CHILD'
+    ).show();
+
     runLayout(cy);
 
-    const clusterName = clusterNode.data('name');
-    let records;
-    try {
-      records = await safeQuery('scwCreate',
-        'MATCH (n:TextNode)-[]->(c:Cluster {name: $clusterName}) ' +
-        'WHERE n.gateway = false ' +
-        'RETURN DISTINCT n.source_text AS work, count(n) AS chapterCount ' +
-        'ORDER BY chapterCount DESC',
-        { clusterName }
-      );
-    } catch (err) {
-      if (err.message === 'session_expired') {
-        showSessionExpired();
-      } else {
-        console.error('[BD] Search_CW create error:', err);
-      }
-      return;
-    }
-
-    if (!records.length) return;
-
-    for (const rec of records) {
-      const work = rec.work;
-      const count = Number(rec.chapterCount || 0);
-      if (!work) continue;
-      const nodeId = 'search_cw_' + work.replace(/\W+/g, '_');
-      cy.add([
-        {
-          group: 'nodes',
-          data: {
-            id: nodeId,
-            type: 'Search_CW',
-            name: work,
-            display_name: work,
-            colour: currentClusterColour,
-            n_r: count,
-            source_text: work,
-          }
-        },
-        {
-          group: 'edges',
-          data: {
-            id: 'scw_edge_' + nodeId,
-            source: clusterNode.id(),
-            target: nodeId,
-            type: 'HAS_SEARCH_CW',
-            colour: '#666666',
-          }
-        }
-      ]);
-      addBadge(cy.getElementById(nodeId));
-    }
-    runLayout(cy);
-
-    // After fCoSE settles, arrange tracker nodes in a horizontal row below the cluster
     setTimeout(() => {
-      const trackers = cy.nodes('[type="Search_CW"]:visible');
-      if (!trackers.length) return;
-      const spacing = 110;
-      const rowX = clusterNode.position().x - ((trackers.length - 1) * spacing) / 2;
+      const gws = gwEdges.sources().filter(':visible');
+      if (!gws.length) return;
+      const spacing = 130;
+      const rowX = clusterNode.position().x - ((gws.length - 1) * spacing) / 2;
       const rowY = clusterNode.position().y + 150;
-      trackers.forEach((n, i) => n.position({ x: rowX + i * spacing, y: rowY }));
+      gws.forEach((n, i) => n.position({ x: rowX + i * spacing, y: rowY }));
       cy.fit(cy.elements(':visible'), 60);
     }, 500);
   }
 
-  async function handleSearchCWTap(node) {
-    if (!lastClusterNode) return;
+  async function handleGatewayClick(node) {
+    if (!lastClusterNode) {
+      expandToNode(node);
+      return;
+    }
+
     const work = node.data('source_text');
     const clusterName = lastClusterNode.data('name');
     let records;
     try {
-      records = await safeQuery('scwClick',
+      records = await safeQuery('gwClick',
         'MATCH (n:TextNode {source_text: $work, gateway: false})-[r]->(c:Cluster {name: $clusterName}) ' +
         'RETURN n, r',
         { work, clusterName }
       );
     } catch (err) {
-      if (err.message === 'session_expired') {
-        showSessionExpired();
-      } else {
-        console.error('[BD] Search_CW click error:', err);
-      }
+      if (err.message === 'session_expired') showSessionExpired();
+      else console.error('[BD] Gateway click error:', err);
       return;
     }
 
-    const showIds = new Set([lastClusterNode.id()]);
+    const showIds = new Set([lastClusterNode.id(), node.id()]);
     for (const rec of records) {
       if (rec.n) showIds.add(getElementId(rec.n));
     }
-
-    lastSearchCWNode = node;
-    cy.$('[type="Search_CW"]').hide();
 
     exitSnakeView();
     saveState();
@@ -1344,7 +1215,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
 
     exitSnakeView();
-    cy.$('[type="Search_CW"]').hide();
     saveState();
     activeNodeId = titlePage.id();
     cy.elements().hide();
@@ -1404,22 +1274,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }).run();
   }
 
-  function updateSearchCWVisibility(node) {
-    if (!lastClusterNode) return;
-    if (lastSearchCWNode !== null) return;
-    // Phase 1 — octagons only valid in cluster/TextNode context, not Family or root
-    const scwNodes = cy.$('[type="Search_CW"]');
-    if (!scwNodes.length) return;
-    if (node.data('type') !== 'TextNode') {
-      scwNodes.hide();
-      cy.$('[type="HAS_SEARCH_CW"]').hide();
-      return;
-    }
-    const connected = node.neighborhood('node').filter(n => n.id() === lastClusterNode.id()).length > 0;
-    scwNodes[connected ? 'show' : 'hide']();
-    cy.$('[type="HAS_SEARCH_CW"]')[connected ? 'show' : 'hide']();
-  }
-
   // Media bar
 
   const mediaBar = document.getElementById('media-bar');
@@ -1473,24 +1327,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
-    if (addChip && (type === 'Family' || type === 'Cluster' || type === 'TextNode' || type === 'Search_CW')) {
+    if (addChip && (type === 'Family' || type === 'Cluster' || type === 'TextNode')) {
       addYouChip(node);
-    }
-
-    if (type === 'Search_CW') {
-      handleSearchCWTap(node);
-      return;
     }
 
     if (node.id() === activeNodeId) {
       if (type === 'TextNode') {
-        if (node.data('section_title')) {
+        if (node.data('gateway')) {
+          handleGatewayClick(node);
+        } else if (node.data('section_title')) {
           handleTitlePageTap(node);
         } else {
           expandToNode(node);
         }
       } else if (type === 'Family') {
-        expandToFamily(node);  // re-run layout on repeat tap (fCoSE randomize:true gives new arrangement)
+        expandToFamily(node);
       } else {
         restoreState();
         activeNodeId = null;
@@ -1500,11 +1351,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         expandToCluster(node);
       } else if (type === 'Family') {
         expandToFamily(node);
+      } else if (type === 'TextNode' && node.data('gateway')) {
+        handleGatewayClick(node);
       } else if (type === 'TextNode' && node.data('section_title')) {
         handleTitlePageTap(node);
       } else {
         expandToNode(node);
-        updateSearchCWVisibility(node);
       }
     }
 
@@ -1647,6 +1499,10 @@ function setupNrBadges(cy) {
   function addBadge(node) {
     const nr = node.data('n_r');
     if (!nr || nr <= 0) return;
+    if (badges.has(node.id())) {
+      badges.get(node.id()).textContent = String(nr);
+      return;
+    }
     const div = document.createElement('div');
     div.textContent = String(nr);
     div.style.cssText = 'position:absolute;font-size:9px;font-family:sans-serif;line-height:1;display:none;transform:translate(-50%,-100%);';
