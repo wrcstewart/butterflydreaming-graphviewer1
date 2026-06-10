@@ -518,7 +518,7 @@ function buildStyle() {
     },
     {
       selector: 'edge[type="PART_OF"]',
-      style: { 'opacity': 0.35, 'target-arrow-shape': 'none' }
+      style: { 'opacity': 0.55, 'target-arrow-shape': 'none' }
     },
     {
       selector: 'node[type="TextNode"][?section_title]',
