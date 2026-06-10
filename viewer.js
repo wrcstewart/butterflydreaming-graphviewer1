@@ -21,23 +21,9 @@ const FAMILY_COLOURS = {
 };
 
 const EDGE_COLOURS = {
-  RESONATES_WITH: '#4A90D9',
-  BRIDGES_TO:     '#E8A838',
-  ECHOES:         '#9B59B6',
-  TAGGED_AS:      '#888888',
-  CHILD:          '#4A8C4F',
-  GIVES:          '#E85A38',
-  CONTAINS:       '#444444',
-  DESCENDS_FROM:  '#444444',
-};
-
-const EDGE_WIDTHS = {
-  RESONATES_WITH: 2,
-  BRIDGES_TO:     4,
-  ECHOES:         1,
-  TAGGED_AS:      1,
-  CHILD:          2,
-  GIVES:          2,
+  CHILD:         '#4A8C4F',
+  CONTAINS:      '#444444',
+  DESCENDS_FROM: '#444444',
 };
 
 // --- Helpers ---
@@ -194,6 +180,13 @@ function computeBlendedColours(cy) {
     edge.style('line-color', parentColour);
   });
 
+  // Colour CLUSTER_REL edges from their target Cluster's blended colour
+  cy.edges('[type="CLUSTER_REL"]').forEach(edge => {
+    const cluster = edge.target();
+    const colour = cluster.data('blendedColour') || cluster.data('colour') || '#666666';
+    edge.data('colour', colour);
+  });
+
 }
 
 function toPlain(val) {
@@ -292,9 +285,19 @@ function buildEdgeData(r, n, m) {
     target: getElementId(m),
     rel_source: props.source,  // preserve Neo4j 'source' prop ('seed'/'dyad') before Cytoscape overwrites it
     type,
-    colour: props.family_colour || EDGE_COLOURS[type] || '#666666',
-    width: EDGE_WIDTHS[type] || 1,
+    colour: EDGE_COLOURS[type] || '#666666',
   });
+}
+
+function getClusterRelWidth(edge) {
+  const w = Math.max(
+    edge.data('tagged_as')      || 0,
+    edge.data('resonates_with') || 0,
+    edge.data('bridges_to')     || 0,
+    edge.data('echoes')         || 0,
+    edge.data('gives')          || 0
+  );
+  return Math.max(1.0, w * 2.5);
 }
 
 // --- Cytoscape stylesheet ---
@@ -503,6 +506,15 @@ function buildStyle() {
     {
       selector: 'edge[type="DESCENDS_FROM"]',
       style: { 'opacity': 0.7, 'target-arrow-shape': 'none' }
+    },
+    {
+      selector: 'edge[type="CLUSTER_REL"]',
+      style: {
+        'width': function(edge) { return getClusterRelWidth(edge); },
+        'line-color': 'data(colour)',
+        'opacity': 0.7,
+        'target-arrow-shape': 'none',
+      }
     },
     {
       selector: 'node[type="TextNode"][?section_title]',
@@ -1245,8 +1257,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     parts.forEach(n => {
       n.show();
       n.addClass('snake-section');
-      const linked = clusterNode && n.connectedEdges()
-        .connectedNodes().filter(nb => nb.id() === clusterNode.id()).length > 0;
+      const linked = clusterNode &&
+        n.outgoers('edge[type="CLUSTER_REL"]')
+         .filter(e => e.target().id() === clusterNode.id()).length > 0;
       n.style({
         'width':              nodeW,
         'height':             nodeH,
