@@ -581,18 +581,46 @@ function runLayout(cy) {
     cy.fit(visible, 120);
     return;
   }
-  visible.layout({
-    name: 'fcose',
-    animate: true,
-    animationDuration: 450,
-    randomize: true,
-    fit: true,
-    padding: 60,
-    nodeSeparation: 75,
-    idealEdgeLength: 100,
-    nodeRepulsion: 4500,
-    gravity: 0.25,
-  }).run();
+
+  const hasRoot = visible.nodes().filter(n => n.data('type') === 'root').length > 0;
+
+  if (hasRoot) {
+    // Nav-layer view: use preset layout so nodes hold exact computed positions.
+    // Positions are derived from the graph container (not the window) so the
+    // arrangement stays correct if a sidebar shrinks the available area.
+    // fit: false on the layout prevents auto-centering that would override
+    // placement; we do a single cy.fit() afterwards to frame the two nodes.
+    const rect = cy.container().getBoundingClientRect();
+    const cx   = rect.width  / 2;
+    const positions = {};
+    const nonRoot = visible.nodes().filter(n => n.data('type') !== 'root');
+    visible.nodes().filter(n => n.data('type') === 'root').forEach(n => {
+      positions[n.id()] = { x: cx, y: rect.height * 0.15 };
+    });
+    nonRoot.forEach((n, i) => {
+      const spread = Math.min(180, rect.width / (nonRoot.length + 1));
+      positions[n.id()] = {
+        x: cx + (i - (nonRoot.length - 1) / 2) * spread,
+        y: rect.height * 0.40,
+      };
+    });
+    visible.layout({ name: 'preset', positions, fit: false }).run();
+    cy.fit(visible, 80);
+  } else {
+    // Cluster / content views — fCoSE as normal.
+    visible.layout({
+      name: 'fcose',
+      animate: true,
+      animationDuration: 450,
+      randomize: true,
+      fit: true,
+      padding: 60,
+      nodeSeparation: 75,
+      idealEdgeLength: 100,
+      nodeRepulsion: 4500,
+      gravity: 0.25,
+    }).run();
+  }
 }
 
 // --- Interactions ---
