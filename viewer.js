@@ -281,6 +281,7 @@ function buildEdgeData(r, n, m) {
   // that would otherwise overwrite the source node ID.
   return Object.assign({}, props, {
     id: getElementId(r),
+    raw_rel_id: getElementId(r),  // preserved after ed.id is overwritten with cf_/sf_/r_ prefix
     source: getElementId(n),
     target: getElementId(m),
     rel_source: props.source,  // preserve Neo4j 'source' prop ('seed'/'dyad') before Cytoscape overwrites it
@@ -575,11 +576,29 @@ function buildStyle() {
 
 // --- Layout ---
 
-function runLayout(cy) {
+function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
   if (visible.nodes().length <= 1) {
     cy.fit(visible, 120);
     return;
+  }
+
+  // Scan DESCENDS_FROM edges for hint_x/hint_y when a parent context is known.
+  // In Cytoscape, DESCENDS_FROM edges are stored source=child, target=parent,
+  // so children of parentNode are edges where target === parentNode.id().
+  let hintMode    = 'force';
+  let childEdges  = null;
+  let hintedEdges = null;
+  if (parentNode) {
+    childEdges  = visible.edges('[type="DESCENDS_FROM"]').filter(
+      e => e.target().id() === parentNode.id()
+    );
+    hintedEdges = childEdges.filter(e => e.data('hint_x') != null && e.data('hint_y') != null);
+    const total = childEdges.length;
+    hintMode = total === 0 || hintedEdges.length === 0 ? 'force'
+             : hintedEdges.length === total             ? 'preset'
+             :                                            'hybrid';
+    console.log(`[BD] hint scan: parent=${parentNode.data('name')} total=${total} hinted=${hintedEdges.length} mode=${hintMode}`);
   }
 
   const hasRoot = visible.nodes().filter(n => n.data('type') === 'root').length > 0;
@@ -606,8 +625,61 @@ function runLayout(cy) {
     });
     visible.layout({ name: 'preset', positions, fit: false }).run();
     cy.fit(visible, 80);
+
+  } else if (hintMode === 'preset') {
+    // All children hinted — recover positions from stored offsets, no force simulation.
+    const area = cy.container().getBoundingClientRect();
+    const renderScale = 0.40 * Math.min(area.width, area.height);
+    const parentPos   = parentNode.position();
+    const positions   = { [parentNode.id()]: parentPos };
+    hintedEdges.forEach(e => {
+      const child = e.source();
+      positions[child.id()] = {
+        x: parentPos.x + e.data('hint_x') * renderScale,
+        y: parentPos.y + e.data('hint_y') * renderScale,
+      };
+    });
+    visible.layout({ name: 'preset', positions, fit: false }).run();
+    cy.fit(visible, 80);
+
+  } else if (hintMode === 'hybrid') {
+    // Some children hinted — pin hinted at recovered positions, seed un-hinted
+    // at their centroid, then let fCoSE settle un-hinted around the fixed ones.
+    const area = cy.container().getBoundingClientRect();
+    const renderScale = 0.40 * Math.min(area.width, area.height);
+    const parentPos   = parentNode.position();
+    const pins = [{ nodeId: parentNode.id(), position: { ...parentPos } }];
+    let sumX = 0, sumY = 0;
+    hintedEdges.forEach(e => {
+      const child = e.source();
+      const pos = {
+        x: parentPos.x + e.data('hint_x') * renderScale,
+        y: parentPos.y + e.data('hint_y') * renderScale,
+      };
+      child.position(pos);
+      pins.push({ nodeId: child.id(), position: { ...pos } });
+      sumX += pos.x;
+      sumY += pos.y;
+    });
+    const centroid = { x: sumX / hintedEdges.length, y: sumY / hintedEdges.length };
+    childEdges.filter(e => e.data('hint_x') == null || e.data('hint_y') == null)
+      .sources().forEach(c => c.position({ ...centroid }));
+    visible.layout({
+      name: 'fcose',
+      animate: true,
+      animationDuration: 450,
+      randomize: false,
+      fit: true,
+      padding: 60,
+      nodeSeparation: 75,
+      idealEdgeLength: 100,
+      nodeRepulsion: 4500,
+      gravity: 0.25,
+      fixedNodeConstraint: pins,
+    }).run();
+
   } else {
-    // Cluster / content views — fCoSE as normal.
+    // force mode — plain fCoSE from scratch (un-curated parent, or no parent context).
     visible.layout({
       name: 'fcose',
       animate: true,
@@ -664,6 +736,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let recentTouchTimer = null;
   let lastClusterNode = null;
   let currentClusterColour = null;
+  let lastParentNode = null;
 
   // --- You breadcrumb chips ---
   let youChipCount = 0;
@@ -1130,6 +1203,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function expandToFamily(familyNode) {
+    lastParentNode = familyNode;
     clearFamilyView();
     saveState();
     activeNodeId = familyNode.id();
@@ -1142,7 +1216,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     descEdges.show();
     descEdges.connectedNodes().show();
 
-    runLayout(cy);
+    runLayout(cy, familyNode);
   }
 
   function expandChildLevel() {
@@ -1506,6 +1580,69 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (c.style.cursor !== butterflyCursor) c.style.cursor = butterflyCursor;
     });
   }, { passive: true });
+
+  // --- Dev panel (position curation) ---
+  const devCodeEl   = document.getElementById('dev-code');
+  const devStatusEl = document.getElementById('dev-status');
+
+  function devStatus(msg) {
+    devStatusEl.textContent = msg;
+    clearTimeout(devStatus._t);
+    devStatus._t = setTimeout(() => { devStatusEl.textContent = ''; }, 3000);
+  }
+
+  document.getElementById('dev-write').addEventListener('click', () => {
+    if (!lastParentNode) { devStatus('tap a family first'); return; }
+    const code = devCodeEl.value.trim();
+    if (!code) { devStatus('enter code'); return; }
+
+    const vis = cy.elements(':visible');
+    const childEdges = vis.edges('[type="DESCENDS_FROM"]').filter(
+      e => e.target().id() === lastParentNode.id()
+    );
+    if (!childEdges.length) { devStatus('no children'); return; }
+
+    const parentPos = lastParentNode.position();
+    const scale = Math.max(...childEdges.map(e => {
+      const c = e.source();
+      return Math.hypot(c.position('x') - parentPos.x, c.position('y') - parentPos.y);
+    })) || 1;
+
+    const hints = [];
+    childEdges.forEach(e => {
+      const c = e.source();
+      hints.push({
+        relId:  e.data('raw_rel_id'),
+        hint_x: (c.position('x') - parentPos.x) / scale,
+        hint_y: (c.position('y') - parentPos.y) / scale,
+      });
+    });
+
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) { devStatus('ws not open'); return; }
+    wsNow.addEventListener('message', function handler(event) {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg.type !== 'write_hints') return;
+      wsNow.removeEventListener('message', handler);
+      if (msg.error) { devStatus(msg.error); return; }
+      // Update in-memory edge data so Reset/re-entry uses preset mode immediately
+      childEdges.forEach((e, i) => {
+        e.data('hint_x', hints[i].hint_x);
+        e.data('hint_y', hints[i].hint_y);
+      });
+      devStatus(`saved ${msg.count}`);
+      // No layout re-run — positions are already correct on screen
+    });
+    wsNow.send(JSON.stringify({ type: 'write_hints', code, hints }));
+    devStatus('writing…');
+  });
+
+  document.getElementById('dev-reset').addEventListener('click', () => {
+    if (!lastParentNode) { devStatus('tap a family first'); return; }
+    runLayout(cy, lastParentNode);
+    devStatus('reset');
+  });
 
   return { appendBuddyChip, resetBuddyBar };
 

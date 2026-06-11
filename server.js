@@ -1,10 +1,19 @@
 // server.js — ButterflyDreaming Graph Viewer server
 
+const crypto  = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const neo4j = require('neo4j-driver');
 
+// Load curation code from gitignored config — absent = curation disabled, app still works.
+let CURATION_CODE = null;
+try {
+  const cfg = require('./config');
+  CURATION_CODE = cfg.CURATION_CODE || null;
+} catch { /* no config or no CURATION_CODE — curation disabled */ }
+
 const app = express();
+app.use(express.json());
 app.use(express.static('.'));
 
 const driver = neo4j.driver(
@@ -183,6 +192,41 @@ wss.on('connection', async (ws) => {
       }
       if (msg.type === 'breadcrumb') {
         if (ws.userId) sendToBuddy(ws.userId, { type: 'buddy_breadcrumb', data: msg.data });
+        return;
+      }
+      if (msg.type === 'write_hints') {
+        if (!CURATION_CODE) {
+          ws.send(JSON.stringify({ type: 'write_hints', error: 'curation_disabled' }));
+          return;
+        }
+        const now = Date.now();
+        if (ws._lastHintWrite && now - ws._lastHintWrite < 8000) {
+          ws.send(JSON.stringify({ type: 'write_hints', error: 'rate_limited' }));
+          return;
+        }
+        const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
+          crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
+        if (!codeOk) {
+          ws.send(JSON.stringify({ type: 'write_hints', error: 'bad_code' }));
+          return;
+        }
+        ws._lastHintWrite = now;
+        const s = driver.session({ database: 'memgraph' });
+        try {
+          await s.run(
+            'UNWIND $hints AS h ' +
+            'MATCH ()-[r:DESCENDS_FROM]-() WHERE id(r) = toInteger(h.relId) ' +
+            'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y',
+            { hints: msg.hints }
+          );
+          ws.send(JSON.stringify({ type: 'write_hints', ok: true, count: msg.hints.length }));
+          console.log(`[BD] Hints written: ${msg.hints.length} edges by ${ws.userId}`);
+        } catch (err) {
+          console.error('[BD] write_hints error:', err.message);
+          ws.send(JSON.stringify({ type: 'write_hints', error: err.message }));
+        } finally {
+          await s.close();
+        }
         return;
       }
       if (!msg.query) return;  // ignore keepalive pings and other non-query messages
