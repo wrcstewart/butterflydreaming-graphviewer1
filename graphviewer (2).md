@@ -3833,3 +3833,651 @@ have `section_title: true` set in the corpus load file. No
 viewer code changes needed — the selector handles all current
 and future title page nodes automatically.
 ```
+
+Amendment 29 — graphviewer.md — 31 May 2026
+Navigation Redesign — Title Page Snake, PART_OF, Simplified Cluster Flow
+Overview
+The navigation model has been simplified and made more intuitive.
+Key changes:
+
+Cluster click always shows Search_CW work nodes — no alternating
+Search_CW click shows filtered TextNodes only — no gateway
+TextNode click shows one-hop neighbourhood plus its title page
+Title page click triggers the linear snake view for that story
+Read Mode tick box removed — snake triggered by title page click
+New PART_OF relationship connects every TextNode to its title page
+
+
+29.1 New PART_OF Relationship
+170 PART_OF relationships now exist in Memgraph connecting every
+content TextNode to its nearest title page ancestor:
+TextNode (content) -[:PART_OF]-> TextNode (section_title: true)
+The viewer must load PART_OF relationships as part of the initial
+graph load. Add to the relationship type list in the load query:
+javascriptWHERE type(r) IN ['CONTAINS', 'DESCENDS_FROM', 'CHILD', 'PART_OF',
+                  'RESONATES_WITH', 'BRIDGES_TO', 'ECHOES',
+                  'TAGGED_AS', 'GIVES']
+
+29.2 Cluster Click — Always Shows Search_CW Nodes
+Remove the alternating behaviour from cluster click. Cluster click
+always produces Search_CW work nodes — same behaviour every time:
+javascript// On any Cluster node click:
+// 1. Remove existing Search_CW nodes
+// 2. Query Memgraph for works with chapters in this cluster
+// 3. Create Search_CW nodes for each work found
+// 4. Never show TextNodes directly from cluster click
+
+29.3 Search_CW Click — TextNodes Only, No Gateway
+When a Search_CW node or button is clicked, show only the filtered
+TextNodes connected to the active cluster from that work.
+Do not include the gateway node in the results:
+javascriptconst query = `
+    MATCH (gw:TextNode {source_text: $work, gateway: true})
+    MATCH (gw)-[:CHILD*]->(n:TextNode)-[r]->(c:Cluster {name: $clusterName})
+    WHERE n.gateway = false
+    RETURN n, r
+`;
+
+29.4 TextNode Click — Include Title Page
+When a TextNode is clicked and its one-hop neighbourhood is shown,
+also show its title page node via the PART_OF relationship:
+javascript// After standard one-hop show:
+const titlePage = node.outgoers('edge[type="PART_OF"]').targets();
+if (titlePage.length) {
+    titlePage.show();
+    // show edge between TextNode and title page
+    node.edgesTo(titlePage).show();
+}
+The title page appears in the one-hop view automatically — the user
+can see which story this TextNode belongs to and can click the title
+page to enter the snake view.
+
+29.5 Title Page Click — Linear Snake View
+Clicking a title page node triggers the linear snake view for that
+story — equivalent to the Read Mode described in Amendment 23 but
+now triggered by node click rather than a tick box.
+Remove the Read Mode tick box (Amendment 23 superseded).
+The snake shows:
+[Cluster] → [Title page] → [Part 1] [Part 2] [Part 3] ...
+
+Cluster node sits above or at start of snake (lastClusterNode)
+Title page node — grey background, full size
+All story parts in seq order — dark background, compact
+Parts with PART_OF connection to this title page AND a relationship
+to lastClusterNode get a low-opacity tint of the cluster family colour
+
+Query to get all parts of a story:
+javascriptconst query = `
+    MATCH (title:TextNode {url: $titleUrl})
+    MATCH (n:TextNode)-[:PART_OF]->(title)
+    RETURN n
+    ORDER BY n.seq
+`;
+Tinting logic:
+javascript// After rendering snake:
+cy.nodes('[type="TextNode"]').forEach(node => {
+    const hasClusterLink = node
+        .neighborhood('edge')
+        .filter(e => e.target().data('name') === activeClusterName)
+        .length > 0;
+
+    if (hasClusterLink) {
+        node.style('background-color',
+            hexToRgba(currentClusterColour, 0.3));
+    }
+});
+Layout: preset left-to-right, fixed spacing. Use same approach
+as Amendment 23 snake layout.
+
+29.6 Back Navigation from Snake
+Two ways to exit the snake:
+Click any TextNode in snake:
+Standard one-hop view for that node. Snake disappears.
+Title page appears in one-hop view via PART_OF (see 29.4).
+Click Search_CW button (cluster tracker):
+Returns to Search_CW filtered TextNode view for the active cluster
+and work. Same as clicking Search_CW initially.
+
+29.7 Gateway Nodes
+Gateway nodes remain in the database and display in the graph.
+They are no longer central to the navigation flow but provide
+conceptual organisation and may be reconsidered in future.
+No changes to gateway node styling or behaviour.
+
+29.8 Summary of Behaviour Changes
+Cluster click previously alternated between showing Search_CW work nodes and showing TextNodes directly. This alternating behaviour is removed — cluster click now always shows Search_CW work nodes, same behaviour every time.
+Search_CW click previously showed the gateway node alongside filtered TextNodes. The gateway is no longer included — Search_CW click now shows filtered TextNodes only.
+TextNode click previously showed only the standard one-hop neighbourhood. It now additionally shows the TextNode's title page node via the PART_OF relationship, so the user can always see which story they are in and navigate to the snake view.
+Title page click previously showed the standard one-hop neighbourhood like any other node. It now triggers the linear snake view for that story — all parts in sequence with cluster-relevant tinting.
+Read Mode tick box introduced in Amendment 23 is removed. The snake view is now triggered by clicking a title page node rather than a UI toggle. Amendment 23 is superseded by this amendment.
+
+## Amendment 30 — graphviewer.md — 1 June 2026
+
+## Help Bar — Context-Aware Single Line
+
+### Overview
+
+A single-line help bar is added below the Ready to Pair button
+and Settling player. The breadcrumb bars move down to accommodate
+it. The help text is selected automatically based on whether the
+device supports touch.
+
+---
+
+### 30.1 Touch Detection
+
+```javascript
+const isTouchDevice = navigator.maxTouchPoints > 0;
+```
+
+Set once at startup. Used to select the appropriate help text
+and may be reused elsewhere in the viewer for touch-specific
+behaviour.
+
+---
+
+### 30.2 Help Text
+
+```javascript
+const helpText = isTouchDevice
+    ? 'Single tap any node to read — double tap to navigate.'
+    : 'Hover any node to read — click to navigate.';
+```
+
+---
+
+### 30.3 HTML
+
+Add the help bar below the top controls and above the breadcrumb rows:
+
+```html
+<div id="help-bar">
+    <span id="help-text"></span>
+</div>
+```
+
+Set content at startup:
+
+```javascript
+document.getElementById('help-text').textContent = helpText;
+```
+
+---
+
+### 30.4 CSS
+
+One line, comfortable readable font size, full width:
+
+```css
+#help-bar {
+    width: 100%;
+    padding: 4px 12px;
+    font-size: 13px;
+    color: #cccccc;
+    background: transparent;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+```
+
+---
+
+### 30.5 Layout
+
+The help bar sits below the top button row (Ready to Pair button
+and Settling player) and above the youCy breadcrumb canvas.
+The breadcrumb canvases move down by the height of the help bar
+— approximately 24px. Adjust the top offset of youCy and buddyCy
+accordingly.
+
+---
+
+### 30.6 Future
+
+Additional context-sensitive help messages may be added later
+for specific navigation states (e.g. when a title page is
+clicked, when paired with a buddy). The `isTouchDevice`
+constant is available globally for all future help text
+selection.
+## Amendment 31 — graphviewer.md — 9 June 2026
+
+## Replace Search_CW Virtual Nodes with CONTAINS_CLUSTER Relationships
+
+### Overview
+
+The Search_CW virtual node system is replaced by a permanent
+CONTAINS_CLUSTER relationship stored in Memgraph. This eliminates
+all virtual node creation/destruction logic and simplifies the
+viewer significantly.
+
+207 CONTAINS_CLUSTER relationships now exist in Memgraph:
+
+One relationship per Gateway-Cluster pair. `count` is the number
+of TextNodes in that work connected to that Cluster.
+
+---
+
+## Amendment 31 — graphviewer.md — 9 June 2026
+
+## Replace Search_CW Virtual Nodes with CONTAINS_CLUSTER Relationships
+
+### Overview
+
+The Search_CW virtual node system is replaced by a permanent
+CONTAINS_CLUSTER relationship stored in Memgraph. This eliminates
+all virtual node creation/destruction logic and simplifies the
+viewer significantly.
+
+207 CONTAINS_CLUSTER relationships now exist in Memgraph:
+Gateway TextNode -[:CONTAINS_CLUSTER {count: N}]-> Cluster
+
+One relationship per Gateway-Cluster pair. `count` is the number
+of TextNodes in that work connected to that Cluster.
+
+---
+
+### 31.1 Remove Search_CW Logic
+
+Remove entirely:
+- Search_CW node creation on Cluster click
+- Search_CW node destruction/hiding logic
+- Phase 1 rectangle "search" node creation
+- Phase 2 DOM button migration
+- clearSearchCWNodes() function
+- lastSearchCWNode variable
+- syntheticEdgeIds Set
+- #search-bar DOM element and its CSS
+- HAS_SEARCH_CW virtual edge creation
+
+Retain:
+- lastClusterNode variable — still needed for filter context
+- currentClusterColour variable — still needed for breadcrumb chips
+- breadcrumbTransmissionActive flag — unchanged
+
+---
+
+### 31.2 Load CONTAINS_CLUSTER Relationships
+
+Add CONTAINS_CLUSTER to the relationship type list in the
+initial graph load query:
+
+```javascript
+WHERE type(r) IN ['CONTAINS', 'DESCENDS_FROM', 'CHILD', 'PART_OF',
+                  'CONTAINS_CLUSTER', 'RESONATES_WITH', 'BRIDGES_TO',
+                  'ECHOES', 'TAGGED_AS', 'GIVES']
+```
+
+CONTAINS_CLUSTER edges should not be visually rendered —
+add to the hidden edge list or set opacity 0:
+
+```javascript
+{ selector: 'edge[type="CONTAINS_CLUSTER"]',
+  style: { 'opacity': 0, 'events': 'no' } }
+```
+
+---
+
+### 31.3 Cluster Click — Show Gateway Nodes
+
+When a Cluster node is clicked, show only the Gateway nodes
+connected to it via CONTAINS_CLUSTER:
+
+```javascript
+function handleClusterClick(node) {
+    lastClusterNode = node;
+    currentClusterColour = node.data('colour');
+
+    // Add cluster chip to breadcrumb
+    appendClusterChip(node);
+
+    // Find connected gateways via CONTAINS_CLUSTER
+    const gateways = node
+        .incomers('edge[type="CONTAINS_CLUSTER"]')
+        .sources();
+
+    // Show cluster node and its gateway neighbours only
+    showNodesOnly([node, ...gateways.toArray()]);
+
+    // Show count on each gateway edge
+    // (count property on CONTAINS_CLUSTER edge)
+}
+```
+
+Each Gateway node displayed should show the count from the
+CONTAINS_CLUSTER relationship as a badge or label suffix —
+e.g. "Thomas Hardy (12)" — so the user knows how many
+relevant chapters exist before clicking.
+
+---
+
+### 31.4 Gateway Click — Show Cluster-Filtered TextNodes
+
+When a Gateway node is clicked, check if it was arrived at
+via a Cluster context (lastClusterNode is set). If so, show
+only TextNodes from that work connected to lastClusterNode.
+Also show the title pages for those TextNodes via PART_OF.
+
+```javascript
+function handleGatewayClick(node) {
+    // Add work chip to breadcrumb
+    appendWorkChip(node);
+
+    if (lastClusterNode) {
+        // Cluster context — show filtered TextNodes
+        const clusterName = lastClusterNode.data('name');
+        const work = node.data('source_text');
+
+        const query = `
+            MATCH (gw:TextNode {source_text: $work, gateway: true})
+            MATCH (gw)-[:CHILD*]->(n:TextNode)-[r]->(c:Cluster {name: $clusterName})
+            WHERE n.gateway = false AND n.section_title IS NULL
+            OPTIONAL MATCH (n)-[:PART_OF]->(title:TextNode)
+            RETURN n, r, title
+        `;
+
+        // Run query, show results in mainCy
+        sendQuery('gateway_filtered', { work, clusterName });
+
+    } else {
+        // No cluster context — show first chapter (standard one-hop)
+        const firstChild = node
+            .outgoers('edge[type="CHILD"]')
+            .targets()
+            .first();
+        showNodesOnly([node, firstChild]);
+    }
+}
+```
+
+---
+
+### 31.5 Breadcrumb — Work Chip from Gateway
+
+When a Gateway is clicked from Cluster context, append a
+work chip to youCy breadcrumb (same as Search_CW chip was):
+
+```javascript
+function appendWorkChip(gatewayNode) {
+    const workName = gatewayNode.data('source_text');
+    youCy.add({
+        group: 'nodes',
+        data: {
+            id: `chip_work_${Date.now()}`,
+            type: 'chip_work',
+            label: workName,
+            colour: currentClusterColour,
+            url: gatewayNode.data('url'),
+            source_text: workName
+        },
+        position: nextChipPosition()
+    });
+}
+```
+
+---
+
+### 31.6 Back Navigation
+
+Back navigation unchanged from Amendment 29:
+- Click any TextNode in filtered view → one-hop view
+- Click work chip in breadcrumb → re-run filtered query
+- Click cluster chip in breadcrumb → show gateways again
+- Reset → full reset
+
+---
+
+### 31.7 Summary of Changes
+
+The Search_CW virtual node system is entirely removed.
+Navigation from Cluster to TextNodes now goes:
+Cluster clicked
+→ Gateway nodes appear (one per work, count shown)
+→ Gateway clicked
+→ Cluster-filtered TextNodes appear
+→ Title pages visible via PART_OF
+→ Title page clicked
+→ Snake view for that story
+
+The breadcrumb trail records:
+[Cluster chip] [Work chip] [TextNode seq chips] ...
+
+Identical to previous behaviour from the user's perspective
+but implemented entirely via permanent Memgraph relationships
+rather than virtual Cytoscape nodes.
+
+### 31.8 CONTAINS_CLUSTER count display
+
+The count on the CONTAINS_CLUSTER relationship should be
+visible to the user when Gateway nodes are shown after a
+Cluster click. Suggested display: append the count to the
+Gateway node label in parentheses:
+
+```javascript
+// When displaying gateway nodes after cluster click:
+gateways.forEach(gw => {
+    const edge = gw.edgesTo(lastClusterNode)
+        .filter('[type="CONTAINS_CLUSTER"]').first();
+    const count = edge.data('count');
+    gw.data('displayLabel', `${gw.data('source_text')} (${count})`);
+});
+```
+
+This tells the user "Thomas Hardy (12)" — 12 chapters from
+Hardy touch this cluster — before they decide whether to
+click through.
+
+## Amendment 32 — graphviewer.md — 10 June 2026
+
+## CLUSTER_REL Edge Styling
+
+### Overview
+
+The TextNode→Cluster semantic relationships have been migrated
+from five separate types (TAGGED_AS, RESONATES_WITH, BRIDGES_TO,
+ECHOES, GIVES) to a single `CLUSTER_REL` relationship type carrying
+float properties for each semantic type. Absent property implies 0.0.
+
+The viewer must be updated to style CLUSTER_REL edges correctly
+and remove all references to the old relationship types.
+
+---
+
+### 32.1 Edge Colour
+
+CLUSTER_REL edges should be coloured using the target Cluster
+node's blended colour — the same colour as the Cluster node
+background, computed by `computeBlendedColours()` at load time.
+
+In `buildEdgeData`, when relationship type is CLUSTER_REL:
+
+```javascript
+// Set colour from target cluster's blended colour
+// Run after computeBlendedColours() so blended colours are available
+cy.edges('[type="CLUSTER_REL"]').forEach(edge => {
+    const cluster = edge.target();
+    const colour = cluster.data('blendedColour')
+        || cluster.data('colour')
+        || '#666666';
+    edge.style('line-color', colour);
+});
+```
+
+Call this after `computeBlendedColours(cy)` completes at load time.
+
+---
+
+### 32.2 Edge Width
+
+Width is derived from the highest non-null semantic property
+value on the relationship, minimum 1.0px:
+
+```javascript
+function getClusterRelWidth(edge) {
+    const weight = Math.max(
+        edge.data('tagged_as') || 0,
+        edge.data('resonates_with') || 0,
+        edge.data('bridges_to') || 0,
+        edge.data('echoes') || 0,
+        edge.data('gives') || 0
+    );
+    return Math.max(1.0, weight * 2.5);
+}
+```
+
+Apply in the Cytoscape stylesheet:
+
+```javascript
+{
+    selector: 'edge[type="CLUSTER_REL"]',
+    style: {
+        'width': function(edge) { return getClusterRelWidth(edge); },
+        'line-color': 'data(colour)',
+        'opacity': 0.7,
+        'target-arrow-shape': 'none'
+    }
+}
+```
+
+---
+
+### 32.3 Remove Old Relationship Type References
+
+The old relationship types (TAGGED_AS, RESONATES_WITH, BRIDGES_TO,
+ECHOES, GIVES) no longer exist in the database. Remove:
+
+- Any entries for these types in EDGE_COLOURS lookup table
+- Any entries for these types in EDGE_WIDTHS lookup table
+- Any stylesheet selectors targeting these types
+- Any code that checks `type(r)` against these type names
+
+The EDGE_WIDTHS constant table is already dead code (see
+ButterflyDreaming_EdgeColourWidth_Notes.md) — this is a good
+opportunity to remove it entirely.
+
+---
+
+### 32.4 Snake View Tinting
+
+The snake view tinting logic (title page click → show all story
+parts with cluster-relevant tinting) currently checks for
+TAGGED_AS or similar relationship types. Update to check
+CLUSTER_REL properties instead:
+
+```javascript
+// A TextNode is cluster-relevant if any CLUSTER_REL property > 0
+function hasClusterConnection(node, clusterName) {
+    const clusterEdges = node
+        .outgoers('edge[type="CLUSTER_REL"]')
+        .filter(e => e.target().data('name') === clusterName);
+    return clusterEdges.length > 0;
+}
+```
+
+---
+
+### 32.5 CLUSTER_REL Property Reference
+
+| Property | Meaning | Typical range |
+|---|---|---|
+| tagged_as | Primary classification | 0.6 - 0.85 |
+| resonates_with | Thematic affinity | 0.35 - 0.5 |
+| bridges_to | Cross-cluster bridge | 0.4 - 0.55 |
+| echoes | Faint recall | 0.25 - 0.3 |
+| gives | Generative connection | 0.4 - 0.7 |
+
+Absent property = 0.0. At least one property is always present.
+
+Amendment 33
+
+A Warm-up Amendment: Hint Section-Title Nodes Toward the Bottom
+Why this task exists
+This is a deliberately small first step to validate the position-hinting mechanism before we build the full system (edge-stored, hand-curated child positions recovered as layout hints). The goal here is only to prove that we can bias where a class of nodes settles in the fCoSE force-directed layout without hard-pinning them and without breaking overlap avoidance.
+If this works, the full system is the same idea with richer hint values; if it doesn't, we want to find out now on something trivial.
+The task
+When section-title nodes (the grey ones, identified by section_title: true) are displayed, they should settle toward the bottom of the available graph area, rather than wherever the force layout would otherwise place them. Other nodes are unaffected.
+This is a soft bias: section-title nodes are pulled downward but the layout still spaces everything to avoid overlaps. They should not be rigidly locked to a fixed y.
+How to identify the nodes
+A node is a section-title node when its data has section_title: true — i.e. node.data('section_title') === true. This is the same flag that already drives their grey styling. Do not introduce a new tagging scheme.
+javascriptconst isSectionTitle = n => n.data('section_title') === true;
+Mechanism: seed low, then relax (not a pin)
+The right approach — and the one that mirrors the full system — is to seed the section-title nodes at a low y position before running the layout, then let fCoSE relax with randomize: false so the seeded positions survive while overlaps are still resolved.
+javascript// After elements are added, BEFORE running the layout:
+const area = cy.container().getBoundingClientRect();
+const lowY = area.height * 0.80;   // 80% down the available area = "toward the bottom"
+
+cy.nodes().forEach(n => {
+  if (isSectionTitle(n)) {
+    n.position({
+      x: n.position('x'),   // leave x alone; only bias y
+      y: lowY
+    });
+  }
+});
+
+cy.layout({
+  name: 'fcose',
+  randomize: false,        // CRITICAL: respect the seeded y positions.
+  quality: 'proof',
+  animate: false,
+  nodeSeparation: 80,      // keep overlap avoidance working.
+  nodeRepulsion: 4500,
+  numIter: 2500,
+}).run();
+randomize: false is what makes the seeded low position survive into the result. With randomize: true (the default) fCoSE discards the seed and the bias does nothing — so if the section-title nodes do NOT end up low, the first thing to check is that randomize is false.
+Fallback only if seeding proves fiddly
+If (and only if) the seed approach cannot be made to work, fCoSE's relativePlacementConstraint can require each section-title node to sit below a reference node by a gap:
+javascriptrelativePlacementConstraint: cy.nodes().filter(isSectionTitle).map(tp => ({
+  top: centreId, bottom: tp.id(), gap: 200
+}))
+Do not use fixedNodeConstraint for this — that hard-pins the nodes and disables the overlap avoidance we are specifically trying to preserve.
+Important: "bottom of the available area", not the window
+Compute the low position from the graph container's current size (cy.container().getBoundingClientRect()), not the browser window. A chat panel or sidebar may later shrink the graph area — reading the container keeps "toward the bottom" correct regardless. (This is a small preview of why the full system stores hints in a resolution-independent way.)
+What NOT to change
+
+Do not alter node colours, the grey styling, or any data.
+Do not hard-pin nodes (no fixedNodeConstraint for section-title nodes).
+Do not disable node dragging or panning.
+Do not touch the Memgraph query or the data model — this warm-up is viewer-only.
+
+Acceptance check
+
+When a view containing section-title (grey) nodes is drawn, those nodes sit in the lower portion of the graph area.
+Non-section-title nodes are positioned normally by the force layout.
+No nodes overlap.
+Shrinking the graph area (e.g. opening a side/chat panel) still places the grey nodes toward the bottom of the remaining area, not off-screen or mid-canvas.
+Dragging and panning still work.
+
+Why this leads into the full system
+Here the hint is a single hard-coded rule (section_title: true → low y). In the full system the hint per child will instead be read from the parent→child DESCENDS_FROM edge (hint_x, hint_y, stored as centre-relative normalised offsets recorded via a developer button). The mechanism — seed positions, then randomize: false relax — is identical. Proving it on the section-title nodes de-risks the rest.
+
+---
+
+DDR — Live Graph Refresh (2026-06-12)
+
+Context: the viewer loads the full graph from Memgraph once at startup into
+Cytoscape's in-memory cache. Any subsequent DB changes (new nodes, new hints,
+updated relationships) are invisible to the client until data is reloaded.
+
+Decision: a live refresh does NOT require a full browser page reload. The
+WebSocket connection, DOM, CSS, and JS all remain intact. Only the graph data
+needs to be replaced in place:
+
+1. Re-run the three load queries (graph, clusterFamily, subfamilyLinks) over
+   the existing WebSocket connection.
+2. Rebuild nodesById/edgesById from the fresh results.
+3. cy.elements().remove() → cy.add(newElements).
+4. Re-run computeBlendedColours(cy).
+5. Re-navigate to the saved view via expandToCluster / expandToFamily etc.,
+   using the preserved activeNodeId and lastClusterNode.id().
+
+State that survives a graph-only refresh: WebSocket User node, pairing state,
+breadcrumb chips, dev panel code field.
+State that needs saving before refresh and restoring after: activeNodeId,
+lastClusterNode.id(), view type (family / cluster / gateway).
+sessionStorage is sufficient for this — no server changes needed.
+
+Why not needed yet: the current usage model has the developer writing hints at
+the end of a curation session and other users reading them on next load. Live
+refresh becomes relevant if real-time multi-user updates or frequent corpus
+additions are needed. The implementation path above is low-risk when required.
