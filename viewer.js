@@ -592,7 +592,7 @@ function runLayout(cy, parentNode = null) {
   let hintedEdges = null;
   if (parentNode) {
     const pid = parentNode.id();
-    childEdges  = visible.edges('[type="DESCENDS_FROM"]').filter(
+    childEdges  = visible.edges().filter(
       e => e.source().id() === pid || e.target().id() === pid
     );
     hintedEdges = childEdges.filter(e => e.data('hint_x') != null && e.data('hint_y') != null);
@@ -601,6 +601,30 @@ function runLayout(cy, parentNode = null) {
              : hintedEdges.length === total             ? 'preset'
              :                                            'hybrid';
     console.log(`[BD] hint scan: parent=${parentNode.data('name')} total=${total} hinted=${hintedEdges.length} mode=${hintMode}`);
+  }
+
+  // Pre-position and pin section_title nodes at the top of the graph area.
+  // They connect to TextNodes via PART_OF (not to parentNode), so they never
+  // appear in childEdges.  Pinning before layout avoids a post-layout jump.
+  // Only active when parentNode is known (gateway and family views); not for
+  // the root splash or restoreState paths.
+  const titleNodes = visible.nodes().filter(n => !!n.data('section_title'));
+  const titlePins  = [];
+  if (titleNodes.length > 0 && parentNode) {
+    const tArea  = cy.container().getBoundingClientRect();
+    const tZoom  = cy.zoom() || 1;
+    const gcx    = (tArea.width  / 2 - cy.pan().x) / tZoom;
+    const gcy    = (tArea.height / 2 - cy.pan().y) / tZoom;
+    const spread = 100 * Math.sqrt(visible.nodes().length);
+    const sep    = Math.min(200, spread * 1.4 / Math.max(1, titleNodes.length));
+    titleNodes.forEach((n, i) => {
+      const pos = {
+        x: gcx + (i - (titleNodes.length - 1) / 2) * sep,
+        y: gcy - spread,
+      };
+      n.position(pos);
+      titlePins.push({ nodeId: n.id(), position: { ...pos } });
+    });
   }
 
   const hasRoot = visible.nodes().filter(n => n.data('type') === 'root').length > 0;
@@ -680,11 +704,20 @@ function runLayout(cy, parentNode = null) {
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
       gravity: 0.25,
-      fixedNodeConstraint: pins,
+      fixedNodeConstraint: [...pins, ...titlePins],
     }).run();
 
   } else {
-    // force mode — plain fCoSE from scratch (un-curated parent, or no parent context).
+    // force mode — fCoSE from scratch.  If title nodes are present, pin them at
+    // the top (and anchor the parent at centre) so they don't drift randomly.
+    const forceConstraint = titlePins.length > 0 && parentNode
+      ? [...titlePins, { nodeId: parentNode.id(),
+                         position: (() => {
+                           const a = cy.container().getBoundingClientRect();
+                           const z = cy.zoom() || 1;
+                           return { x: (a.width/2 - cy.pan().x)/z, y: (a.height/2 - cy.pan().y)/z };
+                         })() }]
+      : [];
     visible.layout({
       name: 'fcose',
       animate: true,
@@ -696,6 +729,7 @@ function runLayout(cy, parentNode = null) {
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
       gravity: 0.25,
+      ...(forceConstraint.length ? { fixedNodeConstraint: forceConstraint } : {}),
     }).run();
   }
 }
@@ -1320,7 +1354,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.edges().filter(e =>
       e.source().visible() && e.target().visible() && e.data('type') !== 'CHILD'
     ).show();
-    runLayout(cy);
+    lastParentNode = lastClusterNode;
+    runLayout(cy, lastClusterNode);
   }
 
   function exitSnakeView() {
@@ -1603,7 +1638,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const vis = cy.elements(':visible');
     const ppid = lastParentNode.id();
-    const childEdges = vis.edges('[type="DESCENDS_FROM"]').filter(
+    const childEdges = vis.edges().filter(
       e => e.source().id() === ppid || e.target().id() === ppid
     );
     if (!childEdges.length) { devStatus('no children'); return; }

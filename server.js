@@ -215,7 +215,7 @@ wss.on('connection', async (ws) => {
         try {
           await s.run(
             'UNWIND $hints AS h ' +
-            'MATCH ()-[r:DESCENDS_FROM]-() WHERE id(r) = toInteger(h.relId) ' +
+            'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
             'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y',
             { hints: msg.hints }
           );
