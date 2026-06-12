@@ -233,3 +233,79 @@ those parents; no code change required.
   preserved, no shearing.
 - Reset restores on-screen arrangement; Write again overwrites saved positions.
 - No visible double render on view construction.
+
+---
+
+## Design Decision Record — Implementation 2026-06-11/12
+
+### DDR-1: WebSocket over HTTP POST for write-back
+
+The spec proposed a REST `POST /api/hints` endpoint. Implemented as a WebSocket
+message (`type: 'write_hints'`) instead, consistent with all other server
+communication. Rate limiting is handled per-connection via a timestamp on the
+`ws` object (`ws._lastHintWrite`); no `express-rate-limit` package needed.
+Code verification (`crypto.timingSafeEqual`) is identical either way.
+
+### DDR-2: Edge direction is inconsistent in the DB
+
+The spec assumed `DESCENDS_FROM` edges always run parent→child. The codebase stores
+them the opposite way for most edges (child→parent), but some are reversed.
+**All edge scans (capture, render, scan)** use direction-agnostic matching:
+```javascript
+e.source().id() === pid || e.target().id() === pid
+```
+The "neighbour" end of each edge is whichever endpoint is NOT the parent.
+This also means the grandparent Family node (visible in the family view because
+`connectedEdges` is direction-agnostic) gets a hint stored on its edge too,
+so its position relative to the parent is preserved on revisit.
+
+### DDR-3: Node lookup in write-back Cypher
+
+The spec's `MATCH (p {id: $parentId})` cannot work — nodes have no `id` property.
+Write-back keys directly on the relationship integer:
+```cypher
+MATCH ()-[r:DESCENDS_FROM]-() WHERE id(r) = toInteger(h.relId)
+SET r.hint_x = h.hint_x, r.hint_y = h.hint_y
+```
+Direction-agnostic, no node property lookup needed. `raw_rel_id` is stored on
+every edge in Cytoscape data (set in `buildEdgeData`, preserved when `ed.id` is
+overwritten with its `r_`/`cf_`/`sf_` prefix).
+
+### DDR-4: renderScale must be in graph coordinates, not screen pixels
+
+The spec's `0.40 × Math.min(width, height)` is in screen pixels. Cytoscape
+`node.position()` is in abstract graph coordinates; the relationship between
+the two depends on `cy.zoom()` at that moment. Using screen pixels directly
+caused nodes to appear at wildly different sizes depending on the zoom of the
+previous view.
+
+**Fix:** derive renderScale from `idealEdgeLength` and child count — the same
+parameters fCoSE uses internally, in the same coordinate space:
+```javascript
+const renderScale = 100 * Math.sqrt((childEdges.length || 1) + 1);
+```
+This is independent of viewport size and current zoom. After fCoSE + `fit:true`,
+the zoom adjusts to fill the screen regardless of the absolute graph-coordinate
+scale, so the visual result is consistent across devices and navigation paths.
+
+### DDR-5: Pure preset layout replaced by fCoSE with fixedNodeConstraint
+
+The spec's mode='preset' used `cy.layout({ name:'preset' })` with no simulation.
+This fails when non-hinted nodes (grandparent Family, un-hinted children) are
+visible — they keep their stale positions from the previous view and pull `cy.fit()`
+off-centre, making the parent appear non-central and edges appear much longer.
+
+**Fix:** both preset and hybrid use fCoSE with `randomize: false` and
+`fixedNodeConstraint` pinning the parent + hinted children. Un-hinted nodes
+(including the grandparent) settle naturally via edge attraction. The parent is
+explicitly centred in graph space before the layout runs:
+```javascript
+const graphCx = (area.width  / 2 - cy.pan().x) / curZoom;
+const graphCy = (area.height / 2 - cy.pan().y) / curZoom;
+```
+
+### DDR-6: In-memory edge update after Write keyed by raw_rel_id
+
+Initial implementation updated Cytoscape edge data by positional index after
+Write. Fixed to key by `raw_rel_id` (Map lookup) — robust to any difference
+in iteration order between the `childEdges` collection and the `hints` array.
