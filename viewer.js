@@ -584,14 +584,16 @@ function runLayout(cy, parentNode = null) {
   }
 
   // Scan DESCENDS_FROM edges for hint_x/hint_y when a parent context is known.
-  // In Cytoscape, DESCENDS_FROM edges are stored source=child, target=parent,
-  // so children of parentNode are edges where target === parentNode.id().
+  // Edge direction is inconsistent in the DB (some stored child→parent, some parent→child),
+  // so match on EITHER endpoint being the parent.  The "neighbour" end of each edge is
+  // whichever endpoint is NOT the parent.
   let hintMode    = 'force';
   let childEdges  = null;
   let hintedEdges = null;
   if (parentNode) {
+    const pid = parentNode.id();
     childEdges  = visible.edges('[type="DESCENDS_FROM"]').filter(
-      e => e.target().id() === parentNode.id()
+      e => e.source().id() === pid || e.target().id() === pid
     );
     hintedEdges = childEdges.filter(e => e.data('hint_x') != null && e.data('hint_y') != null);
     const total = childEdges.length;
@@ -626,44 +628,47 @@ function runLayout(cy, parentNode = null) {
     visible.layout({ name: 'preset', positions, fit: false }).run();
     cy.fit(visible, 80);
 
-  } else if (hintMode === 'preset') {
-    // All children hinted — recover positions from stored offsets, no force simulation.
-    const area = cy.container().getBoundingClientRect();
-    const renderScale = 0.40 * Math.min(area.width, area.height);
-    const parentPos   = parentNode.position();
-    const positions   = { [parentNode.id()]: parentPos };
-    hintedEdges.forEach(e => {
-      const child = e.source();
-      positions[child.id()] = {
-        x: parentPos.x + e.data('hint_x') * renderScale,
-        y: parentPos.y + e.data('hint_y') * renderScale,
-      };
-    });
-    visible.layout({ name: 'preset', positions, fit: false }).run();
-    cy.fit(visible, 80);
+  } else if (hintMode === 'preset' || hintMode === 'hybrid') {
+    // Recover hinted children from stored offsets, pin them, and run fCoSE so any
+    // un-hinted nodes (grandparent Family, un-hinted children in hybrid) settle
+    // naturally via edge attraction rather than sitting at stale off-screen positions.
+    //
+    // renderScale must be in graph coordinate units (not screen pixels), so divide
+    // by the current zoom.  Parent is placed at the graph-space centre of the
+    // viewport so cy.fit() frames it correctly after the layout.
+    const area        = cy.container().getBoundingClientRect();
+    // renderScale in graph coordinate units, matching fCoSE's natural spread for this
+    // many children (idealEdgeLength=100, so sqrt(n+1)*100 gives the right ballpark).
+    // This is deliberately independent of cy.zoom() — the current zoom reflects the
+    // previous view and would make the scale inconsistent.
+    const renderScale = 100 * Math.sqrt((childEdges.length || 1) + 1);
+    // Centre the parent at the current viewport centre in graph space.
+    const curZoom = cy.zoom() || 1;
+    const graphCx = (area.width  / 2 - cy.pan().x) / curZoom;
+    const graphCy = (area.height / 2 - cy.pan().y) / curZoom;
 
-  } else if (hintMode === 'hybrid') {
-    // Some children hinted — pin hinted at recovered positions, seed un-hinted
-    // at their centroid, then let fCoSE settle un-hinted around the fixed ones.
-    const area = cy.container().getBoundingClientRect();
-    const renderScale = 0.40 * Math.min(area.width, area.height);
-    const parentPos   = parentNode.position();
-    const pins = [{ nodeId: parentNode.id(), position: { ...parentPos } }];
+    const pid = parentNode.id();
+    parentNode.position({ x: graphCx, y: graphCy });
+    const pins = [{ nodeId: pid, position: { x: graphCx, y: graphCy } }];
     let sumX = 0, sumY = 0;
     hintedEdges.forEach(e => {
-      const child = e.source();
+      const child = e.source().id() === pid ? e.target() : e.source();
       const pos = {
-        x: parentPos.x + e.data('hint_x') * renderScale,
-        y: parentPos.y + e.data('hint_y') * renderScale,
+        x: graphCx + e.data('hint_x') * renderScale,
+        y: graphCy + e.data('hint_y') * renderScale,
       };
       child.position(pos);
       pins.push({ nodeId: child.id(), position: { ...pos } });
       sumX += pos.x;
       sumY += pos.y;
     });
-    const centroid = { x: sumX / hintedEdges.length, y: sumY / hintedEdges.length };
-    childEdges.filter(e => e.data('hint_x') == null || e.data('hint_y') == null)
-      .sources().forEach(c => c.position({ ...centroid }));
+    if (hintMode === 'hybrid') {
+      const centroid = { x: sumX / hintedEdges.length, y: sumY / hintedEdges.length };
+      childEdges.filter(e => e.data('hint_x') == null || e.data('hint_y') == null).forEach(e => {
+        const c = e.source().id() === pid ? e.target() : e.source();
+        c.position({ ...centroid });
+      });
+    }
     visible.layout({
       name: 'fcose',
       animate: true,
@@ -1597,20 +1602,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!code) { devStatus('enter code'); return; }
 
     const vis = cy.elements(':visible');
+    const ppid = lastParentNode.id();
     const childEdges = vis.edges('[type="DESCENDS_FROM"]').filter(
-      e => e.target().id() === lastParentNode.id()
+      e => e.source().id() === ppid || e.target().id() === ppid
     );
     if (!childEdges.length) { devStatus('no children'); return; }
 
     const parentPos = lastParentNode.position();
     const scale = Math.max(...childEdges.map(e => {
-      const c = e.source();
+      const c = e.source().id() === ppid ? e.target() : e.source();
       return Math.hypot(c.position('x') - parentPos.x, c.position('y') - parentPos.y);
     })) || 1;
 
     const hints = [];
     childEdges.forEach(e => {
-      const c = e.source();
+      const c = e.source().id() === ppid ? e.target() : e.source();
       hints.push({
         relId:  e.data('raw_rel_id'),
         hint_x: (c.position('x') - parentPos.x) / scale,
@@ -1626,10 +1632,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (msg.type !== 'write_hints') return;
       wsNow.removeEventListener('message', handler);
       if (msg.error) { devStatus(msg.error); return; }
-      // Update in-memory edge data so Reset/re-entry uses preset mode immediately
-      childEdges.forEach((e, i) => {
-        e.data('hint_x', hints[i].hint_x);
-        e.data('hint_y', hints[i].hint_y);
+      // Update in-memory edge data so Reset/re-entry uses preset mode immediately.
+      // Match by raw_rel_id since childEdges and hints are built in the same order.
+      const hintByRelId = new Map(hints.map(h => [h.relId, h]));
+      childEdges.forEach(e => {
+        const h = hintByRelId.get(e.data('raw_rel_id'));
+        if (h) { e.data('hint_x', h.hint_x); e.data('hint_y', h.hint_y); }
       });
       devStatus(`saved ${msg.count}`);
       // No layout re-run — positions are already correct on screen
