@@ -309,3 +309,40 @@ const graphCy = (area.height / 2 - cy.pan().y) / curZoom;
 Initial implementation updated Cytoscape edge data by positional index after
 Write. Fixed to key by `raw_rel_id` (Map lookup) — robust to any difference
 in iteration order between the `childEdges` collection and the `hints` array.
+
+### DDR-7: Hint system extended to gateway view (Cluster + TextNodes)
+
+The spec scoped hints to nav layers (DESCENDS_FROM edges). Extended to the
+gateway click view (Cluster surrounded by filtered TextNodes) with no spec
+change needed — the mechanism is generic.
+
+Two generalisations required:
+1. **Edge scan made type-agnostic** — originally filtered `[type="DESCENDS_FROM"]`;
+   changed to all visible edges where either endpoint is the parentNode. In the
+   gateway view the relevant edges are `CLUSTER_REL` and `CONTAINS_CLUSTER`.
+   In the family view only `DESCENDS_FROM` edges are visible anyway, so behaviour
+   there is unchanged.
+2. **Server Cypher type constraint dropped** — `MATCH ()-[r:DESCENDS_FROM]-()` →
+   `MATCH ()-[r]-()`. Since write-back keys on the integer relationship ID,
+   the type constraint was redundant and prevented writing to non-DESCENDS_FROM
+   relationships.
+
+`handleGatewayClick` sets `lastParentNode = lastClusterNode` and passes it to
+`runLayout`, enabling both Write/Reset and the three-mode layout selection.
+
+### DDR-8: section_title nodes pinned at top of graph area
+
+Title page nodes (section_title: truthy) connect to TextNodes via PART_OF, not
+to the Cluster or Family parent. They therefore never appear in `childEdges` and
+cannot carry position hints via the edge mechanism.
+
+Decision: position them by code at the top of the graph area on every render,
+rather than creating a semantic Cluster→TitlePage relationship (which would
+require per-cluster curation whenever clusters are added and carries no real
+meaning). Order among title nodes does not matter.
+
+Implementation: before any fCoSE call, detect visible section_title nodes, spread
+them horizontally at `gcy - spread` (where `spread = 100 × √n`) and add them to
+`fixedNodeConstraint`. In force mode the parentNode is also anchored at centre so
+title nodes consistently sit above the cluster rather than above wherever the
+previous view left things.
