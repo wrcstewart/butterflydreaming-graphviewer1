@@ -1142,9 +1142,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (type === 'TextNode') {
       const title = node.data('title') || '';
       const text = node.data('text') || '';
-      const lines = text.split('\n').filter(l => l.trim());
-      let body = lines.slice(0, 6).join('\n');
-      if (lines.length > 6) body += '\n…';
+      const body = text.split('\n').filter(l => l.trim()).join('\n');
       return title ? `${title}\n${body}` : body;
     }
     return '';
