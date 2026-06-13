@@ -1040,7 +1040,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (same && inWindow) {
         buddyTouchPending = null;
         hideTooltip();
-        if (main.length) handleNodeTap(main, false);
+        if (main.length) handleNodeTap(main);
       } else {
         const content = buildBuddyChipTooltip(chip);
         if (content) {
@@ -1056,7 +1056,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
 
     hideTooltip();
-    if (main.length) handleNodeTap(main, false);
+    if (main.length) handleNodeTap(main);
   });
 
   // --- youCy chip interactions ---
@@ -1105,7 +1105,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (same && inWindow) {
         youTouchPending = null;
         hideTooltip();
-        handleNodeTap(main, false);
+        handleNodeTap(main);
       } else {
         const content = buildTooltipContent(main);
         if (content) {
@@ -1122,7 +1122,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
 
     hideTooltip();
-    handleNodeTap(main, false);
+    handleNodeTap(main);
   });
 
   function markRecentTouch() {
