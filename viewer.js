@@ -627,6 +627,12 @@ function runLayout(cy, parentNode = null) {
     });
   }
 
+  // Seq-grid: detect gateway view with un-curated TextNodes that carry seq numbers.
+  // section_title nodes are excluded — they go to the top via titlePins.
+  const gridNodes = (hintMode === 'force' && parentNode && parentNode.data('type') === 'Cluster')
+    ? visible.nodes().filter(n => n.data('type') === 'TextNode' && !n.data('section_title') && n.data('seq') != null)
+    : cy.collection();
+
   const hasRoot = visible.nodes().filter(n => n.data('type') === 'root').length > 0;
 
   if (hasRoot) {
@@ -661,11 +667,11 @@ function runLayout(cy, parentNode = null) {
     // by the current zoom.  Parent is placed at the graph-space centre of the
     // viewport so cy.fit() frames it correctly after the layout.
     const area        = cy.container().getBoundingClientRect();
-    // renderScale in graph coordinate units, matching fCoSE's natural spread for this
-    // many children (idealEdgeLength=100, so sqrt(n+1)*100 gives the right ballpark).
-    // This is deliberately independent of cy.zoom() — the current zoom reflects the
-    // previous view and would make the scale inconsistent.
-    const renderScale = 100 * Math.sqrt((childEdges.length || 1) + 1);
+    // renderScale: use the stored capture scale if available (exact match to what the
+    // user arranged). Fall back to sqrt formula for old hints that predate hint_scale.
+    const storedScale = hintedEdges.length ? hintedEdges[0].data('hint_scale') : null;
+    const renderScale = storedScale != null ? storedScale
+                      : 100 * Math.sqrt((childEdges.length || 1) + 1);
     // Centre the parent at the current viewport centre in graph space.
     const curZoom = cy.zoom() || 1;
     const graphCx = (area.width  / 2 - cy.pan().x) / curZoom;
@@ -706,6 +712,45 @@ function runLayout(cy, parentNode = null) {
       gravity: 0.25,
       fixedNodeConstraint: [...pins, ...titlePins],
     }).run();
+
+  } else if (gridNodes.length > 0) {
+    // Seq-grid mode — gateway view, no stored hints.
+    // Sort TextNodes by seq rank and place on a ceil(√n)-column grid.
+    // Pure preset layout: all positions computed, no simulation needed.
+    const sorted  = gridNodes.toArray().sort((a, b) => (a.data('seq') || 0) - (b.data('seq') || 0));
+    const n       = sorted.length;
+    const cols    = Math.ceil(Math.sqrt(n));
+    const spacing = 120;
+    const gridW   = (cols - 1) * spacing;
+    const rows    = Math.ceil(n / cols);
+
+    // Work from a fixed origin — cy.fit() normalises to the viewport afterwards.
+    const ox = 0, oy = 0;
+    const clusterY  = oy - 100;
+    const gridTopY  = oy + 80;
+    const titleY    = clusterY - 150;
+
+    const positions = {};
+    positions[parentNode.id()] = { x: ox, y: clusterY };
+
+    sorted.forEach((node, rank) => {
+      positions[node.id()] = {
+        x: ox - gridW / 2 + (rank % cols) * spacing,
+        y: gridTopY + Math.floor(rank / cols) * spacing,
+      };
+    });
+
+    const tCount = titleNodes.length;
+    const tSep   = Math.min(200, Math.max(120, gridW / Math.max(1, tCount - 1)));
+    titleNodes.forEach((node, i) => {
+      positions[node.id()] = {
+        x: ox + (i - (tCount - 1) / 2) * tSep,
+        y: titleY,
+      };
+    });
+
+    visible.layout({ name: 'preset', positions, fit: false }).run();
+    cy.fit(visible, 80);
 
   } else {
     // force mode — fCoSE from scratch.  If title nodes are present, pin them at
@@ -1201,18 +1246,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   // History (for collapse)
 
+  const backBtn = document.getElementById('back-btn');
+
+  function updateBackBtn() {
+    backBtn.classList.toggle('visible', history.length > 0);
+  }
+
   function saveState() {
-    history.push(cy.elements(':visible').map(el => el.id()));
+    history.push({ ids: cy.elements(':visible').map(el => el.id()), parent: lastParentNode });
+    updateBackBtn();
   }
 
   function restoreState() {
     if (history.length === 0) return false;
-    const ids = new Set(history.pop());
+    const state = history.pop();
+    const ids = new Set(state.ids);
+    lastParentNode = state.parent;
+    activeNodeId = null;
     cy.elements().hide();
     cy.elements().filter(el => ids.has(el.id())).show();
-    runLayout(cy);
+    runLayout(cy, lastParentNode);
+    updateBackBtn();
     return true;
   }
+
+  backBtn.addEventListener('click', () => { restoreState(); });
 
   // Expand
 
@@ -1535,6 +1593,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       helpEl.textContent = 'Enter one of the Works shown';
     } else if (type === 'TextNode' && node.data('section_title')) {
       helpEl.textContent = 'To return enter a text node, search rectangle or breadcrumb';
+    } else if (type === 'TextNode' && node.data('gateway')) {
+      helpEl.textContent = isTouchDevice ? 'Double tap a node for further context' : 'Click a node for further context';
     } else if (type === 'TextNode' && !node.data('gateway')) {
       helpEl.textContent = 'Enter the grey section title to see the whole story/poem etc';
     } else if (type === 'Family' && node.hasClass('subfamily')) {
@@ -1653,9 +1713,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     childEdges.forEach(e => {
       const c = e.source().id() === ppid ? e.target() : e.source();
       hints.push({
-        relId:  e.data('raw_rel_id'),
-        hint_x: (c.position('x') - parentPos.x) / scale,
-        hint_y: (c.position('y') - parentPos.y) / scale,
+        relId:       e.data('raw_rel_id'),
+        hint_x:      (c.position('x') - parentPos.x) / scale,
+        hint_y:      (c.position('y') - parentPos.y) / scale,
+        hint_scale:  scale,
       });
     });
 
@@ -1672,7 +1733,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const hintByRelId = new Map(hints.map(h => [h.relId, h]));
       childEdges.forEach(e => {
         const h = hintByRelId.get(e.data('raw_rel_id'));
-        if (h) { e.data('hint_x', h.hint_x); e.data('hint_y', h.hint_y); }
+        if (h) { e.data('hint_x', h.hint_x); e.data('hint_y', h.hint_y); e.data('hint_scale', h.hint_scale); }
       });
       devStatus(`saved ${msg.count}`);
       // No layout re-run — positions are already correct on screen
@@ -1777,8 +1838,10 @@ function queryWS(ws, type, query, params = {}) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+
 async function init() {
   document.getElementById('help-text').textContent = helpText;
+
 
   const overlay = document.getElementById('loading-overlay');
   const msgEl   = document.getElementById('loading-msg');

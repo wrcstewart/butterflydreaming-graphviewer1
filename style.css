@@ -75,6 +75,31 @@ html, body {
   border-color: #fff;
 }
 
+#back-btn {
+  display: none;
+  position: fixed;
+  top: 164px;
+  left: 12px;
+  z-index: 10;
+  background: none;
+  border: 1px solid #888;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 33px;
+  cursor: pointer;
+  padding: 4px 16px;
+  line-height: 1.2;
+  font-family: sans-serif;
+}
+
+#back-btn.visible {
+  display: block;
+}
+
+#back-btn:hover {
+  border-color: #fff;
+}
+
 #pair-btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -195,6 +220,7 @@ html, body {
   line-height: 1.7;
   margin: 0;
 }
+
 
 #session-expired {
   display: none;

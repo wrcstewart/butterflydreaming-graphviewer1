@@ -216,7 +216,7 @@ wss.on('connection', async (ws) => {
           await s.run(
             'UNWIND $hints AS h ' +
             'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
-            'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y',
+            'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y, r.hint_scale = h.hint_scale',
             { hints: msg.hints }
           );
           ws.send(JSON.stringify({ type: 'write_hints', ok: true, count: msg.hints.length }));
