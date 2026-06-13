@@ -51,7 +51,8 @@ html, body {
 #pair-control {
   position: fixed;
   top: 8px;
-  left: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -61,25 +62,26 @@ html, body {
 }
 
 #pair-btn {
-  background: none;
-  border: 1px solid #888;
+  background: #3d2e00;
+  border: 1px solid #a07820;
   border-radius: 4px;
-  color: #fff;
-  font-size: 11px;
+  color: #ffd88a;
+  font-size: 17px;
   cursor: pointer;
-  padding: 2px 8px;
+  padding: 4px 14px;
   line-height: 1.4;
 }
 
 #pair-btn:hover:not(:disabled) {
-  border-color: #fff;
+  border-color: #ffd88a;
+  color: #fff;
 }
 
 #back-btn {
   display: none;
   position: fixed;
-  top: 164px;
-  left: 12px;
+  top: 8px;
+  left: 16px;
   z-index: 10;
   background: none;
   border: 1px solid #888;

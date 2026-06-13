@@ -1253,7 +1253,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function saveState() {
-    history.push({ ids: cy.elements(':visible').map(el => el.id()), parent: lastParentNode });
+    const focusEl = activeNodeId ? cy.getElementById(activeNodeId) : null;
+    const chipNode = (focusEl && focusEl.length) ? focusEl : lastParentNode;
+    history.push({ ids: cy.elements(':visible').map(el => el.id()), parent: lastParentNode, chipNode });
     updateBackBtn();
   }
 
@@ -1267,8 +1269,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.elements().filter(el => ids.has(el.id())).show();
     runLayout(cy, lastParentNode);
     updateBackBtn();
-    const dest = state.parent || cy.nodes('[type="root"]').first();
-    if (dest && dest.length) addYouChip(dest);
+    const dest = state.chipNode || state.parent;
+    if (dest && dest.length) {
+      const ptype = dest.data('type');
+      if (ptype === 'Family' || ptype === 'Cluster' || ptype === 'TextNode') addYouChip(dest);
+    }
     return true;
   }
 
