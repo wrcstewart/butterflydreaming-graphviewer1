@@ -8,8 +8,8 @@ const BARS_BOTTOM = 158; // bc-spacer(50) + help-bar(26) + cy-buddy(36) + gap(10
 
 const isTouchDevice = navigator.maxTouchPoints > 0;
 const helpText = isTouchDevice
-  ? 'Single tap any node to read — double tap to navigate.'
-  : 'Hover any node to read — click to navigate.';
+  ? 'Tap to read — double tap to navigate.'
+  : 'Hover to read — click to navigate.';
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
