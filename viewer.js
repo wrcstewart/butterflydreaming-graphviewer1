@@ -705,7 +705,7 @@ function runLayout(cy, parentNode = null) {
       animationDuration: 450,
       randomize: false,
       fit: true,
-      padding: 60,
+      padding: 8,
       nodeSeparation: 75,
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
@@ -1267,6 +1267,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.elements().filter(el => ids.has(el.id())).show();
     runLayout(cy, lastParentNode);
     updateBackBtn();
+    const dest = state.parent || cy.nodes('[type="root"]').first();
+    if (dest && dest.length) addYouChip(dest);
     return true;
   }
 
@@ -1300,9 +1302,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function expandToFamily(familyNode) {
-    lastParentNode = familyNode;
     clearFamilyView();
     saveState();
+    lastParentNode = familyNode;
     activeNodeId = familyNode.id();
     cy.elements().hide();
     familyNode.show();
