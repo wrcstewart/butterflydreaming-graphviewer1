@@ -57,7 +57,7 @@ http://localhost:8080
 https://graph.virtualfictions.uk
 
 # Memgraph Lab (Chrome only for copy/paste)
-http://localhost:3000  |  host: memgraph-dev  port: 7687  user: memgraph  pass: memgraph
+http://localhost:3000  |  host: memgraph-dev  port: 7687  user: memgraph  pass: [see server.js]
 
 # Memgraph backup to Dropbox
 docker cp memgraph-dev:/var/lib/memgraph /Users/williamstewart2/Dropbox/memgraphback
@@ -66,7 +66,7 @@ docker cp memgraph-dev:/var/lib/memgraph /Users/williamstewart2/Dropbox/memgraph
 0 */3 * * * /usr/local/bin/docker cp memgraph-dev:/var/lib/memgraph /Users/williamstewart2/Dropbox/memgraphback
 
 # Load cypher file into Memgraph
-docker exec -i memgraph-dev mgconsole --username memgraph --password memgraph < ~/Downloads/file.cypher
+docker exec -i memgraph-dev mgconsole --username memgraph --password [see server.js] < ~/Downloads/file.cypher
 ```
 
 ### 2.4 Docker Container State
@@ -91,7 +91,7 @@ MP3 files in the project root follow a naming convention: `D_` prefix = default 
 
 ### 2.6 Security
 - `config.js` is gitignored — contains `CURATION_CODE` for position-hint write access. Must never be committed.
-- Memgraph credentials (username `memgraph`, password `memgraph`) live only in `server.js`.
+- Memgraph credentials live only in `server.js` — do not commit them elsewhere.
 - Always run `git push origin main` immediately after every `git commit`.
 
 ---
