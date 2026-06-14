@@ -1518,15 +1518,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function displayName(filename) {
-    return filename.replace(/^[DA]_/i, '').replace(/\.mp3$/i, '');
+    return filename.replace(/^[DA]_/i, '').replace(/\.mp3$/i, '').slice(0, 12);
   }
 
-  function loadMediaTrack(audio, btn, time, src) {
+  function loadMediaTrack(audio, btn, src) {
     const wasPlaying = !audio.paused;
     if (wasPlaying) audio.pause();
     audio.src = src;
     btn.textContent = '▶';
-    time.textContent = '–:–– / –:––';
     if (wasPlaying) audio.play().then(() => { btn.textContent = '⏸'; }).catch(() => {});
   }
 
@@ -1537,45 +1536,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const existingAudio = mediaBar.querySelector('audio');
     if (existingAudio) { existingAudio.pause(); existingAudio.src = ''; }
 
-    const selectHtml = mediaFilesList.length > 1
-      ? `<select class="mp-select">` +
-        mediaFilesList.map(f =>
-          `<option value="${f}"${f === audioSrc ? ' selected' : ''}>${displayName(f)}</option>`
-        ).join('') +
-        `</select>`
-      : '';
+    const selectHtml = `<select class="mp-select">` +
+      mediaFilesList.map(f =>
+        `<option value="${f}"${f === audioSrc ? ' selected' : ''}>${displayName(f)}</option>`
+      ).join('') +
+      `</select>`;
 
     mediaBar.innerHTML =
-      `<div class="mp-row">` +
-        `<span class="media-label">${label}</span>` +
-        `<button class="mp-btn" aria-label="play">▶</button>` +
-        `<span class="mp-time">–:–– / –:––</span>` +
-        `<audio src="${audioSrc}"></audio>` +
-        `<button class="media-close" aria-label="close">✕</button>` +
-      `</div>` +
-      selectHtml;
+      selectHtml +
+      `<button class="mp-btn" aria-label="play">▶</button>` +
+      `<audio src="${audioSrc}"></audio>` +
+      `<button class="media-close" aria-label="close">✕</button>`;
 
     mediaBar.dataset.node = label;
     mediaBar.classList.add('active');
 
     const audio  = mediaBar.querySelector('audio');
     const btn    = mediaBar.querySelector('.mp-btn');
-    const time   = mediaBar.querySelector('.mp-time');
     const select = mediaBar.querySelector('.mp-select');
 
     btn.addEventListener('click', () => {
       if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
       else              { audio.pause(); btn.textContent = '▶'; }
     });
-    audio.addEventListener('timeupdate', () => {
-      time.textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
-    });
     audio.addEventListener('ended', () => { btn.textContent = '▶'; });
-    if (select) {
-      select.addEventListener('change', () => {
-        loadMediaTrack(audio, btn, time, select.value);
-      });
-    }
+    select.addEventListener('change', () => loadMediaTrack(audio, btn, select.value));
   }
 
   mediaBar.addEventListener('click', evt => {
