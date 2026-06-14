@@ -8,14 +8,10 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #000;
+  background: #0d0a00;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-body {
-  border: 4px solid #a07820;
 }
 
 #bc-spacer {
