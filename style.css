@@ -14,6 +14,20 @@ html, body {
   flex-direction: column;
 }
 
+#title-bar {
+  width: 100%;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-family: sans-serif;
+  font-style: italic;
+  color: #ffd88a;
+  text-align: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 #bc-spacer {
   height: 50px;
   flex-shrink: 0;
@@ -25,7 +39,10 @@ html, body {
 }
 
 #help-bar {
-  width: 100%;
+  position: fixed;
+  bottom: 8px;
+  left: 0;
+  right: 0;
   padding: 4px 12px;
   font-size: 13px;
   font-family: sans-serif;
@@ -34,8 +51,9 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 0;
   text-align: center;
+  pointer-events: none;
+  z-index: 5;
   animation: help-pulse 0.5s ease-in-out 30;
 }
 
@@ -50,7 +68,7 @@ html, body {
 
 #pair-control {
   position: fixed;
-  top: 8px;
+  top: 34px;
   left: calc(16% + 8px);
   display: flex;
   align-items: center;
@@ -79,7 +97,7 @@ html, body {
 #back-btn {
   display: none;
   position: fixed;
-  top: 8px;
+  top: 34px;
   left: 8px;
   z-index: 10;
   background: #3d2e00;
@@ -136,7 +154,7 @@ html, body {
 #media-bar {
   display: none;
   position: fixed;
-  top: 8px;
+  top: 34px;
   right: 8px;
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid #444;
@@ -276,7 +294,7 @@ html, body {
 
 #dev-panel {
   position: fixed;
-  bottom: 8px;
+  bottom: 34px;
   left: 16px;
   display: flex;
   align-items: center;
