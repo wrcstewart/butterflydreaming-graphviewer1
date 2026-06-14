@@ -1509,11 +1509,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Media bar
 
   const mediaBar = document.getElementById('media-bar');
+  let mediaFilesList = [];  // populated from server on connect
 
   function fmtTime(s) {
     if (!isFinite(s)) return '–:––';
     const m = Math.floor(s / 60);
     return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  }
+
+  function displayName(filename) {
+    return filename.replace(/^[DA]_/i, '').replace(/\.mp3$/i, '');
+  }
+
+  function loadMediaTrack(audio, btn, time, src) {
+    const wasPlaying = !audio.paused;
+    if (wasPlaying) audio.pause();
+    audio.src = src;
+    btn.textContent = '▶';
+    time.textContent = '–:–– / –:––';
+    if (wasPlaying) audio.play().then(() => { btn.textContent = '⏸'; }).catch(() => {});
   }
 
   function toggleMediaBar(label, audioSrc) {
@@ -1522,18 +1536,32 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
     const existingAudio = mediaBar.querySelector('audio');
     if (existingAudio) { existingAudio.pause(); existingAudio.src = ''; }
+
+    const selectHtml = mediaFilesList.length > 1
+      ? `<select class="mp-select">` +
+        mediaFilesList.map(f =>
+          `<option value="${f}"${f === audioSrc ? ' selected' : ''}>${displayName(f)}</option>`
+        ).join('') +
+        `</select>`
+      : '';
+
     mediaBar.innerHTML =
-      `<span class="media-label">${label}</span>` +
-      `<button class="mp-btn" aria-label="play">▶</button>` +
-      `<span class="mp-time">–:–– / –:––</span>` +
-      `<audio src="${audioSrc}"></audio>` +
-      `<button class="media-close" aria-label="close">✕</button>`;
+      `<div class="mp-row">` +
+        `<span class="media-label">${label}</span>` +
+        `<button class="mp-btn" aria-label="play">▶</button>` +
+        `<span class="mp-time">–:–– / –:––</span>` +
+        `<audio src="${audioSrc}"></audio>` +
+        `<button class="media-close" aria-label="close">✕</button>` +
+      `</div>` +
+      selectHtml;
+
     mediaBar.dataset.node = label;
     mediaBar.classList.add('active');
 
-    const audio = mediaBar.querySelector('audio');
-    const btn   = mediaBar.querySelector('.mp-btn');
-    const time  = mediaBar.querySelector('.mp-time');
+    const audio  = mediaBar.querySelector('audio');
+    const btn    = mediaBar.querySelector('.mp-btn');
+    const time   = mediaBar.querySelector('.mp-time');
+    const select = mediaBar.querySelector('.mp-select');
 
     btn.addEventListener('click', () => {
       if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
@@ -1543,6 +1571,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       time.textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
     });
     audio.addEventListener('ended', () => { btn.textContent = '▶'; });
+    if (select) {
+      select.addEventListener('change', () => {
+        loadMediaTrack(audio, btn, time, select.value);
+      });
+    }
   }
 
   mediaBar.addEventListener('click', evt => {
@@ -1594,7 +1627,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const helpEl = document.getElementById('help-text');
     if (node.data('name') === 'Settling') {
-      toggleMediaBar('Settling', 'ChineseSad1.mp3');
+      const defaultTrack = mediaFilesList.find(f => /^D_/i.test(f)) || mediaFilesList[0] || '';
+      toggleMediaBar('Settling', defaultTrack);
       helpEl.textContent = 'Optionally, use the player at the top right.';
     } else if (type === 'Cluster') {
       helpEl.textContent = 'Enter one of the Works shown';
@@ -2073,6 +2107,7 @@ async function init() {
   const userCountPanel = document.getElementById('user-count-panel');
 
   ws.send(JSON.stringify({ type: 'get_user_count' }));
+  ws.send(JSON.stringify({ type: 'get_media_files' }));
 
   ws.addEventListener('message', event => {
     let msg;
@@ -2080,6 +2115,10 @@ async function init() {
     if (msg.type === 'user_count') {
       userCountPanel.textContent = `${msg.count} connected`;
       userCountPanel.classList.add('active');
+      return;
+    }
+    if (msg.type === 'media_files') {
+      mediaFilesList = msg.files;
       return;
     }
     if (msg.type === 'wait_state') {

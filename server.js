@@ -1,9 +1,17 @@
 // server.js — ButterflyDreaming Graph Viewer server
 
 const crypto  = require('crypto');
+const fs      = require('fs');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const neo4j = require('neo4j-driver');
+
+// Scan project directory for eligible media files (D_ = default, A_ = alternate).
+// Restart server to pick up new files.
+const mediaFiles = fs.readdirSync('.')
+  .filter(f => /^[DA]_.*\.mp3$/i.test(f))
+  .sort((a, b) => (a.startsWith('D_') ? 0 : 1) - (b.startsWith('D_') ? 0 : 1) || a.localeCompare(b));
+console.log('[BD] Media files:', mediaFiles);
 
 // Load curation code from gitignored config — absent = curation disabled, app still works.
 let CURATION_CODE = null;
@@ -200,6 +208,10 @@ wss.on('connection', async (ws) => {
       }
       if (msg.type === 'get_user_count') {
         ws.send(JSON.stringify({ type: 'user_count', count: sessions.size }));
+        return;
+      }
+      if (msg.type === 'get_media_files') {
+        ws.send(JSON.stringify({ type: 'media_files', files: mediaFiles }));
         return;
       }
       if (msg.type === 'breadcrumb') {
