@@ -97,7 +97,7 @@ html, body {
 #back-btn {
   display: none;
   position: fixed;
-  top: 34px;
+  top: 24px;
   left: 8px;
   z-index: 10;
   background: #3d2e00;
