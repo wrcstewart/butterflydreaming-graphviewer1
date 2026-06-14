@@ -825,6 +825,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let currentClusterColour = null;
   let lastParentNode = null;
 
+  // --- Help text with downloading indicator ---
+  const helpEl = document.getElementById('help-text');
+  let currentHelpText = helpEl.textContent;
+  let isDownloading = false;
+
+  function setHelpText(text) {
+    currentHelpText = text;
+    helpEl.textContent = isDownloading ? text + ' — downloading' : text;
+  }
+
+  function setDownloading(active) {
+    isDownloading = active;
+    helpEl.textContent = isDownloading ? currentHelpText + ' — downloading' : currentHelpText;
+  }
+
   // --- You breadcrumb chips ---
   let youChipCount = 0;
   let youChipX = 0;
@@ -1521,11 +1536,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return filename.replace(/^[DA]_/i, '').replace(/\.mp3$/i, '').slice(0, 12);
   }
 
+  function formatOption(file) {
+    const name = displayName(file.name);
+    const mb = Math.round(file.size / (1024 * 1024));
+    return `${name}: ${mb < 1 ? '<1' : mb} MB`;
+  }
+
   function loadMediaTrack(audio, btn, src) {
     const wasPlaying = !audio.paused;
     if (wasPlaying) audio.pause();
     audio.src = src;
     btn.textContent = '▶';
+    setDownloading(true);
     if (wasPlaying) audio.play().then(() => { btn.textContent = '⏸'; }).catch(() => {});
   }
 
@@ -1538,7 +1560,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const selectHtml = `<select class="mp-select">` +
       mediaFilesList.map(f =>
-        `<option value="${f}"${f === audioSrc ? ' selected' : ''}>${displayName(f)}</option>`
+        `<option value="${f.name}"${f.name === audioSrc ? ' selected' : ''}>${formatOption(f)}</option>`
       ).join('') +
       `</select>`;
 
@@ -1560,11 +1582,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       else              { audio.pause(); btn.textContent = '▶'; }
     });
     audio.addEventListener('ended', () => { btn.textContent = '▶'; });
+    audio.addEventListener('loadstart', () => setDownloading(true));
+    audio.addEventListener('canplay', () => setDownloading(false));
     select.addEventListener('change', () => loadMediaTrack(audio, btn, select.value));
   }
 
   mediaBar.addEventListener('click', evt => {
     if (evt.target.classList.contains('media-close')) {
+      setDownloading(false);
       mediaBar.classList.remove('active');
       mediaBar.dataset.node = '';
       mediaBar.innerHTML = '';
@@ -1610,25 +1635,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
     }
 
-    const helpEl = document.getElementById('help-text');
     if (node.data('name') === 'Settling') {
-      const defaultTrack = mediaFilesList.find(f => /^D_/i.test(f)) || mediaFilesList[0] || '';
+      const defaultTrack = mediaFilesList.find(f => /^D_/i.test(f.name))?.name || mediaFilesList[0]?.name || '';
       toggleMediaBar('Settling', defaultTrack);
-      helpEl.textContent = 'Optionally, use the player at the top right.';
+      setHelpText('Optionally, use the player above.');
     } else if (type === 'Cluster') {
-      helpEl.textContent = 'Enter one of the Works shown';
+      setHelpText('Enter one of the Works shown');
     } else if (type === 'TextNode' && node.data('section_title')) {
-      helpEl.textContent = 'To return enter a text node, search rectangle or breadcrumb';
+      setHelpText('To return enter a text node, search rectangle or breadcrumb');
     } else if (type === 'TextNode' && node.data('gateway')) {
-      helpEl.textContent = isTouchDevice ? 'Double tap a node for further context' : 'Click a node for further context';
+      setHelpText(isTouchDevice ? 'Double tap a node for further context' : 'Click a node for further context');
     } else if (type === 'TextNode' && !node.data('gateway')) {
-      helpEl.textContent = 'Enter the grey section title to see the whole story/poem etc';
+      setHelpText('Enter the grey section title to see the whole story/poem etc');
     } else if (type === 'Family' && node.hasClass('subfamily')) {
-      helpEl.textContent = 'Keep browsing or, enter a rectangle.';
+      setHelpText('Keep browsing or, enter a rectangle.');
     } else if (type === 'Family') {
-      helpEl.textContent = 'Choose a sub family or a search term (rectangle)';
+      setHelpText('Choose a sub family or a search term (rectangle)');
     } else {
-      helpEl.textContent = helpText;
+      setHelpText(helpText);
     }
   }
 

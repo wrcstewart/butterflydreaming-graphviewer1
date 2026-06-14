@@ -10,7 +10,8 @@ const neo4j = require('neo4j-driver');
 // Restart server to pick up new files.
 const mediaFiles = fs.readdirSync('.')
   .filter(f => /^[DA]_.*\.mp3$/i.test(f))
-  .sort((a, b) => (a.startsWith('D_') ? 0 : 1) - (b.startsWith('D_') ? 0 : 1) || a.localeCompare(b));
+  .sort((a, b) => (a.startsWith('D_') ? 0 : 1) - (b.startsWith('D_') ? 0 : 1) || a.localeCompare(b))
+  .map(f => ({ name: f, size: fs.statSync(f).size }));
 console.log('[BD] Media files:', mediaFiles);
 
 // Load curation code from gitignored config — absent = curation disabled, app still works.

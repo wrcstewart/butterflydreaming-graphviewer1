@@ -69,8 +69,7 @@ html, body {
 #pair-control {
   position: fixed;
   top: 34px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -156,7 +155,8 @@ html, body {
   display: none;
   position: fixed;
   top: 34px;
-  right: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid #444;
   padding: 3px 8px;
@@ -180,7 +180,7 @@ html, body {
   font-size: 11px;
   font-family: sans-serif;
   padding: 1px 3px;
-  width: 88px;
+  min-width: 130px;
   cursor: pointer;
 }
 
