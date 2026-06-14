@@ -930,7 +930,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const type        = data.type;
     const sourceText  = type === 'TextNode' ? (data.source_text || null) : null;
     const seq         = data.seq ?? null;
-    const abbreviated = type === 'TextNode' && sourceText !== null && sourceText === lastBuddySourceText;
+    const abbreviated = type === 'TextNode' && !data.gateway && !data.section_title && sourceText !== null && sourceText === lastBuddySourceText;
     const isSubfamily = data.subfamily || false;
     const displayName = abbreviated ? String(seq ?? '?') : (data.display_name || data.name || '');
 
