@@ -600,7 +600,9 @@ function runLayout(cy, parentNode = null) {
     hintMode = total === 0 || hintedEdges.length === 0 ? 'force'
              : hintedEdges.length === total             ? 'preset'
              :                                            'hybrid';
-    console.log(`[BD] hint scan: parent=${parentNode.data('name')} total=${total} hinted=${hintedEdges.length} mode=${hintMode}`);
+    const storedScaleLog = hintedEdges.length ? hintedEdges[0].data('hint_scale') : null;
+    const formulaScaleLog = 100 * Math.sqrt((total || 1) + 1);
+    console.log(`[BD] hint scan: parent=${parentNode.data('name')} total=${total} hinted=${hintedEdges.length} mode=${hintMode} hint_scale=${storedScaleLog?.toFixed(1)} formula_scale=${formulaScaleLog.toFixed(1)}`);
   }
 
   // Pre-position and pin section_title nodes at the top of the graph area.
