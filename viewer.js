@@ -7,6 +7,7 @@ const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 const BARS_BOTTOM = 158; // bc-spacer(50) + help-bar(26) + cy-buddy(36) + gap(10) + cy-you(36)
 
 const isTouchDevice = navigator.maxTouchPoints > 0;
+let mediaFilesList = [];  // populated via WebSocket on connect
 const helpText = isTouchDevice
   ? 'Tap to read — double tap to navigate.'
   : 'Hover to read — click to navigate.';
@@ -1509,7 +1510,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Media bar
 
   const mediaBar = document.getElementById('media-bar');
-  let mediaFilesList = [];  // populated from server on connect
 
   function fmtTime(s) {
     if (!isFinite(s)) return '–:––';
