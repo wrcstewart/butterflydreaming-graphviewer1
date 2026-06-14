@@ -2099,3 +2099,10 @@ async function init() {
 }
 
 window.addEventListener('DOMContentLoaded', init);
+
+// iOS Safari bfcache: when the user presses the browser back button, Safari may
+// restore a frozen JS snapshot (an earlier graph state) rather than navigating away.
+// Force a reload in that case so the browser back button behaves normally.
+window.addEventListener('pageshow', event => {
+  if (event.persisted) window.location.reload();
+});
