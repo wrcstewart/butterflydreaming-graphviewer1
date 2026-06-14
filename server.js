@@ -54,6 +54,13 @@ function sendToBuddy(userId, msg) {
   if (buddyWs && buddyWs.readyState === 1 /* OPEN */) buddyWs.send(JSON.stringify(msg));
 }
 
+function broadcastUserCount() {
+  const msg = JSON.stringify({ type: 'user_count', count: sessions.size });
+  for (const s of sessions.values()) {
+    if (s.readyState === 1) s.send(msg);
+  }
+}
+
 // --- Serialisation ---
 // neo4j-driver returns typed objects (Integer, DateTime, Node, Relationship).
 // These must be converted to plain JS before JSON.stringify.
@@ -121,7 +128,7 @@ wss.on('connection', async (ws) => {
         'RETURN u.viewer_id AS viewer_id'
       );
       ws.userId = result.records[0]?.get('viewer_id') ?? null;
-      if (ws.userId) sessions.set(ws.userId, ws);
+      if (ws.userId) { sessions.set(ws.userId, ws); broadcastUserCount(); }
       console.log(`[BD] User created: ${ws.userId}`);
     } finally {
       await s.close();
@@ -141,6 +148,7 @@ wss.on('connection', async (ws) => {
     clearInterval(keepAlive);
     if (ws.userId) {
       sessions.delete(ws.userId);
+      broadcastUserCount();
       if (waitingUser?.userId === ws.userId) waitingUser = null;
       const buddyId = pairedWith.get(ws.userId);
       if (buddyId) {
@@ -188,6 +196,10 @@ wss.on('connection', async (ws) => {
           buddy.ws.send(JSON.stringify({ type: 'paired', buddyId: ws.userId }));
           console.log(`[BD] Paired: ${ws.userId} ↔ ${buddy.userId}`);
         }
+        return;
+      }
+      if (msg.type === 'get_user_count') {
+        ws.send(JSON.stringify({ type: 'user_count', count: sessions.size }));
         return;
       }
       if (msg.type === 'breadcrumb') {

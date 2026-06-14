@@ -312,6 +312,24 @@ html, body {
   white-space: nowrap;
 }
 
+#user-count-panel {
+  position: fixed;
+  bottom: 8px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #444;
+  color: #888;
+  font-size: 11px;
+  font-family: sans-serif;
+  padding: 3px 8px;
+  z-index: 10;
+  display: none;
+}
+
+#user-count-panel.active {
+  display: block;
+}
+
 #label-tooltip {
   position: fixed;
   background: rgba(0, 0, 0, 0.7);

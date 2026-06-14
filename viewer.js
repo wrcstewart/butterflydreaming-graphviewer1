@@ -832,7 +832,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const type        = node.data('type');
     const sourceText  = type === 'TextNode' ? (node.data('source_text') || null) : null;
     const seq         = node.data('seq') ?? null;
-    const abbreviated = type === 'TextNode' && sourceText !== null && sourceText === lastYouSourceText;
+    const abbreviated = type === 'TextNode' && !node.data('gateway') && !node.data('section_title') && sourceText !== null && sourceText === lastYouSourceText;
     const isSubfamily = node.hasClass('subfamily');
     const displayName = abbreviated ? String(seq ?? '?') : (node.data('display_name') || node.data('name') || '');
 
@@ -1270,7 +1270,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const dest = state.chipNode || state.parent;
     if (dest && dest.length) {
       const ptype = dest.data('type');
-      if (ptype === 'Family' || ptype === 'Cluster' || ptype === 'TextNode') addYouChip(dest);
+      if (ptype === 'Entry' || ptype === 'Family' || ptype === 'Cluster' || ptype === 'TextNode') addYouChip(dest);
     }
     return true;
   }
@@ -1557,7 +1557,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
-    if (addChip && (type === 'Family' || type === 'Cluster' || type === 'TextNode')) {
+    if (addChip && (type === 'Entry' || type === 'Family' || type === 'Cluster' || type === 'TextNode')) {
       addYouChip(node);
     }
 
@@ -2068,9 +2068,18 @@ async function init() {
   const { addBadge }      = setupNrBadges(cy);
   const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
+  const userCountPanel = document.getElementById('user-count-panel');
+
+  ws.send(JSON.stringify({ type: 'get_user_count' }));
+
   ws.addEventListener('message', event => {
     let msg;
     try { msg = JSON.parse(event.data); } catch (e) { return; }
+    if (msg.type === 'user_count') {
+      userCountPanel.textContent = `${msg.count} connected`;
+      userCountPanel.classList.add('active');
+      return;
+    }
     if (msg.type === 'wait_state') {
       pairStatus.textContent = 'Waiting...';
     } else if (msg.type === 'paired') {
