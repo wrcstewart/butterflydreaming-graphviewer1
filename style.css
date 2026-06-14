@@ -68,7 +68,7 @@ html, body {
 
 #pair-control {
   position: fixed;
-  top: 81px;
+  top: 34px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
