@@ -17,7 +17,7 @@ html, body {
 #bc-spacer {
   height: 50px;
   flex-shrink: 0;
-  border-top: 2px solid #a07820;
+  border-top: 3px solid #a07820;
 }
 
 @keyframes help-pulse {
