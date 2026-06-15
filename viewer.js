@@ -612,7 +612,7 @@ function buildStyle() {
         'background-opacity': 0.85,
         'color': '#ffffff',
         'label': 'data(display_name)',
-        'font-size': '8px',
+        'font-size': '6px',
         'text-max-width': '30px',
         'border-width': 0,
         'overlay-padding': 4,
@@ -1562,11 +1562,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const chipW = 34, chipH = 16, chipGapX = 5, chipGapY = 5;
       const chipStepX = chipW + chipGapX;
       const chipStepY = chipH + chipGapY;
-      const chipStartX = originX + 150;
+      // Start 30px left of title node right edge (title centre=originX, half-width=60 → right=originX+60)
+      const chipStartX = originX + 30;
       const canvasRight = originX + (cols - 1) * stepX;
       const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX));
+      const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
+      const chipRows = Math.ceil(sortedClusters.length / chipsPerRow);
+      // Place chip block above the cluster node, ending 10px above it
+      const chipBlockTop = headerY - chipRows * chipStepY - 10;
       cy.nodes('[type="ClusterEditChip"]').remove();
-      sortClustersByColour(cy.nodes('[type="Cluster"]').toArray()).forEach((cluster, i) => {
+      sortedClusters.forEach((cluster, i) => {
         const row = Math.floor(i / chipsPerRow);
         const col = i % chipsPerRow;
         const chipId = 'cec_' + cluster.id();
@@ -1582,7 +1587,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         });
         positions[chipId] = {
           x: chipStartX + col * chipStepX + chipW / 2,
-          y: headerY + row * chipStepY + chipH / 2,
+          y: chipBlockTop + row * chipStepY + chipH / 2,
         };
       });
     }
@@ -1593,7 +1598,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       animate: true,
       animationDuration: 400,
       fit: true,
-      padding: 40,
+      padding: 50,
     }).run();
   }
 
