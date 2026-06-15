@@ -77,22 +77,48 @@ function rgbDotProduct(hex1, hex2) {
 function sortClustersByRgb(clusters, startCluster) {
   if (!clusters.length) return clusters;
   const byId = new Map(clusters.map(c => [c.id(), c]));
-  const unvisited = new Set(clusters.map(c => c.id()));
-  const result = [];
-  let current = (startCluster && byId.has(startCluster.id())) ? startCluster : clusters[0];
-  unvisited.delete(current.id());
-  result.push(current);
-  while (unvisited.size > 0) {
-    let nearest = null, maxDot = -Infinity;
-    for (const id of unvisited) {
-      const dot = rgbDotProduct(current.data('colour'), byId.get(id).data('colour'));
-      if (dot > maxDot) { maxDot = dot; nearest = byId.get(id); }
+
+  function greedyChain(start) {
+    const unvisited = new Set(clusters.map(c => c.id()));
+    const chain = [];
+    let cur = start;
+    unvisited.delete(cur.id());
+    chain.push(cur);
+    while (unvisited.size > 0) {
+      let nearest = null, maxDot = -Infinity;
+      for (const id of unvisited) {
+        const dot = rgbDotProduct(cur.data('colour'), byId.get(id).data('colour'));
+        if (dot > maxDot) { maxDot = dot; nearest = byId.get(id); }
+      }
+      unvisited.delete(nearest.id());
+      chain.push(nearest);
+      cur = nearest;
     }
-    unvisited.delete(nearest.id());
-    result.push(nearest);
-    current = nearest;
+    return chain;
   }
-  return result;
+
+  function chainScore(chain) {
+    let s = 0;
+    for (let i = 0; i < chain.length - 1; i++)
+      s += rgbDotProduct(chain[i].data('colour'), chain[i+1].data('colour'));
+    return s;
+  }
+
+  // Try every starting cluster, keep the highest-scoring chain
+  let best = null, bestScore = -Infinity;
+  for (const c of clusters) {
+    const chain = greedyChain(c);
+    const score = chainScore(chain);
+    if (score > bestScore) { bestScore = score; best = chain; }
+  }
+
+  // Rotate so startCluster appears first
+  if (startCluster && byId.has(startCluster.id())) {
+    const idx = best.findIndex(c => c.id() === startCluster.id());
+    if (idx > 0) best = [...best.slice(idx), ...best.slice(0, idx)];
+  }
+
+  return best;
 }
 
 // --- Helpers ---
