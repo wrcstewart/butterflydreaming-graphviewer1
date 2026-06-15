@@ -1497,12 +1497,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
 
     const positions = {};
-    let hx = originX;
     if (clusterNode && clusterNode.length) {
-      positions[clusterNode.id()] = { x: hx, y: headerY };
-      hx += stepX * 2;
+      positions[clusterNode.id()] = { x: originX, y: headerY };
     }
-    positions[titlePage.id()] = { x: hx, y: headerY };
+    positions[titlePage.id()] = { x: originX, y: headerY + stepY };
 
     const gridY = headerY + stepY * 2;
     parts.forEach((n, i) => {
