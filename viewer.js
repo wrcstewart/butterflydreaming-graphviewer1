@@ -1632,63 +1632,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), clusterNode);
       const nChips = sortedClusters.length;
 
-      // Circle radius: minimum needed for chip spacing, then +15% breathing room
-      const circleR = Math.max(100, Math.ceil(nChips * chipStepX / (2 * Math.PI) * 1.15));
-      const circleCx = clusterX + 60 + circleR + 20;
-      const circleCy = headerY + circleR;
-
-      // Find largest nodeW that inscribes the snake grid in the circle.
-      // Inscribed rectangle → diagonal = diameter = 2R (Pythagoras).
-      // W = cols·w + (cols−1)·gapX,  H = gridRows·round(0.57w) + (gridRows−1)·gapY
-      // Decrease w from 120 until W²+H² ≤ (2R)²
+      // 1. Measure the grid that was already laid out above
       const gridRows = Math.ceil(count / cols);
-      const diam2 = 4 * circleR * circleR;
-      let nodeWi = 120;
-      while (nodeWi > 8) {
-        const nHi = Math.round(nodeWi * 0.57);
-        const W = cols * nodeWi + (cols - 1) * gapX;
-        const H = gridRows * nHi + (gridRows - 1) * gapY;
-        if (W * W + H * H <= diam2) break;
-        nodeWi--;
-      }
-      const nodeHi   = Math.round(nodeWi * 0.57);
-      const stepXi   = nodeWi + gapX;
-      const stepYi   = nodeHi + gapY;
-      const fontSizei = nodeWi >= 60 ? 12 : nodeWi >= 50 ? 11 : 10;
+      const gridW    = (cols - 1) * stepX + nodeW;
+      const gridH    = (gridRows - 1) * stepY + nodeH;
 
-      // Re-style parts with inscribed dimensions
-      parts.forEach(n => {
-        const linked = clusterNode &&
-          n.outgoers('edge[type="CLUSTER_REL"]')
-           .filter(e => e.target().id() === clusterNode.id()).length > 0;
-        n.style({
-          'width':              nodeWi,
-          'height':             nodeHi,
-          'font-size':          fontSizei + 'px',
-          'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
-          'background-opacity': 0.7,
-        });
-      });
+      // 2. Circle: diameter = grid diagonal × 1.05, centred on grid centre
+      const circleR  = Math.sqrt(gridW * gridW + gridH * gridH) * 1.05 / 2;
+      const circleCx = originX + (cols - 1) * stepX / 2;
+      const circleCy = gridY + (gridRows - 1) * stepY / 2;
 
-      // Centre grid inside circle
-      const gridW = (cols - 1) * stepXi + nodeWi;
-      const gridH = (gridRows - 1) * stepYi + nodeHi;
-      const gridX0 = circleCx - gridW / 2;
-      const gridY0 = circleCy - gridH / 2;
-      parts.forEach((n, i) => {
-        const row      = Math.floor(i / cols);
-        const col      = i % cols;
-        const snakeCol = (row % 2 === 0) ? col : (cols - 1 - col);
-        positions[n.id()] = {
-          x: gridX0 + snakeCol * stepXi + nodeWi / 2,
-          y: gridY0 + row * stepYi + nodeHi / 2,
-        };
-      });
-
-      // Cluster and title above the grid top, centred on the circle
+      // 3. Cluster and title just above the grid top, centred on the circle
+      const gridTopY = circleCy - gridH / 2;
       if (clusterNode && clusterNode.length)
-        positions[clusterNode.id()] = { x: circleCx, y: gridY0 - 22 };   // 5px gap + half cluster height
-      positions[titlePage.id()]     = { x: circleCx, y: gridY0 - 61 };   // above cluster
+        positions[clusterNode.id()] = { x: circleCx, y: gridTopY - 22 };
+      positions[titlePage.id()]     = { x: circleCx, y: gridTopY - 61 };
 
       // Place chips around the circle
       cy.nodes('[type="ClusterEditChip"]').remove();
