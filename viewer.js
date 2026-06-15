@@ -2188,7 +2188,7 @@ async function init() {
 
   document.getElementById('edit-mode-cb').addEventListener('change', e => {
     if (!editModeUnlocked) {
-      const code = prompt('Edit mode code:');
+      const code = document.getElementById('dev-code').value.trim();
       if (code === EDIT_MODE_CODE) {
         editModeUnlocked = true;
       } else {
