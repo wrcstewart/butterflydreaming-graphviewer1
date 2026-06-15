@@ -1527,6 +1527,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const stepX    = nodeW + gapX;
     const stepY    = nodeH + gapY;
     const originX  = 50;
+    const clusterX = 0;    // cluster + title pinned to left edge; snake grid starts at originX
     const headerY  = 30;
 
     parts.forEach(n => {
@@ -1546,9 +1547,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const positions = {};
     if (clusterNode && clusterNode.length) {
-      positions[clusterNode.id()] = { x: originX, y: headerY };
+      positions[clusterNode.id()] = { x: clusterX, y: headerY };
     }
-    positions[titlePage.id()] = { x: originX, y: headerY + stepY };
+    positions[titlePage.id()] = { x: clusterX, y: headerY + stepY };
 
     const gridY = headerY + stepY * 2;
     parts.forEach((n, i) => {
@@ -1562,8 +1563,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const chipW = 34, chipH = 16, chipGapX = 5, chipGapY = 5;
       const chipStepX = chipW + chipGapX;
       const chipStepY = chipH + chipGapY;
-      // Start 30px left of title node right edge (title centre=originX, half-width=60 → right=originX+60)
-      const chipStartX = originX + 30;
+      // Start 30px left of title node right edge (title centre=clusterX, half-width=60 → right=clusterX+60)
+      const chipStartX = clusterX + 30;
       const canvasRight = originX + (cols - 1) * stepX;
       const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX));
       const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
