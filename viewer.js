@@ -27,7 +27,6 @@ const EDGE_COLOURS = {
   DESCENDS_FROM: '#444444',
 };
 
-const EDIT_MODE_CODE = 'bd-edit-2026';
 let editModeUnlocked = false;
 let editModeActive   = false;
 
@@ -1861,6 +1860,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const h = hintByRelId.get(e.data('raw_rel_id'));
         if (h) { e.data('hint_x', h.hint_x); e.data('hint_y', h.hint_y); e.data('hint_scale', h.hint_scale); }
       });
+      editModeUnlocked = true;
       devStatus(`saved ${msg.count}`);
       // No layout re-run — positions are already correct on screen
     });
@@ -2187,16 +2187,33 @@ async function init() {
   });
 
   document.getElementById('edit-mode-cb').addEventListener('change', e => {
-    if (!editModeUnlocked) {
-      const code = document.getElementById('dev-code').value.trim();
-      if (code === EDIT_MODE_CODE) {
-        editModeUnlocked = true;
-      } else {
-        e.target.checked = false;
-        return;
-      }
+    if (editModeUnlocked) {
+      editModeActive = e.target.checked;
+      return;
     }
-    editModeActive = e.target.checked;
+    // Validate against server using the code already in the dev-code field
+    const code = document.getElementById('dev-code').value.trim();
+    if (!code) { e.target.checked = false; return; }
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) { e.target.checked = false; return; }
+    const devStatusEl = document.getElementById('dev-status');
+    wsNow.addEventListener('message', function handler(event) {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg.type !== 'write_hints') return;
+      wsNow.removeEventListener('message', handler);
+      if (msg.ok) {
+        editModeUnlocked = true;
+        editModeActive = true;
+        document.getElementById('edit-mode-cb').checked = true;
+      } else {
+        devStatusEl.textContent = msg.error || 'bad code';
+        setTimeout(() => { devStatusEl.textContent = ''; }, 3000);
+        document.getElementById('edit-mode-cb').checked = false;
+        editModeActive = false;
+      }
+    });
+    wsNow.send(JSON.stringify({ type: 'write_hints', code, hints: [] }));
   });
 
   const { addBadge }      = setupNrBadges(cy);
