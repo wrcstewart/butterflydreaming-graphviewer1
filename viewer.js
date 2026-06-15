@@ -101,6 +101,8 @@ function sortClustersByRgb(clusters, startCluster) {
     let s = 0;
     for (let i = 0; i < chain.length - 1; i++)
       s += rgbDotProduct(chain[i].data('colour'), chain[i+1].data('colour'));
+    // Close the loop so we score a cycle, not a path
+    s += rgbDotProduct(chain[chain.length-1].data('colour'), chain[0].data('colour'));
     return s;
   }
 
@@ -1624,22 +1626,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
 
     if (editModeActive) {
-      const chipW = 37, chipH = 16, chipGapX = 5, chipGapY = 5;
-      const chipStepX = chipW + chipGapX;
-      const chipStepY = chipH + chipGapY;
-      // title right edge (clusterX+60) + 70px clearance − one chip width back
-      const chipStartX = clusterX + 130 - chipW;
+      const chipW = 37, chipH = 16, chipGapX = 5;
+      const chipStepX = chipW + chipGapX;  // arc spacing between chip centres
       const canvasRight = originX + (cols - 1) * stepX;
-      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX) + 2);
       // const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
       const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), clusterNode);
-      const chipRows = Math.ceil(sortedClusters.length / chipsPerRow);
-      // Place chip block above the cluster node, ending 10px above it
-      const chipBlockTop = headerY - chipRows * chipStepY - 10;
+      const n = sortedClusters.length;
+      // Radius so chips don't overlap: circumference >= n * chipStepX
+      const circleR = Math.max(80, Math.ceil(n * chipStepX / (2 * Math.PI)));
+      const circleCx = (clusterX + canvasRight) / 2;
+      const circleCy = headerY - circleR - 30;
       cy.nodes('[type="ClusterEditChip"]').remove();
       sortedClusters.forEach((cluster, i) => {
-        const row = Math.floor(i / chipsPerRow);
-        const col = i % chipsPerRow;
+        const angle = (i / n) * 2 * Math.PI - Math.PI / 2;  // 12 o'clock = index 0
         const chipId = 'cec_' + cluster.id();
         cy.add({
           group: 'nodes',
@@ -1652,8 +1651,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           }
         });
         positions[chipId] = {
-          x: chipStartX + col * chipStepX + chipW / 2,
-          y: chipBlockTop + row * chipStepY + chipH / 2,
+          x: circleCx + circleR * Math.cos(angle),
+          y: circleCy + circleR * Math.sin(angle),
         };
       });
     }
