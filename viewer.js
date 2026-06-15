@@ -1516,6 +1516,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     if (clusterNode && clusterNode.length) clusterNode.show();
     titlePage.show();
+    titlePage.style({ 'background-color': '#0055cc' }); // DEBUG: blue = v231 loaded
 
     const count    = parts.length;
     const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
