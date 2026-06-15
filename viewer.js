@@ -58,18 +58,15 @@ function sortClustersByColour(clusters) {
 }
 
 // --- RGB nearest-neighbour sort (alternative to HSL above) ---
-// Geometric mean of per-channel differences: (|dr|·|dg|·|db|)^(1/3)
-// Note: if any channel difference is zero the product is zero regardless of
-// the other channels, so colours that share an exact channel value score 0
-// distance on that axis — an intentional quirk of this metric.
+// Dot product in RGB space: r1·r2 + g1·g2 + b1·b2  (range 0–3, higher = more similar)
 
-function rgbDistance(hex1, hex2) {
+function rgbDotProduct(hex1, hex2) {
   function toRgb(h) {
     h = h.replace('#', '');
     return { r: parseInt(h.slice(0,2),16)/255, g: parseInt(h.slice(2,4),16)/255, b: parseInt(h.slice(4,6),16)/255 };
   }
   const a = toRgb(hex1), b = toRgb(hex2);
-  return Math.cbrt(Math.abs(a.r-b.r) * Math.abs(a.g-b.g) * Math.abs(a.b-b.b));
+  return a.r*b.r + a.g*b.g + a.b*b.b;
 }
 
 function sortClustersByRgb(clusters, startCluster) {
@@ -81,10 +78,10 @@ function sortClustersByRgb(clusters, startCluster) {
   unvisited.delete(current.id());
   result.push(current);
   while (unvisited.size > 0) {
-    let nearest = null, minDist = Infinity;
+    let nearest = null, maxDot = -Infinity;
     for (const id of unvisited) {
-      const dist = rgbDistance(current.data('colour'), byId.get(id).data('colour'));
-      if (dist < minDist) { minDist = dist; nearest = byId.get(id); }
+      const dot = rgbDotProduct(current.data('colour'), byId.get(id).data('colour'));
+      if (dot > maxDot) { maxDot = dot; nearest = byId.get(id); }
     }
     unvisited.delete(nearest.id());
     result.push(nearest);
