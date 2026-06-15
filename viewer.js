@@ -605,7 +605,7 @@ function buildStyle() {
     {
       selector: 'node[type="ClusterEditChip"]',
       style: {
-        'width': 34,
+        'width': 37,
         'height': 16,
         'shape': 'round-rectangle',
         'background-color': 'data(colour)',
@@ -613,7 +613,7 @@ function buildStyle() {
         'color': '#ffffff',
         'label': 'data(display_name)',
         'font-size': '6px',
-        'text-max-width': '30px',
+        'text-max-width': '33px',
         'border-width': 0,
         'overlay-padding': 4,
       }
@@ -1560,11 +1560,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
 
     if (editModeActive) {
-      const chipW = 34, chipH = 16, chipGapX = 5, chipGapY = 5;
+      const chipW = 37, chipH = 16, chipGapX = 5, chipGapY = 5;
       const chipStepX = chipW + chipGapX;
       const chipStepY = chipH + chipGapY;
-      // Start one cluster-width (70px) right of title right edge to avoid overlap with cluster/title column
-      const chipStartX = clusterX + 60 + 70;   // title right edge + 70px clearance = clusterX+130
+      // title right edge (clusterX+60) + 70px clearance − one chip width back
+      const chipStartX = clusterX + 130 - chipW;
       const canvasRight = originX + (cols - 1) * stepX;
       const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX) + 2);
       const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
