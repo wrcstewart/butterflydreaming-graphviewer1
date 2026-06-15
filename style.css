@@ -335,6 +335,14 @@ html, body {
   white-space: nowrap;
 }
 
+#edit-mode-label {
+  color: #888;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
 #user-count-panel {
   position: fixed;
   bottom: 8px;

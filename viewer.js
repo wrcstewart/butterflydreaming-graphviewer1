@@ -27,6 +27,37 @@ const EDGE_COLOURS = {
   DESCENDS_FROM: '#444444',
 };
 
+const EDIT_MODE_CODE = 'bd-edit-2026';
+let editModeUnlocked = false;
+let editModeActive   = false;
+
+function hslDistance(hsl1, hsl2) {
+  let dh = Math.abs(hsl1.h - hsl2.h);
+  if (dh > 180) dh = 360 - dh;
+  return (dh / 180) * 0.6 + Math.abs(hsl1.s - hsl2.s) * 0.2 + Math.abs(hsl1.l - hsl2.l) * 0.2;
+}
+
+function sortClustersByColour(clusters) {
+  if (!clusters.length) return clusters;
+  const byId = new Map(clusters.map(c => [c.id(), c]));
+  const unvisited = new Set(clusters.map(c => c.id()));
+  const result = [];
+  let current = clusters[0];
+  unvisited.delete(current.id());
+  result.push(current);
+  while (unvisited.size > 0) {
+    let nearest = null, minDist = Infinity;
+    for (const id of unvisited) {
+      const dist = hslDistance(hexToHsl(current.data('colour')), hexToHsl(byId.get(id).data('colour')));
+      if (dist < minDist) { minDist = dist; nearest = byId.get(id); }
+    }
+    unvisited.delete(nearest.id());
+    result.push(nearest);
+    current = nearest;
+  }
+  return result;
+}
+
 // --- Helpers ---
 
 function desaturate(hex, amount) {
@@ -570,6 +601,22 @@ function buildStyle() {
         'border-width': 2,
         'border-color': '#ffffff',
         'border-opacity': 1,
+      }
+    },
+    {
+      selector: 'node[type="ClusterEditChip"]',
+      style: {
+        'width': 34,
+        'height': 16,
+        'shape': 'round-rectangle',
+        'background-color': 'data(colour)',
+        'background-opacity': 0.85,
+        'color': '#ffffff',
+        'label': 'data(display_name)',
+        'font-size': '8px',
+        'text-max-width': '30px',
+        'border-width': 0,
+        'overlay-padding': 4,
       }
     },
   ];
@@ -1277,6 +1324,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function restoreState() {
     if (history.length === 0) return false;
+    exitSnakeView();
     const state = history.pop();
     const ids = new Set(state.ids);
     lastParentNode = state.parent;
@@ -1444,6 +1492,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       n.removeClass('snake-section');
       n.removeStyle('background-color background-opacity width height font-size');
     });
+    cy.nodes('[type="ClusterEditChip"]').remove();
   }
 
   function handleTitlePageTap(titlePage) {
@@ -1509,6 +1558,35 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const snakeCol = (row % 2 === 0) ? col : (cols - 1 - col);
       positions[n.id()] = { x: originX + snakeCol * stepX, y: gridY + row * stepY };
     });
+
+    if (editModeActive) {
+      const chipW = 34, chipH = 16, chipGapX = 5, chipGapY = 5;
+      const chipStepX = chipW + chipGapX;
+      const chipStepY = chipH + chipGapY;
+      const chipStartX = originX + 150;
+      const canvasRight = originX + (cols - 1) * stepX;
+      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX));
+      cy.nodes('[type="ClusterEditChip"]').remove();
+      sortClustersByColour(cy.nodes('[type="Cluster"]').toArray()).forEach((cluster, i) => {
+        const row = Math.floor(i / chipsPerRow);
+        const col = i % chipsPerRow;
+        const chipId = 'cec_' + cluster.id();
+        cy.add({
+          group: 'nodes',
+          data: {
+            id: chipId,
+            type: 'ClusterEditChip',
+            mainClusterId: cluster.id(),
+            colour: cluster.data('colour'),
+            display_name: cluster.data('display_name') || cluster.data('name') || '',
+          }
+        });
+        positions[chipId] = {
+          x: chipStartX + col * chipStepX + chipW / 2,
+          y: headerY + row * chipStepY + chipH / 2,
+        };
+      });
+    }
 
     cy.layout({
       name: 'preset',
@@ -2106,6 +2184,19 @@ async function init() {
     wsRef.lastActivity = Date.now();
     pairBtn.disabled = true;
     ws.send(JSON.stringify({ type: 'ready_to_pair' }));
+  });
+
+  document.getElementById('edit-mode-cb').addEventListener('change', e => {
+    if (!editModeUnlocked) {
+      const code = prompt('Edit mode code:');
+      if (code === EDIT_MODE_CODE) {
+        editModeUnlocked = true;
+      } else {
+        e.target.checked = false;
+        return;
+      }
+    }
+    editModeActive = e.target.checked;
   });
 
   const { addBadge }      = setupNrBadges(cy);
