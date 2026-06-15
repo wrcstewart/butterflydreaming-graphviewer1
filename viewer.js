@@ -57,6 +57,42 @@ function sortClustersByColour(clusters) {
   return result;
 }
 
+// --- RGB nearest-neighbour sort (alternative to HSL above) ---
+// Geometric mean of per-channel differences: (|dr|·|dg|·|db|)^(1/3)
+// Note: if any channel difference is zero the product is zero regardless of
+// the other channels, so colours that share an exact channel value score 0
+// distance on that axis — an intentional quirk of this metric.
+
+function rgbDistance(hex1, hex2) {
+  function toRgb(h) {
+    h = h.replace('#', '');
+    return { r: parseInt(h.slice(0,2),16)/255, g: parseInt(h.slice(2,4),16)/255, b: parseInt(h.slice(4,6),16)/255 };
+  }
+  const a = toRgb(hex1), b = toRgb(hex2);
+  return Math.cbrt(Math.abs(a.r-b.r) * Math.abs(a.g-b.g) * Math.abs(a.b-b.b));
+}
+
+function sortClustersByRgb(clusters, startCluster) {
+  if (!clusters.length) return clusters;
+  const byId = new Map(clusters.map(c => [c.id(), c]));
+  const unvisited = new Set(clusters.map(c => c.id()));
+  const result = [];
+  let current = (startCluster && byId.has(startCluster.id())) ? startCluster : clusters[0];
+  unvisited.delete(current.id());
+  result.push(current);
+  while (unvisited.size > 0) {
+    let nearest = null, minDist = Infinity;
+    for (const id of unvisited) {
+      const dist = rgbDistance(current.data('colour'), byId.get(id).data('colour'));
+      if (dist < minDist) { minDist = dist; nearest = byId.get(id); }
+    }
+    unvisited.delete(nearest.id());
+    result.push(nearest);
+    current = nearest;
+  }
+  return result;
+}
+
 // --- Helpers ---
 
 function desaturate(hex, amount) {
@@ -1567,7 +1603,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const chipStartX = clusterX + 130 - chipW;
       const canvasRight = originX + (cols - 1) * stepX;
       const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX) + 2);
-      const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
+      // const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
+      const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), clusterNode);
       const chipRows = Math.ceil(sortedClusters.length / chipsPerRow);
       // Place chip block above the cluster node, ending 10px above it
       const chipBlockTop = headerY - chipRows * chipStepY - 10;
