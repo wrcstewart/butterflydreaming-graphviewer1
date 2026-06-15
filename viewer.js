@@ -58,7 +58,9 @@ function sortClustersByColour(clusters) {
 }
 
 // --- RGB nearest-neighbour sort (alternative to HSL above) ---
-// Dot product in RGB space: r1·r2 + g1·g2 + b1·b2  (range 0–3, higher = more similar)
+// Cosine similarity: dot product of unit-length RGB vectors (range 0–1, higher = more similar).
+// Normalising removes the effect of brightness so only the direction (hue/saturation ratio)
+// determines the score. Black (magnitude 0) returns 0 against everything.
 
 function rgbDotProduct(hex1, hex2) {
   function toRgb(h) {
@@ -66,7 +68,10 @@ function rgbDotProduct(hex1, hex2) {
     return { r: parseInt(h.slice(0,2),16)/255, g: parseInt(h.slice(2,4),16)/255, b: parseInt(h.slice(4,6),16)/255 };
   }
   const a = toRgb(hex1), b = toRgb(hex2);
-  return a.r*b.r + a.g*b.g + a.b*b.b;
+  const magA = Math.sqrt(a.r*a.r + a.g*a.g + a.b*a.b);
+  const magB = Math.sqrt(b.r*b.r + b.g*b.g + b.b*b.b);
+  if (magA === 0 || magB === 0) return 0;
+  return (a.r*b.r + a.g*b.g + a.b*b.b) / (magA * magB);
 }
 
 function sortClustersByRgb(clusters, startCluster) {
