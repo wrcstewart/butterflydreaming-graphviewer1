@@ -1516,7 +1516,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     if (clusterNode && clusterNode.length) clusterNode.show();
     titlePage.show();
-    titlePage.style({ 'background-color': '#0055cc' }); // DEBUG: blue = v231 loaded
 
     const count    = parts.length;
     const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
@@ -1564,10 +1563,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const chipW = 34, chipH = 16, chipGapX = 5, chipGapY = 5;
       const chipStepX = chipW + chipGapX;
       const chipStepY = chipH + chipGapY;
-      // Start 30px left of title node right edge (title centre=clusterX, half-width=60 → right=clusterX+60)
-      const chipStartX = clusterX + 30;
+      // Start one cluster-width (70px) right of title right edge to avoid overlap with cluster/title column
+      const chipStartX = clusterX + 60 + 70;   // title right edge + 70px clearance = clusterX+130
       const canvasRight = originX + (cols - 1) * stepX;
-      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX));
+      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX) + 2);
       const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
       const chipRows = Math.ceil(sortedClusters.length / chipsPerRow);
       // Place chip block above the cluster node, ending 10px above it
