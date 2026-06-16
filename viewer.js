@@ -1626,32 +1626,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
 
     if (editModeActive) {
-      const chipW = 37, chipH = 16, chipGapX = 5;
+      const chipW = 37, chipH = 16, chipGapX = 5, chipGapY = 5;
       const chipStepX = chipW + chipGapX;
+      const chipStepY = chipH + chipGapY;
+      // title right edge (clusterX+60) + 70px clearance − one chip width back
+      const chipStartX = clusterX + 130 - chipW;
+      const canvasRight = originX + (cols - 1) * stepX;
+      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX) + 2);
       // const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
       const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), clusterNode);
-      const nChips = sortedClusters.length;
-
-      // 1. Measure the grid that was already laid out above
-      const gridRows = Math.ceil(count / cols);
-      const gridW    = (cols - 1) * stepX + nodeW;
-      const gridH    = (gridRows - 1) * stepY + nodeH;
-
-      // 2. Circle: diameter = grid diagonal × 1.05, centred on grid centre
-      const circleR  = Math.sqrt(gridW * gridW + gridH * gridH) * 1.05 / 2;
-      const circleCx = originX + (cols - 1) * stepX / 2;
-      const circleCy = gridY + (gridRows - 1) * stepY / 2;
-
-      // 3. Cluster and title just above the grid top, centred on the circle
-      const gridTopY = circleCy - gridH / 2;
-      if (clusterNode && clusterNode.length)
-        positions[clusterNode.id()] = { x: circleCx, y: gridTopY - 22 };
-      positions[titlePage.id()]     = { x: circleCx, y: gridTopY - 61 };
-
-      // Place chips around the circle
+      const chipRows = Math.ceil(sortedClusters.length / chipsPerRow);
+      // Place chip block above the cluster node, ending 10px above it
+      const chipBlockTop = headerY - chipRows * chipStepY - 10;
       cy.nodes('[type="ClusterEditChip"]').remove();
       sortedClusters.forEach((cluster, i) => {
-        const angle = (i / nChips) * 2 * Math.PI - Math.PI / 2;  // 12 o'clock = index 0
+        const row = Math.floor(i / chipsPerRow);
+        const col = i % chipsPerRow;
         const chipId = 'cec_' + cluster.id();
         cy.add({
           group: 'nodes',
@@ -1664,8 +1654,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           }
         });
         positions[chipId] = {
-          x: circleCx + circleR * Math.cos(angle),
-          y: circleCy + circleR * Math.sin(angle),
+          x: chipStartX + col * chipStepX + chipW / 2,
+          y: chipBlockTop + row * chipStepY + chipH / 2,
         };
       });
     }
