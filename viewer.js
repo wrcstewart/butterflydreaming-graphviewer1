@@ -27,8 +27,9 @@ const EDGE_COLOURS = {
   DESCENDS_FROM: '#444444',
 };
 
-let editModeUnlocked = false;
-let editModeActive   = false;
+let editModeUnlocked      = false;
+let editModeActive        = false;
+let editSelectedClusterId = null;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1559,6 +1560,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
     cy.nodes('[type="Cluster"]').removeStyle('width height text-max-width');
     cy.nodes('[type="ClusterEditChip"]').remove();
+    editSelectedClusterId = null;
+  }
+
+  function applyEditChipSelection(selectedClusterId) {
+    editSelectedClusterId = selectedClusterId;
+    const selectedCluster = cy.getElementById(selectedClusterId);
+    const selectedColour  = selectedCluster.data('colour');
+
+    cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
+      chip.style('opacity', chip.data('mainClusterId') === selectedClusterId ? 1.0 : 0.65);
+    });
+
+    cy.$('.snake-section').forEach(n => {
+      const linked = n.outgoers('edge[type="CLUSTER_REL"]')
+        .filter(e => e.target().id() === selectedClusterId).length > 0;
+      n.style({
+        'background-color':   linked && selectedColour ? selectedColour : '#1a1a1a',
+        'background-opacity': linked ? 0.9 : 0.35,
+      });
+    });
   }
 
   function handleTitlePageTap(titlePage) {
@@ -1657,13 +1678,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const editHeaderY   = chipBlockTop + chipRows * chipStepY + 15 + titleH / 2;
       const editGridY     = editHeaderY + titleH / 2 + 10 + dispNodeH / 2;
 
+      // Selected cluster defaults to the current cluster on entry
+      if (!editSelectedClusterId)
+        editSelectedClusterId = clusterNode ? clusterNode.id() : (sortedClusters[0]?.id() || null);
+
       // Chip grid
       cy.nodes('[type="ClusterEditChip"]').remove();
       sortedClusters.forEach((cluster, i) => {
         const row = Math.floor(i / chipsPerRow);
         const col = i % chipsPerRow;
         const chipId = 'cec_' + cluster.id();
-        cy.add({
+        const chip = cy.add({
           group: 'nodes',
           data: {
             id: chipId,
@@ -1673,6 +1698,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             display_name: cluster.data('display_name') || cluster.data('name') || '',
           }
         });
+        chip.style('opacity', cluster.id() === editSelectedClusterId ? 1.0 : 0.65);
         positions[chipId] = {
           x: chipStartX + col * chipStepX + chipW / 2,
           y: chipBlockTop + row * chipStepY + chipH / 2,
@@ -1794,6 +1820,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function handleNodeTap(node, addChip = true) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
+
+    if (type === 'ClusterEditChip') {
+      applyEditChipSelection(node.data('mainClusterId'));
+      return;
+    }
 
     if (addChip && (type === 'Entry' || type === 'Family' || type === 'Cluster' || type === 'TextNode')) {
       addYouChip(node);
