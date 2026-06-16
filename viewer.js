@@ -671,15 +671,15 @@ function buildStyle() {
     {
       selector: 'node[type="ClusterEditChip"]',
       style: {
-        'width': 37,
-        'height': 16,
+        'width': 48,
+        'height': 21,
         'shape': 'round-rectangle',
         'background-color': 'data(colour)',
         'background-opacity': 0.85,
         'color': '#ffffff',
         'label': 'data(display_name)',
-        'font-size': '6px',
-        'text-max-width': '33px',
+        'font-size': '8px',
+        'text-max-width': '43px',
         'border-width': 0,
         'overlay-padding': 4,
       }
@@ -1619,50 +1619,41 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
 
     const positions = {};
-    if (clusterNode && clusterNode.length) {
-      positions[clusterNode.id()] = { x: clusterX, y: headerY };
-    }
-    positions[titlePage.id()] = { x: clusterX, y: headerY + stepY };
 
-    // Edit mode: push grid lower to leave room for chip grid above
-    const gridY = editModeActive ? headerY + stepY + 100 : headerY + stepY * 2;
-    parts.forEach((n, i) => {
-      const row      = Math.floor(i / dispCols);
-      const col      = i % dispCols;
-      const snakeCol = (row % 2 === 0) ? col : (dispCols - 1 - col);
-      positions[n.id()] = { x: originX + snakeCol * stepX, y: gridY + row * stepY };
-    });
-
-    if (editModeActive) {
-      const titleW       = 120;  // TextNode default width
-      const titleH       = 34;   // TextNode default height
+    if (!editModeActive) {
+      // Non-edit: cluster above title, title above grid
+      if (clusterNode && clusterNode.length)
+        positions[clusterNode.id()] = { x: clusterX, y: headerY };
+      positions[titlePage.id()] = { x: clusterX, y: headerY + stepY };
+      const gridY = headerY + stepY * 2;
+      parts.forEach((n, i) => {
+        const row      = Math.floor(i / dispCols);
+        const col      = i % dispCols;
+        const snakeCol = (row % 2 === 0) ? col : (dispCols - 1 - col);
+        positions[n.id()] = { x: originX + snakeCol * stepX, y: gridY + row * stepY };
+      });
+    } else {
+      // Edit mode: chip grid at top, title+cluster immediately above text grid
+      const titleW       = 120;
+      const titleH       = 34;
       const editClusterW = Math.round(titleH * 37 / 16);  // chip aspect ratio, title height
 
-      // Resize cluster node to chip aspect ratio at title height, place to its right
-      if (clusterNode && clusterNode.length) {
-        clusterNode.style({
-          'width':          editClusterW,
-          'height':         titleH,
-          'text-max-width': (editClusterW - 6) + 'px',
-        });
-        positions[clusterNode.id()] = {
-          x: clusterX + titleW / 2 + 8 + editClusterW / 2,
-          y: headerY,
-        };
-      }
-      positions[titlePage.id()] = { x: clusterX, y: headerY };
-
-      // Chip grid above the title/cluster row
-      const chipW = 37, chipH = 16, chipGapX = 5, chipGapY = 5;
-      const chipStepX = chipW + chipGapX;
-      const chipStepY = chipH + chipGapY;
-      const chipStartX = clusterX + 130 - chipW;
+      const chipW = 48, chipH = 21, chipGapX = 5, chipGapY = 5;
+      const chipStepX  = chipW + chipGapX;
+      const chipStepY  = chipH + chipGapY;
+      const chipStartX = originX;
       const canvasRight = originX + (dispCols - 1) * stepX;
-      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX) + 2);
+      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX));
       // const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
       const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), clusterNode);
-      const chipRows = Math.ceil(sortedClusters.length / chipsPerRow);
-      const chipBlockTop = headerY - chipRows * chipStepY - 10;
+      const chipRows    = Math.ceil(sortedClusters.length / chipsPerRow);
+
+      // Y layout: chips → gap → title+cluster → gap → text grid
+      const chipBlockTop  = 0;
+      const editHeaderY   = chipBlockTop + chipRows * chipStepY + 15 + titleH / 2;
+      const editGridY     = editHeaderY + titleH / 2 + 10 + dispNodeH / 2;
+
+      // Chip grid
       cy.nodes('[type="ClusterEditChip"]').remove();
       sortedClusters.forEach((cluster, i) => {
         const row = Math.floor(i / chipsPerRow);
@@ -1682,6 +1673,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           x: chipStartX + col * chipStepX + chipW / 2,
           y: chipBlockTop + row * chipStepY + chipH / 2,
         };
+      });
+
+      // Title: left edge aligned with grid left edge
+      const titleCenterX = originX + titleW / 2;
+      positions[titlePage.id()] = { x: titleCenterX, y: editHeaderY };
+
+      // Cluster: to the right of title, resized to chip aspect ratio at title height
+      if (clusterNode && clusterNode.length) {
+        clusterNode.style({
+          'width':          editClusterW,
+          'height':         titleH,
+          'text-max-width': (editClusterW - 6) + 'px',
+        });
+        positions[clusterNode.id()] = {
+          x: titleCenterX + titleW / 2 + 8 + editClusterW / 2,
+          y: editHeaderY,
+        };
+      }
+
+      // Text grid
+      parts.forEach((n, i) => {
+        const row      = Math.floor(i / dispCols);
+        const col      = i % dispCols;
+        const snakeCol = (row % 2 === 0) ? col : (dispCols - 1 - col);
+        positions[n.id()] = { x: originX + snakeCol * stepX, y: editGridY + row * stepY };
       });
     }
 
