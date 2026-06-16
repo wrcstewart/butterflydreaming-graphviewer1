@@ -1615,8 +1615,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'font-size':          dispFont + 'px',
         'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
         'background-opacity': 0.7,
-        'text-valign':        editModeActive ? 'top' : 'center',
-        'text-margin-y':      editModeActive ? 2 : 0,
+        'text-valign':        'center',
+        'text-margin-y':      editModeActive ? -Math.round(dispNodeH / 4) : 0,
       });
     });
 
