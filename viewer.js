@@ -1569,7 +1569,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const selectedColour  = selectedCluster.data('colour');
 
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
-      chip.style('opacity', chip.data('mainClusterId') === selectedClusterId ? 1.0 : 0.65);
+      chip.style('opacity', chip.data('mainClusterId') === selectedClusterId ? 1.0 : 0.45);
     });
 
     cy.$('.snake-section').forEach(n => {
@@ -1698,7 +1698,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             display_name: cluster.data('display_name') || cluster.data('name') || '',
           }
         });
-        chip.style('opacity', cluster.id() === editSelectedClusterId ? 1.0 : 0.65);
+        chip.style('opacity', cluster.id() === editSelectedClusterId ? 1.0 : 0.45);
         positions[chipId] = {
           x: chipStartX + col * chipStepX + chipW / 2,
           y: chipBlockTop + row * chipStepY + chipH / 2,
