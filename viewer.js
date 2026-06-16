@@ -1595,11 +1595,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const clusterX = 0;
     const headerY  = 30;
 
-    // Edit mode: text nodes 30% smaller, more columns per row, grid pushed lower for chip room
-    const dispCols  = editModeActive ? Math.min(20, Math.max(7, Math.round(cols / 0.7))) : cols;
-    const dispNodeW = editModeActive ? Math.round(nodeW * 0.7) : nodeW;
+    // Edit mode: text nodes 50% of base size, doubled columns, grid at bottom
+    const dispCols  = editModeActive ? Math.min(30, Math.max(10, cols * 2)) : cols;
+    const dispNodeW = editModeActive ? Math.round(nodeW * 0.5) : nodeW;
     const dispNodeH = editModeActive ? Math.round(dispNodeW * 0.57) : nodeH;
-    const dispFont  = editModeActive ? (dispNodeW >= 50 ? 10 : 9) : fontSize;
+    const dispFont  = editModeActive ? 7 : fontSize;
     const stepX     = dispNodeW + gapX;
     const stepY     = dispNodeH + gapY;
 
