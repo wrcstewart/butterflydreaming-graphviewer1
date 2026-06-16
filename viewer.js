@@ -1581,7 +1581,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'border-width':   sel ? 2 : 0,
         'border-color':   '#ffffff',
         'border-opacity': 1,
-        'text-transform': sel ? 'uppercase' : 'none',
       });
     });
 
