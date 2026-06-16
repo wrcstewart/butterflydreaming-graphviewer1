@@ -673,7 +673,7 @@ function buildStyle() {
     {
       selector: 'node[type="ClusterEditChip"]',
       style: {
-        'width': 48,
+        'width': 53,
         'height': 21,
         'shape': 'round-rectangle',
         'background-color': 'data(colour)',
@@ -681,7 +681,7 @@ function buildStyle() {
         'color': '#ffffff',
         'label': 'data(display_name)',
         'font-size': '7px',
-        'text-max-width': '43px',
+        'text-max-width': '48px',
         'border-width': 0,
         'overlay-padding': 4,
       }
@@ -1571,9 +1571,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const selectedColour  = selectedCluster.data('colour');
     const selectedName    = selectedCluster.data('display_name') || selectedCluster.data('name') || '';
 
-    const chipW = 48, chipH = 21;
+    const chipW = 53, chipH = 21;
 
-    // All chips full opacity; selected gets a 2px white border expanding into gap space
+    // All chips full opacity; selected gets a 2px white border expanding outward into gap space
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
       const sel = chip.data('mainClusterId') === selectedClusterId;
       chip.style({
@@ -1598,11 +1598,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           if (cid === selectedClusterId) return;  // leave newly selected chip's white border alone
           const linked = linkedClusterIds.has(cid);
           chip.style({
-            'width':          linked ? chipW + 4 : chipW,
-            'height':         linked ? chipH + 4 : chipH,
+            'width':          chipW,   // no expansion — grey border is inset
+            'height':         chipH,
             'border-width':   linked ? 2 : 0,
             'border-color':   '#888888',
-            'border-opacity': linked ? 1 : 0,
+            'border-opacity': linked ? 0.6 : 0,
           });
         });
       }
@@ -1628,7 +1628,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function applyEditTextSelection(node) {
-    const chipW = 48, chipH = 21;
+    const chipW = 53, chipH = 21;
 
     // Clear border from previously selected text node
     if (editSelectedTextNodeId && editSelectedTextNodeId !== node.id()) {
@@ -1644,17 +1644,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       node.outgoers('edge[type="CLUSTER_REL"]').targets().map(c => c.id())
     );
 
-    // Grey border on chips linked to this text node, except the currently selected cluster chip
+    // Grey inset border on chips linked to this text node, except the currently selected cluster chip
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
       const cid = chip.data('mainClusterId');
       if (cid === editSelectedClusterId) return;  // leave selected chip unchanged
       const linked = linkedClusterIds.has(cid);
       chip.style({
-        'width':          linked ? chipW + 4 : chipW,
-        'height':         linked ? chipH + 4 : chipH,
+        'width':          chipW,   // no expansion — grey border is inset
+        'height':         chipH,
         'border-width':   linked ? 2 : 0,
         'border-color':   '#888888',
-        'border-opacity': linked ? 1 : 0,
+        'border-opacity': linked ? 0.6 : 0,
       });
     });
   }
@@ -1738,7 +1738,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const titleH       = 34;
       const editClusterW = Math.round(titleH * 37 / 16);  // chip aspect ratio, title height
 
-      const chipW = 48, chipH = 21, chipGapX = 5, chipGapY = 5;
+      const chipW = 53, chipH = 21, chipGapX = 5, chipGapY = 5;
       const chipStepX  = chipW + chipGapX;
       const chipStepY  = chipH + chipGapY;
       // alignX = left edge of text grid (node centres are at originX, so left edge is half a node left)
