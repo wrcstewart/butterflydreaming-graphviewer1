@@ -1575,7 +1575,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     // Clear text node selection when cluster focus changes
     if (editSelectedTextNodeId) {
-      cy.getElementById(editSelectedTextNodeId).style({ 'border-width': 0 });
+      cy.getElementById(editSelectedTextNodeId).removeStyle('border-width border-color border-opacity');
       editSelectedTextNodeId = null;
     }
 
@@ -1616,7 +1616,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     // Clear border from previously selected text node
     if (editSelectedTextNodeId && editSelectedTextNodeId !== node.id()) {
-      cy.getElementById(editSelectedTextNodeId).style({ 'border-width': 0 });
+      cy.getElementById(editSelectedTextNodeId).removeStyle('border-width border-color border-opacity');
     }
     editSelectedTextNodeId = node.id();
 
