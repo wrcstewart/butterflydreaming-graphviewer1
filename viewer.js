@@ -1595,15 +1595,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         );
         cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
           const cid = chip.data('mainClusterId');
-          if (cid === selectedClusterId) return;  // leave newly selected chip's white border alone
+          const isSelected = cid === selectedClusterId;
           const linked = linkedClusterIds.has(cid);
-          chip.style({
-            'width':          chipW,   // no expansion — grey border is inset
-            'height':         chipH,
-            'border-width':   linked ? 2 : 0,
-            'border-color':   '#888888',
-            'border-opacity': linked ? 0.6 : 0,
-          });
+          if (isSelected && linked) {
+            chip.style({
+              'width':          chipW,
+              'height':         chipH,
+              'border-width':   2,
+              'border-color':   '#888888',
+              'border-opacity': 1.0,
+            });
+          } else if (!isSelected) {
+            chip.style({
+              'width':          chipW,
+              'height':         chipH,
+              'border-width':   linked ? 2 : 0,
+              'border-color':   '#888888',
+              'border-opacity': linked ? 1.0 : 0,
+            });
+          }
+          // selected + not linked: white exterior border remains untouched
         });
       }
     }
@@ -1644,18 +1655,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       node.outgoers('edge[type="CLUSTER_REL"]').targets().map(c => c.id())
     );
 
-    // Grey inset border on chips linked to this text node, except the currently selected cluster chip
+    // Grey inset border on chips linked to this text node, including the selected cluster if related
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
       const cid = chip.data('mainClusterId');
-      if (cid === editSelectedClusterId) return;  // leave selected chip unchanged
+      const isSelected = cid === editSelectedClusterId;
       const linked = linkedClusterIds.has(cid);
-      chip.style({
-        'width':          chipW,   // no expansion — grey border is inset
-        'height':         chipH,
-        'border-width':   linked ? 2 : 0,
-        'border-color':   '#888888',
-        'border-opacity': linked ? 0.6 : 0,
-      });
+      if (isSelected && linked) {
+        // Selected chip is also related — grey inset border alongside the white exterior
+        chip.style({
+          'width':          chipW,
+          'height':         chipH,
+          'border-width':   2,
+          'border-color':   '#888888',
+          'border-opacity': 1.0,
+        });
+      } else if (!isSelected) {
+        chip.style({
+          'width':          chipW,
+          'height':         chipH,
+          'border-width':   linked ? 2 : 0,
+          'border-color':   '#888888',
+          'border-opacity': linked ? 1.0 : 0,
+        });
+      }
+      // selected + not linked: leave white exterior border untouched
     });
   }
 
