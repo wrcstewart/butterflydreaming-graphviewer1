@@ -1573,12 +1573,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const chipW = 48, chipH = 21;
 
-    // Clear text node selection when cluster focus changes
-    if (editSelectedTextNodeId) {
-      cy.getElementById(editSelectedTextNodeId).removeStyle('border-width border-color border-opacity');
-      editSelectedTextNodeId = null;
-    }
-
     // All chips full opacity; selected gets a 2px white border expanding into gap space
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
       const sel = chip.data('mainClusterId') === selectedClusterId;
@@ -1591,6 +1585,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'border-opacity': 1,
       });
     });
+
+    // Re-apply grey borders for any currently selected text node (text selection is preserved)
+    if (editSelectedTextNodeId) {
+      const textNode = cy.getElementById(editSelectedTextNodeId);
+      if (textNode.length) {
+        const linkedClusterIds = new Set(
+          textNode.outgoers('edge[type="CLUSTER_REL"]').targets().map(c => c.id())
+        );
+        cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
+          const cid = chip.data('mainClusterId');
+          if (cid === selectedClusterId) return;  // leave newly selected chip's white border alone
+          const linked = linkedClusterIds.has(cid);
+          chip.style({
+            'width':          linked ? chipW + 4 : chipW,
+            'height':         linked ? chipH + 4 : chipH,
+            'border-width':   linked ? 2 : 0,
+            'border-color':   '#888888',
+            'border-opacity': linked ? 1 : 0,
+          });
+        });
+      }
+    }
 
     // Update the current cluster node above the text grid to reflect the selection
     if (lastClusterNode && lastClusterNode.length) {
