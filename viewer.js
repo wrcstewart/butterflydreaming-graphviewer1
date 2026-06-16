@@ -29,7 +29,8 @@ const EDGE_COLOURS = {
 
 let editModeUnlocked      = false;
 let editModeActive        = false;
-let editSelectedClusterId = null;
+let editSelectedClusterId  = null;
+let editSelectedTextNodeId = null;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1556,11 +1557,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function exitSnakeView() {
     cy.$('.snake-section').forEach(n => {
       n.removeClass('snake-section');
-      n.removeStyle('background-color background-opacity width height font-size text-valign text-margin-y');
+      n.removeStyle('background-color background-opacity width height font-size text-valign text-margin-y border-width border-color border-opacity');
     });
     cy.nodes('[type="Cluster"]').removeStyle('width height text-max-width background-color label border-width border-color border-opacity');
     cy.nodes('[type="ClusterEditChip"]').remove();
-    editSelectedClusterId = null;
+    editSelectedClusterId  = null;
+    editSelectedTextNodeId = null;
   }
 
   function applyEditChipSelection(selectedClusterId) {
@@ -1570,6 +1572,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const selectedName    = selectedCluster.data('display_name') || selectedCluster.data('name') || '';
 
     const chipW = 48, chipH = 21;
+
+    // Clear text node selection when cluster focus changes
+    if (editSelectedTextNodeId) {
+      cy.getElementById(editSelectedTextNodeId).style({ 'border-width': 0 });
+      editSelectedTextNodeId = null;
+    }
 
     // All chips full opacity; selected gets a 2px white border expanding into gap space
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
@@ -1599,6 +1607,38 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       n.style({
         'background-color':   linked && selectedColour ? selectedColour : '#1a1a1a',
         'background-opacity': linked ? 0.9 : 0.35,
+      });
+    });
+  }
+
+  function applyEditTextSelection(node) {
+    const chipW = 48, chipH = 21;
+
+    // Clear border from previously selected text node
+    if (editSelectedTextNodeId && editSelectedTextNodeId !== node.id()) {
+      cy.getElementById(editSelectedTextNodeId).style({ 'border-width': 0 });
+    }
+    editSelectedTextNodeId = node.id();
+
+    // White border on the selected text node
+    node.style({ 'border-width': 2, 'border-color': '#ffffff', 'border-opacity': 1 });
+
+    // Find all clusters this text node belongs to
+    const linkedClusterIds = new Set(
+      node.outgoers('edge[type="CLUSTER_REL"]').targets().map(c => c.id())
+    );
+
+    // Grey border on chips linked to this text node, except the currently selected cluster chip
+    cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
+      const cid = chip.data('mainClusterId');
+      if (cid === editSelectedClusterId) return;  // leave selected chip unchanged
+      const linked = linkedClusterIds.has(cid);
+      chip.style({
+        'width':          linked ? chipW + 4 : chipW,
+        'height':         linked ? chipH + 4 : chipH,
+        'border-width':   linked ? 2 : 0,
+        'border-color':   '#888888',
+        'border-opacity': linked ? 1 : 0,
       });
     });
   }
@@ -1850,6 +1890,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     if (type === 'ClusterEditChip') {
       applyEditChipSelection(node.data('mainClusterId'));
+      return;
+    }
+
+    if (editModeActive && node.hasClass('snake-section')) {
+      applyEditTextSelection(node);
       return;
     }
 
