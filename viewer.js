@@ -1555,7 +1555,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function exitSnakeView() {
     cy.$('.snake-section').forEach(n => {
       n.removeClass('snake-section');
-      n.removeStyle('background-color background-opacity width height font-size');
+      n.removeStyle('background-color background-opacity width height font-size text-valign text-margin-y');
     });
     cy.nodes('[type="Cluster"]').removeStyle('width height text-max-width');
     cy.nodes('[type="ClusterEditChip"]').remove();
@@ -1615,6 +1615,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'font-size':          dispFont + 'px',
         'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
         'background-opacity': 0.7,
+        'text-valign':        editModeActive ? 'top' : 'center',
+        'text-margin-y':      editModeActive ? 2 : 0,
       });
     });
 
