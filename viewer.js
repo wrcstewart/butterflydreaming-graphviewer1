@@ -1641,9 +1641,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const chipW = 48, chipH = 21, chipGapX = 5, chipGapY = 5;
       const chipStepX  = chipW + chipGapX;
       const chipStepY  = chipH + chipGapY;
-      const chipStartX = originX;
-      const canvasRight = originX + (dispCols - 1) * stepX;
-      const chipsPerRow = Math.max(1, Math.floor((canvasRight - chipStartX) / chipStepX));
+      // alignX = left edge of text grid (node centres are at originX, so left edge is half a node left)
+      const alignX     = originX - dispNodeW / 2;
+      const chipStartX = alignX;
+      const canvasRight = originX + (dispCols - 1) * stepX + dispNodeW / 2;
+      const chipsPerRow = Math.max(1, Math.floor((canvasRight - alignX) / chipStepX));
       // const sortedClusters = sortClustersByColour(cy.nodes('[type="Cluster"]').toArray());
       const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), clusterNode);
       const chipRows    = Math.ceil(sortedClusters.length / chipsPerRow);
@@ -1675,8 +1677,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         };
       });
 
-      // Title: left edge aligned with grid left edge
-      const titleCenterX = originX + titleW / 2;
+      // Title: left edge aligned with text grid left edge
+      const titleCenterX = alignX + titleW / 2;
       positions[titlePage.id()] = { x: titleCenterX, y: editHeaderY };
 
       // Cluster: to the right of title, resized to chip aspect ratio at title height
