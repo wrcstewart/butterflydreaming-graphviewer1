@@ -1558,7 +1558,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       n.removeClass('snake-section');
       n.removeStyle('background-color background-opacity width height font-size text-valign text-margin-y');
     });
-    cy.nodes('[type="Cluster"]').removeStyle('width height text-max-width background-color label');
+    cy.nodes('[type="Cluster"]').removeStyle('width height text-max-width background-color label border-width border-color border-opacity');
     cy.nodes('[type="ClusterEditChip"]').remove();
     editSelectedClusterId = null;
   }
@@ -1730,11 +1730,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       positions[titlePage.id()] = { x: titleCenterX, y: editHeaderY };
 
       // Cluster: to the right of title, resized to chip aspect ratio at title height
+      // +4 to width/height expands the 2px white border outward without reducing content area
       if (clusterNode && clusterNode.length) {
         clusterNode.style({
-          'width':          editClusterW,
-          'height':         titleH,
+          'width':          editClusterW + 4,
+          'height':         titleH + 4,
           'text-max-width': (editClusterW - 6) + 'px',
+          'border-width':   2,
+          'border-color':   '#ffffff',
+          'border-opacity': 1,
         });
         positions[clusterNode.id()] = {
           x: titleCenterX + titleW / 2 + 8 + editClusterW / 2,
