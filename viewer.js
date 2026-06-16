@@ -678,7 +678,7 @@ function buildStyle() {
         'background-opacity': 0.85,
         'color': '#ffffff',
         'label': 'data(display_name)',
-        'font-size': '8px',
+        'font-size': '7px',
         'text-max-width': '43px',
         'border-width': 0,
         'overlay-padding': 4,
