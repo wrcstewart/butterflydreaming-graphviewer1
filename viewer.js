@@ -1569,16 +1569,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const selectedColour  = selectedCluster.data('colour');
     const selectedName    = selectedCluster.data('display_name') || selectedCluster.data('name') || '';
 
-    const chipW = 48, chipH = 21, chipGapX = 5, chipGapY = 5;
+    const chipW = 48, chipH = 21;
 
-    // All chips full opacity; selected enlarged to fill its gap on all sides and uppercased
+    // All chips full opacity; selected gets a 2px white border expanding into gap space
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
       const sel = chip.data('mainClusterId') === selectedClusterId;
       chip.style({
-        'opacity':         1.0,
-        'width':           sel ? chipW + chipGapX : chipW,
-        'height':          sel ? chipH + chipGapY : chipH,
-        'text-transform':  sel ? 'uppercase' : 'none',
+        'opacity':        1.0,
+        'width':          sel ? chipW + 4 : chipW,
+        'height':         sel ? chipH + 4 : chipH,
+        'border-width':   sel ? 2 : 0,
+        'border-color':   '#ffffff',
+        'border-opacity': 1,
+        'text-transform': sel ? 'uppercase' : 'none',
       });
     });
 
