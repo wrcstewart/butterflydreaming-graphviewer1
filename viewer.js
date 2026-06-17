@@ -1577,14 +1577,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (bar.style.display === 'none') return;
     if (!lastClusterNode || !lastClusterNode.length || !lastClusterNode.visible()) return;
     try {
-      const bb             = lastClusterNode.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
-      const containerRect  = cy.container().getBoundingClientRect();
-      const nodeW          = bb.x2 - bb.x1;
-      const nodeScreenX    = Math.round(containerRect.left + (bb.x1 + bb.x2) / 2);
-      const nodeScreenY    = Math.round(containerRect.top  + (bb.y1 + bb.y2) / 2);
-      bar.style.left      = (nodeScreenX + 0.75 * nodeW) + 'px';
+      const bb            = lastClusterNode.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
+      const containerRect = cy.container().getBoundingClientRect();
+      const nodeRightX    = Math.round(containerRect.left + bb.x2);
+      const nodeScreenY   = Math.round(containerRect.top  + (bb.y1 + bb.y2) / 2);
+      bar.style.left      = (nodeRightX + 8) + 'px';
       bar.style.top       = nodeScreenY + 'px';
-      bar.style.transform = 'translateX(-50%) translateY(-50%)';
+      bar.style.transform = 'translateY(-50%)';
     } catch (_) {}
   }
 
