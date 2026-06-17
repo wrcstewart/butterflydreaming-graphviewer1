@@ -2300,11 +2300,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
     });
     if (editSelectedClusterId) {
-      // In snake edit view: hide the raw Cluster node (it's shown as a chip),
-      // select the new cluster, and rebuild the chip grid so it appears
+      // In snake edit view: hide the raw Cluster node (it's shown via a chip)
+      // and rebuild the grid. Do NOT change the selection — the clone will appear
+      // in its natural colour-sorted position adjacent to the source cluster.
       cy.getElementById(msg.newCluster.id).hide();
-      editSelectedClusterId  = msg.newCluster.id;
-      editSelectedTextNodeId = null;
       rebuildClusterEditGrid();
     }
   }
@@ -2433,7 +2432,7 @@ function setupNrBadges(cy) {
     if (badges.has(node.id())) {
       // Always update existing badge text — clears it (to '') when nr=0 so
       // the temp-swap in applyEditChipSelection doesn't leave stale counts visible
-      badges.get(node.id()).textContent = (nr && nr > 0) ? String(nr) : '';
+      badges.get(node.id()).textContent = (nr && nr > 0) ? String(nr) : '0';
       return;
     }
     if (!nr || nr <= 0) return;
