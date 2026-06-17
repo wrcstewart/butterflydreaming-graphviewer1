@@ -321,6 +321,57 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
+      if (msg.type === 'edit_clone_cluster') {
+        if (!CURATION_CODE) {
+          ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: 'curation_disabled' }));
+          return;
+        }
+        const { sourceName, newName } = msg;
+        if (!sourceName || !newName) {
+          ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: 'missing_params' }));
+          return;
+        }
+        const s = driver.session({ database: 'memgraph' });
+        try {
+          const checkResult = await s.run(
+            'MATCH (c:Cluster {name: $newName}) RETURN c LIMIT 1',
+            { newName }
+          );
+          if (checkResult.records.length > 0) {
+            ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: 'name_exists' }));
+            return;
+          }
+          await s.run(
+            'MATCH (src:Cluster {name: $sourceName}) ' +
+            'CREATE (c:Cluster { name: $newName, display_name: $newName, label: $newName, n_r: 0 })',
+            { sourceName, newName }
+          );
+          await s.run(
+            'MATCH (parent)-[r:DESCENDS_FROM]->(src:Cluster {name: $sourceName}) ' +
+            'MATCH (c:Cluster {name: $newName}) ' +
+            'CREATE (parent)-[:DESCENDS_FROM {weight: r.weight}]->(c)',
+            { sourceName, newName }
+          );
+          const result = await s.run(
+            'MATCH (c:Cluster {name: $newName}) RETURN c',
+            { newName }
+          );
+          const node = result.records[0].get('c');
+          const newCluster = {
+            id: node.elementId ?? node.identity.toString(),
+            ...serializeProps(node.properties),
+          };
+          ws.send(JSON.stringify({ type: 'edit_clone_cluster', ok: true }));
+          broadcastCorpusUpdate({ type: 'cluster_cloned', newCluster, sourceName });
+          console.log(`[BD] cluster_cloned: ${newName} from ${sourceName}`);
+        } catch (err) {
+          console.error('[BD] edit_clone_cluster error:', err.message);
+          ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: err.message }));
+        } finally {
+          await s.close();
+        }
+        return;
+      }
       if (!msg.query) return;  // ignore keepalive pings and other non-query messages
       const session = driver.session({ database: 'memgraph' });
       try {

@@ -31,6 +31,7 @@ let editModeUnlocked      = false;
 let editModeActive        = false;
 let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
+let chipGridParams         = null;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1566,19 +1567,43 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (lastClusterNode && lastClusterNode.length) addBadge(lastClusterNode);
     editSelectedClusterId  = null;
     editSelectedTextNodeId = null;
+    chipGridParams         = null;
     document.getElementById('cluster-editor-bar').style.display = 'none';
+    document.getElementById('clone-panel').style.display = 'none';
   }
 
   function updateEditorBar() {
     const bar       = document.getElementById('cluster-editor-bar');
     const deleteBtn = document.getElementById('editor-delete-btn');
-    if (!editSelectedClusterId || !editSelectedTextNodeId) {
+    const cloneBtn  = document.getElementById('editor-clone-btn');
+    const saveBtn   = document.getElementById('editor-save-btn');
+    const spinners  = bar.querySelectorAll('.spinner-group');
+
+    if (!editSelectedClusterId) {
       bar.style.display = 'none';
       return;
     }
-    const textNode = cy.getElementById(editSelectedTextNodeId);
-    if (!textNode.length) { bar.style.display = 'none'; return; }
+
     bar.style.display = 'flex';
+    cloneBtn.style.display = 'inline-block';
+
+    if (!editSelectedTextNodeId) {
+      spinners.forEach(s => { s.style.display = 'none'; });
+      saveBtn.style.display  = 'none';
+      deleteBtn.style.display = 'none';
+      return;
+    }
+    const textNode = cy.getElementById(editSelectedTextNodeId);
+    if (!textNode.length) {
+      spinners.forEach(s => { s.style.display = 'none'; });
+      saveBtn.style.display   = 'none';
+      deleteBtn.style.display = 'none';
+      return;
+    }
+
+    spinners.forEach(s => { s.style.display = 'flex'; });
+    saveBtn.style.display = 'inline-block';
+
     const edge = textNode.outgoers('edge[type="CLUSTER_REL"]')
       .filter(e => e.target().id() === editSelectedClusterId)
       .first();
@@ -1610,11 +1635,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
     // Keep editSelectedClusterId so the next text-node tap reopens the bar immediately
     editSelectedTextNodeId = null;
+    document.getElementById('clone-panel').style.display = 'none';
     updateEditorBar();
   }
 
   function applyEditChipSelection(selectedClusterId) {
     editSelectedClusterId = selectedClusterId;
+    document.getElementById('clone-panel').style.display = 'none';
     const selectedCluster = cy.getElementById(selectedClusterId);
     const selectedColour  = selectedCluster.data('colour');
     const selectedName    = selectedCluster.data('display_name') || selectedCluster.data('name') || '';
@@ -1802,6 +1829,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Selected cluster defaults to the current cluster on entry
       if (!editSelectedClusterId)
         editSelectedClusterId = clusterNode ? clusterNode.id() : (sortedClusters[0]?.id() || null);
+
+      // Store layout params so rebuildClusterEditGrid can re-render chips after clone
+      chipGridParams = { chipW, chipH, chipStepX, chipStepY, chipStartX, chipBlockTop, chipsPerRow };
 
       // Chip grid
       cy.nodes('[type="ClusterEditChip"]').remove();
@@ -2202,6 +2232,83 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }));
   });
 
+  function rebuildClusterEditGrid() {
+    if (!chipGridParams) return;
+    const { chipW, chipH, chipStepX, chipStepY, chipStartX, chipBlockTop, chipsPerRow } = chipGridParams;
+    const startNode = editSelectedClusterId ? cy.getElementById(editSelectedClusterId) : null;
+    const sortedClusters = sortClustersByRgb(cy.nodes('[type="Cluster"]').toArray(), startNode);
+    cy.nodes('[type="ClusterEditChip"]').remove();
+    sortedClusters.forEach((cluster, i) => {
+      const row    = Math.floor(i / chipsPerRow);
+      const col    = i % chipsPerRow;
+      const chipId = 'cec_' + cluster.id();
+      cy.add({
+        group: 'nodes',
+        data: {
+          id:           chipId,
+          type:         'ClusterEditChip',
+          mainClusterId: cluster.id(),
+          colour:       cluster.data('colour'),
+          display_name: cluster.data('display_name') || cluster.data('name') || '',
+        }
+      });
+      cy.getElementById(chipId).position({
+        x: chipStartX + col * chipStepX + chipW / 2,
+        y: chipBlockTop + row * chipStepY + chipH / 2,
+      });
+    });
+    if (editSelectedClusterId) applyEditChipSelection(editSelectedClusterId);
+  }
+
+  document.getElementById('editor-clone-btn').addEventListener('click', () => {
+    if (!editSelectedClusterId) return;
+    const sourceCluster = cy.getElementById(editSelectedClusterId);
+    const sourceName    = sourceCluster.data('name') || '';
+    document.getElementById('clone-name-input').value = sourceName + ' (2)';
+    document.getElementById('clone-panel').style.display = 'flex';
+  });
+
+  document.getElementById('clone-cancel-btn').addEventListener('click', () => {
+    document.getElementById('clone-panel').style.display = 'none';
+  });
+
+  document.getElementById('clone-confirm-btn').addEventListener('click', () => {
+    const newName = document.getElementById('clone-name-input').value.trim();
+    if (!newName || !editSelectedClusterId) return;
+    const sourceCluster = cy.getElementById(editSelectedClusterId);
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return;
+    wsNow.send(JSON.stringify({
+      type:       'edit_clone_cluster',
+      sourceName: sourceCluster.data('name'),
+      newName,
+    }));
+    document.getElementById('clone-panel').style.display = 'none';
+  });
+
+  function handleClusterCloned(msg) {
+    const sourceNode   = cy.nodes('[type="Cluster"]').filter(n => n.data('name') === msg.sourceName).first();
+    const sourceColour = sourceNode.length ? sourceNode.data('colour') : '#666666';
+    cy.add({
+      group: 'nodes',
+      data: {
+        ...msg.newCluster,
+        type:         'Cluster',
+        colour:       sourceColour,
+        display_name: msg.newCluster.display_name || msg.newCluster.name || '',
+        n_r:          0,
+      }
+    });
+    if (editSelectedClusterId) {
+      // In snake edit view: hide the raw Cluster node (it's shown as a chip),
+      // select the new cluster, and rebuild the chip grid so it appears
+      cy.getElementById(msg.newCluster.id).hide();
+      editSelectedClusterId  = msg.newCluster.id;
+      editSelectedTextNodeId = null;
+      rebuildClusterEditGrid();
+    }
+  }
+
   function handleClusterRelMsg(msg) {
     const clusterNode = cy.nodes('[type="Cluster"]')
       .filter(n => n.data('name') === msg.clusterName).first();
@@ -2279,7 +2386,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned };
 
 }
 
@@ -2622,7 +2729,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   const userCountPanel = document.getElementById('user-count-panel');
 
@@ -2657,6 +2764,8 @@ async function init() {
       appendBuddyChip(msg.data);
     } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
       handleClusterRelMsg(msg);
+    } else if (msg.type === 'cluster_cloned') {
+      handleClusterCloned(msg);
     }
   });
 }

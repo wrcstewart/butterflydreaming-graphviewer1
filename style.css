@@ -208,7 +208,7 @@ html, body {
   padding: 2px;
 }
 
-#editor-save-btn, #editor-delete-btn {
+#editor-save-btn, #editor-delete-btn, #editor-clone-btn {
   font-size: 11px;
   padding: 4px 10px;
   border-radius: 3px;
@@ -226,6 +226,58 @@ html, body {
   background: #C0504D;
   color: #ffffff;
   border: none;
+}
+
+#editor-clone-btn {
+  background: #4A7BC0;
+  color: #ffffff;
+  border: none;
+}
+
+#clone-panel {
+  position: fixed;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid #444;
+  font-size: 11px;
+  font-family: sans-serif;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+#clone-name-input {
+  width: 200px;
+  font-size: 11px;
+  background: #1a1a2e;
+  color: #ffffff;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 3px 6px;
+}
+
+#clone-confirm-btn {
+  background: #4A8C4F;
+  color: #ffffff;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+#clone-cancel-btn {
+  background: #444;
+  color: #cccccc;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
 }
 
 .mp-select {

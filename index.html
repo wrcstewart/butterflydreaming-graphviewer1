@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=50">
+  <link rel="stylesheet" href="style.css?v=51">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming — Navigation Development</div>
@@ -37,6 +37,12 @@
     </div>
     <button id="editor-save-btn">Save</button>
     <button id="editor-delete-btn" style="display:none">Delete</button>
+    <button id="editor-clone-btn" style="display:none">Clone</button>
+  </div>
+  <div id="clone-panel" style="display:none">
+    <input type="text" id="clone-name-input" placeholder="New cluster name">
+    <button id="clone-confirm-btn">Confirm</button>
+    <button id="clone-cancel-btn">Cancel</button>
   </div>
   <div id="label-tooltip"></div>
   <div id="user-count-panel"></div>
@@ -70,6 +76,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script src="viewer.js?v=263"></script>
+  <script src="viewer.js?v=264"></script>
 </body>
 </html>
