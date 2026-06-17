@@ -1563,6 +1563,51 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.nodes('[type="ClusterEditChip"]').remove();
     editSelectedClusterId  = null;
     editSelectedTextNodeId = null;
+    document.getElementById('cluster-editor-bar').style.display = 'none';
+  }
+
+  function updateEditorBar() {
+    const bar       = document.getElementById('cluster-editor-bar');
+    const deleteBtn = document.getElementById('editor-delete-btn');
+    if (!editSelectedClusterId || !editSelectedTextNodeId) {
+      bar.style.display = 'none';
+      return;
+    }
+    const textNode = cy.getElementById(editSelectedTextNodeId);
+    if (!textNode.length) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    const edge = textNode.outgoers('edge[type="CLUSTER_REL"]')
+      .filter(e => e.target().id() === editSelectedClusterId)
+      .first();
+    if (edge.length) {
+      document.getElementById('sp-tagged-as').value      = edge.data('tagged_as')      ?? 0.0;
+      document.getElementById('sp-resonates-with').value = edge.data('resonates_with') ?? 0.0;
+      document.getElementById('sp-bridges-to').value     = edge.data('bridges_to')     ?? 0.0;
+      document.getElementById('sp-echoes').value         = edge.data('echoes')         ?? 0.0;
+      document.getElementById('sp-gives').value          = edge.data('gives')          ?? 0.0;
+      deleteBtn.style.display = 'inline-block';
+    } else {
+      document.getElementById('sp-tagged-as').value      = 0.5;
+      document.getElementById('sp-resonates-with').value = 0.0;
+      document.getElementById('sp-bridges-to').value     = 0.0;
+      document.getElementById('sp-echoes').value         = 0.0;
+      document.getElementById('sp-gives').value          = 0.0;
+      deleteBtn.style.display = 'none';
+    }
+  }
+
+  function clearEditSelection() {
+    if (editSelectedTextNodeId) {
+      const tn = cy.getElementById(editSelectedTextNodeId);
+      if (tn.length) tn.removeStyle('border-width border-color border-opacity');
+    }
+    const chipW = 53, chipH = 21;
+    cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
+      chip.style({ 'width': chipW, 'height': chipH, 'border-width': 0 });
+    });
+    editSelectedClusterId  = null;
+    editSelectedTextNodeId = null;
+    updateEditorBar();
   }
 
   function applyEditChipSelection(selectedClusterId) {
@@ -1615,6 +1660,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         });
       }
     }
+    updateEditorBar();
   }
 
   function applyEditTextSelection(node) {
@@ -1645,6 +1691,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'border-opacity': linked ? 1.0 : 0,
       });
     });
+    updateEditorBar();
   }
 
   function handleTitlePageTap(titlePage) {
@@ -2099,7 +2146,95 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     devStatus('reset');
   });
 
-  return { appendBuddyChip, resetBuddyBar };
+  // --- Cluster editor bar buttons ---
+
+  document.getElementById('editor-save-btn').addEventListener('click', () => {
+    if (!editSelectedClusterId || !editSelectedTextNodeId) return;
+    const textNode    = cy.getElementById(editSelectedTextNodeId);
+    const clusterNode = cy.getElementById(editSelectedClusterId);
+    if (!textNode.length || !clusterNode.length) return;
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return;
+
+    const ta = parseFloat(document.getElementById('sp-tagged-as').value);
+    const rw = parseFloat(document.getElementById('sp-resonates-with').value);
+    const bt = parseFloat(document.getElementById('sp-bridges-to').value);
+    const ec = parseFloat(document.getElementById('sp-echoes').value);
+    const gi = parseFloat(document.getElementById('sp-gives').value);
+    const props = {};
+    if (ta > 0) props.tagged_as      = ta;
+    if (rw > 0) props.resonates_with = rw;
+    if (bt > 0) props.bridges_to     = bt;
+    if (ec > 0) props.echoes         = ec;
+    if (gi > 0) props.gives          = gi;
+
+    wsNow.send(JSON.stringify({
+      type:        'edit_save',
+      textNodeUrl: textNode.data('url'),
+      clusterName: clusterNode.data('name'),
+      work:        textNode.data('source_text'),
+      props,
+    }));
+  });
+
+  document.getElementById('editor-delete-btn').addEventListener('click', () => {
+    if (!editSelectedClusterId || !editSelectedTextNodeId) return;
+    const textNode    = cy.getElementById(editSelectedTextNodeId);
+    const clusterNode = cy.getElementById(editSelectedClusterId);
+    if (!textNode.length || !clusterNode.length) return;
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return;
+
+    wsNow.send(JSON.stringify({
+      type:        'edit_delete',
+      textNodeUrl: textNode.data('url'),
+      clusterName: clusterNode.data('name'),
+      work:        textNode.data('source_text'),
+    }));
+  });
+
+  function handleClusterRelMsg(msg) {
+    const clusterNode = cy.nodes('[type="Cluster"]')
+      .filter(n => n.data('name') === msg.clusterName).first();
+
+    if (msg.type === 'cluster_rel_saved') {
+      const textNode = cy.nodes('[type="TextNode"]')
+        .filter(n => n.data('url') === msg.textNodeUrl).first();
+      if (textNode.length && clusterNode.length) {
+        const existing = textNode.outgoers('edge[type="CLUSTER_REL"]')
+          .filter(e => e.target().id() === clusterNode.id()).first();
+        if (existing.length) {
+          ['tagged_as', 'resonates_with', 'bridges_to', 'echoes', 'gives']
+            .forEach(k => existing.removeData(k));
+          if (msg.props) Object.keys(msg.props).forEach(k => existing.data(k, msg.props[k]));
+        } else {
+          const edgeData = {
+            type:   'CLUSTER_REL',
+            source: textNode.id(),
+            target: clusterNode.id(),
+          };
+          if (msg.props) Object.assign(edgeData, msg.props);
+          cy.add({ group: 'edges', data: edgeData });
+        }
+      }
+    } else if (msg.type === 'cluster_rel_deleted') {
+      const textNode = cy.nodes('[type="TextNode"]')
+        .filter(n => n.data('url') === msg.textNodeUrl).first();
+      if (textNode.length && clusterNode.length) {
+        textNode.outgoers('edge[type="CLUSTER_REL"]')
+          .filter(e => e.target().id() === clusterNode.id())
+          .remove();
+      }
+    }
+
+    if (clusterNode.length && msg.n_r !== undefined) {
+      clusterNode.data('n_r', msg.n_r);
+      addBadge(clusterNode);
+    }
+    clearEditSelection();
+  }
+
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg };
 
 }
 
@@ -2442,7 +2577,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   const userCountPanel = document.getElementById('user-count-panel');
 
@@ -2475,6 +2610,8 @@ async function init() {
       ws.send(JSON.stringify({ type: 'ready_to_pair' }));
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
+    } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
+      handleClusterRelMsg(msg);
     }
   });
 }

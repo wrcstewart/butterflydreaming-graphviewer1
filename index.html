@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=49">
+  <link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming — Navigation Development</div>
@@ -14,6 +14,30 @@
   <div id="cy-you"></div>
   <div id="cy"></div>
   <div id="media-bar"></div>
+  <div id="cluster-editor-bar" style="display:none">
+    <div class="spinner-group">
+      <label>tagged_as</label>
+      <input type="number" id="sp-tagged-as" min="0" max="1" step="0.1" value="0.5">
+    </div>
+    <div class="spinner-group">
+      <label>resonates_with</label>
+      <input type="number" id="sp-resonates-with" min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <div class="spinner-group">
+      <label>bridges_to</label>
+      <input type="number" id="sp-bridges-to" min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <div class="spinner-group">
+      <label>echoes</label>
+      <input type="number" id="sp-echoes" min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <div class="spinner-group">
+      <label>gives</label>
+      <input type="number" id="sp-gives" min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <button id="editor-save-btn">Save</button>
+    <button id="editor-delete-btn" style="display:none">Delete</button>
+  </div>
   <div id="label-tooltip"></div>
   <div id="user-count-panel"></div>
   <button id="back-btn">←</button>
@@ -46,6 +70,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script src="viewer.js?v=262"></script>
+  <script src="viewer.js?v=263"></script>
 </body>
 </html>

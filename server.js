@@ -70,6 +70,13 @@ function broadcastUserCount() {
   }
 }
 
+function broadcastCorpusUpdate(msg) {
+  const json = JSON.stringify(msg);
+  for (const s of sessions.values()) {
+    if (s.readyState === 1) s.send(json);
+  }
+}
+
 // --- Serialisation ---
 // neo4j-driver returns typed objects (Integer, DateTime, Node, Relationship).
 // These must be converted to plain JS before JSON.stringify.
@@ -249,6 +256,63 @@ wss.on('connection', async (ws) => {
         } catch (err) {
           console.error('[BD] write_hints error:', err.message);
           ws.send(JSON.stringify({ type: 'write_hints', error: err.message }));
+        } finally {
+          await s.close();
+        }
+        return;
+      }
+      if (msg.type === 'edit_save' || msg.type === 'edit_delete') {
+        if (!CURATION_CODE) {
+          ws.send(JSON.stringify({ type: msg.type, error: 'curation_disabled' }));
+          return;
+        }
+        const { textNodeUrl, clusterName, work, props } = msg;
+        const s = driver.session({ database: 'memgraph' });
+        try {
+          const tx = s.beginTransaction();
+          try {
+            // Delete existing CLUSTER_REL (idempotent — fine if it doesn't exist)
+            await tx.run(
+              'MATCH (n:TextNode {url: $url})-[r:CLUSTER_REL]->(c:Cluster {name: $clusterName}) DELETE r',
+              { url: textNodeUrl, clusterName }
+            );
+            if (msg.type === 'edit_save') {
+              await tx.run(
+                'MATCH (n:TextNode {url: $url}), (c:Cluster {name: $clusterName}) ' +
+                'CREATE (n)-[r:CLUSTER_REL]->(c) SET r += $props',
+                { url: textNodeUrl, clusterName, props: props || {} }
+              );
+            }
+            // Refresh n_r — OPTIONAL MATCH + WHERE with null-guard handles the zero-count case
+            // (a plain MATCH would return no rows when all edges are gone, leaving n_r stale)
+            const nrResult = await tx.run(
+              'MATCH (c:Cluster {name: $name}) ' +
+              'OPTIONAL MATCH (n:TextNode)-[:CLUSTER_REL]->(c) ' +
+              'WITH c, n WHERE n IS NULL OR (n.gateway = false AND n.section_title IS NULL) ' +
+              'WITH c, count(n) AS total SET c.n_r = total RETURN total',
+              { name: clusterName }
+            );
+            const n_r = nrResult.records[0]?.get('total').toNumber() ?? 0;
+            // Refresh CONTAINS_CLUSTER count on the gateway for this work
+            await tx.run(
+              'MATCH (gw:TextNode {gateway: true, source_text: $work})-[r:CONTAINS_CLUSTER]->(c:Cluster {name: $name}) ' +
+              'OPTIONAL MATCH (n:TextNode {source_text: $work})-[:CLUSTER_REL]->(c) ' +
+              'WITH r, n WHERE n IS NULL OR (n.gateway = false AND n.section_title IS NULL) ' +
+              'WITH r, count(n) AS total SET r.count = total',
+              { name: clusterName, work }
+            );
+            await tx.commit();
+            const eventType = msg.type === 'edit_save' ? 'cluster_rel_saved' : 'cluster_rel_deleted';
+            ws.send(JSON.stringify({ type: msg.type, ok: true }));
+            broadcastCorpusUpdate({ type: eventType, textNodeUrl, clusterName, work, props: props || {}, n_r });
+            console.log(`[BD] ${eventType}: ${textNodeUrl} → ${clusterName} (n_r=${n_r})`);
+          } catch (err) {
+            await tx.rollback();
+            throw err;
+          }
+        } catch (err) {
+          console.error(`[BD] ${msg.type} error:`, err.message);
+          ws.send(JSON.stringify({ type: msg.type, error: err.message }));
         } finally {
           await s.close();
         }
