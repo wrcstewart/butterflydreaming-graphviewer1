@@ -346,10 +346,12 @@ wss.on('connection', async (ws) => {
             'CREATE (c:Cluster { name: $newName, display_name: $newName, label: $newName, n_r: 0 })',
             { sourceName, newName }
           );
+          // Copy DESCENDS_FROM edges. Use undirected MATCH to be robust against
+          // DB direction uncertainty; spec says Family-[:DESCENDS_FROM]->Cluster.
           await s.run(
-            'MATCH (parent)-[r:DESCENDS_FROM]->(src:Cluster {name: $sourceName}) ' +
+            'MATCH (family:Family)-[r:DESCENDS_FROM]-(src:Cluster {name: $sourceName}) ' +
             'MATCH (c:Cluster {name: $newName}) ' +
-            'CREATE (parent)-[:DESCENDS_FROM {weight: r.weight}]->(c)',
+            'CREATE (family)-[:DESCENDS_FROM {weight: r.weight}]->(c)',
             { sourceName, newName }
           );
           const result = await s.run(
@@ -361,8 +363,17 @@ wss.on('connection', async (ws) => {
             id: node.elementId ?? node.identity.toString(),
             ...serializeProps(node.properties),
           };
+          // Return parent family names+weights so client can add edges to Cytoscape
+          const parentsResult = await s.run(
+            'MATCH (f:Family)-[r:DESCENDS_FROM]-(c:Cluster {name: $newName}) RETURN f.name AS fname, r.weight AS weight',
+            { newName }
+          );
+          const parents = parentsResult.records.map(rec => ({
+            fname:  rec.get('fname'),
+            weight: serializeValue(rec.get('weight')),
+          }));
           ws.send(JSON.stringify({ type: 'edit_clone_cluster', ok: true }));
-          broadcastCorpusUpdate({ type: 'cluster_cloned', newCluster, sourceName });
+          broadcastCorpusUpdate({ type: 'cluster_cloned', newCluster, sourceName, parents });
           console.log(`[BD] cluster_cloned: ${newName} from ${sourceName}`);
         } catch (err) {
           console.error('[BD] edit_clone_cluster error:', err.message);

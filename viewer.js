@@ -2009,7 +2009,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
     } else {
       if (type === 'Cluster') {
-        expandToCluster(node);
+        // In snake edit mode the displayed cluster node is visually repurposed to
+        // show the selected chip. Navigate to the chip's actual cluster instead.
+        const target = (editModeActive && editSelectedClusterId && editSelectedClusterId !== node.id())
+          ? cy.getElementById(editSelectedClusterId)
+          : node;
+        expandToCluster(target);
       } else if (type === 'Family') {
         expandToFamily(node);
       } else if (type === 'TextNode' && node.data('gateway')) {
@@ -2299,6 +2304,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         n_r:          0,
       }
     });
+    // Add DESCENDS_FROM edges so expandToCluster shows the correct Family parents.
+    // Direction follows Cytoscape convention: source=Cluster, target=Family.
+    if (msg.parents && msg.parents.length) {
+      msg.parents.forEach(p => {
+        const familyNode = cy.nodes('[type="Family"]').filter(n => n.data('name') === p.fname).first();
+        if (familyNode.length) {
+          cy.add({ group: 'edges', data: {
+            type:   'DESCENDS_FROM',
+            source: msg.newCluster.id,
+            target: familyNode.id(),
+            weight: p.weight ?? 1,
+          }});
+        }
+      });
+    }
     if (editSelectedClusterId) {
       // In snake edit view: hide the raw Cluster node (it's shown via a chip)
       // and rebuild the grid. Do NOT change the selection — the clone will appear
