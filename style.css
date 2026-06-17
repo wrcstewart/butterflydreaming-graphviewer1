@@ -175,11 +175,8 @@ html, body {
 
 #cluster-editor-bar {
   position: fixed;
-  bottom: 35px;
-  left: 50%;
-  transform: translateX(-50%);
-  align-items: flex-end;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   padding: 6px 10px;
   background: rgba(0,0,0,0.75);
   border: 1px solid #444;
@@ -236,9 +233,6 @@ html, body {
 
 #clone-panel {
   position: fixed;
-  bottom: 70px;
-  left: 50%;
-  transform: translateX(-50%);
   align-items: center;
   gap: 8px;
   padding: 4px 10px;

@@ -1572,6 +1572,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     document.getElementById('clone-panel').style.display = 'none';
   }
 
+  function positionEditorBar() {
+    const bar = document.getElementById('cluster-editor-bar');
+    if (bar.style.display === 'none') return;
+    if (!lastClusterNode || !lastClusterNode.length || !lastClusterNode.visible()) return;
+    try {
+      const bb = lastClusterNode.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
+      bar.style.left      = (bb.x2 + 10) + 'px';
+      bar.style.top       = Math.round((bb.y1 + bb.y2) / 2) + 'px';
+      bar.style.transform = 'translateY(-50%)';
+    } catch (_) {}
+  }
+
   function updateEditorBar() {
     const bar       = document.getElementById('cluster-editor-bar');
     const deleteBtn = document.getElementById('editor-delete-btn');
@@ -1586,6 +1598,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     bar.style.display = 'flex';
     cloneBtn.style.display = 'inline-block';
+    positionEditorBar();
 
     if (!editSelectedTextNodeId) {
       spinners.forEach(s => { s.style.display = 'none'; });
@@ -2113,6 +2126,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   });
 
+  cy.on('render', positionEditorBar);
+
   // Keep butterfly cursor — Cytoscape resets it during its own mouseover pipeline,
   // so we re-apply on every mousemove, which fires after Cytoscape's handlers settle.
   const butterflyCursor = "url('cursor-wings.svg') 16 16, auto";
@@ -2270,7 +2285,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const sourceCluster = cy.getElementById(editSelectedClusterId);
     const sourceName    = sourceCluster.data('name') || '';
     document.getElementById('clone-name-input').value = sourceName + ' (2)';
-    document.getElementById('clone-panel').style.display = 'flex';
+    const bar   = document.getElementById('cluster-editor-bar');
+    const panel = document.getElementById('clone-panel');
+    const rect  = bar.getBoundingClientRect();
+    panel.style.left      = rect.left + 'px';
+    panel.style.top       = (rect.bottom + 4) + 'px';
+    panel.style.transform = 'none';
+    panel.style.display   = 'flex';
   });
 
   document.getElementById('clone-cancel-btn').addEventListener('click', () => {
