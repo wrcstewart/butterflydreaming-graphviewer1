@@ -1626,12 +1626,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       chip.style({ 'opacity': 1.0, 'width': chipW, 'height': chipH, 'border-width': 0 });
     });
 
-    // Update the current cluster node above the text grid to reflect the selection
+    // Update the current cluster node above the text grid to reflect the selection.
+    // Its badge is wired to its own n_r data; temporarily swap that data to show
+    // the selected cluster's count, then restore so underlying data stays correct.
     if (lastClusterNode && lastClusterNode.length) {
       lastClusterNode.style({
         'background-color': selectedColour,
         'label':            selectedName,
       });
+      const origN_r = lastClusterNode.data('n_r');
+      lastClusterNode.data('n_r', selectedCluster.data('n_r') ?? 0);
+      addBadge(lastClusterNode);
+      lastClusterNode.data('n_r', origN_r);
     }
 
     // Highlight text nodes belonging to the selected cluster
