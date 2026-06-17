@@ -2227,10 +2227,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
     }
 
+    // Refresh snake view text-node background colours with updated edge data
+    if (editSelectedClusterId) applyEditChipSelection(editSelectedClusterId);
+
+    // Update Cluster n_r badge
     if (clusterNode.length && msg.n_r !== undefined) {
       clusterNode.data('n_r', msg.n_r);
       addBadge(clusterNode);
     }
+
+    // Update CONTAINS_CLUSTER edge count and gateway badge (cluster view)
+    if (clusterNode.length && msg.cc_count !== undefined) {
+      const ccEdge = clusterNode.incomers('edge[type="CONTAINS_CLUSTER"]')
+        .filter(e => e.source().data('source_text') === msg.work).first();
+      if (ccEdge.length) {
+        ccEdge.data('count', msg.cc_count);
+        const gw = ccEdge.source();
+        gw.data('n_r', msg.cc_count);
+        addBadge(gw);
+      }
+    }
+
     clearEditSelection();
   }
 
