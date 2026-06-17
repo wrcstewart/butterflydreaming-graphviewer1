@@ -346,12 +346,13 @@ wss.on('connection', async (ws) => {
             'CREATE (c:Cluster { name: $newName, display_name: $newName, label: $newName, n_r: 0 })',
             { sourceName, newName }
           );
-          // Copy DESCENDS_FROM edges. Use undirected MATCH to be robust against
-          // DB direction uncertainty; spec says Family-[:DESCENDS_FROM]->Cluster.
+          // Copy all DESCENDS_FROM edges from the source cluster. No label constraint
+          // on the parent so sub-families (also :Family in Memgraph) are included.
           await s.run(
-            'MATCH (family:Family)-[r:DESCENDS_FROM]-(src:Cluster {name: $sourceName}) ' +
+            'MATCH (parent)-[r:DESCENDS_FROM]-(src:Cluster {name: $sourceName}) ' +
+            'WHERE NOT parent:Cluster ' +
             'MATCH (c:Cluster {name: $newName}) ' +
-            'CREATE (family)-[:DESCENDS_FROM {weight: r.weight}]->(c)',
+            'CREATE (parent)-[:DESCENDS_FROM {weight: r.weight}]->(c)',
             { sourceName, newName }
           );
           const result = await s.run(
@@ -365,7 +366,9 @@ wss.on('connection', async (ws) => {
           };
           // Return parent family names+weights so client can add edges to Cytoscape
           const parentsResult = await s.run(
-            'MATCH (f:Family)-[r:DESCENDS_FROM]-(c:Cluster {name: $newName}) RETURN f.name AS fname, r.weight AS weight',
+            'MATCH (parent)-[r:DESCENDS_FROM]-(c:Cluster {name: $newName}) ' +
+            'WHERE NOT parent:Cluster ' +
+            'RETURN parent.name AS fname, r.weight AS weight',
             { newName }
           );
           const parents = parentsResult.records.map(rec => ({
