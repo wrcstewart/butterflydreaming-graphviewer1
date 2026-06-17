@@ -1577,10 +1577,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (bar.style.display === 'none') return;
     if (!lastClusterNode || !lastClusterNode.length || !lastClusterNode.visible()) return;
     try {
-      const bb = lastClusterNode.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
-      bar.style.left      = (bb.x2 + 10) + 'px';
-      bar.style.top       = Math.round((bb.y1 + bb.y2) / 2) + 'px';
-      bar.style.transform = 'translateY(-50%)';
+      const bb            = lastClusterNode.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
+      const containerTop  = cy.container().getBoundingClientRect().top;
+      const nodeScreenY   = Math.round(containerTop + (bb.y1 + bb.y2) / 2);
+      bar.style.left      = '50%';
+      bar.style.top       = nodeScreenY + 'px';
+      bar.style.transform = 'translateX(-50%) translateY(-50%)';
     } catch (_) {}
   }
 
