@@ -374,7 +374,7 @@ wss.on('connection', async (ws) => {
           }));
           ws.send(JSON.stringify({ type: 'edit_clone_cluster', ok: true }));
           broadcastCorpusUpdate({ type: 'cluster_cloned', newCluster, sourceName, parents });
-          console.log(`[BD] cluster_cloned: ${newName} from ${sourceName}`);
+          console.log(`[BD] cluster_cloned: ${newName} from ${sourceName} (${parents.length} parent(s): ${parents.map(p => p.fname).join(', ') || 'none'})`);
         } catch (err) {
           console.error('[BD] edit_clone_cluster error:', err.message);
           ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: err.message }));
