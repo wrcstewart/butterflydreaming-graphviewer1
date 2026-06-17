@@ -293,9 +293,11 @@ wss.on('connection', async (ws) => {
               { name: clusterName }
             );
             const n_r = nrResult.records[0]?.get('total').toNumber() ?? 0;
-            // Refresh CONTAINS_CLUSTER count on the gateway for this work
+            // Refresh CONTAINS_CLUSTER count — MERGE creates the edge on first association
             const ccResult = await tx.run(
-              'MATCH (gw:TextNode {gateway: true, source_text: $work})-[r:CONTAINS_CLUSTER]->(c:Cluster {name: $name}) ' +
+              'MATCH (gw:TextNode {gateway: true, source_text: $work}), (c:Cluster {name: $name}) ' +
+              'MERGE (gw)-[r:CONTAINS_CLUSTER]->(c) ' +
+              'WITH r ' +
               'OPTIONAL MATCH (n:TextNode {source_text: $work})-[:CLUSTER_REL]->(c) ' +
               'WITH r, n WHERE n IS NULL OR (n.gateway = false AND n.section_title IS NULL) ' +
               'WITH r, count(n) AS total SET r.count = total RETURN total AS cc_count',

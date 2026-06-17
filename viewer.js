@@ -1561,6 +1561,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
     cy.nodes('[type="Cluster"]').removeStyle('width height text-max-width background-color label border-width border-color border-opacity');
     cy.nodes('[type="ClusterEditChip"]').remove();
+    // Restore lastClusterNode badge to its own n_r in case a temporary-swap left it
+    // showing a different cluster's count during edit mode
+    if (lastClusterNode && lastClusterNode.length) addBadge(lastClusterNode);
     editSelectedClusterId  = null;
     editSelectedTextNodeId = null;
     document.getElementById('cluster-editor-bar').style.display = 'none';
@@ -2234,12 +2237,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (clusterNode.length && msg.n_r !== undefined) {
       clusterNode.data('n_r', msg.n_r);
       addBadge(clusterNode);
+      // lastClusterNode is the only visible Cluster node in snake view. It's visually
+      // repurposed to show the selected cluster's colour/label (applyEditChipSelection),
+      // so if it's a different node its badge also needs to reflect the saved count.
+      if (lastClusterNode && lastClusterNode.length && lastClusterNode.id() !== clusterNode.id()) {
+        const orig = lastClusterNode.data('n_r');
+        lastClusterNode.data('n_r', msg.n_r);
+        addBadge(lastClusterNode);
+        lastClusterNode.data('n_r', orig);  // preserve actual data; exitSnakeView restores badge
+      }
     }
 
-    // Update CONTAINS_CLUSTER edge count and gateway badge (cluster view)
+    // Update CONTAINS_CLUSTER edge count and gateway badge (cluster view).
+    // If no CONTAINS_CLUSTER edge exists yet (first association), create it in Cytoscape.
     if (clusterNode.length && msg.cc_count !== undefined) {
-      const ccEdge = clusterNode.incomers('edge[type="CONTAINS_CLUSTER"]')
+      let ccEdge = clusterNode.incomers('edge[type="CONTAINS_CLUSTER"]')
         .filter(e => e.source().data('source_text') === msg.work).first();
+      if (!ccEdge.length) {
+        const gwNode = cy.nodes('[type="TextNode"][?gateway]')
+          .filter(n => n.data('source_text') === msg.work).first();
+        if (gwNode.length) {
+          cy.add({ group: 'edges', data: { type: 'CONTAINS_CLUSTER', source: gwNode.id(), target: clusterNode.id(), count: msg.cc_count } });
+          ccEdge = clusterNode.incomers('edge[type="CONTAINS_CLUSTER"]')
+            .filter(e => e.source().data('source_text') === msg.work).first();
+        }
+      }
       if (ccEdge.length) {
         ccEdge.data('count', msg.cc_count);
         const gw = ccEdge.source();
