@@ -1605,7 +1605,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.nodes('[type="ClusterEditChip"]').forEach(chip => {
       chip.style({ 'width': chipW, 'height': chipH, 'border-width': 0 });
     });
-    editSelectedClusterId  = null;
+    // Keep editSelectedClusterId so the next text-node tap reopens the bar immediately
     editSelectedTextNodeId = null;
     updateEditorBar();
   }
