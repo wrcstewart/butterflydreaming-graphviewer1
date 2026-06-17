@@ -2430,11 +2430,13 @@ function setupNrBadges(cy) {
 
   function addBadge(node) {
     const nr = node.data('n_r');
-    if (!nr || nr <= 0) return;
     if (badges.has(node.id())) {
-      badges.get(node.id()).textContent = String(nr);
+      // Always update existing badge text — clears it (to '') when nr=0 so
+      // the temp-swap in applyEditChipSelection doesn't leave stale counts visible
+      badges.get(node.id()).textContent = (nr && nr > 0) ? String(nr) : '';
       return;
     }
+    if (!nr || nr <= 0) return;
     const div = document.createElement('div');
     div.textContent = String(nr);
     div.style.cssText = 'position:absolute;font-size:9px;font-family:sans-serif;line-height:1;display:none;transform:translate(-50%,-100%);';
