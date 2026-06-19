@@ -32,6 +32,7 @@ let editModeActive        = false;
 let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
 let chipGridParams         = null;
+let chatModeActive         = false;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -938,7 +939,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let recentTouchTimer = null;
   let desktopPendingNodeId = null;
   let desktopClickTimer = null;
-  let chatModeActive = false;
   let lastClusterNode = null;
   let currentClusterColour = null;
   let lastParentNode = null;
