@@ -2736,14 +2736,32 @@ async function init() {
 
   const chatBtn  = document.getElementById('chat-btn');
   const chatPanel = document.getElementById('chat-panel');
+  let savedChatZoom = null;
+  let savedChatPan  = null;
 
   function toggleChatMode() {
-    const zoom = cy.zoom();
-    const pan  = cy.pan();
     chatModeActive = !chatModeActive;
+    if (chatModeActive) {
+      savedChatZoom = cy.zoom();
+      savedChatPan  = cy.pan();
+    }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
-    setTimeout(() => { cy.resize(); cy.zoom(zoom); cy.pan(pan); }, 0);
+    setTimeout(() => {
+      cy.resize();
+      if (chatModeActive) {
+        if (isTouchDevice) {
+          cy.fit(undefined, 20);
+        } else {
+          cy.zoom({ level: savedChatZoom * 0.65, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+        }
+      } else if (savedChatZoom !== null) {
+        cy.zoom(savedChatZoom);
+        cy.pan(savedChatPan);
+        savedChatZoom = null;
+        savedChatPan  = null;
+      }
+    }, 0);
   }
 
   chatBtn.addEventListener('click', toggleChatMode);
