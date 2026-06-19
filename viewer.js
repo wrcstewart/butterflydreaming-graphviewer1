@@ -1143,30 +1143,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let buddyDesktopPending = null;
   let buddyDesktopTimer   = null;
 
-  // Desktop hover — shows tooltip (suppressed in chat mode)
-  let buddyHoveredId = null;
-  buddyContainer.addEventListener('mousemove', evt => {
-    if (recentTouch || chatModeActive) return;
-    const rect    = buddyContainer.getBoundingClientRect();
-    const pan     = buddyCy.pan();
-    const canvasX = evt.clientX - rect.left - pan.x;
-    const canvasY = evt.clientY - rect.top  - pan.y;
-    const hit = buddyCy.nodes().filter(n => {
-      const bb = n.boundingBox();
-      return canvasX >= bb.x1 && canvasX <= bb.x2 && canvasY >= bb.y1 && canvasY <= bb.y2;
-    }).first();
-    if (!hit.length) { buddyHoveredId = null; hideTooltip(); return; }
-    if (hit.id() === buddyHoveredId) return;
-    buddyHoveredId = hit.id();
-    const content = buildBuddyChipTooltip(hit);
-    if (!content) { hideTooltip(); return; }
-    tooltip.textContent = content;
-    tooltip.style.display = 'block';
-    const bb = hit.renderedBoundingBox();
-    positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
-  });
-  buddyContainer.addEventListener('mouseleave', () => { buddyHoveredId = null; hideTooltip(); });
-
   buddyCy.on('tap', 'node', evt => {
     const chip = evt.target;
     const main = cy.getElementById(chip.data('mainId'));
@@ -1199,7 +1175,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    // Desktop: single click = populate textarea (chat mode); double click = navigate
+    // Desktop: single click = show tooltip / populate textarea; double click = navigate
     if (buddyDesktopPending === chip.id() && buddyDesktopTimer !== null) {
       clearTimeout(buddyDesktopTimer);
       buddyDesktopTimer = null;
@@ -1211,6 +1187,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       buddyDesktopPending = chip.id();
       if (chatModeActive) {
         document.getElementById('chat-text-area').value = buildBuddyChipTooltip(chip);
+      } else {
+        const content = buildBuddyChipTooltip(chip);
+        if (content) {
+          const bb   = chip.renderedBoundingBox();
+          const rect = buddyContainer.getBoundingClientRect();
+          tooltip.textContent = content;
+          tooltip.style.display = 'block';
+          positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
+        }
       }
       buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
     }
@@ -1224,32 +1209,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   let youDesktopPending = null;
   let youDesktopTimer   = null;
-
-  // Desktop hover — shows tooltip (suppressed in chat mode)
-  let youHoveredId = null;
-  youContainer.addEventListener('mousemove', evt => {
-    if (recentTouch || chatModeActive) return;
-    const rect    = youContainer.getBoundingClientRect();
-    const pan     = youCy.pan();
-    const canvasX = evt.clientX - rect.left - pan.x;
-    const canvasY = evt.clientY - rect.top  - pan.y;
-    const hit = youCy.nodes().filter(n => {
-      const bb = n.boundingBox();
-      return canvasX >= bb.x1 && canvasX <= bb.x2 && canvasY >= bb.y1 && canvasY <= bb.y2;
-    }).first();
-    if (!hit.length) { youHoveredId = null; hideTooltip(); return; }
-    if (hit.id() === youHoveredId) return;
-    youHoveredId = hit.id();
-    const main = cy.getElementById(hit.data('mainId'));
-    if (!main.length) { hideTooltip(); return; }
-    const content = buildTooltipContent(main);
-    if (!content) { hideTooltip(); return; }
-    tooltip.textContent = content;
-    tooltip.style.display = 'block';
-    const bb = hit.renderedBoundingBox();
-    positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
-  });
-  youContainer.addEventListener('mouseleave', () => { youHoveredId = null; hideTooltip(); });
 
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
@@ -1285,7 +1244,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    // Desktop: single click = populate textarea (chat mode); double click = navigate
+    // Desktop: single click = show tooltip / populate textarea; double click = navigate
     if (youDesktopPending === chip.id() && youDesktopTimer !== null) {
       clearTimeout(youDesktopTimer);
       youDesktopTimer = null;
@@ -1297,6 +1256,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       youDesktopPending = chip.id();
       if (chatModeActive) {
         document.getElementById('chat-text-area').value = buildTooltipContent(main);
+      } else {
+        const content = buildTooltipContent(main);
+        if (content) {
+          const bb   = chip.renderedBoundingBox();
+          const rect = youContainer.getBoundingClientRect();
+          tooltip.textContent = content;
+          tooltip.style.display = 'block';
+          positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
+        }
       }
       youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
     }
