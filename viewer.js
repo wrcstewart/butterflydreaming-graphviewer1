@@ -2086,7 +2086,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    // Desktop: single click = show tooltip; double click (second click within 300ms) = navigate
+    // Desktop: single click = show tooltip immediately; double click = navigate
     if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
       clearTimeout(desktopClickTimer);
       desktopClickTimer = null;
@@ -2097,10 +2097,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearTimeout(desktopClickTimer);
       desktopPendingNodeId = node.id();
       const rp = evt.renderedPosition;
+      showTooltip(node, rp.x, rp.y, false);
       desktopClickTimer = setTimeout(() => {
         desktopClickTimer = null;
         desktopPendingNodeId = null;
-        showTooltip(node, rp.x, rp.y, false);
       }, 450);
     }
   });
