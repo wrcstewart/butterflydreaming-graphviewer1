@@ -4481,3 +4481,1134 @@ Why not needed yet: the current usage model has the developer writing hints at
 the end of a curation session and other users reading them on next load. Live
 refresh becomes relevant if real-time multi-user updates or frequent corpus
 additions are needed. The implementation path above is low-risk when required.
+
+
+
+## Amendment 33 — graphviewer.md — 15 June 2026
+
+## Cluster Edit Mode
+
+### Overview
+
+A developer/editor mode for managing CLUSTER_REL relationships
+between TextNodes and Clusters directly in the viewer — adding
+or removing cluster tags on text chunks without writing Cypher.
+Restricted to larger devices; not optimised for mobile.
+
+---
+
+### 33.1 Edit Mode Checkbox — Access Code Protected
+
+Add a small checkbox at screen bottom next to the Reset button,
+labelled "Edit mode". The checkbox is only enabled after the user
+enters a developer access code.
+
+On first interaction with the checkbox (before code entered):
+prompt for an access code. If correct, enable the checkbox for
+the remainder of the session. If incorrect, ignore.
+
+The access code should be a simple hardcoded string in viewer.js
+— this is a developer feature, not a security system.
+
+```javascript
+const EDIT_MODE_CODE = 'bd-edit-2026'; // change as needed
+
+let editModeUnlocked = false;
+let editModeActive = false;
+
+document.getElementById('edit-mode-checkbox').addEventListener('change', (e) => {
+    if (!editModeUnlocked) {
+        const code = prompt('Enter edit mode code:');
+        if (code === EDIT_MODE_CODE) {
+            editModeUnlocked = true;
+        } else {
+            e.target.checked = false;
+            return;
+        }
+    }
+    editModeActive = e.target.checked;
+    onEditModeChange(editModeActive);
+});
+```
+
+HTML addition at screen bottom alongside Reset button:
+
+```html
+<div id="bottom-bar">
+    <button id="reset-btn">Reset</button>
+    <label id="edit-mode-label">
+        <input type="checkbox" id="edit-mode-checkbox"> Edit mode
+    </label>
+</div>
+```
+
+CSS — position at screen bottom, same row as Reset:
+
+```css
+#bottom-bar {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 1000;
+}
+
+#edit-mode-label {
+    font-size: 11px;
+    color: #888888;
+    cursor: pointer;
+    user-select: none;
+}
+```
+
+---
+
+### 33.2 Edit Mode — Behaviour Changes
+
+When `editModeActive` is true:
+
+**Outside Read View:** no visible change. Edit mode is indicated
+only by the checkbox state. Navigation remains normal.
+
+**Inside Read View** (after clicking a title page node):
+- A Cluster grid panel appears above the text node snake
+- Cluster nodes and TextNodes respond to clicks differently
+  (see 33.3 and 33.4)
+
+---
+
+### 33.3 Cluster Grid Panel — Read View Only
+
+When edit mode is active and the user enters Read View (title
+page click), render a compact grid of ALL Cluster nodes above
+the text node snake.
+
+**Layout:**
+- Full width of the canvas area
+- Clusters arranged in rows, ordered by colour proximity
+  (nearest-neighbour HSL chain sort — see below)
+- Each Cluster node approximately half the dimensions of
+  a text node in the snake
+- Smallest available font size — same font size as used
+  in the breadcrumb chips (currently the smallest legible
+  text in the viewer)
+
+**Cluster ordering — nearest-neighbour HSL sort:**
+
+```javascript
+function sortClustersByColour(clusters) {
+    const unvisited = new Set(clusters.map(c => c.id()));
+    const result = [];
+    let current = clusters[0]; // start from first
+    unvisited.delete(current.id());
+    result.push(current);
+
+    while (unvisited.size > 0) {
+        let nearest = null;
+        let minDist = Infinity;
+
+        for (const id of unvisited) {
+            const candidate = cy.getElementById(id);
+            const dist = hslDistance(
+                hexToHsl(current.data('colour')),
+                hexToHsl(candidate.data('colour'))
+            );
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = candidate;
+            }
+        }
+
+        unvisited.delete(nearest.id());
+        result.push(nearest);
+        current = nearest;
+    }
+    return result;
+}
+
+function hslDistance(hsl1, hsl2) {
+    let dh = Math.abs(hsl1.h - hsl2.h);
+    if (dh > 180) dh = 360 - dh;
+    const ds = Math.abs(hsl1.s - hsl2.s);
+    const dl = Math.abs(hsl1.l - hsl2.l);
+    return (dh / 180) * 0.6 + ds * 0.2 + dl * 0.2;
+}
+```
+
+**Implementation note:** The Cluster grid is a separate DOM
+element (not a Cytoscape canvas) positioned above the snake.
+Render colour-sorted Cluster chips as div elements — same
+visual style as breadcrumb chips but smaller. Each chip shows
+the Cluster display_name or label in the smallest legible font.
+
+```html
+<div id="cluster-edit-grid"></div>
+```
+
+```css
+#cluster-edit-grid {
+    display: none; /* shown only in edit mode + read view */
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.4);
+    border-bottom: 1px solid #333;
+}
+
+#cluster-edit-grid.active {
+    display: flex;
+}
+
+.cluster-edit-chip {
+    font-size: 9px; /* smallest legible — same as breadcrumb chips */
+    padding: 2px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+
+.cluster-edit-chip.selected {
+    outline: 2px solid #ffffff;
+    opacity: 1.0;
+}
+```
+
+---
+
+### 33.4 Selection State — Next Amendment
+
+Click behaviour for Clusters and TextNodes in edit mode,
+and the add/remove CLUSTER_REL logic, will be specified
+in Amendment 34 once the grid display is verified working.
+
+---
+
+### 33.5 Device Restriction
+
+Edit mode is a developer/editor feature. It is not optimised
+for mobile — cluster chips at half text-node size with minimum
+font will be difficult to use on a phone screen. No special
+handling needed for mobile; the feature simply works better
+on desktop and tablet.
+
+---
+
+### 33.6 Implementation Order
+
+1. Add checkbox at screen bottom with access code protection
+2. Implement `editModeActive` flag and `onEditModeChange()`
+3. Implement `sortClustersByColour()` using hexToHsl and
+   hslDistance (hexToHsl already exists in viewer.js)
+4. Render Cluster grid panel in Read View when edit mode active
+5. Report back before proceeding to Amendment 34
+
+Here is the combined Amendment 34/35:
+
+---
+
+```markdown
+## Amendment 34 — graphviewer.md — 15 June 2026
+
+## Cluster Edit Mode — Full Property Editor
+
+### Overview
+
+Amendment 33 introduced the Edit Mode checkbox, access code
+protection, Cluster grid panel, and selection state for both
+Cluster chips and TextNode chips. This amendment adds the
+complete property editor — spinners for each CLUSTER_REL
+property, Save and Delete buttons, and automatic refresh of
+Cluster n_r and Gateway CONTAINS_CLUSTER counts after every
+change.
+
+The editor is designed for desktop/laptop/iPad. It is not
+optimised for mobile — spinners at this scale are impractical
+on a phone screen.
+
+---
+
+### 34.1 Editor Controls Layout
+
+When edit mode is active and both a Cluster chip and a TextNode
+chip are selected, a horizontal editor bar appears above the
+text node grid:
+
+```
+[tagged_as ▲▼] [resonates_with ▲▼] [bridges_to ▲▼] [echoes ▲▼] [gives ▲▼]  [Save]  [Delete]
+```
+
+Each spinner: label above, numeric input below with up/down
+arrows. Range 0.0 to 1.0 in 0.1 steps.
+
+Delete button only visible when a CLUSTER_REL already exists
+between the selected pair.
+
+```html
+<div id="cluster-editor-bar" style="display:none">
+    <div class="spinner-group">
+        <label>tagged_as</label>
+        <input type="number" id="sp-tagged-as"
+               min="0" max="1" step="0.1" value="0.5">
+    </div>
+    <div class="spinner-group">
+        <label>resonates_with</label>
+        <input type="number" id="sp-resonates-with"
+               min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <div class="spinner-group">
+        <label>bridges_to</label>
+        <input type="number" id="sp-bridges-to"
+               min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <div class="spinner-group">
+        <label>echoes</label>
+        <input type="number" id="sp-echoes"
+               min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <div class="spinner-group">
+        <label>gives</label>
+        <input type="number" id="sp-gives"
+               min="0" max="1" step="0.1" value="0.0">
+    </div>
+    <button id="editor-save-btn">Save</button>
+    <button id="editor-delete-btn" style="display:none">Delete</button>
+</div>
+```
+
+```css
+#cluster-editor-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.5);
+    border-bottom: 1px solid #444;
+    font-size: 10px;
+    color: #cccccc;
+}
+
+.spinner-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.spinner-group input {
+    width: 48px;
+    font-size: 11px;
+    text-align: center;
+    background: #1a1a2e;
+    color: #ffffff;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 2px;
+}
+
+#editor-save-btn, #editor-delete-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    align-self: flex-end;
+}
+
+#editor-save-btn {
+    background: #4A8C4F;
+    color: #ffffff;
+    border: none;
+}
+
+#editor-delete-btn {
+    background: #C0504D;
+    color: #ffffff;
+    border: none;
+}
+```
+
+---
+
+### 34.2 Populating Spinners on Selection
+
+Call `updateEditorBar()` after any selection change — whenever
+editSelectedCluster or editSelectedTextNode changes:
+
+```javascript
+function updateEditorBar() {
+    const bar = document.getElementById('cluster-editor-bar');
+    const deleteBtn = document.getElementById('editor-delete-btn');
+
+    if (!editSelectedCluster || !editSelectedTextNode) {
+        bar.style.display = 'none';
+        return;
+    }
+
+    bar.style.display = 'flex';
+
+    // Find existing CLUSTER_REL edge if present
+    const edge = editSelectedTextNode
+        .outgoers('edge[type="CLUSTER_REL"]')
+        .filter(e => e.target().id() === editSelectedCluster.id())
+        .first();
+
+    if (edge.length) {
+        // Populate from existing relationship values
+        document.getElementById('sp-tagged-as').value =
+            edge.data('tagged_as') || 0.0;
+        document.getElementById('sp-resonates-with').value =
+            edge.data('resonates_with') || 0.0;
+        document.getElementById('sp-bridges-to').value =
+            edge.data('bridges_to') || 0.0;
+        document.getElementById('sp-echoes').value =
+            edge.data('echoes') || 0.0;
+        document.getElementById('sp-gives').value =
+            edge.data('gives') || 0.0;
+        deleteBtn.style.display = 'inline-block';
+    } else {
+        // No existing edge — initialise defaults
+        document.getElementById('sp-tagged-as').value = 0.5;
+        document.getElementById('sp-resonates-with').value = 0.0;
+        document.getElementById('sp-bridges-to').value = 0.0;
+        document.getElementById('sp-echoes').value = 0.0;
+        document.getElementById('sp-gives').value = 0.0;
+        deleteBtn.style.display = 'none';
+    }
+}
+```
+
+---
+
+### 34.3 Save Action
+
+Reads spinner values and creates or updates the CLUSTER_REL.
+Only properties with value > 0 are stored — sparse properties,
+absent implies 0.0.
+
+After save: refresh Cluster n_r AND CONTAINS_CLUSTER count
+on the Gateway node for the affected work.
+
+```javascript
+document.getElementById('editor-save-btn').addEventListener('click', () => {
+    const props = {};
+    const ta = parseFloat(document.getElementById('sp-tagged-as').value);
+    const rw = parseFloat(document.getElementById('sp-resonates-with').value);
+    const bt = parseFloat(document.getElementById('sp-bridges-to').value);
+    const ec = parseFloat(document.getElementById('sp-echoes').value);
+    const gi = parseFloat(document.getElementById('sp-gives').value);
+
+    if (ta > 0) props.tagged_as = ta;
+    if (rw > 0) props.resonates_with = rw;
+    if (bt > 0) props.bridges_to = bt;
+    if (ec > 0) props.echoes = ec;
+    if (gi > 0) props.gives = gi;
+
+    ws.send(JSON.stringify({
+        type: 'edit_save',
+        textNodeUrl: editSelectedTextNode.data('url'),
+        clusterName: editSelectedCluster.data('name'),
+        work: editSelectedTextNode.data('source_text'),
+        props
+    }));
+});
+```
+
+Server handler for edit_save — delete existing edge first
+then create fresh with new properties:
+
+```javascript
+await session.run(
+    `MATCH (n:TextNode {url: $url})-[r:CLUSTER_REL]->(c:Cluster {name: $clusterName})
+     DELETE r`,
+    { url, clusterName }
+);
+await session.run(
+    `MATCH (n:TextNode {url: $url}), (c:Cluster {name: $clusterName})
+     CREATE (n)-[:CLUSTER_REL $props]->(c)`,
+    { url, clusterName, props }
+);
+
+// Refresh Cluster n_r
+await session.run(
+    `MATCH (n:TextNode)-[:CLUSTER_REL]->(c:Cluster {name: $name})
+     WHERE n.gateway = false AND n.section_title IS NULL
+     WITH c, count(n) AS total
+     SET c.n_r = total`,
+    { name: clusterName }
+);
+
+// Refresh CONTAINS_CLUSTER count on Gateway for this work
+await session.run(
+    `MATCH (gw:TextNode {gateway: true, source_text: $work})
+     -[r:CONTAINS_CLUSTER]->(c:Cluster {name: $name})
+     OPTIONAL MATCH (n:TextNode {source_text: $work})-[:CLUSTER_REL]->(c)
+     WHERE n.gateway = false AND n.section_title IS NULL
+     WITH r, count(n) AS total
+     SET r.count = total`,
+    { name: clusterName, work }
+);
+
+broadcastCorpusUpdate({
+    type: 'cluster_rel_saved',
+    clusterName,
+    work,
+    n_r: total
+});
+```
+
+Client on receipt: update edge data in Cytoscape, refresh
+badge, refresh editor bar, clear selection.
+
+---
+
+### 34.4 Delete Action
+
+Removes the CLUSTER_REL entirely. After delete: refresh
+Cluster n_r AND CONTAINS_CLUSTER count on Gateway.
+
+```javascript
+document.getElementById('editor-delete-btn').addEventListener('click', () => {
+    ws.send(JSON.stringify({
+        type: 'edit_delete',
+        textNodeUrl: editSelectedTextNode.data('url'),
+        clusterName: editSelectedCluster.data('name'),
+        work: editSelectedTextNode.data('source_text')
+    }));
+});
+```
+
+Server handler for edit_delete:
+
+```javascript
+await session.run(
+    `MATCH (n:TextNode {url: $url})-[r:CLUSTER_REL]->(c:Cluster {name: $clusterName})
+     DELETE r`,
+    { url, clusterName }
+);
+
+// Refresh Cluster n_r
+await session.run(
+    `MATCH (n:TextNode)-[:CLUSTER_REL]->(c:Cluster {name: $name})
+     WHERE n.gateway = false AND n.section_title IS NULL
+     WITH c, count(n) AS total
+     SET c.n_r = total`,
+    { name: clusterName }
+);
+
+// Refresh CONTAINS_CLUSTER count on Gateway for this work
+await session.run(
+    `MATCH (gw:TextNode {gateway: true, source_text: $work})
+     -[r:CONTAINS_CLUSTER]->(c:Cluster {name: $name})
+     OPTIONAL MATCH (n:TextNode {source_text: $work})-[:CLUSTER_REL]->(c)
+     WHERE n.gateway = false AND n.section_title IS NULL
+     WITH r, count(n) AS total
+     SET r.count = total`,
+    { name: clusterName, work }
+);
+
+broadcastCorpusUpdate({
+    type: 'cluster_rel_deleted',
+    clusterName,
+    work,
+    n_r: total
+});
+```
+
+Client on receipt: remove edge from Cytoscape, refresh badge,
+reset spinners to defaults, hide Delete button, clear selection.
+
+---
+
+### 34.5 Badge Update on Client
+
+On receiving cluster_rel_saved or cluster_rel_deleted,
+update the Cluster node badge using n_r from the broadcast
+payload — no second round trip needed:
+
+```javascript
+if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
+    const node = cy.nodes()
+        .filter(n => n.data('name') === msg.clusterName).first();
+    if (node.length && msg.n_r !== undefined) {
+        node.data('n_r', msg.n_r);
+    }
+}
+```
+
+---
+
+### 34.6 Deselect After Action
+
+After successful Save or Delete:
+- Clear editSelectedCluster and editSelectedTextNode
+- Remove selected styling from all chips
+- Hide editor bar
+- Leave edit mode active for next operation
+```
+
+Amendement 35
+## Amendment 35 — graphviewer.md — 16 June 2026
+
+## Cluster Edit Mode — Clone Cluster
+
+### Overview
+
+Adds a Clone button to the edit mode controls. When a Cluster
+is selected in the edit grid, Clone creates a new Cluster node
+in Memgraph with the same DESCENDS_FROM relationships and weights
+as the selected Cluster — giving it the same blended colour.
+The new Cluster starts with no CLUSTER_REL or CONTAINS_CLUSTER
+relationships — it has no TextNode connections until the user
+adds them via the editor.
+
+---
+
+### 35.1 Clone Button
+
+The Clone button is visible in edit mode whenever a Cluster
+chip is selected, regardless of whether a TextNode is also
+selected. Position it in the editor controls bar alongside
+Save and Delete.
+
+When clicked, a small inline panel appears below the controls
+bar containing:
+- A text input pre-filled with the selected Cluster's name
+  with " (2)" appended
+- A Confirm button to save the new Cluster
+- A Cancel button to dismiss without action
+
+```html
+<button id="editor-clone-btn" style="display:none">Clone</button>
+
+<div id="clone-panel" style="display:none">
+    <input type="text" id="clone-name-input" placeholder="New cluster name">
+    <button id="clone-confirm-btn">Confirm</button>
+    <button id="clone-cancel-btn">Cancel</button>
+</div>
+```
+
+```css
+#clone-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: rgba(0,0,0,0.4);
+    font-size: 11px;
+}
+
+#clone-name-input {
+    width: 200px;
+    font-size: 11px;
+    background: #1a1a2e;
+    color: #ffffff;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 3px 6px;
+}
+
+#clone-confirm-btn {
+    background: #4A8C4F;
+    color: #ffffff;
+    border: none;
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+#clone-cancel-btn {
+    background: #444;
+    color: #cccccc;
+    border: none;
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+```
+
+Show Clone button whenever editSelectedCluster is set:
+
+```javascript
+function updateEditorBar() {
+    // ... existing spinner logic ...
+
+    const cloneBtn = document.getElementById('editor-clone-btn');
+    cloneBtn.style.display = editSelectedCluster ? 'inline-block' : 'none';
+}
+```
+
+---
+
+### 35.2 Clone Button Click
+
+When Clone is clicked, show the clone panel and initialise
+the name input:
+
+```javascript
+document.getElementById('editor-clone-btn').addEventListener('click', () => {
+    const sourceName = editSelectedCluster.data('name');
+    document.getElementById('clone-name-input').value = sourceName + ' (2)';
+    document.getElementById('clone-panel').style.display = 'flex';
+});
+
+document.getElementById('clone-cancel-btn').addEventListener('click', () => {
+    document.getElementById('clone-panel').style.display = 'none';
+});
+```
+
+---
+
+### 35.3 Confirm Clone — Client
+
+On Confirm, send a WebSocket message with the source Cluster
+name and the new name:
+
+```javascript
+document.getElementById('clone-confirm-btn').addEventListener('click', () => {
+    const newName = document.getElementById('clone-name-input').value.trim();
+    if (!newName) return;
+
+    ws.send(JSON.stringify({
+        type: 'edit_clone_cluster',
+        sourceName: editSelectedCluster.data('name'),
+        newName
+    }));
+
+    document.getElementById('clone-panel').style.display = 'none';
+});
+```
+
+---
+
+### 35.4 Confirm Clone — Server
+
+Server handler for edit_clone_cluster:
+
+1. Create the new Cluster node
+2. Copy all DESCENDS_FROM relationships from the source
+   Cluster with the same weights
+3. Set n_r to 0 — no TextNodes connected yet
+4. Return the new Cluster's properties to the client
+
+```javascript
+// Create new Cluster node
+await session.run(
+    `MATCH (src:Cluster {name: $sourceName})
+     CREATE (c:Cluster {
+         name: $newName,
+         display_name: $newName,
+         label: $newName,
+         n_r: 0
+     })`,
+    { sourceName, newName }
+);
+
+// Copy DESCENDS_FROM relationships from source
+await session.run(
+    `MATCH (parent)-[r:DESCENDS_FROM]->(src:Cluster {name: $sourceName})
+     MATCH (c:Cluster {name: $newName})
+     CREATE (parent)-[:DESCENDS_FROM {weight: r.weight}]->(c)`,
+    { sourceName, newName }
+);
+
+// Fetch new Cluster properties to return to client
+const result = await session.run(
+    `MATCH (c:Cluster {name: $newName})
+     RETURN c`,
+    { newName }
+);
+
+const newClusterProps = result.records[0].get('c').properties;
+
+broadcastCorpusUpdate({
+    type: 'cluster_cloned',
+    newCluster: newClusterProps,
+    sourceName
+});
+```
+
+---
+
+### 35.5 Confirm Clone — Client Receipt
+
+On receiving cluster_cloned:
+
+1. Add the new Cluster node to Cytoscape with the same
+   colour as the source Cluster (inherited from shared
+   DESCENDS_FROM parents — compute via computeBlendedColours
+   or copy directly from source)
+2. Add the new Cluster chip to the edit grid — rerun the
+   colour sort so the new chip appears naturally adjacent
+   to the source chip
+3. Set the new Cluster as the selected Cluster
+   (editSelectedCluster)
+4. Clear any TextNode selection
+5. Refresh the editor bar
+
+```javascript
+if (msg.type === 'cluster_cloned') {
+    // Add to Cytoscape
+    const sourceColour = cy.nodes()
+        .filter(n => n.data('name') === msg.sourceName)
+        .first().data('colour');
+
+    cy.add({
+        group: 'nodes',
+        data: {
+            ...msg.newCluster,
+            type: 'Cluster',
+            colour: sourceColour,
+            n_r: 0
+        }
+    });
+
+    // Rebuild colour-sorted cluster grid
+    rebuildClusterEditGrid();
+
+    // Select new cluster
+    const newNode = cy.nodes()
+        .filter(n => n.data('name') === msg.newCluster.name).first();
+    editSelectedCluster = newNode;
+    editSelectedTextNode = null;
+    updateEditorBar();
+}
+```
+
+---
+
+### 35.6 Grid Rebuild
+
+`rebuildClusterEditGrid()` reruns the nearest-neighbour HSL
+colour sort across all Cluster nodes and re-renders the DOM
+chips. Call this after any Clone operation and after any
+operation that changes a Cluster's colour (none currently,
+but future-proofing).
+
+---
+
+### 35.7 Notes
+
+- The new Cluster has n_r = 0 and no CLUSTER_REL or
+  CONTAINS_CLUSTER relationships. It will not appear in
+  any Gateway's cluster list until TextNodes are connected
+  to it via the editor and CONTAINS_CLUSTER is rebuilt.
+
+- The new Cluster's blended colour is identical to the
+  source Cluster's because it inherits the same DESCENDS_FROM
+  parents with the same weights. The colour sort will place
+  it naturally adjacent to the source in the grid.
+
+- If the user wants a different name than the pre-filled
+  suggestion, they edit the text input before hitting Confirm.
+  The name must be unique — server should check and return
+  an error if a Cluster with that name already exists.
+  Text area width: 90% of screen width, centred.
+Same width on desktop and mobile — this is intentional
+for testing so space constraints are visible on all devices.
+
+```javascript
+function onChatModeChange(active) {
+    const viewer = document.getElementById('cy-main');
+    const panel = document.getElementById('chat-panel');
+
+    if (active) {
+        // Panel top 50%, viewer bottom 50%
+        panel.style.display = 'block';
+        viewer.style.height = '50vh';
+        viewer.style.position = 'absolute';
+        viewer.style.bottom = '0';
+        viewer.style.top = 'auto';
+        cy.resize(); // tell Cytoscape canvas has changed size
+    } else {
+        // Full screen graph
+        panel.style.display = 'none';
+        viewer.style.height = '100vh';
+        viewer.style.position = 'absolute';
+        viewer.style.top = '0';
+        viewer.style.bottom = 'auto';
+        cy.resize();
+    }
+}
+```
+
+---
+
+### 36.3 Panel HTML
+
+```html
+<div id="chat-panel" style="display:none">
+    <textarea id="chat-text-area"
+              placeholder="Click a node to read its text here...">
+    </textarea>
+</div>
+```
+
+```css
+#chat-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 8px;
+    background: #0a0a1a;
+    box-sizing: border-box;
+}
+
+#chat-text-area {
+    width: 90%;
+    height: calc(50vh - 24px);
+    background: #1a1a2e;
+    color: #ffffff;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: none;
+    font-family: inherit;
+}
+```
+
+---
+
+### 36.4 TextNode Click — Populate Panel
+
+When chat mode is active and the user single-clicks
+a TextNode, populate the text area with that node's
+text property:
+
+```javascript
+// In the single-click handler for TextNode:
+if (chatModeActive) {
+    const text = node.data('text') || '';
+    document.getElementById('chat-text-area').value = text;
+    // Still show node info in graph as normal
+}
+```
+
+When chat mode is not active, single click behaves
+as per Amendment 35 (Step 1) — shows node text in
+existing tooltip/info area.
+
+---
+
+### 36.5 Keyboard Behaviour on Mobile
+
+When the user taps the text area to edit on a mobile
+device, the iOS/Android keyboard rises from the bottom
+and naturally overlays the graph viewer below. No
+special handling needed — this is the browser's default
+behaviour. The graph viewer being obscured by the
+keyboard is acceptable and expected.
+
+---
+
+### 36.6 Testing Notes
+
+Keep text area width at 90% on both mobile and desktop
+for now — this is intentional so space constraints are
+visible across device sizes before finalising the layout.
+
+Report back on how the layout feels on both desktop
+and mobile before any further panel development.
+
+---
+
+## Amendment 36 — graphviewer.md — 18–19 June 2026
+
+## Chat Panel (A36) — As Built
+
+### Overview
+
+A Chat toggle button (to the left of the Pair button) splits the screen
+into a text panel above and the graph below. The panel contains an
+editable textarea. Single-clicking any node or breadcrumb chip while
+chat mode is active populates the textarea with that node's text instead
+of showing the floating tooltip.
+
+The spec fragments at sections 36.3–36.6 above were indicative. The
+implementation diverged on layout approach as described here.
+
+---
+
+### 36.A HTML Changes
+
+Chat button added inside `#pair-control` to the left of the Pair button:
+
+```html
+<button id="chat-btn">Chat</button>
+```
+
+Chat panel inserted between `#cy-you` and `#cy` in the flex column:
+
+```html
+<div id="chat-panel">
+  <textarea id="chat-text-area"
+            placeholder="Click any node to read its text here…"></textarea>
+</div>
+```
+
+---
+
+### 36.B Layout Approach
+
+`#cy` is `position: fixed` (not a flex child). Its top pixel is set
+precisely by JavaScript at two points:
+
+1. **At startup** — set to `cy-you.getBoundingClientRect().bottom`
+2. **On chat toggle** — set to `chatPanel.getBoundingClientRect().bottom`
+   when open, or `cy-you.getBoundingClientRect().bottom` when closed
+
+`bottom: 34px` clears the help bar. `left: 0; right: 0` gives full width.
+
+After repositioning, `cy.resize()` then `cy.fit(undefined, 40)` is called
+in both directions (open and close). Fit is always used — no saved
+zoom/pan state — because navigation during chat mode would make a saved
+state stale and cause off-screen nodes on close.
+
+**Why position:fixed and not flex?**
+When `#cy` was a flex child, Cytoscape could not reliably read the
+container's new dimensions after the chat panel appeared. `cy.resize()`
+returned stale values, making `cy.fit()` ineffective. Fixed positioning
+with explicit pixel bounds gives Cytoscape an accurate container at
+all times.
+
+---
+
+### 36.C Panel Sizing
+
+| Property | Value | Reason |
+|---|---|---|
+| Height | `33dvh` | `dvh` = dynamic viewport height, excludes iOS browser chrome |
+| Width (desktop) | `50%`, centred | Keeps panel compact; matches centred node view aesthetic |
+| Width (mobile) | `100%` | Phone screens too narrow for 50% |
+| Textarea font | `16px` | iOS Safari auto-zooms inputs with font-size < 16px |
+| Textarea width | `90%` of panel | Per spec |
+
+---
+
+### 36.D Toggle Behaviour
+
+```javascript
+function toggleChatMode() {
+  chatModeActive = !chatModeActive;
+  if (chatModeActive) {
+    // Transfer any visible tooltip to textarea then hide it
+    const tip = document.getElementById('label-tooltip');
+    if (tip.style.display !== 'none' && tip.textContent) {
+      document.getElementById('chat-text-area').value = tip.textContent;
+    }
+    tip.style.display = 'none';
+  }
+  chatPanel.classList.toggle('active', chatModeActive);
+  chatBtn.classList.toggle('active', chatModeActive);
+  requestAnimationFrame(() => {
+    positionCyEl();   // updates #cy top pixel
+    cy.resize();
+    cy.fit(undefined, 40);
+  });
+}
+```
+
+---
+
+### 36.E Node Click in Chat Mode
+
+When `chatModeActive` is true, single click on any main graph node or
+breadcrumb chip writes `buildTooltipContent(node)` to the textarea.
+The floating tooltip is suppressed entirely in chat mode to avoid overlap
+with the panel.
+
+On entering chat mode, if a tooltip is already visible (from a prior
+single click in normal mode), its text is transferred to the textarea
+before the tooltip is hidden.
+
+---
+
+### 36.F Chat Button Styling
+
+Same gold border/background as Pair button. Gets a brighter `.active`
+state (`background: #5a4400; border-color: #ffd88a`) when chat mode is on.
+Hover on the button is suppressed in CSS — the active state provides
+the only visual feedback.
+
+---
+
+## Amendment 37 — graphviewer.md — 18–19 June 2026
+
+## CC Step 1 — Unified Click Model
+
+### Overview
+
+Desktop hover was removed throughout the viewer. A single-click /
+double-click model now applies uniformly to all nodes and breadcrumb
+chips on both desktop and touch.
+
+| Action | Result |
+|---|---|
+| Single click / single tap | Shows node text in tooltip (or textarea in chat mode) |
+| Double click / double tap | Navigates (existing behaviour) |
+| Hover | Removed on desktop |
+
+---
+
+### 37.1 Desktop Main Graph
+
+**Removed:** `cy.on('mouseover')`, `cy.on('mousemove')`,
+`cy.on('mouseout')` and `tooltip.addEventListener('mouseleave')`.
+
+**Added:** In the `tap` handler desktop branch, a 450ms pending-node
+window detects double-click:
+
+- First click on a node: show tooltip immediately; start 450ms timer.
+- Second click on the same node within the window: cancel timer,
+  hide tooltip, call `handleNodeTap(node)` to navigate.
+- Timer expiry: reset pending state; tooltip stays visible.
+- Click on empty canvas: hides tooltip and clears pending state.
+
+In chat mode, the first click writes to the textarea instead of showing
+the tooltip.
+
+---
+
+### 37.2 Desktop Breadcrumb Bars
+
+Both `#cy-buddy` and `#cy-you` bars received the same treatment:
+
+**Removed:** `mousemove` and `mouseleave` DOM listeners (hover tooltip).
+
+**Added:** Same 450ms pending-node double-click detection in the desktop
+branch of each bar's `tap` handler. Single click shows tooltip (or
+writes to textarea in chat mode); double click navigates.
+
+Touch behaviour on both bars is unchanged.
+
+---
+
+### 37.3 Help Text
+
+```javascript
+const helpText = isTouchDevice
+  ? 'Tap to read — double tap to navigate.'
+  : 'Click to read — double click to navigate.';
+```
+
+The gateway-context help text was also updated:
+`'Double click a node for further context'` (desktop).
+
+---
+
+### 37.4 Touch Devices
+
+No change to touch behaviour. The existing single-tap / double-tap
+(800ms window) model already matched the new desktop model conceptually.
+`isTouchEvent(evt)` continues to distinguish touch from desktop in all
+tap handlers.
