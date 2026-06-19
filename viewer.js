@@ -2756,6 +2756,13 @@ async function init() {
 
   function toggleChatMode() {
     chatModeActive = !chatModeActive;
+    if (chatModeActive) {
+      const tip = document.getElementById('label-tooltip');
+      if (tip.style.display !== 'none' && tip.textContent) {
+        document.getElementById('chat-text-area').value = tip.textContent;
+      }
+      tip.style.display = 'none';
+    }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
     requestAnimationFrame(() => {
