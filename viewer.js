@@ -2078,17 +2078,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         touchPendingNodeId = node.id();
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       } else {
-        // Show tooltip for this node
+        // Show tooltip for this node (or populate chat panel if active)
         hideTooltip();
         touchPendingNodeId = node.id();
-        showTooltip(node, 0, 0, true);
-        if (chatModeActive) document.getElementById('chat-text-area').value = buildTooltipContent(node);
+        if (chatModeActive) {
+          document.getElementById('chat-text-area').value = buildTooltipContent(node);
+        } else {
+          showTooltip(node, 0, 0, true);
+        }
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       }
       return;
     }
 
-    // Desktop: single click = show tooltip immediately; double click = navigate
+    // Desktop: single click = show tooltip (or populate chat panel); double click = navigate
     if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
       clearTimeout(desktopClickTimer);
       desktopClickTimer = null;
@@ -2098,9 +2101,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(desktopClickTimer);
       desktopPendingNodeId = node.id();
-      const rp = evt.renderedPosition;
-      showTooltip(node, rp.x, rp.y, false);
-      if (chatModeActive) document.getElementById('chat-text-area').value = buildTooltipContent(node);
+      if (chatModeActive) {
+        document.getElementById('chat-text-area').value = buildTooltipContent(node);
+      } else {
+        const rp = evt.renderedPosition;
+        showTooltip(node, rp.x, rp.y, false);
+      }
       desktopClickTimer = setTimeout(() => {
         desktopClickTimer = null;
         desktopPendingNodeId = null;
@@ -2732,10 +2738,12 @@ async function init() {
   const chatPanel = document.getElementById('chat-panel');
 
   function toggleChatMode() {
+    const zoom = cy.zoom();
+    const pan  = cy.pan();
     chatModeActive = !chatModeActive;
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
-    setTimeout(() => cy.resize(), 0);
+    setTimeout(() => { cy.resize(); cy.zoom(zoom); cy.pan(pan); }, 0);
   }
 
   chatBtn.addEventListener('click', toggleChatMode);
