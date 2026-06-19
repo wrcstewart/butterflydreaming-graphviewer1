@@ -2101,7 +2101,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         desktopClickTimer = null;
         desktopPendingNodeId = null;
         showTooltip(node, rp.x, rp.y, false);
-      }, 300);
+      }, 450);
     }
   });
 
