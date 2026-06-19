@@ -2737,8 +2737,6 @@ async function init() {
   const chatBtn   = document.getElementById('chat-btn');
   const chatPanel = document.getElementById('chat-panel');
   const cyEl      = document.getElementById('cy');
-  let savedChatZoom = null;
-  let savedChatPan  = null;
 
   function positionCyEl() {
     const refEl = (chatModeActive && chatPanel.getBoundingClientRect().height > 0)
@@ -2749,22 +2747,12 @@ async function init() {
 
   function toggleChatMode() {
     chatModeActive = !chatModeActive;
-    if (chatModeActive) {
-      savedChatZoom = cy.zoom();
-      savedChatPan  = cy.pan();
-    }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
     requestAnimationFrame(() => {
       positionCyEl();
       cy.resize();
-      if (chatModeActive) {
-        cy.fit(undefined, 40);
-      } else if (savedChatZoom !== null) {
-        cy.viewport({ zoom: savedChatZoom, pan: savedChatPan });
-        savedChatZoom = null;
-        savedChatPan  = null;
-      }
+      cy.fit(undefined, 40);
     });
   }
 
