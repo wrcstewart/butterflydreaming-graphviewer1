@@ -159,13 +159,21 @@ html, body {
 
 #chat-panel {
   display: none;
-  width: 100%;
-  height: 50dvh;
+  width: 50%;
+  height: 33dvh;
   flex-shrink: 0;
+  align-self: center;
   background: #0a0a1a;
   justify-content: center;
   align-items: flex-start;
   padding: 8px;
+}
+
+@media (max-width: 767px) {
+  #chat-panel {
+    width: 100%;
+    height: 33dvh;
+  }
 }
 
 #chat-panel.active {
