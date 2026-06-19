@@ -146,8 +146,12 @@ html, body {
 }
 
 #cy {
-  width: 100%;
-  flex: 1;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 158px;   /* set precisely by JS; fallback matches BARS_BOTTOM */
+  bottom: 34px; /* above help bar */
+  z-index: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;

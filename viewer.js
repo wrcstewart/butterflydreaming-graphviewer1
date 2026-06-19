@@ -2734,42 +2734,38 @@ async function init() {
 
   const pairingState = { active: false };
 
-  const chatBtn  = document.getElementById('chat-btn');
+  const chatBtn   = document.getElementById('chat-btn');
   const chatPanel = document.getElementById('chat-panel');
+  const cyEl      = document.getElementById('cy');
   let savedChatZoom = null;
   let savedChatPan  = null;
-  let savedChatW    = null;
-  let savedChatH    = null;
+
+  function positionCyEl() {
+    const refEl = (chatModeActive && chatPanel.getBoundingClientRect().height > 0)
+      ? chatPanel
+      : document.getElementById('cy-you');
+    cyEl.style.top = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+  }
 
   function toggleChatMode() {
     chatModeActive = !chatModeActive;
     if (chatModeActive) {
       savedChatZoom = cy.zoom();
       savedChatPan  = cy.pan();
-      savedChatW    = cy.width();
-      savedChatH    = cy.height();
     }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
-    setTimeout(() => {
+    requestAnimationFrame(() => {
+      positionCyEl();
       cy.resize();
       if (chatModeActive) {
-        const newW    = cy.width();
-        const newH    = cy.height();
-        const newZoom = isTouchDevice ? savedChatZoom : savedChatZoom * 0.65;
-        // Model point at the centre of the old canvas
-        const mx = (savedChatW / 2 - savedChatPan.x) / savedChatZoom;
-        const my = (savedChatH / 2 - savedChatPan.y) / savedChatZoom;
-        // Place that model point at the centre of the new (smaller) canvas
-        cy.viewport({ zoom: newZoom, pan: { x: newW / 2 - mx * newZoom, y: newH / 2 - my * newZoom } });
+        cy.fit(undefined, 40);
       } else if (savedChatZoom !== null) {
         cy.viewport({ zoom: savedChatZoom, pan: savedChatPan });
         savedChatZoom = null;
         savedChatPan  = null;
-        savedChatW    = null;
-        savedChatH    = null;
       }
-    }, 0);
+    });
   }
 
   chatBtn.addEventListener('click', toggleChatMode);
@@ -2815,6 +2811,11 @@ async function init() {
 
   const { addBadge }      = setupNrBadges(cy);
   const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+
+  // Pin #cy top to the bottom of the bar area so Cytoscape knows its exact bounds
+  document.getElementById('cy').style.top =
+    Math.ceil(document.getElementById('cy-you').getBoundingClientRect().bottom) + 'px';
+  cy.resize();
 
   const userCountPanel = document.getElementById('user-count-panel');
 
