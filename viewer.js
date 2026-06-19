@@ -1140,28 +1140,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return chip.data('display_name') || chip.data('name') || '';
   }
 
-  let buddyHoveredId = null;
-  buddyContainer.addEventListener('mousemove', evt => {
-    if (recentTouch) return;
-    const rect    = buddyContainer.getBoundingClientRect();
-    const pan     = buddyCy.pan();
-    const canvasX = evt.clientX - rect.left - pan.x;
-    const canvasY = evt.clientY - rect.top  - pan.y;
-    const hit = buddyCy.nodes().filter(n => {
-      const bb = n.boundingBox();
-      return canvasX >= bb.x1 && canvasX <= bb.x2 && canvasY >= bb.y1 && canvasY <= bb.y2;
-    }).first();
-    if (!hit.length) { buddyHoveredId = null; hideTooltip(); return; }
-    if (hit.id() === buddyHoveredId) return;
-    buddyHoveredId = hit.id();
-    const content = buildBuddyChipTooltip(hit);
-    if (!content) { hideTooltip(); return; }
-    tooltip.textContent = content;
-    tooltip.style.display = 'block';
-    const bb = hit.renderedBoundingBox();
-    positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
-  });
-  buddyContainer.addEventListener('mouseleave', () => { buddyHoveredId = null; hideTooltip(); });
+  let buddyDesktopPending = null;
+  let buddyDesktopTimer   = null;
 
   buddyCy.on('tap', 'node', evt => {
     const chip = evt.target;
@@ -1178,12 +1158,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         hideTooltip();
         if (main.length) handleNodeTap(main);
       } else {
-        const content = buildBuddyChipTooltip(chip);
-        if (content) {
-          tooltip.textContent = content;
-          tooltip.style.display = 'block';
-          tooltip.style.left = '14px';
-          tooltip.style.top  = (buddyContainer.getBoundingClientRect().bottom + 6) + 'px';
+        if (chatModeActive) {
+          document.getElementById('chat-text-area').value = buildBuddyChipTooltip(chip);
+        } else {
+          const content = buildBuddyChipTooltip(chip);
+          if (content) {
+            tooltip.textContent = content;
+            tooltip.style.display = 'block';
+            tooltip.style.left = '14px';
+            tooltip.style.top  = (buddyContainer.getBoundingClientRect().bottom + 6) + 'px';
+          }
         }
         buddyTouchPending = chip.id();
         buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
@@ -1191,8 +1175,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    hideTooltip();
-    if (main.length) handleNodeTap(main);
+    // Desktop: single click = show tooltip / populate textarea; double click = navigate
+    if (buddyDesktopPending === chip.id() && buddyDesktopTimer !== null) {
+      clearTimeout(buddyDesktopTimer);
+      buddyDesktopTimer = null;
+      buddyDesktopPending = null;
+      hideTooltip();
+      if (main.length) handleNodeTap(main);
+    } else {
+      clearTimeout(buddyDesktopTimer);
+      buddyDesktopPending = chip.id();
+      if (chatModeActive) {
+        document.getElementById('chat-text-area').value = buildBuddyChipTooltip(chip);
+      } else {
+        const content = buildBuddyChipTooltip(chip);
+        if (content) {
+          const bb   = chip.renderedBoundingBox();
+          const rect = buddyContainer.getBoundingClientRect();
+          tooltip.textContent = content;
+          tooltip.style.display = 'block';
+          positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
+        }
+      }
+      buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
+    }
   });
 
   // --- youCy chip interactions ---
@@ -1201,34 +1207,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let youTouchPending = null;
   let youTouchTimer   = null;
 
-  let youHoveredId = null;
-  youContainer.addEventListener('mousemove', evt => {
-    if (recentTouch) return;
-    const rect    = youContainer.getBoundingClientRect();
-    const pan     = youCy.pan();
-    const canvasX = evt.clientX - rect.left - pan.x;
-    const canvasY = evt.clientY - rect.top  - pan.y;
-    const hit = youCy.nodes().filter(n => {
-      const bb = n.boundingBox();
-      return canvasX >= bb.x1 && canvasX <= bb.x2 && canvasY >= bb.y1 && canvasY <= bb.y2;
-    }).first();
-    if (!hit.length) { youHoveredId = null; hideTooltip(); return; }
-    if (hit.id() === youHoveredId) return;
-    youHoveredId = hit.id();
-    const main = cy.getElementById(hit.data('mainId'));
-    if (!main.length) { hideTooltip(); return; }
-    const content = buildTooltipContent(main);
-    if (!content) { hideTooltip(); return; }
-    tooltip.textContent = content;
-    tooltip.style.display = 'block';
-    const bb = hit.renderedBoundingBox();
-    positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
-  });
-  youContainer.addEventListener('mouseleave', () => { youHoveredId = null; hideTooltip(); });
+  let youDesktopPending = null;
+  let youDesktopTimer   = null;
 
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
-
     const main = cy.getElementById(chip.data('mainId'));
     if (!main.length) return;
 
@@ -1243,13 +1226,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         hideTooltip();
         handleNodeTap(main);
       } else {
-        const content = buildTooltipContent(main);
-        if (content) {
-          tooltip.textContent = content;
-          tooltip.style.display = 'block';
-          const rect = youContainer.getBoundingClientRect();
-          tooltip.style.left = '14px';
-          tooltip.style.top  = (rect.bottom + 6) + 'px';
+        if (chatModeActive) {
+          document.getElementById('chat-text-area').value = buildTooltipContent(main);
+        } else {
+          const content = buildTooltipContent(main);
+          if (content) {
+            tooltip.textContent = content;
+            tooltip.style.display = 'block';
+            const rect = youContainer.getBoundingClientRect();
+            tooltip.style.left = '14px';
+            tooltip.style.top  = (rect.bottom + 6) + 'px';
+          }
         }
         youTouchPending = chip.id();
         youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
@@ -1257,8 +1244,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    hideTooltip();
-    handleNodeTap(main);
+    // Desktop: single click = show tooltip / populate textarea; double click = navigate
+    if (youDesktopPending === chip.id() && youDesktopTimer !== null) {
+      clearTimeout(youDesktopTimer);
+      youDesktopTimer = null;
+      youDesktopPending = null;
+      hideTooltip();
+      handleNodeTap(main);
+    } else {
+      clearTimeout(youDesktopTimer);
+      youDesktopPending = chip.id();
+      if (chatModeActive) {
+        document.getElementById('chat-text-area').value = buildTooltipContent(main);
+      } else {
+        const content = buildTooltipContent(main);
+        if (content) {
+          const bb   = chip.renderedBoundingBox();
+          const rect = youContainer.getBoundingClientRect();
+          tooltip.textContent = content;
+          tooltip.style.display = 'block';
+          positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
+        }
+      }
+      youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
+    }
   });
 
   function markRecentTouch() {
