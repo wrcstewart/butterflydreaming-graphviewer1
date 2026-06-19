@@ -942,6 +942,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let lastClusterNode = null;
   let currentClusterColour = null;
   let lastParentNode = null;
+  let lastReadNodeId = null;
+  let lastReadNodeCy = null;
+
+  function markReadNode(cytoNode, instanceCy) {
+    if (lastReadNodeId && lastReadNodeCy) {
+      try { lastReadNodeCy.getElementById(lastReadNodeId).removeStyle('border-width border-color border-opacity'); } catch (_) {}
+    }
+    cytoNode.style({ 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
+    lastReadNodeId = cytoNode.id();
+    lastReadNodeCy = instanceCy;
+  }
+
+  function clearReadMark() {
+    if (lastReadNodeId && lastReadNodeCy) {
+      try { lastReadNodeCy.getElementById(lastReadNodeId).removeStyle('border-width border-color border-opacity'); } catch (_) {}
+      lastReadNodeId = null;
+      lastReadNodeCy = null;
+    }
+  }
 
   // --- Help text with downloading indicator ---
   const helpEl = document.getElementById('help-text');
@@ -1156,6 +1175,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (same && inWindow) {
         buddyTouchPending = null;
         hideTooltip();
+        clearReadMark();
         if (main.length) handleNodeTap(main);
       } else {
         if (chatModeActive) {
@@ -1169,6 +1189,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             tooltip.style.top  = (buddyContainer.getBoundingClientRect().bottom + 6) + 'px';
           }
         }
+        markReadNode(chip, buddyCy);
         buddyTouchPending = chip.id();
         buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
       }
@@ -1181,6 +1202,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       buddyDesktopTimer = null;
       buddyDesktopPending = null;
       hideTooltip();
+      clearReadMark();
       if (main.length) handleNodeTap(main);
     } else {
       clearTimeout(buddyDesktopTimer);
@@ -1197,6 +1219,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
         }
       }
+      markReadNode(chip, buddyCy);
       buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
     }
   });
@@ -1224,6 +1247,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (same && inWindow) {
         youTouchPending = null;
         hideTooltip();
+        clearReadMark();
         handleNodeTap(main);
       } else {
         if (chatModeActive) {
@@ -1238,6 +1262,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             tooltip.style.top  = (rect.bottom + 6) + 'px';
           }
         }
+        markReadNode(chip, youCy);
         youTouchPending = chip.id();
         youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
       }
@@ -1250,6 +1275,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       youDesktopTimer = null;
       youDesktopPending = null;
       hideTooltip();
+      clearReadMark();
       handleNodeTap(main);
     } else {
       clearTimeout(youDesktopTimer);
@@ -1266,6 +1292,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
         }
       }
+      markReadNode(chip, youCy);
       youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
     }
   });
@@ -2080,6 +2107,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // Double tap (two taps within 800ms) — navigate regardless of tooltip state
         hideTooltip();
         touchPendingNodeId = null;
+        clearReadMark();
         handleNodeTap(node);
       } else if (tooltipNodeId === node.id()) {
         // Tap same node while its tooltip is showing — dismiss
@@ -2095,6 +2123,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         } else {
           showTooltip(node, 0, 0, true);
         }
+        markReadNode(node, cy);
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       }
       return;
@@ -2106,6 +2135,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       desktopClickTimer = null;
       desktopPendingNodeId = null;
       hideTooltip();
+      clearReadMark();
       handleNodeTap(node);
     } else {
       clearTimeout(desktopClickTimer);
@@ -2116,6 +2146,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const rp = evt.renderedPosition;
         showTooltip(node, rp.x, rp.y, false);
       }
+      markReadNode(node, cy);
       desktopClickTimer = setTimeout(() => {
         desktopClickTimer = null;
         desktopPendingNodeId = null;
