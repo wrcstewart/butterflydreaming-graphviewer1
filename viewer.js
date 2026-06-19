@@ -10,7 +10,7 @@ const isTouchDevice = navigator.maxTouchPoints > 0;
 let mediaFilesList = [];  // populated via WebSocket on connect
 const helpText = isTouchDevice
   ? 'Tap to read — double tap to navigate.'
-  : 'Hover to read — click to navigate.';
+  : 'Click to read — double click to navigate.';
 
 const FAMILY_COLOURS = {
   Nature:   '#4A8C4F',
@@ -936,6 +936,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let tooltipNodeId = null;
   let recentTouch = false;
   let recentTouchTimer = null;
+  let desktopPendingNodeId = null;
+  let desktopClickTimer = null;
   let lastClusterNode = null;
   let currentClusterColour = null;
   let lastParentNode = null;
@@ -1331,34 +1333,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearTimeout(dwellTimer);
     dwellTimer = null;
   }
-
-  // Desktop hover dwell — skipped if a touch event recently fired
-  cy.on('mouseover', 'node', evt => {
-    if (recentTouch) return;
-    const rp = evt.renderedPosition;
-    startDwell(evt.target, rp.x, rp.y, false);
-  });
-
-  cy.on('mousemove', 'node', evt => {
-    if (recentTouch) return;
-    if (tooltip.style.display !== 'none') {
-      positionTooltip(evt.renderedPosition.x, evt.renderedPosition.y);
-    } else if (!dwellTimer) {
-      // mouseover can be missed on fast entry — mousemove rescues it
-      const rp = evt.renderedPosition;
-      startDwell(evt.target, rp.x, rp.y, false);
-    }
-  });
-
-  cy.on('mouseout', 'node', () => {
-    if (recentTouch) return;
-    // Delay so cursor can move onto an interactive tooltip without it disappearing
-    setTimeout(() => {
-      if (!tooltip.matches(':hover')) { cancelDwell(); hideTooltip(); }
-    }, 100);
-  });
-
-  tooltip.addEventListener('mouseleave', () => { cancelDwell(); hideTooltip(); });
 
   // Touch hold dwell (tapstart held 400ms without move)
   cy.on('tapstart', 'node', evt => {
@@ -2051,7 +2025,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else if (type === 'TextNode' && node.data('section_title')) {
       setHelpText('To return enter a text node, search rectangle or breadcrumb');
     } else if (type === 'TextNode' && node.data('gateway')) {
-      setHelpText(isTouchDevice ? 'Double tap a node for further context' : 'Click a node for further context');
+      setHelpText(isTouchDevice ? 'Double tap a node for further context' : 'Double click a node for further context');
     } else if (type === 'TextNode' && !node.data('gateway')) {
       setHelpText('Enter the grey section title to see the whole story/poem etc');
     } else if (type === 'Family' && node.hasClass('subfamily')) {
@@ -2112,20 +2086,37 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    // Desktop click — navigate immediately
-    hideTooltip();
-    touchPendingNodeId = null;
-    handleNodeTap(node);
+    // Desktop: single click = show tooltip; double click (second click within 300ms) = navigate
+    if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
+      clearTimeout(desktopClickTimer);
+      desktopClickTimer = null;
+      desktopPendingNodeId = null;
+      hideTooltip();
+      handleNodeTap(node);
+    } else {
+      clearTimeout(desktopClickTimer);
+      desktopPendingNodeId = node.id();
+      const rp = evt.renderedPosition;
+      desktopClickTimer = setTimeout(() => {
+        desktopClickTimer = null;
+        desktopPendingNodeId = null;
+        showTooltip(node, rp.x, rp.y, false);
+      }, 300);
+    }
   });
 
-  // Tap on empty canvas — hide tooltip and reset touch state
+  // Tap on empty canvas — hide tooltip and reset state
   cy.on('tap', evt => {
     if (evt.target !== cy) return;
+    hideTooltip();
     if (isTouchEvent(evt)) {
-      hideTooltip();
       clearTimeout(tapResetTimer);
       tapResetTimer = null;
       touchPendingNodeId = null;
+    } else {
+      clearTimeout(desktopClickTimer);
+      desktopClickTimer = null;
+      desktopPendingNodeId = null;
     }
   });
 
