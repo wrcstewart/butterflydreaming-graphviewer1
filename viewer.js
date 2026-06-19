@@ -2738,28 +2738,36 @@ async function init() {
   const chatPanel = document.getElementById('chat-panel');
   let savedChatZoom = null;
   let savedChatPan  = null;
+  let savedChatW    = null;
+  let savedChatH    = null;
 
   function toggleChatMode() {
     chatModeActive = !chatModeActive;
     if (chatModeActive) {
       savedChatZoom = cy.zoom();
       savedChatPan  = cy.pan();
+      savedChatW    = cy.width();
+      savedChatH    = cy.height();
     }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
     setTimeout(() => {
       cy.resize();
       if (chatModeActive) {
-        if (isTouchDevice) {
-          cy.fit(undefined, 20);
-        } else {
-          cy.zoom({ level: savedChatZoom * 0.65, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
-        }
+        const newW    = cy.width();
+        const newH    = cy.height();
+        const newZoom = isTouchDevice ? savedChatZoom : savedChatZoom * 0.65;
+        // Model point at the centre of the old canvas
+        const mx = (savedChatW / 2 - savedChatPan.x) / savedChatZoom;
+        const my = (savedChatH / 2 - savedChatPan.y) / savedChatZoom;
+        // Place that model point at the centre of the new (smaller) canvas
+        cy.viewport({ zoom: newZoom, pan: { x: newW / 2 - mx * newZoom, y: newH / 2 - my * newZoom } });
       } else if (savedChatZoom !== null) {
-        cy.zoom(savedChatZoom);
-        cy.pan(savedChatPan);
+        cy.viewport({ zoom: savedChatZoom, pan: savedChatPan });
         savedChatZoom = null;
         savedChatPan  = null;
+        savedChatW    = null;
+        savedChatH    = null;
       }
     }, 0);
   }
