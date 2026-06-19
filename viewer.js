@@ -1313,9 +1313,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
     if (type === 'TextNode') {
       const title = node.data('title') || '';
-      const text = node.data('text') || '';
-      const body = text.split('\n').filter(l => l.trim()).join('\n');
-      return title ? `${title}\n${body}` : body;
+      const work  = node.data('source_text') || '';
+      const seq   = node.data('seq');
+      const text  = node.data('text') || '';
+      const body  = text.split('\n').filter(l => l.trim()).join('\n');
+      let header  = title;
+      if (work)       header += (header ? ' : ' : '') + work;
+      if (seq != null) header += (header ? ' : ' : '') + seq;
+      return header ? `${header}\n${body}` : body;
     }
     return '';
   }
