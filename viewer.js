@@ -1317,9 +1317,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const seq   = node.data('seq');
       const text  = node.data('text') || '';
       const body  = text.split('\n').filter(l => l.trim()).join('\n');
+      const showSeq = !node.data('gateway') && !node.data('section_title');
       let header  = title;
-      if (work)       header += (header ? ' : ' : '') + work;
-      if (seq != null) header += (header ? ' : ' : '') + seq;
+      if (work)              header += (header ? ' : ' : '') + work;
+      if (showSeq && seq != null) header += (header ? ' : ' : '') + seq;
       return header ? `${header}\n${body}` : body;
     }
     return '';
