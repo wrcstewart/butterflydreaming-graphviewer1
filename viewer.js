@@ -938,6 +938,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let recentTouchTimer = null;
   let desktopPendingNodeId = null;
   let desktopClickTimer = null;
+  let chatModeActive = false;
   let lastClusterNode = null;
   let currentClusterColour = null;
   let lastParentNode = null;
@@ -2081,6 +2082,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         hideTooltip();
         touchPendingNodeId = node.id();
         showTooltip(node, 0, 0, true);
+        if (chatModeActive) document.getElementById('chat-text-area').value = buildTooltipContent(node);
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       }
       return;
@@ -2098,6 +2100,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       desktopPendingNodeId = node.id();
       const rp = evt.renderedPosition;
       showTooltip(node, rp.x, rp.y, false);
+      if (chatModeActive) document.getElementById('chat-text-area').value = buildTooltipContent(node);
       desktopClickTimer = setTimeout(() => {
         desktopClickTimer = null;
         desktopPendingNodeId = null;
@@ -2724,6 +2727,18 @@ async function init() {
   });
 
   const pairingState = { active: false };
+
+  const chatBtn  = document.getElementById('chat-btn');
+  const chatPanel = document.getElementById('chat-panel');
+
+  function toggleChatMode() {
+    chatModeActive = !chatModeActive;
+    chatPanel.classList.toggle('active', chatModeActive);
+    chatBtn.classList.toggle('active', chatModeActive);
+    setTimeout(() => cy.resize(), 0);
+  }
+
+  chatBtn.addEventListener('click', toggleChatMode);
 
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
