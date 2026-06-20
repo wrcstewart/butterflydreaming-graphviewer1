@@ -1,7 +1,5 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
-import { basicSetup, EditorView, EditorState } from 'https://cdn.jsdelivr.net/npm/codemirror@6/+esm';
-
 const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
@@ -36,6 +34,7 @@ let editSelectedTextNodeId = null;
 let chipGridParams         = null;
 let chatModeActive         = false;
 let chatEditor             = null;
+let CmEditorView           = null;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1330,18 +1329,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function setChatText(content) {
-    if (!chatEditor) return;
+    if (!chatEditor || !CmEditorView) return;
     if (document.getElementById('chat-append-cb').checked && chatEditor.state.doc.length > 0) {
       const current  = chatEditor.state.doc.toString().replace(/\n{2,}$/, '\n');
       const insertAt = current.length + 1;
       chatEditor.dispatch({
         changes: { from: 0, to: chatEditor.state.doc.length, insert: current + '\n' + content },
-        effects: EditorView.scrollIntoView(insertAt, { y: 'center' }),
+        effects: CmEditorView.scrollIntoView(insertAt, { y: 'center' }),
       });
     } else {
       chatEditor.dispatch({
         changes: { from: 0, to: chatEditor.state.doc.length, insert: content },
-        effects: EditorView.scrollIntoView(0),
+        effects: CmEditorView.scrollIntoView(0),
       });
     }
   }
@@ -2834,28 +2833,35 @@ async function init() {
 
   chatBtn.addEventListener('click', toggleChatMode);
 
-  chatEditor = new EditorView({
-    state: EditorState.create({
-      doc: '',
-      extensions: [
-        basicSetup,
-        EditorView.lineWrapping,
-        EditorView.theme({
-          '&':                            { height: '100%', background: '#1a1a2e', color: '#ffffff' },
-          '&.cm-focused':                 { outline: 'none' },
-          '.cm-content':                  { padding: '10px', caretColor: '#fff', fontFamily: 'sans-serif', lineHeight: '1.6', fontSize: '16px' },
-          '.cm-line':                     { padding: '0' },
-          '.cm-scroller':                 { overflow: 'auto' },
-          '.cm-gutters':                  { display: 'none' },
-          '.cm-activeLine':               { background: 'rgba(255,255,255,0.04)' },
-          '.cm-selectionBackground':      { background: '#2a4080 !important' },
-          '&.cm-focused .cm-selectionBackground': { background: '#2a4080 !important' },
-          '.cm-cursor':                   { borderLeftColor: '#ffffff' },
-        }, { dark: true }),
-      ],
-    }),
-    parent: document.getElementById('chat-editor-mount'),
-  });
+  try {
+    const cm = await import('https://esm.sh/codemirror@6');
+    const { basicSetup, EditorState } = cm;
+    CmEditorView = cm.EditorView;
+    chatEditor = new CmEditorView({
+      state: EditorState.create({
+        doc: '',
+        extensions: [
+          basicSetup,
+          CmEditorView.lineWrapping,
+          CmEditorView.theme({
+            '&':                                    { height: '100%', background: '#1a1a2e', color: '#ffffff' },
+            '&.cm-focused':                         { outline: 'none' },
+            '.cm-content':                          { padding: '10px', caretColor: '#fff', fontFamily: 'sans-serif', lineHeight: '1.6', fontSize: '16px' },
+            '.cm-line':                             { padding: '0' },
+            '.cm-scroller':                         { overflow: 'auto' },
+            '.cm-gutters':                          { display: 'none' },
+            '.cm-activeLine':                       { background: 'rgba(255,255,255,0.04)' },
+            '.cm-selectionBackground':              { background: '#2a4080 !important' },
+            '&.cm-focused .cm-selectionBackground': { background: '#2a4080 !important' },
+            '.cm-cursor':                           { borderLeftColor: '#ffffff' },
+          }, { dark: true }),
+        ],
+      }),
+      parent: document.getElementById('chat-editor-mount'),
+    });
+  } catch (e) {
+    console.warn('CodeMirror 6 failed to load — chat panel unavailable', e);
+  }
 
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
