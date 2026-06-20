@@ -35,6 +35,7 @@ let chipGridParams         = null;
 let chatModeActive         = false;
 let chatEditor             = null;
 let CmEditorView           = null;
+let collectedBasket        = [];
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -2834,15 +2835,36 @@ async function init() {
   chatBtn.addEventListener('click', toggleChatMode);
 
   try {
-    const { EditorView, EditorState, keymap, drawSelection, dropCursor,
+    const { EditorView, EditorState, StateField, StateEffect, Decoration,
+            keymap, drawSelection, dropCursor,
             rectangularSelection, crosshairCursor, highlightActiveLine,
             highlightSpecialChars, history, defaultKeymap, historyKeymap } =
-      await import('./codemirror-bundle.js?v=2');
+      await import('./codemirror-bundle.js?v=3');
     CmEditorView = EditorView;
+
+    const collectEffect      = StateEffect.define();
+    const clearCollectEffect = StateEffect.define();
+    const collectedField     = StateField.define({
+      create() { return Decoration.none; },
+      update(deco, tr) {
+        deco = deco.map(tr.changes);
+        for (const e of tr.effects) {
+          if (e.is(collectEffect)) {
+            const marks = e.value.map(r => Decoration.mark({ class: 'cm-collected' }).range(r.from, r.to));
+            deco = deco.update({ add: marks, sort: true });
+          }
+          if (e.is(clearCollectEffect)) deco = Decoration.none;
+        }
+        return deco;
+      },
+      provide: f => EditorView.decorations.from(f),
+    });
+
     chatEditor = new CmEditorView({
       state: EditorState.create({
         doc: '',
         extensions: [
+          collectedField,
           highlightSpecialChars(),
           history(),
           drawSelection(),
@@ -2864,11 +2886,40 @@ async function init() {
             '.cm-selectionBackground':              { background: '#2a4080 !important' },
             '&.cm-focused .cm-selectionBackground': { background: '#2a4080 !important' },
             '.cm-cursor':                           { borderLeftColor: '#ffffff' },
+            '.cm-collected':                        { background: 'rgba(255, 200, 50, 0.2)', borderRadius: '2px' },
           }, { dark: true }),
         ],
       }),
       parent: document.getElementById('chat-editor-mount'),
     });
+
+    const collectBtn     = document.getElementById('chat-collect-btn');
+    const basketCountEl  = document.getElementById('chat-basket-count');
+    const basketClearBtn = document.getElementById('chat-basket-clear');
+
+    function updateBasketUI() {
+      const n = collectedBasket.length;
+      collectBtn.classList.toggle('has-items', n > 0);
+      basketCountEl.textContent = n > 0 ? `${n}` : '';
+      basketClearBtn.style.display = n > 0 ? '' : 'none';
+    }
+
+    collectBtn.addEventListener('click', () => {
+      if (!chatEditor) return;
+      const ranges = chatEditor.state.selection.ranges.filter(r => !r.empty);
+      if (ranges.length === 0) return;
+      const items = ranges.map(r => ({ from: r.from, to: r.to, text: chatEditor.state.doc.sliceString(r.from, r.to) }));
+      collectedBasket.push(...items);
+      chatEditor.dispatch({ effects: collectEffect.of(items) });
+      updateBasketUI();
+    });
+
+    basketClearBtn.addEventListener('click', () => {
+      collectedBasket = [];
+      chatEditor.dispatch({ effects: clearCollectEffect.of(null) });
+      updateBasketUI();
+    });
+
   } catch (e) {
     console.error('[CM6] Failed to load — chat panel unavailable. Check CSP / network:', e);
   }

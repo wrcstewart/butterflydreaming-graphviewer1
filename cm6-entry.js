@@ -1,5 +1,5 @@
-export { EditorView, keymap, drawSelection, dropCursor,
+export { EditorView, keymap, drawSelection, dropCursor, Decoration,
          rectangularSelection, crosshairCursor,
          highlightActiveLine, highlightSpecialChars } from '@codemirror/view';
-export { EditorState } from '@codemirror/state';
+export { EditorState, StateField, StateEffect } from '@codemirror/state';
 export { history, defaultKeymap, historyKeymap } from '@codemirror/commands';

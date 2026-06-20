@@ -193,16 +193,69 @@ html, body {
   border-radius: 6px;
 }
 
-#chat-append-label {
+#chat-right-col {
   flex-shrink: 0;
-  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+#chat-append-label {
   color: #cccccc;
   font-size: 15px;
   font-family: sans-serif;
   cursor: pointer;
   user-select: none;
-  padding-top: 6px;
   white-space: nowrap;
+}
+
+#chat-collect-btn {
+  background: #1a1a2e;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #cccccc;
+  font-size: 12px;
+  font-family: sans-serif;
+  cursor: pointer;
+  padding: 4px 8px;
+  white-space: nowrap;
+  width: 100%;
+}
+
+#chat-collect-btn:hover {
+  border-color: #aaa;
+  color: #fff;
+}
+
+#chat-collect-btn.has-items {
+  border-color: #ffd88a;
+  color: #ffd88a;
+}
+
+#chat-basket-count {
+  color: #ffd88a;
+  font-size: 11px;
+  font-family: sans-serif;
+  text-align: center;
+}
+
+#chat-basket-clear {
+  background: none;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #888;
+  font-size: 11px;
+  font-family: sans-serif;
+  cursor: pointer;
+  padding: 3px 6px;
+  width: 100%;
+}
+
+#chat-basket-clear:hover {
+  border-color: #aaa;
+  color: #fff;
 }
 
 #media-bar {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=60">
+  <link rel="stylesheet" href="style.css?v=61">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming — Navigation Development</div>
@@ -14,7 +14,12 @@
   <div id="cy-you"></div>
   <div id="chat-panel">
     <div id="chat-editor-mount"></div>
-    <label id="chat-append-label"><input type="checkbox" id="chat-append-cb"> +</label>
+    <div id="chat-right-col">
+      <label id="chat-append-label"><input type="checkbox" id="chat-append-cb"> +</label>
+      <button id="chat-collect-btn">Collect</button>
+      <span id="chat-basket-count"></span>
+      <button id="chat-basket-clear" style="display:none">Clear</button>
+    </div>
   </div>
   <div id="cy"></div>
   <div id="media-bar"></div>
@@ -81,6 +86,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script type="module" src="viewer.js?v=299"></script>
+  <script type="module" src="viewer.js?v=300"></script>
 </body>
 </html>
