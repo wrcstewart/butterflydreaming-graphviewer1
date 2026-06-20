@@ -2834,9 +2834,10 @@ async function init() {
   chatBtn.addEventListener('click', toggleChatMode);
 
   try {
-    const cm = await import('https://esm.sh/codemirror@6');
+    const cm = await import('https://esm.sh/codemirror@6?bundle');
     const { basicSetup, EditorState } = cm;
     CmEditorView = cm.EditorView;
+    if (!CmEditorView) throw new Error('EditorView not found in codemirror bundle');
     chatEditor = new CmEditorView({
       state: EditorState.create({
         doc: '',
@@ -2860,7 +2861,7 @@ async function init() {
       parent: document.getElementById('chat-editor-mount'),
     });
   } catch (e) {
-    console.warn('CodeMirror 6 failed to load — chat panel unavailable', e);
+    console.error('[CM6] Failed to load — chat panel unavailable. Check CSP / network:', e);
   }
 
   const pairBtn    = document.getElementById('pair-btn');
