@@ -2834,10 +2834,12 @@ async function init() {
   chatBtn.addEventListener('click', toggleChatMode);
 
   try {
-    const cm = await import('https://esm.sh/codemirror@6?bundle');
-    const { basicSetup, EditorState } = cm;
-    CmEditorView = cm.EditorView;
-    if (!CmEditorView) throw new Error('EditorView not found in codemirror bundle');
+    const [{ basicSetup }, { EditorView }, { EditorState }] = await Promise.all([
+      import('https://esm.sh/codemirror@6'),
+      import('https://esm.sh/@codemirror/view@6'),
+      import('https://esm.sh/@codemirror/state@6'),
+    ]);
+    CmEditorView = EditorView;
     chatEditor = new CmEditorView({
       state: EditorState.create({
         doc: '',
