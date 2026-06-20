@@ -2834,13 +2834,24 @@ async function init() {
   chatBtn.addEventListener('click', toggleChatMode);
 
   try {
-    const { basicSetup, EditorView, EditorState } = await import('./codemirror-bundle.js');
+    const { EditorView, EditorState, keymap, drawSelection, dropCursor,
+            rectangularSelection, crosshairCursor, highlightActiveLine,
+            highlightSpecialChars, history, defaultKeymap, historyKeymap } =
+      await import('./codemirror-bundle.js');
     CmEditorView = EditorView;
     chatEditor = new CmEditorView({
       state: EditorState.create({
         doc: '',
         extensions: [
-          basicSetup,
+          highlightSpecialChars(),
+          history(),
+          drawSelection(),
+          dropCursor(),
+          EditorState.allowMultipleSelections.of(true),
+          rectangularSelection(),
+          crosshairCursor(),
+          highlightActiveLine(),
+          keymap.of([...defaultKeymap, ...historyKeymap]),
           CmEditorView.lineWrapping,
           CmEditorView.theme({
             '&':                                    { height: '100%', background: '#1a1a2e', color: '#ffffff' },
