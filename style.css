@@ -200,9 +200,11 @@ html, body {
   align-items: center;
   gap: 6px;
   padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 #chat-append-label {
+  margin-top: auto;
   color: #cccccc;
   font-size: 15px;
   font-family: sans-serif;
@@ -239,6 +241,23 @@ html, body {
   font-size: 11px;
   font-family: sans-serif;
   text-align: center;
+}
+
+#chat-basket-show {
+  background: #1a2e1a;
+  border: 1px solid #4A8C4F;
+  border-radius: 3px;
+  color: #88cc88;
+  font-size: 11px;
+  font-family: sans-serif;
+  cursor: pointer;
+  padding: 3px 6px;
+  width: 100%;
+}
+
+#chat-basket-show:hover {
+  border-color: #88cc88;
+  color: #fff;
 }
 
 #chat-basket-clear {

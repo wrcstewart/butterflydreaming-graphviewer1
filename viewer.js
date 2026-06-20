@@ -2895,12 +2895,14 @@ async function init() {
 
     const collectBtn     = document.getElementById('chat-collect-btn');
     const basketCountEl  = document.getElementById('chat-basket-count');
+    const basketShowBtn  = document.getElementById('chat-basket-show');
     const basketClearBtn = document.getElementById('chat-basket-clear');
 
     function updateBasketUI() {
       const n = collectedBasket.length;
       collectBtn.classList.toggle('has-items', n > 0);
       basketCountEl.textContent = n > 0 ? `${n}` : '';
+      basketShowBtn.style.display  = n > 0 ? '' : 'none';
       basketClearBtn.style.display = n > 0 ? '' : 'none';
     }
 
@@ -2912,6 +2914,18 @@ async function init() {
       collectedBasket.push(...items);
       chatEditor.dispatch({ effects: collectEffect.of(items) });
       updateBasketUI();
+    });
+
+    basketShowBtn.addEventListener('click', () => {
+      if (!chatEditor || collectedBasket.length === 0) return;
+      const joined  = collectedBasket.map(item => item.text).join('');
+      const current = chatEditor.state.doc.toString().replace(/\n{2,}$/, '\n');
+      const insert  = current.length > 0 ? current + '\n' + joined : joined;
+      const scrollTo = current.length > 0 ? current.length + 1 : 0;
+      chatEditor.dispatch({
+        changes: { from: 0, to: chatEditor.state.doc.length, insert },
+        effects: CmEditorView.scrollIntoView(scrollTo, { y: 'center' }),
+      });
     });
 
     basketClearBtn.addEventListener('click', () => {
