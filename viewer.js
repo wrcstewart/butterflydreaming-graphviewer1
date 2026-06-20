@@ -2837,7 +2837,7 @@ async function init() {
     const { EditorView, EditorState, keymap, drawSelection, dropCursor,
             rectangularSelection, crosshairCursor, highlightActiveLine,
             highlightSpecialChars, history, defaultKeymap, historyKeymap } =
-      await import('./codemirror-bundle.js');
+      await import('./codemirror-bundle.js?v=2');
     CmEditorView = EditorView;
     chatEditor = new CmEditorView({
       state: EditorState.create({
