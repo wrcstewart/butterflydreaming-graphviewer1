@@ -163,13 +163,13 @@ html, body {
 
 #chat-panel {
   display: none;
-  width: 50%;
+  width: 40%;
   height: 33dvh;
   flex-shrink: 0;
   align-self: center;
   background: #0a0a1a;
-  justify-content: center;
   align-items: flex-start;
+  gap: 8px;
   padding: 8px;
 }
 
@@ -185,7 +185,8 @@ html, body {
 }
 
 #chat-text-area {
-  width: 90%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   background: #1a1a2e;
   color: #ffffff;
@@ -196,6 +197,18 @@ html, body {
   line-height: 1.6;
   resize: none;
   font-family: sans-serif;
+}
+
+#chat-append-label {
+  flex-shrink: 0;
+  align-self: flex-start;
+  color: #cccccc;
+  font-size: 15px;
+  font-family: sans-serif;
+  cursor: pointer;
+  user-select: none;
+  padding-top: 6px;
+  white-space: nowrap;
 }
 
 #media-bar {

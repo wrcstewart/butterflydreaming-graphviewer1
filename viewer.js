@@ -1179,7 +1179,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (main.length) handleNodeTap(main);
       } else {
         if (chatModeActive) {
-          document.getElementById('chat-text-area').value = buildBuddyChipTooltip(chip);
+          setChatText(buildBuddyChipTooltip(chip));
         } else {
           const content = buildBuddyChipTooltip(chip);
           if (content) {
@@ -1208,7 +1208,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearTimeout(buddyDesktopTimer);
       buddyDesktopPending = chip.id();
       if (chatModeActive) {
-        document.getElementById('chat-text-area').value = buildBuddyChipTooltip(chip);
+        setChatText(buildBuddyChipTooltip(chip));
       } else {
         const content = buildBuddyChipTooltip(chip);
         if (content) {
@@ -1251,7 +1251,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         handleNodeTap(main);
       } else {
         if (chatModeActive) {
-          document.getElementById('chat-text-area').value = buildTooltipContent(main);
+          setChatText(buildTooltipContent(main));
         } else {
           const content = buildTooltipContent(main);
           if (content) {
@@ -1281,7 +1281,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearTimeout(youDesktopTimer);
       youDesktopPending = chip.id();
       if (chatModeActive) {
-        document.getElementById('chat-text-area').value = buildTooltipContent(main);
+        setChatText(buildTooltipContent(main));
       } else {
         const content = buildTooltipContent(main);
         if (content) {
@@ -1324,6 +1324,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return header ? `${header}\n${body}` : body;
     }
     return '';
+  }
+
+  function setChatText(content) {
+    const ta = document.getElementById('chat-text-area');
+    if (document.getElementById('chat-append-cb').checked && ta.value) {
+      ta.value = ta.value + '\n' + content;
+    } else {
+      ta.value = content;
+    }
   }
 
   function positionTooltip(x, y) {
@@ -2125,7 +2134,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         hideTooltip();
         touchPendingNodeId = node.id();
         if (chatModeActive) {
-          document.getElementById('chat-text-area').value = buildTooltipContent(node);
+          setChatText(buildTooltipContent(node));
         } else {
           showTooltip(node, 0, 0, true);
         }
@@ -2147,7 +2156,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearTimeout(desktopClickTimer);
       desktopPendingNodeId = node.id();
       if (chatModeActive) {
-        document.getElementById('chat-text-area').value = buildTooltipContent(node);
+        setChatText(buildTooltipContent(node));
       } else {
         const rp = evt.renderedPosition;
         showTooltip(node, rp.x, rp.y, false);
