@@ -1329,9 +1329,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function setChatText(content) {
     const ta = document.getElementById('chat-text-area');
     if (document.getElementById('chat-append-cb').checked && ta.value) {
+      const newTextTop = ta.scrollHeight;
       ta.value = ta.value + '\n' + content;
+      ta.scrollTop = newTextTop - ta.clientHeight / 2;
     } else {
       ta.value = content;
+      ta.scrollTop = 0;
     }
   }
 
