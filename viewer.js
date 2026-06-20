@@ -1,5 +1,7 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
+import { basicSetup, EditorView, EditorState } from 'https://cdn.jsdelivr.net/npm/codemirror@6/+esm';
+
 const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
@@ -33,6 +35,7 @@ let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
 let chipGridParams         = null;
 let chatModeActive         = false;
+let chatEditor             = null;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1327,20 +1330,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function setChatText(content) {
-    const ta = document.getElementById('chat-text-area');
-    if (document.getElementById('chat-append-cb').checked && ta.value) {
-      // Trim scroll-padding left by the previous append (keep at most 2 blank lines as separator)
-      ta.value = ta.value.replace(/\n{2,}$/, '\n');
-      const newTextTop = ta.scrollHeight;
-      // Pad below new content so the browser has enough scroll range to honour the midpoint
-      const padLines = Math.ceil(ta.clientHeight / 2 / 26) + 2;
-      ta.value = ta.value + '\n' + content + '\n'.repeat(padLines);
-      requestAnimationFrame(() => {
-        ta.scrollTop = newTextTop - ta.clientHeight / 2;
+    if (!chatEditor) return;
+    if (document.getElementById('chat-append-cb').checked && chatEditor.state.doc.length > 0) {
+      const current  = chatEditor.state.doc.toString().replace(/\n{2,}$/, '\n');
+      const insertAt = current.length + 1;
+      chatEditor.dispatch({
+        changes: { from: 0, to: chatEditor.state.doc.length, insert: current + '\n' + content },
+        effects: EditorView.scrollIntoView(insertAt, { y: 'center' }),
       });
     } else {
-      ta.value = content;
-      ta.scrollTop = 0;
+      chatEditor.dispatch({
+        changes: { from: 0, to: chatEditor.state.doc.length, insert: content },
+        effects: EditorView.scrollIntoView(0),
+      });
     }
   }
 
@@ -2813,8 +2815,10 @@ async function init() {
     chatModeActive = !chatModeActive;
     if (chatModeActive) {
       const tip = document.getElementById('label-tooltip');
-      if (tip.style.display !== 'none' && tip.textContent) {
-        document.getElementById('chat-text-area').value = tip.textContent;
+      if (tip.style.display !== 'none' && tip.textContent && chatEditor) {
+        chatEditor.dispatch({
+          changes: { from: 0, to: chatEditor.state.doc.length, insert: tip.textContent },
+        });
       }
       tip.style.display = 'none';
     }
@@ -2824,10 +2828,34 @@ async function init() {
       positionCyEl();
       cy.resize();
       cy.fit(undefined, 40);
+      if (chatModeActive && chatEditor) chatEditor.requestMeasure();
     });
   }
 
   chatBtn.addEventListener('click', toggleChatMode);
+
+  chatEditor = new EditorView({
+    state: EditorState.create({
+      doc: '',
+      extensions: [
+        basicSetup,
+        EditorView.lineWrapping,
+        EditorView.theme({
+          '&':                            { height: '100%', background: '#1a1a2e', color: '#ffffff' },
+          '&.cm-focused':                 { outline: 'none' },
+          '.cm-content':                  { padding: '10px', caretColor: '#fff', fontFamily: 'sans-serif', lineHeight: '1.6', fontSize: '16px' },
+          '.cm-line':                     { padding: '0' },
+          '.cm-scroller':                 { overflow: 'auto' },
+          '.cm-gutters':                  { display: 'none' },
+          '.cm-activeLine':               { background: 'rgba(255,255,255,0.04)' },
+          '.cm-selectionBackground':      { background: '#2a4080 !important' },
+          '&.cm-focused .cm-selectionBackground': { background: '#2a4080 !important' },
+          '.cm-cursor':                   { borderLeftColor: '#ffffff' },
+        }, { dark: true }),
+      ],
+    }),
+    parent: document.getElementById('chat-editor-mount'),
+  });
 
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');

@@ -184,19 +184,13 @@ html, body {
   display: flex;
 }
 
-#chat-text-area {
+#chat-editor-mount {
   flex: 1;
   min-width: 0;
   height: 100%;
-  background: #1a1a2e;
-  color: #ffffff;
+  overflow: hidden;
   border: 1px solid #444;
   border-radius: 6px;
-  padding: 10px;
-  font-size: 16px;
-  line-height: 1.6;
-  resize: none;
-  font-family: sans-serif;
 }
 
 #chat-append-label {
