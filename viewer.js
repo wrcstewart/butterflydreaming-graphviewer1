@@ -1330,7 +1330,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const ta = document.getElementById('chat-text-area');
     if (document.getElementById('chat-append-cb').checked && ta.value) {
       // Trim scroll-padding left by the previous append (keep at most 2 blank lines as separator)
-      ta.value = ta.value.replace(/\n{4,}$/, '\n\n\n');
+      ta.value = ta.value.replace(/\n{2,}$/, '\n');
       const newTextTop = ta.scrollHeight;
       // Pad below new content so the browser has enough scroll range to honour the midpoint
       const padLines = Math.ceil(ta.clientHeight / 2 / 26) + 2;
