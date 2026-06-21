@@ -1419,6 +1419,42 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     card.text = content;
   }
 
+  function scrollTextareaToInsertPoint(textarea, insertAt) {
+    // Use a hidden mirror div to measure the actual rendered y-position of insertAt
+    // including wrapped lines (split('\n') alone undercounts when text wraps).
+    const style         = getComputedStyle(textarea);
+    const lineHeight    = parseFloat(style.lineHeight) || 26;
+    const paddingBottom = parseFloat(style.paddingBottom) || 0;
+
+    const mirror = document.createElement('div');
+    Object.assign(mirror.style, {
+      position:      'absolute',
+      visibility:    'hidden',
+      top:           '-9999px',
+      left:          '0',
+      whiteSpace:    'pre-wrap',
+      wordWrap:      'break-word',
+      overflowWrap:  'break-word',
+      boxSizing:     'border-box',
+      width:         textarea.clientWidth + 'px',
+      paddingTop:    style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      paddingLeft:   style.paddingLeft,
+      paddingRight:  style.paddingRight,
+      fontFamily:    style.fontFamily,
+      fontSize:      style.fontSize,
+      fontWeight:    style.fontWeight,
+      fontStyle:     style.fontStyle,
+      lineHeight:    style.lineHeight,
+      letterSpacing: style.letterSpacing,
+    });
+    mirror.textContent = textarea.value.substring(0, insertAt);
+    document.body.appendChild(mirror);
+    const scrollTo = Math.max(0, mirror.offsetHeight - paddingBottom - lineHeight);
+    document.body.removeChild(mirror);
+    textarea.scrollTop = scrollTo;
+  }
+
   function appendToCard(card, content) {
     if (!card) return;
     if (card.kind === 'local') {
@@ -1429,10 +1465,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Cursor at the start of the inserted text. No focus() — that would
       // pop up the iOS keyboard on every node click.
       try { card.body.setSelectionRange(insertAt, insertAt); } catch (_) {}
-      // Scroll so the insert line sits near the top of the visible area.
-      const linesBefore = card.body.value.substring(0, insertAt).split('\n').length - 1;
-      const lineHeight  = parseFloat(getComputedStyle(card.body).lineHeight) || 26;
-      card.body.scrollTop = Math.max(0, linesBefore * lineHeight - 4);
+      scrollTextareaToInsertPoint(card.body, insertAt);
     } else {
       const current = card.body.textContent.replace(/\n{2,}$/, '\n');
       card.body.textContent = current.length > 0 ? current + '\n' + content : content;
