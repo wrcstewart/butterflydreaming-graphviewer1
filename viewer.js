@@ -33,9 +33,7 @@ let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
 let chipGridParams         = null;
 let chatModeActive         = false;
-let chatEditor             = null;
-let CmEditorView           = null;
-let collectedBasket        = [];
+let chatTextarea           = null;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1330,19 +1328,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function setChatText(content) {
-    if (!chatEditor || !CmEditorView) return;
-    if (document.getElementById('chat-append-cb').checked && chatEditor.state.doc.length > 0) {
-      const current  = chatEditor.state.doc.toString().replace(/\n{2,}$/, '\n');
-      const insertAt = current.length + 1;
-      chatEditor.dispatch({
-        changes: { from: 0, to: chatEditor.state.doc.length, insert: current + '\n' + content },
-        effects: CmEditorView.scrollIntoView(insertAt, { y: 'center' }),
-      });
+    if (!chatTextarea) return;
+    if (document.getElementById('chat-append-cb').checked && chatTextarea.value.length > 0) {
+      const current  = chatTextarea.value.replace(/\n{2,}$/, '\n');
+      chatTextarea.value = current + '\n' + content;
+      chatTextarea.scrollTop = chatTextarea.scrollHeight;
     } else {
-      chatEditor.dispatch({
-        changes: { from: 0, to: chatEditor.state.doc.length, insert: content },
-        effects: CmEditorView.scrollIntoView(0),
-      });
+      chatTextarea.value = content;
+      chatTextarea.scrollTop = 0;
     }
   }
 
@@ -2815,10 +2808,8 @@ async function init() {
     chatModeActive = !chatModeActive;
     if (chatModeActive) {
       const tip = document.getElementById('label-tooltip');
-      if (tip.style.display !== 'none' && tip.textContent && chatEditor) {
-        chatEditor.dispatch({
-          changes: { from: 0, to: chatEditor.state.doc.length, insert: tip.textContent },
-        });
+      if (tip.style.display !== 'none' && tip.textContent && chatTextarea) {
+        chatTextarea.value = tip.textContent;
       }
       tip.style.display = 'none';
     }
@@ -2828,115 +2819,12 @@ async function init() {
       positionCyEl();
       cy.resize();
       cy.fit(undefined, 40);
-      if (chatModeActive && chatEditor) chatEditor.requestMeasure();
     });
   }
 
   chatBtn.addEventListener('click', toggleChatMode);
 
-  try {
-    const { EditorView, EditorState, StateField, StateEffect, Decoration,
-            keymap, drawSelection, dropCursor,
-            rectangularSelection, crosshairCursor, highlightActiveLine,
-            highlightSpecialChars, history, defaultKeymap, historyKeymap } =
-      await import('./codemirror-bundle.js?v=3');
-    CmEditorView = EditorView;
-
-    const collectEffect      = StateEffect.define();
-    const clearCollectEffect = StateEffect.define();
-    const collectedField     = StateField.define({
-      create() { return Decoration.none; },
-      update(deco, tr) {
-        deco = deco.map(tr.changes);
-        for (const e of tr.effects) {
-          if (e.is(collectEffect)) {
-            const marks = e.value.map(r => Decoration.mark({ class: 'cm-collected' }).range(r.from, r.to));
-            deco = deco.update({ add: marks, sort: true });
-          }
-          if (e.is(clearCollectEffect)) deco = Decoration.none;
-        }
-        return deco;
-      },
-      provide: f => EditorView.decorations.from(f),
-    });
-
-    chatEditor = new CmEditorView({
-      state: EditorState.create({
-        doc: '',
-        extensions: [
-          collectedField,
-          highlightSpecialChars(),
-          history(),
-          drawSelection(),
-          dropCursor(),
-          EditorState.allowMultipleSelections.of(true),
-          rectangularSelection(),
-          crosshairCursor(),
-          highlightActiveLine(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
-          CmEditorView.lineWrapping,
-          CmEditorView.theme({
-            '&':                                    { height: '100%', background: '#1a1a2e', color: '#ffffff' },
-            '&.cm-focused':                         { outline: 'none' },
-            '.cm-content':                          { padding: '10px', caretColor: '#fff', fontFamily: 'sans-serif', lineHeight: '1.6', fontSize: '16px' },
-            '.cm-line':                             { padding: '0' },
-            '.cm-scroller':                         { overflow: 'auto' },
-            '.cm-gutters':                          { display: 'none' },
-            '.cm-activeLine':                       { background: 'rgba(255,255,255,0.04)' },
-            '.cm-selectionBackground':              { background: '#2a4080 !important' },
-            '&.cm-focused .cm-selectionBackground': { background: '#2a4080 !important' },
-            '.cm-cursor':                           { borderLeftColor: '#ffffff' },
-            '.cm-collected':                        { background: 'rgba(255, 200, 50, 0.2)', borderRadius: '2px' },
-          }, { dark: true }),
-        ],
-      }),
-      parent: document.getElementById('chat-editor-mount'),
-    });
-
-    const collectBtn     = document.getElementById('chat-collect-btn');
-    const basketCountEl  = document.getElementById('chat-basket-count');
-    const basketShowBtn  = document.getElementById('chat-basket-show');
-    const basketClearBtn = document.getElementById('chat-basket-clear');
-
-    function updateBasketUI() {
-      const n = collectedBasket.length;
-      collectBtn.classList.toggle('has-items', n > 0);
-      basketCountEl.textContent = n > 0 ? `${n}` : '';
-      basketShowBtn.style.display  = n > 0 ? '' : 'none';
-      basketClearBtn.style.display = n > 0 ? '' : 'none';
-    }
-
-    collectBtn.addEventListener('click', () => {
-      if (!chatEditor) return;
-      const ranges = chatEditor.state.selection.ranges.filter(r => !r.empty);
-      if (ranges.length === 0) return;
-      const items = ranges.map(r => ({ from: r.from, to: r.to, text: chatEditor.state.doc.sliceString(r.from, r.to) }));
-      collectedBasket.push(...items);
-      chatEditor.dispatch({ effects: collectEffect.of(items) });
-      updateBasketUI();
-    });
-
-    basketShowBtn.addEventListener('click', () => {
-      if (!chatEditor || collectedBasket.length === 0) return;
-      const joined  = collectedBasket.map(item => item.text).join('');
-      const current = chatEditor.state.doc.toString().replace(/\n{2,}$/, '\n');
-      const insert  = current.length > 0 ? current + '\n' + joined : joined;
-      const scrollTo = current.length > 0 ? current.length + 1 : 0;
-      chatEditor.dispatch({
-        changes: { from: 0, to: chatEditor.state.doc.length, insert },
-        effects: CmEditorView.scrollIntoView(scrollTo, { y: 'center' }),
-      });
-    });
-
-    basketClearBtn.addEventListener('click', () => {
-      collectedBasket = [];
-      chatEditor.dispatch({ effects: clearCollectEffect.of(null) });
-      updateBasketUI();
-    });
-
-  } catch (e) {
-    console.error('[CM6] Failed to load — chat panel unavailable. Check CSP / network:', e);
-  }
+  chatTextarea = document.getElementById('chat-textarea');
 
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
