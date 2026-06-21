@@ -2972,18 +2972,11 @@ async function init() {
 
   const newCardBtn = document.getElementById('chat-new-card-btn');
   if (newCardBtn) {
+    newCardBtn.style.background = 'lime';   // DIAGNOSTIC: proves this code ran
     newCardBtn.addEventListener('click', () => {
+      newCardBtn.style.background = 'purple';   // DIAGNOSTIC: proves the listener fired
       const card = createCard({ kind: 'local' });
       if (chatStackEl) chatStackEl.scrollTop = 0;
-      // Briefly focus the new card body so the user sees something happen.
-      // (focus also pops iOS keyboard, but here it's an explicit user action.)
-      if (card && card.body && card.body.focus) {
-        try { card.body.focus(); } catch (_) {}
-      }
-      // Flash the button label so the click is clearly registered.
-      const orig = newCardBtn.innerHTML;
-      newCardBtn.innerHTML = 'N=' + (card ? card.serial : '?');
-      setTimeout(() => { newCardBtn.innerHTML = orig; }, 600);
     });
   }
 
