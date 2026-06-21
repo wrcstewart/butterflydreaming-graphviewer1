@@ -2970,6 +2970,14 @@ async function init() {
 
   chatStackEl = document.getElementById('chat-stack');
 
+  const newCardBtn = document.getElementById('chat-new-card-btn');
+  if (newCardBtn) {
+    newCardBtn.addEventListener('click', () => {
+      createCard({ kind: 'local' });
+      if (chatStackEl) chatStackEl.scrollTop = 0;
+    });
+  }
+
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
 

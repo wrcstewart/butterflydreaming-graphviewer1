@@ -267,6 +267,24 @@ html, body {
   white-space: nowrap;
 }
 
+#chat-new-card-btn {
+  background: #1a1a2e;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: sans-serif;
+  font-size: 10px;
+  line-height: 1.1;
+  padding: 3px 6px;
+  cursor: pointer;
+  text-align: center;
+}
+
+#chat-new-card-btn:hover {
+  border-color: #aaa;
+  color: #fff;
+}
+
 #media-bar {
   display: none;
   position: fixed;
