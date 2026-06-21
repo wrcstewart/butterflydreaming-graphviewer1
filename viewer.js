@@ -36,6 +36,8 @@ let chatModeActive         = false;
 let chatStackEl            = null;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;
+let currentCopyText        = null;    // most recently copied text — survives until next copy
+let currentCopyRange       = null;    // { cardId, from, to } of the source range
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1364,7 +1366,45 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     card.el   = el;
     card.body = body;
     cards.push(card);
+
+    // Hook OS-native copy. We do NOT preventDefault — system clipboard still gets the text,
+    // so the user can paste outside the app as a side effect.
+    body.addEventListener('copy', e => handleCardCopy(e, card));
+
     return card;
+  }
+
+  function handleCardCopy(_e, card) {
+    let from, to, text;
+    if (card.kind === 'local') {
+      from = card.body.selectionStart;
+      to   = card.body.selectionEnd;
+      text = card.body.value.slice(from, to);
+    } else {
+      const sel = window.getSelection();
+      text = sel ? sel.toString() : '';
+      if (text && sel.rangeCount) {
+        const r   = sel.getRangeAt(0);
+        const pre = r.cloneRange();
+        pre.selectNodeContents(card.body);
+        pre.setEnd(r.startContainer, r.startOffset);
+        from = pre.toString().length;
+        to   = from + r.toString().length;
+      } else {
+        from = to = 0;
+      }
+    }
+
+    if (!text) return;   // empty selection — no-op
+
+    currentCopyText  = text;
+    currentCopyRange = { cardId: card.id, from, to };
+
+    // Destination = top card. If source IS the top, grow the stack with a new card above it.
+    const dest = (card === topCard())
+      ? createCard({ kind: 'local' })
+      : topCard();
+    appendToCard(dest, text);
   }
 
   function setCardText(card, content) {
