@@ -5612,3 +5612,297 @@ No change to touch behaviour. The existing single-tap / double-tap
 (800ms window) model already matched the new desktop model conceptually.
 `isTouchEvent(evt)` continues to distinguish touch from desktop in all
 tap handlers.
+
+---
+
+## Amendment 38 — graphviewer.md — 19 June 2026
+
+### Read indicator and extended panel header
+
+#### 38.1 Read Indicator
+
+A single click ("read") on any node now leaves a persistent **2px light
+grey (#cccccc) border** on the last-clicked node, so the user can see
+which node was most recently read.
+
+Module-scope state (viewer.js):
+
+```javascript
+let lastReadNodeId = null;
+let lastReadNodeCy = null;
+
+function markReadNode(cytoNode, instanceCy) {
+  if (lastReadNodeId && lastReadNodeCy) {
+    try { lastReadNodeCy.getElementById(lastReadNodeId)
+      .removeStyle('border-width border-color border-opacity'); } catch (_) {}
+  }
+  cytoNode.style({ 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
+  lastReadNodeId = cytoNode.id();
+  lastReadNodeCy = instanceCy;
+}
+
+function clearReadMark() { … }
+```
+
+`markReadNode` is called from every tap handler in single-click branches
+(main graph, buddy bar, you bar). When the user navigates with a double
+click the border is cleared so the indicator only tracks reads.
+
+The handler tracks both the node id and the Cytoscape instance because
+the same id may exist on `cy`, `youCy`, and `buddyCy` and only the
+correct instance's `getElementById` will find it.
+
+#### 38.2 Extended Panel Header
+
+`buildTooltipContent` was extended for TextNodes to produce a header of
+the form `title : work : seq`, where `work` comes from
+`data('source_text')` and `seq` from `data('seq')`. Gateway and
+section_title nodes suppress the seq portion:
+
+```javascript
+const showSeq = !node.data('gateway') && !node.data('section_title');
+let header  = title;
+if (work)              header += (header ? ' : ' : '') + work;
+if (showSeq && seq != null) header += (header ? ' : ' : '') + seq;
+return header ? `${header}\n${body}` : body;
+```
+
+The same content function feeds both the tooltip and the chat editor
+(`setChatText(buildTooltipContent(node))`), so the panel header matches
+the tooltip header exactly.
+
+---
+
+## Amendment 39 — graphviewer.md — 19 June 2026
+
+### Chat Panel Append Mode
+
+A `+` checkbox (`#chat-append-cb`) was added to the chat panel's right
+column. When checked, clicking a node **appends** its content to the
+editor instead of overwriting it. When unchecked, behaviour reverts to
+overwrite-on-click.
+
+Append logic (initially against `<textarea>`, then carried forward to
+CM6 in A40):
+
+- Trim trailing blank lines on the existing content
+  (`/\n{2,}$/ → '\n'`) so successive appends produce exactly one blank
+  line between entries.
+- Insert a single `\n` separator, then the new node's text.
+- Scroll position is set so the **first line of the newly inserted
+  text appears at the vertical centre of the panel**.
+
+For the textarea era this required dynamic blank-line padding at the
+bottom of the content; otherwise `scrollTop` got clamped when the doc
+was shorter than half panel height. The padding trick was superseded by
+A40 (CM6's `scrollIntoView({ y: 'center' })`).
+
+---
+
+## Amendment 40 — graphviewer.md — 19–20 June 2026
+
+### CodeMirror 6 Editor in the Chat Panel
+
+#### 40.1 Motivation
+
+Replaced the chat panel `<textarea>` with a CodeMirror 6 editor so that
+users could **multi-select** non-contiguous text spans for the basket
+feature in A41. A textarea cannot represent multiple disjoint
+selections, but CM6 supports them natively
+(`EditorState.allowMultipleSelections.of(true)` + `rectangularSelection()`).
+
+Multi-select inputs available with CM6:
+
+| Gesture | Effect |
+|---|---|
+| Cmd/Ctrl + click | Add a caret at the click point |
+| Cmd/Ctrl + drag | Extend an existing range |
+| Alt + drag | Rectangular selection across lines |
+
+#### 40.2 Module Conversion
+
+viewer.js was converted to an ES module — one attribute change in
+`index.html`:
+
+```html
+<script type="module" src="viewer.js?v=N"></script>
+```
+
+CM6 is loaded via dynamic `import()` inside an `async init()`, wrapped in
+`try/catch` so a CM6 load failure does not break the rest of the app.
+`chatEditor` stays `null` on failure and every consumer guards with
+`if (!chatEditor || !CmEditorView) return`.
+
+#### 40.3 Why a Local Bundle Was Necessary
+
+Four CDN approaches were attempted and all failed:
+
+| Attempt | Failure |
+|---|---|
+| Static imports from multiple CDN URLs | Whole viewer module aborted before any code ran (single module-load failure cascades). |
+| Dynamic import from the `codemirror` meta-package | `EditorView` not found — that package only exports `basicSetup` / `minimalSetup`. |
+| Multi-URL imports from `esm.sh` | `undefined is not an object (evaluating 'l.extension')` — multiple module instances of shared deps at different resolved versions. |
+| `esm.sh?bundle` single URL | Partially worked but proved fragile under cache-bust scenarios. |
+
+**Final approach:** local esbuild bundle.
+
+```
+cm6-entry.js          → imports from @codemirror/view, @codemirror/state,
+                        @codemirror/commands (and friends)
+codemirror-bundle.js  → ~275KB self-contained ESM bundle, committed to repo
+```
+
+Build command:
+
+```bash
+npx esbuild cm6-entry.js --bundle --format=esm --outfile=codemirror-bundle.js --minify
+```
+
+Loaded with:
+
+```javascript
+const cm = await import('./codemirror-bundle.js?v=2');
+```
+
+**Cache-bust rule:** always bump `?v=N` when the bundle is rebuilt.
+
+#### 40.4 Extensions Used
+
+`basicSetup` was rejected because it includes `highlightSelectionMatches`
+(highlights every occurrence of the word under cursor — not wanted). A
+hand-picked extension list is used instead: `history`, `drawSelection`,
+`dropCursor`, `rectangularSelection`, `crosshairCursor`,
+`highlightActiveLine`, `highlightSpecialChars`, `EditorView.lineWrapping`,
+plus a dark theme.
+
+#### 40.5 Editor Theme
+
+```javascript
+'.cm-content':           { padding: '10px', fontFamily: 'sans-serif', lineHeight: 1.6, fontSize: '16px' },
+'.cm-gutters':           { display: 'none' },                  // hide line-number gutter
+'.cm-selectionBackground': { background: '#2a4080 !important' }, // visible on dark bg
+'.cm-collected':         { background: 'rgba(255,200,50,0.2)' }  // basket highlight
+```
+
+#### 40.6 Pitfalls and Fixes
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| Whole viewer breaks, only buttons render | Static import failure cascades | Dynamic import in try/catch |
+| `EditorView` not found | meta-package omits it | Import from `@codemirror/view` directly |
+| `undefined.extension` | Multiple module instances | One local bundle |
+| `highlightSpecialChars is not a function` | Stale browser cache | Bump `?v=N` |
+| Highlight-all-occurrences | `basicSetup` includes it | Hand-pick extensions |
+| `lineWrapping` not a named export | It is a static on `EditorView` | Use `EditorView.lineWrapping` directly |
+| 3 blank lines between appended entries | `/\n{4,}$/ → '\n\n\n'` | `/\n{2,}$/ → '\n'` |
+
+#### 40.7 iOS Concern
+
+Multi-touch + modifier keys are unreliable on iOS Safari. CM6's
+`rectangularSelection` and Cmd+click multi-caret do not map cleanly to
+touch. This concern motivated the A41 collect-basket design, which
+allows the basket to be built from **a sequence of single contiguous
+selections** rather than gesture-based multi-selection — see A41.
+
+---
+
+## Amendment 41 — graphviewer.md — 20 June 2026
+
+### Collect Basket — Multi-Select Without Multi-Select UX
+
+#### 41.1 Concept
+
+Multi-touch and platform-dependent modifier keys make multi-select
+fragile (especially on iOS). The basket replaces *gesture-driven*
+multi-select with a *sequential* model:
+
+1. The user makes a single contiguous selection.
+2. Press **Collect** — the range is added to a basket and its background
+   in the editor is tinted gold.
+3. Repeat for further ranges; the basket accumulates.
+4. Press **Show** — basket contents are joined and appended to the
+   editor, scrolled so the appended block sits at the panel midpoint.
+5. Press **Clear** — basket emptied; gold tints removed.
+
+#### 41.2 UI
+
+Right column of `#chat-panel` (top → bottom):
+
+```
+[ Collect ]  (count)  [ Show ]  [ Clear ]
+                                [ + (append) ]
+```
+
+`Show` and `Clear` are hidden until the basket has at least one item.
+The `+` checkbox was moved to the bottom of the column in A41b.
+
+#### 41.3 State
+
+```javascript
+let collectedBasket = [];                       // module-scope: { from, to, text }[]
+const collectEffect      = StateEffect.define();
+const clearCollectEffect = StateEffect.define();
+const collectedField     = StateField.define({ … }); // gold-tint decorations
+```
+
+Decorations are mapped through document changes
+(`deco = deco.map(tr.changes)`), so insertions / deletions before a
+collected range shift its tint correctly.
+
+#### 41.4 Collect Handler
+
+```javascript
+collectBtn.addEventListener('click', () => {
+  const ranges = chatEditor.state.selection.ranges.filter(r => !r.empty);
+  if (ranges.length === 0) return;
+  const items  = ranges.map(r => ({
+    from: r.from, to: r.to,
+    text: chatEditor.state.doc.sliceString(r.from, r.to),
+  }));
+  collectedBasket.push(...items);
+  chatEditor.dispatch({ effects: collectEffect.of(items) });
+  updateBasketUI();
+});
+```
+
+`filter(r => !r.empty)` ignores caret-only "ranges". The full multi-
+selection API still works (Cmd+click etc.) but is no longer required —
+the user can hit Collect once per single-range selection and build the
+basket sequentially, which is what works on iOS.
+
+#### 41.5 Show Handler (A41b)
+
+```javascript
+basketShowBtn.addEventListener('click', () => {
+  const joined   = collectedBasket.map(i => i.text).join('');
+  const current  = chatEditor.state.doc.toString().replace(/\n{2,}$/, '\n');
+  const insert   = current.length > 0 ? current + '\n' + joined : joined;
+  const scrollTo = current.length > 0 ? current.length + 1 : 0;
+  chatEditor.dispatch({
+    changes: { from: 0, to: chatEditor.state.doc.length, insert },
+    effects: CmEditorView.scrollIntoView(scrollTo, { y: 'center' }),
+  });
+});
+```
+
+The joined basket is appended (one blank line separator) and the cursor
+target is the first inserted character so the new block centres in the
+panel.
+
+#### 41.6 Clear Handler
+
+```javascript
+basketClearBtn.addEventListener('click', () => {
+  collectedBasket = [];
+  chatEditor.dispatch({ effects: clearCollectEffect.of(null) });
+  updateBasketUI();
+});
+```
+
+#### 41.7 Status (forward look)
+
+If a new design lets the basket be filled **without any in-editor text
+selection** (for example, *node clicks* feed the basket directly), then
+the only feature CM6 was providing — multi-range selection — becomes
+unnecessary, and the chat editor could revert to a plain `<textarea>`
+for full cross-OS reliability. See A42.
