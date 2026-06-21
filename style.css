@@ -184,46 +184,64 @@ html, body {
   display: flex;
 }
 
-#chat-textarea {
+#chat-stack {
   flex: 1;
   min-width: 0;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  background: #1a1a2e;
-  color: #ffffff;
+  display: flex;
+  flex-direction: column-reverse;     /* highest-numbered card visually on top */
+  gap: 6px;
+  padding: 4px;
+  overflow-y: auto;
+  background: #0a0a1a;
   border: 1px solid #444;
   border-radius: 6px;
-  padding: 10px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.card-head {
+  padding: 3px 8px;
+  background: rgba(255,255,255,0.04);
+  color: #cccccc;
+  font-family: sans-serif;
+  font-size: 12px;
+  border-bottom: 1px solid #2a2a3a;
+  user-select: none;
+}
+
+.card-body {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  color: #ffffff;
+  border: 0;
+  padding: 8px 10px;
   font-family: sans-serif;
   font-size: 16px;
   line-height: 1.6;
   resize: none;
   outline: none;
+  min-height: 2.4em;
 }
 
-#chat-textarea:focus {
-  border-color: #888;
-}
+/* alternating tints — last child (top) is treated as the "newest" tint */
+.card.local:nth-child(odd)  { background: #161624; }
+.card.local:nth-child(even) { background: #1c1c30; }
 
-#chat-right-col {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-top: 6px;
-  padding-bottom: 6px;
+.card.received {
+  background: #16242c;                /* faint teal tint */
 }
-
-#chat-append-label {
-  margin-top: auto;
-  color: #cccccc;
-  font-size: 15px;
-  font-family: sans-serif;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
+.card.received .card-head::after {
+  content: ' · C';
 }
 
 #media-bar {

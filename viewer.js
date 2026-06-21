@@ -33,7 +33,9 @@ let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
 let chipGridParams         = null;
 let chatModeActive         = false;
-let chatTextarea           = null;
+let chatStackEl            = null;
+let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
+let nextCardSerial         = 1;
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1327,16 +1329,61 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return '';
   }
 
-  function setChatText(content) {
-    if (!chatTextarea) return;
-    if (document.getElementById('chat-append-cb').checked && chatTextarea.value.length > 0) {
-      const current  = chatTextarea.value.replace(/\n{2,}$/, '\n');
-      chatTextarea.value = current + '\n' + content;
-      chatTextarea.scrollTop = chatTextarea.scrollHeight;
+  function topCard() {
+    return cards.length ? cards[cards.length - 1] : null;
+  }
+
+  function createCard({ kind = 'local' } = {}) {
+    if (!chatStackEl) return null;
+    const id     = 'card_' + nextCardSerial;
+    const serial = nextCardSerial++;
+    const card   = { id, kind, serial, volume: 0.85, text: '' };
+
+    const el = document.createElement('div');
+    el.className          = 'card ' + kind;
+    el.dataset.cardId     = id;
+    el.style.opacity      = card.volume;
+
+    const head = document.createElement('div');
+    head.className   = 'card-head';
+    head.textContent = (kind === 'local' ? 'N' : 'C') + (kind === 'local' && serial > 1 ? '+' + (serial - 1) : '');
+
+    const body = kind === 'local'
+      ? document.createElement('textarea')
+      : document.createElement('div');
+    body.className = 'card-body';
+    if (kind === 'local') {
+      body.value = '';
     } else {
-      chatTextarea.value = content;
-      chatTextarea.scrollTop = 0;
+      body.contentEditable = 'false';
+      body.textContent = '';
     }
+
+    el.append(head, body);
+    chatStackEl.append(el);                 // column-reverse: latest visually on top
+    card.el   = el;
+    card.body = body;
+    cards.push(card);
+    return card;
+  }
+
+  function appendToCard(card, content) {
+    if (!card) return;
+    if (card.kind === 'local') {
+      const current = card.body.value.replace(/\n{2,}$/, '\n');
+      card.body.value = current.length > 0 ? current + '\n' + content : content;
+      card.text = card.body.value;
+      card.body.scrollTop = card.body.scrollHeight;
+    } else {
+      const current = card.body.textContent.replace(/\n{2,}$/, '\n');
+      card.body.textContent = current.length > 0 ? current + '\n' + content : content;
+      card.text = card.body.textContent;
+    }
+  }
+
+  function setChatText(content) {
+    const dest = topCard() || createCard({ kind: 'local' });
+    appendToCard(dest, content);
   }
 
   function positionTooltip(x, y) {
@@ -2808,8 +2855,8 @@ async function init() {
     chatModeActive = !chatModeActive;
     if (chatModeActive) {
       const tip = document.getElementById('label-tooltip');
-      if (tip.style.display !== 'none' && tip.textContent && chatTextarea) {
-        chatTextarea.value = tip.textContent;
+      if (tip.style.display !== 'none' && tip.textContent) {
+        setChatText(tip.textContent);
       }
       tip.style.display = 'none';
     }
@@ -2824,7 +2871,7 @@ async function init() {
 
   chatBtn.addEventListener('click', toggleChatMode);
 
-  chatTextarea = document.getElementById('chat-textarea');
+  chatStackEl = document.getElementById('chat-stack');
 
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
