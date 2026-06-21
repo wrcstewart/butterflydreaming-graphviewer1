@@ -233,7 +233,7 @@ html, body {
   line-height: 1.6;
   resize: none;
   outline: none;
-  min-height: 6em;                    /* ~3.75 visible lines so ~3 cards fill the 33dvh panel */
+  min-height: 8.5em;                  /* ~5 lines visible; with ~1.5em head ≈ 10em per card → 3 cards fill the 33dvh panel */
 }
 
 /* alternating tints — last child (top) is treated as the "newest" tint */
