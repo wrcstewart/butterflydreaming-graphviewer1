@@ -2975,8 +2975,16 @@ async function init() {
     newCardBtn.style.background = 'lime';   // DIAGNOSTIC: proves this code ran
     newCardBtn.addEventListener('click', () => {
       newCardBtn.style.background = 'purple';   // DIAGNOSTIC: proves the listener fired
+      // DIAGNOSTIC: append a banner so we know whether chatStackEl receives DOM updates
+      if (chatStackEl) {
+        const banner = document.createElement('div');
+        banner.textContent = 'DIAG banner @ ' + (chatStackEl.children.length);
+        banner.style.cssText = 'background:red;color:white;padding:8px;font-size:14px';
+        chatStackEl.prepend(banner);
+        chatStackEl.scrollTop = 0;
+      }
       const card = createCard({ kind: 'local' });
-      if (chatStackEl) chatStackEl.scrollTop = 0;
+      console.log('[diag] createCard returned', card, 'cards.length now', cards.length, 'chatStackEl.children.length', chatStackEl && chatStackEl.children.length);
     });
   }
 
