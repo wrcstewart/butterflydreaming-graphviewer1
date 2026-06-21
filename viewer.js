@@ -1346,7 +1346,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const head = document.createElement('div');
     head.className   = 'card-head';
-    head.textContent = (kind === 'local' ? 'N' : 'C') + (kind === 'local' && serial > 1 ? '+' + (serial - 1) : '');
+    head.textContent = kind === 'local' ? ('N=' + serial) : 'C';
 
     const body = kind === 'local'
       ? document.createElement('textarea')
@@ -1360,11 +1360,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
 
     el.append(head, body);
-    chatStackEl.append(el);                 // column-reverse: latest visually on top
+    chatStackEl.prepend(el);                // newest card visually on top; older cards push down
     card.el   = el;
     card.body = body;
     cards.push(card);
     return card;
+  }
+
+  function setCardText(card, content) {
+    if (!card) return;
+    if (card.kind === 'local') {
+      card.body.value = content;
+      card.body.scrollTop = 0;
+    } else {
+      card.body.textContent = content;
+    }
+    card.text = content;
   }
 
   function appendToCard(card, content) {
@@ -1373,7 +1384,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const current = card.body.value.replace(/\n{2,}$/, '\n');
       card.body.value = current.length > 0 ? current + '\n' + content : content;
       card.text = card.body.value;
-      card.body.scrollTop = card.body.scrollHeight;
+      card.body.scrollTop = 0;                // keep top of card body in view
     } else {
       const current = card.body.textContent.replace(/\n{2,}$/, '\n');
       card.body.textContent = current.length > 0 ? current + '\n' + content : content;
@@ -1383,7 +1394,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function setChatText(content) {
     const dest = topCard() || createCard({ kind: 'local' });
-    appendToCard(dest, content);
+    const appendMode = document.getElementById('chat-append-cb').checked;
+    if (appendMode && dest.text) {
+      appendToCard(dest, content);
+    } else {
+      setCardText(dest, content);
+    }
   }
 
   function positionTooltip(x, y) {
