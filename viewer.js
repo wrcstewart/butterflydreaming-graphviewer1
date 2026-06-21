@@ -1411,6 +1411,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!card) return;
     if (card.kind === 'local') {
       card.body.value = content;
+      try { card.body.setSelectionRange(0, 0); } catch (_) {}
       card.body.scrollTop = 0;
     } else {
       card.body.textContent = content;
@@ -1421,10 +1422,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function appendToCard(card, content) {
     if (!card) return;
     if (card.kind === 'local') {
-      const current = card.body.value.replace(/\n{2,}$/, '\n');
+      const current  = card.body.value.replace(/\n{2,}$/, '\n');
+      const insertAt = current.length > 0 ? current.length + 1 : 0;
       card.body.value = current.length > 0 ? current + '\n' + content : content;
       card.text = card.body.value;
-      card.body.scrollTop = 0;                // keep top of card body in view
+      // Cursor at the start of the inserted text. No focus() — that would
+      // pop up the iOS keyboard on every node click.
+      try { card.body.setSelectionRange(insertAt, insertAt); } catch (_) {}
+      // Scroll so the insert line sits near the top of the visible area.
+      const linesBefore = card.body.value.substring(0, insertAt).split('\n').length - 1;
+      const lineHeight  = parseFloat(getComputedStyle(card.body).lineHeight) || 26;
+      card.body.scrollTop = Math.max(0, linesBefore * lineHeight - 4);
     } else {
       const current = card.body.textContent.replace(/\n{2,}$/, '\n');
       card.body.textContent = current.length > 0 ? current + '\n' + content : content;
