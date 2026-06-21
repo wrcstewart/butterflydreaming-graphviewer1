@@ -184,13 +184,26 @@ html, body {
   display: flex;
 }
 
-#chat-editor-mount {
+#chat-textarea {
   flex: 1;
   min-width: 0;
+  width: 100%;
   height: 100%;
-  overflow: hidden;
+  box-sizing: border-box;
+  background: #1a1a2e;
+  color: #ffffff;
   border: 1px solid #444;
   border-radius: 6px;
+  padding: 10px;
+  font-family: sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+#chat-textarea:focus {
+  border-color: #888;
 }
 
 #chat-right-col {
@@ -211,70 +224,6 @@ html, body {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-}
-
-#chat-collect-btn {
-  background: #1a1a2e;
-  border: 1px solid #555;
-  border-radius: 3px;
-  color: #cccccc;
-  font-size: 12px;
-  font-family: sans-serif;
-  cursor: pointer;
-  padding: 4px 8px;
-  white-space: nowrap;
-  width: 100%;
-}
-
-#chat-collect-btn:hover {
-  border-color: #aaa;
-  color: #fff;
-}
-
-#chat-collect-btn.has-items {
-  border-color: #ffd88a;
-  color: #ffd88a;
-}
-
-#chat-basket-count {
-  color: #ffd88a;
-  font-size: 11px;
-  font-family: sans-serif;
-  text-align: center;
-}
-
-#chat-basket-show {
-  background: #1a2e1a;
-  border: 1px solid #4A8C4F;
-  border-radius: 3px;
-  color: #88cc88;
-  font-size: 11px;
-  font-family: sans-serif;
-  cursor: pointer;
-  padding: 3px 6px;
-  width: 100%;
-}
-
-#chat-basket-show:hover {
-  border-color: #88cc88;
-  color: #fff;
-}
-
-#chat-basket-clear {
-  background: none;
-  border: 1px solid #555;
-  border-radius: 3px;
-  color: #888;
-  font-size: 11px;
-  font-family: sans-serif;
-  cursor: pointer;
-  padding: 3px 6px;
-  width: 100%;
-}
-
-#chat-basket-clear:hover {
-  border-color: #aaa;
-  color: #fff;
 }
 
 #media-bar {
