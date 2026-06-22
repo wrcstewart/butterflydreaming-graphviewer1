@@ -35,7 +35,8 @@ let chipGridParams         = null;
 let chatModeActive         = false;
 let chatStackEl            = null;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
-let nextCardSerial         = 1;
+let nextCardSerial         = 1;     // unique id counter across all kinds
+let nextLocalSerial        = 1;     // N=k label counter — only locals consume it
 let defaultStackEl         = null;    // #default-stack — central system-message hub
 let currentCopyText        = null;    // most recently copied text — survives until next copy
 let currentCopyRange       = null;    // { cardId, from, to } of the source range
@@ -1413,11 +1414,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return cards.length ? cards[cards.length - 1] : null;
   }
 
+  // Most recent local card — chat-side destinations (node-click inserts, copy
+  // appends) always target the newest *editable* card, never a system/received
+  // card sitting on top of the stack.
+  function topLocalCard() {
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (cards[i].kind === 'local') return cards[i];
+    }
+    return null;
+  }
+
   function createCard({ kind = 'local' } = {}) {
     if (!chatStackEl) return null;
-    const id     = 'card_' + nextCardSerial;
-    const serial = nextCardSerial++;
-    const card   = { id, kind, serial, volume: 0.85, text: '' };
+    const id        = 'card_' + nextCardSerial;
+    nextCardSerial++;
+    const serial    = kind === 'local' ? nextLocalSerial++ : null;
+    const card      = { id, kind, serial, volume: 0.85, text: '' };
 
     const el = document.createElement('div');
     el.className          = 'card ' + kind;
@@ -1426,7 +1438,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const head = document.createElement('div');
     head.className   = 'card-head';
-    head.textContent = kind === 'local' ? ('N=' + serial) : 'C';
+    head.textContent = kind === 'local'  ? ('N=' + serial)
+                     : kind === 'system' ? 'System'
+                     :                     'C';
 
     const body = kind === 'local'
       ? document.createElement('textarea')
@@ -1478,10 +1492,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     currentCopyText  = text;
     currentCopyRange = { cardId: card.id, from, to };
 
-    // Destination = top card. If source IS the top, grow the stack with a new card above it.
-    const dest = (card === topCard())
+    // Destination = top local card. If source IS the top local, grow the stack
+    // with a new local above it. Copies from system/received cards land in the
+    // existing top local (creating one if there isn't one yet).
+    const dest = (card === topLocalCard())
       ? createCard({ kind: 'local' })
-      : topCard();
+      : (topLocalCard() || createCard({ kind: 'local' }));
     appendToCard(dest, text);
   }
 
@@ -1552,11 +1568,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function setChatText(content) {
-    const dest = topCard() || createCard({ kind: 'local' });
+    const dest = topLocalCard() || createCard({ kind: 'local' });
     if (dest.text) {
       appendToCard(dest, content);
     } else {
       setCardText(dest, content);
+    }
+  }
+
+  const CHAT_WELCOME_TEXT =
+    'Click a node to start the conversation or type your own message. '
+    + 'If you select text and copy, it will appear on your next card up. '
+    + 'Start a new card if you wish. Send your top card to partner.';
+
+  let chatWelcomeShown = false;
+  function showWelcomeOnce() {
+    if (chatWelcomeShown) return;
+    chatWelcomeShown = true;
+    if (cards.length === 0) createCard({ kind: 'local' });
+    const sys = createCard({ kind: 'system' });
+    if (sys && sys.body) {
+      sys.body.textContent = CHAT_WELCOME_TEXT;
+      sys.text = CHAT_WELCOME_TEXT;
     }
   }
 
@@ -2781,7 +2814,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, showWelcomeOnce };
 
 }
 
@@ -3108,6 +3141,7 @@ async function init() {
         setChatText(tip.textContent);
       }
       tip.style.display = 'none';
+      showWelcomeOnce();
     }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
@@ -3174,7 +3208,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, showWelcomeOnce } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Pin #cy top to the bottom of the default-panel (or the cy-you bar if absent)
   const initialRef = document.getElementById('default-panel') || document.getElementById('cy-you');

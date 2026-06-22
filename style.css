@@ -222,16 +222,25 @@ html, body {
 
 .card.system {
   background: #1c1a30;
+}
+
+/* default-panel system card is the panel's only scroller — it must stretch */
+#default-stack .card.system {
   flex: 1;                             /* fill the default-stack vertically */
 }
 
-.card.system .card-body {
+#default-stack .card.system .card-body {
   position: relative;                  /* offsetParent for inserted spans */
   flex: 1;                             /* fill the card minus the head */
   min-height: 0;                       /* allow shrink-to-overflow inside flex parent */
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-y: auto;
+}
+
+/* chat-panel system card is just a static welcome card — distinct tint, normal sizing */
+#chat-stack .card.system {
+  background: #2c241a;                 /* amber-tinted dark, distinct from local (indigo) and received (teal) */
 }
 
 #chat-stack {
