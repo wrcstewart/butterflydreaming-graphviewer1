@@ -62,12 +62,20 @@ function setSystemText(content) {
   }
   const body = topEl.querySelector('.card-body');
   if (!body) return;
-  // Wrap each insert in its own span so we can scroll the body to its top edge.
+
+  // Separator goes OUTSIDE the span so the span's top is exactly the new
+  // content's first line (not the previous line ending).
+  if (body.textContent && body.textContent.length > 0) {
+    body.appendChild(document.createTextNode('\n'));
+  }
   const span = document.createElement('span');
-  const sep  = (body.textContent || '').length > 0 ? '\n' : '';
-  span.textContent = sep + content;
+  span.textContent = content;
   body.appendChild(span);
-  body.scrollTop = span.offsetTop;
+
+  // Use viewport-relative rects (independent of offsetParent / positioning).
+  const bodyRect = body.getBoundingClientRect();
+  const spanRect = span.getBoundingClientRect();
+  body.scrollTop += spanRect.top - bodyRect.top;
   defaultStackEl.scrollTop = 0;
 }
 

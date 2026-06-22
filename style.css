@@ -225,6 +225,7 @@ html, body {
 }
 
 .card.system .card-body {
+  position: relative;                  /* makes this the offsetParent for inserted spans */
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-y: auto;
