@@ -67,27 +67,31 @@ function setSystemText(content) {
   const oldSpacer = body.querySelector('.system-spacer');
   if (oldSpacer) oldSpacer.remove();
 
-  // Separator goes OUTSIDE the span so the span's top is exactly the new
-  // content's first line (not the previous line ending).
-  if (body.textContent && body.textContent.length > 0) {
-    body.appendChild(document.createTextNode('\n'));
-  }
-  const span = document.createElement('span');
-  span.textContent = content;
-  body.appendChild(span);
+  // Wrap each insert in a block <div> so its offsetTop / offsetHeight are
+  // unambiguous (inline span.offsetTop returns the line box top, which can
+  // be misleading) and so each insert starts on its own line.
+  const block = document.createElement('div');
+  block.className = 'system-insert';
+  block.textContent = content;
+  body.appendChild(block);
 
-  // Trail with a spacer the height of the visible body so total content is
-  // always taller than the body. Without this, single-line inserts fit
-  // without overflow and scrollTop is silently clamped to 0 — long inserts
-  // (TextNodes) work fine because they already overflow on their own.
+  // Trail with a spacer the FULL visible height so scrollHeight - clientHeight
+  // is always >= block.offsetTop with slack to spare. With a "just enough"
+  // spacer (= visibleH - insertHeight) the desired scrollTop lands exactly at
+  // max and any sub-pixel rounding clamps it down, leaving short inserts at
+  // the bottom of the panel.
   const spacer = document.createElement('div');
   spacer.className = 'system-spacer';
   spacer.style.height = body.clientHeight + 'px';
   body.appendChild(spacer);
 
-  // body has position: relative, so it's the span's offsetParent.
-  body.scrollTop = span.offsetTop;
-  defaultStackEl.scrollTop = 0;
+  // Defer one frame so the spacer is fully laid out before we read offsetTop
+  // and assign scrollTop — otherwise the assignment may use a stale, pre-
+  // spacer scrollHeight and be clamped.
+  requestAnimationFrame(() => {
+    body.scrollTop = block.offsetTop;
+    defaultStackEl.scrollTop = 0;
+  });
 }
 
 function hslDistance(hsl1, hsl2) {
