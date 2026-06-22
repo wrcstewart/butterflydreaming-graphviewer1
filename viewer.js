@@ -72,10 +72,10 @@ function setSystemText(content) {
   span.textContent = content;
   body.appendChild(span);
 
-  // Use viewport-relative rects (independent of offsetParent / positioning).
-  const bodyRect = body.getBoundingClientRect();
-  const spanRect = span.getBoundingClientRect();
-  body.scrollTop += spanRect.top - bodyRect.top;
+  // body has position: relative, so it's the span's offsetParent.
+  // span.offsetTop is the y-position of the new content's first line
+  // measured from body's padding edge — exactly where scrollTop wants it.
+  body.scrollTop = span.offsetTop;
   defaultStackEl.scrollTop = 0;
 }
 
