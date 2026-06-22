@@ -1324,10 +1324,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function buildTooltipContent(node) {
     const type = node.data('type');
-    if (type === 'root')     return node.data('text') || node.data('name') || 'ButterflyDreaming';
-    if (type === 'Entry')    return node.data('text') || node.data('name') || '';
-    if (type === 'Family')   return node.data('text') || node.data('name') || '';
-    if (type === 'Cluster')   return node.data('text') || node.data('label') || node.data('name') || '';
+    const navHeader = name => `Node: ${name}\n`;
+    if (type === 'root') {
+      const name = node.data('name') || 'ButterflyDreaming';
+      return navHeader(name) + (node.data('text') || '');
+    }
+    if (type === 'Entry' || type === 'Family' || type === 'Cluster') {
+      const name = node.data('name') || node.data('label') || '';
+      return navHeader(name) + (node.data('text') || '');
+    }
     if (type === 'TextNode') {
       const title = node.data('title') || '';
       const work  = node.data('source_text') || '';
