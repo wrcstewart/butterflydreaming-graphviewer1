@@ -1475,8 +1475,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function setChatText(content) {
     const dest = topCard() || createCard({ kind: 'local' });
-    const appendMode = document.getElementById('chat-append-cb').checked;
-    if (appendMode && dest.text) {
+    if (dest.text) {
       appendToCard(dest, content);
     } else {
       setCardText(dest, content);

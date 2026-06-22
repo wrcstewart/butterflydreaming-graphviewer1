@@ -257,17 +257,8 @@ html, body {
   padding-bottom: 6px;
 }
 
-#chat-append-label {
-  margin-top: auto;
-  color: #cccccc;
-  font-size: 15px;
-  font-family: sans-serif;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-
 #chat-new-card-btn {
+  margin-top: auto;
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
