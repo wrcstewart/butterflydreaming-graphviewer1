@@ -2941,9 +2941,12 @@ async function init() {
   const cyEl      = document.getElementById('cy');
 
   function positionCyEl() {
-    const refEl = (chatModeActive && chatPanel.getBoundingClientRect().height > 0)
-      ? chatPanel
-      : document.getElementById('cy-you');
+    let refEl;
+    if (chatModeActive && chatPanel.getBoundingClientRect().height > 0) {
+      refEl = chatPanel;
+    } else {
+      refEl = document.getElementById('default-panel') || document.getElementById('cy-you');
+    }
     cyEl.style.top = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
   }
 
@@ -3022,9 +3025,10 @@ async function init() {
   const { addBadge }      = setupNrBadges(cy);
   const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
-  // Pin #cy top to the bottom of the bar area so Cytoscape knows its exact bounds
+  // Pin #cy top to the bottom of the default-panel (or the cy-you bar if absent)
+  const initialRef = document.getElementById('default-panel') || document.getElementById('cy-you');
   document.getElementById('cy').style.top =
-    Math.ceil(document.getElementById('cy-you').getBoundingClientRect().bottom) + 'px';
+    Math.ceil(initialRef.getBoundingClientRect().bottom) + 'px';
   cy.resize();
 
   const userCountPanel = document.getElementById('user-count-panel');
