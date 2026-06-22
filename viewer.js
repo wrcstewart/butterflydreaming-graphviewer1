@@ -2632,7 +2632,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText };
 
 }
 
@@ -2972,19 +2972,12 @@ async function init() {
 
   const newCardBtn = document.getElementById('chat-new-card-btn');
   if (newCardBtn) {
-    newCardBtn.style.background = 'lime';   // DIAGNOSTIC: proves this code ran
     newCardBtn.addEventListener('click', () => {
-      newCardBtn.style.background = 'purple';   // DIAGNOSTIC: proves the listener fired
-      // DIAGNOSTIC: append a banner so we know whether chatStackEl receives DOM updates
-      if (chatStackEl) {
-        const banner = document.createElement('div');
-        banner.textContent = 'DIAG banner @ ' + (chatStackEl.children.length);
-        banner.style.cssText = 'background:red;color:white;padding:8px;font-size:14px';
-        chatStackEl.prepend(banner);
-        chatStackEl.scrollTop = 0;
-      }
       const card = createCard({ kind: 'local' });
-      console.log('[diag] createCard returned', card, 'cards.length now', cards.length, 'chatStackEl.children.length', chatStackEl && chatStackEl.children.length);
+      if (chatStackEl) chatStackEl.scrollTop = 0;
+      if (card && card.body && card.body.focus) {
+        try { card.body.focus(); } catch (_) {}
+      }
     });
   }
 
@@ -3028,7 +3021,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Pin #cy top to the bottom of the bar area so Cytoscape knows its exact bounds
   document.getElementById('cy').style.top =
