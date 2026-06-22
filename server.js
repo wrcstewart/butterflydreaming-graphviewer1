@@ -386,6 +386,53 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
+      if (msg.type === 'edit_node_text') {
+        if (!CURATION_CODE) {
+          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'curation_disabled' }));
+          return;
+        }
+        const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
+          crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
+        if (!codeOk) {
+          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'bad_code' }));
+          return;
+        }
+        const allowed = ['Root', 'Entry', 'Family', 'Cluster'];
+        if (!allowed.includes(msg.label)) {
+          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'invalid_label' }));
+          return;
+        }
+        if (typeof msg.name !== 'string' || !msg.name.length) {
+          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'missing_name' }));
+          return;
+        }
+        if (typeof msg.text !== 'string') {
+          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'missing_text' }));
+          return;
+        }
+        const s = driver.session({ database: 'memgraph' });
+        try {
+          const result = await s.run(
+            'MATCH (n) WHERE $label IN labels(n) AND n.name = $name ' +
+            'SET n.text = $text RETURN count(n) AS c',
+            { label: msg.label, name: msg.name, text: msg.text }
+          );
+          const rec   = result.records[0];
+          const count = rec ? (rec.get('c').toNumber ? rec.get('c').toNumber() : rec.get('c')) : 0;
+          if (!count) {
+            ws.send(JSON.stringify({ type: 'edit_node_text', error: 'node_not_found' }));
+          } else {
+            ws.send(JSON.stringify({ type: 'edit_node_text', ok: true, count }));
+            console.log(`[BD] edit_node_text: ${msg.label} "${msg.name}" updated by ${ws.userId}`);
+          }
+        } catch (err) {
+          console.error('[BD] edit_node_text error:', err.message);
+          ws.send(JSON.stringify({ type: 'edit_node_text', error: err.message }));
+        } finally {
+          await s.close();
+        }
+        return;
+      }
       if (!msg.query) return;  // ignore keepalive pings and other non-query messages
       const session = driver.session({ database: 'memgraph' });
       try {

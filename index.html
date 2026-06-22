@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=72">
+  <link rel="stylesheet" href="style.css?v=73">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming — Navigation Development</div>
@@ -24,6 +24,10 @@
         <div class="card-head">System</div>
         <div class="card-body" id="default-card-body">Welcome! Please click or tap the node below to start your journey</div>
       </div>
+    </div>
+    <div id="default-right-col">
+      <button id="default-save-btn" type="button" disabled>Save</button>
+      <span id="default-save-status"></span>
     </div>
   </div>
   <div id="cy"></div>
@@ -91,6 +95,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script type="module" src="viewer.js?v=325"></script>
+  <script type="module" src="viewer.js?v=326"></script>
 </body>
 </html>

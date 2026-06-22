@@ -53,7 +53,7 @@ function createSystemCardEl(label) {
   return el;
 }
 
-function setSystemText(content) {
+function setSystemText(content, meta) {
   if (!defaultStackEl) return;
   let topEl = defaultStackEl.firstElementChild;
   if (!topEl) {
@@ -62,6 +62,31 @@ function setSystemText(content) {
   }
   const body = topEl.querySelector('.card-body');
   if (!body) return;
+
+  // meta = { label, name } marks the card as a save-target for a navigation
+  // node. The whole body is replaced (not appended) and becomes editable so
+  // the user can rewrite the text before pressing Save.
+  if (meta) {
+    body.textContent = '';
+    body.contentEditable = 'true';
+    topEl.dataset.bdLabel = meta.label;
+    topEl.dataset.bdName  = meta.name;
+    const block = document.createElement('div');
+    block.className = 'system-insert';
+    block.textContent = content;
+    body.appendChild(block);
+    requestAnimationFrame(() => {
+      body.scrollTop = 0;
+      defaultStackEl.scrollTop = 0;
+    });
+    updateSaveButtonState();
+    return;
+  }
+
+  // No meta — non-editable append (buddy chip tooltips, TextNode details, …).
+  body.contentEditable = 'false';
+  delete topEl.dataset.bdLabel;
+  delete topEl.dataset.bdName;
 
   // Remove any prior trailing spacer before measuring / appending.
   const oldSpacer = body.querySelector('.system-spacer');
@@ -92,7 +117,12 @@ function setSystemText(content) {
     body.scrollTop = block.offsetTop;
     defaultStackEl.scrollTop = 0;
   });
+  updateSaveButtonState();
 }
+
+// Forward declared — assigned inside setupInteractions once the dev-code
+// element and save button are wired. Safe to call before assignment.
+let updateSaveButtonState = () => {};
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1238,7 +1268,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         clearReadMark();
         if (main.length) handleNodeTap(main);
       } else {
-        setSystemText(buildBuddyChipTooltip(chip));
+        setSystemText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
         markReadNode(chip, buddyCy);
         buddyTouchPending = chip.id();
         buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
@@ -1257,7 +1287,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(buddyDesktopTimer);
       buddyDesktopPending = chip.id();
-      setSystemText(buildBuddyChipTooltip(chip));
+      setSystemText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
       markReadNode(chip, buddyCy);
       buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
     }
@@ -1289,7 +1319,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         clearReadMark();
         handleNodeTap(main);
       } else {
-        setSystemText(buildTooltipContent(main));
+        setSystemText(buildTooltipContent(main), navNodeMeta(main));
         markReadNode(chip, youCy);
         youTouchPending = chip.id();
         youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
@@ -1308,7 +1338,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(youDesktopTimer);
       youDesktopPending = chip.id();
-      setSystemText(buildTooltipContent(main));
+      setSystemText(buildTooltipContent(main), navNodeMeta(main));
       markReadNode(chip, youCy);
       youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
     }
@@ -1321,6 +1351,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   // Tooltip
+
+  // Returns { label, name } for navigation nodes (Root/Entry/Family/Cluster),
+  // null otherwise. The label is the memgraph DB label so the server can match
+  // `$label IN labels(n)`. Sub-families are :Family nodes with a non-palette
+  // name — they share the Family label, distinguished by name alone.
+  function navNodeMeta(node) {
+    const type = node.data('type');
+    const name = node.data('name');
+    if (!name) return null;
+    const labelByType = { root: 'Root', Entry: 'Entry', Family: 'Family', Cluster: 'Cluster' };
+    const label = labelByType[type];
+    return label ? { label, name } : null;
+  }
 
   function buildTooltipContent(node) {
     const type = node.data('type');
@@ -2300,8 +2343,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         touchPendingNodeId = node.id();
         markReadNode(node, cy);
         const content = buildTooltipContent(node);
+        const meta    = navNodeMeta(node);
         tapResetTimer = setTimeout(() => {
-          setSystemText(content);
+          setSystemText(content, meta);
           touchPendingNodeId = null;
           tapResetTimer = null;
         }, 800);
@@ -2322,9 +2366,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       desktopPendingNodeId = node.id();
       markReadNode(node, cy);
       const content = buildTooltipContent(node);
+      const meta    = navNodeMeta(node);
       desktopClickTimer = setTimeout(() => {
         // Fires only if no second click arrived within the window — a confirmed single click.
-        setSystemText(content);
+        setSystemText(content, meta);
         desktopClickTimer = null;
         desktopPendingNodeId = null;
       }, 450);
@@ -2423,6 +2468,78 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!lastParentNode) { devStatus('tap a family first'); return; }
     runLayout(cy, lastParentNode);
     devStatus('reset');
+  });
+
+  // --- Default panel node-text Save ---
+
+  const defaultSaveBtn    = document.getElementById('default-save-btn');
+  const defaultSaveStatus = document.getElementById('default-save-status');
+
+  function setSaveStatus(msg) {
+    if (!defaultSaveStatus) return;
+    defaultSaveStatus.textContent = msg;
+    clearTimeout(setSaveStatus._t);
+    if (msg) setSaveStatus._t = setTimeout(() => { defaultSaveStatus.textContent = ''; }, 3000);
+  }
+
+  updateSaveButtonState = function () {
+    if (!defaultSaveBtn) return;
+    const topEl   = defaultStackEl && defaultStackEl.firstElementChild;
+    const hasMeta = !!(topEl && topEl.dataset && topEl.dataset.bdName && topEl.dataset.bdLabel);
+    const hasCode = !!(devCodeEl && devCodeEl.value.trim());
+    defaultSaveBtn.disabled = !(hasMeta && hasCode);
+  };
+
+  if (devCodeEl) devCodeEl.addEventListener('input', updateSaveButtonState);
+
+  defaultSaveBtn.addEventListener('click', () => {
+    const topEl = defaultStackEl && defaultStackEl.firstElementChild;
+    if (!topEl) { setSaveStatus('no node'); return; }
+    const label = topEl.dataset.bdLabel;
+    const name  = topEl.dataset.bdName;
+    if (!label || !name) { setSaveStatus('no node'); return; }
+
+    const body = topEl.querySelector('.card-body');
+    if (!body) { setSaveStatus('no body'); return; }
+
+    // innerText preserves line breaks across the child block <div>s; textContent
+    // would smash them together. Trim a trailing newline so the saved text
+    // doesn't grow a blank line each round-trip.
+    const full     = (body.innerText || '').replace(/\n+$/, '');
+    const newline  = full.indexOf('\n');
+    const firstLine = newline === -1 ? full : full.slice(0, newline);
+    const rest      = newline === -1 ? ''   : full.slice(newline + 1);
+
+    const expected = `Node: ${name}`;
+    if (firstLine.trim() !== expected) {
+      setSaveStatus('first line must be "' + expected + '"');
+      return;
+    }
+
+    const code = devCodeEl.value.trim();
+    if (!code) { setSaveStatus('enter code'); return; }
+
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) { setSaveStatus('ws not open'); return; }
+
+    function handler(event) {
+      let m;
+      try { m = JSON.parse(event.data); } catch { return; }
+      if (m.type !== 'edit_node_text') return;
+      wsNow.removeEventListener('message', handler);
+      if (m.error) { setSaveStatus(m.error); return; }
+      setSaveStatus('saved');
+    }
+    wsNow.addEventListener('message', handler);
+
+    wsNow.send(JSON.stringify({
+      type:  'edit_node_text',
+      code,
+      label,
+      name,
+      text:  rest,
+    }));
+    setSaveStatus('saving…');
   });
 
   // --- Cluster editor bar buttons ---
