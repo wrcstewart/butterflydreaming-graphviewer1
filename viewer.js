@@ -63,6 +63,10 @@ function setSystemText(content) {
   const body = topEl.querySelector('.card-body');
   if (!body) return;
 
+  // Remove any prior trailing spacer before measuring / appending.
+  const oldSpacer = body.querySelector('.system-spacer');
+  if (oldSpacer) oldSpacer.remove();
+
   // Separator goes OUTSIDE the span so the span's top is exactly the new
   // content's first line (not the previous line ending).
   if (body.textContent && body.textContent.length > 0) {
@@ -72,9 +76,16 @@ function setSystemText(content) {
   span.textContent = content;
   body.appendChild(span);
 
+  // Trail with a spacer the height of the visible body so total content is
+  // always taller than the body. Without this, single-line inserts fit
+  // without overflow and scrollTop is silently clamped to 0 — long inserts
+  // (TextNodes) work fine because they already overflow on their own.
+  const spacer = document.createElement('div');
+  spacer.className = 'system-spacer';
+  spacer.style.height = body.clientHeight + 'px';
+  body.appendChild(spacer);
+
   // body has position: relative, so it's the span's offsetParent.
-  // span.offsetTop is the y-position of the new content's first line
-  // measured from body's padding edge — exactly where scrollTop wants it.
   body.scrollTop = span.offsetTop;
   defaultStackEl.scrollTop = 0;
 }
@@ -2274,17 +2285,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         touchPendingNodeId = node.id();
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       } else {
-        // Node text goes to the default-stack top card (central system panel)
+        // Touch: defer setSystemText until 800ms confirms single tap (else the second tap
+        // pre-empts it as navigation).
         hideTooltip();
         touchPendingNodeId = node.id();
-        setSystemText(buildTooltipContent(node));
         markReadNode(node, cy);
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
+        const content = buildTooltipContent(node);
+        tapResetTimer = setTimeout(() => {
+          setSystemText(content);
+          touchPendingNodeId = null;
+          tapResetTimer = null;
+        }, 800);
       }
       return;
     }
 
-    // Desktop: single click = show tooltip (or populate chat panel); double click = navigate
+    // Desktop: single click → setSystemText (deferred so double-click can pre-empt); double click → navigate
     if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
       clearTimeout(desktopClickTimer);
       desktopClickTimer = null;
@@ -2295,9 +2311,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(desktopClickTimer);
       desktopPendingNodeId = node.id();
-      setSystemText(buildTooltipContent(node));
       markReadNode(node, cy);
+      const content = buildTooltipContent(node);
       desktopClickTimer = setTimeout(() => {
+        // Fires only if no second click arrived within the window — a confirmed single click.
+        setSystemText(content);
         desktopClickTimer = null;
         desktopPendingNodeId = null;
       }, 450);

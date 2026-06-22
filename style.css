@@ -222,14 +222,16 @@ html, body {
 
 .card.system {
   background: #1c1a30;
+  flex: 1;                             /* fill the default-stack vertically */
 }
 
 .card.system .card-body {
-  position: relative;                  /* makes this the offsetParent for inserted spans */
+  position: relative;                  /* offsetParent for inserted spans */
+  flex: 1;                             /* fill the card minus the head */
+  min-height: 0;                       /* allow shrink-to-overflow inside flex parent */
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-y: auto;
-  max-height: 8.5em;
 }
 
 #chat-stack {
