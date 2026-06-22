@@ -36,8 +36,37 @@ let chatModeActive         = false;
 let chatStackEl            = null;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;
+let defaultStackEl         = null;    // #default-stack — central system-message hub
 let currentCopyText        = null;    // most recently copied text — survives until next copy
 let currentCopyRange       = null;    // { cardId, from, to } of the source range
+
+function createSystemCardEl(label) {
+  const el = document.createElement('div');
+  el.className = 'card system';
+  const head = document.createElement('div');
+  head.className = 'card-head';
+  head.textContent = label || 'System';
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  body.contentEditable = 'false';
+  el.append(head, body);
+  return el;
+}
+
+function setSystemText(content) {
+  if (!defaultStackEl) return;
+  let topEl = defaultStackEl.firstElementChild;
+  if (!topEl) {
+    topEl = createSystemCardEl();
+    defaultStackEl.prepend(topEl);
+  }
+  const body = topEl.querySelector('.card-body');
+  if (!body) return;
+  const current = (body.textContent || '').replace(/\n{2,}$/, '\n');
+  body.textContent = current.length > 0 ? current + '\n' + content : content;
+  body.scrollTop = body.scrollHeight;
+  defaultStackEl.scrollTop = 0;
+}
 
 function hslDistance(hsl1, hsl2) {
   let dh = Math.abs(hsl1.h - hsl2.h);
@@ -1183,17 +1212,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         clearReadMark();
         if (main.length) handleNodeTap(main);
       } else {
-        if (chatModeActive) {
-          setChatText(buildBuddyChipTooltip(chip));
-        } else {
-          const content = buildBuddyChipTooltip(chip);
-          if (content) {
-            tooltip.textContent = content;
-            tooltip.style.display = 'block';
-            tooltip.style.left = '14px';
-            tooltip.style.top  = (buddyContainer.getBoundingClientRect().bottom + 6) + 'px';
-          }
-        }
+        setSystemText(buildBuddyChipTooltip(chip));
         markReadNode(chip, buddyCy);
         buddyTouchPending = chip.id();
         buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
@@ -1212,18 +1231,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(buddyDesktopTimer);
       buddyDesktopPending = chip.id();
-      if (chatModeActive) {
-        setChatText(buildBuddyChipTooltip(chip));
-      } else {
-        const content = buildBuddyChipTooltip(chip);
-        if (content) {
-          const bb   = chip.renderedBoundingBox();
-          const rect = buddyContainer.getBoundingClientRect();
-          tooltip.textContent = content;
-          tooltip.style.display = 'block';
-          positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
-        }
-      }
+      setSystemText(buildBuddyChipTooltip(chip));
       markReadNode(chip, buddyCy);
       buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
     }
@@ -1255,18 +1263,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         clearReadMark();
         handleNodeTap(main);
       } else {
-        if (chatModeActive) {
-          setChatText(buildTooltipContent(main));
-        } else {
-          const content = buildTooltipContent(main);
-          if (content) {
-            tooltip.textContent = content;
-            tooltip.style.display = 'block';
-            const rect = youContainer.getBoundingClientRect();
-            tooltip.style.left = '14px';
-            tooltip.style.top  = (rect.bottom + 6) + 'px';
-          }
-        }
+        setSystemText(buildTooltipContent(main));
         markReadNode(chip, youCy);
         youTouchPending = chip.id();
         youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
@@ -1285,18 +1282,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(youDesktopTimer);
       youDesktopPending = chip.id();
-      if (chatModeActive) {
-        setChatText(buildTooltipContent(main));
-      } else {
-        const content = buildTooltipContent(main);
-        if (content) {
-          const bb   = chip.renderedBoundingBox();
-          const rect = youContainer.getBoundingClientRect();
-          tooltip.textContent = content;
-          tooltip.style.display = 'block';
-          positionTooltip(rect.left + (bb.x1 + bb.x2) / 2, rect.bottom);
-        }
-      }
+      setSystemText(buildTooltipContent(main));
       markReadNode(chip, youCy);
       youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
     }
@@ -1479,6 +1465,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       appendToCard(dest, content);
     } else {
       setCardText(dest, content);
+    }
+  }
+
+  function setDefaultText(content) {
+    const body = document.getElementById('default-card-body');
+    if (body) body.textContent = content;
+  }
+
+  // Single entry point for node-tap text: routes to whichever panel is showing.
+  function setNodeText(content) {
+    if (chatModeActive) {
+      setChatText(content);
+    } else {
+      setDefaultText(content);
     }
   }
 
@@ -2277,14 +2277,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         touchPendingNodeId = node.id();
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       } else {
-        // Show tooltip for this node (or populate chat panel if active)
+        // Node text goes to the default-stack top card (central system panel)
         hideTooltip();
         touchPendingNodeId = node.id();
-        if (chatModeActive) {
-          setChatText(buildTooltipContent(node));
-        } else {
-          showTooltip(node, 0, 0, true);
-        }
+        setSystemText(buildTooltipContent(node));
         markReadNode(node, cy);
         tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
       }
@@ -2302,12 +2298,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(desktopClickTimer);
       desktopPendingNodeId = node.id();
-      if (chatModeActive) {
-        setChatText(buildTooltipContent(node));
-      } else {
-        const rp = evt.renderedPosition;
-        showTooltip(node, rp.x, rp.y, false);
-      }
+      setSystemText(buildTooltipContent(node));
       markReadNode(node, cy);
       desktopClickTimer = setTimeout(() => {
         desktopClickTimer = null;
@@ -2970,7 +2961,8 @@ async function init() {
 
   chatBtn.addEventListener('click', toggleChatMode);
 
-  chatStackEl = document.getElementById('chat-stack');
+  chatStackEl    = document.getElementById('chat-stack');
+  defaultStackEl = document.getElementById('default-stack');
 
   const newCardBtn = document.getElementById('chat-new-card-btn');
   if (newCardBtn) {
