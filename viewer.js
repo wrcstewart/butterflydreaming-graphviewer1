@@ -1268,7 +1268,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         clearReadMark();
         if (main.length) handleNodeTap(main);
       } else {
-        setSystemText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
+        routeNodeText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
         markReadNode(chip, buddyCy);
         buddyTouchPending = chip.id();
         buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
@@ -1287,7 +1287,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(buddyDesktopTimer);
       buddyDesktopPending = chip.id();
-      setSystemText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
+      routeNodeText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
       markReadNode(chip, buddyCy);
       buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
     }
@@ -1319,7 +1319,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         clearReadMark();
         handleNodeTap(main);
       } else {
-        setSystemText(buildTooltipContent(main), navNodeMeta(main));
+        routeNodeText(buildTooltipContent(main), navNodeMeta(main));
         markReadNode(chip, youCy);
         youTouchPending = chip.id();
         youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
@@ -1338,7 +1338,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       clearTimeout(youDesktopTimer);
       youDesktopPending = chip.id();
-      setSystemText(buildTooltipContent(main), navNodeMeta(main));
+      routeNodeText(buildTooltipContent(main), navNodeMeta(main));
       markReadNode(chip, youCy);
       youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
     }
@@ -1363,6 +1363,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const labelByType = { root: 'Root', Entry: 'Entry', Family: 'Family', Cluster: 'Cluster' };
     const label = labelByType[type];
     return label ? { label, name } : null;
+  }
+
+  // Routes a node-click insert to either the chat panel (Copy-collage workflow,
+  // when chat mode is active) or the default panel (editable system card with
+  // Save button). The "Node: <name>" header added by buildTooltipContent is
+  // useful in the default panel as a save anchor, but it's noise in a chat
+  // card — strip it on chat-side inserts.
+  function routeNodeText(content, meta) {
+    if (chatModeActive) {
+      let text = content;
+      if (meta && meta.name) {
+        const prefix = `Node: ${meta.name}\n`;
+        if (text.startsWith(prefix)) text = text.slice(prefix.length);
+      }
+      setChatText(text);
+    } else {
+      setSystemText(content, meta);
+    }
   }
 
   function buildTooltipContent(node) {
@@ -2345,7 +2363,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const content = buildTooltipContent(node);
         const meta    = navNodeMeta(node);
         tapResetTimer = setTimeout(() => {
-          setSystemText(content, meta);
+          routeNodeText(content, meta);
           touchPendingNodeId = null;
           tapResetTimer = null;
         }, 800);
@@ -2369,7 +2387,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const meta    = navNodeMeta(node);
       desktopClickTimer = setTimeout(() => {
         // Fires only if no second click arrived within the window — a confirmed single click.
-        setSystemText(content, meta);
+        routeNodeText(content, meta);
         desktopClickTimer = null;
         desktopPendingNodeId = null;
       }, 450);
