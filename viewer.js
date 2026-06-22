@@ -62,9 +62,12 @@ function setSystemText(content) {
   }
   const body = topEl.querySelector('.card-body');
   if (!body) return;
-  const current = (body.textContent || '').replace(/\n{2,}$/, '\n');
-  body.textContent = current.length > 0 ? current + '\n' + content : content;
-  body.scrollTop = body.scrollHeight;
+  // Wrap each insert in its own span so we can scroll the body to its top edge.
+  const span = document.createElement('span');
+  const sep  = (body.textContent || '').length > 0 ? '\n' : '';
+  span.textContent = sep + content;
+  body.appendChild(span);
+  body.scrollTop = span.offsetTop;
   defaultStackEl.scrollTop = 0;
 }
 
@@ -1465,20 +1468,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       appendToCard(dest, content);
     } else {
       setCardText(dest, content);
-    }
-  }
-
-  function setDefaultText(content) {
-    const body = document.getElementById('default-card-body');
-    if (body) body.textContent = content;
-  }
-
-  // Single entry point for node-tap text: routes to whichever panel is showing.
-  function setNodeText(content) {
-    if (chatModeActive) {
-      setChatText(content);
-    } else {
-      setDefaultText(content);
     }
   }
 

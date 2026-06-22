@@ -224,6 +224,13 @@ html, body {
   background: #1c1a30;
 }
 
+.card.system .card-body {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+  max-height: 8.5em;
+}
+
 #chat-stack {
   flex: 1;
   min-width: 0;
