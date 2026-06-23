@@ -1536,6 +1536,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       card.body.textContent = content;
     }
     card.text = content;
+    // Programmatic value assignment doesn't fire 'input' — re-evaluate Send.
+    updateSendBtn();
   }
 
   function scrollTextareaToInsertPoint(textarea, insertAt) {
@@ -1590,6 +1592,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       card.body.textContent = current.length > 0 ? current + '\n' + content : content;
       card.text = card.body.textContent;
     }
+    // Programmatic value assignment doesn't fire 'input' — re-evaluate Send.
+    updateSendBtn();
   }
 
   function setChatText(content) {
