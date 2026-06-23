@@ -1587,20 +1587,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  // Inbound system card (server-emitted). Inserts an amber, non-editable card
-  // immediately ABOVE the top local compose card — the system/partner log
-  // grows upward from the most recent local. When only N=1 exists the first
-  // system cards just stack between the panel ceiling and N=1.
+  // Inbound system card (server-emitted). Newest on top: createCard already
+  // prepends to chatStackEl, so the natural insertion is exactly what we want.
+  // No DOM repositioning — moving to top.el.before(sys.el) would put newest
+  // immediately above N=k and push older ones up, which inverts the rule.
   function prependSystemCard(text) {
     const sys = createCard({ kind: 'system' });
     if (!sys) return;
     if (sys.body) {
       sys.body.textContent = text;
       sys.text = text;
-    }
-    const top = topLocalCard();
-    if (top && top.el && top.el !== sys.el) {
-      top.el.before(sys.el);
     }
   }
 
@@ -1616,10 +1612,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   const receivedCountByN = new Map();
 
   // Inbound partner card (server-relayed). Teal, non-editable, head label `N.M`.
-  // Placement matches system cards: directly below the top local compose area.
+  // Newest on top — createCard's prepend puts it at the absolute top of the
+  // stack. N is the *label* (top local serial at receipt), not a positional
+  // anchor (communications.md §4.1).
   function prependPartnerCard(text) {
-    const parent = topLocalCard();
-    if (!parent) {
+    if (!topLocalCard()) {
       // ensureLocalCard makes this unreachable in practice, but degrade gracefully.
       createCard({ kind: 'local' });
     }
@@ -1632,9 +1629,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (rcv.body) {
       rcv.body.textContent = text;
       rcv.text = text;
-    }
-    if (top && top.el && top.el !== rcv.el) {
-      top.el.before(rcv.el);
     }
   }
 
