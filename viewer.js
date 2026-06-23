@@ -1588,8 +1588,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   // Inbound system card (server-emitted). Inserts an amber, non-editable card
-  // immediately BELOW the top local compose card so the running system log
-  // never pushes the user's typing area off-screen.
+  // immediately ABOVE the top local compose card — the system/partner log
+  // grows upward from the most recent local. When only N=1 exists the first
+  // system cards just stack between the panel ceiling and N=1.
   function prependSystemCard(text) {
     const sys = createCard({ kind: 'system' });
     if (!sys) return;
@@ -1599,7 +1600,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
     const top = topLocalCard();
     if (top && top.el && top.el !== sys.el) {
-      top.el.after(sys.el);
+      top.el.before(sys.el);
     }
   }
 
@@ -1633,7 +1634,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       rcv.text = text;
     }
     if (top && top.el && top.el !== rcv.el) {
-      top.el.after(rcv.el);
+      top.el.before(rcv.el);
     }
   }
 
