@@ -94,7 +94,7 @@ function sendHowToOnce(userId) {
 
 // Current connection-status text for `userId`.
 function statusTextFor(userId) {
-  if (channelOpen(userId)) return "You're chatting — try sending a message.";
+  if (channelOpen(userId)) return "You're chatting — try putting a message above.";
   return 'Partner not available — please wait.';
 }
 
@@ -284,7 +284,7 @@ wss.on('connection', async (ws) => {
           // Partner is also in chat — one combined card instead of two
           // ("Partner joined" + status), since the status at this moment
           // is unambiguously "You're chatting".
-          sendSystemCard(buddyId, 'Partner joined chat — try sending a message.');
+          sendSystemCard(buddyId, 'Partner joined chat — try putting a message above.');
         }
         return;
       }
