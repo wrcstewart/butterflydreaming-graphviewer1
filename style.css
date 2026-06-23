@@ -238,9 +238,9 @@ html, body {
   overflow-y: auto;
 }
 
-/* chat-panel system card — very dark yellow body, matches the darker yellow head */
+/* chat-panel system card — pure black body; head stripe carries the kind signal */
 #chat-stack .card.system {
-  background: #0a0a00;
+  background: #000;
 }
 
 #chat-stack {
@@ -311,15 +311,11 @@ html, body {
   min-height: 0;
 }
 
-/* Body backgrounds — same hue family as the head, very dark (almost black
-   but visible). Subtle alternation kept on locals so adjacent N=k cards
-   stay distinguishable. */
-.card.local:nth-child(odd)  { background: #161300; }
-.card.local:nth-child(even) { background: #1a1700; }
-
-.card.received {
-  background: #00081a;                /* very dark navy, matches head */
-}
+/* Body backgrounds — pure black for all kinds. The coloured head stripe
+   already signals kind, and dim hue tints in the body were proving more
+   confusing than helpful. N=k labels distinguish adjacent local cards. */
+.card.local    { background: #000; }
+.card.received { background: #000; }
 
 /* Hidden ghost N=0 — conceptual anchor only, never shown */
 .card.card-hidden {
