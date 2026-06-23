@@ -1424,6 +1424,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return null;
   }
 
+  // Most recent VISIBLE local — excludes the hidden N=0 ghost. Used by
+  // prependSystemCard so new status notifications pin themselves below the
+  // user's compose card instead of bumping it down the stack.
+  function topVisibleLocalCard() {
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (cards[i].kind === 'local' && !cards[i].hidden) return cards[i];
+    }
+    return null;
+  }
+
   function createCard({ kind = 'local', label, hidden = false } = {}) {
     if (!chatStackEl) return null;
     const id        = 'card_' + nextCardSerial;
@@ -1591,16 +1601,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  // Inbound system card (server-emitted). Newest on top: createCard already
-  // prepends to chatStackEl, so the natural insertion is exactly what we want.
-  // No DOM repositioning — moving to top.el.before(sys.el) would put newest
-  // immediately above N=k and push older ones up, which inverts the rule.
+  // Inbound system card (server-emitted). Two-mode placement so A and B end
+  // up with the same shape after first pair-up:
+  //   - Initial batch (before chat_ready): no visible local exists yet, so
+  //     createCard's prepend leaves the system card at the top of the stack.
+  //     handleChatReady's N=1 then lands above it naturally.
+  //   - Later batch (after chat_ready, e.g. "Partner joined chat"): a visible
+  //     local exists, so we dock the new system card immediately below it.
+  //     The user's compose card stays pinned at the top; status notifications
+  //     accumulate beneath it (newest closest to N=k).
+  // Partner cards (prependPartnerCard) keep strict newest-on-top.
   function prependSystemCard(text) {
     const sys = createCard({ kind: 'system' });
     if (!sys) return;
     if (sys.body) {
       sys.body.textContent = text;
       sys.text = text;
+    }
+    const top = topVisibleLocalCard();
+    if (top && top.el && top.el !== sys.el) {
+      top.el.after(sys.el);
     }
   }
 

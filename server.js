@@ -273,9 +273,11 @@ wss.on('connection', async (ws) => {
         inChat.set(ws.userId, true);
         sendHowToOnce(ws.userId);
         sendSystemCard(ws.userId, statusTextFor(ws.userId));
-        // Initial batch done — client uses this to drop in N=1 above the
-        // how-to + status it just received. Sent every enter_chat; client
-        // handles idempotently (only creates N=1 if no visible local exists).
+        // Client uses this to drop in N=1 above the initial how-to + status.
+        // Sent every enter_chat; client handles idempotently. A/B layout
+        // consistency is enforced on the client by the system-card pinning
+        // rule in prependSystemCard (see [[system-card-placement]]), not by
+        // the order of these emits.
         ws.send(JSON.stringify({ type: 'chat_ready' }));
         const buddyId = pairedWith.get(ws.userId);
         if (buddyId && inChat.get(buddyId)) {
