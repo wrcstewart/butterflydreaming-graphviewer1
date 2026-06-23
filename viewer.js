@@ -3197,6 +3197,16 @@ async function init() {
   nodesById.forEach(nd => elements.push({ data: nd }));
   edgesById.forEach(ed => elements.push({ data: ed }));
 
+  // Pin #cy's top to the bottom of #default-panel BEFORE cytoscape constructs,
+  // so the initial cy.fit() uses the real canvas dimensions. If this runs after
+  // init, the root ends up off-centre (mis-fit against the CSS fallback rect),
+  // visible especially on iPhone after #default-panel grew to 34dvh.
+  {
+    const refEl = document.getElementById('default-panel') || document.getElementById('cy-you');
+    document.getElementById('cy').style.top =
+      Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+  }
+
   // Init Cytoscape
   const cy = cytoscape({
     container: document.getElementById('cy'),
@@ -3376,11 +3386,9 @@ async function init() {
     sendBtn.addEventListener('click', () => { sendTopLocalCard(); });
   }
 
-  // Pin #cy top to the bottom of the default-panel (or the cy-you bar if absent)
-  const initialRef = document.getElementById('default-panel') || document.getElementById('cy-you');
-  document.getElementById('cy').style.top =
-    Math.ceil(initialRef.getBoundingClientRect().bottom) + 'px';
-  cy.resize();
+  // #cy top is pinned earlier — before cytoscape constructs — so init fits
+  // the root correctly. No re-pin needed here; cy.resize on subsequent panel
+  // toggles is handled by positionCyEl().
 
   const userCountPanel = document.getElementById('user-count-panel');
 
