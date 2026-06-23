@@ -273,6 +273,10 @@ wss.on('connection', async (ws) => {
         inChat.set(ws.userId, true);
         sendHowToOnce(ws.userId);
         sendSystemCard(ws.userId, statusTextFor(ws.userId));
+        // Initial batch done — client uses this to drop in N=1 above the
+        // how-to + status it just received. Sent every enter_chat; client
+        // handles idempotently (only creates N=1 if no visible local exists).
+        ws.send(JSON.stringify({ type: 'chat_ready' }));
         const buddyId = pairedWith.get(ws.userId);
         if (buddyId && inChat.get(buddyId)) {
           // Partner is also in chat — tell them we joined, and refresh their status

@@ -1424,15 +1424,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return null;
   }
 
-  function createCard({ kind = 'local', label } = {}) {
+  function createCard({ kind = 'local', label, hidden = false } = {}) {
     if (!chatStackEl) return null;
     const id        = 'card_' + nextCardSerial;
     nextCardSerial++;
-    const serial    = kind === 'local' ? nextLocalSerial++ : null;
-    const card      = { id, kind, serial, volume: 0.85, text: '' };
+    // Hidden ghost local takes serial 0 explicitly so user-facing N=1 stays
+    // the first visible serial. Visible locals consume nextLocalSerial.
+    const serial    = kind === 'local'
+      ? (hidden ? 0 : nextLocalSerial++)
+      : null;
+    const card      = { id, kind, serial, hidden, volume: 0.85, text: '' };
 
     const el = document.createElement('div');
-    el.className          = 'card ' + kind;
+    el.className          = 'card ' + kind + (hidden ? ' card-hidden' : '');
     el.dataset.cardId     = id;
     el.style.opacity      = card.volume;
 
@@ -1600,10 +1604,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  // Guarantee N=1 exists so partner-receive never faces a "no local card" case
-  // (communications.md §5.1). Called on Chat press.
+  // Called on Chat press: drop in a hidden N=0 ghost so the user's first
+  // visible card (N=1) lands above the server's initial how-to + status batch
+  // when chat_ready fires. The ghost anchors partner-card labels too — it
+  // gives topLocalCard().serial a defined value (0) in the brief window
+  // between Chat press and chat_ready.
   function ensureLocalCard() {
-    if (!topLocalCard()) createCard({ kind: 'local' });
+    if (!topLocalCard()) createCard({ kind: 'local', hidden: true });
+  }
+
+  // Server's chat_ready signal: initial system batch is in. Promote the
+  // chat panel by creating the user's first visible local card (N=1) on top.
+  // Idempotent: if a visible local already exists, no-op.
+  function handleChatReady() {
+    const top = topLocalCard();
+    if (top && !top.hidden) return;
+    createCard({ kind: 'local' });
   }
 
   // Per-local-card counter for inbound partner messages (communications.md §4.1).
@@ -1642,7 +1658,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function updateSendBtn() {
     if (!sendBtnEl) return;
     const top = topLocalCard();
-    const text = top && top.body ? top.body.value : '';
+    // Hidden ghost (N=0) is never sendable — it has no body the user can fill.
+    const text = top && !top.hidden && top.body ? top.body.value : '';
     sendBtnEl.disabled = !pairingState.active || !text.trim();
   }
 
@@ -1650,7 +1667,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // on direct user typing). Returns true if the WS frame went out.
   function sendTopLocalCard() {
     const top = topLocalCard();
-    if (!top || !top.body) return false;
+    if (!top || top.hidden || !top.body) return false;
     const text = top.body.value;
     if (!text.trim()) return false;
     const wsNow = wsRef.current;
@@ -2906,7 +2923,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck };
 
 }
 
@@ -3309,7 +3326,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -3370,6 +3387,8 @@ async function init() {
       }
     } else if (msg.type === 'buddy_card_ack') {
       handleBuddyCardAck(msg);
+    } else if (msg.type === 'chat_ready') {
+      handleChatReady();
     } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
       handleClusterRelMsg(msg);
     } else if (msg.type === 'cluster_cloned') {

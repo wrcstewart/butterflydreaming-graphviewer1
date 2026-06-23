@@ -302,6 +302,11 @@ html, body {
 .card.received {
   background: #16242c;                /* faint teal tint */
 }
+
+/* Hidden ghost N=0 — conceptual anchor only, never shown */
+.card.card-hidden {
+  display: none;
+}
 .card-delivered {
   margin-left: 0.6em;
   font-size: 0.85em;
