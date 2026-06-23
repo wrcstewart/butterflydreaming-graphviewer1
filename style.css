@@ -141,7 +141,7 @@ html, body {
   width: 100%;
   height: 36px;
   flex-shrink: 0;
-  background: #1f3d00;                  /* dark green — matches local card head */
+  background: #5a5000;                  /* brighter yellow — matches local card head */
   cursor: url('cursor-wings.svg') 16 16, auto;
 }
 
@@ -238,9 +238,9 @@ html, body {
   overflow-y: auto;
 }
 
-/* chat-panel system card — very dark pure yellow body, matches the brighter yellow head */
+/* chat-panel system card — very dark green body, matches the dark green head */
 #chat-stack .card.system {
-  background: #161300;
+  background: #070d00;
 }
 
 #chat-stack {
@@ -282,12 +282,11 @@ html, body {
 
 /* Card heads colour-coded to mirror the bar / title palette. White text
    throughout — body backgrounds are very dark so the head reads as a
-   distinct stripe. Local moved to green, system pushed to brighter
-   pure yellow so the two are clearly distinguishable in luminance
-   and hue (was previously two near-identical dark golds). */
-.card.local    .card-head { background: #1f3d00; }   /* dark green, matches #cy-you breadcrumb */
+   distinct stripe. Local takes the brighter yellow (user's compose
+   area should stand out); system fades back to the dimmer green. */
+.card.local    .card-head { background: #5a5000; }   /* brighter yellow, matches #cy-you breadcrumb */
 .card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
-#chat-stack .card.system .card-head { background: #5a5000; }   /* brighter pure yellow, distinct from local green */
+#chat-stack .card.system .card-head { background: #1f3d00; }   /* dark green — status notifications recede */
 
 .card-body {
   width: 100%;
@@ -315,8 +314,8 @@ html, body {
 /* Body backgrounds — same hue family as the head, very dark (almost black
    but visible). Subtle alternation kept on locals so adjacent N=k cards
    stay distinguishable. */
-.card.local:nth-child(odd)  { background: #070d00; }
-.card.local:nth-child(even) { background: #0a1200; }
+.card.local:nth-child(odd)  { background: #161300; }
+.card.local:nth-child(even) { background: #1a1700; }
 
 .card.received {
   background: #00081a;                /* very dark navy, matches head */
