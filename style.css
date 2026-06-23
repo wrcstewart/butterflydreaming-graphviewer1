@@ -295,6 +295,14 @@ html, body {
   min-height: 8.5em;                  /* ~5 lines visible; with ~1.5em head ≈ 10em per card → 3 cards fill the 33dvh panel */
 }
 
+/* Non-editable cards size to content — no writing room needed. The 8.5em
+   floor is for the local textarea. System / received bodies are divs that
+   shrink-wrap their text, freeing vertical space in the chat-stack. */
+#chat-stack .card.system .card-body,
+.card.received .card-body {
+  min-height: 0;
+}
+
 /* alternating tints — last child (top) is treated as the "newest" tint */
 .card.local:nth-child(odd)  { background: #161624; }
 .card.local:nth-child(even) { background: #1c1c30; }
