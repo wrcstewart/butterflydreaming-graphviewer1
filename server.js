@@ -279,10 +279,10 @@ wss.on('connection', async (ws) => {
         ws.send(JSON.stringify({ type: 'chat_ready' }));
         const buddyId = pairedWith.get(ws.userId);
         if (buddyId && inChat.get(buddyId)) {
-          // Partner is also in chat — tell them we joined, and refresh their status
-          // so the running log shows the channel opening on their side too.
-          sendSystemCard(buddyId, 'Partner joined chat.');
-          sendSystemCard(buddyId, statusTextFor(buddyId));
+          // Partner is also in chat — one combined card instead of two
+          // ("Partner joined" + status), since the status at this moment
+          // is unambiguously "You're chatting".
+          sendSystemCard(buddyId, 'Partner joined chat — try sending a message.');
         }
         return;
       }
