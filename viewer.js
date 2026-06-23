@@ -3256,6 +3256,20 @@ async function init() {
   const chatPanel = document.getElementById('chat-panel');
   const cyEl      = document.getElementById('cy');
 
+  // Gate the Chat button on the dev-code being non-empty (curator only).
+  // Mirrors the Save-button pattern (UX hint; server is the real check).
+  function updateChatBtnEnabled() {
+    if (!chatBtn) return;
+    const devCodeEl = document.getElementById('dev-code');
+    const hasCode = !!(devCodeEl && devCodeEl.value.trim());
+    chatBtn.disabled = !hasCode;
+  }
+  {
+    const devCodeEl = document.getElementById('dev-code');
+    if (devCodeEl) devCodeEl.addEventListener('input', updateChatBtnEnabled);
+    updateChatBtnEnabled();
+  }
+
   function positionCyEl() {
     let refEl;
     if (chatModeActive && chatPanel.getBoundingClientRect().height > 0) {

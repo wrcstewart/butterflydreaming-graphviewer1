@@ -89,7 +89,7 @@ html, body {
   line-height: 1.4;
 }
 
-#chat-btn:hover, #pair-btn:hover:not(:disabled) {
+#chat-btn:hover:not(:disabled), #pair-btn:hover:not(:disabled) {
   border-color: #ffd88a;
   color: #fff;
 }
@@ -126,6 +126,7 @@ html, body {
   color: #fff;
 }
 
+#chat-btn:disabled,
 #pair-btn:disabled {
   opacity: 0.45;
   cursor: default;
