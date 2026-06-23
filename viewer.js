@@ -1576,21 +1576,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  const CHAT_WELCOME_TEXT =
-    'Click a node to start the conversation or type your own message. '
-    + 'If you select text and copy, it will appear on your next card up. '
-    + 'Start a new card if you wish. Send your top card to partner.';
-
-  let chatWelcomeShown = false;
-  function showWelcomeOnce() {
-    if (chatWelcomeShown) return;
-    chatWelcomeShown = true;
-    if (cards.length === 0) createCard({ kind: 'local' });
+  // Inbound system card (server-emitted). Prepends an amber, non-editable card
+  // above the current top. Used for the how-to text and connection-status log.
+  function prependSystemCard(text) {
     const sys = createCard({ kind: 'system' });
     if (sys && sys.body) {
-      sys.body.textContent = CHAT_WELCOME_TEXT;
-      sys.text = CHAT_WELCOME_TEXT;
+      sys.body.textContent = text;
+      sys.text = text;
     }
+  }
+
+  // Guarantee N=1 exists so partner-receive never faces a "no local card" case
+  // (communications.md §5.1). Called on Chat press.
+  function ensureLocalCard() {
+    if (!topLocalCard()) createCard({ kind: 'local' });
   }
 
   function positionTooltip(x, y) {
@@ -2814,7 +2813,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, showWelcomeOnce };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, ensureLocalCard };
 
 }
 
@@ -3141,7 +3140,16 @@ async function init() {
         setChatText(tip.textContent);
       }
       tip.style.display = 'none';
-      showWelcomeOnce();
+      ensureLocalCard();
+      const wsNow = wsRef.current;
+      if (wsNow && wsNow.readyState === WebSocket.OPEN) {
+        wsNow.send(JSON.stringify({ type: 'enter_chat' }));
+      }
+    } else {
+      const wsNow = wsRef.current;
+      if (wsNow && wsNow.readyState === WebSocket.OPEN) {
+        wsNow.send(JSON.stringify({ type: 'leave_chat' }));
+      }
     }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
@@ -3208,7 +3216,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, showWelcomeOnce } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, ensureLocalCard } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Pin #cy top to the bottom of the default-panel (or the cy-you bar if absent)
   const initialRef = document.getElementById('default-panel') || document.getElementById('cy-you');
@@ -3247,6 +3255,13 @@ async function init() {
       ws.send(JSON.stringify({ type: 'ready_to_pair' }));
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
+    } else if (msg.type === 'buddy_card') {
+      // communications.md §1 — one inbound path, one rendering rule.
+      // Channel selects tint/head; for now only 'system' is wired
+      // (partner-receive comes in slice step 4).
+      if (msg.channel === 'system' && typeof msg.text === 'string') {
+        prependSystemCard(msg.text);
+      }
     } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
       handleClusterRelMsg(msg);
     } else if (msg.type === 'cluster_cloned') {

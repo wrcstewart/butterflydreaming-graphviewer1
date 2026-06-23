@@ -55,12 +55,47 @@ const wss = new WebSocketServer({ server });
 const sessions    = new Map();  // userId → ws
 let   waitingUser = null;        // { userId, ws } | null
 const pairedWith  = new Map();  // userId → buddyUserId
+const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
+const howToSent   = new Set();  // userIds that have already received the how-to card this session
 
 function sendToBuddy(userId, msg) {
   const buddyId = pairedWith.get(userId);
   if (!buddyId) return;
   const buddyWs = sessions.get(buddyId);
   if (buddyWs && buddyWs.readyState === 1 /* OPEN */) buddyWs.send(JSON.stringify(msg));
+}
+
+// --- A43 chat-channel helpers ---
+
+const HOW_TO_TEXT =
+  'Click a node to start the conversation or type your own message. '
+  + 'If you select text and copy, it will appear on your next card up. '
+  + 'Start a new card if you wish. Send your top card to partner.';
+
+// Channel "open" requires both users paired AND both currently in chat mode.
+function channelOpen(userId) {
+  const buddyId = pairedWith.get(userId);
+  if (!buddyId) return false;
+  return inChat.get(userId) === true && inChat.get(buddyId) === true;
+}
+
+function sendSystemCard(userId, text) {
+  const ws = sessions.get(userId);
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'buddy_card', channel: 'system', text }));
+  }
+}
+
+function sendHowToOnce(userId) {
+  if (howToSent.has(userId)) return;
+  howToSent.add(userId);
+  sendSystemCard(userId, HOW_TO_TEXT);
+}
+
+// Current connection-status text for `userId`.
+function statusTextFor(userId) {
+  if (channelOpen(userId)) return "You're chatting — try sending a message.";
+  return 'Partner not available — please wait.';
 }
 
 function broadcastUserCount() {
@@ -168,12 +203,19 @@ wss.on('connection', async (ws) => {
       if (waitingUser?.userId === ws.userId) waitingUser = null;
       const buddyId = pairedWith.get(ws.userId);
       if (buddyId) {
+        // If both were in chat, drop a "partner disconnected" system card into
+        // the buddy's running log before tearing the pair down.
+        if (inChat.get(ws.userId) && inChat.get(buddyId)) {
+          sendSystemCard(buddyId, 'Partner disconnected.');
+        }
         pairedWith.delete(ws.userId);
         pairedWith.delete(buddyId);
         const buddyWs = sessions.get(buddyId);
         if (buddyWs && buddyWs.readyState === 1)
           buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
       }
+      inChat.delete(ws.userId);
+      howToSent.delete(ws.userId);
     }
     if (!ws.userId) return;
     try {
@@ -224,6 +266,29 @@ wss.on('connection', async (ws) => {
       }
       if (msg.type === 'breadcrumb') {
         if (ws.userId) sendToBuddy(ws.userId, { type: 'buddy_breadcrumb', data: msg.data });
+        return;
+      }
+      if (msg.type === 'enter_chat') {
+        if (!ws.userId) return;
+        inChat.set(ws.userId, true);
+        sendHowToOnce(ws.userId);
+        sendSystemCard(ws.userId, statusTextFor(ws.userId));
+        const buddyId = pairedWith.get(ws.userId);
+        if (buddyId && inChat.get(buddyId)) {
+          // Partner is also in chat — tell them we joined, and refresh their status
+          // so the running log shows the channel opening on their side too.
+          sendSystemCard(buddyId, 'Partner joined chat.');
+          sendSystemCard(buddyId, statusTextFor(buddyId));
+        }
+        return;
+      }
+      if (msg.type === 'leave_chat') {
+        if (!ws.userId) return;
+        inChat.set(ws.userId, false);
+        const buddyId = pairedWith.get(ws.userId);
+        if (buddyId && inChat.get(buddyId)) {
+          sendSystemCard(buddyId, 'Partner left chat.');
+        }
         return;
       }
       if (msg.type === 'write_hints') {
