@@ -240,7 +240,7 @@ html, body {
 
 /* chat-panel system card — very dark yellow body, matches the darker yellow head */
 #chat-stack .card.system {
-  background: #070500;
+  background: #0a0a00;
 }
 
 #chat-stack {
@@ -286,7 +286,7 @@ html, body {
    area should stand out); system fades back to the dimmer green. */
 .card.local    .card-head { background: #5a5000; }   /* brighter yellow, matches #cy-you breadcrumb */
 .card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
-#chat-stack .card.system .card-head { background: #1f1c00; }   /* darker pure yellow — same hue family as local, much dimmer luminance */
+#chat-stack .card.system .card-head { background: #2a2a00; }   /* pure yellow R=G, modestly brighter than before but still much dimmer than local */
 
 .card-body {
   width: 100%;
