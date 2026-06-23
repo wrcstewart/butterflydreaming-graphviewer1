@@ -1576,13 +1576,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  // Inbound system card (server-emitted). Prepends an amber, non-editable card
-  // above the current top. Used for the how-to text and connection-status log.
+  // Inbound system card (server-emitted). Inserts an amber, non-editable card
+  // immediately BELOW the top local compose card so the running system log
+  // never pushes the user's typing area off-screen.
   function prependSystemCard(text) {
     const sys = createCard({ kind: 'system' });
-    if (sys && sys.body) {
+    if (!sys) return;
+    if (sys.body) {
       sys.body.textContent = text;
       sys.text = text;
+    }
+    const top = topLocalCard();
+    if (top && top.el && top.el !== sys.el) {
+      top.el.after(sys.el);
     }
   }
 
