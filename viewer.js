@@ -3274,12 +3274,6 @@ async function init() {
     });
   }
 
-  const sendBtn = document.getElementById('chat-send-btn');
-  if (sendBtn) {
-    setSendBtn(sendBtn);
-    sendBtn.addEventListener('click', () => { sendTopLocalCard(); });
-  }
-
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
 
@@ -3321,6 +3315,16 @@ async function init() {
 
   const { addBadge }      = setupNrBadges(cy);
   const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+
+  // Bind Send button — must run AFTER setupInteractions destructure because
+  // setSendBtn is an immediate call (not deferred into a closure like newCard's
+  // createCard reference). Hoisting only saves function declarations, not
+  // const bindings from object destructuring.
+  const sendBtn = document.getElementById('chat-send-btn');
+  if (sendBtn) {
+    setSendBtn(sendBtn);
+    sendBtn.addEventListener('click', () => { sendTopLocalCard(); });
+  }
 
   // Pin #cy top to the bottom of the default-panel (or the cy-you bar if absent)
   const initialRef = document.getElementById('default-panel') || document.getElementById('cy-you');
