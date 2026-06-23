@@ -189,7 +189,7 @@ html, body {
 #default-panel {
   display: flex;
   width: 40%;
-  height: 17dvh;                       /* about half the 33dvh chat panel */
+  height: 34dvh;                       /* doubled from 17dvh on 2026-06-23 to give system messages more room */
   flex-shrink: 0;
   align-self: center;
   background: #0a0a1a;
