@@ -1424,7 +1424,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return null;
   }
 
-  function createCard({ kind = 'local' } = {}) {
+  function createCard({ kind = 'local', label } = {}) {
     if (!chatStackEl) return null;
     const id        = 'card_' + nextCardSerial;
     nextCardSerial++;
@@ -1438,9 +1438,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const head = document.createElement('div');
     head.className   = 'card-head';
-    head.textContent = kind === 'local'  ? ('N=' + serial)
-                     : kind === 'system' ? 'System'
-                     :                     'C';
+    const headLabel = document.createElement('span');
+    headLabel.className = 'card-head-label';
+    headLabel.textContent = label !== undefined
+      ? label
+      : kind === 'local'  ? ('N=' + serial)
+      : kind === 'system' ? 'System'
+      :                     'C';
+    head.appendChild(headLabel);
 
     const body = kind === 'local'
       ? document.createElement('textarea')
@@ -1462,6 +1467,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // Hook OS-native copy. We do NOT preventDefault — system clipboard still gets the text,
     // so the user can paste outside the app as a side effect.
     body.addEventListener('copy', e => handleCardCopy(e, card));
+
+    // Local cards drive the Send button's enable state (communications.md §6.1).
+    if (kind === 'local') {
+      body.addEventListener('input', updateSendBtn);
+    }
+    updateSendBtn();
 
     return card;
   }
@@ -1596,6 +1607,87 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // (communications.md §5.1). Called on Chat press.
   function ensureLocalCard() {
     if (!topLocalCard()) createCard({ kind: 'local' });
+  }
+
+  // Per-local-card counter for inbound partner messages (communications.md §4.1).
+  // Frozen at receipt: numbering reflects the top local at the moment the message
+  // arrived, not whatever the top local is now.
+  const receivedCountByN = new Map();
+
+  // Inbound partner card (server-relayed). Teal, non-editable, head label `N.M`.
+  // Placement matches system cards: directly below the top local compose area.
+  function prependPartnerCard(text) {
+    const parent = topLocalCard();
+    if (!parent) {
+      // ensureLocalCard makes this unreachable in practice, but degrade gracefully.
+      createCard({ kind: 'local' });
+    }
+    const top = topLocalCard();
+    const parentN = top ? top.serial : 0;
+    const m = (receivedCountByN.get(parentN) || 0) + 1;
+    receivedCountByN.set(parentN, m);
+    const rcv = createCard({ kind: 'received', label: parentN + '.' + m });
+    if (!rcv) return;
+    if (rcv.body) {
+      rcv.body.textContent = text;
+      rcv.text = text;
+    }
+    if (top && top.el && top.el !== rcv.el) {
+      top.el.after(rcv.el);
+    }
+  }
+
+  // ── Send / ack plumbing (communications.md §6) ────────────────────────────
+  const pendingSends = new Map(); // sendId → card object
+  let nextSendId = 1;
+  let sendBtnEl = null;
+
+  function setSendBtn(el) { sendBtnEl = el; updateSendBtn(); }
+
+  function updateSendBtn() {
+    if (!sendBtnEl) return;
+    const top = topLocalCard();
+    const text = top && top.body ? top.body.value : '';
+    sendBtnEl.disabled = !pairingState.active || !text.trim();
+  }
+
+  // Click-time send: read the *current* textarea value (card.text isn't synced
+  // on direct user typing). Returns true if the WS frame went out.
+  function sendTopLocalCard() {
+    const top = topLocalCard();
+    if (!top || !top.body) return false;
+    const text = top.body.value;
+    if (!text.trim()) return false;
+    const wsNow = wsRef.current;
+    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return false;
+    const sendId = 'send_' + (nextSendId++);
+    pendingSends.set(sendId, top);
+    wsNow.send(JSON.stringify({ type: 'buddy_card', sendId, text }));
+    return true;
+  }
+
+  function fmtDeliveredAt(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return 'delivered ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  // Stamp the matching card on `buddy_card_ack`. Overwrites any prior stamp
+  // so a re-sent card shows only the most recent delivery time (§6.5).
+  function handleBuddyCardAck(msg) {
+    const card = pendingSends.get(msg.sendId);
+    if (!card) return;
+    pendingSends.delete(msg.sendId);
+    if (!card.el) return;
+    const head = card.el.querySelector('.card-head');
+    if (!head) return;
+    let stamp = head.querySelector('.card-delivered');
+    if (!stamp) {
+      stamp = document.createElement('span');
+      stamp.className = 'card-delivered';
+      head.appendChild(stamp);
+    }
+    stamp.textContent = fmtDeliveredAt(msg.deliveredAt);
   }
 
   function positionTooltip(x, y) {
@@ -2819,7 +2911,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, ensureLocalCard };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck };
 
 }
 
@@ -3182,6 +3274,12 @@ async function init() {
     });
   }
 
+  const sendBtn = document.getElementById('chat-send-btn');
+  if (sendBtn) {
+    setSendBtn(sendBtn);
+    sendBtn.addEventListener('click', () => { sendTopLocalCard(); });
+  }
+
   const pairBtn    = document.getElementById('pair-btn');
   const pairStatus = document.getElementById('pair-status');
 
@@ -3222,7 +3320,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, ensureLocalCard } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Pin #cy top to the bottom of the default-panel (or the cy-you bar if absent)
   const initialRef = document.getElementById('default-panel') || document.getElementById('cy-you');
@@ -3254,20 +3352,25 @@ async function init() {
       pairBtn.style.display = 'none';
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
+      updateSendBtn();
     } else if (msg.type === 'buddy_disconnected') {
       pairingState.active = false;
       buddyCy.nodes().addClass('buddy-gone');
       pairStatus.textContent = 'Waiting...';
       ws.send(JSON.stringify({ type: 'ready_to_pair' }));
+      updateSendBtn();
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
     } else if (msg.type === 'buddy_card') {
       // communications.md §1 — one inbound path, one rendering rule.
-      // Channel selects tint/head; for now only 'system' is wired
-      // (partner-receive comes in slice step 4).
-      if (msg.channel === 'system' && typeof msg.text === 'string') {
+      if (typeof msg.text !== 'string') return;
+      if (msg.channel === 'system') {
         prependSystemCard(msg.text);
+      } else if (msg.channel === 'partner') {
+        prependPartnerCard(msg.text);
       }
+    } else if (msg.type === 'buddy_card_ack') {
+      handleBuddyCardAck(msg);
     } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
       handleClusterRelMsg(msg);
     } else if (msg.type === 'cluster_cloned') {

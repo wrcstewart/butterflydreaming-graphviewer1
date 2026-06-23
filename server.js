@@ -291,6 +291,30 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
+      if (msg.type === 'buddy_card') {
+        // Outbound from client (Send button). communications.md §6.2/§6.4.
+        // No persistence — pure pass-through with a delivery ack on success.
+        if (!ws.userId) return;
+        const text = typeof msg.text === 'string' ? msg.text : '';
+        const sendId = msg.sendId;
+        if (!channelOpen(ws.userId)) {
+          sendSystemCard(ws.userId, 'Partner not available — please wait.');
+          return;
+        }
+        const buddyId = pairedWith.get(ws.userId);
+        const buddyWs = sessions.get(buddyId);
+        if (buddyWs && buddyWs.readyState === 1) {
+          buddyWs.send(JSON.stringify({ type: 'buddy_card', channel: 'partner', text }));
+          ws.send(JSON.stringify({
+            type: 'buddy_card_ack',
+            sendId,
+            deliveredAt: new Date().toISOString(),
+          }));
+        } else {
+          sendSystemCard(ws.userId, 'Partner not available — please wait.');
+        }
+        return;
+      }
       if (msg.type === 'write_hints') {
         if (!CURATION_CODE) {
           ws.send(JSON.stringify({ type: 'write_hints', error: 'curation_disabled' }));

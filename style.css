@@ -302,8 +302,11 @@ html, body {
 .card.received {
   background: #16242c;                /* faint teal tint */
 }
-.card.received .card-head::after {
-  content: ' · C';
+.card-delivered {
+  margin-left: 0.6em;
+  font-size: 0.85em;
+  opacity: 0.8;
+  font-style: italic;
 }
 
 #chat-right-col,
@@ -350,8 +353,8 @@ html, body {
   min-height: 1em;
 }
 
+#chat-send-btn,
 #chat-new-card-btn {
-  margin-top: auto;
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
@@ -364,9 +367,21 @@ html, body {
   text-align: center;
 }
 
+#chat-send-btn {
+  margin-top: auto;
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+#chat-send-btn:hover:not(:disabled),
 #chat-new-card-btn:hover {
   border-color: #aaa;
   color: #fff;
+}
+
+#chat-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 #media-bar {
