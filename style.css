@@ -662,9 +662,11 @@ html, body {
   background: #111;
   border: 1px solid #444;
   color: #ccc;
-  font-size: 11px;
+  /* iOS Safari auto-zooms any input under 16px on focus. Keeping >= 16px
+     prevents the zoom-in / can't-zoom-back problem on iPhone. */
+  font-size: 16px;
   padding: 2px 6px;
-  width: 72px;
+  width: 96px;
   border-radius: 3px;
 }
 
