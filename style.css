@@ -238,9 +238,9 @@ html, body {
   overflow-y: auto;
 }
 
-/* chat-panel system card is just a static welcome card — distinct tint, normal sizing */
+/* chat-panel system card — very dark gold body, matches the dark-yellow head */
 #chat-stack .card.system {
-  background: #2c241a;                 /* amber-tinted dark, distinct from local (indigo) and received (teal) */
+  background: #0e0c00;
 }
 
 #chat-stack {
@@ -273,12 +273,19 @@ html, body {
 .card-head {
   padding: 3px 8px;
   background: rgba(255,255,255,0.04);
-  color: #cccccc;
+  color: #ffffff;
   font-family: sans-serif;
   font-size: 12px;
   border-bottom: 1px solid #2a2a3a;
   user-select: none;
 }
+
+/* Card heads colour-coded to mirror the bar / title palette. White text
+   throughout — body backgrounds are very dark so the head reads as a
+   distinct stripe. */
+.card.local    .card-head { background: #3d2e00; }   /* same hue as #cy-you breadcrumb */
+.card.received .card-head { background: #001f4d; }   /* same hue as #cy-buddy breadcrumb */
+#chat-stack .card.system .card-head { background: #3d3500; }   /* dark gold matching root #FFD700 */
 
 .card-body {
   width: 100%;
@@ -303,12 +310,14 @@ html, body {
   min-height: 0;
 }
 
-/* alternating tints — last child (top) is treated as the "newest" tint */
-.card.local:nth-child(odd)  { background: #161624; }
-.card.local:nth-child(even) { background: #1c1c30; }
+/* Body backgrounds — same hue family as the head, very dark (almost black
+   but visible). Subtle alternation kept on locals so adjacent N=k cards
+   stay distinguishable. */
+.card.local:nth-child(odd)  { background: #0d0a00; }
+.card.local:nth-child(even) { background: #120e00; }
 
 .card.received {
-  background: #16242c;                /* faint teal tint */
+  background: #00081a;                /* very dark navy, matches head */
 }
 
 /* Hidden ghost N=0 — conceptual anchor only, never shown */
