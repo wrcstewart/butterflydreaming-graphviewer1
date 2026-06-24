@@ -1315,7 +1315,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         routeNodeText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
         markReadNode(chip, buddyCy);
         buddyTouchPending = chip.id();
-        buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 800);
+        buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 560);
       }
       return;
     }
@@ -1333,7 +1333,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       buddyDesktopPending = chip.id();
       routeNodeText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
       markReadNode(chip, buddyCy);
-      buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 450);
+      buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 320);
     }
   });
 
@@ -1366,7 +1366,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         routeNodeText(buildTooltipContent(main), navNodeMeta(main));
         markReadNode(chip, youCy);
         youTouchPending = chip.id();
-        youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 800);
+        youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 560);
       }
       return;
     }
@@ -1384,7 +1384,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       youDesktopPending = chip.id();
       routeNodeText(buildTooltipContent(main), navNodeMeta(main));
       markReadNode(chip, youCy);
-      youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 450);
+      youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 320);
     }
   });
 
@@ -2542,7 +2542,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           handleNodeTap(node);
         } else {
           touchPendingNodeId = node.id();
-          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
+          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
         }
         return;
       }
@@ -2562,7 +2562,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // Tap same node while its tooltip is showing — dismiss
         hideTooltip();
         touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 800);
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
       } else {
         // Touch: defer setSystemText until 800ms confirms single tap (else the second tap
         // pre-empts it as navigation).
@@ -2575,7 +2575,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           routeNodeText(content, meta);
           touchPendingNodeId = null;
           tapResetTimer = null;
-        }, 800);
+        }, 560);
       }
       return;
     }
@@ -2599,7 +2599,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         routeNodeText(content, meta);
         desktopClickTimer = null;
         desktopPendingNodeId = null;
-      }, 450);
+      }, 320);
     }
   });
 
