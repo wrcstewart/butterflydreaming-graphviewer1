@@ -54,6 +54,31 @@ function createSystemCardEl(label) {
   return el;
 }
 
+// ── Bot-context (bd_ai_read) helpers ─────────────────────────────────────────
+// Curators author bot-only context in square brackets [ … ] inside nav-node
+// text. On Save the bracket form is normalised to %%bd_ai_read [ … %%bd_] for
+// storage (one-canonical-form, parseable). On render the inverse applies:
+// curator view (#dev-code non-empty) un-normalises back to [ … ]; ordinary
+// user view strips the directive entirely. bdbot reads the raw stored text
+// straight from memgraph and bypasses this layer.
+//
+// Round-trip contract: content between [ and ] is placed VERBATIM between
+// %%bd_ai_read [ and %%bd_]. No whitespace added or stripped. Known limitation
+// — bracket content containing the literal substrings "[", "]", or "%%bd_]"
+// is not supported.
+function normalizeBotBlocks(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/\[([^\[\]]*)\]/g, '%%bd_ai_read [$1%%bd_]');
+}
+function unnormalizeBotBlocks(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/%%bd_ai_read \[([\s\S]*?)%%bd_\]/g, '[$1]');
+}
+function stripBotBlocks(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/%%bd_ai_read \[[\s\S]*?%%bd_\]/g, '');
+}
+
 function setSystemText(content, meta) {
   if (!defaultStackEl) return;
   let topEl = defaultStackEl.firstElementChild;
@@ -72,9 +97,17 @@ function setSystemText(content, meta) {
     body.contentEditable = 'true';
     topEl.dataset.bdLabel = meta.label;
     topEl.dataset.bdName  = meta.name;
+    // bot-context display fork (see bot_context.md §4.1): curator view
+    // un-normalises %%bd_ai_read blocks back to [ … ]; ordinary user view
+    // strips them entirely. Render-time evaluation against #dev-code per §4.3.
+    const devCodeEl = document.getElementById('dev-code');
+    const curatorView = !!(devCodeEl && devCodeEl.value.trim());
+    const displayContent = curatorView
+      ? unnormalizeBotBlocks(content)
+      : stripBotBlocks(content);
     const block = document.createElement('div');
     block.className = 'system-insert';
-    block.textContent = content;
+    block.textContent = displayContent;
     body.appendChild(block);
     requestAnimationFrame(() => {
       body.scrollTop = 0;
@@ -2716,12 +2749,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
     wsNow.addEventListener('message', handler);
 
+    // Normalise curator-authored [ … ] blocks into canonical %%bd_ai_read
+    // before persisting (bot_context.md §3). Server is a dumb store-and-forward.
     wsNow.send(JSON.stringify({
       type:  'edit_node_text',
       code,
       label,
       name,
-      text:  rest,
+      text:  normalizeBotBlocks(rest),
     }));
     setSaveStatus('saving…');
   });
