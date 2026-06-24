@@ -54,6 +54,16 @@ function createSystemCardEl(label) {
   return el;
 }
 
+// cy.fit() takes absolute pixel padding, which eats a much larger viewport
+// fraction on phones than on desktop. Compute padding as a fraction of the
+// smaller canvas dimension, with a floor (so things don't touch the edge) and
+// a cap (so desktop doesn't waste space). Caller passes the original "ideal"
+// padding as the cap.
+function fitPadding(cy, maxPad) {
+  const dim = Math.min(cy.width(), cy.height());
+  return Math.max(20, Math.min(maxPad, dim * 0.08));
+}
+
 // ── Bot-context (bd_ai_read) helpers ─────────────────────────────────────────
 // Curators author bot-only context in square brackets [ … ] inside nav-node
 // text. On Save the bracket form is normalised to %%bd_ai_read [ … %%bd_] for
@@ -820,7 +830,7 @@ function buildStyle() {
 function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
   if (visible.nodes().length <= 1) {
-    cy.fit(visible, 120);
+    cy.fit(visible, fitPadding(cy, 120));
     return;
   }
 
@@ -899,7 +909,7 @@ function runLayout(cy, parentNode = null) {
       };
     });
     visible.layout({ name: 'preset', positions, fit: false }).run();
-    cy.fit(visible, 80);
+    cy.fit(visible, fitPadding(cy, 80));
 
   } else if (hintMode === 'preset' || hintMode === 'hybrid') {
     // Recover hinted children from stored offsets, pin them, and run fCoSE so any
@@ -993,7 +1003,7 @@ function runLayout(cy, parentNode = null) {
     });
 
     visible.layout({ name: 'preset', positions, fit: false }).run();
-    cy.fit(visible, 80);
+    cy.fit(visible, fitPadding(cy, 80));
 
   } else {
     // force mode — fCoSE from scratch.  If title nodes are present, pin them at
@@ -1955,7 +1965,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const rowX = clusterNode.position().x - ((gws.length - 1) * spacing) / 2;
       const rowY = clusterNode.position().y + 150;
       gws.forEach((n, i) => n.position({ x: rowX + i * spacing, y: rowY }));
-      cy.fit(cy.elements(':visible'), 60);
+      cy.fit(cy.elements(':visible'), fitPadding(cy, 60));
     }, 500);
   }
 
@@ -3257,7 +3267,7 @@ async function init() {
   cy.elements().hide();
   const root = cy.nodes('[type="root"]').first();
   root.show();
-  cy.fit(root, 120);
+  cy.fit(root, fitPadding(cy, 120));
 
   const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
   const wsRef = { current: ws, lastActivity: Date.now(), maxIdleMs: MAX_IDLE_MS };
@@ -3349,7 +3359,7 @@ async function init() {
     requestAnimationFrame(() => {
       positionCyEl();
       cy.resize();
-      cy.fit(undefined, 40);
+      cy.fit(undefined, fitPadding(cy, 40));
     });
   }
 
