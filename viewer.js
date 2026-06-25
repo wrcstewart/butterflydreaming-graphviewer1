@@ -1322,7 +1322,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           routeNodeText(content, meta);
           buddyTouchPending = null;
           buddyTouchTimer = null;
-        }, 460);
+        }, 560);
       }
       return;
     }
@@ -1346,7 +1346,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         routeNodeText(content, meta);
         buddyDesktopTimer = null;
         buddyDesktopPending = null;
-      }, 220);
+      }, 320);
     }
   });
 
@@ -1386,7 +1386,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           routeNodeText(content, meta);
           youTouchPending = null;
           youTouchTimer = null;
-        }, 460);
+        }, 560);
       }
       return;
     }
@@ -1410,7 +1410,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         routeNodeText(content, meta);
         youDesktopTimer = null;
         youDesktopPending = null;
-      }, 220);
+      }, 320);
     }
   });
 
@@ -2568,7 +2568,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           handleNodeTap(node);
         } else {
           touchPendingNodeId = node.id();
-          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 460);
+          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
         }
         return;
       }
@@ -2588,7 +2588,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // Tap same node while its tooltip is showing — dismiss
         hideTooltip();
         touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 460);
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
       } else {
         // Touch: defer routeNodeText so a follow-up double-tap can pre-empt it
         // (no text shown on double-tap, no flash).
@@ -2601,7 +2601,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           routeNodeText(content, meta);
           touchPendingNodeId = null;
           tapResetTimer = null;
-        }, 460);
+        }, 560);
       }
       return;
     }
@@ -2625,7 +2625,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         routeNodeText(content, meta);
         desktopClickTimer = null;
         desktopPendingNodeId = null;
-      }, 220);
+      }, 320);
     }
   });
 
