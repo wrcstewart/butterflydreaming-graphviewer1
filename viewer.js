@@ -2523,6 +2523,52 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
+  // Tap revert support: snapshot the destination before a single-tap fires
+  // routeNodeText, so that if a second tap arrives within the debounce window
+  // (double-tap detected → navigation), we can undo the first tap's auto-insert.
+  // Net visible effect on double-tap: a brief flash of text, then the panel
+  // returns to its pre-tap state and the navigation runs. Single-tap (no
+  // second tap) clears the snapshot harmlessly when the timer expires.
+  let pendingTapRevert = null;
+  function snapshotForTap() {
+    if (chatModeActive) {
+      const top = topLocalCard();
+      if (!top || top.hidden || !top.body) return null;
+      const savedValue = top.body.value;
+      const savedStart = top.body.selectionStart;
+      const savedEnd   = top.body.selectionEnd;
+      const savedText  = top.text;
+      return {
+        revert() {
+          top.body.value = savedValue;
+          top.text = savedText;
+          try { top.body.setSelectionRange(savedStart, savedEnd); } catch (_) {}
+          updateSendBtn();
+        }
+      };
+    }
+    if (!defaultStackEl) return null;
+    const topEl = defaultStackEl.firstElementChild;
+    if (!topEl) return null;
+    const body = topEl.querySelector('.card-body');
+    if (!body) return null;
+    const savedHTML     = body.innerHTML;
+    const savedEditable = body.contentEditable;
+    const hadLabel      = 'bdLabel' in topEl.dataset;
+    const savedLabel    = topEl.dataset.bdLabel;
+    const hadName       = 'bdName' in topEl.dataset;
+    const savedName     = topEl.dataset.bdName;
+    return {
+      revert() {
+        body.innerHTML = savedHTML;
+        body.contentEditable = savedEditable;
+        if (hadLabel) topEl.dataset.bdLabel = savedLabel; else delete topEl.dataset.bdLabel;
+        if (hadName)  topEl.dataset.bdName  = savedName;  else delete topEl.dataset.bdName;
+        updateSaveButtonState();
+      }
+    };
+  }
+
   cy.on('tap', 'node', evt => {
     const node = evt.target;
 
@@ -2553,53 +2599,49 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       tapResetTimer = null;
 
       if (sameNode && withinWindow) {
-        // Double tap (two taps within 800ms) — navigate regardless of tooltip state
+        // Double tap — undo the first tap's auto-insert (brief flash), then navigate.
         hideTooltip();
         touchPendingNodeId = null;
         clearReadMark();
+        if (pendingTapRevert) { pendingTapRevert.revert(); pendingTapRevert = null; }
         handleNodeTap(node);
       } else if (tooltipNodeId === node.id()) {
         // Tap same node while its tooltip is showing — dismiss
         hideTooltip();
         touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; pendingTapRevert = null; }, 560);
       } else {
-        // Touch: defer setSystemText until 800ms confirms single tap (else the second tap
-        // pre-empts it as navigation).
+        // Touch: fire routeNodeText synchronously on first tap (snappy). The
+        // snapshot lets a follow-up double-tap revert it; if no second tap
+        // arrives, the timer expires and the text stays.
         hideTooltip();
-        touchPendingNodeId = node.id();
         markReadNode(node, cy);
-        const content = buildTooltipContent(node);
-        const meta    = navNodeMeta(node);
-        tapResetTimer = setTimeout(() => {
-          routeNodeText(content, meta);
-          touchPendingNodeId = null;
-          tapResetTimer = null;
-        }, 560);
+        pendingTapRevert = snapshotForTap();
+        routeNodeText(buildTooltipContent(node), navNodeMeta(node));
+        touchPendingNodeId = node.id();
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; pendingTapRevert = null; }, 560);
       }
       return;
     }
 
-    // Desktop: single click → setSystemText (deferred so double-click can pre-empt); double click → navigate
+    // Desktop: single click fires routeNodeText immediately (snappy). If a
+    // double-click is detected within the window, undo the first click's
+    // auto-insert (brief flash) and run navigation instead.
     if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
       clearTimeout(desktopClickTimer);
       desktopClickTimer = null;
       desktopPendingNodeId = null;
       hideTooltip();
       clearReadMark();
+      if (pendingTapRevert) { pendingTapRevert.revert(); pendingTapRevert = null; }
       handleNodeTap(node);
     } else {
       clearTimeout(desktopClickTimer);
-      desktopPendingNodeId = node.id();
       markReadNode(node, cy);
-      const content = buildTooltipContent(node);
-      const meta    = navNodeMeta(node);
-      desktopClickTimer = setTimeout(() => {
-        // Fires only if no second click arrived within the window — a confirmed single click.
-        routeNodeText(content, meta);
-        desktopClickTimer = null;
-        desktopPendingNodeId = null;
-      }, 320);
+      pendingTapRevert = snapshotForTap();
+      routeNodeText(buildTooltipContent(node), navNodeMeta(node));
+      desktopPendingNodeId = node.id();
+      desktopClickTimer = setTimeout(() => { desktopClickTimer = null; desktopPendingNodeId = null; pendingTapRevert = null; }, 320);
     }
   });
 
