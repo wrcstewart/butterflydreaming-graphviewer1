@@ -1307,20 +1307,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearTimeout(buddyTouchTimer);
       buddyTouchTimer = null;
       if (same && inWindow) {
+        // Double tap — navigate; deferred routeNodeText cancelled.
         buddyTouchPending = null;
         hideTooltip();
         clearReadMark();
         if (main.length) handleNodeTap(main);
       } else {
-        routeNodeText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
+        // Defer routeNodeText so a follow-up double-tap can pre-empt it.
         markReadNode(chip, buddyCy);
+        const content = buildBuddyChipTooltip(chip);
+        const meta    = main.length ? navNodeMeta(main) : null;
         buddyTouchPending = chip.id();
-        buddyTouchTimer = setTimeout(() => { buddyTouchPending = null; buddyTouchTimer = null; }, 560);
+        buddyTouchTimer = setTimeout(() => {
+          routeNodeText(content, meta);
+          buddyTouchPending = null;
+          buddyTouchTimer = null;
+        }, 460);
       }
       return;
     }
 
-    // Desktop: single click = show tooltip / populate textarea; double click = navigate
+    // Desktop: deferred routeNodeText — single click shows after the window;
+    // double click cancels the deferred and navigates instead.
     if (buddyDesktopPending === chip.id() && buddyDesktopTimer !== null) {
       clearTimeout(buddyDesktopTimer);
       buddyDesktopTimer = null;
@@ -1330,10 +1338,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (main.length) handleNodeTap(main);
     } else {
       clearTimeout(buddyDesktopTimer);
-      buddyDesktopPending = chip.id();
-      routeNodeText(buildBuddyChipTooltip(chip), main.length ? navNodeMeta(main) : null);
       markReadNode(chip, buddyCy);
-      buddyDesktopTimer = setTimeout(() => { buddyDesktopTimer = null; buddyDesktopPending = null; }, 320);
+      const content = buildBuddyChipTooltip(chip);
+      const meta    = main.length ? navNodeMeta(main) : null;
+      buddyDesktopPending = chip.id();
+      buddyDesktopTimer = setTimeout(() => {
+        routeNodeText(content, meta);
+        buddyDesktopTimer = null;
+        buddyDesktopPending = null;
+      }, 220);
     }
   });
 
@@ -1358,20 +1371,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearTimeout(youTouchTimer);
       youTouchTimer = null;
       if (same && inWindow) {
+        // Double tap — navigate; deferred routeNodeText cancelled.
         youTouchPending = null;
         hideTooltip();
         clearReadMark();
         handleNodeTap(main);
       } else {
-        routeNodeText(buildTooltipContent(main), navNodeMeta(main));
+        // Defer routeNodeText so a follow-up double-tap can pre-empt it.
         markReadNode(chip, youCy);
+        const content = buildTooltipContent(main);
+        const meta    = navNodeMeta(main);
         youTouchPending = chip.id();
-        youTouchTimer = setTimeout(() => { youTouchPending = null; youTouchTimer = null; }, 560);
+        youTouchTimer = setTimeout(() => {
+          routeNodeText(content, meta);
+          youTouchPending = null;
+          youTouchTimer = null;
+        }, 460);
       }
       return;
     }
 
-    // Desktop: single click = show tooltip / populate textarea; double click = navigate
+    // Desktop: deferred routeNodeText — single click shows after the window;
+    // double click cancels the deferred and navigates instead.
     if (youDesktopPending === chip.id() && youDesktopTimer !== null) {
       clearTimeout(youDesktopTimer);
       youDesktopTimer = null;
@@ -1381,10 +1402,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       handleNodeTap(main);
     } else {
       clearTimeout(youDesktopTimer);
-      youDesktopPending = chip.id();
-      routeNodeText(buildTooltipContent(main), navNodeMeta(main));
       markReadNode(chip, youCy);
-      youDesktopTimer = setTimeout(() => { youDesktopTimer = null; youDesktopPending = null; }, 320);
+      const content = buildTooltipContent(main);
+      const meta    = navNodeMeta(main);
+      youDesktopPending = chip.id();
+      youDesktopTimer = setTimeout(() => {
+        routeNodeText(content, meta);
+        youDesktopTimer = null;
+        youDesktopPending = null;
+      }, 220);
     }
   });
 
@@ -2523,52 +2549,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  // Tap revert support: snapshot the destination before a single-tap fires
-  // routeNodeText, so that if a second tap arrives within the debounce window
-  // (double-tap detected → navigation), we can undo the first tap's auto-insert.
-  // Net visible effect on double-tap: a brief flash of text, then the panel
-  // returns to its pre-tap state and the navigation runs. Single-tap (no
-  // second tap) clears the snapshot harmlessly when the timer expires.
-  let pendingTapRevert = null;
-  function snapshotForTap() {
-    if (chatModeActive) {
-      const top = topLocalCard();
-      if (!top || top.hidden || !top.body) return null;
-      const savedValue = top.body.value;
-      const savedStart = top.body.selectionStart;
-      const savedEnd   = top.body.selectionEnd;
-      const savedText  = top.text;
-      return {
-        revert() {
-          top.body.value = savedValue;
-          top.text = savedText;
-          try { top.body.setSelectionRange(savedStart, savedEnd); } catch (_) {}
-          updateSendBtn();
-        }
-      };
-    }
-    if (!defaultStackEl) return null;
-    const topEl = defaultStackEl.firstElementChild;
-    if (!topEl) return null;
-    const body = topEl.querySelector('.card-body');
-    if (!body) return null;
-    const savedHTML     = body.innerHTML;
-    const savedEditable = body.contentEditable;
-    const hadLabel      = 'bdLabel' in topEl.dataset;
-    const savedLabel    = topEl.dataset.bdLabel;
-    const hadName       = 'bdName' in topEl.dataset;
-    const savedName     = topEl.dataset.bdName;
-    return {
-      revert() {
-        body.innerHTML = savedHTML;
-        body.contentEditable = savedEditable;
-        if (hadLabel) topEl.dataset.bdLabel = savedLabel; else delete topEl.dataset.bdLabel;
-        if (hadName)  topEl.dataset.bdName  = savedName;  else delete topEl.dataset.bdName;
-        updateSaveButtonState();
-      }
-    };
-  }
-
   cy.on('tap', 'node', evt => {
     const node = evt.target;
 
@@ -2588,7 +2568,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           handleNodeTap(node);
         } else {
           touchPendingNodeId = node.id();
-          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
+          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 460);
         }
         return;
       }
@@ -2599,49 +2579,53 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       tapResetTimer = null;
 
       if (sameNode && withinWindow) {
-        // Double tap — undo the first tap's auto-insert (brief flash), then navigate.
+        // Double tap (two taps within window) — navigate; deferred routeNodeText cancelled.
         hideTooltip();
         touchPendingNodeId = null;
         clearReadMark();
-        if (pendingTapRevert) { pendingTapRevert.revert(); pendingTapRevert = null; }
         handleNodeTap(node);
       } else if (tooltipNodeId === node.id()) {
         // Tap same node while its tooltip is showing — dismiss
         hideTooltip();
         touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; pendingTapRevert = null; }, 560);
+        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 460);
       } else {
-        // Touch: fire routeNodeText synchronously on first tap (snappy). The
-        // snapshot lets a follow-up double-tap revert it; if no second tap
-        // arrives, the timer expires and the text stays.
+        // Touch: defer routeNodeText so a follow-up double-tap can pre-empt it
+        // (no text shown on double-tap, no flash).
         hideTooltip();
         markReadNode(node, cy);
-        pendingTapRevert = snapshotForTap();
-        routeNodeText(buildTooltipContent(node), navNodeMeta(node));
+        const content = buildTooltipContent(node);
+        const meta    = navNodeMeta(node);
         touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; pendingTapRevert = null; }, 560);
+        tapResetTimer = setTimeout(() => {
+          routeNodeText(content, meta);
+          touchPendingNodeId = null;
+          tapResetTimer = null;
+        }, 460);
       }
       return;
     }
 
-    // Desktop: single click fires routeNodeText immediately (snappy). If a
-    // double-click is detected within the window, undo the first click's
-    // auto-insert (brief flash) and run navigation instead.
+    // Desktop: single click defers routeNodeText so a double-click can cancel
+    // it (no text shown on double-click). Double click navigates.
     if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
       clearTimeout(desktopClickTimer);
       desktopClickTimer = null;
       desktopPendingNodeId = null;
       hideTooltip();
       clearReadMark();
-      if (pendingTapRevert) { pendingTapRevert.revert(); pendingTapRevert = null; }
       handleNodeTap(node);
     } else {
       clearTimeout(desktopClickTimer);
       markReadNode(node, cy);
-      pendingTapRevert = snapshotForTap();
-      routeNodeText(buildTooltipContent(node), navNodeMeta(node));
+      const content = buildTooltipContent(node);
+      const meta    = navNodeMeta(node);
       desktopPendingNodeId = node.id();
-      desktopClickTimer = setTimeout(() => { desktopClickTimer = null; desktopPendingNodeId = null; pendingTapRevert = null; }, 320);
+      desktopClickTimer = setTimeout(() => {
+        routeNodeText(content, meta);
+        desktopClickTimer = null;
+        desktopPendingNodeId = null;
+      }, 220);
     }
   });
 
