@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 158; // bc-spacer(50) + help-bar(26) + cy-buddy(36) + gap(10) + cy-you(36)
+const BARS_BOTTOM = 130; // title(~21) + bc-spacer(50) + cy-buddy(23) + gap(10) + cy-you(23) — help-bar removed A50, breadcrumbs 36→23 A49
 
 const isTouchDevice = navigator.maxTouchPoints > 0;
 let mediaFilesList = [];  // populated via WebSocket on connect
@@ -3137,8 +3137,9 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 
 async function init() {
-  document.getElementById('help-text').textContent = helpText;
-
+  // #help-text was removed in A50 — guard the legacy assignment so init() doesn't abort.
+  const helpTextEl = document.getElementById('help-text');
+  if (helpTextEl) helpTextEl.textContent = helpText;
 
   const overlay = document.getElementById('loading-overlay');
   const msgEl   = document.getElementById('loading-msg');

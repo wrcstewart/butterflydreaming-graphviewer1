@@ -625,8 +625,8 @@ html, body {
 
 #dev-panel {
   position: fixed;
-  top: 34px;                            /* moved from bottom in A50b — bottom is for the media player */
-  left: 8px;                            /* mirrors #pair-control on the right */
+  bottom: 38px;                         /* sits just above the media player (media-bar at bottom: 8px) */
+  left: 16px;
   display: flex;
   align-items: center;
   gap: 6px;
