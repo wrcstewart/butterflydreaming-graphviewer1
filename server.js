@@ -23,7 +23,18 @@ try {
 
 const app = express();
 app.use(express.json());
-app.use(express.static('.'));
+// HTML must never be cached — otherwise the browser keeps requesting old
+// ?v= numbers and never picks up new CSS/JS. CSS/JS themselves are cache-
+// busted via the ?v= query so they CAN be cached aggressively.
+app.use(express.static('.', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 const driver = neo4j.driver(
   'bolt://localhost:7687',
