@@ -3299,7 +3299,9 @@ async function init() {
   // init, the root ends up off-centre (mis-fit against the CSS fallback rect),
   // visible especially on iPhone after #default-panel grew to 34dvh.
   {
-    const refEl = document.getElementById('default-panel') || document.getElementById('cy-you');
+    const refEl = document.getElementById('action-bar')
+              || document.getElementById('default-panel')
+              || document.getElementById('cy-you');
     document.getElementById('cy').style.top =
       Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
   }
@@ -3384,14 +3386,15 @@ async function init() {
   }
 
   function positionCyEl() {
-    let refEl;
-    if (chatModeActive && chatPanel.getBoundingClientRect().height > 0) {
-      // Pin below the send-bar (sibling of chat-panel, full-width navy strip
-      // added in A50g). Fall back to chat-panel if the bar isn't rendered yet.
-      refEl = document.getElementById('chat-send-bar') || chatPanel;
-    } else {
-      refEl = document.getElementById('default-panel') || document.getElementById('cy-you');
-    }
+    // A50j: #action-bar is always visible and sits below whichever panel
+    // (chat or default) is showing in DOM flow — so cy always pins to its
+    // bottom. Fall back to the active panel / breadcrumb if the bar is
+    // missing for any reason.
+    const refEl =
+      document.getElementById('action-bar') ||
+      (chatModeActive && chatPanel.getBoundingClientRect().height > 0 ? chatPanel : null) ||
+      document.getElementById('default-panel') ||
+      document.getElementById('cy-you');
     cyEl.style.top = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
   }
 
