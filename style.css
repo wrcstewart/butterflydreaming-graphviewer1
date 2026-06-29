@@ -372,6 +372,9 @@ html, body {
   margin-top: auto;
   font-size: 11px;
   padding: 4px 10px;
+  background: #0080ff !important;       /* DIAGNOSTIC — bright blue to confirm CSS is applying */
+  color: #fff !important;
+  border-color: #0080ff !important;
 }
 
 #chat-send-btn:hover:not(:disabled),
