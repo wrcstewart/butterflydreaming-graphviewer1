@@ -822,6 +822,27 @@ function buildStyle() {
         'overlay-padding': 4,
       }
     },
+    // Breadcrumb chip override — applied in addYouChip / appendBuddyChip via
+    // addClass('breadcrumb-chip'). Defined AFTER all per-type rules so it
+    // wins on specificity ties. The bar is 23px tall; chips need to fit
+    // inside that with a small margin. Width kept generous-ish so labels
+    // aren't truncated too aggressively — pinch-zoom is enabled if more
+    // reading room is needed.
+    {
+      selector: 'node.breadcrumb-chip',
+      style: {
+        'width': 60,
+        'height': 18,
+        'font-size': '9px',
+        'text-max-width': '54px',
+        'text-margin-y': 0,
+        'border-width': 0,
+      }
+    },
+    {
+      selector: 'node.breadcrumb-chip.latest',
+      style: { 'border-width': 1.5 }
+    },
   ];
 }
 
@@ -1147,13 +1168,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         section_title:  node.data('section_title') || false,
         subfamily:      isSubfamily,
       },
-      position: { x: 0, y: 18 }
+      position: { x: 0, y: 11 }              // centre of 23px bar
     });
     const chip = youCy.getElementById(id);
+    chip.addClass('breadcrumb-chip');         // override per-type size to fit bar
     if (abbreviated)  chip.addClass('abbreviated');
     if (isSubfamily)  chip.addClass('subfamily');
     const w = chip.width();
-    chip.position({ x: youChipX + w / 2, y: 18 });
+    chip.position({ x: youChipX + w / 2, y: 11 });
 
     lastYouSourceText = type === 'TextNode' ? sourceText : null;
     if (lastYouChipId) {
@@ -1241,13 +1263,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         subfamily:      isSubfamily,
         clusterNodeId:  data.clusterNodeId || null,
       },
-      position: { x: 0, y: 18 }
+      position: { x: 0, y: 11 }              // centre of 23px bar
     });
     const chip = buddyCy.getElementById(id);
+    chip.addClass('breadcrumb-chip');         // override per-type size to fit bar
     if (abbreviated)  chip.addClass('abbreviated');
     if (isSubfamily)  chip.addClass('subfamily');
     const w = chip.width();
-    chip.position({ x: buddyChipX + w / 2, y: 18 });
+    chip.position({ x: buddyChipX + w / 2, y: 11 });
 
     if (lastBuddyChipId) {
       buddyCy.add({
