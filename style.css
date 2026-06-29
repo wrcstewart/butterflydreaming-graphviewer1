@@ -140,25 +140,30 @@ html, body {
 
 #chat-panel {
   display: none;
-  width: 40%;
+  width: 100%;                          /* A50g — full width, no longer 40% on desktop */
   height: 33dvh;
   flex-shrink: 0;
-  align-self: center;
   background: #0a0a1a;
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
 }
 
-@media (max-width: 767px) {
-  #chat-panel {
-    width: 100%;
-    height: 33dvh;
-  }
-}
-
 #chat-panel.active {
   display: flex;
+}
+
+/* Send bar (A50g) — full-width navy strip under the chat panel,
+   matches the #cy-buddy breadcrumb colour. Send button left-aligned. */
+#chat-send-bar {
+  display: none;
+  width: 100%;
+  background: #001f4d;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+#chat-panel.active ~ #chat-send-bar {
+  display: block;
 }
 
 /* Default (system-message) panel — visible whenever the chat panel is not active */

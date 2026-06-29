@@ -3386,7 +3386,9 @@ async function init() {
   function positionCyEl() {
     let refEl;
     if (chatModeActive && chatPanel.getBoundingClientRect().height > 0) {
-      refEl = chatPanel;
+      // Pin below the send-bar (sibling of chat-panel, full-width navy strip
+      // added in A50g). Fall back to chat-panel if the bar isn't rendered yet.
+      refEl = document.getElementById('chat-send-bar') || chatPanel;
     } else {
       refEl = document.getElementById('default-panel') || document.getElementById('cy-you');
     }
