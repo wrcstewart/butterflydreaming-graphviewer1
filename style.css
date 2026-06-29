@@ -625,9 +625,8 @@ html, body {
 
 #dev-panel {
   position: fixed;
-  top: 34px;                            /* same row as #back-btn (left:8px) and #pair-control (right:8px) — sits between them */
-  left: 50%;
-  transform: translateX(-50%);
+  top: 34px;                            /* same row as #back-btn (left:8px) and #pair-control (right:8px) */
+  left: 50px;                           /* just right of #back-btn (left:8px, ~38px wide) — leaves right side free for #pair-control on mobile */
   display: flex;
   align-items: center;
   gap: 6px;
