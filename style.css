@@ -143,7 +143,7 @@ html, body {
   width: 100%;                          /* A50g — full width, no longer 40% on desktop */
   height: 33dvh;
   flex-shrink: 0;
-  background: #0a0a1a;
+  background: #3d2e00;                  /* dark amber — pairs with #action-bar (A50k) */
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
@@ -153,15 +153,16 @@ html, body {
   display: flex;
 }
 
-/* Action bar (A50j) — full-width navy strip under whichever panel is
-   showing (chat or default). Always visible. Matches #cy-buddy navy.
-   Save left-aligned, Send to its right, then the status span. */
+/* Action bar (A50j) — full-width strip under whichever panel is showing
+   (chat or default). Always visible. Save left-aligned, Send to its right,
+   then the status span. Dark amber to pair visually with the panels above
+   it (A50k). */
 #action-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  background: #001f4d;
+  background: #3d2e00;
   padding: 4px 8px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -174,7 +175,7 @@ html, body {
   height: 34dvh;                       /* doubled from 17dvh on 2026-06-23 to give system messages more room */
   flex-shrink: 0;
   align-self: center;
-  background: #0a0a1a;
+  background: #3d2e00;                  /* dark amber — pairs with #action-bar (A50k) */
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
