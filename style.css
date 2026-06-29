@@ -625,8 +625,8 @@ html, body {
 
 #dev-panel {
   position: fixed;
-  bottom: 34px;
-  left: 16px;
+  top: 34px;                            /* moved from bottom in A50b — bottom is for the media player */
+  left: 8px;                            /* mirrors #pair-control on the right */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -680,12 +680,12 @@ html, body {
   top: 4px;                              /* aligns with #title-bar text */
   right: 16px;
   background: rgba(0, 0, 0, 0.6);
-  border: 1px solid #444;
-  color: #888;
+  border: 1px solid #666;
+  color: #ccc;                          /* was #888 — brighter for visibility against #title-bar yellow */
   font-size: 11px;
   font-family: sans-serif;
   padding: 3px 8px;
-  z-index: 10;
+  z-index: 20;                          /* above pair-control and dev-panel just in case */
   display: none;
 }
 
