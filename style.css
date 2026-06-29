@@ -16,12 +16,12 @@ html, body {
 
 #title-bar {
   width: 100%;
-  padding: 4px 12px;
+  padding: 4px 110px 4px 12px;          /* right padding reserves room for #user-count-panel */
   font-size: 13px;
   font-family: sans-serif;
   font-style: italic;
   color: #ffd88a;
-  text-align: center;
+  text-align: left;
   flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -31,30 +31,6 @@ html, body {
 #bc-spacer {
   height: 50px;
   flex-shrink: 0;
-}
-
-@keyframes help-pulse {
-  0%, 100% { color: #cccccc; }
-  50%       { color: #FFD700; }
-}
-
-#help-bar {
-  position: fixed;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  padding: 4px 12px;
-  font-size: 13px;
-  font-family: sans-serif;
-  color: #cccccc;
-  background: transparent;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
-  pointer-events: none;
-  z-index: 5;
-  animation: help-pulse 0.5s ease-in-out 30;
 }
 
 #cy-buddy {
@@ -151,7 +127,7 @@ html, body {
   left: 0;
   right: 0;
   top: 158px;   /* set precisely by JS; fallback matches BARS_BOTTOM */
-  bottom: 34px; /* above help bar */
+  bottom: 0;                            /* help bar removed; media bar overlays when active */
   z-index: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
@@ -407,7 +383,7 @@ html, body {
 #media-bar {
   display: none;
   position: fixed;
-  top: 34px;
+  bottom: 8px;                          /* moved from top: 34px → bottom: 8px (former help-bar slot) */
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.75);
@@ -701,7 +677,7 @@ html, body {
 
 #user-count-panel {
   position: fixed;
-  bottom: 8px;
+  top: 4px;                              /* aligns with #title-bar text */
   right: 16px;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid #444;

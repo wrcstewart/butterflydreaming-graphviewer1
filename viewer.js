@@ -1118,18 +1118,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   // --- Help text with downloading indicator ---
+  // #help-bar / #help-text was removed in A50; setHelpText / setDownloading
+  // are kept as silent no-ops so the many call sites don't all need editing.
   const helpEl = document.getElementById('help-text');
-  let currentHelpText = helpEl.textContent;
+  let currentHelpText = helpEl ? helpEl.textContent : '';
   let isDownloading = false;
 
   function setHelpText(text) {
     currentHelpText = text;
-    helpEl.textContent = isDownloading ? text + ' — downloading' : text;
+    if (helpEl) helpEl.textContent = isDownloading ? text + ' — downloading' : text;
   }
 
   function setDownloading(active) {
     isDownloading = active;
-    helpEl.textContent = isDownloading ? currentHelpText + ' — downloading' : currentHelpText;
+    if (helpEl) helpEl.textContent = isDownloading ? currentHelpText + ' — downloading' : currentHelpText;
   }
 
   // --- You breadcrumb chips ---
