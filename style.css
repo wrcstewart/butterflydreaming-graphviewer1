@@ -127,7 +127,7 @@ html, body {
   left: 0;
   right: 0;
   top: 158px;   /* set precisely by JS; fallback matches BARS_BOTTOM */
-  bottom: 0;                            /* help bar removed; media bar overlays when active */
+  bottom: 0;                            /* dev-panel moved to top in A50d; bottom is just the media-bar overlaying when active */
   z-index: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
@@ -383,7 +383,7 @@ html, body {
 #media-bar {
   display: none;
   position: fixed;
-  bottom: 8px;                          /* moved from top: 34px → bottom: 8px (former help-bar slot) */
+  bottom: 2px;                          /* very bottom of the viewport (A50d — was 8px) */
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.75);
@@ -625,8 +625,9 @@ html, body {
 
 #dev-panel {
   position: fixed;
-  bottom: 38px;                         /* sits just above the media player (media-bar at bottom: 8px) */
-  left: 16px;
+  top: 34px;                            /* same row as #back-btn (left:8px) and #pair-control (right:8px) — sits between them */
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 6px;
