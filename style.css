@@ -59,7 +59,7 @@ html, body {
 
 #cy-buddy {
   width: 100%;
-  height: 36px;
+  height: 23px;                          /* -35% from 36px (2026-06-29) */
   flex-shrink: 0;
   background: #001f4d;
   margin-bottom: 10px;
@@ -140,7 +140,7 @@ html, body {
 
 #cy-you {
   width: 100%;
-  height: 36px;
+  height: 23px;                          /* -35% from 36px (2026-06-29) */
   flex-shrink: 0;
   background: #5a5000;                  /* brighter yellow — matches local card head */
   cursor: url('cursor-wings.svg') 16 16, auto;

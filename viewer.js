@@ -3315,8 +3315,8 @@ async function init() {
     style: buildStyle(),
     layout: { name: 'preset' },
     zoom: 1,
-    userZoomingEnabled: false,
-    userPanningEnabled: false,
+    userZoomingEnabled: true,            // pinch / wheel zoom enabled (2026-06-29)
+    userPanningEnabled: true,            // drag pan along trail
     boxSelectionEnabled: false,
   });
 
@@ -3326,10 +3326,16 @@ async function init() {
     style: buildStyle(),
     layout: { name: 'preset' },
     zoom: 1,
-    userZoomingEnabled: false,
-    userPanningEnabled: false,
+    userZoomingEnabled: true,
+    userPanningEnabled: true,
     boxSelectionEnabled: false,
   });
+
+  // After CSS sets the new 23px bar heights, sync cytoscape's internal size
+  // and fit any existing chips. Empty on first load — these are no-ops then —
+  // but harmless and gives a clean reset point if the bars are ever rebuilt.
+  youCy.resize();   youCy.fit();
+  buddyCy.resize(); buddyCy.fit();
 
   const pairingState = { active: false };
 
