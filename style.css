@@ -61,7 +61,7 @@ html, body {
   color: #ffd88a;
   font-size: 14px;
   cursor: pointer;
-  padding: 3px 11px;
+  padding: 3px 7px;                     /* -36% horizontal padding from 11px (A50f) — tighter buttons */
   line-height: 1.4;
 }
 
@@ -626,7 +626,7 @@ html, body {
 #dev-panel {
   position: fixed;
   top: 34px;                            /* same row as #back-btn (left:8px) and #pair-control (right:8px) */
-  left: 50px;                           /* just right of #back-btn (left:8px, ~38px wide) — leaves right side free for #pair-control on mobile */
+  left: 54px;                           /* ~8px gap right of #back-btn (left:8px, ~46px right edge) */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -642,7 +642,7 @@ html, body {
      prevents the zoom-in / can't-zoom-back problem on iPhone. */
   font-size: 16px;
   padding: 2px 6px;
-  width: 96px;
+  width: 77px;                          /* -20% from 96px (A50f) */
   border-radius: 3px;
 }
 
