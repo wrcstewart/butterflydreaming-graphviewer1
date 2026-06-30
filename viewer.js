@@ -2282,7 +2282,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const count    = parts.length;
     const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
-    const nodeW    = Math.max(40, Math.min(70, Math.round(640 / cols)));
+    // +15% width and height vs the previous (40/70/640) values so finger taps
+    // land reliably on iPhone-class viewports (A52). Aspect ratio (0.57) keeps
+    // the depth-bump proportional to the width-bump automatically.
+    const nodeW    = Math.max(46, Math.min(81, Math.round(736 / cols)));
     const nodeH    = Math.round(nodeW * 0.57);
     const fontSize = nodeW >= 60 ? 12 : nodeW >= 50 ? 11 : 10;
     const gapX     = 10;
