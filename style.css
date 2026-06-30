@@ -34,10 +34,10 @@ html, body {
 }
 
 #cy-buddy {
-  position: fixed;                       /* A51 — anchored at bottom, above #cy-you and the media-bar */
+  position: fixed;                       /* A51c — bottom slot (was upper); just above the media-bar */
   left: 0;
   right: 0;
-  bottom: 63px;                          /* clears #cy-you (bottom: 37px, 23px tall) + 3px gap (A51b — gap reduced from 10) */
+  bottom: 37px;                          /* clears #media-bar (bottom: 2px, ~26px tall) */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
   background: #001f4d;
   cursor: url('cursor-wings.svg') 16 16, auto;
@@ -117,10 +117,10 @@ html, body {
 
 
 #cy-you {
-  position: fixed;                       /* A51 — anchored at bottom, just above the media-bar slot */
+  position: fixed;                       /* A51c — upper slot (was lower); closer to the node graph */
   left: 0;
   right: 0;
-  bottom: 37px;                          /* raised 7px from 30 (A51b) — gives clearance over media-bar */
+  bottom: 63px;                          /* clears #cy-buddy (bottom: 37px, 23px tall) + 3px gap */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
   background: #5a5000;                  /* brighter yellow — matches local card head */
   cursor: url('cursor-wings.svg') 16 16, auto;
