@@ -2286,16 +2286,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const gapY     = 10;
     const originX  = 50;
     const clusterX = 0;
-    // A52b: adaptive sizing — make the grid fill the available canvas width
-    // after cy.fit's padding so each device gets the right tap-target size
-    // for its CSS viewport. iPhone Mini gets smaller cells than Pro Max,
+    // A52c: adaptive sizing — make the grid fill the available canvas width
+    // after the layout's fit padding so each device gets the right tap-target
+    // size for its CSS viewport. iPhone Mini gets smaller cells than Pro Max,
     // desktop gets larger; all fill the available horizontal space.
     // Clamped [46, 120]: 46 = Apple-recommended minimum tap target;
     // 120 stops desktop / wide viewports going overboard.
+    //
+    // layoutPad MUST be the same number passed to cy.layout({ padding: ... })
+    // below — that padding is what eats the canvas around the fit. Shrunk on
+    // small canvases so phones don't lose half their width to padding.
     const canvasW  = (cy.width()  && cy.width()  > 100) ? cy.width()  : window.innerWidth;
     const canvasH  = (cy.height() && cy.height() > 100) ? cy.height() : window.innerHeight;
-    const fitPad   = Math.max(20, Math.min(60, Math.min(canvasW, canvasH) * 0.08));
-    const availW   = canvasW - 2 * fitPad;
+    const layoutPad = Math.max(20, Math.min(50, Math.min(canvasW, canvasH) * 0.06));
+    const availW   = canvasW - 2 * layoutPad;
     const nodeW    = Math.max(46, Math.min(120,
       Math.floor((availW - (cols - 1) * gapX) / cols)
     ));
@@ -2433,7 +2437,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       animate: true,
       animationDuration: 400,
       fit: true,
-      padding: 50,
+      padding: layoutPad,                /* A52c: was hardcoded 50 — now matches the nodeW math above */
     }).run();
   }
 
