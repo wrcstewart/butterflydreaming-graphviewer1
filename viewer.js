@@ -2282,16 +2282,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const count    = parts.length;
     const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
-    // +15% width and height vs the previous (40/70/640) values so finger taps
-    // land reliably on iPhone-class viewports (A52). Aspect ratio (0.57) keeps
-    // the depth-bump proportional to the width-bump automatically.
-    const nodeW    = Math.max(46, Math.min(81, Math.round(736 / cols)));
-    const nodeH    = Math.round(nodeW * 0.57);
-    const fontSize = nodeW >= 60 ? 12 : nodeW >= 50 ? 11 : 10;
     const gapX     = 10;
     const gapY     = 10;
     const originX  = 50;
     const clusterX = 0;
+    // A52b: adaptive sizing — make the grid fill the available canvas width
+    // after cy.fit's padding so each device gets the right tap-target size
+    // for its CSS viewport. iPhone Mini gets smaller cells than Pro Max,
+    // desktop gets larger; all fill the available horizontal space.
+    // Clamped [46, 120]: 46 = Apple-recommended minimum tap target;
+    // 120 stops desktop / wide viewports going overboard.
+    const canvasW  = (cy.width()  && cy.width()  > 100) ? cy.width()  : window.innerWidth;
+    const canvasH  = (cy.height() && cy.height() > 100) ? cy.height() : window.innerHeight;
+    const fitPad   = Math.max(20, Math.min(60, Math.min(canvasW, canvasH) * 0.08));
+    const availW   = canvasW - 2 * fitPad;
+    const nodeW    = Math.max(46, Math.min(120,
+      Math.floor((availW - (cols - 1) * gapX) / cols)
+    ));
+    const nodeH    = Math.round(nodeW * 0.57);
+    const fontSize = nodeW >= 60 ? 12 : nodeW >= 50 ? 11 : 10;
     const headerY  = 30;
 
     // Edit mode: text nodes 50% of base size, doubled columns, grid at bottom
