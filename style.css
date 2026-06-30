@@ -145,13 +145,19 @@ html, body {
 
 #chat-panel {
   display: none;
-  width: 100%;                          /* A50g — full width, no longer 40% on desktop */
+  width: 40%;                           /* A51e — matches #default-panel so the panel width
+                                           is constant whether chat-mode is on or off */
   height: 33dvh;
   flex-shrink: 0;
+  align-self: center;
   background: #3d2e00;                  /* dark amber — pairs with #action-bar (A50k) */
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
+}
+
+@media (max-width: 767px) {
+  #chat-panel { width: 100%; }
 }
 
 #chat-panel.active {
