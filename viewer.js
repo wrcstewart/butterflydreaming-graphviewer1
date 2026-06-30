@@ -4,7 +4,7 @@ const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
 // Vertical top of main graph canvas — tooltips must not appear above this line
-const BARS_BOTTOM = 130; // title(~21) + bc-spacer(50) + cy-buddy(23) + gap(10) + cy-you(23) — help-bar removed A50, breadcrumbs 36→23 A49
+const BARS_BOTTOM = 80;  // title(~21) + bc-spacer(50) + a few px — breadcrumbs moved to bottom in A51; cy.top is now set dynamically and is the real ceiling for tooltips
 
 const isTouchDevice = navigator.maxTouchPoints > 0;
 let mediaFilesList = [];  // populated via WebSocket on connect

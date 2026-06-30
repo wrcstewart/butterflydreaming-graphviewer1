@@ -34,12 +34,14 @@ html, body {
 }
 
 #cy-buddy {
-  width: 100%;
+  position: fixed;                       /* A51 — anchored at bottom, above #cy-you and the media-bar */
+  left: 0;
+  right: 0;
+  bottom: 63px;                          /* clears #cy-you (bottom: 30px, 23px tall) + 10px gap */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
-  flex-shrink: 0;
   background: #001f4d;
-  margin-bottom: 10px;
   cursor: url('cursor-wings.svg') 16 16, auto;
+  z-index: 5;                            /* above the cy canvas, below fixed top controls */
 }
 
 #pair-control {
@@ -115,11 +117,14 @@ html, body {
 
 
 #cy-you {
-  width: 100%;
+  position: fixed;                       /* A51 — anchored at bottom, just above the media-bar slot */
+  left: 0;
+  right: 0;
+  bottom: 30px;                          /* clears #media-bar (bottom: 2px, ~26px tall) with ~2px gap */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
-  flex-shrink: 0;
   background: #5a5000;                  /* brighter yellow — matches local card head */
   cursor: url('cursor-wings.svg') 16 16, auto;
+  z-index: 5;
 }
 
 #cy {
@@ -127,7 +132,7 @@ html, body {
   left: 0;
   right: 0;
   top: 158px;   /* set precisely by JS; fallback matches BARS_BOTTOM */
-  bottom: 0;                            /* dev-panel moved to top in A50d; bottom is just the media-bar overlaying when active */
+  bottom: 90px;                         /* clears bottom-stack: cy-buddy(63+23=86) + 4px gap (A51) */
   z-index: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
