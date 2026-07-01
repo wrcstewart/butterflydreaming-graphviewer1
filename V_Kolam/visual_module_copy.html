@@ -1,0 +1,801 @@
+<!-- ButterflyDreaming Visual Module — visual_module.html — BD Protocol v0.1 -->
+<!-- Sync check: verified visual_module.html <-> GitHub round-trip (2026-07-01). -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Visual Module</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0a0a0f;
+      color: #e8e8e0;
+      font-family: Georgia, 'Times New Roman', serif;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1.4rem;
+      min-height: auto;
+    }
+
+    #status {
+      font-size: 0.85rem;
+      font-style: italic;
+      color: #9e9e90;
+      letter-spacing: 0.04em;
+      min-height: 1.4rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      padding: 0.45rem 1.1rem;
+      text-transform: uppercase;
+    }
+
+    button:hover {
+      background: #1a2a28;
+    }
+
+    button:active {
+      background: #243f3b;
+    }
+
+    /* Copy layout — Step 2: canvas left, narrow control strip right (~20% width) */
+    /* Step 3: canvas column hugs the canvas so the strip sits ~10px from it */
+    .module-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 660px) 170px;
+      gap: 10px;
+      align-items: stretch;
+      justify-content: start;
+    }
+
+    .canvas-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 660px;
+    }
+
+    /* Narrow vertical control strip — dropdowns + spinners stacked */
+    .control-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      background: rgba(15, 15, 24, 0.75);
+      border: 1px solid rgba(74, 155, 142, 0.2);
+      padding: 0.7rem 0.6rem;
+      border-radius: 0.5rem;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .control-row label {
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #4a9b8e;
+    }
+
+    .control-panel input[type='number'],
+    .control-panel select {
+      width: 100%;
+      background: #0f0f18;
+      color: #e8e8e0;
+      border: 1px solid #2a2a3a;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.72rem;
+      padding: 0.22rem 0.3rem;
+      accent-color: #4a9b8e;
+      outline: none;
+    }
+
+    .control-panel input[type='number']:focus,
+    .control-panel select:focus {
+      border-color: #4a9b8e;
+    }
+
+    .slider-value {
+      font-size: 0.62rem;
+      color: #9e9e90;
+      text-align: right;
+    }
+
+    canvas {
+      border: 1px solid #4a9b8e;
+      border-opacity: 0.3;
+      display: block;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="status">Ready</div>
+
+  <div class="module-layout">
+
+  <div class="canvas-wrapper">
+    <canvas id="kolam-canvas"></canvas>
+  </div>
+
+  <div class="control-panel">
+    <div class="control-row">
+      <label for="symmetry-select">Symmetry</label>
+      <select id="symmetry-select">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+        <option value="12">12</option>
+        <option value="16">16</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label for="depth-select">Depth</label>
+      <select id="depth-select">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label for="step-slider">Step</label>
+      <input id="step-slider" type="number" min="10" max="200" step="1" value="40">
+    </div>
+
+    <div class="control-row">
+      <label for="angle-slider">Angle</label>
+      <input id="angle-slider" type="number" min="5" max="90" step="1" value="45">
+    </div>
+
+    <div class="control-row">
+      <label for="angle-minutes-slider">Angle Fine</label>
+      <input id="angle-minutes-slider" type="number" min="0" max="59" step="1" value="0">
+    </div>
+
+    <!-- Angle Very Fine (seconds) removed from UI; hidden input retained so the
+         angle-drift automation can still accumulate seconds of arc. -->
+    <input id="angle-seconds-slider" type="hidden" value="0">
+
+    <div class="control-row">
+      <label for="angle-drift-slider">Angle Drift</label>
+      <input id="angle-drift-slider" type="number" min="0" max="10" step="1" value="0">
+    </div>
+
+    <div class="control-row">
+      <label for="colour-speed-slider">Colour Speed</label>
+      <input id="colour-speed-slider" type="number" min="-2" max="4" step="1" value="2">
+      <span id="colour-speed-value" class="slider-value">4.0x</span>
+    </div>
+
+    <div class="control-row">
+      <label for="weight-slider">Line Weight</label>
+      <input id="weight-slider" type="number" min="0.5" max="5" step="0.1" value="1.5">
+    </div>
+
+    <div class="control-row">
+      <label for="saturation-slider">Saturation</label>
+      <input id="saturation-slider" type="number" min="0" max="100" step="1" value="100">
+    </div>
+
+    <div class="control-row">
+      <label for="lightness-slider">Lightness</label>
+      <input id="lightness-slider" type="number" min="0" max="100" step="1" value="65">
+    </div>
+
+  </div>
+
+  </div>
+
+  <!-- lindenmayer library for L-system rewriting -->
+  <script src="https://cdn.jsdelivr.net/npm/lindenmayer/dist/lindenmayer.browser.js"></script>
+
+  <script>
+    'use strict';
+
+    // ── Element refs ──────────────────────────────────────────────────────────
+    const statusEl       = document.getElementById('status');
+    const symmetrySelect = document.getElementById('symmetry-select');
+    const depthSelect    = document.getElementById('depth-select');
+    const stepSlider     = document.getElementById('step-slider');
+    const angleSlider    = document.getElementById('angle-slider');
+    const angleMinutesSlider = document.getElementById('angle-minutes-slider');
+    const angleSecondsSlider = document.getElementById('angle-seconds-slider');
+    const angleDriftSlider  = document.getElementById('angle-drift-slider');
+    const colourSpeedSlider = document.getElementById('colour-speed-slider');
+    const weightSlider   = document.getElementById('weight-slider');
+    const saturationSlider = document.getElementById('saturation-slider');
+    const lightnessSlider  = document.getElementById('lightness-slider');
+    // Spinner controls show their own value; only colour speed needs a separate
+    // "×" multiplier readout beside its exponent spinner.
+    const colourSpeedValue = document.getElementById('colour-speed-value');
+    const canvas         = document.getElementById('kolam-canvas');
+    const ctx            = canvas.getContext('2d');
+    const canvasWrapper  = document.querySelector('.canvas-wrapper');
+
+    function updateCanvasSize() {
+      const width = canvasWrapper.clientWidth;
+      const size = Math.floor(width);
+      if (size > 0) {
+        canvas.width = size;
+        canvas.height = size;
+      }
+    }
+
+    // ── Module state ──────────────────────────────────────────────────────────
+    let storedText    = ''; // full node text, kept current by render()
+    let lastError     = null;
+    let driftInterval = null; // setInterval handle for angle drift automation
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const setStatus = (msg) => { statusEl.textContent = msg; };
+
+    const postToParent = (message) => {
+      window.parent.postMessage(message, '*');
+    };
+
+    // ── %%bd_ Parser ──────────────────────────────────────────────────────────
+    // Two-state machine: text state and bracket state.
+    // Returns object of directive name/value pairs.
+    // Multi-line directives with [ ] have their raw text (including newlines) as value.
+    function parseBD(text) {
+      const directives = {};
+      const lines = text.split('\n');
+      let state = 'text';
+      let currentDirective = null;
+      let currentLines = [];
+
+      for (const line of lines) {
+        if (state === 'text') {
+          if (line.startsWith('%%bd_')) {
+            const spaceIdx = line.indexOf(' ');
+            if (spaceIdx === -1) continue;
+            const name = line.slice(5, spaceIdx);
+            const value = line.slice(spaceIdx + 1).trim();
+            if (value === '[') {
+              currentDirective = name;
+              currentLines = [];
+              state = 'bracket';
+            } else {
+              directives[name] = value;
+            }
+          }
+        } else if (state === 'bracket') {
+          if (line.trim() === '%%bd_]') {
+            directives[currentDirective] = currentLines.join('\n');
+            state = 'text';
+          } else {
+            currentLines.push(line);
+          }
+        }
+      }
+      return directives;
+    }
+
+    // ── Score Parser ──────────────────────────────────────────────────────────
+    // Extract axiom and production rules from %%bd_score content.
+    function parseScore(scoreText) {
+      const result = { axiom: '', productions: {} };
+      for (const line of scoreText.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        if (trimmed.startsWith('axiom:')) {
+          result.axiom = trimmed.slice(6).trim();
+        } else {
+          const colonIdx = trimmed.indexOf(':');
+          if (colonIdx !== -1) {
+            const symbol = trimmed.slice(0, colonIdx).trim();
+            const replacement = trimmed.slice(colonIdx + 1).trim();
+            result.productions[symbol] = replacement;
+          }
+        }
+      }
+      return result;
+    }
+
+    function safeParseNumber(value, fallback) {
+      const n = parseFloat(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function safeParseInt(value, fallback) {
+      const n = parseInt(value, 10);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function formatDirectiveNumber(value) {
+      if (!Number.isFinite(value)) return String(value);
+      const normalized = Math.round(value * 100) / 100;
+      return normalized.toString();
+    }
+
+    function setControlValues(directives) {
+      if (!symmetrySelect) return;
+      const symmetryValue = safeParseInt(directives.symmetry, 8);
+      symmetrySelect.value = [1, 2, 3, 4, 6, 8, 10, 12, 16].includes(symmetryValue)
+        ? String(symmetryValue)
+        : '8';
+      const depthValue = Math.min(Math.max(safeParseInt(directives.depth, 4), 1), 5);
+      depthSelect.value = String(depthValue);
+      stepSlider.value = String(Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 200));
+      angleSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90));
+      angleMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_minutes, 0), 0), 59));
+      angleSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_seconds, 0), 0), 59));
+      angleDriftSlider.value   = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 10));
+      manageDriftInterval();
+      const colourSpeedValueParsed = Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16);
+      const colourSpeedExponent = Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -2), 4);
+      colourSpeedSlider.value = String(colourSpeedExponent);
+      weightSlider.value = String(Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5));
+      saturationSlider.value = String(Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100));
+      lightnessSlider.value = String(Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100));
+
+      // Update value displays
+      updateValueDisplays();
+    }
+
+    function updateValueDisplays() {
+      // Number spinners reflect their own .value, so only the colour-speed
+      // multiplier readout needs updating here.
+      colourSpeedValue.textContent = `${(2 ** Number(colourSpeedSlider.value)).toFixed(1)}x`;
+    }
+
+    function setDirectiveValue(nodeText, name, value) {
+      const lines = nodeText.split('\n');
+      const directiveName = `%%bd_${name}`;
+      let replaced = false;
+      const updated = lines.map((line) => {
+        if (line.startsWith(`${directiveName} `)) {
+          replaced = true;
+          return `${directiveName} ${value}`;
+        }
+        return line;
+      });
+      if (!replaced) {
+        const insertAt = updated.findIndex((line) => line.trim() === '%%bd_score [');
+        const index = insertAt === -1 ? updated.length : insertAt;
+        updated.splice(index, 0, `${directiveName} ${value}`);
+      }
+      return updated.join('\n');
+    }
+
+    function applyControlDirectives(nodeText) {
+      let text = nodeText;
+      const controlValues = {
+        symmetry: symmetrySelect.value,
+        depth: depthSelect.value,
+        step: stepSlider.value,
+        angle: angleSlider.value,
+        angle_minutes: angleMinutesSlider.value,
+        angle_seconds: angleSecondsSlider.value,
+        angle_drift:   angleDriftSlider.value,
+        colour_speed: formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
+        weight: weightSlider.value,
+        saturation: saturationSlider.value,
+        lightness: lightnessSlider.value
+      };
+      for (const [name, value] of Object.entries(controlValues)) {
+        text = setDirectiveValue(text, name, value);
+      }
+      return text;
+    }
+
+    function handleControlChange() {
+      updateValueDisplays();
+      if (!storedText) return;
+      const updatedText = applyControlDirectives(storedText);
+      render(updatedText);
+    }
+
+    const controlInputs = [
+      symmetrySelect,
+      depthSelect,
+      stepSlider,
+      angleSlider,
+      angleMinutesSlider,
+      angleSecondsSlider,
+      angleDriftSlider,
+      colourSpeedSlider,
+      weightSlider,
+      saturationSlider,
+      lightnessSlider
+    ];
+
+    controlInputs.forEach((input) => {
+      input.addEventListener('input', handleControlChange);
+    });
+
+    // ── Angle Drift Automation ────────────────────────────────────────────────
+    // Advance angle by drift (seconds of arc) on a depth-dependent interval,
+    // propagating carry through seconds → minutes → degrees. Uses setTimeout
+    // so the interval can change dynamically between ticks.
+
+    // Depth-dependent tick interval (Amendment 17)
+    function driftIntervalMs() {
+      const depth = parseInt(depthSelect.value, 10);
+      const table = { 1: 100, 2: 100, 3: 100, 4: 200, 5: 1000 };
+      return table[depth] ?? 200;
+    }
+
+    function manageDriftInterval() {
+      const drift = parseInt(angleDriftSlider.value, 10);
+      if (drift === 0) {
+        if (driftInterval !== null) {
+          clearTimeout(driftInterval);
+          driftInterval = null;
+        }
+      } else if (driftInterval === null) {
+        driftInterval = setTimeout(driftTick, driftIntervalMs());
+      }
+    }
+
+    function driftTick() {
+      // Do NOT null driftInterval here — manageDriftInterval (called via render →
+      // setControlValues) checks it to avoid double-scheduling. We overwrite the
+      // stale handle at the end once we know whether to continue.
+      const drift = parseInt(angleDriftSlider.value, 10);
+      if (drift === 0) {
+        driftInterval = null; // stopped — allow manageDriftInterval to restart later
+        return;
+      }
+
+      let secs = parseInt(angleSecondsSlider.value, 10) + drift;
+      let mins = parseInt(angleMinutesSlider.value, 10);
+      let degs = parseInt(angleSlider.value, 10);
+
+      // Propagate carry upward
+      mins += Math.floor(secs / 60);
+      secs  = secs % 60;
+
+      degs += Math.floor(mins / 60);
+      mins  = mins % 60;
+
+      degs  = ((degs % 360) + 360) % 360;
+
+      angleSlider.value        = String(degs);
+      angleMinutesSlider.value = String(mins);
+      angleSecondsSlider.value = String(secs);
+
+      updateValueDisplays();
+
+      if (storedText) {
+        const updatedText = applyControlDirectives(storedText);
+        render(updatedText);
+      }
+
+      // Overwrite the now-fired (stale) handle with the next tick
+      driftInterval = setTimeout(driftTick, driftIntervalMs());
+    }
+
+    // Manage timeout whenever the drift slider moves
+    angleDriftSlider.addEventListener('input', manageDriftInterval);
+
+    // ── Turtle State ──────────────────────────────────────────────────────────
+    function createTurtleState(x, y) {
+      return {
+        x: x,
+        y: y,
+        angle: 0,
+        stack: []
+      };
+    }
+
+    // ── Curved Line Drawing ───────────────────────────────────────────────────
+    // Draw a quadratic bezier curve for a turtle forward step.
+    // Control point offset perpendicular to direction.
+    function drawCurvedStep(ctx, state, step) {
+      const rad = (state.angle * Math.PI) / 180;
+      const nextX = state.x + Math.cos(rad) * step;
+      const nextY = state.y + Math.sin(rad) * step;
+
+      // Control point perpendicular to direction
+      const perpRad = rad + Math.PI / 2;
+      const cpOffset = step * 0.3;
+      const cpx = (state.x + nextX) / 2 + Math.cos(perpRad) * cpOffset;
+      const cpy = (state.y + nextY) / 2 + Math.sin(perpRad) * cpOffset;
+
+      ctx.quadraticCurveTo(cpx, cpy, nextX, nextY);
+      state.x = nextX;
+      state.y = nextY;
+    }
+
+    // ── Turtle Path Renderer ─────────────────────────────────────────────────
+    // Draw the L-system path to an offscreen context, optionally tracking hue.
+    function renderTurtlePath(lsystemResult, params, ctx) {
+      const state = createTurtleState(canvas.width / 2, canvas.height / 2);
+      const startX = state.x;
+      const startY = state.y;
+      const angleTracked = params.stroke.toLowerCase() === 'angle';
+      const baseStroke = angleTracked ? null : params.stroke;
+
+      ctx.lineWidth = params.weight;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      for (const symbol of lsystemResult) {
+        switch (symbol) {
+          case 'F': {
+            const rad = (state.angle * Math.PI) / 180;
+            const nextX = state.x + Math.cos(rad) * params.effectiveStep;
+            const nextY = state.y + Math.sin(rad) * params.effectiveStep;
+            const perpRad = rad + Math.PI / 2;
+            const cpOffset = params.effectiveStep * 0.3;
+            const cpx = (state.x + nextX) / 2 + Math.cos(perpRad) * cpOffset;
+            const cpy = (state.y + nextY) / 2 + Math.sin(perpRad) * cpOffset;
+
+            ctx.beginPath();
+            ctx.moveTo(state.x, state.y);
+            ctx.quadraticCurveTo(cpx, cpy, nextX, nextY);
+            if (angleTracked) {
+              const hue = (((state.angle % (360 * params.colourSpeed)) + (360 * params.colourSpeed)) % (360 * params.colourSpeed)) / params.colourSpeed;
+              ctx.strokeStyle = `hsl(${hue}, ${params.saturation}%, ${params.lightness}%)`;
+            } else {
+              ctx.strokeStyle = baseStroke;
+            }
+            ctx.stroke();
+
+            state.x = nextX;
+            state.y = nextY;
+            break;
+          }
+
+          case 'f': {
+            const rad = (state.angle * Math.PI) / 180;
+            state.x += Math.cos(rad) * params.effectiveStep;
+            state.y += Math.sin(rad) * params.effectiveStep;
+            break;
+          }
+
+          case '+':
+            state.angle += params.effectiveAngle;
+            break;
+
+          case '-':
+            state.angle -= params.effectiveAngle;
+            break;
+
+          case '[':
+            state.stack.push({ x: state.x, y: state.y, angle: state.angle });
+            break;
+
+          case ']':
+            if (state.stack.length > 0) {
+              const saved = state.stack.pop();
+              state.x = saved.x;
+              state.y = saved.y;
+              state.angle = saved.angle;
+            }
+            break;
+
+          case '|':
+            state.angle += 180;
+            break;
+
+          default:
+            break;
+        }
+      }
+
+      return {
+        startX,
+        startY,
+        endX: state.x,
+        endY: state.y
+      };
+    }
+
+    // ── Symmetry Wrapper ──────────────────────────────────────────────────────
+    // Stamp the offscreen canvas n times with rotational symmetry.
+    function applySymmetry(offscreen, symmetry) {
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const sectorAngle = (2 * Math.PI) / symmetry;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      for (let i = 0; i < symmetry; i++) {
+        ctx.rotate(sectorAngle);
+        ctx.drawImage(offscreen, -cx, -cy);
+      }
+      ctx.restore();
+    }
+
+    // ── Closure Checker ───────────────────────────────────────────────────────
+    // Check if the path closes (end position ≈ start position).
+    function checkClosure(startX, startY, endX, endY, step) {
+      const dist = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+      return dist < step / 2;
+    }
+
+    // ── Render Function ───────────────────────────────────────────────────────
+    // Called on BD_INIT. Parses directives, runs L-system, renders kolam.
+    function render(nodeText) {
+      try {
+        setStatus('Rendering…');
+        storedText = nodeText;
+
+        if (typeof nodeText !== 'string') {
+          console.error('visual_module: render() expected text string, got:', nodeText);
+          throw new Error('No valid text provided in BD_INIT payload');
+        }
+
+        // Parse directives
+        const directives = parseBD(nodeText);
+
+        // Extract and parse score block
+        const scoreRaw = directives.score;
+        if (!scoreRaw) {
+          throw new Error('No score found in node text');
+        }
+
+        const score = parseScore(scoreRaw);
+        if (!score.axiom) {
+          throw new Error('No axiom found in score');
+        }
+
+        // Apply defaults for any missing rendering parameters
+        const params = {
+          symmetry:   safeParseInt(directives.symmetry, 8),
+          depth:      Math.min(Math.max(safeParseInt(directives.depth, 4), 1), 5),
+          step:       Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 200),
+          angle:      Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90),
+          stroke:     directives.stroke                  || '#4a9b8e',
+          background: directives.background             || '#0a0a0f',
+          weight:     Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5),
+          saturation: Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100),
+          lightness:  Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100),
+          colourSpeed: Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16)
+        };
+
+        // Calculate effective angle including fine (minutes) and very fine (seconds) adjustments
+        params.effectiveAngle = params.angle + (safeParseNumber(directives.angle_minutes, 0) / 60) + (safeParseNumber(directives.angle_seconds, 0) / 3600);
+        // Ensure colourSpeed is valid for hue cycling
+        if (!Number.isFinite(params.colourSpeed) || params.colourSpeed <= 0) {
+          params.colourSpeed = 4;
+        }
+
+        // Cap depth at 5
+        if (params.depth > 5) {
+          params.depth = 5;
+          setStatus('Rendering… (depth capped at 5)');
+        }
+
+        updateCanvasSize();
+        // Clear canvas with background
+        ctx.fillStyle = params.background;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Add subtle border
+        ctx.strokeStyle = '#4a9b8e';
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+
+        // Run L-system rewriting
+        const lsystem = new LSystem({
+          axiom: score.axiom,
+          productions: score.productions
+        });
+        lsystem.iterate(params.depth);
+        const lsystemResult = lsystem.getString();
+
+        if (!lsystemResult) {
+          throw new Error('L-system produced no output');
+        }
+
+        // Compute depth-scaled step size so the path stays within canvas bounds.
+        const effectiveStep = params.step / Math.pow(3, Math.max(0, params.depth - 1));
+        params.effectiveStep = effectiveStep;
+
+        setControlValues(directives);
+
+        const offscreen = document.createElement('canvas');
+        offscreen.width = canvas.width;
+        offscreen.height = canvas.height;
+        const octx = offscreen.getContext('2d');
+
+        const turtle = renderTurtlePath(lsystemResult, params, octx);
+
+        // Apply symmetry
+        applySymmetry(offscreen, params.symmetry);
+
+        // Check closure using effective step size.
+        const isClosed = checkClosure(turtle.startX, turtle.startY, turtle.endX, turtle.endY, effectiveStep);
+
+        // Update status
+        if (isClosed) {
+          setStatus('Ready');
+        } else {
+          setStatus('Rendered — note: path does not close (kolam constraint not satisfied)');
+        }
+
+        lastError = null;
+
+      } catch (err) {
+        lastError = err.message;
+        setStatus(`Error: ${err.message}`);
+        postToParent({ type: 'BD_ERROR', payload: { message: err.message } });
+        console.error('render error:', err);
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      updateCanvasSize();
+      if (storedText) {
+        render(storedText);
+      }
+    });
+
+    // ── Message Handlers ──────────────────────────────────────────────────────
+    window.addEventListener('message', (event) => {
+      try {
+        const { type, payload } = event.data;
+        switch (type) {
+          case 'BD_INIT': {
+            const rawText = payload && payload.text;
+            const nodeText = typeof rawText === 'string' ? rawText : rawText == null ? '' : String(rawText);
+            render(nodeText);
+            break;
+          }
+
+          case 'BD_STOP':
+            if (driftInterval !== null) { clearTimeout(driftInterval); driftInterval = null; }
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            setStatus('Stopped');
+            break;
+
+          case 'BD_REQUEST_UPDATE':
+            postToParent({ type: 'BD_UPDATE', payload: { text: storedText } });
+            break;
+
+          default:
+            // Ignore unrecognised types
+            break;
+        }
+      } catch (err) {
+        console.error('visual_module: error handling postMessage', err);
+      }
+    });
+
+    // ── Signal module loaded ──────────────────────────────────────────────────
+    postToParent({ type: 'BD_READY' });
+  </script>
+
+</body>
+</html>

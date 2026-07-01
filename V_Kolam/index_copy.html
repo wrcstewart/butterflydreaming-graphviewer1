@@ -1,0 +1,368 @@
+<!-- ButterflyDreaming Visual Module — index.html — BD Protocol v0.1 -->
+<!-- Sync check: verified index.html <-> GitHub round-trip (2026-07-01). -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BUTTERFLY DREAMING - SIMPLE EXAMPLE OF TEXT TO MEDIA (VISUAL KOLAM)</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0a0a0f;
+      color: #e8e8e0;
+      font-family: Georgia, 'Times New Roman', serif;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      font-weight: normal;
+      color: #4a9b8e;
+      letter-spacing: 0.08em;
+      margin-bottom: 1.8rem;
+      text-transform: uppercase;
+    }
+
+    /* Copy layout — Step 1: stack controls on top, player below (was 2-col) */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    label {
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #4a9b8e;
+    }
+
+    textarea {
+      background: #0f0f18;
+      color: #e8e8e0;
+      border: 1px solid #2a2a3a;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      padding: 0.75rem;
+      resize: vertical;
+      width: 100%;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: #4a9b8e;
+    }
+
+    #ls-input {
+      height: 410px;
+    }
+
+    button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      padding: 0.5rem 1.2rem;
+      text-transform: uppercase;
+      width: 100%;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn-row button {
+      width: auto;
+      flex: 1;
+    }
+
+
+    button:hover {
+      background: #1a2a28;
+    }
+
+    button:active {
+      background: #243f3b;
+    }
+
+    .status {
+      border: 1px solid #2a2a3a;
+      color: #9e9e90;
+      font-size: 0.8rem;
+      font-style: italic;
+      min-height: 2.2rem;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .panel-label {
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #4a9b8e;
+    }
+
+    #module-container {
+      border: 1px solid #2a2a3a;
+      height: 720px;
+      width: 100%;
+    }
+
+    #module-container iframe {
+      border: none;
+      display: block;
+      height: 100%;
+      width: 100%;
+    }
+
+    .intro {
+      margin-bottom: 1.8rem;
+      opacity: 0.6;
+    }
+
+    .intro-title {
+      color: #4a9b8e;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+      text-transform: uppercase;
+    }
+
+    .intro p {
+      font-size: 0.78rem;
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+    }
+
+    .intro-rule {
+      border: none;
+      border-top: 1px solid #2a2a3a;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>BUTTERFLY DREAMING - SIMPLE EXAMPLE OF TEXT TO MEDIA (VISUAL KOLAM)</h1>
+
+  <section class="intro">
+    <p class="intro-title">Simple Example of Text to Media — ButterflyDreaming Platform</p>
+    <p>This page demonstrates how a text node from the ButterflyDreaming graph can drive a visual media module. The L-system rules and %%bd_ directives shown below would be found in a graph node, discovered and edited collaboratively by two anonymous users during a dyadic encounter.</p>
+    <p>The %%bd_ directives are a shared platform language — each directive is available to all media modules, which interpret them in their own way or ignore them silently. A directive that controls reverb in the music module might influence colour or motion in a visual module.</p>
+    <p>The kolam tradition of Tamil Nadu draws closed loops around a grid of dots at the threshold of the home at dawn. This module renders kolam using L-system rewriting — the same mathematical framework as plant growth and fractal geometry. In ButterflyDreaming, the closed-loop constraint of kolam — every path returning to its origin — resonates with the aspiration of the dyadic encounter toward resolution and return.</p>
+    <hr class="intro-rule">
+  </section>
+
+  <div class="layout">
+
+    <!-- Left column: controls -->
+    <div class="panel">
+      <label for="ls-input">Extended L-System Notation</label>
+      <textarea id="ls-input" spellcheck="false"></textarea>
+
+      <button id="send-btn">Send to Player</button>
+      <button id="receive-btn">Receive from Player</button>
+
+      <div class="btn-row">
+        <button id="copy-btn">Copy Script</button>
+        <button id="copy-link-btn">Copy Link</button>
+      </div>
+
+      <label>Status</label>
+      <div class="status" id="status-display">Press Send to Player to load the module.</div>
+    </div>
+
+    <!-- Right column: player container — iframe injected on first use -->
+    <div class="panel">
+      <div class="panel-label">Player</div>
+      <div id="module-container"></div>
+    </div>
+
+  </div>
+
+  <script>
+    'use strict';
+
+    // ── Element refs ──────────────────────────────────────────────────────────
+    const textarea      = document.getElementById('ls-input');
+    const sendBtn       = document.getElementById('send-btn');
+    const receiveBtn    = document.getElementById('receive-btn');
+    const copyBtn       = document.getElementById('copy-btn');
+    const copyLinkBtn   = document.getElementById('copy-link-btn');
+    const statusDisplay = document.getElementById('status-display');
+    const container     = document.getElementById('module-container');
+
+    // ── Module iframe state (lazy loading) ────────────────────────────────────
+    let moduleFrame  = null;  // iframe element, null until first use
+    let moduleReady  = false; // true once BD_READY has been received
+    let pendingText  = null;  // BD_INIT text queued while module is loading
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const setStatus = (text) => { statusDisplay.textContent = text; };
+
+    // Post a message to the visual module iframe.
+    // Origin is '*' during development.
+    // TODO: tighten to 'https://butterflydreaming.info' in production.
+    const postToModule = (message) => {
+      moduleFrame.contentWindow.postMessage(message, '*');
+    };
+
+    // ── Initialize module on page load ───────────────────────────────────────
+    function initializeModule() {
+      if (!moduleFrame) {
+        pendingText = textarea.value;
+        moduleFrame = document.createElement('iframe');
+        moduleFrame.src   = 'visual_module_copy.html';
+        moduleFrame.title = 'ButterflyDreaming Visual Module';
+        container.appendChild(moduleFrame);
+        setStatus('Loading module…');
+      }
+    }
+
+    // ── Default script ────────────────────────────────────────────────────────
+    const DEFAULT_SCRIPT = `%%bd_module visual_module.html
+%%bd_symmetry 8
+%%bd_depth 3
+%%bd_step 40
+%%bd_angle 45
+%%bd_angle_minutes 0
+%%bd_angle_seconds 0
+%%bd_angle_drift 3
+%%bd_colour_speed 4
+%%bd_stroke angle
+%%bd_saturation 100
+%%bd_lightness 65
+%%bd_background #0a0a0f
+%%bd_weight 1.5
+%%bd_score [
+axiom: F+F+F+F+F+F+F+F
+F: F+F-F-F+F+F+F-F
+%%bd_]`;
+
+    // ── Populate textarea then autoload (Amendment 12) ────────────────────────
+    // 1. Check for ?script= URL parameter
+    // 2. If found — decode and use it; if not — use default script
+    // 3. Autoload fires using whatever is now in the textarea
+    (function populateAndAutoload() {
+      const params = new URLSearchParams(window.location.search);
+      const scriptParam = params.get('script');
+      if (scriptParam) {
+        try {
+          textarea.value = decodeURIComponent(escape(atob(scriptParam)));
+        } catch (e) {
+          console.warn('index: failed to decode ?script param', e);
+          textarea.value = DEFAULT_SCRIPT;
+        }
+      } else {
+        textarea.value = DEFAULT_SCRIPT;
+      }
+    })();
+
+    // Create iframe on page load and wait for BD_READY before sending initial score
+    window.addEventListener('load', () => {
+      initializeModule();
+    });
+
+    // ── Send to Player ────────────────────────────────────────────────────────
+    sendBtn.addEventListener('click', () => {
+      const text = textarea.value;
+
+      if (!moduleFrame) {
+        // First click (if page load hasn't created it): create the iframe
+        pendingText = text;
+        moduleFrame = document.createElement('iframe');
+        moduleFrame.src   = 'visual_module_copy.html';
+        moduleFrame.title = 'ButterflyDreaming Visual Module';
+        container.appendChild(moduleFrame);
+        setStatus('Loading module…');
+      } else if (moduleReady) {
+        postToModule({ type: 'BD_INIT', payload: { text } });
+      } else {
+        pendingText = text;
+      }
+    });
+
+    // ── Receive from Player button (Amendment 13) ────────────────────────────
+    receiveBtn.addEventListener('click', () => {
+      if (moduleFrame && moduleReady) {
+        postToModule({ type: 'BD_REQUEST_UPDATE' });
+      }
+    });
+
+    // ── Copy Script button (Amendment 11, 10.1) ──────────────────────────────
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const original = copyBtn.textContent;
+        copyBtn.textContent = 'Copied ✓';
+        setTimeout(() => { copyBtn.textContent = original; }, 1500);
+      });
+    });
+
+    // ── Copy Link button (Amendment 11, 10.2) ────────────────────────────────
+    copyLinkBtn.addEventListener('click', () => {
+      const encoded = btoa(unescape(encodeURIComponent(textarea.value)));
+      const url = `https://wrcstewart.github.io/butterflydreaming_visual_1/?script=${encoded}`;
+      navigator.clipboard.writeText(url).then(() => {
+        const original = copyLinkBtn.textContent;
+        copyLinkBtn.textContent = 'Link Copied ✓';
+        setTimeout(() => { copyLinkBtn.textContent = original; }, 1500);
+      });
+    });
+
+    // ── Listen for messages from the module ───────────────────────────────────
+    window.addEventListener('message', (event) => {
+      // Origin is '*' during development.
+      // TODO: tighten to 'https://butterflydreaming.info' in production.
+      try {
+        const { type, payload } = event.data;
+
+      switch (type) {
+          case 'BD_READY':
+            moduleReady = true;
+            setStatus('Module ready');
+            // Dispatch any init that was queued while the module was loading
+            if (pendingText !== null) {
+              postToModule({ type: 'BD_INIT', payload: { text: pendingText } });
+              pendingText = null;
+            }
+            break;
+
+          case 'BD_UPDATE':
+            textarea.value = payload.text;
+            setStatus('Received update from module');
+            break;
+
+          case 'BD_ERROR':
+            setStatus(`Error: ${payload.message}`);
+            break;
+
+          default:
+            // Ignore unrecognised types — other postMessage traffic may arrive
+            break;
+        }
+      } catch (err) {
+        console.error('index: error handling postMessage', err);
+      }
+    });
+  </script>
+
+</body>
+</html>

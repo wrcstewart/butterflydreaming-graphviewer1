@@ -1,0 +1,71 @@
+<!-- ButterflyDreaming Visual Module — index.html — A42 iframe wrapper -->
+<!-- Loaded by the graphviewer's #visual-iframe at /visual1/. Thin wrapper
+     around visual_module.html: relays bd_script_* postMessages between the
+     grandparent viewer and the inner module iframe. The reference
+     index_copy.html (harness with textarea) is preserved untouched. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Visual Module</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #0a0a0f;
+      overflow: hidden;
+    }
+    #module-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="module-frame"
+          src="visual_module.html"
+          title="ButterflyDreaming Visual Module">
+  </iframe>
+
+  <script>
+    'use strict';
+
+    // Two-way postMessage relay:
+    //   grandparent (viewer) ↔ this iframe (index.html) ↔ inner iframe (visual_module.html)
+    // We forward the A42 protocol types in both directions. Other message types
+    // are ignored so the relay doesn't accidentally loop or leak internal
+    // BD_READY / BD_INIT traffic between the layers.
+
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update']);
+    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update']);
+
+    const moduleFrame = document.getElementById('module-frame');
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      // Message from inner module iframe → forward up to viewer.
+      if (event.source === moduleFrame.contentWindow) {
+        if (RELAY_UP.has(data.type)) {
+          window.parent.postMessage(data, '*');
+        }
+        return;
+      }
+
+      // Message from grandparent viewer → forward down to inner module.
+      if (event.source === window.parent && RELAY_DOWN.has(data.type)) {
+        moduleFrame.contentWindow.postMessage(data, '*');
+      }
+    });
+  </script>
+</body>
+</html>

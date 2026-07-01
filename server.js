@@ -36,6 +36,20 @@ app.use(express.static('.', {
   }
 }));
 
+// A42 §42.2 — expose the V_Kolam visual module bundle at /visual1/.
+// The graphviewer's #visual-iframe (added in A42 §42.3) will use this URL.
+// Same no-cache treatment for HTML as the root static — otherwise iframe
+// edits get browser-cached and never surface.
+app.use('/visual1', express.static('./V_Kolam', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 const driver = neo4j.driver(
   'bolt://localhost:7687',
   neo4j.auth.basic('memgraph', 'memgraph')

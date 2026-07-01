@@ -3059,7 +3059,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard };
 
 }
 
@@ -3318,8 +3318,12 @@ async function init() {
     const refEl = document.getElementById('action-bar')
               || document.getElementById('default-panel')
               || document.getElementById('cy-you');
-    document.getElementById('cy').style.top =
-      Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+    const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+    document.getElementById('cy').style.top = topPx;
+    // A42 §42.3 — keep the visual-module iframe rect in sync with #cy so
+    // Nodes/Player toggle swaps between two identically-sized rectangles.
+    const iframeEl = document.getElementById('visual-iframe');
+    if (iframeEl) iframeEl.style.top = topPx;
   }
 
   // Init Cytoscape
@@ -3411,7 +3415,24 @@ async function init() {
       (chatModeActive && chatPanel.getBoundingClientRect().height > 0 ? chatPanel : null) ||
       document.getElementById('default-panel') ||
       document.getElementById('cy-you');
-    cyEl.style.top = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+    const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+    cyEl.style.top = topPx;
+    // A42 §42.3 — #visual-iframe shares #cy's rect exactly.
+    const iframeEl = document.getElementById('visual-iframe');
+    if (iframeEl) iframeEl.style.top = topPx;
+  }
+
+  // A42 §42.3 — Nodes/Player view switch. Called by the radio change handler
+  // and by toggleChatMode when chat closes (forces back to Nodes).
+  const visualIframe = document.getElementById('visual-iframe');
+  function setViewMode(mode) {
+    if (mode === 'player') {
+      cyEl.classList.add('hidden');
+      if (visualIframe) visualIframe.classList.add('active');
+    } else {
+      cyEl.classList.remove('hidden');
+      if (visualIframe) visualIframe.classList.remove('active');
+    }
   }
 
   function toggleChatMode() {
@@ -3427,11 +3448,32 @@ async function init() {
       if (wsNow && wsNow.readyState === WebSocket.OPEN) {
         wsNow.send(JSON.stringify({ type: 'enter_chat' }));
       }
+      // A42 §42.3 — enable Nodes/Player radios while chat is active.
+      document.querySelectorAll('#view-mode-toggle input[type="radio"]')
+        .forEach(r => { r.disabled = false; });
+      // A42 §42.6 — enable Copy Down. Copy Up remains disabled until Copy
+      // Down has been pressed (independent state; managed by that handler).
+      const cdBtn = document.getElementById('copy-down-btn');
+      if (cdBtn) cdBtn.disabled = false;
     } else {
       const wsNow = wsRef.current;
       if (wsNow && wsNow.readyState === WebSocket.OPEN) {
         wsNow.send(JSON.stringify({ type: 'leave_chat' }));
       }
+      // A42 §42.3 — chat closing: disable the toggle again and force back to
+      // Nodes so the graph is visible when the user isn't in chat.
+      const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
+      const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
+      if (nodesRadio)  { nodesRadio.checked  = true;  nodesRadio.disabled  = true; }
+      if (playerRadio) { playerRadio.checked = false; playerRadio.disabled = true; }
+      setViewMode('nodes');
+      // A42 §42.6 / §42.7 — chat closing: disable Copy Down + Copy Up. Copy
+      // Up resets to disabled too, so it must be re-earned by a Copy Down
+      // after the next chat open.
+      const cdBtn = document.getElementById('copy-down-btn');
+      const cuBtn = document.getElementById('copy-up-btn');
+      if (cdBtn) cdBtn.disabled = true;
+      if (cuBtn) cuBtn.disabled = true;
     }
     chatPanel.classList.toggle('active', chatModeActive);
     chatBtn.classList.toggle('active', chatModeActive);
@@ -3441,6 +3483,13 @@ async function init() {
       cy.fit(undefined, fitPadding(cy, 40));
     });
   }
+
+  // A42 §42.3 — Nodes/Player radio change handler.
+  document.querySelectorAll('#view-mode-toggle input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) setViewMode(radio.value);
+    });
+  });
 
   chatBtn.addEventListener('click', toggleChatMode);
 
@@ -3498,7 +3547,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -3513,6 +3562,65 @@ async function init() {
   // #cy top is pinned earlier — before cytoscape constructs — so init fits
   // the root correctly. No re-pin needed here; cy.resize on subsequent panel
   // toggles is handled by positionCyEl().
+
+  // A42 §42.6 / §42.7 — Copy Down (card → iframe) and Copy Up (iframe → card).
+  // Both are gated on chat being active (see toggleChatMode). Copy Up is also
+  // gated on a successful Copy Down having happened first (§42.7).
+  //
+  // "Focused card" per the answer to Q3: whichever local card's textarea has
+  // DOM focus; fallback = topLocalCard() (which excludes the hidden ghost
+  // via the top.hidden check).
+  {
+    const copyDownBtn = document.getElementById('copy-down-btn');
+    const copyUpBtn   = document.getElementById('copy-up-btn');
+    const iframeEl2   = document.getElementById('visual-iframe');
+
+    function getFocusedCardBody() {
+      const active = document.activeElement;
+      if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
+        return active;
+      }
+      const top = topLocalCard();
+      return (top && !top.hidden && top.body) ? top.body : null;
+    }
+
+    if (copyDownBtn) {
+      copyDownBtn.addEventListener('click', () => {
+        const body = getFocusedCardBody();
+        if (!body || !iframeEl2) return;
+        const script = body.value || '';
+        iframeEl2.contentWindow.postMessage(
+          { type: 'bd_script_update', script },
+          '*'
+        );
+        // §42.6 — enable Copy Up once a script has been sent.
+        if (copyUpBtn) copyUpBtn.disabled = false;
+      });
+    }
+
+    if (copyUpBtn) {
+      copyUpBtn.addEventListener('click', () => {
+        if (!iframeEl2) return;
+        iframeEl2.contentWindow.postMessage(
+          { type: 'bd_script_request' },
+          '*'
+        );
+      });
+    }
+
+    // §42.7 — inbound bd_script_response from the iframe writes into the
+    // currently focused local card, mirroring the semantics of Copy Down's
+    // destination. dispatchEvent('input') triggers updateSendBtn so the Send
+    // button's enable state re-evaluates after the write.
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'bd_script_response') return;
+      const body = getFocusedCardBody();
+      if (!body || typeof d.script !== 'string') return;
+      body.value = d.script;
+      body.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
 
   const userCountPanel = document.getElementById('user-count-panel');
 

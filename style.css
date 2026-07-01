@@ -398,6 +398,84 @@ html, body {
   display: inline-block;
 }
 
+/* A42 §42.6 / §42.7 — Copy Down (↓) and Copy Up (↑) buttons. Same visual
+   family as the other action-bar buttons. Both start disabled; JS enables
+   them per chat-active + first-Copy-Down rules. */
+#copy-down-btn,
+#copy-up-btn {
+  background: #1a1a2e;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: sans-serif;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+  min-width: 26px;
+}
+#copy-down-btn:hover:not(:disabled),
+#copy-up-btn:hover:not(:disabled) {
+  border-color: #aaa;
+  color: #fff;
+}
+#copy-down-btn:disabled,
+#copy-up-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A42 §42.3 — Nodes/Player radio toggle in the action bar. Sits at the far
+   right (margin-left: auto). Radios start disabled; JS clears the disabled
+   attribute when chat becomes active and restores it (plus forces back to
+   Nodes) when chat closes. Faded look while disabled makes the state clear
+   without needing a colour cue. */
+#view-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 8px;
+  color: #ccc;
+  font-family: sans-serif;
+  font-size: 11px;
+}
+#view-mode-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+#view-mode-toggle input[type="radio"] {
+  cursor: pointer;
+  margin: 0;
+}
+#view-mode-toggle input[type="radio"]:disabled,
+#view-mode-toggle input[type="radio"]:disabled + span,
+#view-mode-toggle:has(input:disabled) label {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A42 §42.3 — #visual-iframe occupies the same footprint as #cy. Hidden by
+   default; the .active class swaps it in and #cy.hidden hides the graph
+   canvas at the same time. JS keeps the top in sync with #cy via
+   positionCyEl(). */
+#visual-iframe {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 158px;                           /* set precisely by JS; fallback matches #cy */
+  bottom: 90px;                         /* matches #cy's bottom clearance */
+  z-index: 1;
+  border: 0;
+  background: #0a0a0f;
+  width: 100%;
+}
+#visual-iframe.active { display: block; }
+#cy.hidden { display: none; }
+
 #media-bar {
   display: none;
   position: fixed;

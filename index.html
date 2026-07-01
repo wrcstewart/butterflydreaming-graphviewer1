@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=103">
+  <link rel="stylesheet" href="style.css?v=105">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming Development</div>
@@ -25,10 +25,20 @@
   <div id="action-bar">
     <button id="default-save-btn" type="button" disabled>Save</button>
     <button id="chat-send-btn" type="button" disabled>Send</button>
+    <button id="copy-down-btn" type="button" title="Copy Down (card → module)" disabled>↓</button>
+    <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
     <span id="default-save-status"></span>
     <button id="chat-new-card-btn" type="button">New Card</button>
+    <span id="view-mode-toggle">
+      <label><input type="radio" name="view-mode" value="nodes" checked disabled> Nodes</label>
+      <label><input type="radio" name="view-mode" value="player" disabled> Player</label>
+    </span>
   </div>
   <div id="cy"></div>
+  <iframe id="visual-iframe"
+          src="/visual1/"
+          title="ButterflyDreaming Visual Module"
+          sandbox="allow-scripts allow-same-origin"></iframe>
   <div id="media-bar"></div>
   <div id="cluster-editor-bar" style="display:none">
     <div class="spinner-group">
@@ -93,6 +103,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script type="module" src="viewer.js?v=359"></script>
+  <script type="module" src="viewer.js?v=361"></script>
 </body>
 </html>
