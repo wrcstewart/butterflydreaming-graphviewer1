@@ -3319,11 +3319,19 @@ async function init() {
               || document.getElementById('default-panel')
               || document.getElementById('cy-you');
     const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
-    document.getElementById('cy').style.top = topPx;
-    // A42 §42.3 — keep the visual-module iframe rect in sync with #cy so
-    // Nodes/Player toggle swaps between two identically-sized rectangles.
+    const cyEarly = document.getElementById('cy');
+    cyEarly.style.top = topPx;
+    // A42 §42.3 — iframe intrinsic default height (150 px per HTML spec)
+    // overrides position: fixed with top+bottom on some browsers, so we
+    // stamp width/height/top explicitly from #cy's measured rect.
     const iframeEl = document.getElementById('visual-iframe');
-    if (iframeEl) iframeEl.style.top = topPx;
+    if (iframeEl) {
+      const cyRect = cyEarly.getBoundingClientRect();
+      iframeEl.style.top    = cyRect.top    + 'px';
+      iframeEl.style.left   = cyRect.left   + 'px';
+      iframeEl.style.width  = cyRect.width  + 'px';
+      iframeEl.style.height = cyRect.height + 'px';
+    }
   }
 
   // Init Cytoscape
@@ -3417,9 +3425,19 @@ async function init() {
       document.getElementById('cy-you');
     const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
     cyEl.style.top = topPx;
-    // A42 §42.3 — #visual-iframe shares #cy's rect exactly.
+    // A42 §42.3 — #visual-iframe must share #cy's rect exactly. iframe
+    // elements have an HTML intrinsic default height of 150 px that the
+    // browser can honour even under position: fixed with top+bottom set,
+    // so we stamp explicit width/height/top from #cy's bounding rect
+    // rather than relying on CSS to derive them.
     const iframeEl = document.getElementById('visual-iframe');
-    if (iframeEl) iframeEl.style.top = topPx;
+    if (iframeEl) {
+      const cyRect = cyEl.getBoundingClientRect();
+      iframeEl.style.top    = cyRect.top    + 'px';
+      iframeEl.style.left   = cyRect.left   + 'px';
+      iframeEl.style.width  = cyRect.width  + 'px';
+      iframeEl.style.height = cyRect.height + 'px';
+    }
   }
 
   // A42 §42.3 — Nodes/Player view switch. Called by the radio change handler
@@ -3427,6 +3445,9 @@ async function init() {
   const visualIframe = document.getElementById('visual-iframe');
   function setViewMode(mode) {
     if (mode === 'player') {
+      // Refresh the iframe rect from #cy in case anything shifted since the
+      // last chat toggle (window resize, etc.). Then swap visibility.
+      positionCyEl();
       cyEl.classList.add('hidden');
       if (visualIframe) visualIframe.classList.add('active');
     } else {
@@ -3434,6 +3455,12 @@ async function init() {
       if (visualIframe) visualIframe.classList.remove('active');
     }
   }
+  // Window resize while Player is active — restamp the iframe rect from #cy.
+  window.addEventListener('resize', () => {
+    if (visualIframe && visualIframe.classList.contains('active')) {
+      positionCyEl();
+    }
+  });
 
   function toggleChatMode() {
     chatModeActive = !chatModeActive;

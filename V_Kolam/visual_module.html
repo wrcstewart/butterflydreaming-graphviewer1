@@ -23,17 +23,26 @@
       font-family: Georgia, 'Times New Roman', serif;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
-      padding: 0.6rem;
+      gap: 0;                            /* no gap — every pixel goes to the canvas */
+      padding: 0;                        /* was 0.6rem — reclaim ~20px each side (A42) */
       box-sizing: border-box;
     }
 
+    /* Status overlays the top-left corner instead of consuming a full row.
+       Pointer-events: none so it never blocks a canvas or spinner click. */
     #status {
-      font-size: 0.85rem;
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      z-index: 10;
+      font-size: 0.7rem;
       font-style: italic;
       color: #9e9e90;
       letter-spacing: 0.04em;
-      min-height: 1.4rem;
+      pointer-events: none;
+      background: rgba(10, 10, 15, 0.6);
+      padding: 1px 4px;
+      border-radius: 2px;
     }
 
     .controls {
@@ -62,20 +71,27 @@
       background: #243f3b;
     }
 
-    /* A42 §42.9 — fill available space in the iframe. On wide viewports
-       canvas beside controls; on narrow (mobile) canvas above, controls
-       below. Canvas stays square via updateCanvasSize's min(w,h). */
+    /* A42 fix (user report 2026-07-01) — canvas takes the full available
+       height and matches its width to it (square), spinners fill whatever
+       horizontal room is left and wrap. Previous grid layout was giving the
+       controls column a fixed 170px and starving the canvas of both padding
+       and honest height math.
+       In a very wide-and-short iframe (e.g. 1574×150 when the chat panel
+       is open) this yields canvas 150×150 with spinners in a ~1400px-wide
+       band wrapping into a couple of rows. */
     .module-layout {
       flex: 1;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 170px;
-      grid-template-rows: 1fr;
-      gap: 10px;
-      align-items: stretch;
-      min-height: 0;                      /* allow shrink inside body flex */
+      display: flex;
+      flex-direction: row;
+      gap: 0;
+      min-height: 0;
+      min-width: 0;
     }
 
     .canvas-wrapper {
+      flex: 0 0 auto;                    /* natural size — square, height-driven */
+      height: 100%;
+      aspect-ratio: 1 / 1;               /* so width = height */
       display: flex;
       justify-content: center;
       align-items: center;
@@ -83,17 +99,22 @@
       min-width: 0;
     }
 
-    /* Narrow viewport (taller than wide) — stack canvas above controls */
+    /* Narrow viewport (taller than wide) — stack canvas above controls
+       and let the controls take the natural extra vertical room. */
     @media (max-aspect-ratio: 1/1) {
       .module-layout {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto;
+        flex-direction: column;
+      }
+      .canvas-wrapper {
+        flex: 1 1 auto;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        max-height: 100%;
       }
       .control-panel {
         flex-direction: row !important;
         flex-wrap: wrap;
-        max-height: 30vh;
-        overflow-y: auto;
+        max-height: 40vh;
       }
       .control-row {
         flex: 1 1 30%;
@@ -101,26 +122,31 @@
       }
     }
 
-    /* Narrow vertical control strip — dropdowns + spinners stacked.
-       min-height:0 + overflow-y:auto let it shrink to the grid row height
-       and scroll rather than overflow the layout when 12+ controls exceed
-       the cell height (A42 fix — "can't see more than top three controls"). */
+    /* Default (landscape) control panel — flex-row wrap so 12+ spinners
+       flow across the wide-and-short strip beside the canvas. Portrait
+       media query above extends the same pattern with a max-height cap. */
     .control-panel {
+      flex: 1;
       display: flex;
-      flex-direction: column;
-      gap: 0.55rem;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 4px 8px;
       background: rgba(15, 15, 24, 0.75);
       border: 1px solid rgba(74, 155, 142, 0.2);
-      padding: 0.5rem 0.5rem;
-      border-radius: 0.5rem;
+      padding: 4px 6px;
+      border-radius: 0.4rem;
       min-height: 0;
+      min-width: 0;
       overflow-y: auto;
     }
 
     .control-row {
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      gap: 0.15rem;
+      flex: 0 0 auto;
+      width: 88px;                        /* fixed cell width so wrap is consistent (A42) */
     }
 
     .control-row label {

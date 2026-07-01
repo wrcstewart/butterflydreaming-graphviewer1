@@ -464,14 +464,11 @@ html, body {
 #visual-iframe {
   display: none;
   position: fixed;
+  top: 0;                               /* JS stamps top / left / width / height from #cy's rect */
   left: 0;
-  right: 0;
-  top: 158px;                           /* set precisely by JS; fallback matches #cy */
-  bottom: 90px;                         /* matches #cy's bottom clearance */
   z-index: 1;
   border: 0;
   background: #0a0a0f;
-  width: 100%;
 }
 #visual-iframe.active { display: block; }
 #cy.hidden { display: none; }
