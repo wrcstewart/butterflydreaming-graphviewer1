@@ -101,15 +101,20 @@
       }
     }
 
-    /* Narrow vertical control strip — dropdowns + spinners stacked */
+    /* Narrow vertical control strip — dropdowns + spinners stacked.
+       min-height:0 + overflow-y:auto let it shrink to the grid row height
+       and scroll rather than overflow the layout when 12+ controls exceed
+       the cell height (A42 fix — "can't see more than top three controls"). */
     .control-panel {
       display: flex;
       flex-direction: column;
       gap: 0.55rem;
       background: rgba(15, 15, 24, 0.75);
       border: 1px solid rgba(74, 155, 142, 0.2);
-      padding: 0.7rem 0.6rem;
+      padding: 0.5rem 0.5rem;
       border-radius: 0.5rem;
+      min-height: 0;
+      overflow-y: auto;
     }
 
     .control-row {
@@ -813,7 +818,14 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('Waiting for script...', canvas.width / 2, canvas.height / 2);
-      setStatus('Waiting for script...');
+      // A42 diagnostic — surface the measured dimensions so we can tell
+      // whether the wrapper (layout) or the canvas (JS sizing) is the
+      // constraint. Remove once canvas-size issue is resolved.
+      const w = canvasWrapper.clientWidth;
+      const h = canvasWrapper.clientHeight;
+      const bw = document.body.clientWidth;
+      const bh = document.body.clientHeight;
+      setStatus(`Waiting… body ${bw}×${bh}  wrap ${w}×${h}  canvas ${canvas.width}×${canvas.height}`);
     }
 
     // Wrapped render — first call clears the waiting state.
