@@ -1,11 +1,14 @@
 # ButterflyDreaming — Chat Panel Card System
 
-**Snapshot date:** 2026-06-28
-**Latest commit covered:** `489ff9f` on `main`
-**Latest viewer / style:** `viewer.js?v=349`, `style.css?v=85`
+**Snapshot date:** 2026-06-28 (revised 2026-07-01 — see the appended REVISION section at the bottom of this file for A48–A52 changes)
+**Latest commit covered (originally):** `489ff9f` on `main`
+**Latest commit covered (as of revision):** `5d48b1c` on `main`
+**Latest viewer / style (as of revision):** `viewer.js?v=359`, `style.css?v=103`
 **Scope:** the chat panel and its card stack — model, layout, lifecycle, protocol. Self-contained: read this and the protocol below describe everything you need to reason about chat-panel behaviour without the codebase open.
 
 For full project history see the v6 handover (`ButterflyDreaming_GraphViewer_Handover_v6_2026-06-24.md`). For the design rationale see `cards_spec.md` (card model) and `communications.md` (buddy channel).
+
+> **⚠ Revised 2026-07-01 — jump to REVISION at the bottom before relying on layout / positioning details in the body of this doc.** The card model, protocol, and behaviours below are still current; the screen layout was reshuffled substantially (bottom-anchored breadcrumbs, unified action-bar, dark-amber theme, adaptive snake-view) and the revision section supersedes anything in §13 and any specific `bottom: 34px` / panel-width / help-bar claims.
 
 ---
 
@@ -278,3 +281,74 @@ Treat these as invariants until explicitly revisited:
 ---
 
 *ButterflyDreaming — Chat Panel Card System reference, written 2026-06-28 against `viewer.js?v=349` at commit `489ff9f`.*
+
+---
+
+## REVISION — 2026-07-01
+
+**Amendments A48–A52 folded in between the original snapshot and this revision. Latest commit `5d48b1c`, `viewer.js?v=359`, `style.css?v=103`.**
+
+The card model, WebSocket protocol, Send / ack / delivered stamp mechanics, bot-context fork, ghost + chat_ready handshake, and copy semantics (sections 1–11) are **all unchanged**. What follows updates the layout and adds one new adaptive-sizing point.
+
+### R.1 — Tap timing (§12)
+
+Debounce values 320 ms desktop / 560 ms touch remain — but the pattern was made **uniform across all three tap sites** (main cy, cy-buddy chip, cy-you chip). All three now defer `routeNodeText` behind the debounce; a second tap within the window cancels the deferred fire and runs `handleNodeTap` navigation. No text is shown on double-tap. (A48b/c — 220/460 was tried and reverted for missing doubles.)
+
+### R.2 — Layout completely reshuffled (supersedes §13)
+
+**Top area:**
+- `#title-bar` — text: "Butterfly Dreaming Development" (renamed from "…Navigation Development"), left-aligned, `padding-right: 110px` to reserve room for the user-count panel.
+- `#user-count-panel` — moved from bottom-right to `top: 4px; right: 16px` (beside the title).
+- `#pair-control` — unchanged (`top: 34px; right: 8px`).
+- `#dev-panel` (code / Write / Reset / Edit) — moved from the bottom-left to `top: 34px; left: 54px`, sitting between `#back-btn` (left: 8px) and `#pair-control`. Buttons narrowed: `#chat-btn`/`#pair-btn` padding 11 → 7px; `#dev-code` width 96 → 77px.
+- `#help-bar` element and CSS **entirely removed** (was `position: fixed; bottom: 8px`). `setHelpText` / `setDownloading` in viewer.js kept as silent no-ops via `if (helpEl)` guards. **Beware:** `init()` still contains a specifically-guarded `document.getElementById('help-text')` assignment on its first line — must keep the guard or `init()` aborts and everything downstream breaks (root fit, WS dispatch, user-count).
+
+**Middle:**
+- `#chat-panel` and `#default-panel` are both `width: 40%` centred on desktop, `100%` on mobile (`@media (max-width: 767px)`). No width-jump on Chat toggle any more.
+- Both panels use the same dark amber `#3d2e00` background (matches Chat / Back button colour). Height 33dvh (chat) / 34dvh (default).
+
+**New unified `#action-bar`:**
+- Full-width dark-amber strip **always visible**, block-flow directly below whichever panel is showing.
+- Contents left-to-right: `#default-save-btn` (Save), `#chat-send-btn` (Send), `#default-save-status`, `#chat-new-card-btn` (New Card, `margin-left: auto` so it's right-anchored).
+- Save enabled when default-panel is showing a nav node with dev-code non-empty. Send enabled when chat active AND top local visible AND non-empty. New Card visible only when chat is active (via `#chat-panel.active ~ #action-bar #chat-new-card-btn` sibling selector).
+- The old `#chat-right-col` (which used to wrap New Card inside the chat panel) and `#default-right-col` (which used to wrap Save inside the default panel) are **both gone** — element + CSS deleted.
+
+**Bottom-anchored breadcrumbs (moved from top):**
+- `#cy-you` (local, yellow `#5a5000`): `position: fixed; bottom: 63px; height: 23px` — the LOCAL bar is nearer the graph (upper of the two).
+- `#cy-buddy` (remote, navy `#001f4d`): `position: fixed; bottom: 37px; height: 23px` — the REMOTE bar is above the media-bar (lower of the two).
+- 3px gap between them (reduced from 10 to free vertical space).
+- Both bars have `userZoomingEnabled: true; userPanningEnabled: true` so users can pinch to zoom on a chip or drag to pan along the trail. Chip sizes overridden via `node.breadcrumb-chip` class (60×18 uniform, 9px font) so chips actually fit the 23px bars.
+
+**`#cy` (graph canvas):** `position: fixed; left: 0; right: 0; top: <JS>; bottom: 90px`. Top is pinned by `positionCyEl()` (and the init-time pin that runs BEFORE `cytoscape({...})`) to the bottom of `#action-bar`. Bottom (90px) clears the bottom-anchored breadcrumbs.
+
+**`#media-bar`:** moved from `top: 34px` to `bottom: 2px; left: 50%; translateX(-50%)`. Still `display: none` until a track loads.
+
+### R.3 — Snake-view adaptive sizing (new)
+
+`handleTitlePageTap` used to size section nodes with a fixed formula: `Math.max(46, Math.min(81, Math.round(736 / cols)))`. Now:
+
+```js
+const canvasW  = (cy.width()  && cy.width()  > 100) ? cy.width()  : window.innerWidth;
+const canvasH  = (cy.height() && cy.height() > 100) ? cy.height() : window.innerHeight;
+const layoutPad = Math.max(20, Math.min(50, Math.min(canvasW, canvasH) * 0.06));
+const availW   = canvasW - 2 * layoutPad;
+const nodeW    = Math.max(46, Math.min(120, Math.floor((availW - (cols-1)*gapX) / cols)));
+```
+
+**Load-bearing:** `layoutPad` MUST be the same value passed to `cy.layout({ ..., padding: layoutPad })` at the end of the function — if that padding is a different hardcoded number (was `50`), the layout's fit re-scales the model and the sizing calculation becomes irrelevant. Sync them.
+
+Tap targets adapt per device: iPhone Mini (375 CSS px viewport) gets ~55px cells for 5 cols; iPhone Pro Max (430 CSS px) gets ~67px; desktop fills toward the 120px cap. 46px floor guarantees Apple's minimum tap size on any viewport.
+
+### R.4 — Server: no-cache HTML
+
+`express.static` wrapped with `setHeaders` that stamps `Cache-Control: no-cache, no-store, must-revalidate` on every `.html` response. Without this, `?v=` cache-busting on CSS/JS was defeated by cached HTML holding stale version numbers. CSS/JS still cache aggressively — the `?v=` query invalidates them when bumped.
+
+### R.5 — Safety-net rule additions (extends §17)
+
+9. **Snake-view layout padding must equal the padding computed in nodeW math.** If `cy.layout({ padding: N })` uses a different N from the one used in `(canvasW - 2*N)/cols` computation, the layout's fit throws away your sizing. Introduced in A52c after A52a/b appeared to have no effect.
+10. **HTML responses must not be browser-cached.** Cache-Control: no-cache on all `.html` from `express.static`'s setHeaders. Otherwise the browser keeps serving old `?v=` numbers and CSS/JS bumps land nowhere. Introduced in A50h.
+11. **Post-A50 layout removed `#help-bar`, `#chat-right-col`, `#default-right-col`, `#chat-send-bar`.** Anything referencing these elements will fail. `setHelpText` / `setDownloading` / any `document.getElementById('help-text')` MUST be guarded with `if (el)`. `init()` in particular had a naked usage on its first line that had to be guarded — see R.2 note.
+
+---
+
+*Revised 2026-07-01 against `viewer.js?v=359` at commit `5d48b1c`. Original doc content above is preserved verbatim; where it conflicts with this revision, the revision wins.*
