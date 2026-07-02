@@ -89,32 +89,24 @@
     }
 
     .canvas-wrapper {
-      flex: 0 0 auto;                    /* natural size — square, height-driven */
-      height: 100%;
-      aspect-ratio: 1 / 1;               /* so width = height */
+      flex: 1 1 auto;                    /* takes whatever remains after the panel */
+      min-height: 0;
+      min-width: 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 0;
-      min-width: 0;
     }
 
     /* Narrow viewport (taller than wide) — stack canvas above controls
-       and let the controls take the natural extra vertical room. */
+       so the panel gets its own vertical band. */
     @media (max-aspect-ratio: 1/1) {
       .module-layout {
         flex-direction: column;
       }
-      .canvas-wrapper {
-        flex: 1 1 auto;
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        max-height: 100%;
-      }
       .control-panel {
+        flex: 0 0 40vh !important;       /* fixed band along the bottom */
         flex-direction: row !important;
         flex-wrap: wrap;
-        max-height: 40vh;
       }
       .control-row {
         flex: 1 1 30%;
@@ -122,12 +114,13 @@
       }
     }
 
-    /* Default (landscape) control panel — single column stacking down the
-       right-hand strip. Each control (stepper + label) sits above the next
-       with a small vertical gap. Portrait media query above overrides to
-       row-wrap so mobile can fit all controls without excessive scroll. */
+    /* Default (landscape) control panel — fixed 220 px column on the right.
+       Fixed width prevents the canvas from squeezing the panel to zero when
+       the iframe is nearly square (as in the preview harness).
+       Portrait media query above overrides to a bottom band.
+       The <canvas> keeps itself square via its own aspect-ratio + max-*. */
     .control-panel {
-      flex: 1;
+      flex: 0 0 220px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;             /* controls hug the left edge, − on the left */
@@ -221,6 +214,12 @@
     .stepper-source {
       display: none;
     }
+
+    /* Set by the host harness via postMessage bd_ui_config { hideControls: true }.
+       Preview.html supplies its own outer stepper column; hiding the internal
+       one lets the canvas take the whole iframe width. */
+    body.controls-hidden .control-panel { display: none; }
+    body.controls-hidden .canvas-wrapper { flex: 1 1 auto; }
 
     /* Selects retain their native appearance for iOS/mobile compatibility. */
     .control-panel select {
@@ -710,6 +709,17 @@
         render(updatedText);
       }
 
+      // Broadcast the drift-updated fields to the host harness so its outer
+      // steppers / textarea can stay in sync while drift is running.
+      // Only the three fields that change during drift are sent — keeps the
+      // message small (~5 msg/sec at depth 4).
+      postToParent({
+        type: 'bd_state_update',
+        angle: degs,
+        angle_minutes: mins,
+        angle_seconds: secs
+      });
+
       // Overwrite the now-fired (stale) handle with the next tick
       driftInterval = setTimeout(driftTick, driftIntervalMs());
     }
@@ -1073,6 +1083,19 @@
           case 'BD_REQUEST_UPDATE':
             postToParent({ type: 'BD_UPDATE', payload: { text: storedText } });
             break;
+
+          // bd_ui_config: host harness (preview.html, BD viewer, etc.) tells
+          // the module to hide its own control panel because the harness is
+          // supplying an outer control surface. The renderer + canvas stay
+          // fully functional — only the built-in stepper column is hidden.
+          case 'bd_ui_config': {
+            const hide = event.data && event.data.hideControls === true;
+            document.body.classList.toggle('controls-hidden', hide);
+            // Canvas needs a resize kick so it fills the reclaimed space.
+            updateCanvasSize();
+            if (storedText) render(storedText);
+            break;
+          }
 
           default:
             // Ignore unrecognised types

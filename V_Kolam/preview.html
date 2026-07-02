@@ -1,0 +1,541 @@
+<!-- ButterflyDreaming Visual Module — preview / standalone harness.
+     Single side panel (user 2026-07-02):
+       · textarea at the top
+       · action row (Copy Link, Copy, ↓, ↑)
+       · stepper column beneath — the harness owns the visible controls;
+         module's own control panel is hidden via bd_ui_config.
+     Each stepper tap rewrites the corresponding %%bd_<name> line in the
+     textarea and re-sends via bd_script_update, so the textarea is the
+     single source of truth and Copy Link always reflects current state. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — V_Kolam preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: #0a0a0f;
+      color: #e8e8e0;
+      font-family: Georgia, 'Times New Roman', serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .layout {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .module-column {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+    }
+
+    #module-frame {
+      flex: 1;
+      border: none;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Single side panel — textarea → buttons → steppers, scrollable.
+       Width picked so the four-button action row (Copy Link · Copy · ↓ · ↑)
+       fits on a single line without wrapping. */
+    .side-panel {
+      flex: 0 0 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      background: rgba(15, 15, 24, 0.75);
+      border-left: 1px solid rgba(74, 155, 142, 0.2);
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    /* Portrait / narrow viewport — stack module above panel. */
+    @media (max-aspect-ratio: 1/1) {
+      .layout { flex-direction: column; }
+      .side-panel {
+        flex: 0 0 45vh;
+        border-left: none;
+        border-top: 1px solid rgba(74, 155, 142, 0.2);
+      }
+    }
+
+    #script-input {
+      width: 100%;
+      min-height: 160px;
+      background: #0f0f18;
+      color: #e8e8e0;
+      border: 1px solid #2a2a3a;
+      border-bottom: 5px solid #5a4020;   /* dark-amber demarcator strip (2026-07-02) */
+      border-radius: 3px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;              /* ≥16 px avoids iOS auto-zoom on focus */
+      line-height: 1.45;
+      padding: 8px;
+      resize: vertical;
+      outline: none;
+      flex: 0 0 auto;
+      margin-bottom: 7px;           /* small gap between amber bar and action row */
+    }
+    #script-input:focus { border-color: #4a9b8e; border-bottom-color: #5a4020; }
+
+    /* Action row: Copy Link / Copy / ↓ / ↑ on one line; flex-wrap for narrow. */
+    .action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .action-bar button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.03em;
+      padding: 6px 10px;
+      border-radius: 3px;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      flex: 1 1 auto;
+    }
+    .action-bar button.arrow {
+      font-size: 1rem;
+      padding: 6px 12px;
+      flex: 0 0 44px;
+    }
+    .action-bar button:hover  { background: #1a2a28; }
+    .action-bar button:active { background: #243f3b; }
+    .action-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #status {
+      font-size: 0.75rem;
+      font-style: italic;
+      color: #9e9e90;
+      padding: 4px 6px;
+      min-height: 1.6em;
+      flex: 0 0 auto;
+      border-top: 1px solid rgba(74, 155, 142, 0.15);
+      padding-top: 6px;
+    }
+
+    /* Stepper column — one cell per %%bd_ numeric-arg directive, stacked
+       vertically down the side panel. Mirrors the media-module control
+       convention (see feedback_media_module_controls). */
+    .stepper-column {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(74, 155, 142, 0.15);
+      flex: 0 0 auto;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+      max-width: 200px;
+    }
+
+    .control-row label {
+      font-size: 0.7rem;
+      letter-spacing: 0.02em;
+      color: #4a9b8e;
+      text-align: center;
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 3px;
+    }
+
+    .step-btn {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1rem;
+      padding: 0;
+      width: 32px;
+      height: 28px;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 3px;
+      flex: 0 0 auto;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .step-btn:hover  { background: #1a2a28; }
+    .step-btn:active { background: #243f3b; }
+    .step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .stepper-value {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85rem;
+      color: #e8e8e0;
+      background: #0f0f18;
+      border: 1px solid #2a2a3a;
+      padding: 2px;
+      border-radius: 3px;
+      min-width: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="layout">
+    <div class="module-column">
+      <iframe id="module-frame"
+              src="visual_module.html"
+              title="ButterflyDreaming Visual Module"></iframe>
+    </div>
+
+    <aside class="side-panel">
+      <textarea id="script-input" spellcheck="false"></textarea>
+      <div class="action-bar">
+        <button id="copy-link-btn" title="Copy a shareable URL that reproduces this script">Copy Link</button>
+        <button id="copy-btn"      title="Copy the script to the clipboard">Copy</button>
+        <button id="send-btn"      class="arrow" title="Send script → module">↓</button>
+        <button id="receive-btn"   class="arrow" title="Request module state → script">↑</button>
+      </div>
+      <div id="stepper-column" class="stepper-column"><!-- steppers injected --></div>
+      <div id="status">Loading module…</div>
+    </aside>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ── Element refs ──────────────────────────────────────────────────────────
+    const textarea    = document.getElementById('script-input');
+    const sendBtn     = document.getElementById('send-btn');
+    const receiveBtn  = document.getElementById('receive-btn');
+    const copyBtn     = document.getElementById('copy-btn');
+    const copyLinkBtn = document.getElementById('copy-link-btn');
+    const statusEl    = document.getElementById('status');
+    const moduleFrame = document.getElementById('module-frame');
+    const stepperCol  = document.getElementById('stepper-column');
+
+    let moduleReady   = false;
+    let pendingScript = null;
+    const setStatus   = (text) => { statusEl.textContent = text; };
+
+    const postToModule = (message) => {
+      if (!moduleFrame.contentWindow) return;
+      moduleFrame.contentWindow.postMessage(message, '*');
+    };
+
+    // ── Default script ────────────────────────────────────────────────────────
+    const DEFAULT_SCRIPT = `%%bd_module visual_module.html
+%%bd_symmetry 8
+%%bd_depth 3
+%%bd_step 40
+%%bd_angle 45
+%%bd_angle_minutes 0
+%%bd_angle_seconds 0
+%%bd_angle_drift 3
+%%bd_colour_speed 4
+%%bd_stroke angle
+%%bd_saturation 100
+%%bd_lightness 65
+%%bd_background #0a0a0f
+%%bd_weight 1.5
+%%bd_score [
+axiom: F+F+F+F+F+F+F+F
+F: F+F-F-F+F+F+F-F
+%%bd_]`;
+
+    // ── Stepper spec ─────────────────────────────────────────────────────────
+    // Mirrors the numeric-arg %%bd_ directives that visual_module.html exposes.
+    // Colour speed is stored in the script as a linear multiplier (2^exponent),
+    // but the UI shows the exponent (min −2, max 4) same as inside the module.
+    const STEPPERS = [
+      { name: 'symmetry',     min: 1,  max: 16, step: 1,   fallback: 8 },
+      { name: 'depth',        min: 1,  max: 5,  step: 1,   fallback: 3 },
+      { name: 'step',         min: 10, max: 200,step: 1,   fallback: 40 },
+      { name: 'angle',        min: 5,  max: 90, step: 1,   fallback: 45 },
+      { name: 'angle_minutes',min: 0,  max: 59, step: 1,   fallback: 0 },
+      { name: 'angle_drift',  min: 0,  max: 10, step: 1,   fallback: 0 },
+      { name: 'colour_speed', min: -2, max: 4,  step: 1,   fallback: 2,
+        toDirective: (v) => String(Math.round((2 ** v) * 100) / 100),
+        fromDirective: (v) => Math.round(Math.log2(Math.max(0.01, Number(v) || 1))) },
+      { name: 'weight',       min: 0.5,max: 5,  step: 0.1, fallback: 1.5 },
+      { name: 'saturation',   min: 0,  max: 100,step: 1,   fallback: 100 },
+      { name: 'lightness',    min: 0,  max: 100,step: 1,   fallback: 65 }
+    ];
+
+    // Build the stepper DOM.
+    STEPPERS.forEach((s) => {
+      const row = document.createElement('div');
+      row.className = 'control-row';
+      row.innerHTML = `
+        <div class="stepper">
+          <button class="step-btn" type="button" data-name="${s.name}" data-delta="-1">−</button>
+          <span class="stepper-value" data-name="${s.name}">${s.fallback}</span>
+          <button class="step-btn" type="button" data-name="${s.name}" data-delta="1">+</button>
+        </div>
+        <label>${s.name}</label>
+      `;
+      stepperCol.appendChild(row);
+    });
+
+    // ── Script <-> stepper sync ───────────────────────────────────────────────
+    // Regex-based directive read/write. We don't need the full BD parser here —
+    // just find %%bd_<name> <value> lines. Score block (%%bd_score [ … %%bd_])
+    // is preserved verbatim because we never touch it.
+    function readDirective(scriptText, name) {
+      const re = new RegExp(`^%%bd_${name}\\s+(.+)$`, 'm');
+      const m = scriptText.match(re);
+      return m ? m[1].trim() : null;
+    }
+
+    function writeDirective(scriptText, name, value) {
+      const re = new RegExp(`^%%bd_${name}\\s+.+$`, 'm');
+      const newLine = `%%bd_${name} ${value}`;
+      if (re.test(scriptText)) return scriptText.replace(re, newLine);
+      // Insert before %%bd_score if missing.
+      const scoreIdx = scriptText.indexOf('%%bd_score');
+      if (scoreIdx !== -1) {
+        return scriptText.slice(0, scoreIdx) + newLine + '\n' + scriptText.slice(scoreIdx);
+      }
+      return scriptText + '\n' + newLine;
+    }
+
+    function syncSteppersFromScript(scriptText) {
+      STEPPERS.forEach((s) => {
+        const raw = readDirective(scriptText, s.name);
+        let uiVal;
+        if (raw === null) {
+          uiVal = s.fallback;
+        } else if (s.fromDirective) {
+          uiVal = s.fromDirective(raw);
+        } else {
+          uiVal = Number(raw);
+        }
+        if (!Number.isFinite(uiVal)) uiVal = s.fallback;
+        uiVal = Math.max(s.min, Math.min(s.max, uiVal));
+        const span = stepperCol.querySelector(`.stepper-value[data-name="${s.name}"]`);
+        if (span) span.textContent = formatValue(uiVal, s.step);
+      });
+    }
+
+    function formatValue(v, step) {
+      if (step >= 1) return String(Math.round(v));
+      // step < 1 → up to 2 decimal places.
+      return String(Math.round(v * 100) / 100);
+    }
+
+    function stepControl(name, delta) {
+      const s = STEPPERS.find((x) => x.name === name);
+      if (!s) return;
+      const span = stepperCol.querySelector(`.stepper-value[data-name="${name}"]`);
+      const cur = parseFloat(span.textContent);
+      let next = (Number.isFinite(cur) ? cur : s.fallback) + delta * s.step;
+      next = Math.max(s.min, Math.min(s.max, next));
+      next = parseFloat(next.toFixed(4));
+      const uiStr  = formatValue(next, s.step);
+      if (span.textContent === uiStr) return;      // hit min/max, no change
+      span.textContent = uiStr;
+      const dirVal = s.toDirective ? s.toDirective(next) : uiStr;
+      textarea.value = writeDirective(textarea.value, name, dirVal);
+      if (moduleReady) postToModule({ type: 'bd_script_update', script: textarea.value });
+    }
+
+    // Stepper +/− wiring — pointer events, hold-to-repeat.
+    stepperCol.addEventListener('pointerdown', (event) => {
+      const btn = event.target.closest('.step-btn');
+      if (!btn || btn.disabled) return;
+      event.preventDefault();
+      try { btn.setPointerCapture(event.pointerId); } catch (_) {}
+      const name = btn.dataset.name;
+      const delta = parseFloat(btn.dataset.delta);
+      stepControl(name, delta);
+      let repeatTimer = null;
+      const holdTimer = setTimeout(() => {
+        repeatTimer = setInterval(() => stepControl(name, delta), 60);
+      }, 400);
+      const stop = () => {
+        clearTimeout(holdTimer);
+        if (repeatTimer) clearInterval(repeatTimer);
+        btn.removeEventListener('pointerup', stop);
+        btn.removeEventListener('pointercancel', stop);
+        btn.removeEventListener('pointerleave', stop);
+      };
+      btn.addEventListener('pointerup',     stop);
+      btn.addEventListener('pointercancel', stop);
+      btn.addEventListener('pointerleave',  stop);
+    });
+
+    // ── UTF-8 safe base64 (via TextEncoder/Decoder) ──────────────────────────
+    function b64EncodeUtf8(str) {
+      const bytes = new TextEncoder().encode(str);
+      let bin = '';
+      for (const b of bytes) bin += String.fromCharCode(b);
+      return btoa(bin);
+    }
+    function b64DecodeUtf8(b64) {
+      const bin = atob(b64);
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    // ── Initial script (from ?script= or DEFAULT) ────────────────────────────
+    (function loadInitialScript() {
+      const params = new URLSearchParams(window.location.search);
+      const scriptParam = params.get('script');
+      if (scriptParam) {
+        try {
+          textarea.value = b64DecodeUtf8(scriptParam);
+          syncSteppersFromScript(textarea.value);
+          return;
+        } catch (err) {
+          console.warn('preview: failed to decode ?script param', err);
+        }
+      }
+      textarea.value = DEFAULT_SCRIPT;
+      syncSteppersFromScript(textarea.value);
+    })();
+
+    // Manual edits to the textarea should also refresh the stepper displays,
+    // so users who prefer typing directly aren't out of sync visually.
+    textarea.addEventListener('input', () => syncSteppersFromScript(textarea.value));
+
+    // ── Buttons ──────────────────────────────────────────────────────────────
+    sendBtn.addEventListener('click', () => {
+      if (moduleReady) {
+        postToModule({ type: 'bd_script_update', script: textarea.value });
+        syncSteppersFromScript(textarea.value);
+        setStatus('Sent to module.');
+      } else {
+        pendingScript = textarea.value;
+        setStatus('Module not ready — will send once it loads.');
+      }
+    });
+
+    receiveBtn.addEventListener('click', () => {
+      if (!moduleReady) return setStatus('Module not ready yet.');
+      postToModule({ type: 'bd_script_request' });
+    });
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const original = copyBtn.textContent;
+        copyBtn.textContent = 'Copied ✓';
+        setTimeout(() => { copyBtn.textContent = original; }, 1400);
+      }).catch(() => setStatus('Copy failed.'));
+    });
+
+    copyLinkBtn.addEventListener('click', () => {
+      try {
+        const encoded = b64EncodeUtf8(textarea.value);
+        const url = `${window.location.origin}${window.location.pathname}?script=${encoded}`;
+        navigator.clipboard.writeText(url).then(() => {
+          const original = copyLinkBtn.textContent;
+          copyLinkBtn.textContent = 'Link Copied ✓';
+          setTimeout(() => { copyLinkBtn.textContent = original; }, 1400);
+        }).catch(() => setStatus('Copy failed.'));
+      } catch (err) {
+        setStatus(`Encode error: ${err.message}`);
+      }
+    });
+
+    // ── Messages from the module ─────────────────────────────────────────────
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      switch (data.type) {
+        case 'BD_READY': {
+          moduleReady = true;
+          setStatus('Module ready.');
+          // Tell the module to hide its own control panel — this harness owns
+          // the visible steppers now.
+          postToModule({ type: 'bd_ui_config', hideControls: true });
+          const first = pendingScript !== null ? pendingScript : textarea.value;
+          pendingScript = null;
+          postToModule({ type: 'bd_script_update', script: first });
+          syncSteppersFromScript(first);
+          break;
+        }
+        case 'bd_script_response': {
+          if (typeof data.script === 'string') {
+            textarea.value = data.script;
+            syncSteppersFromScript(data.script);
+            setStatus('Received from module.');
+          }
+          break;
+        }
+        // Live drift tick from the module — keep angle / angle_minutes steppers
+        // moving with the animation, and quietly rewrite the corresponding
+        // %%bd_ lines in the textarea so Copy Link captures current state.
+        // Textarea is only rewritten while it's NOT focused, so a user editing
+        // the script isn't interrupted mid-keystroke.
+        case 'bd_state_update': {
+          const { angle, angle_minutes, angle_seconds } = data;
+          const setSpan = (name, val) => {
+            const s = stepperCol.querySelector(`.stepper-value[data-name="${name}"]`);
+            if (s) s.textContent = String(val);
+          };
+          if (Number.isFinite(angle))         setSpan('angle',         angle);
+          if (Number.isFinite(angle_minutes)) setSpan('angle_minutes', angle_minutes);
+          if (document.activeElement !== textarea) {
+            let t = textarea.value;
+            if (Number.isFinite(angle))         t = writeDirective(t, 'angle',         String(angle));
+            if (Number.isFinite(angle_minutes)) t = writeDirective(t, 'angle_minutes', String(angle_minutes));
+            if (Number.isFinite(angle_seconds)) t = writeDirective(t, 'angle_seconds', String(angle_seconds));
+            textarea.value = t;
+          }
+          break;
+        }
+        case 'BD_ERROR': {
+          const msg = data.payload && data.payload.message;
+          setStatus(`Module error: ${msg || '(no detail)'}`);
+          break;
+        }
+        default:
+          break;
+      }
+    });
+  </script>
+
+</body>
+</html>
