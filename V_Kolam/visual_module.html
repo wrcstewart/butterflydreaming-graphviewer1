@@ -911,8 +911,11 @@
           colourSpeed: Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16)
         };
 
-        // Calculate effective angle including fine (minutes) and very fine (seconds) adjustments
-        params.effectiveAngle = params.angle + (safeParseNumber(directives.angle_minutes, 0) / 60) + (safeParseNumber(directives.angle_seconds, 0) / 3600);
+        // Calculate effective angle including fine (minutes) and very fine (seconds) adjustments.
+        // angle_seconds is internal-only (not in the script) — read live from the slider so drift
+        // updates the visual every tick, not just when minutes carry over.
+        const liveSeconds = safeParseNumber(angleSecondsSlider.value, 0);
+        params.effectiveAngle = params.angle + (safeParseNumber(directives.angle_minutes, 0) / 60) + (liveSeconds / 3600);
         // Ensure colourSpeed is valid for hue cycling
         if (!Number.isFinite(params.colourSpeed) || params.colourSpeed <= 0) {
           params.colourSpeed = 4;
