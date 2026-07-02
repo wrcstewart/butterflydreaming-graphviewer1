@@ -272,7 +272,6 @@
 %%bd_step 40
 %%bd_angle 45
 %%bd_angle_minutes 0
-%%bd_angle_seconds 0
 %%bd_angle_drift 3
 %%bd_colour_speed 4
 %%bd_stroke angle
@@ -419,13 +418,20 @@ F: F+F-F-F+F+F+F-F
       return new TextDecoder().decode(bytes);
     }
 
+    // angle_seconds is an internal-only drift accumulator; it should never
+    // appear in the visible script. Strip it from any incoming script (URL
+    // param, bd_script_response) as a safety net against legacy content.
+    function stripAngleSeconds(text) {
+      return text.replace(/^%%bd_angle_seconds\b.*(?:\r?\n)?/gm, '');
+    }
+
     // ── Initial script (from ?script= or DEFAULT) ────────────────────────────
     (function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
       const scriptParam = params.get('script');
       if (scriptParam) {
         try {
-          textarea.value = b64DecodeUtf8(scriptParam);
+          textarea.value = stripAngleSeconds(b64DecodeUtf8(scriptParam));
           syncSteppersFromScript(textarea.value);
           return;
         } catch (err) {
@@ -498,32 +504,26 @@ F: F+F-F-F+F+F+F-F
         }
         case 'bd_script_response': {
           if (typeof data.script === 'string') {
-            textarea.value = data.script;
-            syncSteppersFromScript(data.script);
+            const clean = stripAngleSeconds(data.script);
+            textarea.value = clean;
+            syncSteppersFromScript(clean);
             setStatus('Received from module.');
           }
           break;
         }
-        // Live drift tick from the module — keep angle / angle_minutes steppers
-        // moving with the animation, and quietly rewrite the corresponding
-        // %%bd_ lines in the textarea so Copy Link captures current state.
-        // Textarea is only rewritten while it's NOT focused, so a user editing
-        // the script isn't interrupted mid-keystroke.
+        // Live drift tick from the module — move the angle / angle_minutes
+        // steppers but leave the script textarea alone. Rule (user 2026-07-02):
+        // the script represents user intent; drift is runtime state. Mixing
+        // them is confusing. If the user wants to bake drift progress into the
+        // script they press ↑ (receive) explicitly.
         case 'bd_state_update': {
-          const { angle, angle_minutes, angle_seconds } = data;
+          const { angle, angle_minutes } = data;
           const setSpan = (name, val) => {
             const s = stepperCol.querySelector(`.stepper-value[data-name="${name}"]`);
             if (s) s.textContent = String(val);
           };
           if (Number.isFinite(angle))         setSpan('angle',         angle);
           if (Number.isFinite(angle_minutes)) setSpan('angle_minutes', angle_minutes);
-          if (document.activeElement !== textarea) {
-            let t = textarea.value;
-            if (Number.isFinite(angle))         t = writeDirective(t, 'angle',         String(angle));
-            if (Number.isFinite(angle_minutes)) t = writeDirective(t, 'angle_minutes', String(angle_minutes));
-            if (Number.isFinite(angle_seconds)) t = writeDirective(t, 'angle_seconds', String(angle_seconds));
-            textarea.value = t;
-          }
           break;
         }
         case 'BD_ERROR': {

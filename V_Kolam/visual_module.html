@@ -496,7 +496,13 @@
       stepSlider.value = String(Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 200));
       angleSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90));
       angleMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_minutes, 0), 0), 59));
-      angleSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_seconds, 0), 0), 59));
+      // angle_seconds is now internal-only — never present in the script.
+      // Only touch the slider if the directive was explicitly supplied
+      // (legacy scripts / _copy harness); otherwise leave the running total
+      // alone so the drift accumulator survives between renders.
+      if (directives.angle_seconds !== undefined) {
+        angleSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_seconds, 0), 0), 59));
+      }
       angleDriftSlider.value   = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 10));
       manageDriftInterval();
       const colourSpeedValueParsed = Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16);
@@ -555,7 +561,8 @@
         step: stepSlider.value,
         angle: angleSlider.value,
         angle_minutes: angleMinutesSlider.value,
-        angle_seconds: angleSecondsSlider.value,
+        // angle_seconds intentionally NOT written into the script — it's a
+        // sub-arc-minute drift accumulator that lives only in the module.
         angle_drift:   angleDriftSlider.value,
         colour_speed: formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
         weight: weightSlider.value,
