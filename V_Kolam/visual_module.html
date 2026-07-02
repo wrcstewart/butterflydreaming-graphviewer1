@@ -122,62 +122,118 @@
       }
     }
 
-    /* Default (landscape) control panel — flex-row wrap so 12+ spinners
-       flow across the wide-and-short strip beside the canvas. Portrait
-       media query above extends the same pattern with a max-height cap. */
+    /* Default (landscape) control panel — single column stacking down the
+       right-hand strip. Each control (stepper + label) sits above the next
+       with a small vertical gap. Portrait media query above overrides to
+       row-wrap so mobile can fit all controls without excessive scroll. */
     .control-panel {
       flex: 1;
       display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-content: flex-start;
-      gap: 4px 8px;
+      flex-direction: column;
+      align-items: flex-start;             /* controls hug the left edge, − on the left */
+      gap: 4px;
       background: rgba(15, 15, 24, 0.75);
       border: 1px solid rgba(74, 155, 142, 0.2);
-      padding: 4px 6px;
+      padding: 6px 8px;
       border-radius: 0.4rem;
       min-height: 0;
       min-width: 0;
       overflow-y: auto;
     }
 
+    /* Control cell — one stepper (or select) above, label immediately below.
+       Small margin-bottom separates each button-label pair from the next.
+       Media-module convention 2026-07-02. */
     .control-row {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      gap: 2px;
       flex: 0 0 auto;
-      width: 88px;                        /* fixed cell width so wrap is consistent (A42) */
+      width: 96px;
+      margin-bottom: 6px;
     }
 
     .control-row label {
-      font-size: 0.62rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      font-size: 0.7rem;
+      letter-spacing: 0.02em;
       color: #4a9b8e;
+      text-align: center;
+      font-family: 'Courier New', Courier, monospace;
     }
 
-    .control-panel input[type='number'],
+    /* Stepper: [−] [value] [+] row. Buttons flex fixed-width, value spans middle. */
+    .stepper {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 3px;
+    }
+
+    .step-btn {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1rem;
+      padding: 0;
+      width: 26px;
+      height: 26px;
+      line-height: 1;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      border-radius: 3px;
+      flex: 0 0 auto;
+      touch-action: manipulation;              /* kill iOS double-tap zoom on rapid taps */
+      user-select: none;
+      -webkit-user-select: none;               /* older iOS Safari — text-select on long press */
+      -webkit-touch-callout: none;             /* suppress long-press callout / magnifier */
+      -webkit-tap-highlight-color: transparent;/* no grey flash halo */
+    }
+
+    .step-btn:hover  { background: #1a2a28; }
+    .step-btn:active { background: #243f3b; }
+    .step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .stepper-value {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.78rem;
+      color: #e8e8e0;
+      background: #0f0f18;
+      border: 1px solid #2a2a3a;
+      padding: 2px;
+      border-radius: 3px;
+      min-width: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    /* Hidden source input backing each stepper — kept in the DOM so existing
+       JS can still read/write .value, min, max, step. */
+    .stepper-source {
+      display: none;
+    }
+
+    /* Selects retain their native appearance for iOS/mobile compatibility. */
     .control-panel select {
       width: 100%;
       background: #0f0f18;
       color: #e8e8e0;
       border: 1px solid #2a2a3a;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.72rem;
-      padding: 0.22rem 0.3rem;
+      font-size: 0.9rem;          /* ≥16px logical to avoid iOS auto-zoom on focus */
+      padding: 4px;
       accent-color: #4a9b8e;
       outline: none;
     }
 
-    .control-panel input[type='number']:focus,
     .control-panel select:focus {
       border-color: #4a9b8e;
-    }
-
-    .slider-value {
-      font-size: 0.62rem;
-      color: #9e9e90;
-      text-align: right;
     }
 
     canvas {
@@ -202,75 +258,104 @@
   </div>
 
   <div class="control-panel">
+    <!-- Media-module control convention (2026-07-02):
+         · every numeric-arg %%bd_ directive gets a +/− stepper (buttons above, label below)
+         · label text = the directive name after %%bd_ (verbatim, incl. underscore)
+         · angle_minutes / angle_seconds hidden — drift-automation still uses them -->
     <div class="control-row">
-      <label for="symmetry-select">Symmetry</label>
-      <select id="symmetry-select">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="6">6</option>
-        <option value="8">8</option>
-        <option value="10">10</option>
-        <option value="12">12</option>
-        <option value="16">16</option>
-      </select>
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="symmetry-select" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="symmetry-select">8</span>
+        <button class="step-btn" type="button" data-target="symmetry-select" data-delta="1">+</button>
+      </div>
+      <label>symmetry</label>
+      <input id="symmetry-select" class="stepper-source" type="number" min="1" max="16" step="1" value="8">
     </div>
 
     <div class="control-row">
-      <label for="depth-select">Depth</label>
-      <select id="depth-select">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      </select>
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="depth-select" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="depth-select">4</span>
+        <button class="step-btn" type="button" data-target="depth-select" data-delta="1">+</button>
+      </div>
+      <label>depth</label>
+      <input id="depth-select" class="stepper-source" type="number" min="1" max="5" step="1" value="4">
     </div>
 
     <div class="control-row">
-      <label for="step-slider">Step</label>
-      <input id="step-slider" type="number" min="10" max="200" step="1" value="40">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="step-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="step-slider">40</span>
+        <button class="step-btn" type="button" data-target="step-slider" data-delta="1">+</button>
+      </div>
+      <label>step</label>
+      <input id="step-slider" class="stepper-source" type="number" min="10" max="200" step="1" value="40">
     </div>
 
     <div class="control-row">
-      <label for="angle-slider">Angle</label>
-      <input id="angle-slider" type="number" min="5" max="90" step="1" value="45">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="angle-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="angle-slider">45</span>
+        <button class="step-btn" type="button" data-target="angle-slider" data-delta="1">+</button>
+      </div>
+      <label>angle</label>
+      <input id="angle-slider" class="stepper-source" type="number" min="5" max="90" step="1" value="45">
     </div>
 
-    <div class="control-row">
-      <label for="angle-minutes-slider">Angle Fine</label>
-      <input id="angle-minutes-slider" type="number" min="0" max="59" step="1" value="0">
-    </div>
-
-    <!-- Angle Very Fine (seconds) removed from UI; hidden input retained so the
-         angle-drift automation can still accumulate seconds of arc. -->
+    <!-- angle_minutes ("Angle Fine") hidden per user 2026-07-02.
+         angle_seconds already hidden. Both remain in DOM so the drift-automation
+         tick (driftTick) can still carry seconds → minutes → degrees. -->
+    <input id="angle-minutes-slider" type="hidden" value="0">
     <input id="angle-seconds-slider" type="hidden" value="0">
 
     <div class="control-row">
-      <label for="angle-drift-slider">Angle Drift</label>
-      <input id="angle-drift-slider" type="number" min="0" max="10" step="1" value="0">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="angle-drift-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="angle-drift-slider">0</span>
+        <button class="step-btn" type="button" data-target="angle-drift-slider" data-delta="1">+</button>
+      </div>
+      <label>angle_drift</label>
+      <input id="angle-drift-slider" class="stepper-source" type="number" min="0" max="10" step="1" value="0">
     </div>
 
     <div class="control-row">
-      <label for="colour-speed-slider">Colour Speed</label>
-      <input id="colour-speed-slider" type="number" min="-2" max="4" step="1" value="2">
-      <span id="colour-speed-value" class="slider-value">4.0x</span>
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="colour-speed-slider">4.0x</span>
+        <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="1">+</button>
+      </div>
+      <label>colour_speed</label>
+      <input id="colour-speed-slider" class="stepper-source" type="number" min="-2" max="4" step="1" value="2">
     </div>
 
     <div class="control-row">
-      <label for="weight-slider">Line Weight</label>
-      <input id="weight-slider" type="number" min="0.5" max="5" step="0.1" value="1.5">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="weight-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="weight-slider">1.5</span>
+        <button class="step-btn" type="button" data-target="weight-slider" data-delta="1">+</button>
+      </div>
+      <label>weight</label>
+      <input id="weight-slider" class="stepper-source" type="number" min="0.5" max="5" step="0.1" value="1.5">
     </div>
 
     <div class="control-row">
-      <label for="saturation-slider">Saturation</label>
-      <input id="saturation-slider" type="number" min="0" max="100" step="1" value="100">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="saturation-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="saturation-slider">100</span>
+        <button class="step-btn" type="button" data-target="saturation-slider" data-delta="1">+</button>
+      </div>
+      <label>saturation</label>
+      <input id="saturation-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="100">
     </div>
 
     <div class="control-row">
-      <label for="lightness-slider">Lightness</label>
-      <input id="lightness-slider" type="number" min="0" max="100" step="1" value="65">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="lightness-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="lightness-slider">65</span>
+        <button class="step-btn" type="button" data-target="lightness-slider" data-delta="1">+</button>
+      </div>
+      <label>lightness</label>
+      <input id="lightness-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="65">
     </div>
 
   </div>
@@ -296,9 +381,6 @@
     const weightSlider   = document.getElementById('weight-slider');
     const saturationSlider = document.getElementById('saturation-slider');
     const lightnessSlider  = document.getElementById('lightness-slider');
-    // Spinner controls show their own value; only colour speed needs a separate
-    // "×" multiplier readout beside its exponent spinner.
-    const colourSpeedValue = document.getElementById('colour-speed-value');
     const canvas         = document.getElementById('kolam-canvas');
     const ctx            = canvas.getContext('2d');
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
@@ -405,10 +487,8 @@
 
     function setControlValues(directives) {
       if (!symmetrySelect) return;
-      const symmetryValue = safeParseInt(directives.symmetry, 8);
-      symmetrySelect.value = [1, 2, 3, 4, 6, 8, 10, 12, 16].includes(symmetryValue)
-        ? String(symmetryValue)
-        : '8';
+      const symmetryValue = Math.min(Math.max(safeParseInt(directives.symmetry, 8), 1), 16);
+      symmetrySelect.value = String(symmetryValue);
       const depthValue = Math.min(Math.max(safeParseInt(directives.depth, 4), 1), 5);
       depthSelect.value = String(depthValue);
       stepSlider.value = String(Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 200));
@@ -429,9 +509,21 @@
     }
 
     function updateValueDisplays() {
-      // Number spinners reflect their own .value, so only the colour-speed
-      // multiplier readout needs updating here.
-      colourSpeedValue.textContent = `${(2 ** Number(colourSpeedSlider.value)).toFixed(1)}x`;
+      // Sync every stepper's centre span from its hidden source input.
+      // colour_speed is stored as an exponent (-2..4) but the meaningful value
+      // is the multiplier 2^exp — show that in the readout so the label
+      // (colour_speed) and the number in the box tell the same story.
+      document.querySelectorAll('.stepper-value').forEach((span) => {
+        const targetId = span.dataset.target;
+        const input = targetId && document.getElementById(targetId);
+        if (!input) return;
+        if (targetId === 'colour-speed-slider') {
+          const exp = parseFloat(input.value);
+          span.textContent = Number.isFinite(exp) ? `${(2 ** exp).toFixed(1)}x` : input.value;
+        } else {
+          span.textContent = input.value;
+        }
+      });
     }
 
     function setDirectiveValue(nodeText, name, value) {
@@ -497,6 +589,64 @@
 
     controlInputs.forEach((input) => {
       input.addEventListener('input', handleControlChange);
+    });
+
+    // ── Stepper (+/−) buttons ─────────────────────────────────────────────────
+    // Media-module convention 2026-07-02: each numeric-arg %%bd_ directive gets a
+    // pair of buttons flanking a value display. The hidden source input still
+    // owns min / max / step / value; buttons read those attrs, clamp, and dispatch
+    // a native 'input' event so the existing handleControlChange chain fires.
+    function stepControl(input, delta) {
+      const min  = parseFloat(input.min);
+      const max  = parseFloat(input.max);
+      const step = parseFloat(input.step) || 1;
+      const cur  = parseFloat(input.value);
+      if (!Number.isFinite(cur)) return;
+      let next = cur + delta * step;
+      if (Number.isFinite(min)) next = Math.max(min, next);
+      if (Number.isFinite(max)) next = Math.min(max, next);
+      // Round to the step grid, then trim FP noise (0.1 * 3 = 0.30000000000000004).
+      if (Number.isFinite(step) && step > 0) {
+        next = Math.round(next / step) * step;
+      }
+      next = parseFloat(next.toFixed(4));
+      const strVal = String(next);
+      if (input.value === strVal) return;      // hit min/max — no-op
+      input.value = strVal;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    document.querySelectorAll('.step-btn').forEach((btn) => {
+      let holdTimer     = null;
+      let repeatTimer   = null;
+
+      const doStep = () => {
+        const input = document.getElementById(btn.dataset.target);
+        const delta = parseFloat(btn.dataset.delta);
+        if (!input || input.disabled) return;
+        stepControl(input, delta);
+      };
+
+      const start = (ev) => {
+        if (btn.disabled) return;
+        // Prevent the follow-up synthetic 'click' + iOS text-selection.
+        ev.preventDefault();
+        try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
+        doStep();
+        holdTimer = setTimeout(() => {
+          repeatTimer = setInterval(doStep, 60);
+        }, 400);
+      };
+
+      const stop = () => {
+        if (holdTimer)   { clearTimeout(holdTimer);   holdTimer   = null; }
+        if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+      };
+
+      btn.addEventListener('pointerdown',   start);
+      btn.addEventListener('pointerup',     stop);
+      btn.addEventListener('pointercancel', stop);
+      btn.addEventListener('pointerleave',  stop);
     });
 
     // ── Angle Drift Automation ────────────────────────────────────────────────
@@ -828,11 +978,11 @@
     let waitingForFirstScript = true;
 
     function disableControls() {
-      document.querySelectorAll('.control-panel input, .control-panel select')
+      document.querySelectorAll('.control-panel input, .control-panel select, .control-panel .step-btn')
         .forEach(el => { el.disabled = true; });
     }
     function enableControls() {
-      document.querySelectorAll('.control-panel input, .control-panel select')
+      document.querySelectorAll('.control-panel input, .control-panel select, .control-panel .step-btn')
         .forEach(el => { el.disabled = false; });
     }
     function drawWaitingMessage() {
@@ -865,6 +1015,10 @@
 
     // Initialise waiting state.
     disableControls();
+    // Sync stepper display spans from their source-input defaults so any
+    // HTML/JS drift shows the correct pre-render value (esp. colour_speed's
+    // exponent → multiplier conversion).
+    updateValueDisplays();
     // Defer initial draw until layout has flushed — otherwise the wrapper's
     // clientWidth / clientHeight can still be 0 and the canvas ends up at its
     // default 300×150 (A42 fix — the "canvas only 40% of iframe depth" bug).
