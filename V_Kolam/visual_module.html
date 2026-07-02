@@ -159,6 +159,9 @@
       color: #4a9b8e;
       text-align: center;
       font-family: 'Courier New', Courier, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;      /* no iOS magnifier / text-select on long-press */
     }
 
     /* Stepper: [−] [value] [+] row. Buttons flex fixed-width, value spans middle. */
@@ -944,15 +947,7 @@
         // Apply symmetry
         applySymmetry(offscreen, params.symmetry);
 
-        // Check closure using effective step size.
-        const isClosed = checkClosure(turtle.startX, turtle.startY, turtle.endX, turtle.endY, effectiveStep);
-
-        // Update status
-        if (isClosed) {
-          setStatus('Ready');
-        } else {
-          setStatus('Rendered — note: path does not close (kolam constraint not satisfied)');
-        }
+        setStatus('Ready');
 
         lastError = null;
 
