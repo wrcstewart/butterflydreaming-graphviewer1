@@ -3692,9 +3692,33 @@ async function init() {
       };
 
       copyLinkBtn.addEventListener('click', () => {
-        // Panel text: focused local-card textarea → topLocalCard body →
-        // default-panel body textContent (welcome message when nothing else
-        // exists yet).
+        // Node context — resolve the focused node first; used as both the
+        // metadata source AND (when outside chat mode) as the authoritative
+        // source for the script text itself.
+        let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
+        let activeNode = null;
+        const activeId = getActiveNodeId && getActiveNodeId();
+        if (activeId) {
+          const n = cy.getElementById(activeId);
+          if (n && n.length > 0) {
+            activeNode = n;
+            currentNodeUrl    = n.data('url')         || null;
+            currentSourceText = n.data('source_text') || null;
+            currentTitle      = n.data('title')       || null;
+          }
+        }
+
+        // Panel text precedence:
+        //   1. Focused local-card textarea (chat mode, actively editing)
+        //   2. topLocalCard body (chat mode, not focused)
+        //   3. activeNode.data('text') — the raw source of truth. This is
+        //      what setSystemText renders in the default panel for a TextNode
+        //      click, minus the "Title : source_text : seq" display header
+        //      that buildTooltipContent prepends. Reading DOM instead would
+        //      include the welcome prefix + header + spacer divs + any prior
+        //      append (setSystemText never clears on no-meta inserts).
+        //   4. #default-card-body textContent — last-ditch welcome-message
+        //      fallback when nothing else is available.
         let currentPanelText = '';
         const active = document.activeElement;
         if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
@@ -3703,21 +3727,11 @@ async function init() {
           const top = topLocalCard();
           if (top && !top.hidden && top.body) {
             currentPanelText = top.body.value || '';
+          } else if (activeNode) {
+            currentPanelText = activeNode.data('text') || '';
           } else {
             const defBody = document.getElementById('default-card-body');
             currentPanelText = defBody ? (defBody.textContent || '') : '';
-          }
-        }
-
-        // Node context — null triple when no node is in focus.
-        let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
-        const activeId = getActiveNodeId && getActiveNodeId();
-        if (activeId) {
-          const node = cy.getElementById(activeId);
-          if (node && node.length > 0) {
-            currentNodeUrl    = node.data('url')         || null;
-            currentSourceText = node.data('source_text') || null;
-            currentTitle      = node.data('title')       || null;
           }
         }
 
