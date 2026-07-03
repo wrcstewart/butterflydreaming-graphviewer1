@@ -3727,9 +3727,14 @@ async function init() {
           source_text: currentSourceText,
           title:       currentTitle
         };
+        // Base64 → URL: must percent-encode. Raw base64 contains `+`, `/`, `=`
+        // — all legal in URLs but `+` gets decoded as space by URLSearchParams
+        // (application/x-www-form-urlencoded rules), which corrupts the round
+        // trip and silently drops the standalone into DEFAULT_SCRIPT.
+        // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
         const standaloneBaseUrl = `http://${window.location.hostname}:8080/visual1/preview.html`;
-        const link = `${standaloneBaseUrl}?data=${encoded}`;
+        const link = `${standaloneBaseUrl}?data=${encodeURIComponent(encoded)}`;
 
         copyLinkText(link).then(() => {
           const original = copyLinkBtn.textContent;

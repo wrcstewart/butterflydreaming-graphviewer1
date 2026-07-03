@@ -514,8 +514,11 @@ F: F+F-F-F+F+F+F-F
 
     copyLinkBtn.addEventListener('click', () => {
       try {
+        // encodeURIComponent the base64 so `+` `/` `=` don't get chewed by
+        // URLSearchParams decoding on the receiving end (`+` → space breaks
+        // atob). Matches the fix in viewer.js Copy Link.
         const encoded = b64EncodeUtf8(textarea.value);
-        const url = `${window.location.origin}${window.location.pathname}?script=${encoded}`;
+        const url = `${window.location.origin}${window.location.pathname}?script=${encodeURIComponent(encoded)}`;
         navigator.clipboard.writeText(url).then(() => {
           const original = copyLinkBtn.textContent;
           copyLinkBtn.textContent = 'Link Copied ✓';
