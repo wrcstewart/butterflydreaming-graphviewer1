@@ -3059,7 +3059,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId };
 
 }
 
@@ -3574,7 +3574,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -3692,14 +3692,20 @@ async function init() {
       };
 
       copyLinkBtn.addEventListener('click', () => {
-        // Node context — resolve the focused node first; used as both the
-        // metadata source AND (when outside chat mode) as the authoritative
-        // source for the script text itself.
+        // Node context — resolve the "currently visible in the panel" node.
+        // Prefer lastReadNodeId (last single-tap → routed to the panel via
+        // routeNodeText) over activeNodeId (last navigated-into via double-
+        // tap → expandToNode). A user typically Copy-Link's on the node they
+        // just read, which may sit inside a Family/Cluster they navigated to
+        // earlier — activeNodeId would give the parent, lastReadNodeId gives
+        // the actual read target.
         let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
         let activeNode = null;
-        const activeId = getActiveNodeId && getActiveNodeId();
-        if (activeId) {
-          const n = cy.getElementById(activeId);
+        const readId   = getLastReadNodeId && getLastReadNodeId();
+        const activeId = getActiveNodeId   && getActiveNodeId();
+        const nodeId   = readId || activeId;
+        if (nodeId) {
+          const n = cy.getElementById(nodeId);
           if (n && n.length > 0) {
             activeNode = n;
             currentNodeUrl    = n.data('url')         || null;
