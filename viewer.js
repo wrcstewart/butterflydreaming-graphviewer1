@@ -3059,7 +3059,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId };
 
 }
 
@@ -3574,7 +3574,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -3647,6 +3647,100 @@ async function init() {
       body.value = d.script;
       body.dispatchEvent(new Event('input', { bubbles: true }));
     });
+
+    // ── Copy Link ─────────────────────────────────────────────────────────────
+    // Builds a standalone-player URL (path /visual1/ on port 8080) whose
+    // ?data=<base64 JSON> payload carries: the current panel/card text
+    // (`script`) plus, if a node is currently focused in the graph, its `url`,
+    // `source_text`, and `title`. Always visible/active — does not depend on
+    // pair or chat state. Fallback text box appears if navigator.clipboard is
+    // blocked (plain-HTTP LAN access).
+    const copyLinkBtn = document.getElementById('copy-link-btn');
+    if (copyLinkBtn) {
+      const copyLinkText = (text) => {
+        console.log('Copy Link URL:', text);
+        return navigator.clipboard && navigator.clipboard.writeText
+          ? navigator.clipboard.writeText(text)
+          : Promise.reject(new Error('clipboard API unavailable'));
+      };
+
+      const showFallback = (url) => {
+        document.getElementById('copy-link-fallback')?.remove();
+        const box = document.createElement('div');
+        box.id = 'copy-link-fallback';
+        const hint = document.createElement('div');
+        hint.className = 'fb-hint';
+        hint.textContent = 'Clipboard blocked on plain HTTP — copy manually:';
+        const ta = document.createElement('textarea');
+        ta.readOnly = true;
+        ta.value = url;
+        box.appendChild(hint);
+        box.appendChild(ta);
+        document.body.appendChild(box);
+        ta.focus();
+        ta.select();
+        const dismiss = (ev) => {
+          if (ev.target === ta || box.contains(ev.target)) return;
+          box.remove();
+          document.removeEventListener('mousedown', dismiss, true);
+          document.removeEventListener('touchstart', dismiss, true);
+        };
+        setTimeout(() => {
+          document.addEventListener('mousedown', dismiss, true);
+          document.addEventListener('touchstart', dismiss, true);
+        }, 0);
+      };
+
+      copyLinkBtn.addEventListener('click', () => {
+        // Panel text: focused local-card textarea → topLocalCard body →
+        // default-panel body textContent (welcome message when nothing else
+        // exists yet).
+        let currentPanelText = '';
+        const active = document.activeElement;
+        if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
+          currentPanelText = active.value || '';
+        } else {
+          const top = topLocalCard();
+          if (top && !top.hidden && top.body) {
+            currentPanelText = top.body.value || '';
+          } else {
+            const defBody = document.getElementById('default-card-body');
+            currentPanelText = defBody ? (defBody.textContent || '') : '';
+          }
+        }
+
+        // Node context — null triple when no node is in focus.
+        let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
+        const activeId = getActiveNodeId && getActiveNodeId();
+        if (activeId) {
+          const node = cy.getElementById(activeId);
+          if (node && node.length > 0) {
+            currentNodeUrl    = node.data('url')         || null;
+            currentSourceText = node.data('source_text') || null;
+            currentTitle      = node.data('title')       || null;
+          }
+        }
+
+        const payload = {
+          script:      currentPanelText,
+          node_url:    currentNodeUrl,
+          source_text: currentSourceText,
+          title:       currentTitle
+        };
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        const standaloneBaseUrl = `http://${window.location.hostname}:8080/visual1/`;
+        const link = `${standaloneBaseUrl}?data=${encoded}`;
+
+        copyLinkText(link).then(() => {
+          const original = copyLinkBtn.textContent;
+          copyLinkBtn.textContent = 'Copied!';
+          setTimeout(() => { copyLinkBtn.textContent = original; }, 1500);
+        }).catch((err) => {
+          console.warn('Copy Link: clipboard write failed, showing fallback', err);
+          showFallback(link);
+        });
+      });
+    }
   }
 
   const userCountPanel = document.getElementById('user-count-panel');

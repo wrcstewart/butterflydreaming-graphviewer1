@@ -56,7 +56,7 @@ html, body {
   font-family: sans-serif;
 }
 
-#chat-btn, #pair-btn {
+#chat-btn, #pair-btn, #copy-link-btn {
   background: #3d2e00;
   border: 1px solid #a07820;
   border-radius: 4px;
@@ -67,10 +67,45 @@ html, body {
   line-height: 1.4;
 }
 
-#chat-btn:hover:not(:disabled), #pair-btn:hover:not(:disabled) {
+#chat-btn:hover:not(:disabled), #pair-btn:hover:not(:disabled), #copy-link-btn:hover:not(:disabled) {
   border-color: #ffd88a;
   color: #fff;
 }
+
+/* Fallback for plain-HTTP LAN access where navigator.clipboard.writeText is
+   blocked (secure-context requirement). Floats near #pair-control; user
+   selects the text and Cmd/Ctrl+C manually. Removed on outside click. */
+#copy-link-fallback {
+  position: fixed;
+  top: 68px;
+  right: 8px;
+  z-index: 20;
+  background: #1a1200;
+  border: 1px solid #a07820;
+  border-radius: 4px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 90vw;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  font-family: sans-serif;
+  font-size: 12px;
+  color: #ffd88a;
+}
+#copy-link-fallback textarea {
+  width: min(70ch, 80vw);
+  height: 4.5em;
+  background: #0f0800;
+  color: #ffd88a;
+  border: 1px solid #5a4400;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  padding: 4px;
+  resize: none;
+  outline: none;
+}
+#copy-link-fallback .fb-hint { opacity: 0.75; }
 
 #chat-btn.active {
   border-color: #ffd88a;
@@ -105,7 +140,8 @@ html, body {
 }
 
 #chat-btn:disabled,
-#pair-btn:disabled {
+#pair-btn:disabled,
+#copy-link-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
