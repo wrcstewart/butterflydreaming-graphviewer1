@@ -625,9 +625,57 @@ F: F+F-F-F+F+F+F-F
       });
     }
 
-    // Visible fallback when navigator.clipboard is blocked (plain HTTP / LAN
-    // access — secure-context requirement). Floats above #bd-bar with the
-    // URL preselected; user manually Cmd/Ctrl+C. Outside click dismisses.
+    // Legacy execCommand('copy') fallback — does NOT require a secure
+    // context (only a user gesture, which every button click supplies), so
+    // works on plain HTTP LAN where navigator.clipboard.writeText is
+    // blocked. Deprecated but universally supported. Returns true on
+    // success, false otherwise.
+    function legacyCopyToClipboard(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      Object.assign(ta.style, {
+        position: 'fixed',
+        left:     '-9999px',
+        top:      '0',
+        opacity:  '0'
+      });
+      document.body.appendChild(ta);
+      // iOS Safari needs both focus() and setSelectionRange(); .select()
+      // alone is a no-op for readonly on some versions.
+      ta.focus();
+      ta.select();
+      try { ta.setSelectionRange(0, ta.value.length); } catch (_) {}
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+      return ok;
+    }
+
+    // Unified copy strategy: try async Clipboard API, fall back to legacy
+    // execCommand, and only surface the visible textarea if BOTH fail.
+    // Returns a Promise that resolves with the method name used, or rejects.
+    function copyTextSmart(text) {
+      return new Promise((resolve, reject) => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(
+            () => resolve('async'),
+            () => {
+              if (legacyCopyToClipboard(text)) resolve('legacy');
+              else reject(new Error('async rejected, legacy failed'));
+            }
+          );
+        } else if (legacyCopyToClipboard(text)) {
+          resolve('legacy');
+        } else {
+          reject(new Error('no clipboard API and legacy failed'));
+        }
+      });
+    }
+
+    // Visible fallback when both async + legacy clipboard writes fail.
+    // Floats above #bd-bar with the URL preselected; user manually
+    // Cmd/Ctrl+C. Outside click dismisses.
     function showBdLinkFallback(url) {
       document.getElementById('bd-link-fallback')?.remove();
       const box = document.createElement('div');
@@ -684,8 +732,8 @@ F: F+F-F-F+F+F+F-F
       }, 0);
     }
 
-    // Copy BD Link → clipboard, same URL as Enter. Falls back to a visible
-    // textarea for manual copy when the Clipboard API is unavailable.
+    // Copy BD Link → clipboard, same URL as Enter. Uses copyTextSmart:
+    // async Clipboard API → legacy execCommand → visible fallback.
     const bdCopyLinkBtn = document.getElementById('bd-copy-link-btn');
     if (bdCopyLinkBtn) {
       bdCopyLinkBtn.addEventListener('click', () => {
@@ -697,19 +745,13 @@ F: F+F-F-F+F+F+F-F
           source_text: returnPayload.source_text,
           title:       returnPayload.title
         });
-        // Guard: navigator.clipboard is undefined in insecure contexts on
-        // some browsers, which would throw before the Promise chain and
-        // slip past .catch. Route straight to the fallback in that case.
-        if (!navigator.clipboard || !navigator.clipboard.writeText) {
-          showBdLinkFallback(url);
-          return;
-        }
-        navigator.clipboard.writeText(url).then(() => {
+        copyTextSmart(url).then((method) => {
+          console.log(`Copy BD Link: copied via ${method}`);
           const original = bdCopyLinkBtn.textContent;
           bdCopyLinkBtn.textContent = 'Copied ✓';
           setTimeout(() => { bdCopyLinkBtn.textContent = original; }, 1400);
         }).catch((err) => {
-          console.warn('Copy BD Link: clipboard write failed, showing fallback', err);
+          console.warn('Copy BD Link: all copy strategies failed, showing fallback', err);
           showBdLinkFallback(url);
         });
       });
@@ -733,11 +775,15 @@ F: F+F-F-F+F+F+F-F
     });
 
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(textarea.value).then(() => {
+      copyTextSmart(textarea.value).then((method) => {
+        console.log(`Copy: copied via ${method}`);
         const original = copyBtn.textContent;
         copyBtn.textContent = 'Copied ✓';
         setTimeout(() => { copyBtn.textContent = original; }, 1400);
-      }).catch(() => setStatus('Copy failed.'));
+      }).catch((err) => {
+        console.warn('Copy: all copy strategies failed', err);
+        setStatus('Copy failed — clipboard blocked (plain HTTP).');
+      });
     });
 
     copyLinkBtn.addEventListener('click', () => {
@@ -747,19 +793,13 @@ F: F+F-F-F+F+F+F-F
         // atob). Matches the fix in viewer.js Copy Link.
         const encoded = b64EncodeUtf8(textarea.value);
         const url = `${window.location.origin}${window.location.pathname}?script=${encodeURIComponent(encoded)}`;
-        // Same guard + fallback as the #bd-bar buttons — plain HTTP LAN
-        // access blocks navigator.clipboard.writeText, and silent-fail
-        // status text is easy to miss.
-        if (!navigator.clipboard || !navigator.clipboard.writeText) {
-          showBdLinkFallback(url);
-          return;
-        }
-        navigator.clipboard.writeText(url).then(() => {
+        copyTextSmart(url).then((method) => {
+          console.log(`Copy Link: copied via ${method}`);
           const original = copyLinkBtn.textContent;
           copyLinkBtn.textContent = 'Link Copied ✓';
           setTimeout(() => { copyLinkBtn.textContent = original; }, 1400);
         }).catch((err) => {
-          console.warn('Copy Link: clipboard write failed, showing fallback', err);
+          console.warn('Copy Link: all copy strategies failed, showing fallback', err);
           showBdLinkFallback(url);
         });
       } catch (err) {
