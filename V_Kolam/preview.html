@@ -747,11 +747,21 @@ F: F+F-F-F+F+F+F-F
         // atob). Matches the fix in viewer.js Copy Link.
         const encoded = b64EncodeUtf8(textarea.value);
         const url = `${window.location.origin}${window.location.pathname}?script=${encodeURIComponent(encoded)}`;
+        // Same guard + fallback as the #bd-bar buttons — plain HTTP LAN
+        // access blocks navigator.clipboard.writeText, and silent-fail
+        // status text is easy to miss.
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          showBdLinkFallback(url);
+          return;
+        }
         navigator.clipboard.writeText(url).then(() => {
           const original = copyLinkBtn.textContent;
           copyLinkBtn.textContent = 'Link Copied ✓';
           setTimeout(() => { copyLinkBtn.textContent = original; }, 1400);
-        }).catch(() => setStatus('Copy failed.'));
+        }).catch((err) => {
+          console.warn('Copy Link: clipboard write failed, showing fallback', err);
+          showBdLinkFallback(url);
+        });
       } catch (err) {
         setStatus(`Encode error: ${err.message}`);
       }
