@@ -425,9 +425,47 @@ F: F+F-F-F+F+F+F-F
       return text.replace(/^%%bd_angle_seconds\b.*(?:\r?\n)?/gm, '');
     }
 
-    // ── Initial script (from ?script= or DEFAULT) ────────────────────────────
+    // ── BD-return context (from ?data= payload) ──────────────────────────────
+    // When the URL was produced by the BD viewer's Copy Link button, the
+    // payload carries node_url / source_text / title alongside the script.
+    // Stashed here for a future "back to BD" affordance; not acted on yet.
+    // window.bdReturnContext exposes it for console inspection during dev.
+    let bdReturnContext = { node_url: null, source_text: null, title: null };
+    window.bdReturnContext = bdReturnContext;
+
+    // ── Initial script (from ?data= envelope, ?script= raw, or DEFAULT) ──────
+    // Precedence:
+    //   1. ?data=<base64 JSON {script, node_url, source_text, title}>   (BD viewer Copy Link)
+    //   2. ?script=<base64 raw script text>                             (standalone Copy Link)
+    //   3. DEFAULT_SCRIPT
     (function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
+
+      const dataParam = params.get('data');
+      if (dataParam) {
+        try {
+          const payload = JSON.parse(b64DecodeUtf8(dataParam));
+          if (payload && typeof payload.script === 'string') {
+            textarea.value = stripAngleSeconds(payload.script);
+            bdReturnContext = {
+              node_url:    payload.node_url    ?? null,
+              source_text: payload.source_text ?? null,
+              title:       payload.title       ?? null
+            };
+            window.bdReturnContext = bdReturnContext;
+            console.log('preview: loaded from ?data payload', {
+              scriptLen: textarea.value.length,
+              ...bdReturnContext
+            });
+            syncSteppersFromScript(textarea.value);
+            return;
+          }
+          console.warn('preview: ?data payload missing string `script` field', payload);
+        } catch (err) {
+          console.warn('preview: failed to decode ?data param', err);
+        }
+      }
+
       const scriptParam = params.get('script');
       if (scriptParam) {
         try {
