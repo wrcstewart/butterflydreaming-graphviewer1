@@ -27,6 +27,54 @@
       font-family: Georgia, 'Times New Roman', serif;
       display: flex;
       flex-direction: column;
+      padding-bottom: 36px;   /* reserve space for the fixed #bd-bar */
+    }
+
+    /* Fixed bottom bar — source context (left) + Enter ButterflyDreaming
+       button (right). Sits above the module + side panel via z-index. */
+    #bd-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 36px;
+      background: #0a0a1a;
+      border-top: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 12px;
+      color: #888888;
+      box-sizing: border-box;
+      z-index: 1000;
+      font-family: sans-serif;
+    }
+
+    #bd-source-context {
+      color: #888888;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1 1 auto;
+      margin-right: 12px;
+    }
+
+    #bd-enter-btn {
+      background: #FFD700;
+      color: #0a0a1a;
+      border: none;
+      border-radius: 3px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: sans-serif;
+      flex: 0 0 auto;
+    }
+
+    #bd-enter-btn:hover {
+      background: #ffffff;
     }
 
     .layout {
@@ -243,6 +291,11 @@
     </aside>
   </div>
 
+  <div id="bd-bar">
+    <span id="bd-source-context"></span>
+    <button id="bd-enter-btn" type="button" title="Return to ButterflyDreaming carrying the current script">Enter ButterflyDreaming</button>
+  </div>
+
   <script>
     'use strict';
 
@@ -431,10 +484,16 @@ F: F+F-F-F+F+F+F-F
     // ── BD-return context (from ?data= payload) ──────────────────────────────
     // When the URL was produced by the BD viewer's Copy Link button, the
     // payload carries node_url / source_text / title alongside the script.
-    // Stashed here for a future "back to BD" affordance; not acted on yet.
-    // window.bdReturnContext exposes it for console inspection during dev.
+    // `incomingPayload` holds the whole decoded object (including script);
+    // `bdReturnContext` is a three-field subset kept for existing consumers.
+    // window.bdReturnContext / window.incomingPayload expose them for console
+    // inspection during dev. The "Enter ButterflyDreaming" button reads
+    // incomingPayload?.node_url so the round-trip URL back to BD carries the
+    // originating node's UUID.
+    let incomingPayload = null;
     let bdReturnContext = { node_url: null, source_text: null, title: null };
     window.bdReturnContext = bdReturnContext;
+    window.incomingPayload = incomingPayload;
 
     // ── Initial script (from ?data= envelope, ?script= raw, or DEFAULT) ──────
     // Precedence:
@@ -449,6 +508,8 @@ F: F+F-F-F+F+F+F-F
         try {
           const payload = JSON.parse(b64DecodeUtf8(dataParam));
           if (payload && typeof payload.script === 'string') {
+            incomingPayload = payload;
+            window.incomingPayload = incomingPayload;
             textarea.value = stripAngleSeconds(payload.script);
             bdReturnContext = {
               node_url:    payload.node_url    ?? null,
@@ -461,6 +522,7 @@ F: F+F-F-F+F+F+F-F
               ...bdReturnContext
             });
             syncSteppersFromScript(textarea.value);
+            renderSourceContext();
             return;
           }
           console.warn('preview: ?data payload missing string `script` field', payload);
@@ -486,6 +548,46 @@ F: F+F-F-F+F+F+F-F
     // Manual edits to the textarea should also refresh the stepper displays,
     // so users who prefer typing directly aren't out of sync visually.
     textarea.addEventListener('input', () => syncSteppersFromScript(textarea.value));
+
+    // ── #bd-bar (bottom): source context + Enter ButterflyDreaming ──────────
+    // Populates the source-context span from incomingPayload. Empty span when
+    // there is no ?data= payload (visitor arrived directly, or via legacy
+    // ?script=).
+    function renderSourceContext() {
+      const el = document.getElementById('bd-source-context');
+      if (!el) return;
+      const src = incomingPayload && incomingPayload.source_text ? String(incomingPayload.source_text) : '';
+      const ttl = incomingPayload && incomingPayload.title       ? String(incomingPayload.title)       : '';
+      const parts = [src, ttl].filter(Boolean);
+      el.textContent = parts.join(' — ');
+    }
+
+    // Button: build return payload (current script + preserved incoming
+    // metadata, so BD can navigate back to the originating node), then
+    // navigate. encodeURIComponent the base64 so `+` doesn't get decoded as
+    // space on arrival (same URLSearchParams gotcha as the outbound path).
+    const bdEnterBtn = document.getElementById('bd-enter-btn');
+    if (bdEnterBtn) {
+      bdEnterBtn.addEventListener('click', () => {
+        const currentScript = textarea.value;
+        const returnPayload = {
+          script:      currentScript,
+          node_url:    (incomingPayload && incomingPayload.node_url)    ?? null,
+          source_text: (incomingPayload && incomingPayload.source_text) ?? null,
+          title:       (incomingPayload && incomingPayload.title)       ?? null
+        };
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(returnPayload))));
+        const url = `https://graph.virtualfictions.uk?data=${encodeURIComponent(encoded)}`;
+        console.log('Enter ButterflyDreaming URL:', url);
+        console.log('  return payload preview:', {
+          scriptLen: currentScript.length,
+          node_url:    returnPayload.node_url,
+          source_text: returnPayload.source_text,
+          title:       returnPayload.title
+        });
+        window.location.href = url;
+      });
+    }
 
     // ── Buttons ──────────────────────────────────────────────────────────────
     sendBtn.addEventListener('click', () => {
