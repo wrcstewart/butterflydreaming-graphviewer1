@@ -625,7 +625,67 @@ F: F+F-F-F+F+F+F-F
       });
     }
 
-    // Copy BD Link → clipboard, same URL as Enter.
+    // Visible fallback when navigator.clipboard is blocked (plain HTTP / LAN
+    // access — secure-context requirement). Floats above #bd-bar with the
+    // URL preselected; user manually Cmd/Ctrl+C. Outside click dismisses.
+    function showBdLinkFallback(url) {
+      document.getElementById('bd-link-fallback')?.remove();
+      const box = document.createElement('div');
+      box.id = 'bd-link-fallback';
+      Object.assign(box.style, {
+        position: 'fixed',
+        bottom:   '44px',
+        right:    '8px',
+        zIndex:   '1001',
+        background: '#1a1200',
+        border:   '1px solid #FFD700',
+        borderRadius: '4px',
+        padding:  '8px',
+        display:  'flex',
+        flexDirection: 'column',
+        gap:      '6px',
+        maxWidth: '92vw',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.7)',
+        fontSize: '12px',
+        color:    '#FFD700',
+        fontFamily: 'sans-serif'
+      });
+      const hint = document.createElement('div');
+      hint.textContent = 'Clipboard blocked (plain HTTP) — select-all + copy manually:';
+      const ta = document.createElement('textarea');
+      Object.assign(ta.style, {
+        width:  'min(70ch, 88vw)',
+        height: '4.5em',
+        background: '#0f0800',
+        color:  '#FFD700',
+        border: '1px solid #5a4400',
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        padding: '4px',
+        resize: 'none',
+        outline: 'none'
+      });
+      ta.readOnly = true;
+      ta.value = url;
+      box.appendChild(hint);
+      box.appendChild(ta);
+      document.body.appendChild(box);
+      ta.focus();
+      ta.select();
+      const dismiss = (ev) => {
+        if (box.contains(ev.target)) return;
+        box.remove();
+        document.removeEventListener('mousedown', dismiss, true);
+        document.removeEventListener('touchstart', dismiss, true);
+      };
+      setTimeout(() => {
+        document.addEventListener('mousedown', dismiss, true);
+        document.addEventListener('touchstart', dismiss, true);
+      }, 0);
+    }
+
+    // Copy BD Link → clipboard, same URL as Enter. Falls back to a visible
+    // textarea for manual copy when the Clipboard API is unavailable.
     const bdCopyLinkBtn = document.getElementById('bd-copy-link-btn');
     if (bdCopyLinkBtn) {
       bdCopyLinkBtn.addEventListener('click', () => {
@@ -637,11 +697,21 @@ F: F+F-F-F+F+F+F-F
           source_text: returnPayload.source_text,
           title:       returnPayload.title
         });
+        // Guard: navigator.clipboard is undefined in insecure contexts on
+        // some browsers, which would throw before the Promise chain and
+        // slip past .catch. Route straight to the fallback in that case.
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          showBdLinkFallback(url);
+          return;
+        }
         navigator.clipboard.writeText(url).then(() => {
           const original = bdCopyLinkBtn.textContent;
           bdCopyLinkBtn.textContent = 'Copied ✓';
           setTimeout(() => { bdCopyLinkBtn.textContent = original; }, 1400);
-        }).catch(() => setStatus('BD link copy failed.'));
+        }).catch((err) => {
+          console.warn('Copy BD Link: clipboard write failed, showing fallback', err);
+          showBdLinkFallback(url);
+        });
       });
     }
 
