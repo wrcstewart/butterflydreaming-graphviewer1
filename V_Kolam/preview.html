@@ -60,6 +60,12 @@
       margin-right: 12px;
     }
 
+    #bd-actions {
+      display: flex;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
     #bd-enter-btn {
       background: #FFD700;
       color: #0a0a1a;
@@ -75,6 +81,27 @@
 
     #bd-enter-btn:hover {
       background: #ffffff;
+    }
+
+    /* Secondary / outline styling — same size + rhythm as #bd-enter-btn,
+       muted so the gold Enter stays the primary call to action. */
+    #bd-copy-link-btn {
+      background: transparent;
+      color: #FFD700;
+      border: 1px solid #FFD700;
+      border-radius: 3px;
+      padding: 3px 10px;   /* -1 px vertical to compensate for the added border */
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: sans-serif;
+      flex: 0 0 auto;
+    }
+
+    #bd-copy-link-btn:hover {
+      background: rgba(255, 215, 0, 0.15);
+      color: #ffffff;
+      border-color: #ffffff;
     }
 
     .layout {
@@ -293,7 +320,10 @@
 
   <div id="bd-bar">
     <span id="bd-source-context"></span>
-    <button id="bd-enter-btn" type="button" title="Return to ButterflyDreaming carrying the current script">Enter ButterflyDreaming</button>
+    <div id="bd-actions">
+      <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link (with current script + preserved node UUID) to clipboard">Copy BD Link</button>
+      <button id="bd-enter-btn"     type="button" title="Return to ButterflyDreaming carrying the current script">Enter ButterflyDreaming</button>
+    </div>
   </div>
 
   <script>
@@ -562,30 +592,56 @@ F: F+F-F-F+F+F+F-F
       el.textContent = parts.join(' — ');
     }
 
-    // Button: build return payload (current script + preserved incoming
-    // metadata, so BD can navigate back to the originating node), then
-    // navigate. encodeURIComponent the base64 so `+` doesn't get decoded as
-    // space on arrival (same URLSearchParams gotcha as the outbound path).
+    // Build the return-to-BD URL from the current textarea script + the
+    // preserved incomingPayload metadata (so BD can navigate back to the
+    // originating node). encodeURIComponent the base64 so `+` doesn't get
+    // decoded as space on arrival (URLSearchParams `+ → space` gotcha).
+    function buildBdReturnUrl() {
+      const currentScript = textarea.value;
+      const returnPayload = {
+        script:      currentScript,
+        node_url:    (incomingPayload && incomingPayload.node_url)    ?? null,
+        source_text: (incomingPayload && incomingPayload.source_text) ?? null,
+        title:       (incomingPayload && incomingPayload.title)       ?? null
+      };
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(returnPayload))));
+      const url = `https://graph.virtualfictions.uk?data=${encodeURIComponent(encoded)}`;
+      return { url, returnPayload, scriptLen: currentScript.length };
+    }
+
+    // Enter → navigate.
     const bdEnterBtn = document.getElementById('bd-enter-btn');
     if (bdEnterBtn) {
       bdEnterBtn.addEventListener('click', () => {
-        const currentScript = textarea.value;
-        const returnPayload = {
-          script:      currentScript,
-          node_url:    (incomingPayload && incomingPayload.node_url)    ?? null,
-          source_text: (incomingPayload && incomingPayload.source_text) ?? null,
-          title:       (incomingPayload && incomingPayload.title)       ?? null
-        };
-        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(returnPayload))));
-        const url = `https://graph.virtualfictions.uk?data=${encodeURIComponent(encoded)}`;
+        const { url, returnPayload, scriptLen } = buildBdReturnUrl();
         console.log('Enter ButterflyDreaming URL:', url);
         console.log('  return payload preview:', {
-          scriptLen: currentScript.length,
+          scriptLen,
           node_url:    returnPayload.node_url,
           source_text: returnPayload.source_text,
           title:       returnPayload.title
         });
         window.location.href = url;
+      });
+    }
+
+    // Copy BD Link → clipboard, same URL as Enter.
+    const bdCopyLinkBtn = document.getElementById('bd-copy-link-btn');
+    if (bdCopyLinkBtn) {
+      bdCopyLinkBtn.addEventListener('click', () => {
+        const { url, returnPayload, scriptLen } = buildBdReturnUrl();
+        console.log('Copy BD Link URL:', url);
+        console.log('  return payload preview:', {
+          scriptLen,
+          node_url:    returnPayload.node_url,
+          source_text: returnPayload.source_text,
+          title:       returnPayload.title
+        });
+        navigator.clipboard.writeText(url).then(() => {
+          const original = bdCopyLinkBtn.textContent;
+          bdCopyLinkBtn.textContent = 'Copied ✓';
+          setTimeout(() => { bdCopyLinkBtn.textContent = original; }, 1400);
+        }).catch(() => setStatus('BD link copy failed.'));
       });
     }
 
