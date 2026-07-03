@@ -56,7 +56,7 @@ html, body {
   font-family: sans-serif;
 }
 
-#chat-btn, #pair-btn, #copy-link-btn {
+#chat-btn, #pair-btn {
   background: #3d2e00;
   border: 1px solid #a07820;
   border-radius: 4px;
@@ -67,7 +67,7 @@ html, body {
   line-height: 1.4;
 }
 
-#chat-btn:hover:not(:disabled), #pair-btn:hover:not(:disabled), #copy-link-btn:hover:not(:disabled) {
+#chat-btn:hover:not(:disabled), #pair-btn:hover:not(:disabled) {
   border-color: #ffd88a;
   color: #fff;
 }
@@ -140,8 +140,7 @@ html, body {
 }
 
 #chat-btn:disabled,
-#pair-btn:disabled,
-#copy-link-btn:disabled {
+#pair-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -434,11 +433,13 @@ html, body {
   display: inline-block;
 }
 
-/* A42 §42.6 / §42.7 — Copy Down (↓) and Copy Up (↑) buttons. Same visual
-   family as the other action-bar buttons. Both start disabled; JS enables
-   them per chat-active + first-Copy-Down rules. */
+/* A42 §42.6 / §42.7 — Copy Down (↓) and Copy Up (↑) buttons + Copy Link.
+   Same visual family as the other action-bar buttons. Copy Down/Up start
+   disabled and get enabled per chat-active + first-Copy-Down rules; Copy Link
+   is always active (does not depend on pair/chat state). */
 #copy-down-btn,
-#copy-up-btn {
+#copy-up-btn,
+#copy-link-btn {
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
@@ -451,12 +452,14 @@ html, body {
   min-width: 26px;
 }
 #copy-down-btn:hover:not(:disabled),
-#copy-up-btn:hover:not(:disabled) {
+#copy-up-btn:hover:not(:disabled),
+#copy-link-btn:hover:not(:disabled) {
   border-color: #aaa;
   color: #fff;
 }
 #copy-down-btn:disabled,
-#copy-up-btn:disabled {
+#copy-up-btn:disabled,
+#copy-link-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
