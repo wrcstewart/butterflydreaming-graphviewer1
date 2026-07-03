@@ -3728,7 +3728,7 @@ async function init() {
           title:       currentTitle
         };
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-        const standaloneBaseUrl = `http://${window.location.hostname}:8080/visual1/`;
+        const standaloneBaseUrl = `http://${window.location.hostname}:8080/visual1/preview.html`;
         const link = `${standaloneBaseUrl}?data=${encoded}`;
 
         copyLinkText(link).then(() => {
