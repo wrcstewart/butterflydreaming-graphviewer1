@@ -454,13 +454,22 @@ function shortText(text, wordCount) {
     : words.slice(0, wordCount).join(' ') + '…';
 }
 
+// TextNode label priority (2026-07-04):
+//   0. Gateway TextNodes (work "title cards") — return source_text (the work
+//      name) directly. Structural exception, kept unchanged.
+//   1. seq AND title both present → "seq: title" (numbered verses / sections).
+//   2. name present → name. Wins over source_text so Kolam_1 shows as
+//      "Kolam_1" instead of its parent work ("Visual Tests").
+//   3. source_text present → first 4 words of source_text.
+//   4. Fallback → first 4 words of text.
 function getTextNodeLabel(props) {
-  if (props.gateway) return props.source_text || shortText(props.text, 5);
-  if (props.section_title && props.title) return props.title;
-  const src = props.source_text;
-  const seq = props.seq;
-  if (src && seq !== undefined && seq !== null) return `${seq}: ${src}`;
-  return shortText(props.text, 5);
+  if (props.gateway) return props.source_text || shortText(props.text, 4);
+  if (props.seq !== undefined && props.seq !== null && props.title) {
+    return `${props.seq}: ${props.title}`;
+  }
+  if (props.name) return props.name;
+  if (props.source_text) return shortText(props.source_text, 4);
+  return shortText(props.text, 4);
 }
 
 function buildNodeData(n) {
@@ -3475,7 +3484,10 @@ async function init() {
         if (!pairingState.active) {
           const devCodeEl = document.getElementById('dev-code');
           const code = devCodeEl ? devCodeEl.value.trim() : '';
+          console.log('[pair-debug] Chat ON → sending ready_to_pair (code:', code ? `"${code}"` : 'empty', '), pairingState.active=', pairingState.active);
           wsNow.send(JSON.stringify({ type: 'ready_to_pair', code }));
+        } else {
+          console.log('[pair-debug] Chat ON → SKIP ready_to_pair (pairingState.active=true)');
         }
         wsNow.send(JSON.stringify({ type: 'enter_chat' }));
       }
@@ -3493,6 +3505,7 @@ async function init() {
         // system card while still paired), then unpair (partner receives
         // buddy_disconnected → auto re-queue). This user does NOT auto
         // re-queue — they'll press Chat again if they want a new partner.
+        console.log('[pair-debug] Chat OFF → sending leave_chat + unpair, pairingState.active=', pairingState.active);
         wsNow.send(JSON.stringify({ type: 'leave_chat' }));
         wsNow.send(JSON.stringify({ type: 'unpair' }));
       }
@@ -3789,6 +3802,7 @@ async function init() {
     if (msg.type === 'user_count') {
       userCountPanel.textContent = `${msg.count} connected`;
       userCountPanel.classList.add('active');
+      console.log('[pair-debug] user_count =', msg.count);
       return;
     }
     if (msg.type === 'media_files') {
@@ -3796,13 +3810,16 @@ async function init() {
       return;
     }
     if (msg.type === 'wait_state') {
+      console.log('[pair-debug] ← wait_state received');
       pairStatus.textContent = 'Waiting...';
     } else if (msg.type === 'paired') {
+      console.log('[pair-debug] ← paired received, buddyId=', msg.buddyId);
       resetBuddyBar();
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
       updateSendBtn();
     } else if (msg.type === 'buddy_disconnected') {
+      console.log('[pair-debug] ← buddy_disconnected received, chatModeActive=', chatModeActive);
       // Two ways to reach here: (a) partner's WS closed / partner pressed
       // Chat-off unpair; (b) not applicable to this client — we don't get
       // this message when WE unpair, so this branch always means the OTHER
