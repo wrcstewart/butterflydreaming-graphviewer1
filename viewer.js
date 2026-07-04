@@ -3359,6 +3359,9 @@ async function init() {
     maxZoom: 8,
     wheelSensitivity: 0.3,
   });
+  // Debug hook: viewer.js loads as a module so `cy` isn't automatically on
+  // window. Expose the main cy instance for browser-console diagnostics.
+  window.cy = cy;
 
   computeBlendedColours(cy);
   cy.elements().hide();
