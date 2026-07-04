@@ -266,6 +266,7 @@ wss.on('connection', async (ws) => {
       type = msg.type;
       if (msg.type === 'ready_to_pair') {
         if (!ws.userId) return;
+        console.log(`[BD] ready_to_pair from ${ws.userId}  waitingUser=${waitingUser?.userId ?? 'null'}  sessions=${sessions.size}`);
         // Self-pair guard: if this same user is already sitting in the wait
         // slot, treat the second ready_to_pair as re-affirming their wait,
         // not as a pair-up. Prevents "paired with self" when a client
@@ -275,6 +276,7 @@ wss.on('connection', async (ws) => {
         // unpair).
         if (waitingUser && waitingUser.userId === ws.userId) {
           ws.send(JSON.stringify({ type: 'wait_state' }));
+          console.log(`[BD]   → self-pair guard: re-affirm Waiting`);
           return;
         }
         if (waitingUser === null) {
@@ -359,7 +361,8 @@ wss.on('connection', async (ws) => {
       // Chat again to look for a new partner.
       if (msg.type === 'unpair') {
         if (!ws.userId) return;
-        if (waitingUser?.userId === ws.userId) waitingUser = null;
+        const wasWaiting = waitingUser?.userId === ws.userId;
+        if (wasWaiting) waitingUser = null;
         const buddyId = pairedWith.get(ws.userId);
         if (buddyId) {
           if (inChat.get(ws.userId) && inChat.get(buddyId)) {
@@ -372,6 +375,10 @@ wss.on('connection', async (ws) => {
             buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
           }
           console.log(`[BD] Unpair: ${ws.userId} left ${buddyId}`);
+        } else if (wasWaiting) {
+          console.log(`[BD] Unpair: ${ws.userId} left the wait queue`);
+        } else {
+          console.log(`[BD] Unpair: ${ws.userId} was neither waiting nor paired`);
         }
         return;
       }
