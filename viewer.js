@@ -2068,8 +2068,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     activeNodeId = node.id();
     cy.elements().hide();
     showIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.show(); });
+    // Show every edge whose both endpoints are visible. Previously excluded
+    // CHILD explicitly — that created the "click gateway shows no arrow to
+    // its TextNodes but click a TextNode shows the arrow to its gateway"
+    // asymmetry. Consistent rule: if the relationship exists, show it.
     cy.edges().filter(e =>
-      e.source().visible() && e.target().visible() && e.data('type') !== 'CHILD'
+      e.source().visible() && e.target().visible()
     ).show();
     lastParentNode = lastClusterNode;
     runLayout(cy, lastClusterNode);
