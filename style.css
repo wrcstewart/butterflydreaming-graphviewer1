@@ -56,7 +56,7 @@ html, body {
   font-family: sans-serif;
 }
 
-#chat-btn, #pair-btn {
+#chat-btn {
   background: #3d2e00;
   border: 1px solid #a07820;
   border-radius: 4px;
@@ -67,7 +67,7 @@ html, body {
   line-height: 1.4;
 }
 
-#chat-btn:hover:not(:disabled), #pair-btn:hover:not(:disabled) {
+#chat-btn:hover:not(:disabled) {
   border-color: #ffd88a;
   color: #fff;
 }
@@ -139,8 +139,7 @@ html, body {
   color: #fff;
 }
 
-#chat-btn:disabled,
-#pair-btn:disabled {
+#chat-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }

@@ -322,6 +322,31 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
+      // Voluntary unpair (Chat toggle-off) — the local user is walking away
+      // from this pairing but their WS stays open. Mirrors the on('close')
+      // teardown: clear pairedWith, notify buddy so they re-queue via
+      // buddy_disconnected. Also drop the "Partner disconnected" system card
+      // in the buddy's chat log if both were in chat (same courtesy as
+      // ws.on('close')). Does NOT re-queue the initiator — they must press
+      // Chat again to look for a new partner.
+      if (msg.type === 'unpair') {
+        if (!ws.userId) return;
+        if (waitingUser?.userId === ws.userId) waitingUser = null;
+        const buddyId = pairedWith.get(ws.userId);
+        if (buddyId) {
+          if (inChat.get(ws.userId) && inChat.get(buddyId)) {
+            sendSystemCard(buddyId, 'Partner disconnected.');
+          }
+          pairedWith.delete(ws.userId);
+          pairedWith.delete(buddyId);
+          const buddyWs = sessions.get(buddyId);
+          if (buddyWs && buddyWs.readyState === 1) {
+            buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
+          }
+          console.log(`[BD] Unpair: ${ws.userId} left ${buddyId}`);
+        }
+        return;
+      }
       if (msg.type === 'buddy_card') {
         // Outbound from client (Send button). communications.md §6.2/§6.4.
         // No persistence — pure pass-through with a delivery ack on success.

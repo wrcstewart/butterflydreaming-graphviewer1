@@ -3399,19 +3399,9 @@ async function init() {
   const chatPanel = document.getElementById('chat-panel');
   const cyEl      = document.getElementById('cy');
 
-  // Gate the Chat button on the dev-code being non-empty (curator only).
-  // Mirrors the Save-button pattern (UX hint; server is the real check).
-  function updateChatBtnEnabled() {
-    if (!chatBtn) return;
-    const devCodeEl = document.getElementById('dev-code');
-    const hasCode = !!(devCodeEl && devCodeEl.value.trim());
-    chatBtn.disabled = !hasCode;
-  }
-  {
-    const devCodeEl = document.getElementById('dev-code');
-    if (devCodeEl) devCodeEl.addEventListener('input', updateChatBtnEnabled);
-    updateChatBtnEnabled();
-  }
+  // (Chat button was previously dev-code gated; that gating was removed when
+  // Pair was folded into Chat — Chat is now the single pair+chat toggle,
+  // pressable at any time.)
 
   function positionCyEl() {
     // A50j: #action-bar is always visible and sits below whichever panel
@@ -3473,6 +3463,14 @@ async function init() {
       ensureLocalCard();
       const wsNow = wsRef.current;
       if (wsNow && wsNow.readyState === WebSocket.OPEN) {
+        // Chat toggle now folds in the previous Pair-button step: queue for
+        // pairing on chat-open, unless we're already paired (avoid double-
+        // queue after a mid-session close+reopen without an unpair). Server
+        // responds with wait_state or paired, which flow through the message
+        // handler below to update pairStatus + pairingState.
+        if (!pairingState.active) {
+          wsNow.send(JSON.stringify({ type: 'ready_to_pair' }));
+        }
         wsNow.send(JSON.stringify({ type: 'enter_chat' }));
       }
       // A42 §42.3 — enable Nodes/Player radios while chat is active.
@@ -3485,8 +3483,17 @@ async function init() {
     } else {
       const wsNow = wsRef.current;
       if (wsNow && wsNow.readyState === WebSocket.OPEN) {
+        // Teardown order: leave_chat first (partner sees "Partner left chat"
+        // system card while still paired), then unpair (partner receives
+        // buddy_disconnected → auto re-queue). This user does NOT auto
+        // re-queue — they'll press Chat again if they want a new partner.
         wsNow.send(JSON.stringify({ type: 'leave_chat' }));
+        wsNow.send(JSON.stringify({ type: 'unpair' }));
       }
+      // Locally reset pair state so the next Chat-open re-queues cleanly.
+      pairingState.active = false;
+      const pairStatusEl = document.getElementById('pair-status');
+      if (pairStatusEl) pairStatusEl.textContent = '';
       // A42 §42.3 — chat closing: disable the toggle again and force back to
       // Nodes so the graph is visible when the user isn't in chat.
       const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
@@ -3534,14 +3541,11 @@ async function init() {
     });
   }
 
-  const pairBtn    = document.getElementById('pair-btn');
+  // Pair button was removed 2026-07-04 — its function is now the first step
+  // of the Chat toggle-on (see toggleChatMode). pairStatus span kept for
+  // the Waiting.../Paired status messages routed through the message
+  // handler below.
   const pairStatus = document.getElementById('pair-status');
-
-  pairBtn.addEventListener('click', () => {
-    wsRef.lastActivity = Date.now();
-    pairBtn.disabled = true;
-    ws.send(JSON.stringify({ type: 'ready_to_pair' }));
-  });
 
   document.getElementById('edit-mode-cb').addEventListener('change', e => {
     if (editModeUnlocked) {
@@ -3789,15 +3793,22 @@ async function init() {
       pairStatus.textContent = 'Waiting...';
     } else if (msg.type === 'paired') {
       resetBuddyBar();
-      pairBtn.style.display = 'none';
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
       updateSendBtn();
     } else if (msg.type === 'buddy_disconnected') {
+      // Two ways to reach here: (a) partner's WS closed / partner pressed
+      // Chat-off unpair; (b) not applicable to this client — we don't get
+      // this message when WE unpair, so this branch always means the OTHER
+      // side left. Auto re-queue only if the local user is still in chat.
       pairingState.active = false;
       buddyCy.nodes().addClass('buddy-gone');
-      pairStatus.textContent = 'Waiting...';
-      ws.send(JSON.stringify({ type: 'ready_to_pair' }));
+      if (chatModeActive) {
+        pairStatus.textContent = 'Waiting...';
+        ws.send(JSON.stringify({ type: 'ready_to_pair' }));
+      } else {
+        pairStatus.textContent = '';
+      }
       updateSendBtn();
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
