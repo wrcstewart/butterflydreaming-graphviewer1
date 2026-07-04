@@ -267,10 +267,27 @@ wss.on('connection', async (ws) => {
       if (msg.type === 'ready_to_pair') {
         if (!ws.userId) return;
         if (waitingUser === null) {
+          // First one in — no code gate. Sitting alone in the queue is
+          // harmless (no one to talk to yet).
           waitingUser = { userId: ws.userId, ws };
           ws.send(JSON.stringify({ type: 'wait_state' }));
           console.log(`[BD] Waiting: ${ws.userId}`);
         } else {
+          // Would pair up. If a curation code is configured on this
+          // server, gate the ARRIVER (the one who completes the pair).
+          // Rationale: the developer can sit as waitingUser during dev
+          // testing without needing to enter their own code; but a random
+          // arriving to complete the pair must present a valid code, so
+          // the system can't be used for unmonitored anonymous chatting.
+          if (CURATION_CODE) {
+            const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
+              crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
+            if (!codeOk) {
+              ws.send(JSON.stringify({ type: 'pair_denied', reason: 'code_required' }));
+              console.log(`[BD] Pair denied (no/bad code): ${ws.userId}`);
+              return;
+            }
+          }
           const buddy = waitingUser;
           waitingUser = null;
           pairedWith.set(ws.userId, buddy.userId);

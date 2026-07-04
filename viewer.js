@@ -3466,10 +3466,16 @@ async function init() {
         // Chat toggle now folds in the previous Pair-button step: queue for
         // pairing on chat-open, unless we're already paired (avoid double-
         // queue after a mid-session close+reopen without an unpair). Server
-        // responds with wait_state or paired, which flow through the message
-        // handler below to update pairStatus + pairingState.
+        // responds with wait_state, paired, or pair_denied (if a curation
+        // code was required and we didn't send a valid one); those flow
+        // through the message handler below to update pairStatus +
+        // pairingState. The curation code from #dev-code is always sent
+        // when present — server ignores it if not configured, gates on it
+        // if it is.
         if (!pairingState.active) {
-          wsNow.send(JSON.stringify({ type: 'ready_to_pair' }));
+          const devCodeEl = document.getElementById('dev-code');
+          const code = devCodeEl ? devCodeEl.value.trim() : '';
+          wsNow.send(JSON.stringify({ type: 'ready_to_pair', code }));
         }
         wsNow.send(JSON.stringify({ type: 'enter_chat' }));
       }
@@ -3805,10 +3811,27 @@ async function init() {
       buddyCy.nodes().addClass('buddy-gone');
       if (chatModeActive) {
         pairStatus.textContent = 'Waiting...';
-        ws.send(JSON.stringify({ type: 'ready_to_pair' }));
+        const devCodeEl = document.getElementById('dev-code');
+        const code = devCodeEl ? devCodeEl.value.trim() : '';
+        ws.send(JSON.stringify({ type: 'ready_to_pair', code }));
       } else {
         pairStatus.textContent = '';
       }
+      updateSendBtn();
+    } else if (msg.type === 'pair_denied') {
+      // Server rejected pairing (usually because we tried to complete a
+      // pair without a valid curation code). Close chat cleanly so the
+      // user can enter a code in #dev-code and press Chat again.
+      pairStatus.textContent = msg.reason === 'code_required'
+        ? 'Code required to chat'
+        : `Pair denied: ${msg.reason || 'unknown'}`;
+      pairingState.active = false;
+      if (chatModeActive) toggleChatMode();
+      // toggleChatMode blanks pairStatus on the off-path; restamp our
+      // reason afterwards so the user sees WHY chat closed.
+      pairStatus.textContent = msg.reason === 'code_required'
+        ? 'Code required to chat'
+        : `Pair denied: ${msg.reason || 'unknown'}`;
       updateSendBtn();
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
