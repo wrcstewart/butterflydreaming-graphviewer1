@@ -3239,9 +3239,19 @@ async function init() {
   // phantom duplicate nodes. Without this, TextNode→Cluster edges that landed on a
   // duplicate Cluster ID produce disconnected components in fCoSE, which grids them
   // into a "neat table" alongside the gateway.
-  const clusterIdByName = new Map();
-  const familyIdByName  = new Map();
-  const canonicalNodeId = new Map(); // duplicateId → canonicalId
+  //
+  // 2026-07-04: Same treatment extended to TextNodes, keyed by url (schema-level
+  // UUID identifier). Symptom prompting this: clicking Kolam_1 showed no CHILD
+  // arrow to its gateway "Visual Tests", but clicking the gateway showed the
+  // arrow to Kolam_1 — the edge was attached to a phantom TextNode copy under
+  // a different elementId than the one the user was tapping. Dedup pattern
+  // matches the existing Cluster/Family logic so no orthogonal state machine.
+  // Falls back to elementId when the TextNode has no url (shouldn't happen in
+  // practice but be safe).
+  const clusterIdByName  = new Map();
+  const familyIdByName   = new Map();
+  const textNodeIdByUrl  = new Map();
+  const canonicalNodeId  = new Map(); // duplicateId → canonicalId
   nodesById.forEach(nd => {
     if (nd.type === 'Cluster') {
       if (clusterIdByName.has(nd.name)) canonicalNodeId.set(nd.id, clusterIdByName.get(nd.name));
@@ -3250,6 +3260,10 @@ async function init() {
     if (nd.type === 'Family') {
       if (familyIdByName.has(nd.name)) canonicalNodeId.set(nd.id, familyIdByName.get(nd.name));
       else familyIdByName.set(nd.name, nd.id);
+    }
+    if (nd.type === 'TextNode' && nd.url) {
+      if (textNodeIdByUrl.has(nd.url)) canonicalNodeId.set(nd.id, textNodeIdByUrl.get(nd.url));
+      else textNodeIdByUrl.set(nd.url, nd.id);
     }
   });
   if (canonicalNodeId.size > 0) {
