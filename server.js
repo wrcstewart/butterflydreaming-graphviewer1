@@ -266,6 +266,17 @@ wss.on('connection', async (ws) => {
       type = msg.type;
       if (msg.type === 'ready_to_pair') {
         if (!ws.userId) return;
+        // Self-pair guard: if this same user is already sitting in the wait
+        // slot, treat the second ready_to_pair as re-affirming their wait,
+        // not as a pair-up. Prevents "paired with self" when a client
+        // re-sends ready_to_pair after a Chat toggle-off+on cycle that the
+        // server didn't tear down (e.g., because it predates the unpair
+        // handler, or because two ready_to_pair calls raced past a single
+        // unpair).
+        if (waitingUser && waitingUser.userId === ws.userId) {
+          ws.send(JSON.stringify({ type: 'wait_state' }));
+          return;
+        }
         if (waitingUser === null) {
           // First one in — no code gate. Sitting alone in the queue is
           // harmless (no one to talk to yet).
