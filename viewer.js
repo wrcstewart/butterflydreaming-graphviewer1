@@ -4057,14 +4057,20 @@ async function init() {
       toggleChatMode();
     }
 
-    // 4. Populate the top local card with the payload script. setChatText
-    //    targets the top local card body directly. Must run AFTER chat mode
-    //    engaged so ensureLocalCard's card exists.
+    // 4. Force the visible N=1 local card into existence NOW — normally
+    //    handleChatReady is deferred until the server's chat_ready message,
+    //    but that's async and setChatText below would otherwise land in the
+    //    hidden N=0 ghost created by ensureLocalCard. Calling it here is
+    //    idempotent — when the server's chat_ready later arrives, the same
+    //    handler no-ops because top is already visible.
+    if (typeof handleChatReady === 'function') handleChatReady();
+
+    // 5. Populate the (now-visible) top local card with the payload script.
     if (script !== null && typeof setChatText === 'function') {
       setChatText(script);
     }
 
-    // 5. Engage Player mode via the radio + setViewMode. setViewMode('player')
+    // 6. Engage Player mode via the radio + setViewMode. setViewMode('player')
     //    will call loadModuleForNode(lastReadNodeId), which reads
     //    node.data('text') — now the payload script — and posts it to the
     //    iframe (fast path if same module, src swap + BD_READY otherwise).

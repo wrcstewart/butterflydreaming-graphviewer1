@@ -41,12 +41,17 @@
 
     // Two-way postMessage relay:
     //   grandparent (viewer) ↔ this iframe (index.html) ↔ inner iframe (visual_module.html)
-    // We forward the A42 protocol types in both directions. Other message types
-    // are ignored so the relay doesn't accidentally loop or leak internal
-    // BD_READY / BD_INIT traffic between the layers.
+    // We forward the A42 protocol types in both directions. Other message
+    // types are ignored so the relay doesn't accidentally loop internal
+    // traffic between the layers.
+    //
+    // 2026-07-05: BD_READY added to RELAY_UP so viewer.js's MM1.6 loader
+    // can tell when the inner module is actually ready to receive a
+    // bd_script_update. Without this, viewer.js's onReady wait for
+    // BD_READY never fires, and the initial script gets dropped silently.
 
     const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update']);
-    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update']);
+    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY']);
 
     const moduleFrame = document.getElementById('module-frame');
 
