@@ -3583,6 +3583,14 @@ async function init() {
     } else {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
+      // Cy's internal size may have gone stale while it was hidden (any
+      // resize / rAF re-fit was skipped). Re-sync after a frame so the
+      // container has real dimensions again, then re-fit to whatever
+      // sub-graph is currently visible.
+      requestAnimationFrame(() => {
+        cy.resize();
+        cy.fit(cy.elements(':visible'), fitPadding(cy, 40));
+      });
     }
   }
 
@@ -3673,8 +3681,22 @@ async function init() {
     chatBtn.classList.toggle('active', chatModeActive);
     requestAnimationFrame(() => {
       positionCyEl();
-      cy.resize();
-      cy.fit(undefined, fitPadding(cy, 40));
+      // Only re-fit cy when it's actually visible. In the return-from-
+      // standalone flow, setViewMode('player') has hidden cy by the time
+      // this rAF fires — cy.resize() on a display:none container zeroes
+      // its internal size, and cy.fit(undefined, ...) fits ALL elements
+      // (including hidden ones), so the previous expandToNode's
+      // fit-to-visible on the target node gets overwritten. Then when
+      // the user later switches to Nodes mode, cy re-appears with a
+      // stale fit that looks like Root's neighbourhood instead of the
+      // target. Skipping the resize/fit when hidden preserves the
+      // fit-to-visible from expandToNode. Also switch from `undefined`
+      // (all elements) to `cy.elements(':visible')` so partial-view
+      // navigations don't leak hidden-node bounds into the framing.
+      if (!cyEl.classList.contains('hidden')) {
+        cy.resize();
+        cy.fit(cy.elements(':visible'), fitPadding(cy, 40));
+      }
     });
   }
 
