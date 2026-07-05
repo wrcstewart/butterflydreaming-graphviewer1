@@ -444,6 +444,29 @@ function flattenProps(props) {
   return out;
 }
 
+// --- MM1.6 (2026-07-05) Media-module registry ---
+// Maps the `%%bd_module <id>` identifier to the iframe URL. Identifier and
+// URL are decoupled deliberately — the identifier is the user-facing name
+// (bd_V_Kolam), the URL is an implementation detail (/bd_V_Kolam/index.html
+// after the 2026-07-05 full URL rename — path was /visual1/ before).
+const MODULE_REGISTRY = {
+  'bd_V_Kolam': '/bd_V_Kolam/index.html',
+  // future modules added here
+};
+
+function getModuleUrl(moduleId) {
+  return MODULE_REGISTRY[moduleId] || null;
+}
+
+// Extract the module identifier from a node's text: first line matching
+// `%%bd_module <id>` wins. Returns null when no such line is present
+// (i.e., not a media node) or on non-string input.
+function parseModuleId(text) {
+  if (typeof text !== 'string') return null;
+  const match = text.match(/^%%bd_module\s+(\S+)/m);
+  return match ? match[1] : null;
+}
+
 // --- Neo4j → Cytoscape element builders ---
 
 function shortText(text, wordCount) {
@@ -1485,6 +1508,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       setSystemText(content, meta);
     }
+    // MM1.6 Strategy B — notify the outer scope that a node has been read-
+    // tapped. If Player mode is active, the outer handler auto-loads the
+    // node's module into the iframe. lastReadNodeId is already up to date
+    // (set by markReadNode earlier in the tap chain), so no need to pass id.
+    document.dispatchEvent(new Event('bd:node-read'));
   }
 
   function buildTooltipContent(node) {
@@ -3455,6 +3483,60 @@ async function init() {
   // A42 §42.3 — Nodes/Player view switch. Called by the radio change handler
   // and by toggleChatMode when chat closes (forces back to Nodes).
   const visualIframe = document.getElementById('visual-iframe');
+
+  // MM1.6 (2026-07-05) — track the module currently loaded in the iframe so
+  // navigating to another node using the same module is a cheap postMessage
+  // rather than a full src reload. Initialise by reverse-lookup: if the
+  // iframe's starting src matches a registry entry, we know that module id.
+  let currentModuleId = null;
+  {
+    const initSrc = visualIframe ? (visualIframe.getAttribute('src') || '') : '';
+    const norm = (s) => s.replace(/\/index\.html$/, '/').replace(/\/$/, '');
+    for (const [id, url] of Object.entries(MODULE_REGISTRY)) {
+      if (norm(initSrc) === norm(url)) { currentModuleId = id; break; }
+    }
+  }
+
+  // MM1.6 loader — Strategy B (see amendment discussion). Called only from
+  // Player-mode entry and from the bd:node-read handler when Player is
+  // active. Same module → postMessage the script (fast). Different module
+  // → swap src, await BD_READY, then postMessage script.
+  function loadModuleForNode(nodeId) {
+    if (!nodeId || !visualIframe) return;
+    const node = cy.getElementById(nodeId);
+    if (!node || node.length === 0) return;
+    const text = node.data('text');
+    const moduleId = parseModuleId(text);
+    if (!moduleId) return;                                // not a media node
+    const url = getModuleUrl(moduleId);
+    if (!url) {
+      console.warn(`[MM1.6] Unknown module id '${moduleId}' on node ${nodeId} — ignoring`);
+      return;
+    }
+    if (moduleId === currentModuleId) {
+      // Same module already loaded — just push the script over.
+      try {
+        visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+      } catch (_) {}
+      return;
+    }
+    // Different module — swap src, wait for BD_READY from the new module,
+    // then send the script. Listener removes itself after firing so we
+    // don't accumulate.
+    currentModuleId = moduleId;
+    const onReady = (e) => {
+      if (e.source !== visualIframe.contentWindow) return;
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_READY') return;
+      window.removeEventListener('message', onReady);
+      try {
+        visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+      } catch (_) {}
+    };
+    window.addEventListener('message', onReady);
+    visualIframe.src = url;
+  }
+
   function setViewMode(mode) {
     if (mode === 'player') {
       // Refresh the iframe rect from #cy in case anything shifted since the
@@ -3462,11 +3544,27 @@ async function init() {
       positionCyEl();
       cyEl.classList.add('hidden');
       if (visualIframe) visualIframe.classList.add('active');
+      // MM1.6 Strategy B — on entering Player mode, load the current node's
+      // module so the user sees the visual immediately without having to
+      // press Copy Down.
+      const nodeId = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
+                     (typeof getActiveNodeId    === 'function' && getActiveNodeId());
+      if (nodeId) loadModuleForNode(nodeId);
     } else {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
     }
   }
+
+  // MM1.6 Strategy B — auto-load a module when the user read-taps a node
+  // AND is currently in Player mode. In Nodes mode we don't touch the
+  // iframe; the user's mental model is "browsing", not "previewing".
+  document.addEventListener('bd:node-read', () => {
+    if (!visualIframe || !visualIframe.classList.contains('active')) return;
+    const nodeId = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
+                   (typeof getActiveNodeId    === 'function' && getActiveNodeId());
+    if (nodeId) loadModuleForNode(nodeId);
+  });
   // Window resize while Player is active — restamp the iframe rect from #cy.
   window.addEventListener('resize', () => {
     if (visualIframe && visualIframe.classList.contains('active')) {
@@ -3685,7 +3783,7 @@ async function init() {
     });
 
     // ── Copy Link ─────────────────────────────────────────────────────────────
-    // Builds a standalone-player URL (path /visual1/ on port 8080) whose
+    // Builds a standalone-player URL (path /bd_V_Kolam/ on port 8080) whose
     // ?data=<base64 JSON> payload carries: the current panel/card text
     // (`script`) plus, if a node is currently focused in the graph, its `url`,
     // `source_text`, and `title`. Always visible/active — does not depend on
@@ -3789,7 +3887,7 @@ async function init() {
         // trip and silently drops the standalone into DEFAULT_SCRIPT.
         // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-        const standaloneBaseUrl = `http://${window.location.hostname}:8080/visual1/preview.html`;
+        const standaloneBaseUrl = `http://${window.location.hostname}:8080/bd_V_Kolam/preview.html`;
         const link = `${standaloneBaseUrl}?data=${encodeURIComponent(encoded)}`;
 
         copyLinkText(link).then(() => {

@@ -36,11 +36,12 @@ app.use(express.static('.', {
   }
 }));
 
-// A42 §42.2 — expose the V_Kolam visual module bundle at /visual1/.
-// The graphviewer's #visual-iframe (added in A42 §42.3) will use this URL.
-// Same no-cache treatment for HTML as the root static — otherwise iframe
-// edits get browser-cached and never surface.
-app.use('/visual1', express.static('./V_Kolam', {
+// A42 §42.2 — expose the V_Kolam visual module bundle. Path was /visual1/
+// originally; renamed to /bd_V_Kolam/ 2026-07-05 (MM1 amendment full URL
+// rename). On-disk directory stays as V_Kolam/ — only the served path
+// changes. Same no-cache treatment for HTML as the root static, otherwise
+// iframe edits get browser-cached and never surface.
+app.use('/bd_V_Kolam', express.static('./V_Kolam', {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
