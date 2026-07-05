@@ -3497,16 +3497,11 @@ async function init() {
 
   // MM1.6 (2026-07-05) — track the module currently loaded in the iframe so
   // navigating to another node using the same module is a cheap postMessage
-  // rather than a full src reload. Initialise by reverse-lookup: if the
-  // iframe's starting src matches a registry entry, we know that module id.
+  // rather than a full src reload. Starts null: the iframe has no src at
+  // page load (see index.html comment), so the first loadModuleForNode call
+  // takes the src-swap + BD_READY path. Same-module navigations thereafter
+  // take the fast postMessage path.
   let currentModuleId = null;
-  {
-    const initSrc = visualIframe ? (visualIframe.getAttribute('src') || '') : '';
-    const norm = (s) => s.replace(/\/index\.html$/, '/').replace(/\/$/, '');
-    for (const [id, url] of Object.entries(MODULE_REGISTRY)) {
-      if (norm(initSrc) === norm(url)) { currentModuleId = id; break; }
-    }
-  }
 
   // MM1.6 loader — Strategy B (see amendment discussion). Called only from
   // Player-mode entry and from the bd:node-read handler when Player is

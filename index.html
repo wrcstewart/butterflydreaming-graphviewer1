@@ -36,8 +36,10 @@
     </span>
   </div>
   <div id="cy"></div>
+  <!-- No hardcoded src: viewer.js's MM1.6 loader owns the iframe's URL and
+       only sets it after attaching the BD_READY listener, so we can't race
+       past the initial BD_READY message from a preloaded module. -->
   <iframe id="visual-iframe"
-          src="/bd_V_Kolam/"
           title="ButterflyDreaming Visual Module"
           sandbox="allow-scripts allow-same-origin"></iframe>
   <div id="media-bar"></div>
@@ -103,6 +105,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script type="module" src="viewer.js?v=380"></script>
+  <script type="module" src="viewer.js?v=381"></script>
 </body>
 </html>
