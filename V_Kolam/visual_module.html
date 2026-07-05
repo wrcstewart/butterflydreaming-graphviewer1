@@ -1001,6 +1001,12 @@
         .forEach(el => { el.disabled = false; });
     }
     function drawWaitingMessage() {
+      // 2026-07-05 — bail if the script has already arrived. The initial draw
+      // is scheduled via double requestAnimationFrame (see below) to let
+      // layout flush. On return-from-standalone, bd_script_update can arrive
+      // via BD_READY round-trip in less than 2 frames — if it does, render()
+      // has already painted the kolam, and this call would black-overpaint it.
+      if (!waitingForFirstScript) return;
       updateCanvasSize();
       ctx.fillStyle = '#0a0a0f';
       ctx.fillRect(0, 0, canvas.width, canvas.height);

@@ -3484,10 +3484,19 @@ async function init() {
     const iframeEl = document.getElementById('visual-iframe');
     if (iframeEl) {
       const cyRect = cyEl.getBoundingClientRect();
-      iframeEl.style.top    = cyRect.top    + 'px';
-      iframeEl.style.left   = cyRect.left   + 'px';
-      iframeEl.style.width  = cyRect.width  + 'px';
-      iframeEl.style.height = cyRect.height + 'px';
+      // Only stamp when #cy has non-zero dimensions. In Player mode #cy has
+      // `.hidden` (display: none) so its rect collapses to zeros — if we
+      // stamped those zeros onto the iframe, its inner module would render
+      // into a 0×0 viewport and appear blank. Skipping the stamp keeps the
+      // most recent good rect (from the last un-hidden call) so the iframe
+      // stays sized correctly across the toggleChatMode → setViewMode('player')
+      // rAF sequence used by the ?data= return-from-standalone flow.
+      if (cyRect.width > 0 && cyRect.height > 0) {
+        iframeEl.style.top    = cyRect.top    + 'px';
+        iframeEl.style.left   = cyRect.left   + 'px';
+        iframeEl.style.width  = cyRect.width  + 'px';
+        iframeEl.style.height = cyRect.height + 'px';
+      }
     }
   }
 
@@ -3529,6 +3538,7 @@ async function init() {
 
     if (moduleId === currentModuleId) {
       // Same module already loaded — just push the script over.
+      console.log('[MM1.6] loadModuleForNode: fast path, posting bd_script_update, script length=', text.length);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
         enableCopyUp();
@@ -3538,16 +3548,20 @@ async function init() {
     // Different module — swap src, wait for BD_READY from the new module,
     // then send the script. Listener removes itself after firing so we
     // don't accumulate.
+    console.log('[MM1.6] loadModuleForNode: swap path, setting src=', url, 'script length=', text.length);
     currentModuleId = moduleId;
     const onReady = (e) => {
-      if (e.source !== visualIframe.contentWindow) return;
       const d = e && e.data;
       if (!d || d.type !== 'BD_READY') return;
+      console.log('[MM1.6] onReady: BD_READY received, source match=', e.source === visualIframe.contentWindow);
       window.removeEventListener('message', onReady);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
         enableCopyUp();
-      } catch (_) {}
+        console.log('[MM1.6] onReady: bd_script_update posted');
+      } catch (err) {
+        console.warn('[MM1.6] onReady: postMessage failed', err);
+      }
     };
     window.addEventListener('message', onReady);
     visualIframe.src = url;
