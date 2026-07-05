@@ -3100,7 +3100,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     clearEditSelection();
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId };
+  // enterNode — programmatic "navigate to and read this node" used by the
+  // return-from-standalone flow. Combines markReadNode (sets lastReadNodeId
+  // + visual border) with expandToNode (sets activeNodeId, shows one-hop
+  // neighbourhood). Matches what a manual read-tap achieves, minus the
+  // read-tap's own tooltip/panel routing (caller handles that separately).
+  function enterNode(node) {
+    if (!node || !node.length) return;
+    markReadNode(node, cy);
+    expandToNode(node);
+  }
+
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode };
 
 }
 
@@ -3718,7 +3729,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -3991,6 +4002,87 @@ async function init() {
       handleClusterCloned(msg);
     }
   });
+
+  // MM1 (2026-07-05) — Return-from-standalone flow. When the URL carries a
+  // ?data=<base64 JSON> payload (produced by the standalone player's
+  // "Enter ButterflyDreaming" / "Copy BD Link" buttons), decode it, find
+  // the originating node by url match, engage Chat + Player modes, and
+  // populate the top local card with the (possibly edited) script from the
+  // payload. Locally overwriting node.data('text') means Player mode's
+  // auto-load in setViewMode('player') will push the edited script (not
+  // the DB copy) into the iframe.
+  (function handleReturnFromStandalone() {
+    const params = new URLSearchParams(window.location.search);
+    const dataParam = params.get('data');
+    if (!dataParam) return;
+
+    // Strip ?data= from the URL bar unconditionally, even on failure paths,
+    // so a browser refresh doesn't re-fire this flow.
+    const cleanUrl = () => {
+      try { history.replaceState({}, '', window.location.pathname); } catch (_) {}
+    };
+
+    let payload;
+    try {
+      payload = JSON.parse(decodeURIComponent(escape(atob(dataParam))));
+    } catch (err) {
+      console.warn('[MM1] return-from-standalone: failed to decode ?data payload:', err);
+      cleanUrl();
+      return;
+    }
+    if (!payload || typeof payload !== 'object') { cleanUrl(); return; }
+
+    const nodeUrl = typeof payload.node_url === 'string' ? payload.node_url : null;
+    const script  = typeof payload.script   === 'string' ? payload.script   : null;
+    if (!nodeUrl) {
+      console.warn('[MM1] return-from-standalone: payload has no node_url; nothing to navigate to');
+      cleanUrl();
+      return;
+    }
+
+    const target = cy.nodes().filter(n => n.data('url') === nodeUrl).first();
+    if (!target || !target.length) {
+      console.warn('[MM1] return-from-standalone: no node matches url', nodeUrl);
+      cleanUrl();
+      return;
+    }
+
+    // 1. Update the local node's text so Player mode's auto-load sends the
+    //    edited script instead of the DB copy. Not persisted — a refresh
+    //    without ?data= will restore the DB text.
+    if (script !== null) target.data('text', script);
+
+    // 2. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
+    enterNode(target);
+
+    // 3. Engage Chat mode (folds in the ready_to_pair — same code-gate rules
+    //    as any other Chat toggle-on). If pair_denied fires the existing
+    //    handler closes chat, and the user retries manually with a code.
+    if (typeof toggleChatMode === 'function' && !chatModeActive) {
+      toggleChatMode();
+    }
+
+    // 4. Populate the top local card with the payload script. setChatText
+    //    targets the top local card body directly. Must run AFTER chat mode
+    //    engaged so ensureLocalCard's card exists.
+    if (script !== null && typeof setChatText === 'function') {
+      setChatText(script);
+    }
+
+    // 5. Engage Player mode via the radio + setViewMode. setViewMode('player')
+    //    will call loadModuleForNode(lastReadNodeId), which reads
+    //    node.data('text') — now the payload script — and posts it to the
+    //    iframe (fast path if same module, src swap + BD_READY otherwise).
+    const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
+    const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
+    if (playerRadio && !playerRadio.disabled) {
+      playerRadio.checked = true;
+      if (nodesRadio) nodesRadio.checked = false;
+      setViewMode('player');
+    }
+
+    cleanUrl();
+  })();
 }
 
 window.addEventListener('DOMContentLoaded', init);
