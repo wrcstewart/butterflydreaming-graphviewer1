@@ -4065,15 +4065,40 @@ async function init() {
 
     const nodeUrl = typeof payload.node_url === 'string' ? payload.node_url : null;
     const script  = typeof payload.script   === 'string' ? payload.script   : null;
-    if (!nodeUrl) {
-      console.warn('[MM1] return-from-standalone: payload has no node_url; nothing to navigate to');
-      cleanUrl();
-      return;
-    }
 
-    const target = cy.nodes().filter(n => n.data('url') === nodeUrl).first();
+    // Locate the target node.
+    // Primary: match on node.data('url') === payload.node_url. This is the
+    // clean return-from-a-known-node case.
+    // Fallback (no node_url): standalone was launched from a direct URL, not
+    // from BD → payload carries no origin. Convention: every module has a
+    // default "landing" node named <module_id>_1 (e.g., bd_V_Kolam_1). Parse
+    // the module id from the payload's %%bd_module line and look up that node
+    // by name. Ensures the return still lands somewhere sensible instead of
+    // silently no-oping.
+    let target = null;
+    if (nodeUrl) {
+      target = cy.nodes().filter(n => n.data('url') === nodeUrl).first();
+      if (!target || !target.length) {
+        console.warn('[MM1] return-from-standalone: no node matches url', nodeUrl);
+        target = null;
+      }
+    }
+    if (!target) {
+      const moduleId = script ? parseModuleId(script) : null;
+      if (moduleId) {
+        const defaultName = moduleId + '_1';
+        target = cy.nodes().filter(n => n.data('name') === defaultName).first();
+        if (target && target.length) {
+          console.log(`[MM1] return-from-standalone: no node_url; using module default node '${defaultName}'`);
+        } else {
+          console.warn(`[MM1] return-from-standalone: default node '${defaultName}' not found; nothing to navigate to`);
+          target = null;
+        }
+      } else {
+        console.warn('[MM1] return-from-standalone: payload has no node_url and no parseable %%bd_module — nothing to navigate to');
+      }
+    }
     if (!target || !target.length) {
-      console.warn('[MM1] return-from-standalone: no node matches url', nodeUrl);
       cleanUrl();
       return;
     }
