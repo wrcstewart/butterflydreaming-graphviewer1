@@ -3513,10 +3513,19 @@ async function init() {
       console.warn(`[MM1.6] Unknown module id '${moduleId}' on node ${nodeId} — ignoring`);
       return;
     }
+    // Enable Copy Up (↑) whenever a script actually reaches the iframe —
+    // Player-mode auto-load counts as "there's a script playing" just as
+    // much as a manual Copy Down (↓) does.
+    const enableCopyUp = () => {
+      const cuBtn = document.getElementById('copy-up-btn');
+      if (cuBtn) cuBtn.disabled = false;
+    };
+
     if (moduleId === currentModuleId) {
       // Same module already loaded — just push the script over.
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+        enableCopyUp();
       } catch (_) {}
       return;
     }
@@ -3531,6 +3540,7 @@ async function init() {
       window.removeEventListener('message', onReady);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+        enableCopyUp();
       } catch (_) {}
     };
     window.addEventListener('message', onReady);
