@@ -4126,22 +4126,30 @@ async function init() {
       return;
     }
 
-    // 1. Update the local node's text so Player mode's auto-load sends the
+    // 1. Snapshot the target's current DB text BEFORE we overwrite it, so we
+    //    can also place that original on a chat card (see step 5b). The DB
+    //    isn't touched by any of this — target.data('text', …) mutates only
+    //    Cytoscape's local copy — but until the user refreshes, the DB text
+    //    is otherwise inaccessible in the running session because we shadow
+    //    it with the incoming payload script for Player mode's auto-load.
+    const originalDbScript = target.data('text');
+
+    // 2. Update the local node's text so Player mode's auto-load sends the
     //    edited script instead of the DB copy. Not persisted — a refresh
     //    without ?data= will restore the DB text.
     if (script !== null) target.data('text', script);
 
-    // 2. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
+    // 3. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
     enterNode(target);
 
-    // 3. Engage Chat mode (folds in the ready_to_pair — same code-gate rules
+    // 4. Engage Chat mode (folds in the ready_to_pair — same code-gate rules
     //    as any other Chat toggle-on). If pair_denied fires the existing
     //    handler closes chat, and the user retries manually with a code.
     if (typeof toggleChatMode === 'function' && !chatModeActive) {
       toggleChatMode();
     }
 
-    // 4. Force the visible N=1 local card into existence NOW — normally
+    // 5. Force the visible N=1 local card into existence NOW — normally
     //    handleChatReady is deferred until the server's chat_ready message,
     //    but that's async and setChatText below would otherwise land in the
     //    hidden N=0 ghost created by ensureLocalCard. Calling it here is
@@ -4149,7 +4157,24 @@ async function init() {
     //    handler no-ops because top is already visible.
     if (typeof handleChatReady === 'function') handleChatReady();
 
-    // 5. Populate the (now-visible) top local card with the payload script.
+    // 5a. Populate the current top card (N=1) with the ORIGINAL DB script,
+    //     then create a new local card above it (N=2) for the incoming
+    //     payload script. Result (newest-on-top):
+    //         N=2  ←  incoming (edited)  payload script
+    //         N=1  ←  original DB script (untouched)
+    //         N=0  ←  hidden ghost
+    //     This keeps the original accessible during the session even while
+    //     the node's local .text has been shadowed for Player-mode auto-load.
+    //     Skipped when the two scripts are identical (unedited return) to
+    //     avoid a redundant duplicate card.
+    const hasOriginal = typeof originalDbScript === 'string' && originalDbScript.length > 0;
+    const originalDiffers = hasOriginal && originalDbScript !== script;
+    if (originalDiffers && typeof setChatText === 'function') {
+      setChatText(originalDbScript);
+      if (typeof createCard === 'function') createCard({ kind: 'local' });
+    }
+
+    // 5b. Populate the (now-topmost) local card with the payload script.
     if (script !== null && typeof setChatText === 'function') {
       setChatText(script);
     }
