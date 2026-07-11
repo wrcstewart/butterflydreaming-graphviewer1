@@ -104,6 +104,52 @@
       border-color: #ffffff;
     }
 
+    /* MM2 (2026-07-11) — EV control cluster on the LEFT side of the bar
+       (Freeze, Edit, ◀ Prev, Next ▶). Muted grey-outlined so they read
+       as local-action controls, distinct from the gold BD-return
+       cluster on the right. */
+    #ev-actions {
+      display: flex;
+      gap: 6px;
+      flex: 0 0 auto;
+      margin-right: 12px;
+    }
+
+    #ev-actions button {
+      background: transparent;
+      color: #ccc;
+      border: 1px solid #666;
+      border-radius: 3px;
+      padding: 3px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: sans-serif;
+      flex: 0 0 auto;
+      min-width: 34px;
+    }
+
+    #ev-actions button:hover:not(:disabled) {
+      color: #fff;
+      border-color: #ccc;
+    }
+
+    #ev-actions button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Active-toggle state for Freeze and Edit — highlight when on. */
+    #ev-actions button.active {
+      background: rgba(255, 215, 0, 0.15);
+      color: #FFD700;
+      border-color: #FFD700;
+    }
+
+    /* Basic mode (default on load): side panel hidden, canvas full width.
+       Edit button toggles body.ev-editing to reveal the panel. Side panel
+       stays laid out via existing flex; no width tweaks needed. */
+    body.ev-basic .side-panel { display: none; }
+
     .layout {
       flex: 1;
       display: flex;
@@ -296,7 +342,7 @@
     }
   </style>
 </head>
-<body>
+<body class="ev-basic">
 
   <div class="layout">
     <div class="module-column">
@@ -319,6 +365,12 @@
   </div>
 
   <div id="bd-bar">
+    <div id="ev-actions">
+      <button id="ev-freeze-btn" type="button" title="Toggle animation (freeze / unfreeze)">Freeze</button>
+      <button id="ev-edit-btn"   type="button" title="Show or hide the script editor">Edit</button>
+      <button id="ev-prev-btn"   type="button" title="Previous script under this module" disabled>◀</button>
+      <button id="ev-next-btn"   type="button" title="Next script under this module"     disabled>▶</button>
+    </div>
     <span id="bd-source-context"></span>
     <div id="bd-actions">
       <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link (with current script + preserved node UUID) to clipboard">Copy BD Link</button>
@@ -347,6 +399,32 @@
       if (!moduleFrame.contentWindow) return;
       moduleFrame.contentWindow.postMessage(message, '*');
     };
+
+    // ── EV state (MM2, 2026-07-11) ────────────────────────────────────────────
+    // Current script + node context. Updated on initial load, on ?data= arrival,
+    // and on Prev/Next navigation. buildBdReturnUrl reads these directly so
+    // Enter BD / Copy BD Link carry the currently-displayed node, not the
+    // one we originally arrived from.
+    let currentScript      = '';
+    let currentNodeUrl     = null;
+    let currentSourceText  = null;
+    let currentTitle       = null;
+    let currentName        = null;
+
+    // Freeze state — preFreezeAngleDrift stores the drift value that was in
+    // effect just before Freeze was pressed, so Unfreeze can restore it.
+    let frozen             = false;
+    let preFreezeAngleDrift = null;
+
+    // Module id derived from the URL path (`/bd_V_Kolam/preview.html` → `bd_V_Kolam`).
+    // Falls back to null if the path pattern doesn't match — in that case the
+    // /api/module-default fetch is skipped and we go straight to DEFAULT_SCRIPT.
+    function getModuleIdFromPath() {
+      const m = window.location.pathname.match(/^\/([^/]+)\//);
+      return m ? m[1] : null;
+    }
+    const moduleId = getModuleIdFromPath();
+    console.log('preview: module id from path =', moduleId);
 
     // ── Default script ────────────────────────────────────────────────────────
     // Symmetry 3 (unusual value) chosen deliberately so a default load is
@@ -530,7 +608,59 @@ F: F+F-F-F+F+F+F-F
     //   1. ?data=<base64 JSON {script, node_url, source_text, title}>   (BD viewer Copy Link)
     //   2. ?script=<base64 raw script text>                             (standalone Copy Link)
     //   3. DEFAULT_SCRIPT
-    (function loadInitialScript() {
+    // MM2 — central script-loading function used by:
+    //   · initial page load (default from server or DEFAULT_SCRIPT)
+    //   · ?data= / ?script= URL param decode
+    //   · Prev / Next navigation
+    //   · manual Copy Down (↓)
+    // Updates textarea, steppers, module iframe, and optionally the current
+    // node metadata (source_text/title/name/node_url) for source-context
+    // display and BD-return URL construction.
+    function loadScript(script, meta = {}) {
+      const clean = stripAngleSeconds(typeof script === 'string' ? script : '');
+      currentScript = clean;
+      textarea.value = clean;
+      syncSteppersFromScript(clean);
+      if (moduleReady) postToModule({ type: 'bd_script_update', script: clean });
+      else             pendingScript = clean;
+      if (meta.node_url    !== undefined) currentNodeUrl    = meta.node_url;
+      if (meta.source_text !== undefined) currentSourceText = meta.source_text;
+      if (meta.title       !== undefined) currentTitle      = meta.title;
+      if (meta.name        !== undefined) currentName       = meta.name;
+      renderSourceContext();
+      // Freeze state should never survive a script swap (new script has its
+      // own angle_drift value; the old preFreezeAngleDrift is meaningless).
+      if (frozen) setFrozen(false, { silent: true });
+    }
+
+    // Fetch the module's default node from BD's HTTP API. Falls back to
+    // DEFAULT_SCRIPT on any error (404, network, server absent).
+    async function loadModuleDefault() {
+      if (!moduleId) return false;
+      try {
+        const res = await fetch(`/api/module-default?module=${encodeURIComponent(moduleId)}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        console.log('preview: /api/module-default →', {
+          name: data.name, seq: data.seq, isFirst: data.isFirst, isLast: data.isLast
+        });
+        loadScript(data.script, {
+          node_url:    data.node_url,
+          source_text: data.source_text,
+          title:       data.title,
+          name:        data.name
+        });
+        updateEvNavState(data.isFirst, data.isLast);
+        return true;
+      } catch (err) {
+        console.warn('preview: /api/module-default failed:', err);
+        return false;
+      }
+    }
+
+    (async function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
 
       const dataParam = params.get('data');
@@ -540,7 +670,6 @@ F: F+F-F-F+F+F+F-F
           if (payload && typeof payload.script === 'string') {
             incomingPayload = payload;
             window.incomingPayload = incomingPayload;
-            textarea.value = stripAngleSeconds(payload.script);
             bdReturnContext = {
               node_url:    payload.node_url    ?? null,
               source_text: payload.source_text ?? null,
@@ -548,11 +677,18 @@ F: F+F-F-F+F+F+F-F
             };
             window.bdReturnContext = bdReturnContext;
             console.log('preview: loaded from ?data payload', {
-              scriptLen: textarea.value.length,
+              scriptLen: payload.script.length,
               ...bdReturnContext
             });
-            syncSteppersFromScript(textarea.value);
-            renderSourceContext();
+            loadScript(payload.script, {
+              node_url:    payload.node_url    ?? null,
+              source_text: payload.source_text ?? null,
+              title:       payload.title       ?? null,
+              name:        payload.name        ?? null
+            });
+            // MM2 — enable Prev/Next only if we know the current node in the
+            // module's sequence. Server /api/module-sibling handles boundary.
+            if (currentNodeUrl) updateEvNavState(false, false);
             return;
           }
           console.warn('preview: ?data payload missing string `script` field', payload);
@@ -564,15 +700,16 @@ F: F+F-F-F+F+F+F-F
       const scriptParam = params.get('script');
       if (scriptParam) {
         try {
-          textarea.value = stripAngleSeconds(b64DecodeUtf8(scriptParam));
-          syncSteppersFromScript(textarea.value);
+          loadScript(b64DecodeUtf8(scriptParam));
           return;
         } catch (err) {
           console.warn('preview: failed to decode ?script param', err);
         }
       }
-      textarea.value = DEFAULT_SCRIPT;
-      syncSteppersFromScript(textarea.value);
+
+      // No URL params — try to fetch the module's default node from BD.
+      const ok = await loadModuleDefault();
+      if (!ok) loadScript(DEFAULT_SCRIPT);
     })();
 
     // Manual edits to the textarea should also refresh the stepper displays,
@@ -586,9 +723,14 @@ F: F+F-F-F+F+F+F-F
     function renderSourceContext() {
       const el = document.getElementById('bd-source-context');
       if (!el) return;
-      const src = incomingPayload && incomingPayload.source_text ? String(incomingPayload.source_text) : '';
-      const ttl = incomingPayload && incomingPayload.title       ? String(incomingPayload.title)       : '';
-      const parts = [src, ttl].filter(Boolean);
+      // MM2 — use current* state instead of incomingPayload, so the display
+      // reflects Prev/Next navigation (not just the arrival state).
+      const src = currentSourceText ? String(currentSourceText) : '';
+      const ttl = currentTitle      ? String(currentTitle)      : '';
+      const nm  = currentName       ? String(currentName)       : '';
+      // Prefer the module-specific node name over generic title if both exist.
+      const rightHalf = nm || ttl;
+      const parts = [src, rightHalf].filter(Boolean);
       el.textContent = parts.join(' — ');
     }
 
@@ -597,17 +739,117 @@ F: F+F-F-F+F+F+F-F
     // originating node). encodeURIComponent the base64 so `+` doesn't get
     // decoded as space on arrival (URLSearchParams `+ → space` gotcha).
     function buildBdReturnUrl() {
-      const currentScript = textarea.value;
+      // MM2 — read current* state, which starts from ?data= arrival and
+      // updates on Prev/Next navigation. Textarea is authoritative for the
+      // script itself (user may have edited it).
+      const script = textarea.value;
       const returnPayload = {
-        script:      currentScript,
-        node_url:    (incomingPayload && incomingPayload.node_url)    ?? null,
-        source_text: (incomingPayload && incomingPayload.source_text) ?? null,
-        title:       (incomingPayload && incomingPayload.title)       ?? null
+        script,
+        node_url:    currentNodeUrl    ?? null,
+        source_text: currentSourceText ?? null,
+        title:       currentTitle      ?? null
       };
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(returnPayload))));
       const url = `https://graph.virtualfictions.uk?data=${encodeURIComponent(encoded)}`;
-      return { url, returnPayload, scriptLen: currentScript.length };
+      return { url, returnPayload, scriptLen: script.length };
     }
+
+    // ── EV button strip (MM2) — Freeze / Edit / ◀ Prev / Next ▶ ────────────────
+    const evFreezeBtn = document.getElementById('ev-freeze-btn');
+    const evEditBtn   = document.getElementById('ev-edit-btn');
+    const evPrevBtn   = document.getElementById('ev-prev-btn');
+    const evNextBtn   = document.getElementById('ev-next-btn');
+
+    function updateEvNavState(isFirst, isLast) {
+      if (evPrevBtn) evPrevBtn.disabled = !!isFirst || !currentNodeUrl;
+      if (evNextBtn) evNextBtn.disabled = !!isLast  || !currentNodeUrl;
+    }
+
+    // Freeze — sends bd_param_update {angle_drift: 0} directly to the module
+    // instead of rewriting the script. Stores the value in effect at the moment
+    // Freeze is pressed so Unfreeze can restore it. Any script swap (Prev/Next,
+    // ?data=, Copy Down) implicitly clears frozen state via loadScript's guard.
+    function currentAngleDrift() {
+      const input = document.getElementById('angle-drift-slider');
+      if (input) return Number(input.value);
+      const m = (currentScript || '').match(/^%%bd_angle_drift\s+(-?\d+)/m);
+      return m ? Number(m[1]) : 0;
+    }
+    function setFrozen(state, opts = {}) {
+      if (state === frozen) return;
+      if (state) {
+        preFreezeAngleDrift = currentAngleDrift();
+        postToModule({ type: 'bd_param_update', name: 'angle_drift', value: 0 });
+        frozen = true;
+        if (evFreezeBtn) {
+          evFreezeBtn.classList.add('active');
+          evFreezeBtn.textContent = 'Unfreeze';
+        }
+      } else {
+        // On silent unfreeze (script swap), don't push a value back — the new
+        // script's own angle_drift is already in effect. Only restore when a
+        // user click released the freeze.
+        if (!opts.silent && preFreezeAngleDrift !== null) {
+          postToModule({ type: 'bd_param_update', name: 'angle_drift', value: preFreezeAngleDrift });
+        }
+        frozen = false;
+        preFreezeAngleDrift = null;
+        if (evFreezeBtn) {
+          evFreezeBtn.classList.remove('active');
+          evFreezeBtn.textContent = 'Freeze';
+        }
+      }
+    }
+    if (evFreezeBtn) evFreezeBtn.addEventListener('click', () => setFrozen(!frozen));
+
+    // Edit — toggle the side panel (script textarea + steppers) via a body
+    // class. Basic mode = ev-basic present = side panel hidden.
+    if (evEditBtn) {
+      evEditBtn.addEventListener('click', () => {
+        const nowEditing = document.body.classList.toggle('ev-basic') === false;
+        evEditBtn.classList.toggle('active', nowEditing);
+      });
+    }
+
+    // Prev / Next — fetch adjacent sibling under the same module.
+    async function navigateSibling(direction) {
+      if (!currentNodeUrl) return;
+      const btn = direction === 'next' ? evNextBtn : evPrevBtn;
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch(
+          `/api/module-sibling?node_url=${encodeURIComponent(currentNodeUrl)}` +
+          `&direction=${direction}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) {
+          console.warn('preview: /api/module-sibling failed:', res.status);
+          return;
+        }
+        const data = await res.json();
+        if (!data.node_url) {
+          // Boundary reached — disable this direction and leave the other
+          // alone (the button we just disabled stays disabled until next nav).
+          if (btn) btn.disabled = true;
+          return;
+        }
+        loadScript(data.script, {
+          node_url:    data.node_url,
+          source_text: data.source_text,
+          title:       data.title,
+          name:        data.name
+        });
+        updateEvNavState(data.isFirst, data.isLast);
+      } catch (err) {
+        console.warn('preview: navigateSibling error:', err);
+      } finally {
+        // Re-enable happens via updateEvNavState in the success path; on error
+        // we optimistically re-enable so the user isn't stuck.
+        if (btn && btn.disabled) btn.disabled = false;
+      }
+    }
+    if (evPrevBtn) evPrevBtn.addEventListener('click', () => navigateSibling('prev'));
+    if (evNextBtn) evNextBtn.addEventListener('click', () => navigateSibling('next'));
 
     // Enter → navigate.
     const bdEnterBtn = document.getElementById('bd-enter-btn');
@@ -820,8 +1062,12 @@ F: F+F-F-F+F+F+F-F
           postToModule({ type: 'bd_ui_config', hideControls: true });
           const first = pendingScript !== null ? pendingScript : textarea.value;
           pendingScript = null;
-          postToModule({ type: 'bd_script_update', script: first });
-          syncSteppersFromScript(first);
+          // MM2: don't push an empty script if the async default-fetch hasn't
+          // resolved yet. When it does, loadScript() will post the real thing.
+          if (first) {
+            postToModule({ type: 'bd_script_update', script: first });
+            syncSteppersFromScript(first);
+          }
           break;
         }
         case 'bd_script_response': {
