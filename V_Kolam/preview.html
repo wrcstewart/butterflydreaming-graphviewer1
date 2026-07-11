@@ -69,7 +69,8 @@
       position: fixed;
       bottom: 44px;                  /* 36 px bar + 8 px gap */
       right: 8px;
-      max-width: 260px;
+      max-width: 208px;              /* -20 % from 260 px (2026-07-11);
+                                        panel shrunk after Copy Link removed */
       padding: 10px 12px;
       background: rgba(10, 10, 26, 0.95);
       border: 1px solid #333;
@@ -402,13 +403,15 @@
     <span id="bd-source-context"></span>
   </div>
 
-  <!-- Invitation panel: text + stacked call-to-action buttons. Shown only
-       when Edit is toggled on (body loses the ev-basic class). -->
+  <!-- Invitation panel: text + Jump In button. Shown only when Edit is
+       toggled on (body loses the ev-basic class). Copy Link was removed
+       2026-07-11 — the ?data= URL is visible in the browser address bar
+       during Jump In navigation, so an in-panel Copy Link would be
+       redundant for the intended use case. -->
   <aside id="bd-invite-panel">
     <p id="bd-invite-text">You can use our Butterfly Dreaming Platform to explore context, collaborate and save</p>
     <div id="bd-actions">
-      <button id="bd-enter-btn"     type="button" title="Return to ButterflyDreaming carrying the current script">Jump In</button>
-      <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link (with current script + preserved node UUID) to clipboard">Copy Link</button>
+      <button id="bd-enter-btn" type="button" title="Return to ButterflyDreaming carrying the current script">Jump In</button>
     </div>
   </aside>
 
