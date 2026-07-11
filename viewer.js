@@ -2610,11 +2610,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
     }
 
-    if (node.data('name') === 'Settling') {
-      const defaultTrack = mediaFilesList.find(f => /^D_/i.test(f.name))?.name || mediaFilesList[0]?.name || '';
-      toggleMediaBar('Settling', defaultTrack);
-      setHelpText('Optionally, use the player above.');
-    } else if (type === 'Cluster') {
+    // Media bar is now persistently open — no per-node auto-open. See the
+    // media_files handler in init for the initial toggleMediaBar call.
+    if (type === 'Cluster') {
       setHelpText('Enter one of the Works shown');
     } else if (type === 'TextNode' && node.data('section_title')) {
       setHelpText('To return enter a text node, search rectangle or breadcrumb');
@@ -3111,7 +3109,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, toggleMediaBar };
 
 }
 
@@ -3760,7 +3758,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -3970,6 +3968,15 @@ async function init() {
     }
     if (msg.type === 'media_files') {
       mediaFilesList = msg.files;
+      // Media bar is now persistently open (not gated on Settling
+      // navigation). User picks a track or dismisses via ✕ if they want
+      // it out of the way; refreshing the page brings it back.
+      if (mediaFilesList.length > 0) {
+        const defaultTrack =
+          mediaFilesList.find(f => /^D_/i.test(f.name))?.name ||
+          mediaFilesList[0]?.name || '';
+        if (defaultTrack) toggleMediaBar('media', defaultTrack);
+      }
       return;
     }
     if (msg.type === 'wait_state') {
