@@ -67,7 +67,9 @@
        narrow / portrait so the text has room to breathe. */
     #bd-invite-panel {
       position: fixed;
-      bottom: 44px;                  /* 36 px bar + 8 px gap */
+      bottom: 34px;                  /* was 44 (36 px bar + 8 px gap);
+                                        dropped 10 px 2026-07-11 so panel top
+                                        clears the side-panel action row. */
       right: 8px;
       max-width: 208px;              /* -20 % from 260 px (2026-07-11);
                                         panel shrunk after Copy Link removed */
@@ -425,7 +427,7 @@
        resolves the naming conflict with the side-panel's Copy Link (which
        copies the standalone-EV URL, not the BD-return URL). -->
   <aside id="bd-invite-panel">
-    <p id="bd-invite-text">You can use our Platform to explore context, collaborate and save</p>
+    <p id="bd-invite-text">You can use our Platform to explore, collaborate and save</p>
     <div id="bd-actions">
       <button id="bd-enter-btn"     type="button" title="Return to ButterflyDreaming carrying the current script">Jump to</button>
       <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link to the clipboard">Copy Link to</button>
