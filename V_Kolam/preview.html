@@ -60,42 +60,70 @@
       margin-right: 12px;
     }
 
-    #bd-actions {
-      display: flex;
-      gap: 8px;
-      flex: 0 0 auto;
+    /* Invitation panel (2026-07-11) — floats above #bd-bar. Shown only when
+       Edit is toggled on; hidden in basic mode. Contains an explainer
+       sentence and two stacked call-to-action buttons (Jump In on top,
+       Copy Link below). Right-aligned on landscape, spans further left on
+       narrow / portrait so the text has room to breathe. */
+    #bd-invite-panel {
+      position: fixed;
+      bottom: 44px;                  /* 36 px bar + 8 px gap */
+      right: 8px;
+      max-width: 260px;
+      padding: 10px 12px;
+      background: rgba(10, 10, 26, 0.95);
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #ccc;
+      font-family: sans-serif;
+      font-size: 12px;
+      line-height: 1.35;
+      z-index: 1001;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
     }
 
+    body:not(.ev-basic) #bd-invite-panel { display: block; }
+
+    #bd-invite-text {
+      margin: 0 0 10px 0;
+      color: #ccc;
+    }
+
+    #bd-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Jump In — gold, primary call to action. */
     #bd-enter-btn {
       background: #FFD700;
       color: #0a0a1a;
       border: none;
       border-radius: 3px;
-      padding: 4px 10px;
-      font-size: 11px;
+      padding: 6px 10px;
+      font-size: 12px;
       cursor: pointer;
       font-weight: bold;
       font-family: sans-serif;
-      flex: 0 0 auto;
     }
 
     #bd-enter-btn:hover {
       background: #ffffff;
     }
 
-    /* Secondary / outline styling — same size + rhythm as #bd-enter-btn,
-       muted so the gold Enter stays the primary call to action. */
+    /* Copy Link — outlined, secondary. */
     #bd-copy-link-btn {
       background: transparent;
       color: #FFD700;
       border: 1px solid #FFD700;
       border-radius: 3px;
-      padding: 3px 10px;   /* -1 px vertical to compensate for the added border */
-      font-size: 11px;
+      padding: 5px 10px;             /* -1 px vertical to compensate for the border */
+      font-size: 12px;
       cursor: pointer;
       font-weight: bold;
       font-family: sans-serif;
-      flex: 0 0 auto;
     }
 
     #bd-copy-link-btn:hover {
@@ -372,11 +400,17 @@
       <button id="ev-next-btn"   type="button" title="Next script under this module"     disabled>▶</button>
     </div>
     <span id="bd-source-context"></span>
-    <div id="bd-actions">
-      <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link (with current script + preserved node UUID) to clipboard">Copy BD Link</button>
-      <button id="bd-enter-btn"     type="button" title="Return to ButterflyDreaming carrying the current script">Enter ButterflyDreaming</button>
-    </div>
   </div>
+
+  <!-- Invitation panel: text + stacked call-to-action buttons. Shown only
+       when Edit is toggled on (body loses the ev-basic class). -->
+  <aside id="bd-invite-panel">
+    <p id="bd-invite-text">You can use our Butterfly Dreaming Platform to explore context, collaborate and save</p>
+    <div id="bd-actions">
+      <button id="bd-enter-btn"     type="button" title="Return to ButterflyDreaming carrying the current script">Jump In</button>
+      <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link (with current script + preserved node UUID) to clipboard">Copy Link</button>
+    </div>
+  </aside>
 
   <script>
     'use strict';
