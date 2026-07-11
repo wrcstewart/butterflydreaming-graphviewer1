@@ -411,6 +411,16 @@
     let currentTitle       = null;
     let currentName        = null;
 
+    // Virtual-start position (MM2, 2026-07-11).
+    // When the EV is arrived at with a ?data= payload, we cache that payload
+    // as a "virtual" position occupying slot 0 in the navigation list — the
+    // DB siblings start at slot 1. This lets the user navigate ▶ to the DB
+    // list and ◀ back to their arrival state (which may carry a script that
+    // was edited in the standalone before Enter-BD-ing back or paste-shared).
+    // ◀ from virtual is disabled; ◀ from the first DB sibling returns here.
+    let virtualStart   = null;   // snapshot of ?data= payload, or null
+    let atVirtualStart = false;  // true while we're viewing virtualStart
+
     // Freeze state — preFreezeAngleDrift stores the drift value that was in
     // effect just before Freeze was pressed, so Unfreeze can restore it.
     let frozen             = false;
@@ -633,31 +643,42 @@ F: F+F-F-F+F+F+F-F
       if (frozen) setFrozen(false, { silent: true });
     }
 
-    // Fetch the module's default node from BD's HTTP API. Falls back to
-    // DEFAULT_SCRIPT on any error (404, network, server absent).
-    async function loadModuleDefault() {
-      if (!moduleId) return false;
+    // Fetch the module's default node from BD's HTTP API. Returns the raw
+    // response body or null on failure. Kept as a bare fetch so ▶-from-
+    // virtual can call it without triggering the loader's own nav-state
+    // update (virtual overrides isFirst=false regardless of what the server
+    // says).
+    async function fetchModuleDefault() {
+      if (!moduleId) return null;
       try {
         const res = await fetch(`/api/module-default?module=${encodeURIComponent(moduleId)}`, {
           cache: 'no-store'
         });
-        if (!res.ok) return false;
-        const data = await res.json();
-        console.log('preview: /api/module-default →', {
-          name: data.name, seq: data.seq, isFirst: data.isFirst, isLast: data.isLast
-        });
-        loadScript(data.script, {
-          node_url:    data.node_url,
-          source_text: data.source_text,
-          title:       data.title,
-          name:        data.name
-        });
-        updateEvNavState(data.isFirst, data.isLast);
-        return true;
+        if (!res.ok) return null;
+        return await res.json();
       } catch (err) {
         console.warn('preview: /api/module-default failed:', err);
-        return false;
+        return null;
       }
+    }
+
+    // Initial-load convenience wrapper — used only on cold start when there
+    // was no ?data= / ?script= URL param. Delegates the fetch to
+    // fetchModuleDefault, then applies the response as the current view.
+    async function loadModuleDefault() {
+      const data = await fetchModuleDefault();
+      if (!data) return false;
+      console.log('preview: /api/module-default →', {
+        name: data.name, seq: data.seq, isFirst: data.isFirst, isLast: data.isLast
+      });
+      loadScript(data.script, {
+        node_url:    data.node_url,
+        source_text: data.source_text,
+        title:       data.title,
+        name:        data.name
+      });
+      updateEvNavState(data.isFirst, data.isLast);
+      return true;
     }
 
     (async function loadInitialScript() {
@@ -680,15 +701,26 @@ F: F+F-F-F+F+F+F-F
               scriptLen: payload.script.length,
               ...bdReturnContext
             });
+            // MM2 — cache the arrival payload as a virtual "position 0"
+            // that we can navigate back to from the DB list. The DB siblings
+            // occupy positions 1, 2, 3, … starting from the module's first
+            // node by seq. ◀ disabled on virtual (nothing before), ▶ enabled
+            // (falls into the DB list).
+            virtualStart = {
+              script:      payload.script,
+              node_url:    payload.node_url    ?? null,
+              source_text: payload.source_text ?? null,
+              title:       payload.title       ?? null,
+              name:        payload.name        ?? null
+            };
+            atVirtualStart = true;
             loadScript(payload.script, {
               node_url:    payload.node_url    ?? null,
               source_text: payload.source_text ?? null,
               title:       payload.title       ?? null,
               name:        payload.name        ?? null
             });
-            // MM2 — enable Prev/Next only if we know the current node in the
-            // module's sequence. Server /api/module-sibling handles boundary.
-            if (currentNodeUrl) updateEvNavState(false, false);
+            updateEvNavState(true, !moduleId);
             return;
           }
           console.warn('preview: ?data payload missing string `script` field', payload);
@@ -817,8 +849,47 @@ F: F+F-F-F+F+F+F-F
       });
     }
 
+    // Return to virtual position (MM2) — reinstate the cached ?data= payload
+    // as the current view. Called from navigateSibling when ◀ from the first
+    // DB sibling hits the module boundary AND virtualStart exists.
+    function goToVirtual() {
+      if (!virtualStart) return;
+      atVirtualStart = true;
+      loadScript(virtualStart.script, {
+        node_url:    virtualStart.node_url,
+        source_text: virtualStart.source_text,
+        title:       virtualStart.title,
+        name:        virtualStart.name
+      });
+      // ◀ disabled (nothing before virtual), ▶ enabled while we have a module id.
+      updateEvNavState(true, !moduleId);
+    }
+
     // Prev / Next — fetch adjacent sibling under the same module.
     async function navigateSibling(direction) {
+      // ── ▶ from virtual: land on the first DB sibling of this module ──
+      if (atVirtualStart) {
+        if (direction === 'prev') return;   // shouldn't fire; ◀ is disabled
+        if (evNextBtn) evNextBtn.disabled = true;
+        const data = await fetchModuleDefault();
+        if (data) {
+          loadScript(data.script, {
+            node_url:    data.node_url,
+            source_text: data.source_text,
+            title:       data.title,
+            name:        data.name
+          });
+          atVirtualStart = false;
+          // Virtual is before, so isFirst is always false from a DB position
+          // as long as virtualStart is cached.
+          updateEvNavState(false, data.isLast);
+        } else if (evNextBtn) {
+          evNextBtn.disabled = false;
+        }
+        return;
+      }
+
+      // ── DB position: fetch sibling from server ────────────────────────
       if (!currentNodeUrl) return;
       const btn = direction === 'next' ? evNextBtn : evPrevBtn;
       if (btn) btn.disabled = true;
@@ -834,8 +905,12 @@ F: F+F-F-F+F+F+F-F
         }
         const data = await res.json();
         if (!data.node_url) {
-          // Boundary reached — disable this direction and leave the other
-          // alone (the button we just disabled stays disabled until next nav).
+          // Boundary reached in this direction.
+          if (direction === 'prev' && virtualStart) {
+            // ◀ from first DB sibling with a cached virtualStart → return there.
+            goToVirtual();
+            return;
+          }
           if (btn) btn.disabled = true;
           return;
         }
@@ -845,7 +920,10 @@ F: F+F-F-F+F+F+F-F
           title:       data.title,
           name:        data.name
         });
-        updateEvNavState(data.isFirst, data.isLast);
+        // While virtualStart exists we're never truly at position 0 in the
+        // module list — virtual is. Override isFirst=false so ◀ stays live.
+        const displayIsFirst = virtualStart ? false : data.isFirst;
+        updateEvNavState(displayIsFirst, data.isLast);
       } catch (err) {
         console.warn('preview: navigateSibling error:', err);
       } finally {
