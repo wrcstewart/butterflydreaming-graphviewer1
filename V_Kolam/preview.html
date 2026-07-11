@@ -89,6 +89,7 @@
     #bd-invite-text {
       margin: 0 0 10px 0;
       color: #ccc;
+      text-align: center;
     }
 
     #bd-actions {
@@ -97,9 +98,10 @@
       gap: 6px;
     }
 
-    /* Jump In — gold, primary call to action. */
+    /* Jump to — solid muted amber. Darker/less saturated than the earlier
+       #FFD700 so it reads as invitation, not alarm. */
     #bd-enter-btn {
-      background: #FFD700;
+      background: #a07820;
       color: #0a0a1a;
       border: none;
       border-radius: 3px;
@@ -111,14 +113,14 @@
     }
 
     #bd-enter-btn:hover {
-      background: #ffffff;
+      background: #c9a227;
     }
 
-    /* Copy Link — outlined, secondary. */
+    /* Copy Link to — outlined muted amber, secondary. */
     #bd-copy-link-btn {
       background: transparent;
-      color: #FFD700;
-      border: 1px solid #FFD700;
+      color: #a07820;
+      border: 1px solid #a07820;
       border-radius: 3px;
       padding: 5px 10px;             /* -1 px vertical to compensate for the border */
       font-size: 12px;
@@ -128,9 +130,23 @@
     }
 
     #bd-copy-link-btn:hover {
-      background: rgba(255, 215, 0, 0.15);
-      color: #ffffff;
-      border-color: #ffffff;
+      background: rgba(160, 120, 32, 0.15);
+      color: #c9a227;
+      border-color: #c9a227;
+    }
+
+    /* The target of both verb-buttons above — sits below them so the panel
+       reads as "Jump to Butterfly Dreaming" / "Copy Link to Butterfly
+       Dreaming". Italic + dark amber marks it as the shared object. */
+    #bd-invite-target {
+      margin: 8px 0 0 0;
+      text-align: center;
+      color: #d4a017;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 14px;
+      font-weight: bold;
+      font-style: italic;
+      letter-spacing: 0.02em;
     }
 
     /* MM2 (2026-07-11) — EV control cluster on the LEFT side of the bar
@@ -403,16 +419,18 @@
     <span id="bd-source-context"></span>
   </div>
 
-  <!-- Invitation panel: text + Jump In button. Shown only when Edit is
-       toggled on (body loses the ev-basic class). Copy Link was removed
-       2026-07-11 — the ?data= URL is visible in the browser address bar
-       during Jump In navigation, so an in-panel Copy Link would be
-       redundant for the intended use case. -->
+  <!-- Invitation panel: shown only when Edit is toggled on (body loses the
+       ev-basic class). Structure reads as a sentence — the two verb-buttons
+       above share the italic "Butterfly Dreaming" as their object. Also
+       resolves the naming conflict with the side-panel's Copy Link (which
+       copies the standalone-EV URL, not the BD-return URL). -->
   <aside id="bd-invite-panel">
-    <p id="bd-invite-text">You can use our Butterfly Dreaming Platform to explore context, collaborate and save</p>
+    <p id="bd-invite-text">You can use our Platform to explore context, collaborate and save</p>
     <div id="bd-actions">
-      <button id="bd-enter-btn" type="button" title="Return to ButterflyDreaming carrying the current script">Jump In</button>
+      <button id="bd-enter-btn"     type="button" title="Return to ButterflyDreaming carrying the current script">Jump to</button>
+      <button id="bd-copy-link-btn" type="button" title="Copy a BD-return link to the clipboard">Copy Link to</button>
     </div>
+    <p id="bd-invite-target">Butterfly Dreaming</p>
   </aside>
 
   <script>
