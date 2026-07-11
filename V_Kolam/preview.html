@@ -760,9 +760,15 @@ F: F+F-F-F+F+F+F-F
     const evPrevBtn   = document.getElementById('ev-prev-btn');
     const evNextBtn   = document.getElementById('ev-next-btn');
 
+    // NB: look buttons up by id here rather than closing over the const
+    // bindings above — updateEvNavState is called from loadInitialScript
+    // (module top level) before those `const`s finish initialising, and
+    // closing over them throws a TDZ ReferenceError.
     function updateEvNavState(isFirst, isLast) {
-      if (evPrevBtn) evPrevBtn.disabled = !!isFirst || !currentNodeUrl;
-      if (evNextBtn) evNextBtn.disabled = !!isLast  || !currentNodeUrl;
+      const prev = document.getElementById('ev-prev-btn');
+      const next = document.getElementById('ev-next-btn');
+      if (prev) prev.disabled = !!isFirst || !currentNodeUrl;
+      if (next) next.disabled = !!isLast  || !currentNodeUrl;
     }
 
     // Freeze — sends bd_param_update {angle_drift: 0} directly to the module
