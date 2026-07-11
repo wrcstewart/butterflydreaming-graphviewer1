@@ -4084,14 +4084,37 @@ async function init() {
       }
     }
     if (!target) {
+      // MM2 (2026-07-11) — structural default lookup. Previously
+      // `moduleId + '_1'` name-match; that broke the moment the DB naming
+      // scheme changed (e.g. `_1` → `_001`). Structural rule: find any
+      // TextNode carrying this module's script, pick the one with lowest
+      // seq. Preferred key: `hasModuleScript` property (post-MM2 migration);
+      // fallback: parse the module id from the node's text (pre-MM2 corpus).
+      // Filters out gateway nodes so we land on a real content node.
       const moduleId = script ? parseModuleId(script) : null;
       if (moduleId) {
-        const defaultName = moduleId + '_1';
-        target = cy.nodes().filter(n => n.data('name') === defaultName).first();
-        if (target && target.length) {
-          console.log(`[MM1] return-from-standalone: no node_url; using module default node '${defaultName}'`);
+        const candidates = cy.nodes().filter(n => {
+          if (n.data('type') !== 'TextNode' || n.data('gateway')) return false;
+          if (n.data('hasModuleScript') === moduleId) return true;
+          // Backward-compat pre-MM2: derive from text.
+          return parseModuleId(n.data('text')) === moduleId;
+        });
+        if (candidates.length) {
+          let winner = null;
+          let winnerSeq = Infinity;
+          candidates.forEach(n => {
+            const s = n.data('seq');
+            if (typeof s === 'number' && s < winnerSeq) {
+              winner = n;
+              winnerSeq = s;
+            }
+          });
+          target = winner || candidates.first();
+          if (target && target.length) {
+            console.log(`[MM1] return-from-standalone: no node_url; using default via hasModuleScript+min(seq): ${target.data('name') || target.id()}`);
+          }
         } else {
-          console.warn(`[MM1] return-from-standalone: default node '${defaultName}' not found; nothing to navigate to`);
+          console.warn(`[MM1] return-from-standalone: no TextNode found with hasModuleScript='${moduleId}' or %%bd_module ${moduleId}`);
           target = null;
         }
       } else {

@@ -1113,6 +1113,31 @@
             break;
           }
 
+          // MM2 (2026-07-11) — bd_param_update: host harness sets a single
+          // directive value directly instead of rewriting the whole script.
+          // Used by the EV's Freeze button (angle_drift → 0 and back) and
+          // any future single-knob interactions. Writes into the underlying
+          // hidden <input class="stepper-source"> and dispatches an `input`
+          // event so the existing handleControlChange path fires unchanged
+          // — re-renders the script, re-broadcasts state, etc.
+          //
+          // Recognised names map to hidden-input IDs by convention:
+          //   angle_drift → #angle-drift-slider, angle → #angle-slider, etc.
+          // Unknown names are silently ignored.
+          case 'bd_param_update': {
+            const name  = event.data && event.data.name;
+            const value = event.data && event.data.value;
+            if (typeof name !== 'string') break;
+            const inputId = name.replace(/_/g, '-') + '-slider';
+            const input   = document.getElementById(inputId)
+                         || document.getElementById(name);
+            if (input) {
+              input.value = String(value);
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            break;
+          }
+
           default:
             // Ignore unrecognised types
             break;

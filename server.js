@@ -56,6 +56,129 @@ const driver = neo4j.driver(
   neo4j.auth.basic('memgraph', 'memgraph')
 );
 
+// MM2 (2026-07-11) — HTTP endpoints for the External Viewer's default-node
+// and prev/next sibling navigation. Uses the `hasModuleScript` property
+// (set by migrate_mm2.js) plus a min/max-seq boundary check. All numeric
+// values returned as plain JS numbers.
+
+const toNum = (v) => (v && typeof v.toNumber === 'function' ? v.toNumber() : v);
+
+function serializeNode(props) {
+  return {
+    script:      props.text        || '',
+    node_url:    props.url         || null,
+    source_text: props.source_text || null,
+    title:       props.title       || null,
+    name:        props.name        || null,
+    seq:         toNum(props.seq   ?? null)
+  };
+}
+
+// GET /api/module-default?module=<id>
+// Returns the first content node (min seq) tagged hasModuleScript=<id>,
+// plus isFirst (always true) + isLast (true iff module has exactly one node).
+app.get('/api/module-default', async (req, res) => {
+  const module = req.query.module;
+  if (!module || typeof module !== 'string') {
+    return res.status(400).json({ error: 'missing module param' });
+  }
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    const firstResult = await session.run(
+      `MATCH (n:TextNode)
+       WHERE n.hasModuleScript = $module
+         AND (n.gateway IS NULL OR n.gateway = false)
+       RETURN n ORDER BY n.seq ASC LIMIT 1`,
+      { module }
+    );
+    if (firstResult.records.length === 0) {
+      return res.status(404).json({ error: 'no default node found' });
+    }
+    const countResult = await session.run(
+      `MATCH (n:TextNode)
+       WHERE n.hasModuleScript = $module
+         AND (n.gateway IS NULL OR n.gateway = false)
+       RETURN count(n) AS c`,
+      { module }
+    );
+    const count = toNum(countResult.records[0].get('c'));
+    const props = firstResult.records[0].get('n').properties || {};
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      ...serializeNode(props),
+      isFirst: true,
+      isLast: count === 1
+    });
+  } catch (err) {
+    console.error('[BD] /api/module-default error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
+// GET /api/module-sibling?node_url=<url>&direction=next|prev
+// Returns the adjacent sibling under the same hasModuleScript module.
+// LIMIT 2 trick: 0 rows → { node_url: null } (edge). 1 row → sibling +
+// boundary flag. 2 rows → sibling + more beyond.
+app.get('/api/module-sibling', async (req, res) => {
+  const nodeUrl   = req.query.node_url;
+  const direction = req.query.direction;
+  if (!nodeUrl || typeof nodeUrl !== 'string') {
+    return res.status(400).json({ error: 'missing node_url param' });
+  }
+  if (direction !== 'next' && direction !== 'prev') {
+    return res.status(400).json({ error: 'direction must be next or prev' });
+  }
+  const dirOp    = direction === 'next' ? '>'   : '<';
+  const dirOrder = direction === 'next' ? 'ASC' : 'DESC';
+
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    const currResult = await session.run(
+      `MATCH (n:TextNode {url: $url})
+       RETURN n.seq AS seq, n.hasModuleScript AS mod`,
+      { url: nodeUrl }
+    );
+    if (currResult.records.length === 0) {
+      return res.status(404).json({ error: 'current node not found' });
+    }
+    const currSeq = toNum(currResult.records[0].get('seq'));
+    const module  = currResult.records[0].get('mod');
+    if (!module) {
+      return res.status(400).json({ error: 'current node has no hasModuleScript' });
+    }
+    // Fetch up to 2 in the requested direction; presence of the 2nd tells us
+    // whether the sibling is on the boundary of the module in that direction.
+    const sibResult = await session.run(
+      `MATCH (n:TextNode)
+       WHERE n.hasModuleScript = $module
+         AND n.seq ${dirOp} $currSeq
+         AND (n.gateway IS NULL OR n.gateway = false)
+       RETURN n ORDER BY n.seq ${dirOrder} LIMIT 2`,
+      { module, currSeq }
+    );
+    res.set('Cache-Control', 'no-store');
+    if (sibResult.records.length === 0) {
+      return res.json({ node_url: null });
+    }
+    const hasMoreInDir = sibResult.records.length === 2;
+    const props = sibResult.records[0].get('n').properties || {};
+    return res.json({
+      ...serializeNode(props),
+      // If we arrived via NEXT, we came from something with a smaller seq,
+      // so there IS a prev — isFirst false. Symmetric for PREV.
+      isFirst: direction === 'prev' ? !hasMoreInDir : false,
+      isLast:  direction === 'next' ? !hasMoreInDir : false
+    });
+  } catch (err) {
+    console.error('[BD] /api/module-sibling error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
 const server = app.listen(8080, () =>
   console.log('ButterflyDreaming viewer running at http://localhost:8080')
 );
