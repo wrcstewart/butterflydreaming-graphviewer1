@@ -4056,23 +4056,29 @@ async function init() {
       updateSendBtn();
     } else if (msg.type === 'pair_denied') {
       // Server rejected pairing. Two known reasons today:
-      //   code_required — arriver needs curation code entered in #dev-code
+      //   code_required — arriver needs curation code entered in #dev-code.
+      //                   Close chat cleanly so user can enter a code and
+      //                   re-press Chat.
       //   same_device   — MM3 revised: another BD tab on this browser is
       //                   already in the wait queue. Server refuses to
       //                   pair two ws with the same bd_device_id cookie
-      //                   (prevents same-device self-pair without kicking
-      //                   the other tab and killing a live dyad).
-      // Close chat cleanly so the user can act.
+      //                   (prevents same-device self-pair). Keep chat
+      //                   AND player mode active — solo viewing/editing
+      //                   still makes sense, the anti-gaming refusal only
+      //                   bites at the pair-completion moment. User can
+      //                   close the other tab and toggle Chat to retry.
       const reasonMessage =
           msg.reason === 'code_required' ? 'Code required to chat'
         : msg.reason === 'same_device'   ? 'Another BD tab on this device is already waiting to chat — close that tab or use it instead'
         :                                  `Pair denied: ${msg.reason || 'unknown'}`;
       pairStatus.textContent = reasonMessage;
       pairingState.active = false;
-      if (chatModeActive) toggleChatMode();
-      // toggleChatMode blanks pairStatus on the off-path; restamp our
-      // reason afterwards so the user sees WHY chat closed.
-      pairStatus.textContent = reasonMessage;
+      if (msg.reason !== 'same_device') {
+        if (chatModeActive) toggleChatMode();
+        // toggleChatMode blanks pairStatus on the off-path; restamp our
+        // reason afterwards so the user sees WHY chat closed.
+        pairStatus.textContent = reasonMessage;
+      }
       updateSendBtn();
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
