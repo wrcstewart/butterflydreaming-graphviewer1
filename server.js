@@ -23,6 +23,26 @@ try {
 
 const app = express();
 app.use(express.json());
+
+// MM3 (2026-07-12) — per-browser cookie for the cross-tab kick.
+// Only issued on top-level HTML entry requests ( / and /index.html ) to
+// avoid race-condition duplicate Set-Cookies from parallel asset requests.
+// Value is a random UUID; lifetime 7 days (long enough to survive a
+// weekend browser restart, short enough not to feel like tracking).
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path === '/index.html') {
+    const cookie = req.headers.cookie || '';
+    if (!/(?:^|;\s*)bd_device_id=/.test(cookie)) {
+      const id = crypto.randomUUID();
+      res.setHeader(
+        'Set-Cookie',
+        `bd_device_id=${id}; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`
+      );
+    }
+  }
+  next();
+});
+
 // HTML must never be cached — otherwise the browser keeps requesting old
 // ?v= numbers and never picks up new CSS/JS. CSS/JS themselves are cache-
 // busted via the ?v= query so they CAN be cached aggressively.
@@ -207,6 +227,12 @@ const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
 const howToSent   = new Set();  // userIds that have already received the how-to card this session
 
+// MM3 (2026-07-12) — bd_device_id (cookie) → active ws. Enforces one BD
+// WebSocket per browser instance. On new connection, if the same
+// device_id already has an active ws, send it a `kicked_by_newer_tab`
+// message and close it before registering the new one.
+const deviceIdToWs = new Map();
+
 function sendToBuddy(userId, msg) {
   const buddyId = pairedWith.get(userId);
   if (!buddyId) return;
@@ -314,7 +340,30 @@ function serializeRecord(rec) {
 
 // --- WebSocket handler ---
 
-wss.on('connection', async (ws) => {
+wss.on('connection', async (ws, request) => {
+  // MM3 (2026-07-12) — cross-tab kick: read the bd_device_id cookie from
+  // the WS upgrade request. If the same browser already has a WS open,
+  // send it a kicked_by_newer_tab message and close it before registering
+  // this new one. Cookie-based, so works across any origin flow (including
+  // EV → Jump-in → BD once the EV moves to GitHub Pages).
+  {
+    const cookieHeader = (request && request.headers && request.headers.cookie) || '';
+    const m = cookieHeader.match(/(?:^|;\s*)bd_device_id=([\w-]+)/);
+    if (m) {
+      const deviceId = m[1];
+      const prev = deviceIdToWs.get(deviceId);
+      if (prev && prev !== ws) {
+        if (prev.readyState === 1 /* OPEN */) {
+          try { prev.send(JSON.stringify({ type: 'kicked_by_newer_tab' })); } catch (_) {}
+        }
+        try { prev.close(); } catch (_) {}
+        console.log(`[BD] Kicked older WS for device ${deviceId.slice(0, 8)}…`);
+      }
+      deviceIdToWs.set(deviceId, ws);
+      ws.deviceId = deviceId;
+    }
+  }
+
   // Create ephemeral User node — viewer_id = 'N_<memgraph integer id>'
   // Prevents any ID collision with corpus nodes (same N_ prefix rule as cf_ for edges).
   ws.userId = null;
@@ -346,6 +395,13 @@ wss.on('connection', async (ws) => {
 
   ws.on('close', async () => {
     clearInterval(keepAlive);
+    // MM3 cleanup — remove device_id entry ONLY if the map still points at
+    // this exact ws. Fast kick+reconnect can have already replaced it with
+    // the newer ws; the kicked-ws's own close event fires later and must
+    // not clobber the replacement.
+    if (ws.deviceId && deviceIdToWs.get(ws.deviceId) === ws) {
+      deviceIdToWs.delete(ws.deviceId);
+    }
     if (ws.userId) {
       sessions.delete(ws.userId);
       broadcastUserCount();
