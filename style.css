@@ -595,10 +595,20 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   letter-spacing: 0.02em;
 }
 
-/* Portrait / narrow — hide the invite panel; positionCyEl also skips the
-   iframe-shrink on portrait so the visual keeps the full width. */
+/* Portrait / narrow — invite panel repositions to the bottom-right corner
+   instead of vertically-centered right. Sits above the bottom-stack
+   (#media-bar / #cy-buddy / #cy-you) with a small gap. Overlays the
+   right side of the visual iframe (which is still full-width on portrait —
+   positionCyEl doesn't reserve here). Matches the EV's own #bd-invite-panel
+   corner-placement pattern on phone. */
 @media (max-aspect-ratio: 1/1) {
-  body.player-active #bd-invite-panel-viewer { display: none; }
+  #bd-invite-panel-viewer {
+    top: auto;
+    transform: none;
+    bottom: 100px;                       /* clears cy-buddy(37+23)+cy-you(63+23) stack roughly */
+    right: 8px;
+    max-width: 200px;
+  }
 }
 
 #media-bar {
