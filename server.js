@@ -227,11 +227,15 @@ const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
 const howToSent   = new Set();  // userIds that have already received the how-to card this session
 
-// MM3 (2026-07-12) — bd_device_id (cookie) → active ws. Enforces one BD
-// WebSocket per browser instance. On new connection, if the same
-// device_id already has an active ws, send it a `kicked_by_newer_tab`
-// message and close it before registering the new one.
-const deviceIdToWs = new Map();
+// MM3 (2026-07-12, revised) — anti-self-pair. No longer keeps a map of
+// device_id → active ws or kicks older tabs. Instead: cookie parse in
+// wss.on('connection') stamps ws.deviceId, and ready_to_pair refuses to
+// pair two ws with the same deviceId (see the ready_to_pair handler
+// below). Rationale: kicking at connect time broke dyad continuity when
+// a user returned from EV via Jump-in — their original paired BD tab
+// got kicked, tearing down their pair with the remote partner. The
+// pair-time check preserves the paired session and only refuses at the
+// specific gaming moment (same-device self-pair).
 
 function sendToBuddy(userId, msg) {
   const buddyId = pairedWith.get(userId);
@@ -341,27 +345,15 @@ function serializeRecord(rec) {
 // --- WebSocket handler ---
 
 wss.on('connection', async (ws, request) => {
-  // MM3 (2026-07-12) — cross-tab kick: read the bd_device_id cookie from
-  // the WS upgrade request. If the same browser already has a WS open,
-  // send it a kicked_by_newer_tab message and close it before registering
-  // this new one. Cookie-based, so works across any origin flow (including
-  // EV → Jump-in → BD once the EV moves to GitHub Pages).
+  // MM3 revised (2026-07-12) — stamp ws.deviceId from the bd_device_id
+  // cookie for later same-device pair refusal in the ready_to_pair
+  // handler. No kick: multiple ws per browser are allowed, so a user
+  // returning from EV via Jump-in doesn't tear down their still-alive
+  // paired BD session in a different tab.
   {
     const cookieHeader = (request && request.headers && request.headers.cookie) || '';
     const m = cookieHeader.match(/(?:^|;\s*)bd_device_id=([\w-]+)/);
-    if (m) {
-      const deviceId = m[1];
-      const prev = deviceIdToWs.get(deviceId);
-      if (prev && prev !== ws) {
-        if (prev.readyState === 1 /* OPEN */) {
-          try { prev.send(JSON.stringify({ type: 'kicked_by_newer_tab' })); } catch (_) {}
-        }
-        try { prev.close(); } catch (_) {}
-        console.log(`[BD] Kicked older WS for device ${deviceId.slice(0, 8)}…`);
-      }
-      deviceIdToWs.set(deviceId, ws);
-      ws.deviceId = deviceId;
-    }
+    if (m) ws.deviceId = m[1];
   }
 
   // Create ephemeral User node — viewer_id = 'N_<memgraph integer id>'
@@ -395,13 +387,6 @@ wss.on('connection', async (ws, request) => {
 
   ws.on('close', async () => {
     clearInterval(keepAlive);
-    // MM3 cleanup — remove device_id entry ONLY if the map still points at
-    // this exact ws. Fast kick+reconnect can have already replaced it with
-    // the newer ws; the kicked-ws's own close event fires later and must
-    // not clobber the replacement.
-    if (ws.deviceId && deviceIdToWs.get(ws.deviceId) === ws) {
-      deviceIdToWs.delete(ws.deviceId);
-    }
     if (ws.userId) {
       sessions.delete(ws.userId);
       broadcastUserCount();
@@ -466,6 +451,20 @@ wss.on('connection', async (ws, request) => {
           ws.send(JSON.stringify({ type: 'wait_state' }));
           console.log(`[BD] Waiting: ${ws.userId}`);
         } else {
+          // MM3 revised (2026-07-12) — same-device pair refusal. Two ws
+          // from the same browser instance (identical bd_device_id cookie)
+          // must never pair with each other — that would let one user
+          // self-pair by opening two tabs. Refuse this arriver; the
+          // waitingUser slot keeps its current occupant.
+          if (
+            ws.deviceId &&
+            waitingUser.ws && waitingUser.ws.deviceId &&
+            waitingUser.ws.deviceId === ws.deviceId
+          ) {
+            ws.send(JSON.stringify({ type: 'pair_denied', reason: 'same_device' }));
+            console.log(`[BD] Pair denied (same_device): ${ws.userId} ↔ ${waitingUser.userId}`);
+            return;
+          }
           // Would pair up. If a curation code is configured on this
           // server, gate the ARRIVER (the one who completes the pair).
           // Rationale: the developer can sit as waitingUser during dev

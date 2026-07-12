@@ -3418,14 +3418,16 @@ async function init() {
   const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
   const wsRef = { current: ws, lastActivity: Date.now(), maxIdleMs: MAX_IDLE_MS };
 
-  // MM3 (2026-07-12, cookie version) — cross-tab kick is server-driven now.
-  // Server tracks bd_device_id (cookie) → active ws. When a new ws arrives
-  // for a device_id that already has one, server sends the older ws a
-  // `kicked_by_newer_tab` message and closes it. Handler for that message
-  // lives inside the main ws.addEventListener('message', …) block further
-  // down; it closes the local ws and shows a specific session-expired
-  // overlay. Cookie-based → works across any origin flow (including the
-  // future EV-on-GitHub-Pages → Jump-in → BD path).
+  // MM3 revised (2026-07-12) — anti-self-pair, not cross-tab kick. Server
+  // stamps ws.deviceId from the bd_device_id cookie on each connection and
+  // refuses to pair two ws with the same deviceId (via pair_denied
+  // {reason: 'same_device'} handled below). Multiple BD tabs per browser
+  // are allowed — a user returning from EV via Jump-in doesn't lose their
+  // still-alive paired BD session in a different tab. Only the specific
+  // gaming moment (same device completing a pair with itself) is blocked.
+  // Cookie mechanism is still origin-agnostic (bd_device_id belongs to
+  // BD's origin, travels with every ws upgrade regardless of where the
+  // navigation came from).
 
   // Idle-timeout check — runs every minute, shows session-expired overlay once the
   // user has been inactive for 60 min. Connection keepalive is now handled entirely
@@ -4007,18 +4009,6 @@ async function init() {
   ws.addEventListener('message', event => {
     let msg;
     try { msg = JSON.parse(event.data); } catch (e) { return; }
-    // MM3 (2026-07-12) — server-driven cross-tab kick. A newer BD tab on
-    // this browser (same bd_device_id cookie) has just connected; server
-    // told us to yield. Show the specific overlay before closing.
-    if (msg.type === 'kicked_by_newer_tab') {
-      console.log('[BD] Kicked by newer BD tab on this device');
-      showSessionExpired(
-        'Another BD session opened on this device. '
-        + 'This tab has been closed to prevent duplicate sessions. Reload to reconnect.'
-      );
-      try { ws.close(); } catch (_) {}
-      return;
-    }
     if (msg.type === 'user_count') {
       userCountPanel.textContent = `${msg.count} connected`;
       userCountPanel.classList.add('active');
@@ -4065,19 +4055,24 @@ async function init() {
       }
       updateSendBtn();
     } else if (msg.type === 'pair_denied') {
-      // Server rejected pairing (usually because we tried to complete a
-      // pair without a valid curation code). Close chat cleanly so the
-      // user can enter a code in #dev-code and press Chat again.
-      pairStatus.textContent = msg.reason === 'code_required'
-        ? 'Code required to chat'
-        : `Pair denied: ${msg.reason || 'unknown'}`;
+      // Server rejected pairing. Two known reasons today:
+      //   code_required — arriver needs curation code entered in #dev-code
+      //   same_device   — MM3 revised: another BD tab on this browser is
+      //                   already in the wait queue. Server refuses to
+      //                   pair two ws with the same bd_device_id cookie
+      //                   (prevents same-device self-pair without kicking
+      //                   the other tab and killing a live dyad).
+      // Close chat cleanly so the user can act.
+      const reasonMessage =
+          msg.reason === 'code_required' ? 'Code required to chat'
+        : msg.reason === 'same_device'   ? 'Another BD tab on this device is already waiting to chat — close that tab or use it instead'
+        :                                  `Pair denied: ${msg.reason || 'unknown'}`;
+      pairStatus.textContent = reasonMessage;
       pairingState.active = false;
       if (chatModeActive) toggleChatMode();
       // toggleChatMode blanks pairStatus on the off-path; restamp our
       // reason afterwards so the user sees WHY chat closed.
-      pairStatus.textContent = msg.reason === 'code_required'
-        ? 'Code required to chat'
-        : `Pair denied: ${msg.reason || 'unknown'}`;
+      pairStatus.textContent = reasonMessage;
       updateSendBtn();
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
