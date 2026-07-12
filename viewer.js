@@ -3586,7 +3586,7 @@ async function init() {
       const d = e && e.data;
       if (!d || d.type !== 'BD_READY') return;
       console.log('[MM1.6] onReady: BD_READY received, source match=', e.source === visualIframe.contentWindow);
-      window.off('msg', onReady);
+      window.removeEventListener('message', onReady);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
         enableCopyUp();
@@ -3595,7 +3595,7 @@ async function init() {
         console.warn('[MM1.6] onReady: postMessage failed', err);
       }
     };
-    window.on('msg', onReady);
+    window.addEventListener('message', onReady);
     visualIframe.src = url;
   }
 
@@ -3859,7 +3859,7 @@ async function init() {
     // currently focused local card, mirroring the semantics of Copy Down's
     // destination. dispatchEvent('input') triggers updateSendBtn so the Send
     // button's enable state re-evaluates after the write.
-    window.on('msg', (e) => {
+    window.addEventListener('message', (e) => {
       const d = e && e.data;
       if (!d || d.type !== 'bd_script_response') return;
       const body = getFocusedCardBody();
