@@ -93,8 +93,17 @@
       min-height: 0;
       min-width: 0;
       display: flex;
-      justify-content: center;
+      /* Landscape (default): right-align the square canvas within its wrapper
+         so it sits snug against the left edge of the control-panel.
+         Previously center-aligned, leaving a large empty gap between the
+         canvas and the column on desktop/laptop. Overridden to center in
+         the portrait media query below. */
+      justify-content: flex-end;
       align-items: center;
+    }
+
+    @media (max-aspect-ratio: 1/1) {
+      .canvas-wrapper { justify-content: center; }
     }
 
     /* Narrow viewport (taller than wide) — stack canvas above controls

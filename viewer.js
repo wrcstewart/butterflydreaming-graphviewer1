@@ -3490,9 +3490,16 @@ async function init() {
       // stays sized correctly across the toggleChatMode → setViewMode('player')
       // rAF sequence used by the ?data= return-from-standalone flow.
       if (cyRect.width > 0 && cyRect.height > 0) {
+        // MM3 (2026-07-12) — reserve a band on the right of the iframe on
+        // landscape viewports for #bd-invite-panel-viewer. Portrait
+        // (aspect ratio ≤ 1) keeps the full-width iframe; the invite panel
+        // is hidden or repositioned via CSS on those layouts.
+        const isLandscape   = window.innerWidth > window.innerHeight;
+        const reserveRight  = isLandscape ? 220 : 0;
+        const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
         iframeEl.style.top    = cyRect.top    + 'px';
         iframeEl.style.left   = cyRect.left   + 'px';
-        iframeEl.style.width  = cyRect.width  + 'px';
+        iframeEl.style.width  = stampedWidth  + 'px';
         iframeEl.style.height = cyRect.height + 'px';
       }
     }
@@ -3572,6 +3579,9 @@ async function init() {
       positionCyEl();
       cyEl.classList.add('hidden');
       if (visualIframe) visualIframe.classList.add('active');
+      // MM3 (2026-07-12) — body class so CSS can gate the invite panel
+      // on Player mode. Hidden by default; visible while player-active.
+      document.body.classList.add('player-active');
       // MM1.6 Strategy B — on entering Player mode, load the current node's
       // module so the user sees the visual immediately without having to
       // press Copy Down.
@@ -3581,6 +3591,7 @@ async function init() {
     } else {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
+      document.body.classList.remove('player-active');
       // Cy's internal size may have gone stale while it was hidden (any
       // resize / rAF re-fit was skipped). Re-sync after a frame so the
       // container has real dimensions again, then re-fit to whatever

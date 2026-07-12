@@ -511,6 +511,96 @@ html, body {
 #visual-iframe.active { display: block; }
 #cy.hidden { display: none; }
 
+/* MM3 (2026-07-12) — #bd-invite-panel-viewer.
+   Fixed panel in the 220 px band positionCyEl reserves on the right of
+   #visual-iframe in landscape. Muted-amber styling to match the EV's
+   invitation panel, so the two-way traffic between BD and EV feels of
+   a piece. Visible only in Player mode via body.player-active. Hidden
+   on portrait (media query below) — layout there stacks vertically. */
+#bd-invite-panel-viewer {
+  position: fixed;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 208px;
+  padding: 10px 12px;
+  background: rgba(10, 10, 26, 0.95);
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #ccc;
+  font-family: sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  z-index: 6;                             /* above #cy-you/#cy-buddy (5), below tooltips (10) */
+  display: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+body.player-active #bd-invite-panel-viewer { display: block; }
+
+#bd-invite-text-viewer {
+  margin: 0 0 10px 0;
+  color: #ccc;
+  text-align: center;
+}
+
+#bd-invite-actions-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Jump to — solid muted amber. */
+#jump-to-ext-btn {
+  background: #a07820;
+  color: #0a0a1a;
+  border: none;
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: sans-serif;
+}
+#jump-to-ext-btn:hover { background: #c9a227; }
+
+/* Copy Link to — outlined muted amber, secondary. */
+#copy-link-to-ext-btn {
+  background: transparent;
+  color: #a07820;
+  border: 1px solid #a07820;
+  border-radius: 3px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: sans-serif;
+}
+#copy-link-to-ext-btn:hover {
+  background: rgba(160, 120, 32, 0.15);
+  color: #c9a227;
+  border-color: #c9a227;
+}
+
+/* Shared object of both verb-buttons above — sits below them so the panel
+   reads "Jump to External Website" / "Copy Link to External Website". */
+#bd-invite-target-viewer {
+  margin: 8px 0 0 0;
+  text-align: center;
+  color: #d4a017;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: bold;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+/* Portrait / narrow — hide the invite panel; positionCyEl also skips the
+   iframe-shrink on portrait so the visual keeps the full width. */
+@media (max-aspect-ratio: 1/1) {
+  body.player-active #bd-invite-panel-viewer { display: none; }
+}
+
 #media-bar {
   display: none;
   position: fixed;

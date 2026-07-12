@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=105">
+  <link rel="stylesheet" href="style.css?v=106">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming Development</div>
@@ -42,6 +42,19 @@
   <iframe id="visual-iframe"
           title="ButterflyDreaming Visual Module"
           sandbox="allow-scripts allow-same-origin"></iframe>
+
+  <!-- MM3 (2026-07-12) invite panel — visible only in Player mode
+       (body.player-active toggled by setViewMode). Sits in the 220 px band
+       reserved on the right of #visual-iframe by positionCyEl. Buttons
+       placeholder; wiring follows in a later commit. -->
+  <aside id="bd-invite-panel-viewer">
+    <p id="bd-invite-text-viewer">Explore the media in more detail</p>
+    <div id="bd-invite-actions-viewer">
+      <button id="jump-to-ext-btn"      type="button" title="Open the External Website in this tab, carrying the current script + node context">Jump to</button>
+      <button id="copy-link-to-ext-btn" type="button" title="Copy an External Website link (with current script + node context) to the clipboard">Copy Link to</button>
+    </div>
+    <p id="bd-invite-target-viewer">External Website</p>
+  </aside>
   <div id="media-bar"></div>
   <div id="cluster-editor-bar" style="display:none">
     <div class="spinner-group">
@@ -105,6 +118,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script type="module" src="viewer.js?v=389"></script>
+  <script type="module" src="viewer.js?v=390"></script>
 </body>
 </html>
