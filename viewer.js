@@ -3846,121 +3846,140 @@ async function init() {
       body.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
-    // ── Copy Link ─────────────────────────────────────────────────────────────
-    // Builds a standalone-player URL (path /bd_V_Kolam/ on port 8080) whose
-    // ?data=<base64 JSON> payload carries: the current panel/card text
-    // (`script`) plus, if a node is currently focused in the graph, its `url`,
-    // `source_text`, and `title`. Always visible/active — does not depend on
-    // pair or chat state. Fallback text box appears if navigator.clipboard is
-    // blocked (plain-HTTP LAN access).
-    const copyLinkBtn = document.getElementById('copy-link-btn');
-    if (copyLinkBtn) {
-      const copyLinkText = (text) => {
-        console.log('Copy Link URL:', text);
-        return navigator.clipboard && navigator.clipboard.writeText
-          ? navigator.clipboard.writeText(text)
-          : Promise.reject(new Error('clipboard API unavailable'));
-      };
-
-      const showFallback = (url) => {
-        document.getElementById('copy-link-fallback')?.remove();
-        const box = document.createElement('div');
-        box.id = 'copy-link-fallback';
-        const hint = document.createElement('div');
-        hint.className = 'fb-hint';
-        hint.textContent = 'Clipboard blocked on plain HTTP — copy manually:';
-        const ta = document.createElement('textarea');
-        ta.readOnly = true;
-        ta.value = url;
-        box.appendChild(hint);
-        box.appendChild(ta);
-        document.body.appendChild(box);
-        ta.focus();
-        ta.select();
-        const dismiss = (ev) => {
-          if (ev.target === ta || box.contains(ev.target)) return;
-          box.remove();
-          document.removeEventListener('mousedown', dismiss, true);
-          document.removeEventListener('touchstart', dismiss, true);
-        };
-        setTimeout(() => {
-          document.addEventListener('mousedown', dismiss, true);
-          document.addEventListener('touchstart', dismiss, true);
-        }, 0);
-      };
-
-      copyLinkBtn.addEventListener('click', () => {
-        // Node context — resolve the "currently visible in the panel" node.
-        // Prefer lastReadNodeId (last single-tap → routed to the panel via
-        // routeNodeText) over activeNodeId (last navigated-into via double-
-        // tap → expandToNode). A user typically Copy-Link's on the node they
-        // just read, which may sit inside a Family/Cluster they navigated to
-        // earlier — activeNodeId would give the parent, lastReadNodeId gives
-        // the actual read target.
-        let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
-        let activeNode = null;
-        const readId   = getLastReadNodeId && getLastReadNodeId();
-        const activeId = getActiveNodeId   && getActiveNodeId();
-        const nodeId   = readId || activeId;
-        if (nodeId) {
-          const n = cy.getElementById(nodeId);
-          if (n && n.length > 0) {
-            activeNode = n;
-            currentNodeUrl    = n.data('url')         || null;
-            currentSourceText = n.data('source_text') || null;
-            currentTitle      = n.data('title')       || null;
-          }
+    // ── External Website URL builder (MM3, 2026-07-12) ────────────────────
+    // Assembles the standalone-player URL that both #jump-to-ext-btn and
+    // #copy-link-to-ext-btn (in #bd-invite-panel-viewer) point at. Payload:
+    //   { script, node_url, source_text, title }
+    // - script         = current panel/card text (see 4-tier precedence below)
+    // - node_url et al = properties of the currently-visible-in-panel node,
+    //   preferred by lastReadNodeId over activeNodeId (a user hitting these
+    //   buttons wants a link to whatever they last READ, not to whatever
+    //   Family/Cluster they'd double-tap-navigated into).
+    // Base URL is currently hardcoded to localhost:8080 for testing; once
+    // the EV is being served from GitHub Pages the base can be updated to
+    // that origin (see Q2 answer 2026-07-12).
+    function buildExternalWebsiteUrl() {
+      let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
+      let activeNode = null;
+      const readId   = getLastReadNodeId && getLastReadNodeId();
+      const activeId = getActiveNodeId   && getActiveNodeId();
+      const nodeId   = readId || activeId;
+      if (nodeId) {
+        const n = cy.getElementById(nodeId);
+        if (n && n.length > 0) {
+          activeNode = n;
+          currentNodeUrl    = n.data('url')         || null;
+          currentSourceText = n.data('source_text') || null;
+          currentTitle      = n.data('title')       || null;
         }
+      }
 
-        // Panel text precedence:
-        //   1. Focused local-card textarea (chat mode, actively editing)
-        //   2. topLocalCard body (chat mode, not focused)
-        //   3. activeNode.data('text') — the raw source of truth. This is
-        //      what setSystemText renders in the default panel for a TextNode
-        //      click, minus the "Title : source_text : seq" display header
-        //      that buildTooltipContent prepends. Reading DOM instead would
-        //      include the welcome prefix + header + spacer divs + any prior
-        //      append (setSystemText never clears on no-meta inserts).
-        //   4. #default-card-body textContent — last-ditch welcome-message
-        //      fallback when nothing else is available.
-        let currentPanelText = '';
-        const active = document.activeElement;
-        if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
-          currentPanelText = active.value || '';
+      // Panel text precedence:
+      //   1. Focused local-card textarea (chat mode, actively editing)
+      //   2. topLocalCard body (chat mode, not focused)
+      //   3. activeNode.data('text') — raw source of truth. This is what
+      //      setSystemText renders for a TextNode click, minus the display
+      //      header buildTooltipContent prepends. Reading the DOM instead
+      //      would include the welcome prefix + header + spacer divs + any
+      //      prior append (setSystemText never clears on no-meta inserts).
+      //   4. #default-card-body textContent — last-ditch welcome-message.
+      let currentPanelText = '';
+      const active = document.activeElement;
+      if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
+        currentPanelText = active.value || '';
+      } else {
+        const top = topLocalCard();
+        if (top && !top.hidden && top.body) {
+          currentPanelText = top.body.value || '';
+        } else if (activeNode) {
+          currentPanelText = activeNode.data('text') || '';
         } else {
-          const top = topLocalCard();
-          if (top && !top.hidden && top.body) {
-            currentPanelText = top.body.value || '';
-          } else if (activeNode) {
-            currentPanelText = activeNode.data('text') || '';
-          } else {
-            const defBody = document.getElementById('default-card-body');
-            currentPanelText = defBody ? (defBody.textContent || '') : '';
-          }
+          const defBody = document.getElementById('default-card-body');
+          currentPanelText = defBody ? (defBody.textContent || '') : '';
         }
+      }
 
-        const payload = {
-          script:      currentPanelText,
-          node_url:    currentNodeUrl,
-          source_text: currentSourceText,
-          title:       currentTitle
-        };
-        // Base64 → URL: must percent-encode. Raw base64 contains `+`, `/`, `=`
-        // — all legal in URLs but `+` gets decoded as space by URLSearchParams
-        // (application/x-www-form-urlencoded rules), which corrupts the round
-        // trip and silently drops the standalone into DEFAULT_SCRIPT.
-        // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
-        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-        const standaloneBaseUrl = `http://${window.location.hostname}:8080/bd_V_Kolam/preview.html`;
-        const link = `${standaloneBaseUrl}?data=${encodeURIComponent(encoded)}`;
+      const payload = {
+        script:      currentPanelText,
+        node_url:    currentNodeUrl,
+        source_text: currentSourceText,
+        title:       currentTitle
+      };
+      // Base64 → URL: must percent-encode. Raw base64 contains `+` `/` `=`
+      // — all legal in URLs but `+` gets decoded as space by URLSearchParams
+      // (application/x-www-form-urlencoded rules), which corrupts the round
+      // trip and silently drops the standalone into DEFAULT_SCRIPT.
+      // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      const standaloneBaseUrl = `http://${window.location.hostname}:8080/bd_V_Kolam/preview.html`;
+      const url = `${standaloneBaseUrl}?data=${encodeURIComponent(encoded)}`;
+      return { url, payload };
+    }
 
-        copyLinkText(link).then(() => {
-          const original = copyLinkBtn.textContent;
-          copyLinkBtn.textContent = 'Copied!';
-          setTimeout(() => { copyLinkBtn.textContent = original; }, 1500);
+    // ── Clipboard helpers ──────────────────────────────────────────────
+    const copyLinkText = (text) => {
+      console.log('External Website URL:', text);
+      return navigator.clipboard && navigator.clipboard.writeText
+        ? navigator.clipboard.writeText(text)
+        : Promise.reject(new Error('clipboard API unavailable'));
+    };
+
+    const showFallback = (url) => {
+      document.getElementById('copy-link-fallback')?.remove();
+      const box = document.createElement('div');
+      box.id = 'copy-link-fallback';
+      const hint = document.createElement('div');
+      hint.className = 'fb-hint';
+      hint.textContent = 'Clipboard blocked on plain HTTP — copy manually:';
+      const ta = document.createElement('textarea');
+      ta.readOnly = true;
+      ta.value = url;
+      box.appendChild(hint);
+      box.appendChild(ta);
+      document.body.appendChild(box);
+      ta.focus();
+      ta.select();
+      const dismiss = (ev) => {
+        if (ev.target === ta || box.contains(ev.target)) return;
+        box.remove();
+        document.removeEventListener('mousedown', dismiss, true);
+        document.removeEventListener('touchstart', dismiss, true);
+      };
+      setTimeout(() => {
+        document.addEventListener('mousedown', dismiss, true);
+        document.addEventListener('touchstart', dismiss, true);
+      }, 0);
+    };
+
+    // ── Jump to External Website (MM3) ─────────────────────────────────
+    // Opens the standalone EV in a new tab (Q3 answer 2026-07-12: new tab
+    // for now, preserves the BD chat/pair session). Wrapper is intentionally
+    // one-line so a future alert/confirm can slot in as a pre-flight check.
+    const jumpToBtn = document.getElementById('jump-to-ext-btn');
+    if (jumpToBtn) {
+      jumpToBtn.addEventListener('click', () => {
+        const { url } = buildExternalWebsiteUrl();
+        console.log('Jump to External Website URL:', url);
+        window.open(url, '_blank');
+      });
+    }
+
+    // ── Copy Link to External Website (MM3) ────────────────────────────
+    // Writes the same URL to the clipboard. Three-rung strategy (async
+    // Clipboard API → error path → visible fallback textarea) preserved
+    // from the previous #copy-link-btn (removed from #action-bar in the
+    // same commit).
+    const copyLinkToBtn = document.getElementById('copy-link-to-ext-btn');
+    if (copyLinkToBtn) {
+      copyLinkToBtn.addEventListener('click', () => {
+        const { url } = buildExternalWebsiteUrl();
+        copyLinkText(url).then(() => {
+          const original = copyLinkToBtn.textContent;
+          copyLinkToBtn.textContent = 'Copied!';
+          setTimeout(() => { copyLinkToBtn.textContent = original; }, 1500);
         }).catch((err) => {
-          console.warn('Copy Link: clipboard write failed, showing fallback', err);
-          showFallback(link);
+          console.warn('Copy Link to External Website: clipboard write failed, showing fallback', err);
+          showFallback(url);
         });
       });
     }

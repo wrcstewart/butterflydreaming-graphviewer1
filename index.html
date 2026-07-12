@@ -27,7 +27,9 @@
     <button id="chat-send-btn" type="button" disabled>Send</button>
     <button id="copy-down-btn" type="button" title="Copy Down (card → module)" disabled>↓</button>
     <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
-    <button id="copy-link-btn" type="button" title="Copy a shareable URL that reproduces the current panel content in the standalone player">Copy Link</button>
+    <!-- #copy-link-btn removed 2026-07-12: MM3 moved this action into the
+         #bd-invite-panel-viewer as #copy-link-to-ext-btn / "Copy Link to
+         External Website". Same URL-build code, different button home. -->
     <span id="default-save-status"></span>
     <button id="chat-new-card-btn" type="button">New Card</button>
     <span id="view-mode-toggle">
@@ -118,6 +120,6 @@
   <script src="https://unpkg.com/layout-base@2/layout-base.js"></script>
   <script src="https://unpkg.com/cose-base@2/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
-  <script type="module" src="viewer.js?v=391"></script>
+  <script type="module" src="viewer.js?v=392"></script>
 </body>
 </html>
