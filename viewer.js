@@ -1,5 +1,49 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
+// ── Client → server log forwarding (2026-07-12) ──────────────────────
+// Copy every console.log/info/warn/error and uncaught error / unhandled
+// promise rejection to the server terminal via Socket.IO, so we don't
+// need to cable an iPhone to a Mac to open Web Inspector during dyad
+// testing. DevTools still receives everything as normal — the wrapper
+// calls the original console method first, then forwards.
+let __clientLogSocket = null;
+const __clientLogBuffer = [];
+function __serialiseLogArg(a) {
+  if (a instanceof Error) return `${a.name}: ${a.message}` + (a.stack ? '\n' + a.stack : '');
+  if (typeof a === 'string') return a;
+  try { return JSON.stringify(a); } catch { return String(a); }
+}
+function __forwardClientLog(level, args) {
+  const line = args.map(__serialiseLogArg).join(' ');
+  const rec = { type: 'client_log', level, line };
+  if (__clientLogSocket && __clientLogSocket.connected) {
+    try { __clientLogSocket.emit('msg', rec); } catch {}
+  } else {
+    __clientLogBuffer.push(rec);
+    if (__clientLogBuffer.length > 500) __clientLogBuffer.shift();
+  }
+}
+function attachClientLogSocket(ws) {
+  __clientLogSocket = ws;
+  while (__clientLogBuffer.length) {
+    try { ws.emit('msg', __clientLogBuffer.shift()); } catch { break; }
+  }
+}
+for (const level of ['log', 'info', 'warn', 'error']) {
+  const orig = console[level].bind(console);
+  console[level] = (...args) => {
+    orig(...args);
+    try { __forwardClientLog(level, args); } catch {}
+  };
+}
+window.addEventListener('error', ev => {
+  __forwardClientLog('error', [`Uncaught ${(ev.error && ev.error.stack) || ev.message}`]);
+});
+window.addEventListener('unhandledrejection', ev => {
+  const r = ev.reason;
+  __forwardClientLog('error', [`Unhandled rejection: ${(r && r.stack) || r}`]);
+});
+
 const DWELL_MS   = 200;   // ms before tooltip displays
 const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 
@@ -1117,6 +1161,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Socket dropped (e.g. mobile background/screen lock) but within session window
       // — reconnect transparently so the user can continue without interruption
       wsRef.current = await connectWS();
+      attachClientLogSocket(wsRef.current);
     }
     return queryWS(wsRef.current, type, query, params);
   }
@@ -3234,7 +3279,7 @@ async function init() {
   for (let attempt = 1; ; attempt++) {
     // Connect (or reconnect) WebSocket
     while (true) {
-      try { ws = await connectWS(); break; }
+      try { ws = await connectWS(); attachClientLogSocket(ws); break; }
       catch {
         setMsg(`Waiting for server… (${attempt})`);
         await sleep(3000);

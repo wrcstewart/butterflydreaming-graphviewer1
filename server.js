@@ -494,6 +494,18 @@ io.on('connection', async (socket) => {
     let type;
     try {
       type = msg && msg.type;
+      // Client → server log forwarding. Every client's console.log /
+      // .info / .warn / .error, plus its uncaught errors and unhandled
+      // promise rejections, arrive as these records. Print them here so
+      // the operator can watch a mobile client's runtime from the same
+      // terminal that shows the server logs, no cable to DevTools
+      // required.
+      if (msg.type === 'client_log') {
+        const uid = socket.data.userId || '???';
+        const lvl = (msg.level || 'log').toUpperCase();
+        console.log(`[client:${uid}][${lvl}] ${msg.line}`);
+        return;
+      }
       if (msg.type === 'ready_to_pair') {
         if (!socket.data.userId) return;
         console.log(`[BD] ready_to_pair from ${socket.data.userId}  waitingUser=${waitingUser?.userId ?? 'null'}  sessions=${sessions.size}`);
