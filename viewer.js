@@ -1097,8 +1097,13 @@ function isTouchEvent(evt) {
   return false;
 }
 
-function showSessionExpired() {
-  document.getElementById('session-expired').classList.add('active');
+function showSessionExpired(message) {
+  const overlay = document.getElementById('session-expired');
+  if (message) {
+    const p = overlay.querySelector('p');
+    if (p) p.textContent = message;
+  }
+  overlay.classList.add('active');
 }
 
 function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
@@ -3412,6 +3417,36 @@ async function init() {
 
   const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
   const wsRef = { current: ws, lastActivity: Date.now(), maxIdleMs: MAX_IDLE_MS };
+
+  // MM3 (2026-07-12) — cross-tab BD session enforcement. Return-from-EV
+  // (Jump-in) navigates the EV tab to BD with ?data=; without any special
+  // handling, a user's original BD tab would keep its own WebSocket alive,
+  // leaving them with two simultaneous BD sessions on one device — enough
+  // to game the two-user chat/save requirement by pairing with themselves.
+  //
+  // BroadcastChannel is same-origin same-browser-instance, so we're not
+  // affecting a legit different-device usage. On arrival with ?data=,
+  // broadcast a "kick" that any older BD tab picks up and self-closes.
+  try {
+    const bdChannel = new BroadcastChannel('bd-viewer-active');
+    if (window.location.search.includes('data=')) {
+      bdChannel.postMessage({ type: 'kick-other-bd', at: Date.now() });
+    }
+    bdChannel.addEventListener('message', (e) => {
+      if (!e || !e.data || e.data.type !== 'kick-other-bd') return;
+      console.log('[BD] Kick received from another BD tab; closing this session');
+      try { wsRef.current && wsRef.current.close(); } catch (_) {}
+      showSessionExpired(
+        'Another BD session opened on this device from the External Website. '
+        + 'This tab has been closed to prevent duplicate sessions. Reload to reconnect.'
+      );
+    });
+  } catch (err) {
+    // BroadcastChannel not available (very old browser) — silently no-op.
+    // Anti-gaming is best-effort; server-side dedupe by IP+UA would harden
+    // this if ever needed.
+    console.warn('[BD] BroadcastChannel unavailable — cross-tab kick disabled');
+  }
 
   // Idle-timeout check — runs every minute, shows session-expired overlay once the
   // user has been inactive for 60 min. Connection keepalive is now handled entirely
