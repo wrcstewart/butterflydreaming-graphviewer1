@@ -3493,9 +3493,12 @@ async function init() {
         // MM3 (2026-07-12) — reserve a band on the right of the iframe on
         // landscape viewports for #bd-invite-panel-viewer. Portrait
         // (aspect ratio ≤ 1) keeps the full-width iframe; the invite panel
-        // is hidden or repositioned via CSS on those layouts.
+        // there uses fixed positioning at bottom-right and overlays the
+        // right edge of the visual.
+        // Reserve width tracks the panel: max-width 76 + right 8 = 84,
+        // rounded up to 100 for breathing room.
         const isLandscape   = window.innerWidth > window.innerHeight;
-        const reserveRight  = isLandscape ? 220 : 0;
+        const reserveRight  = isLandscape ? 100 : 0;
         const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
         iframeEl.style.top    = cyRect.top    + 'px';
         iframeEl.style.left   = cyRect.left   + 'px';

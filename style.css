@@ -522,15 +522,15 @@ html, body {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  max-width: 208px;
-  padding: 10px 12px;
+  max-width: 76px;                        /* 50 px button + 2×12 padding + 2 border */
+  padding: 8px 12px;
   background: rgba(10, 10, 26, 0.95);
   border: 1px solid #333;
   border-radius: 6px;
   color: #ccc;
   font-family: sans-serif;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   z-index: 6;                             /* above #cy-you/#cy-buddy (5), below tooltips (10) */
   display: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
@@ -539,7 +539,7 @@ html, body {
 body.player-active #bd-invite-panel-viewer { display: block; }
 
 #bd-invite-text-viewer {
-  margin: 0 0 10px 0;
+  margin: 0 0 8px 0;
   color: #ccc;
   text-align: center;
 }
@@ -547,34 +547,42 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #bd-invite-actions-viewer {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
-/* Jump to — solid muted amber. */
+/* Jump to — solid muted amber. Fixed 50 px width; longer labels wrap
+   inside the button. */
 #jump-to-ext-btn {
   background: #a07820;
   color: #0a0a1a;
   border: none;
   border-radius: 3px;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 5px 4px;
+  font-size: 11px;
   cursor: pointer;
   font-weight: bold;
   font-family: sans-serif;
+  width: 50px;
+  line-height: 1.15;
+  white-space: normal;
 }
 #jump-to-ext-btn:hover { background: #c9a227; }
 
-/* Copy Link to — outlined muted amber, secondary. */
+/* Copy Link to — outlined muted amber, secondary. Wraps to 2 lines
+   inside 50 px ("Copy Link" / "to"). */
 #copy-link-to-ext-btn {
   background: transparent;
   color: #a07820;
   border: 1px solid #a07820;
   border-radius: 3px;
-  padding: 5px 10px;
-  font-size: 12px;
+  padding: 4px 4px;
+  font-size: 11px;
   cursor: pointer;
   font-weight: bold;
   font-family: sans-serif;
+  width: 50px;
+  line-height: 1.15;
+  white-space: normal;
 }
 #copy-link-to-ext-btn:hover {
   background: rgba(160, 120, 32, 0.15);
@@ -583,15 +591,17 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 
 /* Shared object of both verb-buttons above — sits below them so the panel
-   reads "Jump to External Website" / "Copy Link to External Website". */
+   reads "Jump to External / Website" / "Copy Link to External / Website".
+   Forced to two lines via <br> in the markup. */
 #bd-invite-target-viewer {
   margin: 8px 0 0 0;
   text-align: center;
   color: #d4a017;
   font-family: 'Georgia', 'Times New Roman', serif;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: bold;
   font-style: italic;
+  line-height: 1.1;
   letter-spacing: 0.02em;
 }
 
@@ -607,7 +617,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
     transform: none;
     bottom: 100px;                       /* clears cy-buddy(37+23)+cy-you(63+23) stack roughly */
     right: 8px;
-    max-width: 200px;
+    /* max-width stays at the narrow 76 px landscape value — same panel
+       geometry on portrait so it sits alongside the module's control
+       band instead of blanketing it. */
   }
 }
 
