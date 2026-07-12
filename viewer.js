@@ -4009,9 +4009,12 @@ async function init() {
 
   const userCountPanel = document.getElementById('user-count-panel');
 
-  ws.emit('msg', { type: 'get_user_count' });
-  ws.emit('msg', { type: 'get_media_files' });
-
+  // Attach the 'msg' dispatch BEFORE firing the initial requests. Under
+  // ws-based transport this ordering was tolerable because the browser
+  // buffered incoming messages during script parsing; under Socket.IO,
+  // events sent before a listener is attached are dropped by the client
+  // socket. Server also broadcasts user_count on new connection, which
+  // used to be lost the same way.
   ws.on('msg', msg => {
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'user_count') {
@@ -4105,6 +4108,12 @@ async function init() {
       handleClusterCloned(msg);
     }
   });
+
+  // Initial requests fire AFTER the 'msg' handler is attached above, so
+  // the responses can be received. Under Socket.IO (unlike the ws layer)
+  // events sent before a listener is attached are dropped by the client.
+  ws.emit('msg', { type: 'get_user_count' });
+  ws.emit('msg', { type: 'get_media_files' });
 
   // MM1 (2026-07-05) — Return-from-standalone flow. When the URL carries a
   // ?data=<base64 JSON> payload (produced by the standalone player's
