@@ -1109,7 +1109,7 @@ function showSessionExpired(message) {
 function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   async function safeQuery(type, query, params = {}) {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!wsRef.current || !wsRef.current.connected) {
       if (Date.now() - wsRef.lastActivity > wsRef.maxIdleMs) {
         // Truly idle for > 60 min — session ended
         throw new Error('session_expired');
@@ -1232,8 +1232,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     chip.addClass('latest');
     if (pairingState.active) {
       const sendWs = wsRef.current;
-      if (sendWs && sendWs.readyState === WebSocket.OPEN) {
-        sendWs.send(JSON.stringify({
+      if (sendWs && sendWs.connected) {
+        sendWs.emit('msg', {
           type: 'breadcrumb',
           data: {
             type,
@@ -1248,7 +1248,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             subfamily:      isSubfamily,
             clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
           }
-        }));
+        });
       }
     }
     youChipX    += w + 7;
@@ -1831,10 +1831,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const text = top.body.value;
     if (!text.trim()) return false;
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return false;
+    if (!wsNow || !wsNow.connected) return false;
     const sendId = 'send_' + (nextSendId++);
     pendingSends.set(sendId, top);
-    wsNow.send(JSON.stringify({ type: 'buddy_card', sendId, text }));
+    wsNow.emit('msg', { type: 'buddy_card', sendId, text });
     return true;
   }
 
@@ -2780,12 +2780,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
 
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) { devStatus('ws not open'); return; }
-    wsNow.addEventListener('message', function handler(event) {
-      let msg;
-      try { msg = JSON.parse(event.data); } catch { return; }
-      if (msg.type !== 'write_hints') return;
-      wsNow.removeEventListener('message', handler);
+    if (!wsNow || !wsNow.connected) { devStatus('ws not open'); return; }
+    wsNow.on('msg', function handler(msg) {
+      if (!msg || msg.type !== 'write_hints') return;
+      wsNow.off('msg', handler);
       if (msg.error) { devStatus(msg.error); return; }
       // Update in-memory edge data so Reset/re-entry uses preset mode immediately.
       // Match by raw_rel_id since childEdges and hints are built in the same order.
@@ -2798,7 +2796,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       devStatus(`saved ${msg.count}`);
       // No layout re-run — positions are already correct on screen
     });
-    wsNow.send(JSON.stringify({ type: 'write_hints', code, hints }));
+    wsNow.emit('msg', { type: 'write_hints', code, hints });
     devStatus('writing…');
   });
 
@@ -2858,27 +2856,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!code) { setSaveStatus('enter code'); return; }
 
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) { setSaveStatus('ws not open'); return; }
+    if (!wsNow || !wsNow.connected) { setSaveStatus('ws not open'); return; }
 
-    function handler(event) {
-      let m;
-      try { m = JSON.parse(event.data); } catch { return; }
-      if (m.type !== 'edit_node_text') return;
-      wsNow.removeEventListener('message', handler);
+    function handler(m) {
+      if (!m || m.type !== 'edit_node_text') return;
+      wsNow.off('msg', handler);
       if (m.error) { setSaveStatus(m.error); return; }
       setSaveStatus('saved');
     }
-    wsNow.addEventListener('message', handler);
+    wsNow.on('msg', handler);
 
     // Normalise curator-authored [ … ] blocks into canonical %%bd_ai_read
     // before persisting (bot_context.md §3). Server is a dumb store-and-forward.
-    wsNow.send(JSON.stringify({
+    wsNow.emit('msg', {
       type:  'edit_node_text',
       code,
       label,
       name,
       text:  normalizeBotBlocks(rest),
-    }));
+    });
     setSaveStatus('saving…');
   });
 
@@ -2890,7 +2886,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const clusterNode = cy.getElementById(editSelectedClusterId);
     if (!textNode.length || !clusterNode.length) return;
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return;
+    if (!wsNow || !wsNow.connected) return;
 
     const ta = parseFloat(document.getElementById('sp-tagged-as').value);
     const rw = parseFloat(document.getElementById('sp-resonates-with').value);
@@ -2904,13 +2900,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (ec > 0) props.echoes         = ec;
     if (gi > 0) props.gives          = gi;
 
-    wsNow.send(JSON.stringify({
+    wsNow.emit('msg', {
       type:        'edit_save',
       textNodeUrl: textNode.data('url'),
       clusterName: clusterNode.data('name'),
       work:        textNode.data('source_text'),
       props,
-    }));
+    });
   });
 
   document.getElementById('editor-delete-btn').addEventListener('click', () => {
@@ -2919,14 +2915,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const clusterNode = cy.getElementById(editSelectedClusterId);
     if (!textNode.length || !clusterNode.length) return;
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return;
+    if (!wsNow || !wsNow.connected) return;
 
-    wsNow.send(JSON.stringify({
+    wsNow.emit('msg', {
       type:        'edit_delete',
       textNodeUrl: textNode.data('url'),
       clusterName: clusterNode.data('name'),
       work:        textNode.data('source_text'),
-    }));
+    });
   });
 
   function rebuildClusterEditGrid() {
@@ -2980,12 +2976,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!newName || !editSelectedClusterId) return;
     const sourceCluster = cy.getElementById(editSelectedClusterId);
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) return;
-    wsNow.send(JSON.stringify({
+    if (!wsNow || !wsNow.connected) return;
+    wsNow.emit('msg', {
       type:       'edit_clone_cluster',
       sourceName: sourceCluster.data('name'),
       newName,
-    }));
+    });
     document.getElementById('clone-panel').style.display = 'none';
   });
 
@@ -3176,29 +3172,41 @@ function setupNrBadges(cy) {
   return { addBadge };
 }
 
-// --- WebSocket helpers ---
+// --- Socket.IO connection helpers ---
 
+// (2026-07-13) Migrated from raw WebSocket to Socket.IO. `io()` with no
+// args uses same-origin auto-detected protocol. Server-side
+// connectionStateRecovery (see server.js) gives us automatic session
+// recovery on reconnection within 60 s — chat + pair state survive iOS
+// tab-suspension events.
+//
+// The `ws` variable name is preserved throughout the client for minimal
+// diff; despite the name it is now a Socket.IO Socket, not a raw
+// WebSocket. Translations that applied globally:
+//   ws.send(JSON.stringify(x))          →  ws.emit('msg', x)
+//   ws.readyState === WebSocket.OPEN    →  ws.connected
+//   ws.addEventListener('message', h)   →  ws.on('msg', h)
+//     — h now takes the message object directly (no JSON.parse needed)
+//   ws.removeEventListener('message', h)→  ws.off('msg', h)
+//   ws.close()                          →  ws.disconnect()
 function connectWS() {
   return new Promise((resolve, reject) => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
-    ws.onopen  = () => resolve(ws);
-    ws.onerror = ()  => reject(new Error('WebSocket connection failed'));
+    const ws = io();
+    ws.on('connect',       () => resolve(ws));
+    ws.on('connect_error', () => reject(new Error('Socket.IO connection failed')));
   });
 }
 
 function queryWS(ws, type, query, params = {}) {
   return new Promise((resolve, reject) => {
-    function handler(event) {
-      let msg;
-      try { msg = JSON.parse(event.data); } catch (e) { return; }
-      if (msg.type !== type) return;
-      ws.removeEventListener('message', handler);
+    function handler(msg) {
+      if (!msg || msg.type !== type) return;
+      ws.off('msg', handler);
       if (msg.error) reject(new Error(msg.error));
       else resolve(msg.records);
     }
-    ws.addEventListener('message', handler);
-    ws.send(JSON.stringify({ type, query, params }));
+    ws.on('msg', handler);
+    ws.emit('msg', { type, query, params });
   });
 }
 
@@ -3250,7 +3258,7 @@ async function init() {
       break; // success
     } catch (err) {
       console.warn('Load attempt', attempt, 'failed:', err.message);
-      ws.close(); // close so stale message listeners are dropped
+      ws.disconnect(); // close so stale message listeners are dropped
       await sleep(2000);
     }
   }
@@ -3578,7 +3586,7 @@ async function init() {
       const d = e && e.data;
       if (!d || d.type !== 'BD_READY') return;
       console.log('[MM1.6] onReady: BD_READY received, source match=', e.source === visualIframe.contentWindow);
-      window.removeEventListener('message', onReady);
+      window.off('msg', onReady);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
         enableCopyUp();
@@ -3587,7 +3595,7 @@ async function init() {
         console.warn('[MM1.6] onReady: postMessage failed', err);
       }
     };
-    window.addEventListener('message', onReady);
+    window.on('msg', onReady);
     visualIframe.src = url;
   }
 
@@ -3648,7 +3656,7 @@ async function init() {
       tip.style.display = 'none';
       ensureLocalCard();
       const wsNow = wsRef.current;
-      if (wsNow && wsNow.readyState === WebSocket.OPEN) {
+      if (wsNow && wsNow.connected) {
         // Chat toggle now folds in the previous Pair-button step: queue for
         // pairing on chat-open, unless we're already paired (avoid double-
         // queue after a mid-session close+reopen without an unpair). Server
@@ -3662,11 +3670,11 @@ async function init() {
           const devCodeEl = document.getElementById('dev-code');
           const code = devCodeEl ? devCodeEl.value.trim() : '';
           console.log('[pair-debug] Chat ON → sending ready_to_pair (code:', code ? `"${code}"` : 'empty', '), pairingState.active=', pairingState.active);
-          wsNow.send(JSON.stringify({ type: 'ready_to_pair', code }));
+          wsNow.emit('msg', { type: 'ready_to_pair', code });
         } else {
           console.log('[pair-debug] Chat ON → SKIP ready_to_pair (pairingState.active=true)');
         }
-        wsNow.send(JSON.stringify({ type: 'enter_chat' }));
+        wsNow.emit('msg', { type: 'enter_chat' });
       }
       // A42 §42.3 — enable Nodes/Player radios while chat is active.
       document.querySelectorAll('#view-mode-toggle input[type="radio"]')
@@ -3677,14 +3685,14 @@ async function init() {
       if (cdBtn) cdBtn.disabled = false;
     } else {
       const wsNow = wsRef.current;
-      if (wsNow && wsNow.readyState === WebSocket.OPEN) {
+      if (wsNow && wsNow.connected) {
         // Teardown order: leave_chat first (partner sees "Partner left chat"
         // system card while still paired), then unpair (partner receives
         // buddy_disconnected → auto re-queue). This user does NOT auto
         // re-queue — they'll press Chat again if they want a new partner.
         console.log('[pair-debug] Chat OFF → sending leave_chat + unpair, pairingState.active=', pairingState.active);
-        wsNow.send(JSON.stringify({ type: 'leave_chat' }));
-        wsNow.send(JSON.stringify({ type: 'unpair' }));
+        wsNow.emit('msg', { type: 'leave_chat' });
+        wsNow.emit('msg', { type: 'unpair' });
       }
       // Locally reset pair state so the next Chat-open re-queues cleanly.
       pairingState.active = false;
@@ -3766,13 +3774,11 @@ async function init() {
     const code = document.getElementById('dev-code').value.trim();
     if (!code) { e.target.checked = false; return; }
     const wsNow = wsRef.current;
-    if (!wsNow || wsNow.readyState !== WebSocket.OPEN) { e.target.checked = false; return; }
+    if (!wsNow || !wsNow.connected) { e.target.checked = false; return; }
     const devStatusEl = document.getElementById('dev-status');
-    wsNow.addEventListener('message', function handler(event) {
-      let msg;
-      try { msg = JSON.parse(event.data); } catch { return; }
-      if (msg.type !== 'write_hints') return;
-      wsNow.removeEventListener('message', handler);
+    wsNow.on('msg', function handler(msg) {
+      if (!msg || msg.type !== 'write_hints') return;
+      wsNow.off('msg', handler);
       if (msg.ok) {
         editModeUnlocked = true;
         editModeActive = true;
@@ -3784,7 +3790,7 @@ async function init() {
         editModeActive = false;
       }
     });
-    wsNow.send(JSON.stringify({ type: 'write_hints', code, hints: [] }));
+    wsNow.emit('msg', { type: 'write_hints', code, hints: [] });
   });
 
   const { addBadge }      = setupNrBadges(cy);
@@ -3853,7 +3859,7 @@ async function init() {
     // currently focused local card, mirroring the semantics of Copy Down's
     // destination. dispatchEvent('input') triggers updateSendBtn so the Send
     // button's enable state re-evaluates after the write.
-    window.addEventListener('message', (e) => {
+    window.on('msg', (e) => {
       const d = e && e.data;
       if (!d || d.type !== 'bd_script_response') return;
       const body = getFocusedCardBody();
@@ -4003,12 +4009,11 @@ async function init() {
 
   const userCountPanel = document.getElementById('user-count-panel');
 
-  ws.send(JSON.stringify({ type: 'get_user_count' }));
-  ws.send(JSON.stringify({ type: 'get_media_files' }));
+  ws.emit('msg', { type: 'get_user_count' });
+  ws.emit('msg', { type: 'get_media_files' });
 
-  ws.addEventListener('message', event => {
-    let msg;
-    try { msg = JSON.parse(event.data); } catch (e) { return; }
+  ws.on('msg', msg => {
+    if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'user_count') {
       userCountPanel.textContent = `${msg.count} connected`;
       userCountPanel.classList.add('active');
@@ -4049,7 +4054,7 @@ async function init() {
         pairStatus.textContent = 'Waiting...';
         const devCodeEl = document.getElementById('dev-code');
         const code = devCodeEl ? devCodeEl.value.trim() : '';
-        ws.send(JSON.stringify({ type: 'ready_to_pair', code }));
+        ws.emit('msg', { type: 'ready_to_pair', code });
       } else {
         pairStatus.textContent = '';
       }

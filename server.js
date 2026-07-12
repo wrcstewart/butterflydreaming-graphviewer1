@@ -3,7 +3,7 @@
 const crypto  = require('crypto');
 const fs      = require('fs');
 const express = require('express');
-const { WebSocketServer } = require('ws');
+const { Server: SocketIOServer } = require('socket.io');
 const neo4j = require('neo4j-driver');
 
 // Scan project directory for eligible media files (D_ = default, A_ = alternate).
@@ -217,31 +217,53 @@ async function pingMemgraph() {
 pingMemgraph().then(() => console.log('[BD] Memgraph connection warmed up'));
 setInterval(pingMemgraph, 5 * 60 * 1000);
 
-const wss = new WebSocketServer({ server });
+// Socket.IO server (2026-07-13) — replaces raw `ws` WebSocketServer.
+// connectionStateRecovery gives us the mobile-friendly resilience that the
+// bare ws was missing: on a client reconnect within the disconnection
+// window (60 s), Socket.IO restores the session (rooms, ID, buffered
+// events) transparently. iOS Safari tab-suspension → screen-off →
+// screen-on → reconnect within 60 s: session and pair survive.
+// skipMiddlewares means the auth/etc. path (we don't have one yet) isn't
+// re-run on recovery.
+const io = new SocketIOServer(server, {
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 60 * 1000,
+    skipMiddlewares: true,
+  }
+});
 
 // --- Pairing state ---
 
-const sessions    = new Map();  // userId → ws
-let   waitingUser = null;        // { userId, ws } | null
+const sessions    = new Map();  // userId → socket (Socket.IO Socket)
+let   waitingUser = null;        // { userId, socket } | null
 const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
 const howToSent   = new Set();  // userIds that have already received the how-to card this session
 
-// MM3 (2026-07-12, revised) — anti-self-pair. No longer keeps a map of
-// device_id → active ws or kicks older tabs. Instead: cookie parse in
-// wss.on('connection') stamps ws.deviceId, and ready_to_pair refuses to
-// pair two ws with the same deviceId (see the ready_to_pair handler
-// below). Rationale: kicking at connect time broke dyad continuity when
-// a user returned from EV via Jump-in — their original paired BD tab
-// got kicked, tearing down their pair with the remote partner. The
+// Post-Socket.IO migration (2026-07-13). Grace-period purge timers:
+// on disconnect we remove the user from `sessions` immediately (so
+// user_count is accurate) BUT we defer pair/state teardown by 65 s.
+// If the client reconnects within that window (Socket.IO's
+// connectionStateRecovery), the new connection handler cancels the
+// pending purge and refreshes the sessions entry — buddy never sees a
+// buddy_disconnected. If no reconnect, the timer fires and we tear
+// down the pair, notify the buddy, and clean up.
+const pendingPurges = new Map();  // userId → timer handle
+
+// MM3 (2026-07-12, revised) — anti-self-pair. Cookie parse in the
+// connection handler stamps socket.data.deviceId, and ready_to_pair
+// refuses to pair two sockets with the same deviceId. Rationale: an
+// earlier connect-time kick attempt broke dyad continuity when a user
+// returned from EV via Jump-in — their original paired BD tab got
+// kicked, tearing down their pair with the remote partner. The
 // pair-time check preserves the paired session and only refuses at the
 // specific gaming moment (same-device self-pair).
 
 function sendToBuddy(userId, msg) {
   const buddyId = pairedWith.get(userId);
   if (!buddyId) return;
-  const buddyWs = sessions.get(buddyId);
-  if (buddyWs && buddyWs.readyState === 1 /* OPEN */) buddyWs.send(JSON.stringify(msg));
+  const buddy = sessions.get(buddyId);
+  if (buddy && buddy.connected) buddy.emit('msg', msg);
 }
 
 // --- A43 chat-channel helpers ---
@@ -259,9 +281,9 @@ function channelOpen(userId) {
 }
 
 function sendSystemCard(userId, text) {
-  const ws = sessions.get(userId);
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify({ type: 'buddy_card', channel: 'system', text }));
+  const socket = sessions.get(userId);
+  if (socket && socket.connected) {
+    socket.emit('msg', { type: 'buddy_card', channel: 'system', text });
   }
 }
 
@@ -278,16 +300,74 @@ function statusTextFor(userId) {
 }
 
 function broadcastUserCount() {
-  const msg = JSON.stringify({ type: 'user_count', count: sessions.size });
+  const payload = { type: 'user_count', count: sessions.size };
   for (const s of sessions.values()) {
-    if (s.readyState === 1) s.send(msg);
+    if (s.connected) s.emit('msg', payload);
   }
 }
 
 function broadcastCorpusUpdate(msg) {
-  const json = JSON.stringify(msg);
   for (const s of sessions.values()) {
-    if (s.readyState === 1) s.send(json);
+    if (s.connected) s.emit('msg', msg);
+  }
+}
+
+// Grace-period purge helpers (Socket.IO migration 2026-07-13).
+function schedulePurge(userId) {
+  if (!userId) return;
+  cancelPurge(userId);
+  const timer = setTimeout(() => {
+    pendingPurges.delete(userId);
+    executePurge(userId);
+  }, 65 * 1000);
+  pendingPurges.set(userId, timer);
+}
+
+function cancelPurge(userId) {
+  const timer = pendingPurges.get(userId);
+  if (timer) {
+    clearTimeout(timer);
+    pendingPurges.delete(userId);
+  }
+}
+
+async function executePurge(userId) {
+  if (!userId) return;
+  // Recovery race: if a socket is now live under this userId, skip purge.
+  const currentSocket = sessions.get(userId);
+  if (currentSocket && currentSocket.connected) {
+    console.log(`[BD] Purge skipped: ${userId} has a live socket`);
+    return;
+  }
+  console.log(`[BD] Purging user (no recovery): ${userId}`);
+  if (waitingUser?.userId === userId) waitingUser = null;
+  const buddyId = pairedWith.get(userId);
+  if (buddyId) {
+    if (inChat.get(userId) && inChat.get(buddyId)) {
+      sendSystemCard(buddyId, 'Partner disconnected.');
+    }
+    pairedWith.delete(userId);
+    pairedWith.delete(buddyId);
+    const buddySocket = sessions.get(buddyId);
+    if (buddySocket && buddySocket.connected) {
+      buddySocket.emit('msg', { type: 'buddy_disconnected' });
+    }
+  }
+  inChat.delete(userId);
+  howToSent.delete(userId);
+  try {
+    const s = driver.session({ database: 'memgraph' });
+    try {
+      await s.run(
+        'MATCH (u:User {viewer_id: $uid}) DETACH DELETE u',
+        { uid: userId }
+      );
+      console.log(`[BD] User deleted: ${userId}`);
+    } finally {
+      await s.close();
+    }
+  } catch (err) {
+    console.error('[BD] User delete error:', err.message);
   }
 }
 
@@ -342,96 +422,81 @@ function serializeRecord(rec) {
   return obj;
 }
 
-// --- WebSocket handler ---
+// --- Socket.IO connection handler (2026-07-13 migration from raw ws) ---
 
-wss.on('connection', async (ws, request) => {
-  // MM3 revised (2026-07-12) — stamp ws.deviceId from the bd_device_id
-  // cookie for later same-device pair refusal in the ready_to_pair
-  // handler. No kick: multiple ws per browser are allowed, so a user
-  // returning from EV via Jump-in doesn't tear down their still-alive
-  // paired BD session in a different tab.
+io.on('connection', async (socket) => {
+  // Parse the bd_device_id cookie into socket.data.deviceId. Used by the
+  // ready_to_pair handler to refuse same-device self-pair (MM3). Cookie
+  // survives across recovery on socket.data — no need to re-parse.
   {
-    const cookieHeader = (request && request.headers && request.headers.cookie) || '';
+    const cookieHeader = (socket.handshake && socket.handshake.headers && socket.handshake.headers.cookie) || '';
     const m = cookieHeader.match(/(?:^|;\s*)bd_device_id=([\w-]+)/);
-    if (m) ws.deviceId = m[1];
+    if (m) socket.data.deviceId = m[1];
   }
 
-  // Create ephemeral User node — viewer_id = 'N_<memgraph integer id>'
-  // Prevents any ID collision with corpus nodes (same N_ prefix rule as cf_ for edges).
-  ws.userId = null;
-  try {
-    const s = driver.session({ database: 'memgraph' });
-    try {
-      const result = await s.run(
-        'CREATE (u:User {created_at: datetime()}) ' +
-        "WITH u, 'N_' + toString(id(u)) AS vid " +
-        'SET u.viewer_id = vid ' +
-        'RETURN u.viewer_id AS viewer_id'
-      );
-      ws.userId = result.records[0]?.get('viewer_id') ?? null;
-      if (ws.userId) { sessions.set(ws.userId, ws); broadcastUserCount(); }
-      console.log(`[BD] User created: ${ws.userId}`);
-    } finally {
-      await s.close();
-    }
-  } catch (err) {
-    console.error('[BD] User create error:', err.message);
-  }
-
-  // Server-side WebSocket protocol ping every 25 s — browser replies with pong automatically
-  // at the protocol layer, keeping the connection alive without any client JS timer.
-  const keepAlive = setInterval(() => {
-    if (ws.readyState === ws.OPEN) ws.ping();
-    else clearInterval(keepAlive);
-  }, 25000);
-
-  ws.on('close', async () => {
-    clearInterval(keepAlive);
-    if (ws.userId) {
-      sessions.delete(ws.userId);
+  if (socket.recovered) {
+    // Reconnection within the 60 s recovery window. socket.data.userId is
+    // preserved across recovery, so we can re-register the socket without
+    // creating a new Memgraph User node. Any pending purge is cancelled —
+    // the buddy never sees a buddy_disconnected.
+    const userId = socket.data.userId;
+    if (userId) {
+      sessions.set(userId, socket);
+      if (waitingUser?.userId === userId) waitingUser.socket = socket;
+      cancelPurge(userId);
       broadcastUserCount();
-      if (waitingUser?.userId === ws.userId) waitingUser = null;
-      const buddyId = pairedWith.get(ws.userId);
-      if (buddyId) {
-        // If both were in chat, drop a "partner disconnected" system card into
-        // the buddy's running log before tearing the pair down.
-        if (inChat.get(ws.userId) && inChat.get(buddyId)) {
-          sendSystemCard(buddyId, 'Partner disconnected.');
-        }
-        pairedWith.delete(ws.userId);
-        pairedWith.delete(buddyId);
-        const buddyWs = sessions.get(buddyId);
-        if (buddyWs && buddyWs.readyState === 1)
-          buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
-      }
-      inChat.delete(ws.userId);
-      howToSent.delete(ws.userId);
+      console.log(`[BD] Recovered: ${userId}`);
     }
-    if (!ws.userId) return;
+  } else {
+    // Fresh connection — create ephemeral User node in Memgraph.
+    // viewer_id = 'N_<memgraph integer id>' prevents any ID collision with
+    // corpus nodes (same N_ prefix rule as cf_ for edges).
+    socket.data.userId = null;
     try {
       const s = driver.session({ database: 'memgraph' });
       try {
-        await s.run(
-          'MATCH (u:User {viewer_id: $uid}) DETACH DELETE u',
-          { uid: ws.userId }
+        const result = await s.run(
+          'CREATE (u:User {created_at: datetime()}) ' +
+          "WITH u, 'N_' + toString(id(u)) AS vid " +
+          'SET u.viewer_id = vid ' +
+          'RETURN u.viewer_id AS viewer_id'
         );
-        console.log(`[BD] User deleted: ${ws.userId}`);
+        const viewer_id = result.records[0]?.get('viewer_id') ?? null;
+        socket.data.userId = viewer_id;
+        if (viewer_id) { sessions.set(viewer_id, socket); broadcastUserCount(); }
+        console.log(`[BD] User created: ${viewer_id}`);
       } finally {
         await s.close();
       }
     } catch (err) {
-      console.error('[BD] User delete error:', err.message);
+      console.error('[BD] User create error:', err.message);
     }
+  }
+
+  // Socket.IO handles heartbeat/keepalive at the protocol layer — no need
+  // for the old setInterval ws.ping() loop.
+
+  socket.on('disconnect', (reason) => {
+    const userId = socket.data.userId;
+    if (!userId) return;
+    // Remove from sessions immediately so user_count broadcasts reflect the
+    // true active-connection state right away. Pair teardown is deferred by
+    // schedulePurge — if the client reconnects within 65 s (Socket.IO's
+    // connectionStateRecovery window + safety margin), we cancel the purge
+    // and the pair survives.
+    if (sessions.get(userId) === socket) sessions.delete(userId);
+    broadcastUserCount();
+    schedulePurge(userId);
+    console.log(`[BD] Disconnected: ${userId} (reason: ${reason}) — grace period 65 s`);
   });
 
-  ws.on('message', async (raw) => {
+  socket.on('msg', async (msg) => {
     let type;
     try {
-      const msg = JSON.parse(raw);
-      type = msg.type;
+      type = msg && msg.type;
       if (msg.type === 'ready_to_pair') {
-        if (!ws.userId) return;
-        console.log(`[BD] ready_to_pair from ${ws.userId}  waitingUser=${waitingUser?.userId ?? 'null'}  sessions=${sessions.size}`);
+        if (!socket.data.userId) return;
+        console.log(`[BD] ready_to_pair from ${socket.data.userId}  waitingUser=${waitingUser?.userId ?? 'null'}  sessions=${sessions.size}`);
         // Self-pair guard: if this same user is already sitting in the wait
         // slot, treat the second ready_to_pair as re-affirming their wait,
         // not as a pair-up. Prevents "paired with self" when a client
@@ -439,17 +504,17 @@ wss.on('connection', async (ws, request) => {
         // server didn't tear down (e.g., because it predates the unpair
         // handler, or because two ready_to_pair calls raced past a single
         // unpair).
-        if (waitingUser && waitingUser.userId === ws.userId) {
-          ws.send(JSON.stringify({ type: 'wait_state' }));
+        if (waitingUser && waitingUser.userId === socket.data.userId) {
+          socket.emit('msg', { type: 'wait_state' });
           console.log(`[BD]   → self-pair guard: re-affirm Waiting`);
           return;
         }
         if (waitingUser === null) {
           // First one in — no code gate. Sitting alone in the queue is
           // harmless (no one to talk to yet).
-          waitingUser = { userId: ws.userId, ws };
-          ws.send(JSON.stringify({ type: 'wait_state' }));
-          console.log(`[BD] Waiting: ${ws.userId}`);
+          waitingUser = { userId: socket.data.userId, socket };
+          socket.emit('msg', { type: 'wait_state' });
+          console.log(`[BD] Waiting: ${socket.data.userId}`);
         } else {
           // MM3 revised (2026-07-12) — same-device pair refusal. Two ws
           // from the same browser instance (identical bd_device_id cookie)
@@ -457,12 +522,12 @@ wss.on('connection', async (ws, request) => {
           // self-pair by opening two tabs. Refuse this arriver; the
           // waitingUser slot keeps its current occupant.
           if (
-            ws.deviceId &&
-            waitingUser.ws && waitingUser.ws.deviceId &&
-            waitingUser.ws.deviceId === ws.deviceId
+            socket.data.deviceId &&
+            waitingUser.socket && waitingUser.socket.data.deviceId &&
+            waitingUser.socket.data.deviceId === socket.data.deviceId
           ) {
-            ws.send(JSON.stringify({ type: 'pair_denied', reason: 'same_device' }));
-            console.log(`[BD] Pair denied (same_device): ${ws.userId} ↔ ${waitingUser.userId}`);
+            socket.emit('msg', { type: 'pair_denied', reason: 'same_device' });
+            console.log(`[BD] Pair denied (same_device): ${socket.data.userId} ↔ ${waitingUser.userId}`);
             return;
           }
           // Would pair up. If a curation code is configured on this
@@ -475,45 +540,45 @@ wss.on('connection', async (ws, request) => {
             const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
               crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
             if (!codeOk) {
-              ws.send(JSON.stringify({ type: 'pair_denied', reason: 'code_required' }));
-              console.log(`[BD] Pair denied (no/bad code): ${ws.userId}`);
+              socket.emit('msg', { type: 'pair_denied', reason: 'code_required' });
+              console.log(`[BD] Pair denied (no/bad code): ${socket.data.userId}`);
               return;
             }
           }
           const buddy = waitingUser;
           waitingUser = null;
-          pairedWith.set(ws.userId, buddy.userId);
-          pairedWith.set(buddy.userId, ws.userId);
-          ws.send(JSON.stringify({ type: 'paired', buddyId: buddy.userId }));
-          buddy.ws.send(JSON.stringify({ type: 'paired', buddyId: ws.userId }));
-          console.log(`[BD] Paired: ${ws.userId} ↔ ${buddy.userId}`);
+          pairedWith.set(socket.data.userId, buddy.userId);
+          pairedWith.set(buddy.userId, socket.data.userId);
+          socket.emit('msg', { type: 'paired', buddyId: buddy.userId });
+          buddy.socket.emit('msg', { type: 'paired', buddyId: socket.data.userId });
+          console.log(`[BD] Paired: ${socket.data.userId} ↔ ${buddy.userId}`);
         }
         return;
       }
       if (msg.type === 'get_user_count') {
-        ws.send(JSON.stringify({ type: 'user_count', count: sessions.size }));
+        socket.emit('msg', { type: 'user_count', count: sessions.size });
         return;
       }
       if (msg.type === 'get_media_files') {
-        ws.send(JSON.stringify({ type: 'media_files', files: mediaFiles }));
+        socket.emit('msg', { type: 'media_files', files: mediaFiles });
         return;
       }
       if (msg.type === 'breadcrumb') {
-        if (ws.userId) sendToBuddy(ws.userId, { type: 'buddy_breadcrumb', data: msg.data });
+        if (socket.data.userId) sendToBuddy(socket.data.userId, { type: 'buddy_breadcrumb', data: msg.data });
         return;
       }
       if (msg.type === 'enter_chat') {
-        if (!ws.userId) return;
-        inChat.set(ws.userId, true);
-        sendHowToOnce(ws.userId);
-        sendSystemCard(ws.userId, statusTextFor(ws.userId));
+        if (!socket.data.userId) return;
+        inChat.set(socket.data.userId, true);
+        sendHowToOnce(socket.data.userId);
+        sendSystemCard(socket.data.userId, statusTextFor(socket.data.userId));
         // Client uses this to drop in N=1 above the initial how-to + status.
         // Sent every enter_chat; client handles idempotently. A/B layout
         // consistency is enforced on the client by the system-card pinning
         // rule in prependSystemCard (see [[system-card-placement]]), not by
         // the order of these emits.
-        ws.send(JSON.stringify({ type: 'chat_ready' }));
-        const buddyId = pairedWith.get(ws.userId);
+        socket.emit('msg', { type: 'chat_ready' });
+        const buddyId = pairedWith.get(socket.data.userId);
         if (buddyId && inChat.get(buddyId)) {
           // Partner is also in chat — one combined card instead of two
           // ("Partner joined" + status), since the status at this moment
@@ -523,9 +588,9 @@ wss.on('connection', async (ws, request) => {
         return;
       }
       if (msg.type === 'leave_chat') {
-        if (!ws.userId) return;
-        inChat.set(ws.userId, false);
-        const buddyId = pairedWith.get(ws.userId);
+        if (!socket.data.userId) return;
+        inChat.set(socket.data.userId, false);
+        const buddyId = pairedWith.get(socket.data.userId);
         if (buddyId && inChat.get(buddyId)) {
           sendSystemCard(buddyId, 'Partner left chat.');
         }
@@ -539,69 +604,69 @@ wss.on('connection', async (ws, request) => {
       // ws.on('close')). Does NOT re-queue the initiator — they must press
       // Chat again to look for a new partner.
       if (msg.type === 'unpair') {
-        if (!ws.userId) return;
-        const wasWaiting = waitingUser?.userId === ws.userId;
+        if (!socket.data.userId) return;
+        const wasWaiting = waitingUser?.userId === socket.data.userId;
         if (wasWaiting) waitingUser = null;
-        const buddyId = pairedWith.get(ws.userId);
+        const buddyId = pairedWith.get(socket.data.userId);
         if (buddyId) {
-          if (inChat.get(ws.userId) && inChat.get(buddyId)) {
+          if (inChat.get(socket.data.userId) && inChat.get(buddyId)) {
             sendSystemCard(buddyId, 'Partner disconnected.');
           }
-          pairedWith.delete(ws.userId);
+          pairedWith.delete(socket.data.userId);
           pairedWith.delete(buddyId);
-          const buddyWs = sessions.get(buddyId);
-          if (buddyWs && buddyWs.readyState === 1) {
-            buddyWs.send(JSON.stringify({ type: 'buddy_disconnected' }));
+          const buddy = sessions.get(buddyId);
+          if (buddy && buddy.connected) {
+            buddy.emit('msg', { type: 'buddy_disconnected' });
           }
-          console.log(`[BD] Unpair: ${ws.userId} left ${buddyId}`);
+          console.log(`[BD] Unpair: ${socket.data.userId} left ${buddyId}`);
         } else if (wasWaiting) {
-          console.log(`[BD] Unpair: ${ws.userId} left the wait queue`);
+          console.log(`[BD] Unpair: ${socket.data.userId} left the wait queue`);
         } else {
-          console.log(`[BD] Unpair: ${ws.userId} was neither waiting nor paired`);
+          console.log(`[BD] Unpair: ${socket.data.userId} was neither waiting nor paired`);
         }
         return;
       }
       if (msg.type === 'buddy_card') {
         // Outbound from client (Send button). communications.md §6.2/§6.4.
         // No persistence — pure pass-through with a delivery ack on success.
-        if (!ws.userId) return;
+        if (!socket.data.userId) return;
         const text = typeof msg.text === 'string' ? msg.text : '';
         const sendId = msg.sendId;
-        if (!channelOpen(ws.userId)) {
-          sendSystemCard(ws.userId, 'Partner not available — please wait.');
+        if (!channelOpen(socket.data.userId)) {
+          sendSystemCard(socket.data.userId, 'Partner not available — please wait.');
           return;
         }
-        const buddyId = pairedWith.get(ws.userId);
-        const buddyWs = sessions.get(buddyId);
-        if (buddyWs && buddyWs.readyState === 1) {
-          buddyWs.send(JSON.stringify({ type: 'buddy_card', channel: 'partner', text }));
-          ws.send(JSON.stringify({
+        const buddyId = pairedWith.get(socket.data.userId);
+        const buddy = sessions.get(buddyId);
+        if (buddy && buddy.connected) {
+          buddy.emit('msg', { type: 'buddy_card', channel: 'partner', text });
+          socket.emit('msg', {
             type: 'buddy_card_ack',
             sendId,
             deliveredAt: new Date().toISOString(),
-          }));
+          });
         } else {
-          sendSystemCard(ws.userId, 'Partner not available — please wait.');
+          sendSystemCard(socket.data.userId, 'Partner not available — please wait.');
         }
         return;
       }
       if (msg.type === 'write_hints') {
         if (!CURATION_CODE) {
-          ws.send(JSON.stringify({ type: 'write_hints', error: 'curation_disabled' }));
+          socket.emit('msg', { type: 'write_hints', error: 'curation_disabled' });
           return;
         }
         const now = Date.now();
-        if (ws._lastHintWrite && now - ws._lastHintWrite < 8000) {
-          ws.send(JSON.stringify({ type: 'write_hints', error: 'rate_limited' }));
+        if (socket.data._lastHintWrite && now - socket.data._lastHintWrite < 8000) {
+          socket.emit('msg', { type: 'write_hints', error: 'rate_limited' });
           return;
         }
         const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
           crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
         if (!codeOk) {
-          ws.send(JSON.stringify({ type: 'write_hints', error: 'bad_code' }));
+          socket.emit('msg', { type: 'write_hints', error: 'bad_code' });
           return;
         }
-        ws._lastHintWrite = now;
+        socket.data._lastHintWrite = now;
         const s = driver.session({ database: 'memgraph' });
         try {
           await s.run(
@@ -610,11 +675,11 @@ wss.on('connection', async (ws, request) => {
             'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y, r.hint_scale = h.hint_scale',
             { hints: msg.hints }
           );
-          ws.send(JSON.stringify({ type: 'write_hints', ok: true, count: msg.hints.length }));
-          console.log(`[BD] Hints written: ${msg.hints.length} edges by ${ws.userId}`);
+          socket.emit('msg', { type: 'write_hints', ok: true, count: msg.hints.length });
+          console.log(`[BD] Hints written: ${msg.hints.length} edges by ${socket.data.userId}`);
         } catch (err) {
           console.error('[BD] write_hints error:', err.message);
-          ws.send(JSON.stringify({ type: 'write_hints', error: err.message }));
+          socket.emit('msg', { type: 'write_hints', error: err.message });
         } finally {
           await s.close();
         }
@@ -622,7 +687,7 @@ wss.on('connection', async (ws, request) => {
       }
       if (msg.type === 'edit_save' || msg.type === 'edit_delete') {
         if (!CURATION_CODE) {
-          ws.send(JSON.stringify({ type: msg.type, error: 'curation_disabled' }));
+          socket.emit('msg', { type: msg.type, error: 'curation_disabled' });
           return;
         }
         const { textNodeUrl, clusterName, work, props } = msg;
@@ -665,7 +730,7 @@ wss.on('connection', async (ws, request) => {
             const cc_count = ccResult.records[0]?.get('cc_count').toNumber() ?? 0;
             await tx.commit();
             const eventType = msg.type === 'edit_save' ? 'cluster_rel_saved' : 'cluster_rel_deleted';
-            ws.send(JSON.stringify({ type: msg.type, ok: true }));
+            socket.emit('msg', { type: msg.type, ok: true });
             broadcastCorpusUpdate({ type: eventType, textNodeUrl, clusterName, work, props: props || {}, n_r, cc_count });
             console.log(`[BD] ${eventType}: ${textNodeUrl} → ${clusterName} (n_r=${n_r}, cc_count=${cc_count})`);
           } catch (err) {
@@ -674,7 +739,7 @@ wss.on('connection', async (ws, request) => {
           }
         } catch (err) {
           console.error(`[BD] ${msg.type} error:`, err.message);
-          ws.send(JSON.stringify({ type: msg.type, error: err.message }));
+          socket.emit('msg', { type: msg.type, error: err.message });
         } finally {
           await s.close();
         }
@@ -682,12 +747,12 @@ wss.on('connection', async (ws, request) => {
       }
       if (msg.type === 'edit_clone_cluster') {
         if (!CURATION_CODE) {
-          ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: 'curation_disabled' }));
+          socket.emit('msg', { type: 'edit_clone_cluster', error: 'curation_disabled' });
           return;
         }
         const { sourceName, newName } = msg;
         if (!sourceName || !newName) {
-          ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: 'missing_params' }));
+          socket.emit('msg', { type: 'edit_clone_cluster', error: 'missing_params' });
           return;
         }
         const s = driver.session({ database: 'memgraph' });
@@ -697,7 +762,7 @@ wss.on('connection', async (ws, request) => {
             { newName }
           );
           if (checkResult.records.length > 0) {
-            ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: 'name_exists' }));
+            socket.emit('msg', { type: 'edit_clone_cluster', error: 'name_exists' });
             return;
           }
           await s.run(
@@ -734,12 +799,12 @@ wss.on('connection', async (ws, request) => {
             fname:  rec.get('fname'),
             weight: serializeValue(rec.get('weight')),
           }));
-          ws.send(JSON.stringify({ type: 'edit_clone_cluster', ok: true }));
+          socket.emit('msg', { type: 'edit_clone_cluster', ok: true });
           broadcastCorpusUpdate({ type: 'cluster_cloned', newCluster, sourceName, parents });
           console.log(`[BD] cluster_cloned: ${newName} from ${sourceName} (${parents.length} parent(s): ${parents.map(p => p.fname).join(', ') || 'none'})`);
         } catch (err) {
           console.error('[BD] edit_clone_cluster error:', err.message);
-          ws.send(JSON.stringify({ type: 'edit_clone_cluster', error: err.message }));
+          socket.emit('msg', { type: 'edit_clone_cluster', error: err.message });
         } finally {
           await s.close();
         }
@@ -747,26 +812,26 @@ wss.on('connection', async (ws, request) => {
       }
       if (msg.type === 'edit_node_text') {
         if (!CURATION_CODE) {
-          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'curation_disabled' }));
+          socket.emit('msg', { type: 'edit_node_text', error: 'curation_disabled' });
           return;
         }
         const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
           crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
         if (!codeOk) {
-          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'bad_code' }));
+          socket.emit('msg', { type: 'edit_node_text', error: 'bad_code' });
           return;
         }
         const allowed = ['Root', 'Entry', 'Family', 'Cluster'];
         if (!allowed.includes(msg.label)) {
-          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'invalid_label' }));
+          socket.emit('msg', { type: 'edit_node_text', error: 'invalid_label' });
           return;
         }
         if (typeof msg.name !== 'string' || !msg.name.length) {
-          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'missing_name' }));
+          socket.emit('msg', { type: 'edit_node_text', error: 'missing_name' });
           return;
         }
         if (typeof msg.text !== 'string') {
-          ws.send(JSON.stringify({ type: 'edit_node_text', error: 'missing_text' }));
+          socket.emit('msg', { type: 'edit_node_text', error: 'missing_text' });
           return;
         }
         const s = driver.session({ database: 'memgraph' });
@@ -779,14 +844,14 @@ wss.on('connection', async (ws, request) => {
           const rec   = result.records[0];
           const count = rec ? (rec.get('c').toNumber ? rec.get('c').toNumber() : rec.get('c')) : 0;
           if (!count) {
-            ws.send(JSON.stringify({ type: 'edit_node_text', error: 'node_not_found' }));
+            socket.emit('msg', { type: 'edit_node_text', error: 'node_not_found' });
           } else {
-            ws.send(JSON.stringify({ type: 'edit_node_text', ok: true, count }));
-            console.log(`[BD] edit_node_text: ${msg.label} "${msg.name}" updated by ${ws.userId}`);
+            socket.emit('msg', { type: 'edit_node_text', ok: true, count });
+            console.log(`[BD] edit_node_text: ${msg.label} "${msg.name}" updated by ${socket.data.userId}`);
           }
         } catch (err) {
           console.error('[BD] edit_node_text error:', err.message);
-          ws.send(JSON.stringify({ type: 'edit_node_text', error: err.message }));
+          socket.emit('msg', { type: 'edit_node_text', error: err.message });
         } finally {
           await s.close();
         }
@@ -796,13 +861,13 @@ wss.on('connection', async (ws, request) => {
       const session = driver.session({ database: 'memgraph' });
       try {
         const result = await session.run(msg.query, msg.params || {});
-        ws.send(JSON.stringify({ type, records: result.records.map(serializeRecord) }));
+        socket.emit('msg', { type, records: result.records.map(serializeRecord) });
       } finally {
         await session.close();
       }
     } catch (err) {
       console.error('Query error:', err.message);
-      ws.send(JSON.stringify({ type, error: err.message }));
+      socket.emit('msg', { type, error: err.message });
     }
   });
 });
