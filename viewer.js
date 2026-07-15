@@ -4273,28 +4273,44 @@ async function init() {
       return;
     }
 
-    // Is the target a module node? Determines two later behaviours:
-    //   - step 2  (shadow target.text with the payload script) — only for
-    //     modules, so Player-mode auto-load sends the edited script rather
-    //     than the DB copy. Shadowing a normal node's text would replace
-    //     the reader's view with the sender's chat draft, which is wrong.
-    //   - step 6  (auto-engage Player mode) — same reason: normal nodes
-    //     have no module to play, so flipping into Player mode would
-    //     flash a broken load. Land in Nodes mode instead.
-    // Detection: `hasModuleScript` property (post-MM2 nodes) OR the target's
-    // own text carries a `%%bd_module` directive (pre-MM2 backward compat).
+    // Is the target a module node? Determines whether we trust the
+    // payload script at all.
+    //
+    // 2026-07-15 threat model: users typing free text into a producer
+    // (BD chat card, EV script textarea before Op 2) → Copy Link →
+    // receiver's cards populated with unchecked prose. Not a technical
+    // security issue (no eval / no DOM injection), but a content-
+    // moderation one: the corpus is curated, chat cards / scripts
+    // should not leak arbitrary text through the link surface.
+    //
+    // Mitigation is asymmetric by target type:
+    //   - MODULE targets  → payload.script is trusted. The producer's
+    //     UI (EV, once Op 2 lands) constrains it to slider-derived
+    //     changes to a %%bd_ directive template — structured, bounded,
+    //     safe by construction. Shadow node.text, populate cards,
+    //     auto-Player. This is the intended slider-tweak share flow.
+    //   - NORMAL targets  → payload.script is IGNORED. BD's chat cards
+    //     accept free-text typing (that's their whole point), so no
+    //     equivalent producer-side constraint exists. Receiver falls
+    //     back to the node's own DB text — same as if they'd tapped
+    //     the node normally.
+    //
+    // Detection: `hasModuleScript` property (post-MM2 nodes) OR the
+    // target's own text carries a `%%bd_module` directive (pre-MM2
+    // backward compat).
     const isModuleTarget = !!(target.data('hasModuleScript') || parseModuleId(target.data('text')));
 
     // 1. Snapshot the target's current DB text BEFORE we (maybe) overwrite
     //    it, so we can also place that original on a chat card (see 5a).
-    //    The DB isn't touched by any of this — target.data('text', …)
-    //    mutates only Cytoscape's local copy.
+    //    Also used as the card content for the normal-node case (5b non-
+    //    module branch). The DB isn't touched by any of this —
+    //    target.data('text', …) mutates only Cytoscape's local copy.
     const originalDbScript = target.data('text');
 
     // 2. (module-only) Shadow the local node's text so Player mode's
-    //    auto-load sends the edited script instead of the DB copy. Not
-    //    persisted — a refresh without ?data= will restore the DB text.
-    //    For non-module nodes we leave target.data('text') alone.
+    //    auto-load sends the slider-tweaked script instead of the DB
+    //    copy. Not persisted — a refresh without ?data= restores the
+    //    DB text.
     if (isModuleTarget && script !== null) target.data('text', script);
 
     // 3. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
@@ -4312,25 +4328,36 @@ async function init() {
     //    because top is already visible.
     if (typeof handleChatReady === 'function') handleChatReady();
 
-    // 5a. Populate the current top card (N=1) with the ORIGINAL DB script,
-    //     then create a new local card above it (N=2) for the incoming
-    //     payload script. Result (newest-on-top):
-    //         N=2  ←  incoming (edited)  payload script
-    //         N=1  ←  original DB script (untouched)
-    //     This keeps the original accessible during the session even while
-    //     the node's local .text has been shadowed for Player-mode auto-load.
-    //     Skipped when the two scripts are identical (unedited return) to
+    // 5a. (module-only) Preserve the original DB script on N=1 and
+    //     create a fresh N=2 above it for the incoming payload script.
+    //     Result (newest-on-top):
+    //         N=2  ←  incoming (slider-tweaked) payload script
+    //         N=1  ←  original DB script  (session-only access)
+    //     Skipped when the two are identical (unedited return) to
     //     avoid a redundant duplicate card.
-    const hasOriginal = typeof originalDbScript === 'string' && originalDbScript.length > 0;
-    const originalDiffers = hasOriginal && originalDbScript !== script;
-    if (originalDiffers && typeof setChatText === 'function') {
-      setChatText(originalDbScript);
-      if (typeof createCard === 'function') createCard({ kind: 'local' });
+    //     Not run for normal-node arrivals — see 5b below.
+    if (isModuleTarget) {
+      const hasOriginal = typeof originalDbScript === 'string' && originalDbScript.length > 0;
+      const originalDiffers = hasOriginal && originalDbScript !== script;
+      if (originalDiffers && typeof setChatText === 'function') {
+        setChatText(originalDbScript);
+        if (typeof createCard === 'function') createCard({ kind: 'local' });
+      }
     }
 
-    // 5b. Populate the (now-topmost) local card with the payload script.
-    if (script !== null && typeof setChatText === 'function') {
-      setChatText(script);
+    // 5b. Populate the (now-topmost) local card.
+    //   - MODULE target  → sender's payload script (slider-tweaked).
+    //   - NORMAL target  → the node's OWN DB text. Mirrors the effect
+    //     of a manual tap (routeNodeText → setChatText), so the
+    //     arriving user sees the node's curated content in their chat
+    //     panel without needing to tap. Sender's payload.script is
+    //     deliberately NOT used here — see isModuleTarget block above.
+    if (typeof setChatText === 'function') {
+      if (isModuleTarget) {
+        if (script !== null) setChatText(script);
+      } else if (typeof originalDbScript === 'string' && originalDbScript.length > 0) {
+        setChatText(originalDbScript);
+      }
     }
 
     // 6. (module-only, 2026-07-15) Engage Player mode via the radio +
