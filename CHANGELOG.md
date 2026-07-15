@@ -6,6 +6,38 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-07-15 — Chat always on; Chat button → Join / Leave
+
+**Landmark commits:** `893e9af` (UX simplification) → `fd43b45` (onboarding line).
+
+**What shipped:**
+
+- **Chat panel is now permanently active from page load.** Previously the user arrived in a "browse-only" state; the Chat button gated chat mode, Player mode, and pair queue simultaneously — meaning users couldn't try Player or see chat panel until they entered the pair queue with a curation code. Now the panel is visible immediately, populated with the how-to + status system cards, ready for a real N=1 local card to compose in.
+- **Nodes / Player radios enabled from boot;** EV "Extend / Jump to / Copy Link to External Website" invite panel appears the moment a user picks Player — no pair required.
+- **Chat button renamed Join / Leave** and only manages pair state. Label flips based on `pairingState.active || pairingState.waiting`. Curation code still required for arriver; same-device refusal still enforced (MM3 mechanics untouched).
+- **No auto-requeue when buddy leaves.** Previously, on `buddy_disconnected`, client auto-re-emitted `ready_to_pair`. Now the button reverts to Join and the user must press again to try another partner. Matches the opt-in-both-directions model.
+- **N=0 hidden ghost card removed.** Server's `chat_ready` still fires (once, right after boot-time `enter_chat`); client's `handleChatReady` still runs and creates the visible N=1 directly. No more hidden serial-0 placeholder.
+- **Onboarding demoed live.** `HOW_TO_TEXT` in server.js gains "Try it out now — select and copy this line!" — turns the how-to card itself into the demo target for the OS-copy card-lift mechanism (which was already wired but invisible to new users).
+
+**Files touched:**
+
+- `viewer.js`: `chatModeActive` initial `true`; `pairingState.waiting` added; boot activation block after ws connect (chat panel active, enter_chat emit, radios/Copy Down unlocked, Join label, positionCyEl rAF); `toggleChatMode` (~60 lines) replaced by `togglePair` + `updateJoinButtonLabel` (~30 lines); all four pair-state handlers now sync button label; `handleReturnFromStandalone` step 4 removed; step 5 (`handleChatReady` force-call) preserved.
+- `index.html`: `#chat-btn` label `Chat` → `Join`; `disabled` attr removed from radios + `#copy-down-btn` (JS boot still enables them; removing from HTML prevents flash). Cache-bust `viewer.js?v=401`.
+- `server.js`: `HOW_TO_TEXT` extended with the try-it-now sentence. No behaviour change to any handler.
+
+**Discovered but deferred:**
+
+- **OS-copy card-lift mechanism was already wired but invisible.** Every card body listens for `copy` (via `handleCardCopy`), and any copied text auto-appends into the top local card. Users didn't discover this — hence the new demo line. Considered adding a visible per-card lift button; user preferred to leave the wire alone and add the invitation line to onboarding first.
+- **Dead code left in place** for now: `ensureLocalCard` function + destructure slot; stale comments referencing `toggleChatMode`; `#default-panel` in HTML (always hidden via sibling selector). All safe to prune in a follow-up once the new UX is settled.
+
+**Behaviour verification:**
+
+Test flow on reload — page loads → chat panel visible with system cards → Player radio works → EV invite panel appears in Player mode → Join button queues for pair (with optional curation code) → Leave button unpairs / walks out of queue → buddy disconnect returns solo user to Join without auto-requeue → same-device refusal keeps chat panel active (was already the case pre-2026-07-15, now the same is true for `code_required` too).
+
+**Related memory:** [[always-on-chat]] (new); [[project-pairing]] amended for opt-in / no-auto-requeue; [[chat-panel-state]] chat-toggle sections marked superseded; [[n0-ghost-protocol]] marked superseded; [[mm1-amendment]] "Pair button removed" note flagged as reversed.
+
+---
+
 ## 2026-07-12 — MM3 amendment: BD invite panel + cross-tab kick
 
 **Landmark commits:** `5ba9550` (part 1 scaffolding) → `4ad6b8d` → `72f3c64` → `9375167` (part 2 button wiring) → `e2aa7ec` (BroadcastChannel kick — later reverted) → `e864288` (cookie-based kick, final).

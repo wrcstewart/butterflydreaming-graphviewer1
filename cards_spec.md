@@ -4,6 +4,8 @@
 **Replaces:** A36–A41b (textarea / CM6 / collect-basket model).
 **Purpose of this document:** describe how the card system behaves from the user's point of view and document the framework hooks needed to extend it into a two-way buddy communication channel.
 
+> **2026-07-15 amendment note.** The chat panel is now **always active from page load** and the Chat button was renamed **Join / Leave** (only manages pair state; does NOT toggle chat mode). §1 "The two text panels" below describes the previous default-panel / chat-panel either/or model — the default panel is now always hidden (CSS sibling selector still in place, kept for now to minimise diff). The hidden N=0 ghost described later is no longer created; `handleChatReady` produces the visible N=1 directly from the server's `chat_ready` message. Curation-code arriver-gate + same-device refusal + partner-card N.M labelling all preserved verbatim. Fuller detail in `CHANGELOG.md` 2026-07-15 entry and memory `always-on-chat`.
+
 ---
 
 ## 1. The two text panels

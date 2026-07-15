@@ -1,8 +1,10 @@
 # A42 — Buddy Communication Channel (`communications.md`)
 
-**Status:** Design, not yet built. Extends `cards_spec.md` §5 (Communication with partner).
+**Status:** Design, largely built (A43–A47), amended 2026-07-15. Extends `cards_spec.md` §5 (Communication with partner).
 **Depends on:** `cards_spec.md` (card model, panels, routing), the existing `breadcrumb` relay in `server.js`, and `pairingState` passed into `setupInteractions`.
-**Companion memory:** `project_a42_card_stack_design.md`, `project_pairing.md`.
+**Companion memory:** `project_a42_card_stack_design.md`, `project_pairing.md`, `project_always_on_chat.md` (2026-07-15).
+
+> **2026-07-15 amendment note.** "Entered chat mode" is now a **boot-time** signal, not a Chat-button press. The client sends `enter_chat` once, right after ws connects. There is no `leave_chat` any more — the equivalent user action is pressing **Leave** (formerly the Chat button, renamed), which sends `unpair` and lets the server drop "Partner disconnected." into the buddy's log via the existing unpair handler. §3 language referring to "the Chat toggle" and "enters chat mode by pressing Chat" should be read as "the client sends enter_chat once at boot"; the both-in-chat channel-open condition still holds, but is now always satisfied for both sides from the moment their sockets connect. Server-side `channelOpen` / `pairedWith` / `inChat` logic is unchanged. Fuller detail in `CHANGELOG.md` 2026-07-15 entry and memory `always-on-chat`.
 
 > **How to read this document.** Sections marked **[SPEC]** describe agreed behaviour. Sections marked **[BUILD INSTRUCTION]** are directives to Claude Code where the relevant code location is not yet identified — Claude Code should locate the referenced code (the Chat toggle, the WebSocket setup, the `breadcrumb` handler, `pairingState`, the existing system/how-to card rendering) and wire the requirement in, matching existing conventions rather than introducing new ones.
 
