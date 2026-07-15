@@ -4032,40 +4032,23 @@ async function init() {
     // The three Player-mode share buttons below (#jump-to-ext-btn,
     // #copy-link-to-ext-btn, #copy-link-btn) bake the focused card into
     // the outgoing URL — stale card means stale share. withUpdatePrompt
-    // gates on the localStorage preference (same key as EV so a user's
-    // "don't ask again" choice carries across BD ↔ EV) and only fires
-    // when body.player-active — normal-node BD-self Copy Links skip the
-    // gate entirely (their payload is ignored by the receiver anyway,
+    // fires the dialog by default, honours the session-scoped
+    // updateModePref if the user has ticked "Don't ask again this
+    // session", and only fires when body.player-active — normal-node
+    // BD-self Copy Links skip the gate entirely (payload is ignored by
+    // the receiver anyway,
     // per Op 1).
-    const UPDATE_MODE_KEY = 'bd_ev_copylink_updatemode';
-    // 2026-07-15 (late) — URL escape hatch mirrored from preview.html.
-    // Visiting BD with ?reset-dialog=1 clears the localStorage preference
-    // and reloads without the param. Cross-device way to un-tick "Don't
-    // ask again" without needing DevTools — usable on iOS.
-    (function handleResetDialogParam() {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('reset-dialog')) {
-          localStorage.removeItem(UPDATE_MODE_KEY);
-          params.delete('reset-dialog');
-          const q = params.toString();
-          const clean = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
-          console.log('[BD] reset-dialog: cleared', UPDATE_MODE_KEY, '→ ask; reloading', clean);
-          window.location.replace(clean);
-          return;   // page is about to reload
-        }
-      } catch (e) { console.warn('[BD] reset-dialog param handler failed', e); }
-    })();
-    function getUpdateMode() {
-      try {
-        const mode = localStorage.getItem(UPDATE_MODE_KEY) || 'ask';
-        if (mode !== 'ask') console.log('[BD] update-script mode =', mode, '(dialog suppressed; reload with ?reset-dialog=1 to reset)');
-        return mode;
-      } catch { return 'ask'; }
-    }
-    function setUpdateModeStored(mode) {
-      try { localStorage.setItem(UPDATE_MODE_KEY, mode); } catch {}
-    }
+    // 2026-07-15 (late) — session-scoped preference (in-memory). Was
+    // briefly localStorage-backed but that caused "dialog rarely
+    // appears" confusion when a stale preference from an earlier
+    // session was silently suppressing it. Per-page-load feels right:
+    // tick "Don't ask again this session", quiet for the rest of this
+    // load; a browser refresh asks again. No diagnostic mystery.
+    let updateModePref = 'ask';   // 'ask' | 'update' | 'skip'
+    // Best-effort cleanup of the retired localStorage key so users
+    // upgrading from the previous version don't carry an invisible
+    // preference forward. Silent, one-shot, harmless if absent.
+    try { localStorage.removeItem('bd_ev_copylink_updatemode'); } catch {}
     function requestModuleSyncBD(timeoutMs = 500) {
       return new Promise((resolve) => {
         if (!iframeEl2 || !iframeEl2.contentWindow) { resolve(false); return; }
@@ -4093,9 +4076,8 @@ async function init() {
       // isn't in play, drift isn't happening, and (for normal nodes) the
       // receiver's Op 1 code ignores payload.script anyway.
       if (!document.body.classList.contains('player-active')) { action(); return; }
-      const mode = getUpdateMode();
-      if (mode === 'update') { requestModuleSyncBD().then(() => action()); return; }
-      if (mode === 'skip')   { action(); return; }
+      if (updateModePref === 'update') { requestModuleSyncBD().then(() => action()); return; }
+      if (updateModePref === 'skip')   { action(); return; }
       const dialog = document.getElementById('update-script-dialog');
       if (!dialog) { action(); return; }
       const yesBtn = document.getElementById('update-script-yes');
@@ -4109,12 +4091,12 @@ async function init() {
         dialog.hidden = true;
       }
       yesBtn.onclick = () => {
-        if (cb.checked) setUpdateModeStored('update');
+        if (cb.checked) updateModePref = 'update';
         cleanup();
         requestModuleSyncBD().then(() => action());
       };
       noBtn.onclick = () => {
-        if (cb.checked) setUpdateModeStored('skip');
+        if (cb.checked) updateModePref = 'skip';
         cleanup();
         action();
       };
