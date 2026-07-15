@@ -777,6 +777,22 @@ function buildStyle() {
       }
     },
     {
+      // 2026-07-15 — deep-link arrival breadcrumb hop. Handles the Root→target
+      // edge added in handleReturnFromStandalone: renders as a modest upward
+      // arc, distinguishing it from the straight chip-to-chip edges the user
+      // builds by tapping. Signals "we jumped here, didn't walk step by step",
+      // without going so far as to obscure the chip labels on the 23px bar.
+      selector: 'edge.deep-link-hop',
+      style: {
+        'curve-style': 'unbundled-bezier',
+        'control-point-distances': [-11],   // px above the straight line (neg = up)
+        'control-point-weights':  [0.5],    // midpoint
+        'line-color': '#a07820',            // amber — pairs with #chat-btn / action bar
+        'opacity': 0.9,
+        'width': 1.5,
+      }
+    },
+    {
       selector: 'edge[type="CHILD"]',
       style: {
         'target-arrow-shape': 'triangle',
@@ -3155,7 +3171,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, toggleMediaBar };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar };
 
 }
 
@@ -3790,7 +3806,7 @@ async function init() {
   });
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -4315,6 +4331,27 @@ async function init() {
 
     // 3. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
     enterNode(target);
+
+    // 3a. Seed the breadcrumb bar (2026-07-15) with Root → target so a deep-
+    //     link arrival doesn't leave the trail empty. The arriving user gets
+    //     visible provenance (they're at `target` because they came in via
+    //     the site's root) and a chip they can tap to jump back to Root.
+    //     The Root→target edge gets the .deep-link-hop class → renders as a
+    //     modest upward arc rather than a straight line, signalling "we
+    //     jumped here, we didn't walk step by step". Subsequent chips added
+    //     by normal tapping chain onto `target` with straight edges as usual.
+    //     Skipped if Root isn't in cy for any reason (defensive).
+    try {
+      const rootNode = cy.nodes().filter(n => n.data('type') === 'root').first();
+      if (rootNode && rootNode.length) {
+        addYouChip(rootNode);
+        addYouChip(target);
+        const lastEdge = youCy.edges().last();
+        if (lastEdge && lastEdge.length) lastEdge.addClass('deep-link-hop');
+      }
+    } catch (e) {
+      console.warn('[MM1] return-from-standalone: breadcrumb seed failed', e);
+    }
 
     // 4. (was: engage Chat mode) — 2026-07-15 removed. Chat is on from
     //    boot; no auto-Join. The user opts into pairing manually via the
