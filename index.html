@@ -25,7 +25,7 @@
   <div id="action-bar">
     <button id="default-save-btn" type="button" disabled>Save</button>
     <button id="chat-send-btn" type="button" disabled>Send</button>
-    <button id="copy-down-btn" type="button" title="Copy Down (card → module)" disabled>↓</button>
+    <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
     <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
     <!-- #copy-link-btn removed 2026-07-12: MM3 moved this action into the
          #bd-invite-panel-viewer as #copy-link-to-ext-btn / "Copy Link to
@@ -33,8 +33,8 @@
     <span id="default-save-status"></span>
     <button id="chat-new-card-btn" type="button">New Card</button>
     <span id="view-mode-toggle">
-      <label><input type="radio" name="view-mode" value="nodes" checked disabled> Nodes</label>
-      <label><input type="radio" name="view-mode" value="player" disabled> Player</label>
+      <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
+      <label><input type="radio" name="view-mode" value="player"> Player</label>
     </span>
   </div>
   <div id="cy"></div>
@@ -92,7 +92,7 @@
   <div id="user-count-panel"></div>
   <button id="back-btn">←</button>
   <div id="pair-control">
-    <button id="chat-btn">Chat</button>
+    <button id="chat-btn">Join</button>
     <span id="pair-status"></span>
   </div>
   <div id="dev-panel">
@@ -122,6 +122,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=400"></script>
+  <script type="module" src="viewer.js?v=401"></script>
 </body>
 </html>

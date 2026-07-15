@@ -76,7 +76,7 @@ let editModeActive        = false;
 let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
 let chipGridParams         = null;
-let chatModeActive         = false;
+let chatModeActive         = true;   // 2026-07-15 — always on; chat panel is a permanent communication window. Kept as a variable for existing gates (routeNodeText, positionCyEl fallback, etc.); no longer toggled.
 let chatStackEl            = null;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;     // unique id counter across all kinds
@@ -3521,7 +3521,7 @@ async function init() {
   youCy.resize();   youCy.fit();
   buddyCy.resize(); buddyCy.fit();
 
-  const pairingState = { active: false };
+  const pairingState = { active: false, waiting: false };
 
   const chatBtn   = document.getElementById('chat-btn');
   const chatPanel = document.getElementById('chat-panel');
@@ -3691,94 +3691,45 @@ async function init() {
     }
   });
 
-  function toggleChatMode() {
-    chatModeActive = !chatModeActive;
-    if (chatModeActive) {
-      const tip = document.getElementById('label-tooltip');
-      if (tip.style.display !== 'none' && tip.textContent) {
-        setChatText(tip.textContent);
-      }
-      tip.style.display = 'none';
-      ensureLocalCard();
-      const wsNow = wsRef.current;
-      if (wsNow && wsNow.connected) {
-        // Chat toggle now folds in the previous Pair-button step: queue for
-        // pairing on chat-open, unless we're already paired (avoid double-
-        // queue after a mid-session close+reopen without an unpair). Server
-        // responds with wait_state, paired, or pair_denied (if a curation
-        // code was required and we didn't send a valid one); those flow
-        // through the message handler below to update pairStatus +
-        // pairingState. The curation code from #dev-code is always sent
-        // when present — server ignores it if not configured, gates on it
-        // if it is.
-        if (!pairingState.active) {
-          const devCodeEl = document.getElementById('dev-code');
-          const code = devCodeEl ? devCodeEl.value.trim() : '';
-          console.log('[pair-debug] Chat ON → sending ready_to_pair (code:', code ? `"${code}"` : 'empty', '), pairingState.active=', pairingState.active);
-          wsNow.emit('msg', { type: 'ready_to_pair', code });
-        } else {
-          console.log('[pair-debug] Chat ON → SKIP ready_to_pair (pairingState.active=true)');
-        }
-        wsNow.emit('msg', { type: 'enter_chat' });
-      }
-      // A42 §42.3 — enable Nodes/Player radios while chat is active.
-      document.querySelectorAll('#view-mode-toggle input[type="radio"]')
-        .forEach(r => { r.disabled = false; });
-      // A42 §42.6 — enable Copy Down. Copy Up remains disabled until Copy
-      // Down has been pressed (independent state; managed by that handler).
-      const cdBtn = document.getElementById('copy-down-btn');
-      if (cdBtn) cdBtn.disabled = false;
-    } else {
-      const wsNow = wsRef.current;
-      if (wsNow && wsNow.connected) {
-        // Teardown order: leave_chat first (partner sees "Partner left chat"
-        // system card while still paired), then unpair (partner receives
-        // buddy_disconnected → auto re-queue). This user does NOT auto
-        // re-queue — they'll press Chat again if they want a new partner.
-        console.log('[pair-debug] Chat OFF → sending leave_chat + unpair, pairingState.active=', pairingState.active);
-        wsNow.emit('msg', { type: 'leave_chat' });
-        wsNow.emit('msg', { type: 'unpair' });
-      }
-      // Locally reset pair state so the next Chat-open re-queues cleanly.
+  // 2026-07-15 — Chat is now always active from boot (no toggle). The
+  // chat button is now the Join / Leave button: press Join to enter the
+  // pair queue (curation-code-gated for the arriver), press Leave to
+  // unpair or to walk out of the wait queue. Label reflects state.
+  function updateJoinButtonLabel() {
+    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Leave' : 'Join';
+  }
+
+  function togglePair() {
+    const wsNow = wsRef.current;
+    if (!wsNow || !wsNow.connected) return;
+
+    if (pairingState.active || pairingState.waiting) {
+      // Leave — either walking out of the wait queue or unpairing from a
+      // live partner. Server's unpair handler notifies the buddy via
+      // buddy_disconnected (if paired) and drops "Partner disconnected."
+      // in their chat log. This user does NOT auto re-queue.
+      console.log('[pair-debug] Leave press → unpair (active=', pairingState.active, ', waiting=', pairingState.waiting, ')');
+      wsNow.emit('msg', { type: 'unpair' });
       pairingState.active = false;
+      pairingState.waiting = false;
       const pairStatusEl = document.getElementById('pair-status');
       if (pairStatusEl) pairStatusEl.textContent = '';
-      // A42 §42.3 — chat closing: disable the toggle again and force back to
-      // Nodes so the graph is visible when the user isn't in chat.
-      const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
-      const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
-      if (nodesRadio)  { nodesRadio.checked  = true;  nodesRadio.disabled  = true; }
-      if (playerRadio) { playerRadio.checked = false; playerRadio.disabled = true; }
-      setViewMode('nodes');
-      // A42 §42.6 / §42.7 — chat closing: disable Copy Down + Copy Up. Copy
-      // Up resets to disabled too, so it must be re-earned by a Copy Down
-      // after the next chat open.
-      const cdBtn = document.getElementById('copy-down-btn');
-      const cuBtn = document.getElementById('copy-up-btn');
-      if (cdBtn) cdBtn.disabled = true;
-      if (cuBtn) cuBtn.disabled = true;
+      updateJoinButtonLabel();
+      updateSendBtn();
+      return;
     }
-    chatPanel.classList.toggle('active', chatModeActive);
-    chatBtn.classList.toggle('active', chatModeActive);
-    requestAnimationFrame(() => {
-      positionCyEl();
-      // Only re-fit cy when it's actually visible. In the return-from-
-      // standalone flow, setViewMode('player') has hidden cy by the time
-      // this rAF fires — cy.resize() on a display:none container zeroes
-      // its internal size, and cy.fit(undefined, ...) fits ALL elements
-      // (including hidden ones), so the previous expandToNode's
-      // fit-to-visible on the target node gets overwritten. Then when
-      // the user later switches to Nodes mode, cy re-appears with a
-      // stale fit that looks like Root's neighbourhood instead of the
-      // target. Skipping the resize/fit when hidden preserves the
-      // fit-to-visible from expandToNode. Also switch from `undefined`
-      // (all elements) to `cy.elements(':visible')` so partial-view
-      // navigations don't leak hidden-node bounds into the framing.
-      if (!cyEl.classList.contains('hidden')) {
-        cy.resize();
-        cy.fit(cy.elements(':visible'), fitPadding(cy, 40));
-      }
-    });
+
+    // Join — enter the pair queue. Curation code from #dev-code is always
+    // sent when present; server ignores it if no CURATION_CODE is
+    // configured, gates on it (arriver only) if one is. Server responds
+    // with wait_state, paired, or pair_denied; those flow through the
+    // message dispatch below to update pairingState + label.
+    const devCodeEl = document.getElementById('dev-code');
+    const code = devCodeEl ? devCodeEl.value.trim() : '';
+    console.log('[pair-debug] Join press → ready_to_pair (code:', code ? `"${code}"` : 'empty', ')');
+    wsNow.emit('msg', { type: 'ready_to_pair', code });
+    pairingState.waiting = true;
+    updateJoinButtonLabel();
   }
 
   // A42 §42.3 — Nodes/Player radio change handler.
@@ -3788,7 +3739,7 @@ async function init() {
     });
   });
 
-  chatBtn.addEventListener('click', toggleChatMode);
+  chatBtn.addEventListener('click', togglePair);
 
   chatStackEl    = document.getElementById('chat-stack');
   defaultStackEl = document.getElementById('default-stack');
@@ -4084,54 +4035,49 @@ async function init() {
     if (msg.type === 'wait_state') {
       console.log('[pair-debug] ← wait_state received');
       pairStatus.textContent = 'Waiting...';
+      pairingState.waiting = true;
+      updateJoinButtonLabel();
     } else if (msg.type === 'paired') {
       console.log('[pair-debug] ← paired received, buddyId=', msg.buddyId);
       resetBuddyBar();
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
+      pairingState.waiting = false;
+      updateJoinButtonLabel();
       updateSendBtn();
     } else if (msg.type === 'buddy_disconnected') {
-      console.log('[pair-debug] ← buddy_disconnected received, chatModeActive=', chatModeActive);
-      // Two ways to reach here: (a) partner's WS closed / partner pressed
-      // Chat-off unpair; (b) not applicable to this client — we don't get
-      // this message when WE unpair, so this branch always means the OTHER
-      // side left. Auto re-queue only if the local user is still in chat.
+      console.log('[pair-debug] ← buddy_disconnected received');
+      // Partner left (either their WS closed or they pressed Leave). Under
+      // the opt-in pairing model (2026-07-15) we do NOT auto re-queue —
+      // user returns to solo state and must press Join again to look for
+      // a new partner.
       pairingState.active = false;
+      pairingState.waiting = false;
       buddyCy.nodes().addClass('buddy-gone');
-      if (chatModeActive) {
-        pairStatus.textContent = 'Waiting...';
-        const devCodeEl = document.getElementById('dev-code');
-        const code = devCodeEl ? devCodeEl.value.trim() : '';
-        ws.emit('msg', { type: 'ready_to_pair', code });
-      } else {
-        pairStatus.textContent = '';
-      }
+      pairStatus.textContent = '';
+      updateJoinButtonLabel();
       updateSendBtn();
     } else if (msg.type === 'pair_denied') {
       // Server rejected pairing. Two known reasons today:
       //   code_required — arriver needs curation code entered in #dev-code.
-      //                   Close chat cleanly so user can enter a code and
-      //                   re-press Chat.
+      //                   User adjusts the code and presses Join again.
       //   same_device   — MM3 revised: another BD tab on this browser is
       //                   already in the wait queue. Server refuses to
       //                   pair two ws with the same bd_device_id cookie
-      //                   (prevents same-device self-pair). Keep chat
-      //                   AND player mode active — solo viewing/editing
-      //                   still makes sense, the anti-gaming refusal only
-      //                   bites at the pair-completion moment. User can
-      //                   close the other tab and toggle Chat to retry.
+      //                   (prevents same-device self-pair). User closes
+      //                   the other tab / uses it instead, then presses
+      //                   Join to retry.
+      // Under the always-on chat model (2026-07-15) neither reason closes
+      // chat — the panel stays active for solo composition / bot dialogue
+      // / system status; only the pair state resets.
       const reasonMessage =
           msg.reason === 'code_required' ? 'Code required to chat'
         : msg.reason === 'same_device'   ? 'Another BD tab on this device is already waiting to chat — close that tab or use it instead'
         :                                  `Pair denied: ${msg.reason || 'unknown'}`;
       pairStatus.textContent = reasonMessage;
       pairingState.active = false;
-      if (msg.reason !== 'same_device') {
-        if (chatModeActive) toggleChatMode();
-        // toggleChatMode blanks pairStatus on the off-path; restamp our
-        // reason afterwards so the user sees WHY chat closed.
-        pairStatus.textContent = reasonMessage;
-      }
+      pairingState.waiting = false;
+      updateJoinButtonLabel();
       updateSendBtn();
     } else if (msg.type === 'buddy_breadcrumb') {
       appendBuddyChip(msg.data);
@@ -4159,6 +4105,30 @@ async function init() {
   // events sent before a listener is attached are dropped by the client.
   ws.emit('msg', { type: 'get_user_count' });
   ws.emit('msg', { type: 'get_media_files' });
+
+  // 2026-07-15 — Chat panel is always on from boot; user no longer has to
+  // press Chat to enter chat mode. Human pairing is a separate opt-in via
+  // the Join / Leave button (togglePair). This means:
+  //   - chatPanel + chatBtn get the .active class immediately
+  //   - enter_chat fires now (was previously on Chat press) → server
+  //     sends how-to + status system cards + chat_ready; chat_ready
+  //     handler creates the visible N=1 local card above them
+  //   - Nodes / Player radios are enabled from the start (previously
+  //     gated on chat-active); EV invite panel activates the moment
+  //     the user picks Player, no pair needed
+  //   - Copy Down is enabled from the start (Copy Up still waits for a
+  //     Copy Down press — that gate is independent)
+  //   - Join button starts labelled "Join"; togglePair + the pair-state
+  //     message handlers below keep the label in sync (Join ↔ Leave)
+  chatPanel.classList.add('active');
+  chatBtn.classList.add('active');
+  chatBtn.textContent = 'Join';
+  document.querySelectorAll('#view-mode-toggle input[type="radio"]')
+    .forEach(r => { r.disabled = false; });
+  const copyDownBtnBoot = document.getElementById('copy-down-btn');
+  if (copyDownBtnBoot) copyDownBtnBoot.disabled = false;
+  ws.emit('msg', { type: 'enter_chat' });
+  requestAnimationFrame(() => positionCyEl());
 
   // MM1 (2026-07-05) — Return-from-standalone flow. When the URL carries a
   // ?data=<base64 JSON> payload (produced by the standalone player's
@@ -4268,19 +4238,16 @@ async function init() {
     // 3. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
     enterNode(target);
 
-    // 4. Engage Chat mode (folds in the ready_to_pair — same code-gate rules
-    //    as any other Chat toggle-on). If pair_denied fires the existing
-    //    handler closes chat, and the user retries manually with a code.
-    if (typeof toggleChatMode === 'function' && !chatModeActive) {
-      toggleChatMode();
-    }
+    // 4. (was: engage Chat mode) — 2026-07-15 removed. Chat is on from
+    //    boot; no auto-Join. The user opts into pairing manually via the
+    //    Join button after arriving.
 
     // 5. Force the visible N=1 local card into existence NOW — normally
     //    handleChatReady is deferred until the server's chat_ready message,
-    //    but that's async and setChatText below would otherwise land in the
-    //    hidden N=0 ghost created by ensureLocalCard. Calling it here is
-    //    idempotent — when the server's chat_ready later arrives, the same
-    //    handler no-ops because top is already visible.
+    //    but that's async and setChatText below would otherwise have no
+    //    visible card to land in. Calling it here is idempotent — when
+    //    the server's chat_ready later arrives, the same handler no-ops
+    //    because top is already visible.
     if (typeof handleChatReady === 'function') handleChatReady();
 
     // 5a. Populate the current top card (N=1) with the ORIGINAL DB script,
@@ -4288,7 +4255,6 @@ async function init() {
     //     payload script. Result (newest-on-top):
     //         N=2  ←  incoming (edited)  payload script
     //         N=1  ←  original DB script (untouched)
-    //         N=0  ←  hidden ghost
     //     This keeps the original accessible during the session even while
     //     the node's local .text has been shadowed for Player-mode auto-load.
     //     Skipped when the two scripts are identical (unedited return) to
