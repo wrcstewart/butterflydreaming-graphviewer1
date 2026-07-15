@@ -3919,11 +3919,10 @@ async function init() {
 
       const payload = {
         script:      currentPanelText,
-        node_id:     nodeId || null,           // 2026-07-15 — stable Neo4j elementId; direct
-                                               // cy.getElementById lookup on receive. Set for
-                                               // any node the sender was reading, not just
-                                               // module nodes with a url. See handleReturnFromStandalone.
-        node_url:    currentNodeUrl,
+        node_url:    currentNodeUrl,           // 'butterflydreaming.org/n/<uuid>' — the
+                                               // project's durable UUID-based identity,
+                                               // stable across DB reimports (unlike Neo4j
+                                               // elementId). See migrate_mm1.js / apply_mm.js.
         source_text: currentSourceText,
         title:       currentTitle
       };
@@ -4200,36 +4199,31 @@ async function init() {
     }
     if (!payload || typeof payload !== 'object') { cleanUrl(); return; }
 
-    const nodeId  = typeof payload.node_id  === 'string' ? payload.node_id  : null;
     const nodeUrl = typeof payload.node_url === 'string' ? payload.node_url : null;
     const script  = typeof payload.script   === 'string' ? payload.script   : null;
 
-    // Locate the target node — three fallbacks in order of specificity.
+    // Locate the target node — two fallbacks.
     //
-    // Primary (2026-07-15): direct elementId lookup via cy.getElementById.
-    // Works for any node in the graph, not just those with a `url` property
-    // — critical for BD-self deep links that come from normal (non-module)
-    // TextNodes, none of which carry `url`.
+    // Primary: match on node.data('url') === payload.node_url. `url` is
+    // 'butterflydreaming.org/n/<uuid>' set at node creation (see
+    // migrate_mm1.js / apply_mm.js) — the project's durable UUID-based
+    // identity, stable across DB reimports. Node.js elementId is
+    // DELIBERATELY NOT used as the identity — it's DB-instance-scoped
+    // and regenerates on reimport.
     //
-    // Fallback 1: match on node.data('url') === payload.node_url. Kept for
-    // return-from-standalone flows that predate node_id (older EV links
-    // still in the wild) and as a safety net when node_id doesn't hit
-    // (e.g., DB reimport regenerated elementIds since the link was made).
+    // Fallback (MM2, 2026-07-11): structural default via hasModuleScript
+    // + min(seq). Meaningful when there's no node_url AND the payload
+    // script carries a %%bd_module directive — standalone was launched
+    // from a direct URL, not from BD.
     //
-    // Fallback 2 (MM2, 2026-07-11): structural default via hasModuleScript
-    // + min(seq). Only meaningful when neither node_id nor node_url is
-    // available AND the payload script carries a %%bd_module directive —
-    // standalone was launched from a direct URL, not from BD.
+    // KNOWN COVERAGE GAP: the `url` property is only present on nodes
+    // created by the MM1+ migration scripts. Legacy corpus TextNodes
+    // predate the UUID convention and have no url — BD-self deep links
+    // to those nodes currently fail through to the module fallback and
+    // often no-op. Backfilling url on the legacy corpus is a data-side
+    // task (migration script), not a viewer.js change.
     let target = null;
-    if (nodeId) {
-      const n = cy.getElementById(nodeId);
-      if (n && n.length > 0) {
-        target = n;
-      } else {
-        console.warn('[MM1] return-from-standalone: no node with id', nodeId);
-      }
-    }
-    if (!target && nodeUrl) {
+    if (nodeUrl) {
       target = cy.nodes().filter(n => n.data('url') === nodeUrl).first();
       if (!target || !target.length) {
         console.warn('[MM1] return-from-standalone: no node matches url', nodeUrl);
