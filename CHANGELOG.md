@@ -6,6 +6,66 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-07-15 (part 2) — Deep link generation + content-moderation ops
+
+**Landmark commits:** `9c9c5fd` (BD-self Copy Link + action bar reshape) → `7003273` (add node_id — WRONG identity choice) → `e75af6e` (revert; node_url is the durable UUID) → `4d57e71` (Op 1: receiver-gate payload.script on isModuleTarget) → `c88c9f1` (Op 2: EV textarea readonly) → `c63529c` (deep-link arrival breadcrumb seed Root→target) → `2029353` (chip font 9→8) → `3b5cf70` (chip width +5% + Back / Root exit Player mode) → `9deb2a3` (EV "Should I update the script?" dialog) → `ca73e74` (Op 3: EV sliders no longer auto-write textarea) → `dc4f034` (dialog extended to BD's three Player-mode share buttons) → `bffacaf` (wording: "settings may have changed", not "drifted").
+
+**What shipped — three connected threads:**
+
+### 1. BD-self Copy Link button + action-bar layout squeeze
+
+New `#copy-link-btn` on BD's action bar generates a URL back to BD itself (`window.location.origin + "/?data=..."`) carrying the same payload shape as the EV Copy Link. Same three-rung clipboard fallback (async → execCommand → visible textarea). Old New Card lost `margin-left: auto` and moved next to ↑; both New Card and the new Copy Link use two-line labels (`New<br>Card`, `Copy<br>Link`) so each stays narrow enough for the iPhone action bar.
+
+Receiver flow uses `handleReturnFromStandalone` — same code path that already handles EV → BD arrivals.
+
+### 2. Deep-link identity: `node_url` (UUID-based), not Neo4j elementId
+
+Tried using Neo4j's elementId as a "stable id" (commit 7003273). Reverted the next commit — the project already has a durable UUID-based identity: `node.data('url')` = `'butterflydreaming.org/n/<uuid>'`, set at node creation via `crypto.randomUUID()` in the MM1+ migration scripts. Neo4j elementId is DB-instance-scoped and regenerates on reimport — wrong tool for durable share links.
+
+Coverage gap flagged: legacy corpus TextNodes predate the UUID convention and have no `url`. BD-self deep links to those fall through and no-op. Backfilling `url` on the legacy corpus is a data-side migration task, not yet scoped.
+
+### 3. Content-moderation architecture (Ops 1-3 + confirm dialog)
+
+Threat model: users typing free-form text into producer surfaces → Copy Link → receiver applies content as if authoritative. Not a code-injection concern (no eval / DOM injection) but a **content-curation** one — the corpus is curated; chat cards and scripts shouldn't leak arbitrary text through shared URLs. User's framing: "layered security screen will filter engineered URLs anyway; this is more because editing belongs in BD not EV" — the fix here is separation of concerns.
+
+**Op 1** — BD's `handleReturnFromStandalone` computes `isModuleTarget = !!(target.data('hasModuleScript') || parseModuleId(target.data('text')))` and branches:
+- **Module target** → payload.script is trusted (producer's UI, post-Ops-2/3, ensures it's slider-derived). Full existing flow: shadow node.text, original DB script on N=1, payload script on N=2, auto-Player.
+- **Normal target** → payload.script is IGNORED. Navigate to node, populate top card with node's OWN DB text (mirrors a manual tap). Stay in Nodes mode. Sender's typed chat drops on floor.
+
+**Op 2** — EV's script textarea gets `readonly` attribute. Keyboard editing rejected. Sliders write to `.value` programmatically (`readonly` doesn't block JS assignments). Color slightly desaturated + `cursor: default` as read-only cues.
+
+**Op 3** — EV sliders no longer auto-write the textarea. Previously `stepControl` did `textarea.value = writeDirective(textarea.value, ...)` making the textarea a live mirror (Op 1/2's protection would have been hollow). Now sliders update `currentScript` (module-scope mirror) and post that to the module; textarea holds only the LAST COMMITTED script (from loadScript, ↑ Receive, or ↓ Send). User commits accumulated slider + drift state to the textarea by pressing ↑ or accepting the update-script dialog.
+
+**Update-script dialog** — fires from both EV Copy-Link buttons AND (in Player mode) all three BD share buttons (`#jump-to-ext-btn`, `#copy-link-to-ext-btn`, `#copy-link-btn`). Same wording, same shape, same `localStorage.bd_ev_copylink_updatemode` key (BD + EV share an origin, one preference applies). "Yes, update" fires `bd_script_request` to the module, awaits `bd_script_response` (500ms timeout), then runs the copy — existing top-level handler updates textarea (EV) / focused card (BD), promise resolves, copy fires with fresh source. Non-Player-mode BD Copy Link skips the dialog entirely (normal-node share, receiver ignores script anyway).
+
+### Receiver arrival UX polish
+
+- **Breadcrumb seed** — after `enterNode(target)`, `#cy-you` gets two chips: `Root` and target, connected by an amber curved edge (`.deep-link-hop`, `curve-style: unbundled-bezier`, control-point-distance -11px). Signals "we jumped here, we didn't walk step by step". Required exposing `addYouChip` from setupInteractions.
+- **Chip typography** — width 60 → 63 (+5%), font 9 → 8 (~10% smaller). Edge characters no longer clip.
+- **Back button + Root chip exit Player mode** — two supplementary listeners in init(). Without them, `restoreState()` / `expandToNode(root)` fired correctly but the graph update happened UNDER the module iframe — user saw nothing. Now Back and Root taps surface the graph.
+
+### Wording note
+
+Dialog body originally said "The visual may have drifted…". User pushed back — "drifted" is jargon tied to the specific angle-drift feature. Changed to "The settings may have changed since the last sync…" in both origins.
+
+**Files touched:**
+
+- `viewer.js`: `buildBdSelfUrl`, `isModuleTarget` branching, breadcrumb seed, Back/Root mode exits, `withUpdatePrompt` + `requestModuleSyncBD`, dialog wiring for 3 buttons, `addYouChip` exposed
+- `index.html`: action bar reshape, `#copy-link-btn` new, radios `disabled` attr removed, dialog markup
+- `style.css`: two-line button styling, `.modal-*` rules, chip width/font tweak
+- `V_Kolam/preview.html`: `<textarea readonly>` + colour/cursor cue, `stepControl` uses `currentScript`, `bd_script_response` + `sendBtn` also update `currentScript`, dialog markup + CSS + JS, `withUpdatePrompt` + `requestModuleSync`, dialog wiring for 2 buttons, header comment updated
+
+**Deferred:**
+
+- Backfill `url` property on legacy corpus TextNodes (data-side migration)
+- Wrap EV's `#bd-enter-btn` (Jump to BD, same-tab) in the update-script dialog — semantics of dialog-on-navigation weren't obvious enough to just do
+- ESC / click-outside dismiss on both dialogs
+- UI-visible "reset preference" (currently DevTools-only via `localStorage.removeItem`)
+
+**Related memory:** [[deep-link-v2-moderation]] (new comprehensive doc); [[mm1-amendment]] updated with second-amendment note; [[always-on-chat]] unchanged but interacts (unlocking Player at boot is what made step 6's auto-Player always-fire, which Op 1 then re-gated).
+
+---
+
 ## 2026-07-15 — Chat always on; Chat button → Join / Leave
 
 **Landmark commits:** `893e9af` (UX simplification) → `fd43b45` (onboarding line).
