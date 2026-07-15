@@ -3919,6 +3919,10 @@ async function init() {
 
       const payload = {
         script:      currentPanelText,
+        node_id:     nodeId || null,           // 2026-07-15 — stable Neo4j elementId; direct
+                                               // cy.getElementById lookup on receive. Set for
+                                               // any node the sender was reading, not just
+                                               // module nodes with a url. See handleReturnFromStandalone.
         node_url:    currentNodeUrl,
         source_text: currentSourceText,
         title:       currentTitle
@@ -4196,20 +4200,36 @@ async function init() {
     }
     if (!payload || typeof payload !== 'object') { cleanUrl(); return; }
 
+    const nodeId  = typeof payload.node_id  === 'string' ? payload.node_id  : null;
     const nodeUrl = typeof payload.node_url === 'string' ? payload.node_url : null;
     const script  = typeof payload.script   === 'string' ? payload.script   : null;
 
-    // Locate the target node.
-    // Primary: match on node.data('url') === payload.node_url. This is the
-    // clean return-from-a-known-node case.
-    // Fallback (no node_url): standalone was launched from a direct URL, not
-    // from BD → payload carries no origin. Convention: every module has a
-    // default "landing" node named <module_id>_1 (e.g., bd_V_Kolam_1). Parse
-    // the module id from the payload's %%bd_module line and look up that node
-    // by name. Ensures the return still lands somewhere sensible instead of
-    // silently no-oping.
+    // Locate the target node — three fallbacks in order of specificity.
+    //
+    // Primary (2026-07-15): direct elementId lookup via cy.getElementById.
+    // Works for any node in the graph, not just those with a `url` property
+    // — critical for BD-self deep links that come from normal (non-module)
+    // TextNodes, none of which carry `url`.
+    //
+    // Fallback 1: match on node.data('url') === payload.node_url. Kept for
+    // return-from-standalone flows that predate node_id (older EV links
+    // still in the wild) and as a safety net when node_id doesn't hit
+    // (e.g., DB reimport regenerated elementIds since the link was made).
+    //
+    // Fallback 2 (MM2, 2026-07-11): structural default via hasModuleScript
+    // + min(seq). Only meaningful when neither node_id nor node_url is
+    // available AND the payload script carries a %%bd_module directive —
+    // standalone was launched from a direct URL, not from BD.
     let target = null;
-    if (nodeUrl) {
+    if (nodeId) {
+      const n = cy.getElementById(nodeId);
+      if (n && n.length > 0) {
+        target = n;
+      } else {
+        console.warn('[MM1] return-from-standalone: no node with id', nodeId);
+      }
+    }
+    if (!target && nodeUrl) {
       target = cy.nodes().filter(n => n.data('url') === nodeUrl).first();
       if (!target || !target.length) {
         console.warn('[MM1] return-from-standalone: no node matches url', nodeUrl);
@@ -4259,18 +4279,29 @@ async function init() {
       return;
     }
 
-    // 1. Snapshot the target's current DB text BEFORE we overwrite it, so we
-    //    can also place that original on a chat card (see step 5b). The DB
-    //    isn't touched by any of this — target.data('text', …) mutates only
-    //    Cytoscape's local copy — but until the user refreshes, the DB text
-    //    is otherwise inaccessible in the running session because we shadow
-    //    it with the incoming payload script for Player mode's auto-load.
+    // Is the target a module node? Determines two later behaviours:
+    //   - step 2  (shadow target.text with the payload script) — only for
+    //     modules, so Player-mode auto-load sends the edited script rather
+    //     than the DB copy. Shadowing a normal node's text would replace
+    //     the reader's view with the sender's chat draft, which is wrong.
+    //   - step 6  (auto-engage Player mode) — same reason: normal nodes
+    //     have no module to play, so flipping into Player mode would
+    //     flash a broken load. Land in Nodes mode instead.
+    // Detection: `hasModuleScript` property (post-MM2 nodes) OR the target's
+    // own text carries a `%%bd_module` directive (pre-MM2 backward compat).
+    const isModuleTarget = !!(target.data('hasModuleScript') || parseModuleId(target.data('text')));
+
+    // 1. Snapshot the target's current DB text BEFORE we (maybe) overwrite
+    //    it, so we can also place that original on a chat card (see 5a).
+    //    The DB isn't touched by any of this — target.data('text', …)
+    //    mutates only Cytoscape's local copy.
     const originalDbScript = target.data('text');
 
-    // 2. Update the local node's text so Player mode's auto-load sends the
-    //    edited script instead of the DB copy. Not persisted — a refresh
-    //    without ?data= will restore the DB text.
-    if (script !== null) target.data('text', script);
+    // 2. (module-only) Shadow the local node's text so Player mode's
+    //    auto-load sends the edited script instead of the DB copy. Not
+    //    persisted — a refresh without ?data= will restore the DB text.
+    //    For non-module nodes we leave target.data('text') alone.
+    if (isModuleTarget && script !== null) target.data('text', script);
 
     // 3. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
     enterNode(target);
@@ -4308,16 +4339,20 @@ async function init() {
       setChatText(script);
     }
 
-    // 6. Engage Player mode via the radio + setViewMode. setViewMode('player')
-    //    will call loadModuleForNode(lastReadNodeId), which reads
-    //    node.data('text') — now the payload script — and posts it to the
-    //    iframe (fast path if same module, src swap + BD_READY otherwise).
-    const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
-    const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
-    if (playerRadio && !playerRadio.disabled) {
-      playerRadio.checked = true;
-      if (nodesRadio) nodesRadio.checked = false;
-      setViewMode('player');
+    // 6. (module-only, 2026-07-15) Engage Player mode via the radio +
+    //    setViewMode. setViewMode('player') calls loadModuleForNode
+    //    (lastReadNodeId), which reads node.data('text') — now the payload
+    //    script (shadowed in step 2) — and posts it to the iframe (fast
+    //    path if same module, src swap + BD_READY otherwise).
+    //    Non-module deep links stay in Nodes mode — no Player flash.
+    if (isModuleTarget) {
+      const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
+      const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
+      if (playerRadio && !playerRadio.disabled) {
+        playerRadio.checked = true;
+        if (nodesRadio) nodesRadio.checked = false;
+        setViewMode('player');
+      }
     }
 
     cleanUrl();
