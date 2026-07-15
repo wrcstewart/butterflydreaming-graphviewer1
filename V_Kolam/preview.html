@@ -249,7 +249,8 @@
       width: 100%;
       min-height: 160px;
       background: #0f0f18;
-      color: #e8e8e0;
+      color: #cfcfc4;                     /* slightly desaturated from #e8e8e0 —
+                                             non-editable read cue (2026-07-15) */
       border: 1px solid #2a2a3a;
       border-bottom: 5px solid #5a4020;   /* dark-amber demarcator strip (2026-07-02) */
       border-radius: 3px;
@@ -261,6 +262,7 @@
       outline: none;
       flex: 0 0 auto;
       margin-bottom: 7px;           /* small gap between amber bar and action row */
+      cursor: default;              /* not text-cursor — signals non-typable */
     }
     #script-input:focus { border-color: #4a9b8e; border-bottom-color: #5a4020; }
 
@@ -399,7 +401,14 @@
     </div>
 
     <aside class="side-panel">
-      <textarea id="script-input" spellcheck="false"></textarea>
+      <!-- 2026-07-15 (Op 2, content-moderation) — readonly. The script must
+           only be modified via the sliders below (structured, template-bounded
+           edits). Keyboard typing would introduce arbitrary text into the
+           payload that Copy-Link-back-to-BD carries, and BD's receiver would
+           have no way to distinguish typed content from slider-derived
+           content. Sliders continue to write to .value programmatically. -->
+      <textarea id="script-input" spellcheck="false" readonly
+                title="Read-only — use the sliders below to modify the script"></textarea>
       <div class="action-bar">
         <button id="copy-link-btn" title="Copy a shareable URL that reproduces this script">Copy Link</button>
         <button id="copy-btn"      title="Copy the script to the clipboard">Copy</button>
@@ -801,8 +810,12 @@ F: F+F-F-F+F+F+F-F
       if (!ok) loadScript(DEFAULT_SCRIPT);
     })();
 
-    // Manual edits to the textarea should also refresh the stepper displays,
-    // so users who prefer typing directly aren't out of sync visually.
+    // Defensive: keep the input → stepper sync wired up even though the
+    // textarea is readOnly (2026-07-15 Op 2). Programmatic .value = assigns
+    // (what sliders do) don't fire 'input', so this listener only fires if
+    // the readonly attribute is later removed for testing / dev override.
+    // Under normal user operation, sliders write to .value directly and
+    // update their own displays separately — this listener stays idle.
     textarea.addEventListener('input', () => syncSteppersFromScript(textarea.value));
 
     // ── #bd-bar (bottom): source context + Enter ButterflyDreaming ──────────
