@@ -923,15 +923,17 @@ function buildStyle() {
     {
       selector: 'node.breadcrumb-chip',
       style: {
-        'width': 60,
+        'width': 63,                           /* 2026-07-15 — +5% from 60 so
+                                                  edge characters clear the chip
+                                                  border with headroom. Kept
+                                                  under the pinch-zoom trigger. */
         'height': 18,
         'font-size': '8px',                    /* 2026-07-15 — dropped from 9px
                                                   (~10% smaller) so first/last
                                                   characters of labels no longer
-                                                  clip inside the 60px chip. */
-        'text-max-width': '56px',              /* nudged up from 54px to match
-                                                  the extra room the smaller
-                                                  font gives on either side. */
+                                                  clip inside the chip. */
+        'text-max-width': '59px',              /* proportional to width bump
+                                                  (was 56/60 = 0.93; now 59/63). */
         'text-margin-y': 0,
         'border-width': 0,
       }
@@ -3822,6 +3824,35 @@ async function init() {
     setSendBtn(sendBtn);
     sendBtn.addEventListener('click', () => { sendTopLocalCard(); });
   }
+
+  // 2026-07-15 — supplementary listeners: any graph-navigation action
+  // (Back button, or tap on the Root breadcrumb chip) should also drop the
+  // user out of Player mode so they actually see the graph they've just
+  // navigated to. Without this, a user arriving via deep-link into Player
+  // mode presses Back / taps Root chip and the graph updates correctly
+  // underneath but stays hidden by the module iframe — looks like "nothing
+  // happened". These listeners fire in addition to the setupInteractions
+  // ones (restoreState / handleNodeTap); ordering doesn't matter as long
+  // as setViewMode('nodes') runs somewhere. setViewMode is defined later
+  // in init() as a `function` declaration and is hoisted, so this call
+  // resolves at click time.
+  const backBtnEl = document.getElementById('back-btn');
+  if (backBtnEl) {
+    backBtnEl.addEventListener('click', () => {
+      if (document.body.classList.contains('player-active')) {
+        const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
+        if (nodesRadio) nodesRadio.checked = true;
+        setViewMode('nodes');
+      }
+    });
+  }
+  youCy.on('tap', 'node', evt => {
+    if (evt.target.data('type') !== 'root') return;
+    if (!document.body.classList.contains('player-active')) return;
+    const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
+    if (nodesRadio) nodesRadio.checked = true;
+    setViewMode('nodes');
+  });
 
   // #cy top is pinned earlier — before cytoscape constructs — so init fits
   // the root correctly. No re-pin needed here; cy.resize on subsequent panel
