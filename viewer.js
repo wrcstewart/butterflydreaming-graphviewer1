@@ -4024,16 +4024,92 @@ async function init() {
       }, 0);
     };
 
+    // ── Copy-Link update-script gate (2026-07-15) ─────────────────────
+    // Mirrors preview.html's dialog. In Player mode, the visual iframe's
+    // module may have drifted since the focused card was last synced
+    // (Copy Up in BD = ↑ in EV: postMessage bd_script_request →
+    // bd_script_response handler at §42.7 writes into the focused card).
+    // The three Player-mode share buttons below (#jump-to-ext-btn,
+    // #copy-link-to-ext-btn, #copy-link-btn) bake the focused card into
+    // the outgoing URL — stale card means stale share. withUpdatePrompt
+    // gates on the localStorage preference (same key as EV so a user's
+    // "don't ask again" choice carries across BD ↔ EV) and only fires
+    // when body.player-active — normal-node BD-self Copy Links skip the
+    // gate entirely (their payload is ignored by the receiver anyway,
+    // per Op 1).
+    const UPDATE_MODE_KEY = 'bd_ev_copylink_updatemode';
+    function getUpdateMode() {
+      try { return localStorage.getItem(UPDATE_MODE_KEY) || 'ask'; }
+      catch { return 'ask'; }
+    }
+    function setUpdateModeStored(mode) {
+      try { localStorage.setItem(UPDATE_MODE_KEY, mode); } catch {}
+    }
+    function requestModuleSyncBD(timeoutMs = 500) {
+      return new Promise((resolve) => {
+        if (!iframeEl2 || !iframeEl2.contentWindow) { resolve(false); return; }
+        let done = false;
+        function handler(event) {
+          const d = event.data;
+          if (!d || d.type !== 'bd_script_response') return;
+          if (done) return;
+          done = true;
+          window.removeEventListener('message', handler);
+          resolve(true);
+        }
+        window.addEventListener('message', handler);
+        iframeEl2.contentWindow.postMessage({ type: 'bd_script_request' }, '*');
+        setTimeout(() => {
+          if (done) return;
+          done = true;
+          window.removeEventListener('message', handler);
+          resolve(false);
+        }, timeoutMs);
+      });
+    }
+    function withUpdatePrompt(action) {
+      // Skip gate entirely if the user isn't in Player mode — the module
+      // isn't in play, drift isn't happening, and (for normal nodes) the
+      // receiver's Op 1 code ignores payload.script anyway.
+      if (!document.body.classList.contains('player-active')) { action(); return; }
+      const mode = getUpdateMode();
+      if (mode === 'update') { requestModuleSyncBD().then(() => action()); return; }
+      if (mode === 'skip')   { action(); return; }
+      const dialog = document.getElementById('update-script-dialog');
+      if (!dialog) { action(); return; }
+      const yesBtn = document.getElementById('update-script-yes');
+      const noBtn  = document.getElementById('update-script-no');
+      const cb     = document.getElementById('update-script-remember');
+      cb.checked = false;
+      dialog.hidden = false;
+      function cleanup() {
+        yesBtn.onclick = null;
+        noBtn.onclick  = null;
+        dialog.hidden = true;
+      }
+      yesBtn.onclick = () => {
+        if (cb.checked) setUpdateModeStored('update');
+        cleanup();
+        requestModuleSyncBD().then(() => action());
+      };
+      noBtn.onclick = () => {
+        if (cb.checked) setUpdateModeStored('skip');
+        cleanup();
+        action();
+      };
+    }
+
     // ── Jump to External Website (MM3) ─────────────────────────────────
     // Opens the standalone EV in a new tab (Q3 answer 2026-07-12: new tab
-    // for now, preserves the BD chat/pair session). Wrapper is intentionally
-    // one-line so a future alert/confirm can slot in as a pre-flight check.
+    // for now, preserves the BD chat/pair session).
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
       jumpToBtn.addEventListener('click', () => {
-        const { url } = buildExternalWebsiteUrl();
-        console.log('Jump to External Website URL:', url);
-        window.open(url, '_blank');
+        withUpdatePrompt(() => {
+          const { url } = buildExternalWebsiteUrl();
+          console.log('Jump to External Website URL:', url);
+          window.open(url, '_blank');
+        });
       });
     }
 
@@ -4045,14 +4121,16 @@ async function init() {
     const copyLinkToBtn = document.getElementById('copy-link-to-ext-btn');
     if (copyLinkToBtn) {
       copyLinkToBtn.addEventListener('click', () => {
-        const { url } = buildExternalWebsiteUrl();
-        copyLinkText(url).then(() => {
-          const original = copyLinkToBtn.textContent;
-          copyLinkToBtn.textContent = 'Copied!';
-          setTimeout(() => { copyLinkToBtn.textContent = original; }, 1500);
-        }).catch((err) => {
-          console.warn('Copy Link to External Website: clipboard write failed, showing fallback', err);
-          showFallback(url);
+        withUpdatePrompt(() => {
+          const { url } = buildExternalWebsiteUrl();
+          copyLinkText(url).then(() => {
+            const original = copyLinkToBtn.textContent;
+            copyLinkToBtn.textContent = 'Copied!';
+            setTimeout(() => { copyLinkToBtn.textContent = original; }, 1500);
+          }).catch((err) => {
+            console.warn('Copy Link to External Website: clipboard write failed, showing fallback', err);
+            showFallback(url);
+          });
         });
       });
     }
@@ -4083,13 +4161,15 @@ async function init() {
       // space and break the two-line layout after the flash.
       const originalLabel = copyLinkBtn.innerHTML;
       copyLinkBtn.addEventListener('click', () => {
-        const { url } = buildBdSelfUrl();
-        copyLinkText(url).then(() => {
-          copyLinkBtn.textContent = 'Copied!';
-          setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
-        }).catch((err) => {
-          console.warn('Copy Link (BD-self): clipboard write failed, showing fallback', err);
-          showFallback(url);
+        withUpdatePrompt(() => {
+          const { url } = buildBdSelfUrl();
+          copyLinkText(url).then(() => {
+            copyLinkBtn.textContent = 'Copied!';
+            setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
+          }).catch((err) => {
+            console.warn('Copy Link (BD-self): clipboard write failed, showing fallback', err);
+            showFallback(url);
+          });
         });
       });
     }

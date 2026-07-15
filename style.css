@@ -830,6 +830,76 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   margin: 0;
 }
 
+/* 2026-07-15 — Copy-Link "should I update the script?" dialog. Mirrors
+   preview.html's dialog CSS so the two look identical across BD and EV. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;                  /* above cy/action-bar, below loading-overlay */
+  font-family: sans-serif;
+}
+.modal-overlay[hidden] { display: none; }
+.modal-box {
+  background: #1a1a20;
+  border: 1px solid #a07820;
+  border-radius: 6px;
+  padding: 18px 20px;
+  max-width: 380px;
+  width: calc(100vw - 40px);
+  color: #e8e8e0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.modal-heading {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: bold;
+  color: #ffd88a;
+}
+.modal-body {
+  margin: 0 0 14px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #cfcfc4;
+}
+.modal-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.modal-buttons button {
+  background: #3d2e00;
+  color: #ffd88a;
+  border: 1px solid #a07820;
+  border-radius: 3px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: sans-serif;
+}
+.modal-buttons button:hover {
+  background: rgba(160, 120, 32, 0.2);
+  color: #fff;
+  border-color: #c9a227;
+}
+.modal-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #a09a8a;
+  cursor: pointer;
+}
+.modal-check input {
+  cursor: pointer;
+  accent-color: #a07820;
+}
+
 
 #session-expired {
   display: none;
