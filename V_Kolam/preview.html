@@ -1107,19 +1107,24 @@ F: F+F-F-F+F+F+F-F
     if (evPrevBtn) evPrevBtn.addEventListener('click', () => navigateSibling('prev'));
     if (evNextBtn) evNextBtn.addEventListener('click', () => navigateSibling('next'));
 
-    // Enter → navigate.
+    // Enter → navigate. 2026-07-15 (late) — wrapped in withUpdatePrompt so
+    // the update-script dialog fires here too. Earlier concern about "dialog
+    // on a tab that's about to navigate away" was wrong: the dialog PAUSES
+    // navigation until the user picks a button. Silent bug fixed.
     const bdEnterBtn = document.getElementById('bd-enter-btn');
     if (bdEnterBtn) {
       bdEnterBtn.addEventListener('click', () => {
-        const { url, returnPayload, scriptLen } = buildBdReturnUrl();
-        console.log('Enter ButterflyDreaming URL:', url);
-        console.log('  return payload preview:', {
-          scriptLen,
-          node_url:    returnPayload.node_url,
-          source_text: returnPayload.source_text,
-          title:       returnPayload.title
+        withUpdatePrompt(() => {
+          const { url, returnPayload, scriptLen } = buildBdReturnUrl();
+          console.log('Enter ButterflyDreaming URL:', url);
+          console.log('  return payload preview:', {
+            scriptLen,
+            node_url:    returnPayload.node_url,
+            source_text: returnPayload.source_text,
+            title:       returnPayload.title
+          });
+          window.location.href = url;
         });
-        window.location.href = url;
       });
     }
 
@@ -1288,9 +1293,34 @@ F: F+F-F-F+F+F+F-F
     //   'skip'   → run the copy immediately, trust the current textarea
     // The user's choice can be persisted via the "Don't ask again" checkbox.
     const UPDATE_MODE_KEY = 'bd_ev_copylink_updatemode';
+    // 2026-07-15 (late) — URL escape hatch. Visiting the EV with
+    // ?reset-dialog=1 clears the localStorage preference (both mode and
+    // any future flags) and reloads without the param. Cross-device
+    // way to un-tick "Don't ask again" without needing DevTools —
+    // usable on iOS where Web Inspector requires a Mac cable.
+    (function handleResetDialogParam() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('reset-dialog')) {
+          localStorage.removeItem(UPDATE_MODE_KEY);
+          params.delete('reset-dialog');
+          const q = params.toString();
+          const clean = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
+          console.log('[preview] reset-dialog: cleared', UPDATE_MODE_KEY, '→ ask; reloading', clean);
+          window.location.replace(clean);
+          return;   // page is about to reload
+        }
+      } catch (e) { console.warn('[preview] reset-dialog param handler failed', e); }
+    })();
     function getUpdateMode() {
-      try { return localStorage.getItem(UPDATE_MODE_KEY) || 'ask'; }
-      catch { return 'ask'; }
+      try {
+        const mode = localStorage.getItem(UPDATE_MODE_KEY) || 'ask';
+        // Log the current mode on every read so a user seeing "dialog didn't
+        // appear!" can open the console and instantly see whether their
+        // preference is set. Reset via ?reset-dialog=1 in the URL.
+        if (mode !== 'ask') console.log('[preview] update-script mode =', mode, '(dialog suppressed; reload with ?reset-dialog=1 to reset)');
+        return mode;
+      } catch { return 'ask'; }
     }
     function setUpdateModeStored(mode) {
       try { localStorage.setItem(UPDATE_MODE_KEY, mode); } catch {}

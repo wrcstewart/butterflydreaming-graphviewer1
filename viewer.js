@@ -4038,9 +4038,30 @@ async function init() {
     // gate entirely (their payload is ignored by the receiver anyway,
     // per Op 1).
     const UPDATE_MODE_KEY = 'bd_ev_copylink_updatemode';
+    // 2026-07-15 (late) — URL escape hatch mirrored from preview.html.
+    // Visiting BD with ?reset-dialog=1 clears the localStorage preference
+    // and reloads without the param. Cross-device way to un-tick "Don't
+    // ask again" without needing DevTools — usable on iOS.
+    (function handleResetDialogParam() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('reset-dialog')) {
+          localStorage.removeItem(UPDATE_MODE_KEY);
+          params.delete('reset-dialog');
+          const q = params.toString();
+          const clean = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
+          console.log('[BD] reset-dialog: cleared', UPDATE_MODE_KEY, '→ ask; reloading', clean);
+          window.location.replace(clean);
+          return;   // page is about to reload
+        }
+      } catch (e) { console.warn('[BD] reset-dialog param handler failed', e); }
+    })();
     function getUpdateMode() {
-      try { return localStorage.getItem(UPDATE_MODE_KEY) || 'ask'; }
-      catch { return 'ask'; }
+      try {
+        const mode = localStorage.getItem(UPDATE_MODE_KEY) || 'ask';
+        if (mode !== 'ask') console.log('[BD] update-script mode =', mode, '(dialog suppressed; reload with ?reset-dialog=1 to reset)');
+        return mode;
+      } catch { return 'ask'; }
     }
     function setUpdateModeStored(mode) {
       try { localStorage.setItem(UPDATE_MODE_KEY, mode); } catch {}
