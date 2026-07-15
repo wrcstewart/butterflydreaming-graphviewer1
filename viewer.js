@@ -925,8 +925,13 @@ function buildStyle() {
       style: {
         'width': 60,
         'height': 18,
-        'font-size': '9px',
-        'text-max-width': '54px',
+        'font-size': '8px',                    /* 2026-07-15 — dropped from 9px
+                                                  (~10% smaller) so first/last
+                                                  characters of labels no longer
+                                                  clip inside the 60px chip. */
+        'text-max-width': '56px',              /* nudged up from 54px to match
+                                                  the extra room the smaller
+                                                  font gives on either side. */
         'text-margin-y': 0,
         'border-width': 0,
       }
