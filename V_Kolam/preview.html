@@ -1,12 +1,16 @@
 <!-- ButterflyDreaming Visual Module — preview / standalone harness.
      Single side panel (user 2026-07-02):
-       · textarea at the top
+       · textarea at the top (readonly since 2026-07-15 Op 2)
        · action row (Copy Link, Copy, ↓, ↑)
        · stepper column beneath — the harness owns the visible controls;
          module's own control panel is hidden via bd_ui_config.
-     Each stepper tap rewrites the corresponding %%bd_<name> line in the
-     textarea and re-sends via bd_script_update, so the textarea is the
-     single source of truth and Copy Link always reflects current state. -->
+     2026-07-15 — script commit is now EXPLICIT. Stepper taps update the
+     live module state (via `currentScript` mirror) but LEAVE THE TEXTAREA
+     ALONE. The user commits accumulated slider + drift state to the
+     textarea by pressing ↑ (Receive) or by accepting the Copy-Link
+     "update the script?" dialog. Result: textarea is the last-committed
+     snapshot, not a live mirror; Copy Link either reflects that snapshot
+     or triggers a fresh sync first. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -706,8 +710,16 @@ F: F+F-F-F+F+F+F-F
       if (span.textContent === uiStr) return;      // hit min/max, no change
       span.textContent = uiStr;
       const dirVal = s.toDirective ? s.toDirective(next) : uiStr;
-      textarea.value = writeDirective(textarea.value, name, dirVal);
-      if (moduleReady) postToModule({ type: 'bd_script_update', script: textarea.value });
+      // 2026-07-15 — sliders no longer auto-write the script textarea. The
+      // textarea reflects the last COMMITTED script (from loadScript /
+      // bd_script_response / ↓ Send). Slider changes go straight to the
+      // module via `currentScript` as a live-state mirror. The user commits
+      // by pressing ↑ (Receive) or by accepting the Copy-Link update-script
+      // dialog — either of which pulls the module state back into the
+      // textarea. Keeps ↓ Send meaningful as a "restore from committed
+      // script" action.
+      currentScript = writeDirective(currentScript, name, dirVal);
+      if (moduleReady) postToModule({ type: 'bd_script_update', script: currentScript });
     }
 
     // Stepper +/− wiring — pointer events, hold-to-repeat.
@@ -1248,6 +1260,9 @@ F: F+F-F-F+F+F+F-F
     // ── Buttons ──────────────────────────────────────────────────────────────
     sendBtn.addEventListener('click', () => {
       if (moduleReady) {
+        // ↓ Send = "restore module to committed script" — flushes any
+        // uncommitted slider changes on the module side (2026-07-15).
+        currentScript = textarea.value;
         postToModule({ type: 'bd_script_update', script: textarea.value });
         syncSteppersFromScript(textarea.value);
         setStatus('Sent to module.');
@@ -1391,6 +1406,8 @@ F: F+F-F-F+F+F+F-F
           if (typeof data.script === 'string') {
             const clean = stripAngleSeconds(data.script);
             textarea.value = clean;
+            currentScript = clean;              // committed = live; slider-drift
+                                                // gap closed (2026-07-15).
             syncSteppersFromScript(clean);
             setStatus('Received from module.');
           }
