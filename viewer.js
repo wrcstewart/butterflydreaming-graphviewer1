@@ -4001,6 +4001,43 @@ async function init() {
         });
       });
     }
+
+    // ── BD-self Copy Link (2026-07-15) ─────────────────────────────────
+    // Reuses the EV Copy Link payload shape { script, node_url,
+    // source_text, title } but points the URL back at BD's own origin
+    // ("/") instead of the standalone /bd_V_Kolam/preview.html. On the
+    // receiving side, handleReturnFromStandalone decodes ?data=, finds
+    // the node by node_url, overwrites its .text with the payload
+    // script, force-creates a visible N=1 card populated with the
+    // script, and (currently, always) engages Player mode via the
+    // enabled Player radio. Auto-Player behaviour may want a smarter
+    // gate later (only if parseModuleId(script) is non-null) — deferred.
+    function buildBdSelfUrl() {
+      // Reuse buildExternalWebsiteUrl's payload builder by extracting
+      // just the payload, then re-encoding for the BD-origin URL.
+      const { payload } = buildExternalWebsiteUrl();
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      const url = `${window.location.origin}/?data=${encodeURIComponent(encoded)}`;
+      return { url, payload };
+    }
+
+    const copyLinkBtn = document.getElementById('copy-link-btn');
+    if (copyLinkBtn) {
+      // Cache the original innerHTML (contains <br>) so the "Copied!"
+      // flash can restore it. textContent would collapse the <br> to a
+      // space and break the two-line layout after the flash.
+      const originalLabel = copyLinkBtn.innerHTML;
+      copyLinkBtn.addEventListener('click', () => {
+        const { url } = buildBdSelfUrl();
+        copyLinkText(url).then(() => {
+          copyLinkBtn.textContent = 'Copied!';
+          setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
+        }).catch((err) => {
+          console.warn('Copy Link (BD-self): clipboard write failed, showing fallback', err);
+          showFallback(url);
+        });
+      });
+    }
   }
 
   const userCountPanel = document.getElementById('user-count-panel');

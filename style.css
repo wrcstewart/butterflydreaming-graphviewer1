@@ -419,26 +419,39 @@ html, body {
   cursor: not-allowed;
 }
 
-/* New Card lives in #action-bar but is only meaningful in chat mode.
-   Hidden by default; revealed when #chat-panel is active. Right-aligned
-   via margin-left: auto so it sits at the far right of the bar. */
-#chat-new-card-btn {
-  display: none;
-  margin-left: auto;
-  font-size: 11px;
-  padding: 4px 10px;
-}
-#chat-panel.active ~ #action-bar #chat-new-card-btn {
-  display: inline-block;
-}
-
-/* A42 §42.6 / §42.7 — Copy Down (↓) and Copy Up (↑) buttons + Copy Link.
-   Same visual family as the other action-bar buttons. Copy Down/Up start
-   disabled and get enabled per chat-active + first-Copy-Down rules; Copy Link
-   is always active (does not depend on pair/chat state). */
-#copy-down-btn,
-#copy-up-btn,
+/* 2026-07-15 — New Card + BD-self Copy Link are two-line narrow buttons.
+   Both sit between ↑ and the status span. Chat panel is always active
+   now so the old #chat-panel.active gate is redundant; kept for safety
+   in case display state is ever revisited. */
+#chat-new-card-btn,
 #copy-link-btn {
+  background: #1a1a2e;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: sans-serif;
+  font-size: 10px;
+  line-height: 1.05;         /* tight — two lines don't need extra leading */
+  padding: 3px 5px;
+  cursor: pointer;
+  text-align: center;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+#chat-new-card-btn { display: none; }
+#chat-panel.active ~ #action-bar #chat-new-card-btn { display: inline-block; }
+#chat-new-card-btn:hover,
+#copy-link-btn:hover:not(:disabled) {
+  border-color: #aaa;
+  color: #fff;
+}
+#copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* A42 §42.6 / §42.7 — Copy Down (↓) and Copy Up (↑) single-glyph buttons.
+   Same visual family as the other action-bar buttons. Start disabled and
+   get enabled per chat-active + first-Copy-Down rules. */
+#copy-down-btn,
+#copy-up-btn {
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
@@ -451,14 +464,12 @@ html, body {
   min-width: 26px;
 }
 #copy-down-btn:hover:not(:disabled),
-#copy-up-btn:hover:not(:disabled),
-#copy-link-btn:hover:not(:disabled) {
+#copy-up-btn:hover:not(:disabled) {
   border-color: #aaa;
   color: #fff;
 }
 #copy-down-btn:disabled,
-#copy-up-btn:disabled,
-#copy-link-btn:disabled {
+#copy-up-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=108">
+  <link rel="stylesheet" href="style.css?v=109">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming Development</div>
@@ -27,11 +27,12 @@
     <button id="chat-send-btn" type="button" disabled>Send</button>
     <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
     <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
-    <!-- #copy-link-btn removed 2026-07-12: MM3 moved this action into the
-         #bd-invite-panel-viewer as #copy-link-to-ext-btn / "Copy Link to
-         External Website". Same URL-build code, different button home. -->
+    <!-- 2026-07-15: New Card + BD-self Copy Link both live between ↑ and
+         the status span. Two-line labels so each button stays narrow —
+         phone real-estate on the action bar was tight. -->
+    <button id="chat-new-card-btn" type="button" title="Start a new local (compose) card at the top of the stack">New<br>Card</button>
+    <button id="copy-link-btn" type="button" title="Copy a link back to this BD state (current node + top card) to the clipboard">Copy<br>Link</button>
     <span id="default-save-status"></span>
-    <button id="chat-new-card-btn" type="button">New Card</button>
     <span id="view-mode-toggle">
       <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
       <label><input type="radio" name="view-mode" value="player"> Player</label>
@@ -122,6 +123,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=401"></script>
+  <script type="module" src="viewer.js?v=402"></script>
 </body>
 </html>
