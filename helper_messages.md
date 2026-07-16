@@ -28,6 +28,7 @@ Inside a helper block:
 ## Hub
 
 @hub name: Helper Messages
+@hub url: butterflydreaming.org/n/40bc1c0c-17e1-4a55-9af9-a05e5c674bc8
 
 ---
 
@@ -36,6 +37,7 @@ Inside a helper block:
 @helper name: helper-how-to
 @helper title: How-to
 @helper trigger: boot — sent once per user session when the chat panel first opens (paired with helper-nav-hint via sendInitialHelpersOnce)
+@helper url: butterflydreaming.org/n/254bc69a-89b6-4bf8-9780-64c699f93139
 
 Tap a node to search for inspiration for a possible conversation and edit if you wish. Organise on new cards if you wish. Select text and copy will insert it on a new card. Send your top card to the system's Helper for comment — or your Remote once paired.
 
@@ -46,6 +48,7 @@ Tap a node to search for inspiration for a possible conversation and edit if you
 @helper name: helper-nav-hint
 @helper title: Navigation gesture
 @helper trigger: boot — sent once per user session when the chat panel first opens (paired with helper-how-to via sendInitialHelpersOnce)
+@helper url: butterflydreaming.org/n/a50dbc87-45d8-4356-9bbd-54fc6597ff6b
 
 Remember one click (or tap) to see a node's content. Double click (tap) it to hop about.
 
@@ -56,6 +59,7 @@ Remember one click (or tap) to see a node's content. Double click (tap) it to ho
 @helper name: helper-no-partner-waiting
 @helper title: No Remote Partner waiting
 @helper trigger: user pressed Join Remote and no partner is currently waiting to pair
+@helper url: butterflydreaming.org/n/b0fffca7-80ec-4b28-b696-a57325fe5575
 
 No Remote Partner currently waiting to pair — to be expected as
 
@@ -68,6 +72,7 @@ Butterfly Dreaming is a new initiative. If someone remote presses Join you will 
 @helper name: helper-paired-success
 @helper title: Successfully partnered
 @helper trigger: a pair has just completed successfully (fires to both users at the moment of pairing)
+@helper url: butterflydreaming.org/n/d8167049-626b-4ab7-b69b-6d70ff4c2e41
 
 You have successfully partnered — why not create a new card and send them a "Hello from your Remote" message. Use the New Card button, type the message and then use the Send button. Watch out for a message back!
 
@@ -78,5 +83,6 @@ You have successfully partnered — why not create a new card and send them a "H
 @helper name: helper-partner-disconnected
 @helper title: Partner left
 @helper trigger: paired partner left the pair (pressed Say: Bye, closed the tab, or lost their connection)
+@helper url: butterflydreaming.org/n/de6b52f8-1f82-4448-8590-a54ea791f814
 
 Partner disconnected.
