@@ -274,6 +274,19 @@ const HOW_TO_TEXT =
   + 'Select text and copy will insert it on a new card. '
   + 'Send your top card to the system\'s Helper for comment — or your Remote once paired.';
 
+// 2026-07-16 — sent as a Helper card from the ready_to_pair handler when
+// the user presses Join and there's no one else waiting to pair with.
+// Deliberately reassuring rather than blaming ("to be expected" — the
+// platform is new), and points at the two paths forward: (a) Helper as
+// AI-bot correspondent, (b) another browser tab as manual round-tripping.
+// \n\n renders as a paragraph break because the chat-stack helper card
+// body sets white-space: pre-wrap (style.css).
+const NO_PARTNER_WAITING_TEXT =
+  'No Remote Partner currently waiting to pair — to be expected as\n\n'
+  + 'Butterfly Dreaming is a new initiative. If someone remote presses Join you will be paired automatically. '
+  + 'In the meantime your messages will receive special attention from myself (Helper) '
+  + 'or you can use another browser to simulate a remote partner.';
+
 // Channel "open" requires both users paired AND both currently in chat mode.
 function channelOpen(userId) {
   const buddyId = pairedWith.get(userId);
@@ -527,6 +540,11 @@ io.on('connection', async (socket) => {
           // harmless (no one to talk to yet).
           waitingUser = { userId: socket.data.userId, socket };
           socket.emit('msg', { type: 'wait_state' });
+          // 2026-07-16 — helper card explaining the situation. Fires
+          // once each time a user presses Join with nobody else waiting.
+          // Replaces the boot-time Helper (0.2) status card that used to
+          // fire on every arrival regardless of pair intent.
+          sendSystemCard(socket.data.userId, NO_PARTNER_WAITING_TEXT);
           console.log(`[BD] Waiting: ${socket.data.userId}`);
         } else {
           // MM3 revised (2026-07-12) — same-device pair refusal. Two ws
@@ -584,12 +602,18 @@ io.on('connection', async (socket) => {
         if (!socket.data.userId) return;
         inChat.set(socket.data.userId, true);
         sendHowToOnce(socket.data.userId);
-        sendSystemCard(socket.data.userId, statusTextFor(socket.data.userId));
-        // Client uses this to drop in N=1 above the initial how-to + status.
-        // Sent every enter_chat; client handles idempotently. A/B layout
-        // consistency is enforced on the client by the system-card pinning
-        // rule in prependSystemCard (see [[system-card-placement]]), not by
-        // the order of these emits.
+        // 2026-07-16 — status-card at enter_chat removed. Was sending
+        // "Partner not available — please wait." unconditionally at
+        // boot to every user (Helper (0.2)). Under always-on-chat that
+        // fires on every arrival, which is noisy and premature — the
+        // user hasn't asked to pair yet. Replaced with a more useful
+        // helper message that fires from ready_to_pair when there's
+        // genuinely nobody to pair with (see NO_PARTNER_WAITING_TEXT).
+        // Client uses chat_ready to drop in Local (1) above the initial
+        // helper batch. Sent every enter_chat; client handles
+        // idempotently. A/B layout consistency is enforced on the client
+        // by the system-card pinning rule in prependSystemCard (see
+        // [[system-card-placement]]), not by the order of these emits.
         socket.emit('msg', { type: 'chat_ready' });
         const buddyId = pairedWith.get(socket.data.userId);
         if (buddyId && inChat.get(buddyId)) {

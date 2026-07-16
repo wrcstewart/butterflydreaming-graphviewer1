@@ -337,10 +337,15 @@ html, body {
 
 /* Non-editable cards size to content — no writing room needed. The 8.5em
    floor is for the local textarea. System / received bodies are divs that
-   shrink-wrap their text, freeing vertical space in the chat-stack. */
+   shrink-wrap their text, freeing vertical space in the chat-stack.
+   white-space: pre-wrap so \n\n in server-sent helper messages renders
+   as a paragraph break rather than collapsing to a single space
+   (2026-07-16 — needed for the multi-paragraph Helper message on
+   ready_to_pair with no partner). */
 #chat-stack .card.system .card-body,
 .card.received .card-body {
   min-height: 0;
+  white-space: pre-wrap;
 }
 
 /* Body backgrounds — pure black for all kinds. The coloured head stripe
