@@ -19,9 +19,15 @@
 //       Read-only queries are safe; writes/deletes go through — no
 //       guardrails, so double-check the query before pasting.
 //
-//   node bd_tool.js write <patch.md>
-//       (stub) Apply a patch defined in a markdown doc — format TBD in
-//       a later iteration. Errors out for now.
+//   node bd_tool.js write <patch.md> [--dry-run]
+//       Apply a patch defined in a markdown doc. Format is documented
+//       inline with parsePatch() below — briefly: @match <key>: <value>
+//       lines pick the target node (url preferred, then name); @set
+//       <prop>: <value> writes a property, single-line inline OR
+//       multi-line up to the next @ directive. Prose / headers around
+//       these lines is ignored so the .md reads as a normal doc.
+//       Refuses ambiguous @match (>1 hit) and no-match. --dry-run
+//       previews without writing.
 //
 // The tool always writes results as JSON to stdout so the caller
 // (human or agent) can pipe / parse. Errors + progress to stderr.
@@ -133,14 +139,95 @@ async function cmdCypher(query, params) {
   });
 }
 
-async function cmdWrite(patchPath) {
-  // Stub. Left in place so the CLI surface stays stable while we
-  // design the .md patch format in a later iteration.
-  process.stderr.write(
-    `write: not yet implemented (would apply patch from ${patchPath}). ` +
-    `Design deferred — will define the .md patch schema next.\n`
-  );
-  process.exit(2);
+// Parse a .md patch file into { match, set } dicts.
+//
+// Recognised directives (line-anchored, `@` in column 0):
+//   @match <key>: <value>     identity criterion (repeatable)
+//   @set   <prop>: <value>    single-line property write
+//   @set   <prop>:            multi-line property write; content is
+//                             every following line up to the next
+//                             `@match` / `@set` / `@end` / EOF
+//   @end                      optionally terminates a multi-line block
+//
+// All other lines (markdown prose, headers, blank lines) are ignored
+// so the file reads as a normal .md doc explaining WHAT + WHY.
+function parsePatch(md) {
+  const match = {};
+  const set = {};
+  const lines = md.split('\n');
+  const dirRe = /^@(match|set|end)(?:\s+(\S+)\s*:\s*(.*))?$/;
+  let i = 0;
+  while (i < lines.length) {
+    const m = lines[i].match(dirRe);
+    if (!m) { i++; continue; }
+    const [, kind, key, inline] = m;
+    if (kind === 'end') { i++; continue; }
+    if (!key) throw new Error(`@${kind} at line ${i + 1} missing key`);
+    if (kind === 'match') {
+      match[key] = (inline || '').trim();
+      i++;
+    } else {   // set
+      if (inline && inline.trim()) {
+        set[key] = inline.trim();
+        i++;
+      } else {
+        i++;
+        const buf = [];
+        while (i < lines.length && !dirRe.test(lines[i])) {
+          buf.push(lines[i]);
+          i++;
+        }
+        while (buf.length && !buf[0].trim())            buf.shift();
+        while (buf.length && !buf[buf.length - 1].trim()) buf.pop();
+        set[key] = buf.join('\n');
+      }
+    }
+  }
+  return { match, set };
+}
+
+async function cmdWrite(patchPath, opts) {
+  if (!fs.existsSync(patchPath)) throw new Error(`patch file not found: ${patchPath}`);
+  const md = fs.readFileSync(patchPath, 'utf8');
+  const { match, set } = parsePatch(md);
+  if (Object.keys(match).length === 0) throw new Error('patch has no @match directives');
+  if (Object.keys(set).length   === 0) throw new Error('patch has no @set directives');
+  return runSession(async (s) => {
+    // Resolve identity — prefer url, fall back to name. Any single-hit
+    // wins. Multi-hit is refused as ambiguous. Add more criteria later
+    // if a use case arises; for now url + name cover it.
+    let target = null;
+    let matchedBy = null;
+    for (const key of ['url', 'name']) {
+      if (!match[key]) continue;
+      const r = await s.run(
+        `MATCH (n {${key}: $val}) RETURN n LIMIT 2`,
+        { val: match[key] }
+      );
+      if (r.records.length === 0) continue;
+      if (r.records.length > 1) throw new Error(`match.${key} = "${match[key]}" is ambiguous (>1 node)`);
+      target = nodeToObject(r.records[0].get('n'));
+      matchedBy = key;
+      break;
+    }
+    if (!target) throw new Error(
+      `no node matched — tried: ${Object.entries(match).map(([k, v]) => `${k}="${v}"`).join(', ')}`
+    );
+    process.stderr.write(`[bd_tool] write: matched by ${matchedBy}; ` +
+      `${target.labels.join(':')} elementId=${target.elementId}\n`);
+    process.stderr.write(`[bd_tool] write: setting ${Object.keys(set).join(', ')}\n`);
+    if (opts && opts.dryRun) {
+      process.stderr.write('[bd_tool] --dry-run: no changes applied\n');
+      return { target, set, applied: false };
+    }
+    // Bind by the same key we matched with, inside a fresh MATCH — so
+    // the write survives even if the SET changes n.url or n.name.
+    const upd = await s.run(
+      `MATCH (n {${matchedBy}: $val}) SET n += $set RETURN n`,
+      { val: match[matchedBy], set }
+    );
+    return { applied: true, matchedBy, before: target, after: nodeToObject(upd.records[0].get('n')) };
+  });
 }
 
 function printHelp() {
@@ -151,7 +238,7 @@ Usage:
   node bd_tool.js read-id <elementId>
   node bd_tool.js labels
   node bd_tool.js cypher <query> [<paramsJSON>]
-  node bd_tool.js write <patch.md>            (not yet implemented)
+  node bd_tool.js write <patch.md> [--dry-run]
 
 Results are JSON on stdout. Progress + errors on stderr.
 `);
@@ -188,8 +275,10 @@ async function main() {
     }
     out = await cmdCypher(query, params);
   } else if (cmd === 'write') {
-    await cmdWrite(args[0] || '(unspecified)');
-    return;   // exits inside
+    const patchPath = args.find(a => !a.startsWith('--'));
+    if (!patchPath) { process.stderr.write('write: patch path required\n'); process.exit(1); }
+    const dryRun = args.includes('--dry-run');
+    out = await cmdWrite(patchPath, { dryRun });
   } else {
     process.stderr.write(`unknown subcommand: ${cmd}\n`);
     printHelp();
