@@ -6,6 +6,75 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-07-16 — bd_tool.js + Helper Messages in DB (big infrastructure day)
+
+**Landmark commits (chronological):**
+
+- Chat polish: `3292412` (System card head = Root yellow #FFD700) → `1852f50` (accumulated card inserts get paragraph separators) → `ec7911b` (bot-context curator/user fork on chat side) → `df58afb` (card head labels: N=k → Local(k), Remote(k)) → `39cdc9f` (Remote label carries N.M inside brackets) → `d6695ad` (System → Helper (N.M))
+- Onboarding text + helper text tweaks: `bd37458` (Helper 0.1 rewrite mentioning Helper/Remote roles) → `7235349` (dropped boot Helper 0.2 status; added on-Join no-partner message) → `367c4fb` (on-pair "successfully partnered" helper) → `1dcfe67` (Helper 0.2 navigation gesture)
+- Button label reframe: `7c62c7a` (Remote Chat / Local Only) → `260af48` (idle → Join Remote to match helper text) → `9ae3d39` (toggled → Say: Bye)
+- Card placement: `06b1e85` (helper cards strict newest-on-top, drop the dock-below-local rule)
+- Infrastructure: `eb2c337` (bd_tool.js CLI: read / read-id / labels / cypher / write-stub) → `40aa6ac` (write from .md patch; Settling text fix as proof) → `78b20bf` (sync-helpers subcommand: parse @hub/@helper blocks, auto-generate url, write back into .md) → `de2f7ef` (helper_messages.md source-of-truth) → `c7be29b` (first sync — 6 nodes + 5 edges + 6 urls back into .md) → `f65910e` (server integration: retired 4 hard-coded string constants, 7 send sites now sendHelperByName from DB-loaded cache) → `0147aed` (wording iteration proof — flatten paragraph break in no-partner-waiting) → `952ebc8` (backup subcommand — DUMP DATABASE → replayable .cypher)
+
+**Chat panel polish (the visible bits):**
+
+- **System card head colour** — was `#2a2a00` (dim yellow, easy to miss). Now `#FFD700` — the same gold used for the Root node in the graph, with `#1a1a20` near-black text so luminance contrast passes (`[[user-colour-vision]]`).
+- **Paragraph separation for accumulated inserts** — multiple node-taps into one local card used to jam together with single-newline separators. Now `\n\n` between inserts, and any `%%bd_ai_read [ … %%bd_]` block inside the incoming content gets a blank line before and after so it reads as its own paragraph.
+- **Bot-context curator/user fork** — chat-side inserts now respect the same rule as `setSystemText` on the (dormant) default panel: with `#dev-code` non-empty, `%%bd_ai_read [ … %%bd_]` un-normalises to `[ … ]`; without it, the block is stripped entirely. Ordering (paragraph-normalise FIRST, then apply fork) matters.
+- **Card head labels reframed** — `N=1` / `N=2` → `Local (1)` / `Local (2)`; partner cards `1.1` / `2.3` → `Remote (1.1)` / `Remote (2.3)` (N.M inside brackets preserves the compose-card association from the old `communications.md §4.1` scheme); system cards → `Helper`, then `Helper (N.M)` matching Remote's scheme (0.1 / 0.2 for boot-time messages that arrive before Local (1) exists).
+- **Helper cards strict newest-on-top** — dropped `top.el.after(sys.el)` docking rule; helpers now prepend at the top like Local and Remote. `[[system-card-placement]]` memory marked superseded.
+
+**Onboarding text tweaks:**
+
+- Helper (0.1) rewrite mentioning both Helper and Remote roles
+- Boot-time "Partner not available — please wait." card removed (was firing unconditionally to every arrival before they'd expressed pair intent)
+- New helper: NAV_HINT ("Remember one click…") as Helper (0.2)
+- New helper: NO_PARTNER_WAITING when user presses Join with no one waiting
+- New helper: PAIRED sent to both sides on pair completion
+
+**Button labels reframed:**
+
+- Idle: `Chat` → `Join` → `Remote Chat` → **`Join Remote`** (final; kept for consistency with NO_PARTNER_WAITING helper text referencing "if someone remote presses Join")
+- Toggled (waiting/paired): `Leave` → `Local Only` → **`Say: Bye`** (final; farewell framing)
+
+**bd_tool.js — new CLI at repo root:**
+
+```
+node bd_tool.js read <name>
+node bd_tool.js read-id <elementId>
+node bd_tool.js labels
+node bd_tool.js cypher <query> [<paramsJSON>]
+node bd_tool.js write <patch.md> [--dry-run]
+node bd_tool.js sync-helpers <helpers.md> [--dry-run]
+node bd_tool.js backup [<outPath>]
+```
+
+Talks Bolt to localhost:7687 (same as server.js). JSON on stdout, progress/errors on stderr. `disableLosslessIntegers: true` so Integer values arrive as plain JS numbers.
+
+`write` patch format: `@match url|name: <value>` picks target (url preferred), `@set <prop>: <value>` writes (inline or multi-line up to next `@` / EOF). Prose ignored — reads as a normal .md doc. Refuses ambiguous @match, no-match. Proof: `patch_settling_text_fix.md` fixed `tbottom` → `bottom` and stray spaces in the Settling Entry node.
+
+**Helper Messages architecture (the big one):**
+
+- New node kinds: `:HelperHub` (one, `name: 'Helper Messages'`), `:HelperMessage` (one per helper, `{ name, title, trigger, text, url }`)
+- New edge type: `:CONTAINS_HELPER` from hub to each message
+- New source-of-truth file: `helper_messages.md` at repo root — one hub declaration + N helper blocks separated by `---`
+- `sync-helpers` subcommand parses the .md, upserts nodes (identity by url, then name), ensures edges, auto-generates urls on create and writes them back into the .md so the file becomes durable-identity source of truth
+- Server side (`server.js`): new `helpersByName` cache Map, `loadHelpers()` reads all HelperMessages at boot chained after `pingMemgraph`, `sendHelperByName(userId, key)` replaces the old `sendSystemCard(userId, HOW_TO_TEXT)` pattern at 7 send sites
+- Retired 4 hard-coded string constants + 2 inline `'Partner disconnected.'` literals
+- Wording iteration is now: edit .md → sync-helpers → restart server. No code changes for wording tweaks.
+
+Current 5 helpers: `helper-how-to`, `helper-nav-hint`, `helper-no-partner-waiting`, `helper-paired-success`, `helper-partner-disconnected`.
+
+**Backup:**
+
+`node bd_tool.js backup` dumps whole graph via Memgraph's `DUMP DATABASE` → `backups/memgraph_YYYY-MM-DD_HHMMSS.cypher`. First backup 3037 statements, ~810 KB. `backups/` in .gitignore.
+
+Restore recipe: `mgconsole … < backups/memgraph_….cypher` against an empty Memgraph.
+
+**Related memory:** [[bd-tool-and-helper-messages]] (new comprehensive doc); [[system-card-placement]] flagged SUPERSEDED.
+
+---
+
 ## 2026-07-15 (part 2) — Deep link generation + content-moderation ops
 
 **Landmark commits:** `9c9c5fd` (BD-self Copy Link + action bar reshape) → `7003273` (add node_id — WRONG identity choice) → `e75af6e` (revert; node_url is the durable UUID) → `4d57e71` (Op 1: receiver-gate payload.script on isModuleTarget) → `c88c9f1` (Op 2: EV textarea readonly) → `c63529c` (deep-link arrival breadcrumb seed Root→target) → `2029353` (chip font 9→8) → `3b5cf70` (chip width +5% + Back / Root exit Player mode) → `9deb2a3` (EV "Should I update the script?" dialog) → `ca73e74` (Op 3: EV sliders no longer auto-write textarea) → `dc4f034` (dialog extended to BD's three Player-mode share buttons) → `bffacaf` (wording: "settings may have changed", not "drifted").
