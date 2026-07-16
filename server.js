@@ -269,10 +269,10 @@ function sendToBuddy(userId, msg) {
 // --- A43 chat-channel helpers ---
 
 const HOW_TO_TEXT =
-  'Click a node to start the conversation or type your own message. '
-  + 'If you select text and copy, it will appear on your next card up. '
-  + 'Try it out now — select and copy this line! '
-  + 'Start a new card if you wish. Send your top card to partner.';
+  'Tap a node to search for inspiration for a possible conversation and edit if you wish. '
+  + 'Organise on new cards if you wish. '
+  + 'Select text and copy will insert it on a new card. '
+  + 'Send your top card to the system\'s Helper for comment — or your Remote once paired.';
 
 // Channel "open" requires both users paired AND both currently in chat mode.
 function channelOpen(userId) {
