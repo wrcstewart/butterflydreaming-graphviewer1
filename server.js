@@ -287,6 +287,17 @@ const NO_PARTNER_WAITING_TEXT =
   + 'In the meantime your messages will receive special attention from myself (Helper) '
   + 'or you can use another browser to simulate a remote partner.';
 
+// 2026-07-16 — sent as a Helper card to BOTH sides the moment a pair
+// completes. Confirms the success, prompts an ice-breaker, and gestures
+// at the workflow (New Card → type → Send) so a first-time user knows
+// what to do next. Replaces the dormant "Partner joined chat…" message
+// from the enter_chat handler (dead under always-on-chat since
+// enter_chat only fires at boot, before any pairing).
+const PAIRED_TEXT =
+  'You have successfully partnered — why not create a new card and send them a "Hello from your Remote" message. '
+  + 'Use the New Card button, type the message and then use the Send button. '
+  + 'Watch out for a message back!';
+
 // Channel "open" requires both users paired AND both currently in chat mode.
 function channelOpen(userId) {
   const buddyId = pairedWith.get(userId);
@@ -582,6 +593,13 @@ io.on('connection', async (socket) => {
           pairedWith.set(buddy.userId, socket.data.userId);
           socket.emit('msg', { type: 'paired', buddyId: buddy.userId });
           buddy.socket.emit('msg', { type: 'paired', buddyId: socket.data.userId });
+          // 2026-07-16 — Helper card to BOTH sides confirming the pair
+          // and prompting the first move. Fires once per pair-completion
+          // event. Replaces the enter_chat "Partner joined chat…" branch
+          // which is dead under always-on-chat (enter_chat only fires at
+          // boot, before any pairing).
+          sendSystemCard(socket.data.userId, PAIRED_TEXT);
+          sendSystemCard(buddy.userId,       PAIRED_TEXT);
           console.log(`[BD] Paired: ${socket.data.userId} ↔ ${buddy.userId}`);
         }
         return;
