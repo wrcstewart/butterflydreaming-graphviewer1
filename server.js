@@ -216,6 +216,7 @@ async function pingMemgraph() {
 }
 pingMemgraph()
   .then(() => console.log('[BD] Memgraph connection warmed up'))
+  .then(() => purgeStaleUsers())
   .then(() => loadHelpers());
 setInterval(pingMemgraph, 5 * 60 * 1000);
 
@@ -322,6 +323,28 @@ function sendHelperByName(userId, name) {
 // boot after Memgraph is warmed up. Idempotent — replaces the whole
 // cache each call, so a future reload endpoint (if we add one) can
 // just re-invoke this without any teardown.
+// 2026-07-16 — one-off startup cleanup for any :User nodes lingering
+// in Memgraph. These predate today's retirement of DB-backed User
+// tracking (~42 had accumulated over server restarts + purge timers
+// that died with their process). Post-retirement no :User node is
+// ever created, so this runs each boot as a no-op maintenance step —
+// cheap and defensive. Uses label + DETACH DELETE only; no reliance
+// on the Memgraph id() function which has caused node/edge id
+// confusion in the past.
+async function purgeStaleUsers() {
+  const s = driver.session({ database: 'memgraph' });
+  try {
+    const r = await s.run('MATCH (u:User) DETACH DELETE u RETURN count(u) AS deleted');
+    const deleted = r.records[0]?.get('deleted') ?? 0;
+    const n = typeof deleted === 'number' ? deleted : Number(deleted);
+    if (n > 0) console.log(`[BD] Purged ${n} stale :User node(s) from Memgraph`);
+  } catch (err) {
+    console.error('[BD] purgeStaleUsers failed:', err.message);
+  } finally {
+    await s.close();
+  }
+}
+
 async function loadHelpers() {
   const s = driver.session({ database: 'memgraph' });
   try {
@@ -425,20 +448,11 @@ async function executePurge(userId) {
   }
   inChat.delete(userId);
   initialHelpersSent.delete(userId);
-  try {
-    const s = driver.session({ database: 'memgraph' });
-    try {
-      await s.run(
-        'MATCH (u:User {viewer_id: $uid}) DETACH DELETE u',
-        { uid: userId }
-      );
-      console.log(`[BD] User deleted: ${userId}`);
-    } finally {
-      await s.close();
-    }
-  } catch (err) {
-    console.error('[BD] User delete error:', err.message);
-  }
+  // 2026-07-16 — no longer any :User node to DETACH DELETE. viewer_id
+  // is now generated in-memory via crypto.randomUUID; the connect
+  // handler doesn't touch the DB. All ephemeral state above (sessions,
+  // pairedWith, inChat, initialHelpersSent) is Maps in this process.
+  console.log(`[BD] User purged: ${userId}`);
 }
 
 // --- Serialisation ---
@@ -518,29 +532,23 @@ io.on('connection', async (socket) => {
       console.log(`[BD] Recovered: ${userId}`);
     }
   } else {
-    // Fresh connection — create ephemeral User node in Memgraph.
-    // viewer_id = 'N_<memgraph integer id>' prevents any ID collision with
-    // corpus nodes (same N_ prefix rule as cf_ for edges).
-    socket.data.userId = null;
-    try {
-      const s = driver.session({ database: 'memgraph' });
-      try {
-        const result = await s.run(
-          'CREATE (u:User {created_at: datetime()}) ' +
-          "WITH u, 'N_' + toString(id(u)) AS vid " +
-          'SET u.viewer_id = vid ' +
-          'RETURN u.viewer_id AS viewer_id'
-        );
-        const viewer_id = result.records[0]?.get('viewer_id') ?? null;
-        socket.data.userId = viewer_id;
-        if (viewer_id) { sessions.set(viewer_id, socket); broadcastUserCount(); }
-        console.log(`[BD] User created: ${viewer_id}`);
-      } finally {
-        await s.close();
-      }
-    } catch (err) {
-      console.error('[BD] User create error:', err.message);
-    }
+    // Fresh connection — generate ephemeral viewer_id purely in memory.
+    // 2026-07-16 — retired the previous :User-node-in-Memgraph pattern
+    // (was `CREATE (u:User …) SET u.viewer_id = 'N_' + toString(id(u))`
+    // and relying on Memgraph's `id()` for uniqueness). The DB node was
+    // a means-to-an-end to inherit an id, and leaked across every
+    // server restart that killed a purge timer mid-flight — ~42 stale
+    // User nodes had accumulated. Now: no DB write on connect; the
+    // viewer_id is derived from crypto.randomUUID (globally unique,
+    // no id() footgun to worry about). Prefix 'N_' preserved for log
+    // grep continuity with older logs. Session state remains purely
+    // in-memory (sessions / pairedWith / inChat / initialHelpersSent),
+    // as it always was.
+    const viewer_id = 'N_' + crypto.randomUUID().split('-')[0];
+    socket.data.userId = viewer_id;
+    sessions.set(viewer_id, socket);
+    broadcastUserCount();
+    console.log(`[BD] User created: ${viewer_id}`);
   }
 
   // Socket.IO handles heartbeat/keepalive at the protocol layer — no need
