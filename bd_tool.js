@@ -33,11 +33,13 @@
 //       Sync a Helper-Messages .md file into Memgraph. See
 //       parseHelpersFile() for the format — briefly: `---` between
 //       blocks; each block uses @hub or @helper directives + a body
-//       (message text). Creates :HelperHub + :HelperMessage nodes
-//       with :CONTAINS_HELPER edges from hub to each message.
-//       URLs are auto-generated on create and WRITTEN BACK into the
-//       .md so the same file can drive future updates by url.
-//       Idempotent: rerun with the same file to no-op-update.
+//       (message text). Optional `@flag update_this: true|false`
+//       gates the UPDATE case: existing nodes are only updated when
+//       the block is flagged true (CREATE for new blocks is always
+//       applied regardless). Flags auto-reset to false after apply.
+//       Creates :HelperHub + :HelperMessage nodes with
+//       :CONTAINS_HELPER edges. URLs auto-generated on create and
+//       written back to the .md. Idempotent.
 //
 //   node bd_tool.js backup [<outPath>]
 //       Dump the entire Memgraph graph to a replayable .cypher file
@@ -279,36 +281,48 @@ const HUB_RE      = /^@hub\s+(\S+)\s*:\s*(.*)$/;
 const HELPER_RE   = /^@helper\s+(\S+)\s*:\s*(.*)$/;
 const URL_PREFIX  = 'butterflydreaming.org/n/';
 
+// Directive regex covers @hub, @helper, @flag, @end. @hub/@helper set or
+// assert the block kind; @flag modifies the current block regardless of
+// kind (goes into block.flags with its line index in block.flagLines).
+// @end is a soft terminator — recognised but no-op here.
+const DIRECTIVE_RE = /^@(hub|helper|flag|end)(?:\s+(\S+)\s*:\s*(.*))?$/;
+
 function parseHelpersFile(md) {
   const lines = md.split('\n');
   const blocks = [];
-  let cur = { kind: null, directives: {}, bodyLines: [], firstLine: 0, lastLine: -1, lastDirectiveLine: -1 };
+  const newBlock = () => ({
+    kind: null, directives: {}, flags: {}, flagLines: {},
+    bodyLines: [], firstLine: 0, lastLine: -1, lastDirectiveLine: -1,
+  });
+  let cur = newBlock();
   const flush = () => {
     if (cur.kind) blocks.push(cur);
-    cur = { kind: null, directives: {}, bodyLines: [], firstLine: 0, lastLine: -1, lastDirectiveLine: -1 };
+    cur = newBlock();
   };
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (DIVIDER_RE.test(line)) { flush(); cur.firstLine = i + 1; continue; }
-    const hub = line.match(HUB_RE);
-    const helper = line.match(HELPER_RE);
-    if (hub) {
-      if (cur.kind === 'helper') throw new Error(`line ${i + 1}: @hub inside a @helper block`);
-      cur.kind = 'hub';
-      cur.directives[hub[1]] = hub[2].trim();
+    const m = line.match(DIRECTIVE_RE);
+    if (!m) {
+      if (cur.kind) { cur.bodyLines.push(line); cur.lastLine = i; }
+      continue;
+    }
+    const [, dKind, key, inline] = m;
+    if (dKind === 'end') continue;
+    if (dKind === 'hub' || dKind === 'helper') {
+      if (cur.kind && cur.kind !== dKind) throw new Error(`line ${i + 1}: @${dKind} inside a @${cur.kind} block`);
+      cur.kind = dKind;
+      if (key) cur.directives[key] = (inline || '').trim();
       cur.lastDirectiveLine = i;
       cur.lastLine = i;
-    } else if (helper) {
-      if (cur.kind === 'hub') throw new Error(`line ${i + 1}: @helper inside a @hub block`);
-      cur.kind = 'helper';
-      cur.directives[helper[1]] = helper[2].trim();
+    } else if (dKind === 'flag') {
+      if (!cur.kind) throw new Error(`line ${i + 1}: @flag outside a block`);
+      if (!key) throw new Error(`line ${i + 1}: @flag missing key`);
+      cur.flags[key] = (inline || '').trim();
+      cur.flagLines[key] = i;
       cur.lastDirectiveLine = i;
-      cur.lastLine = i;
-    } else if (cur.kind) {
-      cur.bodyLines.push(line);
       cur.lastLine = i;
     }
-    // Non-directive lines outside a block (leading prose) are ignored
   }
   flush();
   const hub     = blocks.find(b => b.kind === 'hub')     || null;
@@ -325,14 +339,24 @@ function blockBody(block) {
 }
 
 async function syncHelpers(session, hub, helpers) {
+  // Flag rules (2026-07-16 late):
+  //   CREATE (node doesn't yet exist in DB) → always applied, regardless
+  //     of flag. Adding a new block to the .md just works.
+  //   UPDATE (node already exists in DB)   → only if @flag update_this
+  //     is 'true'. Otherwise skipped (record noted as skipped=true).
+  // After a successful CREATE or UPDATE, cmdSyncHelpers writes the
+  // flag back to false in the .md — prevents accidental re-apply and
+  // keeps the "flag = pending" invariant.
+  const flagVal = (block, key) => block.flags && block.flags[key];
+
   // ── Hub upsert ────────────────────────────────────────────────────
   if (!hub) throw new Error('helpers file has no @hub block');
   const hubName = hub.directives.name;
   if (!hubName) throw new Error('@hub is missing `name:`');
   let hubUrl  = hub.directives.url || null;
   let hubCreated = false;
+  let hubSkipped = false;
 
-  // Try url first, then name
   let hubNode = null;
   if (hubUrl) {
     const r = await session.run('MATCH (h:HelperHub {url: $url}) RETURN h LIMIT 2', { url: hubUrl });
@@ -345,6 +369,7 @@ async function syncHelpers(session, hub, helpers) {
     if (r.records.length === 1) hubNode = r.records[0].get('h');
   }
   if (!hubNode) {
+    // CREATE — always applied
     if (!hubUrl) hubUrl = URL_PREFIX + crypto.randomUUID();
     const r = await session.run(
       'CREATE (h:HelperHub {name: $name, url: $url}) RETURN h',
@@ -352,13 +377,17 @@ async function syncHelpers(session, hub, helpers) {
     );
     hubNode = r.records[0].get('h');
     hubCreated = true;
-  } else {
+  } else if (flagVal(hub, 'update_this') === 'true') {
+    // UPDATE — only if flagged
     hubUrl = hubNode.properties.url;
-    // Refresh name/url on the node (in case .md renamed the hub)
     await session.run(
       'MATCH (h:HelperHub {url: $url}) SET h.name = $name',
       { url: hubUrl, name: hubName }
     );
+  } else {
+    // SKIP — existing node, flag not true
+    hubUrl = hubNode.properties.url;
+    hubSkipped = true;
   }
 
   // ── Helper upserts + edges ────────────────────────────────────────
@@ -387,8 +416,10 @@ async function syncHelpers(session, hub, helpers) {
     }
 
     let created = false;
+    let skipped = false;
     let finalUrl = url;
     if (!hNode) {
+      // CREATE — always applied
       finalUrl = finalUrl || (URL_PREFIX + crypto.randomUUID());
       const r = await session.run(
         `CREATE (h:HelperMessage {url: $url, name: $name, title: $title, trigger: $trigger, text: $text}) RETURN h`,
@@ -396,41 +427,69 @@ async function syncHelpers(session, hub, helpers) {
       );
       hNode = r.records[0].get('h');
       created = true;
-    } else {
+    } else if (flagVal(block, 'update_this') === 'true') {
+      // UPDATE — only if flagged
       finalUrl = hNode.properties.url;
       await session.run(
         `MATCH (h:HelperMessage {url: $url})
          SET h.name = $name, h.title = $title, h.trigger = $trigger, h.text = $text`,
         { url: finalUrl, name, title, trigger, text }
       );
+    } else {
+      // SKIP — existing node, flag not true
+      finalUrl = hNode.properties.url;
+      skipped = true;
     }
 
-    // Ensure the hub → helper edge (MERGE is idempotent)
+    // Ensure the hub → helper edge unconditionally (MERGE is idempotent;
+    // even skipped blocks need the edge in case a prior sync failed
+    // between node create and edge merge).
     await session.run(
       `MATCH (hub:HelperHub {url: $hubUrl}), (h:HelperMessage {url: $hUrl})
        MERGE (hub)-[:CONTAINS_HELPER]->(h)`,
       { hubUrl, hUrl: finalUrl }
     );
 
-    helperResults.push({ block, name, title, trigger, url: finalUrl, created, textLen: text.length });
+    helperResults.push({ block, name, title, trigger, url: finalUrl, created, skipped, textLen: text.length });
   }
 
   return {
-    hub: { name: hubName, url: hubUrl, created: hubCreated },
+    hub: { name: hubName, url: hubUrl, created: hubCreated, skipped: hubSkipped },
     helpers: helperResults,
   };
 }
 
-// Insert `@<kind> url: <url>` right after the last directive line in
-// the given block, in the file's line array. Called after a create when
-// the block didn't already have a url directive.
-function insertUrlLine(lines, block, kind, url) {
-  const newLine = `@${kind} url: ${url}`;
-  const insertAt = block.lastDirectiveLine + 1;
-  lines.splice(insertAt, 0, newLine);
-  // Shift subsequent block line indices — cheap since we do it in one
-  // pass after all inserts are collected.
-  return newLine;
+// After a block was successfully created or updated in the DB, ensure
+// its `@flag update_this: false` line is present in the .md — either
+// replace an existing flag line in place (no line-index shift) or
+// insert alongside any new @<kind> url line. Called per-block during
+// the reverse-order write-back pass in cmdSyncHelpers.
+function writeBackBlock(lines, block, kind, result) {
+  const flagLineIdx = block.flagLines && block.flagLines.update_this;
+  const flagLineText = `@flag update_this: false`;
+
+  // Case A: existing flag line → replace in place (no shift). Safe
+  // regardless of the block's other write-back operations.
+  if (flagLineIdx !== undefined && flagLineIdx >= 0) {
+    if (lines[flagLineIdx] !== flagLineText) {
+      lines[flagLineIdx] = flagLineText;
+    }
+  }
+
+  // Case B (and only if URL is new): batch inserts to a single splice
+  // after the block's last directive line, so relative ordering of the
+  // new lines is preserved and we shift subsequent lines just once.
+  const newLines = [];
+  if (result.created && !block.directives.url) {
+    newLines.push(`@${kind} url: ${result.url}`);
+  }
+  if (!(flagLineIdx !== undefined && flagLineIdx >= 0)) {
+    // Flag didn't exist → insert one so future syncs know this block's flag state
+    newLines.push(flagLineText);
+  }
+  if (newLines.length) {
+    lines.splice(block.lastDirectiveLine + 1, 0, ...newLines);
+  }
 }
 
 async function cmdSyncHelpers(mdPath, opts) {
@@ -445,10 +504,15 @@ async function cmdSyncHelpers(mdPath, opts) {
   if (opts && opts.dryRun) {
     process.stderr.write('[bd_tool] --dry-run: no DB changes; no file write-back\n');
     return {
-      hub: { name: parsed.hub.directives.name, url: parsed.hub.directives.url || '(will generate)' },
+      hub: {
+        name: parsed.hub.directives.name,
+        url: parsed.hub.directives.url || '(will generate)',
+        flag: (parsed.hub.flags && parsed.hub.flags.update_this) || 'false',
+      },
       helpers: parsed.helpers.map(b => ({
         name: b.directives.name, title: b.directives.title, trigger: b.directives.trigger,
         url: b.directives.url || '(will generate)', textLen: blockBody(b).length,
+        flag: (b.flags && b.flags.update_this) || 'false',
       })),
       applied: false,
     };
@@ -456,41 +520,42 @@ async function cmdSyncHelpers(mdPath, opts) {
 
   const result = await runSession(s => syncHelpers(s, parsed.hub, parsed.helpers));
 
-  // Write-back generated URLs into the .md file, in reverse block order
-  // so earlier insertions don't shift later block line numbers.
+  // Write-back pass: for every block that was created OR updated (not
+  // skipped), reset flag → false in the .md, and insert @<kind> url:
+  // if newly created. Skipped blocks are untouched — they stay flagged
+  // whatever they were (typically already false).
+  //
+  // Process blocks in REVERSE lastDirectiveLine order so any new
+  // inserts in later blocks don't shift the line indices used by
+  // earlier blocks. writeBackBlock handles the flag-replace-vs-insert
+  // decision internally.
   const lines = parsed.lines.slice();
-  const pending = [];
-  if (result.hub.created && !parsed.hub.directives.url) {
-    pending.push({ block: parsed.hub, kind: 'hub', url: result.hub.url });
-  }
-  for (let i = 0; i < parsed.helpers.length; i++) {
-    const r = result.helpers[i];
-    const block = parsed.helpers[i];
-    if (r.created && !block.directives.url) {
-      pending.push({ block, kind: 'helper', url: r.url });
-    }
-  }
-  // Sort by insertion point descending so earlier inserts don't
-  // invalidate later ones
-  pending.sort((a, b) => b.block.lastDirectiveLine - a.block.lastDirectiveLine);
-  for (const p of pending) insertUrlLine(lines, p.block, p.kind, p.url);
+  const applied = [
+    ...(result.hub.skipped ? [] : [{ block: parsed.hub, kind: 'hub', result: result.hub }]),
+    ...parsed.helpers.map((b, i) => ({ block: b, kind: 'helper', result: result.helpers[i] }))
+      .filter(x => !x.result.skipped),
+  ];
+  applied.sort((a, b) => b.block.lastDirectiveLine - a.block.lastDirectiveLine);
+  for (const { block, kind, result: r } of applied) writeBackBlock(lines, block, kind, r);
 
-  if (pending.length > 0) {
+  const anyWriteBack = applied.length > 0;
+  if (anyWriteBack) {
     fs.writeFileSync(mdPath, lines.join('\n'), 'utf8');
-    process.stderr.write(`[bd_tool] sync-helpers: wrote ${pending.length} generated url(s) back to ${mdPath}\n`);
+    process.stderr.write(`[bd_tool] sync-helpers: wrote flag/url updates for ${applied.length} block(s) back to ${mdPath}\n`);
   }
 
   // Summary
   const createdCount = result.helpers.filter(h => h.created).length + (result.hub.created ? 1 : 0);
-  const updatedCount = result.helpers.filter(h => !h.created).length + (result.hub.created ? 0 : 1);
-  process.stderr.write(`[bd_tool] sync-helpers: created ${createdCount}, updated ${updatedCount}\n`);
+  const updatedCount = result.helpers.filter(h => !h.created && !h.skipped).length + (!result.hub.created && !result.hub.skipped ? 1 : 0);
+  const skippedCount = result.helpers.filter(h => h.skipped).length + (result.hub.skipped ? 1 : 0);
+  process.stderr.write(`[bd_tool] sync-helpers: created ${createdCount}, updated ${updatedCount}, skipped ${skippedCount}\n`);
 
   return {
     applied: true,
     hub: result.hub,
     helpers: result.helpers.map(h => ({
       name: h.name, title: h.title, trigger: h.trigger, url: h.url,
-      created: h.created, textLen: h.textLen,
+      created: h.created, skipped: h.skipped, textLen: h.textLen,
     })),
   };
 }
