@@ -238,7 +238,7 @@ const sessions    = new Map();  // userId → socket (Socket.IO Socket)
 let   waitingUser = null;        // { userId, socket } | null
 const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
-const howToSent   = new Set();  // userIds that have already received the how-to card this session
+const initialHelpersSent = new Set();  // userIds that have already received the boot-time helper batch (how-to + nav hint) this session
 
 // Post-Socket.IO migration (2026-07-13). Grace-period purge timers:
 // on disconnect we remove the user from `sessions` immediately (so
@@ -298,6 +298,14 @@ const PAIRED_TEXT =
   + 'Use the New Card button, type the message and then use the Send button. '
   + 'Watch out for a message back!';
 
+// 2026-07-16 — sent as Helper (0.2) at boot, right after the how-to.
+// Quick navigation-gesture reminder — the difference between "read a
+// node" (single tap/click) and "navigate into a node's neighbourhood"
+// (double tap/click) trips first-time users; this puts the rule where
+// they'll notice it while the graph is fresh on screen.
+const NAV_HINT_TEXT =
+  'Remember one click (or tap) to see a node\'s content. Double click (tap) it to hop about.';
+
 // Channel "open" requires both users paired AND both currently in chat mode.
 function channelOpen(userId) {
   const buddyId = pairedWith.get(userId);
@@ -312,10 +320,17 @@ function sendSystemCard(userId, text) {
   }
 }
 
-function sendHowToOnce(userId) {
-  if (howToSent.has(userId)) return;
-  howToSent.add(userId);
+// Sends the boot-time helper batch (how-to + nav hint) once per user
+// session. Cards are sent in order so labels land as:
+//   Helper (0.1) = HOW_TO_TEXT  (older, sits below in stack)
+//   Helper (0.2) = NAV_HINT_TEXT  (newer, sits above HOW_TO)
+// Then chat_ready fires → client creates Local (1) at the top. If more
+// initial-batch cards get added later, append them here in send order.
+function sendInitialHelpersOnce(userId) {
+  if (initialHelpersSent.has(userId)) return;
+  initialHelpersSent.add(userId);
   sendSystemCard(userId, HOW_TO_TEXT);
+  sendSystemCard(userId, NAV_HINT_TEXT);
 }
 
 // Current connection-status text for `userId`.
@@ -379,7 +394,7 @@ async function executePurge(userId) {
     }
   }
   inChat.delete(userId);
-  howToSent.delete(userId);
+  initialHelpersSent.delete(userId);
   try {
     const s = driver.session({ database: 'memgraph' });
     try {
@@ -619,7 +634,7 @@ io.on('connection', async (socket) => {
       if (msg.type === 'enter_chat') {
         if (!socket.data.userId) return;
         inChat.set(socket.data.userId, true);
-        sendHowToOnce(socket.data.userId);
+        sendInitialHelpersOnce(socket.data.userId);
         // 2026-07-16 — status-card at enter_chat removed. Was sending
         // "Partner not available — please wait." unconditionally at
         // boot to every user (Helper (0.2)). Under always-on-chat that
