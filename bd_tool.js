@@ -577,6 +577,71 @@ function defaultBackupPath() {
   return path.join('backups', `memgraph_${stamp}.cypher`);
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// backfill-urls — assign a `butterflydreaming.org/n/<uuid>` url property
+// to every node of the given labels that doesn't already have one
+// (2026-07-16). Corpus-wide UUID identity backfill; needed because
+// most Clusters + some Families predate the url convention that
+// migrate_mm1.js introduced for TextNodes.
+//
+// Strategy: query candidates, generate uuids in JS (one per node),
+// SET them in a single UNWIND'd statement. Identity via Neo4j
+// elementId — reliable string round-trip. The URL guard on the
+// SET (`AND (n.url IS NULL OR n.url = '')`) is a small race-condition
+// safeguard against parallel writes.
+// ─────────────────────────────────────────────────────────────────────
+
+async function cmdBackfillUrls(labels, opts) {
+  return runSession(async (s) => {
+    // Note on Memgraph identifiers (2026-07-16): Memgraph doesn't
+    // implement Neo4j's elementId(); use id() instead. id() returns
+    // a numeric id that CAN collide with a relationship's id (they
+    // share a numeric space) — so ALWAYS scope MATCH to nodes via
+    // the (n) pattern rather than trying to match any element with
+    // WHERE id() = X. The (n) pattern's node-only constraint
+    // prevents any relationship match slipping through.
+    const findRes = await s.run(
+      `MATCH (n)
+       WHERE ANY(l IN labels(n) WHERE l IN $labels)
+         AND (n.url IS NULL OR n.url = '')
+       RETURN id(n) AS nid, labels(n) AS labels, n.name AS name
+       ORDER BY labels(n)[0], n.name`,
+      { labels }
+    );
+    const candidates = findRes.records.map(r => ({
+      nid:    r.get('nid'),   // plain JS number (disableLosslessIntegers)
+      labels: r.get('labels'),
+      name:   r.get('name'),
+    }));
+    if (candidates.length === 0) {
+      process.stderr.write(`[bd_tool] backfill-urls: no nodes without url in labels ${labels.join(',')} — nothing to do\n`);
+      return { candidates: 0, updated: 0, applied: !opts?.dryRun };
+    }
+    process.stderr.write(`[bd_tool] backfill-urls: ${candidates.length} candidate node(s) in labels ${labels.join(',')}\n`);
+    if (opts && opts.dryRun) {
+      process.stderr.write('[bd_tool] --dry-run: no writes\n');
+      return { candidates: candidates.length, updated: 0, applied: false, sample: candidates.slice(0, 10) };
+    }
+    const updates = candidates.map(c => ({ nid: c.nid, url: URL_PREFIX + crypto.randomUUID() }));
+    const updRes = await s.run(
+      `UNWIND $updates AS row
+       MATCH (n) WHERE id(n) = row.nid AND (n.url IS NULL OR n.url = '')
+       SET n.url = row.url
+       RETURN count(n) AS updated`,
+      { updates }
+    );
+    const raw = updRes.records[0].get('updated');
+    const updated = typeof raw === 'number' ? raw : Number(raw);
+    process.stderr.write(`[bd_tool] backfill-urls: SET url on ${updated} node(s)\n`);
+    return {
+      candidates: candidates.length,
+      updated,
+      applied: true,
+      labels,
+    };
+  });
+}
+
 async function cmdBackup(outPath) {
   const target = outPath || defaultBackupPath();
   const dir = path.dirname(target);
@@ -616,6 +681,7 @@ Usage:
   node bd_tool.js write <patch.md> [--dry-run]
   node bd_tool.js sync-helpers <helpers.md> [--dry-run]
   node bd_tool.js backup [<outPath>]
+  node bd_tool.js backfill-urls [--dry-run] [--labels L1,L2]
 
 Results are JSON on stdout. Progress + errors on stderr.
 `);
@@ -664,6 +730,20 @@ async function main() {
   } else if (cmd === 'backup') {
     const outPath = args.find(a => !a.startsWith('--'));
     out = await cmdBackup(outPath);
+  } else if (cmd === 'backfill-urls') {
+    const dryRun = args.includes('--dry-run');
+    let labels = ['Cluster', 'Family'];
+    // Accept --labels=X,Y or --labels X,Y
+    const eqArg = args.find(a => a.startsWith('--labels='));
+    if (eqArg) {
+      labels = eqArg.slice('--labels='.length).split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      const li = args.indexOf('--labels');
+      if (li !== -1 && args[li + 1]) {
+        labels = args[li + 1].split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+    out = await cmdBackfillUrls(labels, { dryRun });
   } else {
     process.stderr.write(`unknown subcommand: ${cmd}\n`);
     printHelp();
