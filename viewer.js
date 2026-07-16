@@ -1577,6 +1577,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const prefix = `Node: ${meta.name}\n`;
         if (text.startsWith(prefix)) text = text.slice(prefix.length);
       }
+      // 2026-07-16 — ensure any %%bd_ai_read [ … %%bd_] block inside the
+      // incoming text sits on its own paragraph. Without this the
+      // bot-context block is hard to parse from the surrounding body text
+      // when the whole thing lands in a chat card. Blank lines are
+      // inserted before AND after every match; adjacent runs of newlines
+      // are collapsed back to a single blank line so paragraph breaks
+      // stay uniform. Leading/trailing whitespace trimmed.
+      text = text
+        .replace(/(\s*)(%%bd_ai_read \[[\s\S]*?%%bd_\])(\s*)/g, '\n\n$2\n\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/^\s+|\s+$/g, '');
       setChatText(text);
     } else {
       setSystemText(content, meta);
@@ -1782,18 +1793,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function appendToCard(card, content) {
     if (!card) return;
+    // 2026-07-16 — separator between accumulated inserts is now a blank
+    // line (\n\n) not a single newline. Strict-append with no delimiter
+    // was hard to read when multiple node-taps piled up in one card;
+    // paragraph breaks make each insert scannable. Trailing newlines on
+    // the previous content are trimmed so the separator is clean.
+    const separator = '\n\n';
     if (card.kind === 'local') {
-      const current  = card.body.value.replace(/\n{2,}$/, '\n');
-      const insertAt = current.length > 0 ? current.length + 1 : 0;
-      card.body.value = current.length > 0 ? current + '\n' + content : content;
+      const current  = card.body.value.replace(/\n+$/, '');
+      const prefix   = current.length > 0 ? current + separator : '';
+      const insertAt = prefix.length;
+      card.body.value = prefix + content;
       card.text = card.body.value;
       // Cursor at the start of the inserted text. No focus() — that would
       // pop up the iOS keyboard on every node click.
       try { card.body.setSelectionRange(insertAt, insertAt); } catch (_) {}
       scrollTextareaToInsertPoint(card.body, insertAt);
     } else {
-      const current = card.body.textContent.replace(/\n{2,}$/, '\n');
-      card.body.textContent = current.length > 0 ? current + '\n' + content : content;
+      const current = card.body.textContent.replace(/\n+$/, '');
+      const prefix  = current.length > 0 ? current + separator : '';
+      card.body.textContent = prefix + content;
       card.text = card.body.textContent;
     }
     // Programmatic value assignment doesn't fire 'input' — re-evaluate Send.
