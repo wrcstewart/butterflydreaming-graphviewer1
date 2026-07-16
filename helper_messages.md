@@ -61,9 +61,7 @@ Remember one click (or tap) to see a node's content. Double click (tap) it to ho
 @helper trigger: user pressed Join Remote and no partner is currently waiting to pair
 @helper url: butterflydreaming.org/n/b0fffca7-80ec-4b28-b696-a57325fe5575
 
-No Remote Partner currently waiting to pair — to be expected as
-
-Butterfly Dreaming is a new initiative. If someone remote presses Join you will be paired automatically. In the meantime your messages will receive special attention from myself (Helper) or you can use another browser to simulate a remote partner.
+No Remote Partner currently waiting to pair — to be expected as Butterfly Dreaming is a new initiative. If someone remote presses Join you will be paired automatically. In the meantime your messages will receive special attention from myself (Helper) or you can use another browser to simulate a remote partner.
 
 ---
 
