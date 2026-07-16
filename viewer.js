@@ -3765,9 +3765,9 @@ async function init() {
     // 2026-07-16 — idle label kept as "Join Remote" so it lines up with
     // the NO_PARTNER_WAITING_TEXT helper copy on the server ("If someone
     // remote presses Join you will be paired automatically"). Toggled
-    // state reads "Local Only" — state-oriented framing, matches the
-    // Local / Helper / Remote card vocabulary.
-    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Local Only' : 'Join Remote';
+    // state reads "Say: Bye" — a farewell prompt rather than a state
+    // label, framing the button press as a courtesy send-off.
+    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Say: Bye' : 'Join Remote';
   }
 
   function togglePair() {
@@ -4343,7 +4343,7 @@ async function init() {
   //     Copy Down press — that gate is independent)
   //   - Pair-toggle button starts labelled "Join Remote"; togglePair +
   //     the pair-state message handlers below keep the label in sync
-  //     (Join Remote ↔ Local Only, per updateJoinButtonLabel)
+  //     (Join Remote ↔ Say: Bye, per updateJoinButtonLabel)
   chatPanel.classList.add('active');
   chatBtn.classList.add('active');
   chatBtn.textContent = 'Join Remote';
