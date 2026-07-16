@@ -1678,7 +1678,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     headLabel.textContent = label !== undefined
       ? label
       : kind === 'local'  ? ('Local (' + serial + ')')
-      : kind === 'system' ? 'System'
+      : kind === 'system' ? 'Helper'
       :                     'Remote';
     head.appendChild(headLabel);
 
@@ -1834,18 +1834,33 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
+  // Per-local-card counter for inbound helper (system) messages —
+  // mirrors receivedCountByN for Remote cards. Frozen at receipt:
+  // numbering reflects the top local at the moment the message arrived,
+  // not whatever the top local is now.
+  const helperCountByN = new Map();
+
   // Inbound system card (server-emitted). Two-mode placement so A and B end
   // up with the same shape after first pair-up:
   //   - Initial batch (before chat_ready): no visible local exists yet, so
   //     createCard's prepend leaves the system card at the top of the stack.
-  //     handleChatReady's N=1 then lands above it naturally.
+  //     handleChatReady's Local (1) then lands above it naturally.
   //   - Later batch (after chat_ready, e.g. "Partner joined chat"): a visible
   //     local exists, so we dock the new system card immediately below it.
-  //     The user's compose card stays pinned at the top; status notifications
-  //     accumulate beneath it (newest closest to N=k).
+  //     The user's compose card stays pinned at the top; helper notifications
+  //     accumulate beneath it (newest closest to the top local).
   // Partner cards (prependPartnerCard) keep strict newest-on-top.
+  //
+  // 2026-07-16 — head label now "Helper (N.M)" matching Remote's scheme:
+  // N = top-local serial at receipt (0 for boot-time messages that arrive
+  // before Local (1) exists), M = per-N counter. Semantically consistent
+  // with Remote; positions helpers to take on a broader advisory / bot
+  // role over time.
   function prependSystemCard(text) {
-    const sys = createCard({ kind: 'system' });
+    const parentN = topLocalCard() ? topLocalCard().serial : 0;
+    const m = (helperCountByN.get(parentN) || 0) + 1;
+    helperCountByN.set(parentN, m);
+    const sys = createCard({ kind: 'system', label: 'Helper (' + parentN + '.' + m + ')' });
     if (!sys) return;
     if (sys.body) {
       sys.body.textContent = text;
