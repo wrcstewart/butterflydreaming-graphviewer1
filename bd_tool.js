@@ -39,6 +39,14 @@
 //       .md so the same file can drive future updates by url.
 //       Idempotent: rerun with the same file to no-op-update.
 //
+//   node bd_tool.js backup [<outPath>]
+//       Dump the entire Memgraph graph to a replayable .cypher file
+//       via `DUMP DATABASE`. Default output path is
+//       backups/memgraph_YYYY-MM-DD_HHMMSS.cypher (creates the
+//       backups/ dir if missing). To restore, pipe the file into
+//       mgconsole (or run its statements through a fresh Memgraph
+//       session). Portable, human-readable, versionable.
+//
 // The tool always writes results as JSON to stdout so the caller
 // (human or agent) can pipe / parse. Errors + progress to stderr.
 
@@ -487,6 +495,51 @@ async function cmdSyncHelpers(mdPath, opts) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// backup — dump the whole graph to a replayable .cypher file
+// (2026-07-16). Uses Memgraph's `DUMP DATABASE` which returns a
+// sequence of records each carrying one Cypher statement in the
+// QUERY column. Joining those with ';\n' produces a script you can
+// pipe into mgconsole against a fresh instance to restore.
+// ─────────────────────────────────────────────────────────────────────
+
+function defaultBackupPath() {
+  // YYYY-MM-DD_HHMMSS without punctuation that trips shells
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_` +
+                `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return path.join('backups', `memgraph_${stamp}.cypher`);
+}
+
+async function cmdBackup(outPath) {
+  const target = outPath || defaultBackupPath();
+  const dir = path.dirname(target);
+  if (dir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  process.stderr.write(`[bd_tool] backup: dumping graph → ${target}\n`);
+  const rows = await runSession(async (s) => {
+    const r = await s.run('DUMP DATABASE');
+    return r.records.map(rec => {
+      // Memgraph DUMP DATABASE returns records with a 'QUERY' column
+      // holding one Cypher statement per row.
+      const q = rec.get('QUERY') !== undefined ? rec.get('QUERY') :
+                rec.get('query') !== undefined ? rec.get('query') :
+                null;
+      return q;
+    }).filter(Boolean);
+  });
+
+  // Assemble as a script — one statement per line, terminated with ;.
+  // Statements from DUMP DATABASE don't include trailing ; themselves.
+  const script = rows.map(q => q.endsWith(';') ? q : q + ';').join('\n') + '\n';
+  fs.writeFileSync(target, script, 'utf8');
+  const stat = fs.statSync(target);
+
+  process.stderr.write(`[bd_tool] backup: wrote ${rows.length} statements, ${stat.size} bytes\n`);
+  return { path: target, statements: rows.length, bytes: stat.size };
+}
+
 function printHelp() {
   process.stderr.write(`bd_tool.js — Direct Memgraph read/write for BD dev workflows.
 
@@ -497,6 +550,7 @@ Usage:
   node bd_tool.js cypher <query> [<paramsJSON>]
   node bd_tool.js write <patch.md> [--dry-run]
   node bd_tool.js sync-helpers <helpers.md> [--dry-run]
+  node bd_tool.js backup [<outPath>]
 
 Results are JSON on stdout. Progress + errors on stderr.
 `);
@@ -542,6 +596,9 @@ async function main() {
     if (!mdPath) { process.stderr.write('sync-helpers: helpers.md path required\n'); process.exit(1); }
     const dryRun = args.includes('--dry-run');
     out = await cmdSyncHelpers(mdPath, { dryRun });
+  } else if (cmd === 'backup') {
+    const outPath = args.find(a => !a.startsWith('--'));
+    out = await cmdBackup(outPath);
   } else {
     process.stderr.write(`unknown subcommand: ${cmd}\n`);
     printHelp();
