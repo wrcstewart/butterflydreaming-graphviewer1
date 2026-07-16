@@ -1840,22 +1840,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // not whatever the top local is now.
   const helperCountByN = new Map();
 
-  // Inbound system card (server-emitted). Two-mode placement so A and B end
-  // up with the same shape after first pair-up:
-  //   - Initial batch (before chat_ready): no visible local exists yet, so
-  //     createCard's prepend leaves the system card at the top of the stack.
-  //     handleChatReady's Local (1) then lands above it naturally.
-  //   - Later batch (after chat_ready, e.g. "Partner joined chat"): a visible
-  //     local exists, so we dock the new system card immediately below it.
-  //     The user's compose card stays pinned at the top; helper notifications
-  //     accumulate beneath it (newest closest to the top local).
-  // Partner cards (prependPartnerCard) keep strict newest-on-top.
+  // Inbound helper card (server-emitted). Strict newest-on-top, same as
+  // Local and Remote cards — createCard's prepend puts the new helper at
+  // the top of the stack.
   //
-  // 2026-07-16 — head label now "Helper (N.M)" matching Remote's scheme:
-  // N = top-local serial at receipt (0 for boot-time messages that arrive
-  // before Local (1) exists), M = per-N counter. Semantically consistent
-  // with Remote; positions helpers to take on a broader advisory / bot
-  // role over time.
+  // Head label "Helper (N.M)": N = top-local serial at receipt (0 for
+  // boot-time messages that arrive before Local (1) exists), M = per-N
+  // counter. Same scheme as Remote (N.M) — see prependPartnerCard.
+  //
+  // 2026-07-16 (late) — dropped the previous "dock below top local"
+  // rule. That was legacy A/B-symmetry logic from when helpers were a
+  // narrow status-notification channel; under the newer advisory /
+  // AI-bot role a helper arriving now IS the most relevant card and
+  // should read where the user's eye naturally lands (top). Also
+  // matches user's mental model — "newer messages float up".
   function prependSystemCard(text) {
     const parentN = topLocalCard() ? topLocalCard().serial : 0;
     const m = (helperCountByN.get(parentN) || 0) + 1;
@@ -1865,10 +1863,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (sys.body) {
       sys.body.textContent = text;
       sys.text = text;
-    }
-    const top = topVisibleLocalCard();
-    if (top && top.el && top.el !== sys.el) {
-      top.el.after(sys.el);
     }
   }
 
