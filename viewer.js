@@ -1577,17 +1577,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const prefix = `Node: ${meta.name}\n`;
         if (text.startsWith(prefix)) text = text.slice(prefix.length);
       }
-      // 2026-07-16 — ensure any %%bd_ai_read [ … %%bd_] block inside the
-      // incoming text sits on its own paragraph. Without this the
-      // bot-context block is hard to parse from the surrounding body text
-      // when the whole thing lands in a chat card. Blank lines are
-      // inserted before AND after every match; adjacent runs of newlines
-      // are collapsed back to a single blank line so paragraph breaks
-      // stay uniform. Leading/trailing whitespace trimmed.
-      text = text
-        .replace(/(\s*)(%%bd_ai_read \[[\s\S]*?%%bd_\])(\s*)/g, '\n\n$2\n\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/^\s+|\s+$/g, '');
+      // 2026-07-16 — bot-context handling on chat inserts, mirroring
+      // setSystemText's default-panel fork (bot_context.md §4.1):
+      //   - Paragraph-normalise the block FIRST (works on the canonical
+      //     %%bd_ai_read [ … %%bd_] form). Blank lines added before AND
+      //     after so the block reads as its own paragraph when it lands
+      //     in a chat card.
+      //   - THEN apply the curator/user fork against #dev-code (§4.3):
+      //       curator view → unnormalizeBotBlocks → block stays as [ … ]
+      //       ordinary view → stripBotBlocks → block removed entirely
+      //   - Collapse any 3+ run of newlines that either transformation
+      //     may leave behind (e.g. strip leaves the blank lines where
+      //     the block used to be) and trim edges.
+      text = text.replace(/(\s*)(%%bd_ai_read \[[\s\S]*?%%bd_\])(\s*)/g, '\n\n$2\n\n');
+      const devCodeEl = document.getElementById('dev-code');
+      const curatorView = !!(devCodeEl && devCodeEl.value.trim());
+      text = curatorView ? unnormalizeBotBlocks(text) : stripBotBlocks(text);
+      text = text.replace(/\n{3,}/g, '\n\n').replace(/^\s+|\s+$/g, '');
       setChatText(text);
     } else {
       setSystemText(content, meta);
