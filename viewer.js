@@ -80,7 +80,8 @@ let chatModeActive         = true;   // 2026-07-15 — always on; chat panel is 
 let chatStackEl            = null;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;     // unique id counter across all kinds
-let nextLocalSerial        = 1;     // N=k label counter — only locals consume it
+let nextLocalSerial        = 1;     // "Local (k)" label counter — only locals consume it
+let nextReceivedSerial     = 1;     // "Remote (k)" label counter — bumped once per prependPartnerCard
 let defaultStackEl         = null;    // #default-stack — central system-message hub
 let currentCopyText        = null;    // most recently copied text — survives until next copy
 let currentCopyRange       = null;    // { cardId, from, to } of the source range
@@ -1677,9 +1678,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     headLabel.className = 'card-head-label';
     headLabel.textContent = label !== undefined
       ? label
-      : kind === 'local'  ? ('N=' + serial)
+      : kind === 'local'  ? ('Local (' + serial + ')')
       : kind === 'system' ? 'System'
-      :                     'C';
+      :                     'Remote';
     head.appendChild(headLabel);
 
     const body = kind === 'local'
@@ -1875,25 +1876,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     createCard({ kind: 'local' });
   }
 
-  // Per-local-card counter for inbound partner messages (communications.md §4.1).
-  // Frozen at receipt: numbering reflects the top local at the moment the message
-  // arrived, not whatever the top local is now.
-  const receivedCountByN = new Map();
-
-  // Inbound partner card (server-relayed). Teal, non-editable, head label `N.M`.
-  // Newest on top — createCard's prepend puts it at the absolute top of the
-  // stack. N is the *label* (top local serial at receipt), not a positional
-  // anchor (communications.md §4.1).
+  // Inbound partner card (server-relayed). Teal, non-editable, head label
+  // "Remote (k)" where k is a simple linear counter over inbound messages
+  // in this session. Newest on top — createCard's prepend puts it at the
+  // absolute top of the stack.
+  //
+  // 2026-07-16 — was `N.M` (top-local serial at receipt × per-N counter,
+  // communications.md §4.1). User wanted a less mathematical head. Simple
+  // linear counter loses the "tied to the compose card I was on" association
+  // but reads naturally alongside "Local (k)" heads.
   function prependPartnerCard(text) {
     if (!topLocalCard()) {
       // ensureLocalCard makes this unreachable in practice, but degrade gracefully.
       createCard({ kind: 'local' });
     }
-    const top = topLocalCard();
-    const parentN = top ? top.serial : 0;
-    const m = (receivedCountByN.get(parentN) || 0) + 1;
-    receivedCountByN.set(parentN, m);
-    const rcv = createCard({ kind: 'received', label: parentN + '.' + m });
+    const rcv = createCard({ kind: 'received', label: 'Remote (' + (nextReceivedSerial++) + ')' });
     if (!rcv) return;
     if (rcv.body) {
       rcv.body.textContent = text;
