@@ -20,14 +20,16 @@
 //       guardrails, so double-check the query before pasting.
 //
 //   node bd_tool.js write <patch.md> [--dry-run]
-//       Apply a patch defined in a markdown doc. Format is documented
-//       inline with parsePatch() below — briefly: @match <key>: <value>
-//       lines pick the target node (url preferred, then name); @set
-//       <prop>: <value> writes a property, single-line inline OR
-//       multi-line up to the next @ directive. Prose / headers around
-//       these lines is ignored so the .md reads as a normal doc.
-//       Refuses ambiguous @match (>1 hit) and no-match. --dry-run
-//       previews without writing.
+//       Apply patches defined in a markdown doc. File is one or many
+//       blocks separated by `---` on a line. Each block uses
+//       @match <key>: <value> to pick the target node (url > name >
+//       title priority), @set <prop>: <value> to write properties
+//       (single-line inline OR multi-line up to next @ directive),
+//       and OPTIONAL @flag update_this: true|false to gate the
+//       apply (default false = skip; blocks without the flag are
+//       skipped). Flags auto-reset to false after apply — the file
+//       becomes an idempotent "no pending edits" state.
+//       Refuses ambiguous @match. --dry-run previews.
 //
 //   node bd_tool.js sync-helpers <helpers.md> [--dry-run]
 //       Sync a Helper-Messages .md file into Memgraph. See
@@ -160,95 +162,179 @@ async function cmdCypher(query, params) {
   });
 }
 
-// Parse a .md patch file into { match, set } dicts.
+// Parse a .md patch file — one or many blocks, separated by `---` on
+// a line by itself.
 //
 // Recognised directives (line-anchored, `@` in column 0):
-//   @match <key>: <value>     identity criterion (repeatable)
-//   @set   <prop>: <value>    single-line property write
-//   @set   <prop>:            multi-line property write; content is
-//                             every following line up to the next
-//                             `@match` / `@set` / `@end` / EOF
-//   @end                      optionally terminates a multi-line block
+//   @match <key>: <value>        identity criterion (repeatable per block)
+//   @set   <prop>: <value>       single-line property write
+//   @set   <prop>:               multi-line property write; content is
+//                                every following line up to the next
+//                                `@match` / `@set` / `@flag` / `@end` / EOF
+//   @flag  update_this: true|false  gate the UPDATE (default false = skip)
+//   @end                         optionally terminates a multi-line block
 //
-// All other lines (markdown prose, headers, blank lines) are ignored
+// All other lines (markdown prose, headers, blank lines) are ignored,
 // so the file reads as a normal .md doc explaining WHAT + WHY.
-function parsePatch(md) {
-  const match = {};
-  const set = {};
+// Blocks lacking @match are treated as prose and dropped.
+function parsePatchesFile(md) {
   const lines = md.split('\n');
-  const dirRe = /^@(match|set|end)(?:\s+(\S+)\s*:\s*(.*))?$/;
-  let i = 0;
-  while (i < lines.length) {
-    const m = lines[i].match(dirRe);
-    if (!m) { i++; continue; }
+  const patches = [];
+  const DIRECTIVE = /^@(match|set|flag|end)(?:\s+(\S+)\s*:\s*(.*))?$/;
+
+  const newPatch = () => ({
+    match: {}, set: {}, flags: {}, flagLines: {},
+    setBodyName: null, setBodyLines: null,  // for the currently-open multi-line @set
+    lastDirectiveLine: -1, lastLine: -1, firstLine: 0,
+  });
+  let cur = newPatch();
+  const closeSetBody = () => {
+    if (cur.setBodyName !== null) {
+      const b = cur.setBodyLines.slice();
+      while (b.length && !b[0].trim())              b.shift();
+      while (b.length && !b[b.length - 1].trim())   b.pop();
+      cur.set[cur.setBodyName] = b.join('\n');
+      cur.setBodyName = null;
+      cur.setBodyLines = null;
+    }
+  };
+  const flush = () => {
+    closeSetBody();
+    if (Object.keys(cur.match).length > 0 || Object.keys(cur.set).length > 0) {
+      patches.push(cur);
+    }
+    cur = newPatch();
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (DIVIDER_RE.test(line)) { flush(); cur.firstLine = i + 1; continue; }
+    const m = line.match(DIRECTIVE);
+    if (!m) {
+      if (cur.setBodyName !== null) { cur.setBodyLines.push(line); cur.lastLine = i; }
+      continue;   // prose lines outside a multi-line body are ignored
+    }
+    // Any directive terminates a pending multi-line body
+    closeSetBody();
     const [, kind, key, inline] = m;
-    if (kind === 'end') { i++; continue; }
-    if (!key) throw new Error(`@${kind} at line ${i + 1} missing key`);
+    if (kind === 'end') continue;
+    if (!key) throw new Error(`line ${i + 1}: @${kind} missing key`);
     if (kind === 'match') {
-      match[key] = (inline || '').trim();
-      i++;
-    } else {   // set
+      cur.match[key] = (inline || '').trim();
+      cur.lastDirectiveLine = i; cur.lastLine = i;
+    } else if (kind === 'flag') {
+      cur.flags[key] = (inline || '').trim();
+      cur.flagLines[key] = i;
+      cur.lastDirectiveLine = i; cur.lastLine = i;
+    } else if (kind === 'set') {
       if (inline && inline.trim()) {
-        set[key] = inline.trim();
-        i++;
+        cur.set[key] = inline.trim();
       } else {
-        i++;
-        const buf = [];
-        while (i < lines.length && !dirRe.test(lines[i])) {
-          buf.push(lines[i]);
-          i++;
-        }
-        while (buf.length && !buf[0].trim())            buf.shift();
-        while (buf.length && !buf[buf.length - 1].trim()) buf.pop();
-        set[key] = buf.join('\n');
+        cur.setBodyName = key;
+        cur.setBodyLines = [];
       }
+      cur.lastDirectiveLine = i; cur.lastLine = i;
     }
   }
-  return { match, set };
+  flush();
+  return { patches, lines };
 }
 
 async function cmdWrite(patchPath, opts) {
   if (!fs.existsSync(patchPath)) throw new Error(`patch file not found: ${patchPath}`);
   const md = fs.readFileSync(patchPath, 'utf8');
-  const { match, set } = parsePatch(md);
-  if (Object.keys(match).length === 0) throw new Error('patch has no @match directives');
-  if (Object.keys(set).length   === 0) throw new Error('patch has no @set directives');
-  return runSession(async (s) => {
-    // Resolve identity — prefer url, fall back to name. Any single-hit
-    // wins. Multi-hit is refused as ambiguous. Add more criteria later
-    // if a use case arises; for now url + name cover it.
-    let target = null;
-    let matchedBy = null;
-    for (const key of ['url', 'name']) {
-      if (!match[key]) continue;
-      const r = await s.run(
-        `MATCH (n {${key}: $val}) RETURN n LIMIT 2`,
-        { val: match[key] }
+  const parsed = parsePatchesFile(md);
+  if (parsed.patches.length === 0) throw new Error('patch file has no @match/@set blocks');
+
+  process.stderr.write(`[bd_tool] write: found ${parsed.patches.length} patch block(s)\n`);
+
+  if (opts && opts.dryRun) {
+    process.stderr.write('[bd_tool] --dry-run: no DB changes; no file write-back\n');
+    return {
+      patches: parsed.patches.map(p => ({
+        match: p.match, setKeys: Object.keys(p.set),
+        flag: (p.flags && p.flags.update_this) || 'false',
+      })),
+      applied: false,
+    };
+  }
+
+  const results = await runSession(async (s) => {
+    const arr = [];
+    for (const patch of parsed.patches) {
+      if (Object.keys(patch.match).length === 0) {
+        arr.push({ patch, skipped: true, reason: 'no @match' });
+        continue;
+      }
+      if (Object.keys(patch.set).length === 0) {
+        arr.push({ patch, skipped: true, reason: 'no @set' });
+        continue;
+      }
+      const flag = patch.flags && patch.flags.update_this;
+      if (flag !== 'true') {
+        arr.push({ patch, skipped: true, reason: 'flag not true' });
+        continue;
+      }
+      // Identity: url > name > title. Each attempted in order; single-hit wins.
+      let matchedBy = null;
+      let target = null;
+      for (const key of ['url', 'name', 'title']) {
+        if (!patch.match[key]) continue;
+        const r = await s.run(`MATCH (n {${key}: $val}) RETURN n LIMIT 2`, { val: patch.match[key] });
+        if (r.records.length === 0) continue;
+        if (r.records.length > 1) throw new Error(`match.${key} = "${patch.match[key]}" is ambiguous`);
+        target = r.records[0].get('n');
+        matchedBy = key;
+        break;
+      }
+      if (!target) {
+        throw new Error(`no node matched — tried: ${Object.entries(patch.match).map(([k, v]) => `${k}="${v}"`).join(', ')}`);
+      }
+      const upd = await s.run(
+        `MATCH (n {${matchedBy}: $val}) SET n += $set RETURN n`,
+        { val: patch.match[matchedBy], set: patch.set }
       );
-      if (r.records.length === 0) continue;
-      if (r.records.length > 1) throw new Error(`match.${key} = "${match[key]}" is ambiguous (>1 node)`);
-      target = nodeToObject(r.records[0].get('n'));
-      matchedBy = key;
-      break;
+      arr.push({ patch, applied: true, matchedBy, after: nodeToObject(upd.records[0].get('n')) });
     }
-    if (!target) throw new Error(
-      `no node matched — tried: ${Object.entries(match).map(([k, v]) => `${k}="${v}"`).join(', ')}`
-    );
-    process.stderr.write(`[bd_tool] write: matched by ${matchedBy}; ` +
-      `${target.labels.join(':')} elementId=${target.elementId}\n`);
-    process.stderr.write(`[bd_tool] write: setting ${Object.keys(set).join(', ')}\n`);
-    if (opts && opts.dryRun) {
-      process.stderr.write('[bd_tool] --dry-run: no changes applied\n');
-      return { target, set, applied: false };
-    }
-    // Bind by the same key we matched with, inside a fresh MATCH — so
-    // the write survives even if the SET changes n.url or n.name.
-    const upd = await s.run(
-      `MATCH (n {${matchedBy}: $val}) SET n += $set RETURN n`,
-      { val: match[matchedBy], set }
-    );
-    return { applied: true, matchedBy, before: target, after: nodeToObject(upd.records[0].get('n')) };
+    return arr;
   });
+
+  // Write-back: reset @flag update_this to false for every applied block.
+  // Existing flag lines get replaced in place (no shift); missing flag
+  // lines get inserted after the last directive. Process applied blocks
+  // in reverse lastDirectiveLine order so later-block inserts don't
+  // shift earlier-block indices.
+  const applied = results.filter(r => r.applied);
+  if (applied.length > 0) {
+    const lines = parsed.lines.slice();
+    const sorted = applied.slice().sort((a, b) => b.patch.lastDirectiveLine - a.patch.lastDirectiveLine);
+    for (const r of sorted) {
+      const flagLineText = '@flag update_this: false';
+      const flagIdx = r.patch.flagLines && r.patch.flagLines.update_this;
+      if (flagIdx !== undefined && flagIdx >= 0) {
+        if (lines[flagIdx] !== flagLineText) lines[flagIdx] = flagLineText;
+      } else {
+        lines.splice(r.patch.lastDirectiveLine + 1, 0, flagLineText);
+      }
+    }
+    fs.writeFileSync(patchPath, lines.join('\n'), 'utf8');
+    process.stderr.write(`[bd_tool] write: reset flag on ${applied.length} block(s) in ${patchPath}\n`);
+  }
+
+  const skippedCount = results.length - applied.length;
+  process.stderr.write(`[bd_tool] write: applied ${applied.length}, skipped ${skippedCount}\n`);
+
+  return {
+    applied: true,
+    patches: results.map(r => ({
+      match: r.patch.match,
+      setKeys: Object.keys(r.patch.set),
+      applied: !!r.applied,
+      skipped: !!r.skipped,
+      reason: r.reason,
+      matchedBy: r.matchedBy,
+    })),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -642,6 +728,136 @@ async function cmdBackfillUrls(labels, opts) {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// dump-nav-nodes — emit a multi-block .md file containing every node
+// in the "navigation hub" of the graph (Root + Entry + Family +
+// Cluster + gateway TextNodes + section_title TextNodes). Excludes
+// the ~186 content TextNodes (chapter/verse chunks) which are much
+// bigger + not part of the user's periodic review workflow.
+//
+// Format matches the `write` subcommand's patch format:
+//   ## <human title> — <label>
+//   @match url: <url>
+//   @match name: <name>           (if node has one)
+//   @match title: <title>         (if node has title but no name — mainly
+//                                  for section_title TextNodes)
+//   @flag update_this: false
+//
+//   @set text:
+//   <current text — empty body if node has no text yet>
+//
+// Blocks separated by `---`. Ordering: Root → Entry (alpha) → Family
+// (alpha) → Cluster (alpha) → gateway TextNodes (alpha by source_text)
+// → section_title TextNodes (alpha by source_text then seq).
+// ─────────────────────────────────────────────────────────────────────
+
+function labelHeader(row) {
+  const label = row.label;
+  const gateway = !!row.gateway;
+  const section_title = !!row.section_title;
+  if (label === 'TextNode') {
+    if (gateway) return `${row.name} — TextNode (gateway)`;
+    if (section_title) {
+      const anchor = row.title || row.name || '(untitled section)';
+      const src = row.source_text ? ` [${row.source_text}]` : '';
+      return `${anchor}${src} — TextNode (section title)`;
+    }
+    return `${row.name || row.title || '(unnamed)'} — TextNode`;
+  }
+  return `${row.name || '(unnamed)'} — ${label}`;
+}
+
+function renderPatchBlock(row) {
+  const lines = [];
+  lines.push(`## ${labelHeader(row)}`);
+  lines.push('');
+  if (row.url)   lines.push(`@match url: ${row.url}`);
+  if (row.name)  lines.push(`@match name: ${row.name}`);
+  if (row.title && !row.name) lines.push(`@match title: ${row.title}`);
+  lines.push(`@flag update_this: false`);
+  lines.push('');
+  lines.push(`@set text:`);
+  if (row.text && row.text.length > 0) {
+    lines.push(row.text);
+  }
+  return lines.join('\n');
+}
+
+async function cmdDumpNavNodes(outPath) {
+  const target = outPath || 'nav_nodes_text.md';
+  const rows = await runSession(async (s) => {
+    const r = await s.run(
+      `MATCH (n)
+       WHERE 'Root' IN labels(n)
+          OR 'Entry' IN labels(n)
+          OR 'Family' IN labels(n)
+          OR 'Cluster' IN labels(n)
+          OR (n:TextNode AND (n.gateway = true OR n.section_title = true))
+       RETURN labels(n)[0] AS label,
+              n.name AS name,
+              n.title AS title,
+              n.text AS text,
+              n.url  AS url,
+              coalesce(n.gateway, false)       AS gateway,
+              coalesce(n.section_title, false) AS section_title,
+              n.source_text AS source_text,
+              n.seq AS seq
+       ORDER BY
+         CASE labels(n)[0]
+           WHEN 'Root'     THEN 0
+           WHEN 'Entry'    THEN 1
+           WHEN 'Family'   THEN 2
+           WHEN 'Cluster'  THEN 3
+           WHEN 'TextNode' THEN 4
+           ELSE 5
+         END,
+         CASE WHEN n.gateway = true THEN 0 ELSE 1 END,
+         n.source_text,
+         n.name,
+         n.seq`
+    );
+    return r.records.map(rec => ({
+      label:         rec.get('label'),
+      name:          rec.get('name'),
+      title:         rec.get('title'),
+      text:          rec.get('text'),
+      url:           rec.get('url'),
+      gateway:       rec.get('gateway'),
+      section_title: rec.get('section_title'),
+      source_text:   rec.get('source_text'),
+      seq:           rec.get('seq'),
+    }));
+  });
+
+  const header = [
+    `# Navigation node text — review sheet`,
+    '',
+    `Generated by \`node bd_tool.js dump-nav-nodes\` on ${new Date().toISOString().slice(0, 10)}.`,
+    `Total: ${rows.length} nodes (Root + Entry + Family + Cluster + gateway/section-title TextNodes).`,
+    `Content-chunk TextNodes are deliberately excluded from this scope.`,
+    '',
+    `To edit: change the body text under \`@set text:\`, flip \`@flag update_this:\` to \`true\`,`,
+    `save, then \`node bd_tool.js write nav_nodes_text.md\`. Only flagged blocks are applied;`,
+    `flags are auto-reset to \`false\` after each successful sync so this file stays honest.`,
+    '',
+    `Identity: url is the durable UUID key (all present after 2026-07-16 backfill); name`,
+    `is a friendly secondary anchor. Section-title TextNodes have no name — matched via`,
+    `\`@match title:\` fallback.`,
+    '',
+  ];
+
+  const blocks = rows.map(renderPatchBlock);
+  const body = header.join('\n') + '---\n\n' + blocks.join('\n\n---\n\n') + '\n';
+  fs.writeFileSync(target, body, 'utf8');
+
+  const byLabel = {};
+  rows.forEach(r => { byLabel[r.label] = (byLabel[r.label] || 0) + 1; });
+
+  process.stderr.write(`[bd_tool] dump-nav-nodes: wrote ${rows.length} blocks → ${target}\n`);
+  process.stderr.write(`[bd_tool] dump-nav-nodes: by label = ${JSON.stringify(byLabel)}\n`);
+  return { path: target, total: rows.length, byLabel };
+}
+
 async function cmdBackup(outPath) {
   const target = outPath || defaultBackupPath();
   const dir = path.dirname(target);
@@ -682,6 +898,7 @@ Usage:
   node bd_tool.js sync-helpers <helpers.md> [--dry-run]
   node bd_tool.js backup [<outPath>]
   node bd_tool.js backfill-urls [--dry-run] [--labels L1,L2]
+  node bd_tool.js dump-nav-nodes [<outPath>]
 
 Results are JSON on stdout. Progress + errors on stderr.
 `);
@@ -730,6 +947,9 @@ async function main() {
   } else if (cmd === 'backup') {
     const outPath = args.find(a => !a.startsWith('--'));
     out = await cmdBackup(outPath);
+  } else if (cmd === 'dump-nav-nodes') {
+    const outPath = args.find(a => !a.startsWith('--'));
+    out = await cmdDumpNavNodes(outPath);
   } else if (cmd === 'backfill-urls') {
     const dryRun = args.includes('--dry-run');
     let labels = ['Cluster', 'Family'];
