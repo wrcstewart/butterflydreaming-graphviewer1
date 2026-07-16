@@ -3762,7 +3762,12 @@ async function init() {
   // pair queue (curation-code-gated for the arriver), press Leave to
   // unpair or to walk out of the wait queue. Label reflects state.
   function updateJoinButtonLabel() {
-    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Leave' : 'Join';
+    // 2026-07-16 — label reframed from Join/Leave to Remote Chat / Local
+    // Only. Emphasises the state you'd be entering rather than the
+    // action verb — "Remote Chat" when currently solo (press to open a
+    // pair channel), "Local Only" when currently waiting or paired
+    // (press to close it and return to solo).
+    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Local Only' : 'Remote Chat';
   }
 
   function togglePair() {
@@ -4336,11 +4341,12 @@ async function init() {
   //     the user picks Player, no pair needed
   //   - Copy Down is enabled from the start (Copy Up still waits for a
   //     Copy Down press — that gate is independent)
-  //   - Join button starts labelled "Join"; togglePair + the pair-state
-  //     message handlers below keep the label in sync (Join ↔ Leave)
+  //   - Pair-toggle button starts labelled "Remote Chat"; togglePair +
+  //     the pair-state message handlers below keep the label in sync
+  //     (Remote Chat ↔ Local Only, per updateJoinButtonLabel)
   chatPanel.classList.add('active');
   chatBtn.classList.add('active');
-  chatBtn.textContent = 'Join';
+  chatBtn.textContent = 'Remote Chat';
   document.querySelectorAll('#view-mode-toggle input[type="radio"]')
     .forEach(r => { r.disabled = false; });
   const copyDownBtnBoot = document.getElementById('copy-down-btn');
