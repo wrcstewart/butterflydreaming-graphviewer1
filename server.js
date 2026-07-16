@@ -214,7 +214,9 @@ async function pingMemgraph() {
     console.error('[BD] Memgraph keepalive error:', err.message);
   }
 }
-pingMemgraph().then(() => console.log('[BD] Memgraph connection warmed up'));
+pingMemgraph()
+  .then(() => console.log('[BD] Memgraph connection warmed up'))
+  .then(() => loadHelpers());
 setInterval(pingMemgraph, 5 * 60 * 1000);
 
 // Socket.IO server (2026-07-13) — replaces raw `ws` WebSocketServer.
@@ -239,6 +241,15 @@ let   waitingUser = null;        // { userId, socket } | null
 const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
 const initialHelpersSent = new Set();  // userIds that have already received the boot-time helper batch (how-to + nav hint) this session
+
+// 2026-07-16 — helper messages loaded from Memgraph at boot instead
+// of the retired HOW_TO_TEXT / NAV_HINT_TEXT / NO_PARTNER_WAITING_TEXT /
+// PAIRED_TEXT string constants. Populated by loadHelpers() below and
+// consulted by sendHelperByName(). Wording changes now flow through
+// helper_messages.md → `node bd_tool.js sync-helpers` → DB, then a
+// server restart re-loads the cache. Add a runtime reload hook if
+// wording iteration ever gets tight enough to need it.
+const helpersByName = new Map();  // name → { name, title, trigger, text }
 
 // Post-Socket.IO migration (2026-07-13). Grace-period purge timers:
 // on disconnect we remove the user from `sessions` immediately (so
@@ -268,43 +279,13 @@ function sendToBuddy(userId, msg) {
 
 // --- A43 chat-channel helpers ---
 
-const HOW_TO_TEXT =
-  'Tap a node to search for inspiration for a possible conversation and edit if you wish. '
-  + 'Organise on new cards if you wish. '
-  + 'Select text and copy will insert it on a new card. '
-  + 'Send your top card to the system\'s Helper for comment — or your Remote once paired.';
-
-// 2026-07-16 — sent as a Helper card from the ready_to_pair handler when
-// the user presses Join and there's no one else waiting to pair with.
-// Deliberately reassuring rather than blaming ("to be expected" — the
-// platform is new), and points at the two paths forward: (a) Helper as
-// AI-bot correspondent, (b) another browser tab as manual round-tripping.
-// \n\n renders as a paragraph break because the chat-stack helper card
-// body sets white-space: pre-wrap (style.css).
-const NO_PARTNER_WAITING_TEXT =
-  'No Remote Partner currently waiting to pair — to be expected as\n\n'
-  + 'Butterfly Dreaming is a new initiative. If someone remote presses Join you will be paired automatically. '
-  + 'In the meantime your messages will receive special attention from myself (Helper) '
-  + 'or you can use another browser to simulate a remote partner.';
-
-// 2026-07-16 — sent as a Helper card to BOTH sides the moment a pair
-// completes. Confirms the success, prompts an ice-breaker, and gestures
-// at the workflow (New Card → type → Send) so a first-time user knows
-// what to do next. Replaces the dormant "Partner joined chat…" message
-// from the enter_chat handler (dead under always-on-chat since
-// enter_chat only fires at boot, before any pairing).
-const PAIRED_TEXT =
-  'You have successfully partnered — why not create a new card and send them a "Hello from your Remote" message. '
-  + 'Use the New Card button, type the message and then use the Send button. '
-  + 'Watch out for a message back!';
-
-// 2026-07-16 — sent as Helper (0.2) at boot, right after the how-to.
-// Quick navigation-gesture reminder — the difference between "read a
-// node" (single tap/click) and "navigate into a node's neighbourhood"
-// (double tap/click) trips first-time users; this puts the rule where
-// they'll notice it while the graph is fresh on screen.
-const NAV_HINT_TEXT =
-  'Remember one click (or tap) to see a node\'s content. Double click (tap) it to hop about.';
+// Helper text constants (HOW_TO_TEXT, NAV_HINT_TEXT, NO_PARTNER_WAITING_TEXT,
+// PAIRED_TEXT) retired 2026-07-16. Helper message text now lives in
+// Memgraph as :HelperMessage nodes, loaded by loadHelpers() at boot
+// into `helpersByName`. Send sites use sendHelperByName(userId, key)
+// where key is the helper's stable `name` property. Source of truth:
+// helper_messages.md at repo root; edit wording there, run
+// `node bd_tool.js sync-helpers helper_messages.md`, restart server.
 
 // Channel "open" requires both users paired AND both currently in chat mode.
 function channelOpen(userId) {
@@ -320,17 +301,66 @@ function sendSystemCard(userId, text) {
   }
 }
 
+// 2026-07-16 — read helper text from Memgraph rather than a hard-
+// coded constant. helpersByName is populated by loadHelpers() at boot;
+// if the requested helper is missing (e.g. name mistyped in a swap, or
+// helper_messages.md not yet synced) we log a loud warning and skip
+// the send so the flow still progresses. In practice this should be
+// caught in dev on server startup by the "[BD] Loaded N helper
+// messages" log line — sanity-check that N matches what the .md
+// declares.
+function sendHelperByName(userId, name) {
+  const h = helpersByName.get(name);
+  if (!h) {
+    console.error(`[BD] sendHelperByName: no such helper "${name}" in helpersByName (loaded ${helpersByName.size})`);
+    return;
+  }
+  sendSystemCard(userId, h.text);
+}
+
+// Load all HelperMessage nodes into the in-memory cache. Called at
+// boot after Memgraph is warmed up. Idempotent — replaces the whole
+// cache each call, so a future reload endpoint (if we add one) can
+// just re-invoke this without any teardown.
+async function loadHelpers() {
+  const s = driver.session({ database: 'memgraph' });
+  try {
+    const r = await s.run(
+      `MATCH (:HelperHub {name: 'Helper Messages'})-[:CONTAINS_HELPER]->(h:HelperMessage)
+       RETURN h.name AS name, h.title AS title, h.trigger AS trigger, h.text AS text`
+    );
+    helpersByName.clear();
+    for (const rec of r.records) {
+      const name = rec.get('name');
+      helpersByName.set(name, {
+        name,
+        title:   rec.get('title'),
+        trigger: rec.get('trigger'),
+        text:    rec.get('text'),
+      });
+    }
+    console.log(`[BD] Loaded ${helpersByName.size} helper messages from DB`);
+  } catch (err) {
+    console.error('[BD] loadHelpers failed:', err.message);
+    // Don't rethrow — server should still start; sendHelperByName will
+    // warn per missing lookup rather than crashing.
+  } finally {
+    await s.close();
+  }
+}
+
 // Sends the boot-time helper batch (how-to + nav hint) once per user
 // session. Cards are sent in order so labels land as:
-//   Helper (0.1) = HOW_TO_TEXT  (older, sits below in stack)
-//   Helper (0.2) = NAV_HINT_TEXT  (newer, sits above HOW_TO)
-// Then chat_ready fires → client creates Local (1) at the top. If more
-// initial-batch cards get added later, append them here in send order.
+//   Helper (0.1) = how-to    (older, sits below in stack)
+//   Helper (0.2) = nav hint  (newer, sits above)
+// Then chat_ready fires → client creates Local (1) at the top. To add
+// more initial-batch cards, add helpers to helper_messages.md with
+// trigger indicating boot, sync, then extend this function.
 function sendInitialHelpersOnce(userId) {
   if (initialHelpersSent.has(userId)) return;
   initialHelpersSent.add(userId);
-  sendSystemCard(userId, HOW_TO_TEXT);
-  sendSystemCard(userId, NAV_HINT_TEXT);
+  sendHelperByName(userId, 'helper-how-to');
+  sendHelperByName(userId, 'helper-nav-hint');
 }
 
 // Current connection-status text for `userId`.
@@ -384,7 +414,7 @@ async function executePurge(userId) {
   const buddyId = pairedWith.get(userId);
   if (buddyId) {
     if (inChat.get(userId) && inChat.get(buddyId)) {
-      sendSystemCard(buddyId, 'Partner disconnected.');
+      sendHelperByName(buddyId, 'helper-partner-disconnected');
     }
     pairedWith.delete(userId);
     pairedWith.delete(buddyId);
@@ -570,7 +600,7 @@ io.on('connection', async (socket) => {
           // once each time a user presses Join with nobody else waiting.
           // Replaces the boot-time Helper (0.2) status card that used to
           // fire on every arrival regardless of pair intent.
-          sendSystemCard(socket.data.userId, NO_PARTNER_WAITING_TEXT);
+          sendHelperByName(socket.data.userId, 'helper-no-partner-waiting');
           console.log(`[BD] Waiting: ${socket.data.userId}`);
         } else {
           // MM3 revised (2026-07-12) — same-device pair refusal. Two ws
@@ -613,8 +643,8 @@ io.on('connection', async (socket) => {
           // event. Replaces the enter_chat "Partner joined chat…" branch
           // which is dead under always-on-chat (enter_chat only fires at
           // boot, before any pairing).
-          sendSystemCard(socket.data.userId, PAIRED_TEXT);
-          sendSystemCard(buddy.userId,       PAIRED_TEXT);
+          sendHelperByName(socket.data.userId, 'helper-paired-success');
+          sendHelperByName(buddy.userId,       'helper-paired-success');
           console.log(`[BD] Paired: ${socket.data.userId} ↔ ${buddy.userId}`);
         }
         return;
@@ -641,7 +671,7 @@ io.on('connection', async (socket) => {
         // fires on every arrival, which is noisy and premature — the
         // user hasn't asked to pair yet. Replaced with a more useful
         // helper message that fires from ready_to_pair when there's
-        // genuinely nobody to pair with (see NO_PARTNER_WAITING_TEXT).
+        // genuinely nobody to pair with (helper-no-partner-waiting).
         // Client uses chat_ready to drop in Local (1) above the initial
         // helper batch. Sent every enter_chat; client handles
         // idempotently. A/B layout consistency is enforced on the client
@@ -680,7 +710,7 @@ io.on('connection', async (socket) => {
         const buddyId = pairedWith.get(socket.data.userId);
         if (buddyId) {
           if (inChat.get(socket.data.userId) && inChat.get(buddyId)) {
-            sendSystemCard(buddyId, 'Partner disconnected.');
+            sendHelperByName(buddyId, 'helper-partner-disconnected');
           }
           pairedWith.delete(socket.data.userId);
           pairedWith.delete(buddyId);
