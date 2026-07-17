@@ -4020,7 +4020,10 @@ async function init() {
     // ── External Website URL builder (MM3, 2026-07-12) ────────────────────
     // Assembles the standalone-player URL that both #jump-to-ext-btn and
     // #copy-link-to-ext-btn (in #bd-invite-panel-viewer) point at. Payload:
-    //   { script, node_url, source_text, title }
+    //   { script, node_url, name, source_text, title }
+    // - name added 2026-07-17: module nodes have names like
+    //   "bd_V_Kolam_2"; EV's source-context display prefers name over
+    //   source_text so the specific node identity survives the round-trip.
     // - script         = current panel/card text (see 4-tier precedence below)
     // - node_url et al = properties of the currently-visible-in-panel node,
     //   preferred by lastReadNodeId over activeNodeId (a user hitting these
@@ -4032,7 +4035,7 @@ async function init() {
     // http://<hostname>:8080/bd_V_Kolam/preview.html as a fallback,
     // but the shared Copy Link URL points at the public deployment.
     function buildExternalWebsiteUrl() {
-      let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
+      let currentNodeUrl = null, currentSourceText = null, currentTitle = null, currentName = null;
       let activeNode = null;
       const readId   = getLastReadNodeId && getLastReadNodeId();
       const activeId = getActiveNodeId   && getActiveNodeId();
@@ -4042,6 +4045,7 @@ async function init() {
         if (n && n.length > 0) {
           activeNode = n;
           currentNodeUrl    = n.data('url')         || null;
+          currentName       = n.data('name')        || null;
           currentSourceText = n.data('source_text') || null;
           currentTitle      = n.data('title')       || null;
         }
@@ -4084,6 +4088,8 @@ async function init() {
                                                // project's durable UUID-based identity,
                                                // stable across DB reimports (unlike Neo4j
                                                // elementId). See migrate_mm1.js / apply_mm.js.
+        name:        currentName,              // e.g. 'bd_V_Kolam_2' — module-node identity
+                                               // shown by EV's source-context (2026-07-17).
         source_text: currentSourceText,
         title:       currentTitle
       };

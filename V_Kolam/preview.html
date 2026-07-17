@@ -870,14 +870,20 @@ F: F+F-F-F+F+F+F-F
     function renderSourceContext() {
       const el = document.getElementById('bd-source-context');
       if (!el) return;
-      // MM2 — use current* state instead of incomingPayload, so the display
-      // reflects Prev/Next navigation (not just the arrival state).
       const src = currentSourceText ? String(currentSourceText) : '';
       const ttl = currentTitle      ? String(currentTitle)      : '';
       const nm  = currentName       ? String(currentName)       : '';
-      // Prefer the module-specific node name over generic title if both exist.
-      const rightHalf = nm || ttl;
-      const parts = [src, rightHalf].filter(Boolean);
+      // 2026-07-17 — display just `name` when present. Module node names
+      // (e.g. bd_V_Kolam_2) already contain the module/source prefix, so
+      // pairing them with source_text reads redundantly ("bd_V_Kolam —
+      // bd_V_Kolam_2"). For nodes without a name (e.g. section-title
+      // TextNodes), fall back to `source_text — title` (e.g.
+      // "Tao Te Ching — Chapter 42").
+      if (nm) {
+        el.textContent = nm;
+        return;
+      }
+      const parts = [src, ttl].filter(Boolean);
       el.textContent = parts.join(' — ');
     }
 
