@@ -511,25 +511,44 @@ function parseModuleId(text) {
   return match ? match[1] : null;
 }
 
-// 2026-07-17 — extract the MOST RECENT module-script paragraph from a
-// card's accumulated text. Chat cards can gather many node-taps (each
-// separated by a blank line per appendToCard's paragraph rule), and
-// only one of those paragraphs is the module script the user wants
-// baked into a deep-link URL — the rest is prior browsing noise.
+// 2026-07-17 — extract the MOST RECENT module-script from a card's
+// accumulated text. Chat cards can gather many node-taps + prose;
+// only the module block belongs in a deep-link URL, the rest is
+// prior browsing noise.
 //
-// Algorithm: split on blank-line boundaries, scan paragraphs from
-// last to first, return the last one containing a `%%bd_module <id>`
-// line. Returns null when no module directive appears anywhere.
-//
-// Multi-line `%%bd_score [ … %%bd_]` blocks don't contain blank
-// lines in realistic authored content, so paragraph-split holds.
+// Algorithm — line-walk from the LAST `%%bd_module <id>` line, no
+// paragraph-boundary requirement:
+//   1. Find the last line matching `%%bd_module <id>`.
+//   2. From that line forward, keep every line while:
+//        - It starts with `%%bd_` (any directive), OR
+//        - We're inside a `%%bd_score [ … %%bd_]` block (blank lines
+//          allowed; block closes on the `%%bd_]` line).
+//   3. Stop at the first line that's neither a `%%bd_` directive nor
+//      inside an open score block. That line marks non-module text.
+// The module's own syntax is the boundary — no need for a blank line
+// above the %%bd_module marker.
 function extractLatestModuleScript(text) {
   if (typeof text !== 'string' || !text.includes('%%bd_module')) return null;
-  const paras = text.split(/\n{2,}/);
-  for (let i = paras.length - 1; i >= 0; i--) {
-    if (/^%%bd_module\s+\S+/m.test(paras[i])) return paras[i].trim();
+  const lines = text.split('\n');
+  let startIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^%%bd_module\s+\S+/.test(lines[i])) { startIdx = i; break; }
   }
-  return null;
+  if (startIdx < 0) return null;
+  const out = [];
+  let inScoreBlock = false;
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i];
+    if (inScoreBlock) {
+      out.push(line);
+      if (/^%%bd_\]/.test(line)) inScoreBlock = false;
+      continue;
+    }
+    if (/^%%bd_score\s*\[/.test(line)) { out.push(line); inScoreBlock = true; continue; }
+    if (/^%%bd_/.test(line))           { out.push(line);                      continue; }
+    break;   // non-directive line + not inside a score → module block ends here
+  }
+  return out.join('\n').trim();
 }
 
 // --- Neo4j → Cytoscape element builders ---
