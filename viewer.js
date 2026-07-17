@@ -4026,9 +4026,11 @@ async function init() {
     //   preferred by lastReadNodeId over activeNodeId (a user hitting these
     //   buttons wants a link to whatever they last READ, not to whatever
     //   Family/Cluster they'd double-tap-navigated into).
-    // Base URL is currently hardcoded to localhost:8080 for testing; once
-    // the EV is being served from GitHub Pages the base can be updated to
-    // that origin (see Q2 answer 2026-07-12).
+    // Base URL is the GitHub Pages deployment of the standalone EV
+    // repo (github.com/wrcstewart/bd_V_Kolam) — moved from localhost
+    // on 2026-07-17. Same file is still served locally at
+    // http://<hostname>:8080/bd_V_Kolam/preview.html as a fallback,
+    // but the shared Copy Link URL points at the public deployment.
     function buildExternalWebsiteUrl() {
       let currentNodeUrl = null, currentSourceText = null, currentTitle = null;
       let activeNode = null;
@@ -4091,7 +4093,7 @@ async function init() {
       // trip and silently drops the standalone into DEFAULT_SCRIPT.
       // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      const standaloneBaseUrl = `http://${window.location.hostname}:8080/bd_V_Kolam/preview.html`;
+      const standaloneBaseUrl = 'https://wrcstewart.github.io/bd_V_Kolam/preview.html';
       const url = `${standaloneBaseUrl}?data=${encodeURIComponent(encoded)}`;
       return { url, payload };
     }
