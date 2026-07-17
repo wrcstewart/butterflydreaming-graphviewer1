@@ -6,6 +6,57 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-07-17 — @flag review workflow + :User retired + Player gated + URLs stripped
+
+**Landmark commits:** `540b46b` (sync-helpers @flag gate) → `de85344` (retire :User nodes) → `fbad529` (backfill-urls) → `f36cd78` (multi-block write + dump-nav-nodes + nav_nodes_text.md) → `aeb2115` (Player visibility gate + deep-link URL strip) → `7fdf7bc` (extractor: line-walk not paragraph-split).
+
+**What shipped, by theme:**
+
+### Bulk-review workflow
+
+- **`@flag update_this: true|false`** directive now recognised by both `sync-helpers` (per @hub/@helper block) and the newly-multi-block-aware `write` command (per @match/@set block). CREATE (node doesn't exist yet) always applies. UPDATE (node exists) only applies when the flag is `true`; otherwise skipped and reported. Flags auto-reset to `false` after apply — file returns to a "no pending edits" state. Test on 6-block helper_messages.md: flipped `helper-nav-hint` to true, added a comma, sync applied 1 + skipped 5, flag reset to false in the .md.
+- **`write` extended to multi-block** — `---` divider between blocks, same @match/@set format. `parsePatch` retired in favour of `parsePatchesFile`. `@match title` added as third-tier identity (url > name > title) for section-title TextNodes.
+- **`backfill-urls`** subcommand — corpus-wide UUID identity coverage for `:Cluster` + `:Family` (default target labels). One round-trip: query candidates by `id(n)` (Memgraph doesn't have `elementId()`), JS generates UUIDs, one `UNWIND'd SET`. Applied to 126 nodes (120 Cluster + 6 Family). Corpus is now url-keyed everywhere except 84 empty orphan nodes (separate cleanup deferred).
+- **`dump-nav-nodes`** subcommand + **`nav_nodes_text.md`** — 172-block file at repo root covering every Root + Entry + Family + Cluster + gateway/section-title TextNode (content-chunk TextNodes deliberately excluded). Each block carries `@match url` (always), `@match name` where present, `@match title` fallback for section-titles, `@flag update_this: false`, and `@set text:` with current text. Ready for the user's periodic review pass.
+
+### Architectural cleanup: `:User` nodes retired
+
+Server was creating a `:User` node in Memgraph on every socket connect purely to inherit an integer from `id(u)` into the viewer_id string. Leaky (~42 orphans had accumulated across dev iterations when purge timers died with their process). Now `viewer_id = 'N_' + crypto.randomUUID().split('-')[0]` — 8 hex chars, globally unique, in-memory only. `executePurge` no longer touches the DB.
+
+Boot chain also gains `purgeStaleUsers()` chained after `pingMemgraph`: `MATCH (u:User) DETACH DELETE u` — one-off cleanup deleted the 42 orphans; a cheap no-op on every subsequent boot.
+
+**Principle codified by user:** "no nodes in Memgraph for non-obvious architectural reasons".
+
+### Memgraph id() vs elementId() gotcha
+
+Discovered live: `elementId()` is Neo4j-only, Memgraph doesn't implement it. Memgraph uses `id()`. AND `id()` returns a numeric id that shares its space with relationship ids, so a bare `WHERE id() = X` could false-match either. Rule now codified: always scope MATCH patterns to nodes-only via `MATCH (n)` before the WHERE clause. Correct form:
+
+```cypher
+MATCH (n) WHERE id(n) = $nid SET n.url = $url
+```
+
+Never `MATCH () WHERE id() = X`. User's warning materialised on my first backfill-urls draft (used elementId — parse error `Function 'elementId' doesn't exist`); the corrected `id()` form runs everywhere in bd_tool.js writes.
+
+### Player mode gated on module-in-top-card
+
+Was previously always-enabled from boot. Now hidden AND disabled by default; visible + enabled only when the top local card's text contains a `%%bd_module` directive. Extends `updateSendBtn` (already called from every top-card mutation) with a regex check + label toggle. If user is currently in Player mode and the module disappears from the top card (e.g. new empty Local card created), a `bd:force-nodes-mode` custom event fires and init()'s listener calls `setViewMode('nodes')` to surface the graph.
+
+### Deep-link URLs stripped to latest module block only
+
+Cards accumulate paragraphs from every node-tap (each separated by `\n\n` since 2026-07-16). Previously, deep-link URL builders baked the whole card into the payload's `script` field, leaking "text from previous browsing". Now they call new helper `extractLatestModuleScript(text)` which returns just the latest module-script block.
+
+Algorithm — LINE-WALK not paragraph-split (per user question: why require a blank line above the `%%bd_module` marker?):
+
+1. Find the last line matching `/^%%bd_module\s+\S+/`
+2. Walk forward, keeping every line while EITHER it starts with `%%bd_` OR we're inside an open `%%bd_score [ … %%bd_]` block (blank lines allowed inside score)
+3. Stop at the first line that's neither a `%%bd_` directive nor inside an open score block
+
+The module's own directive syntax is the boundary. Handles: no-blank-above, blank-inside-score, trailing-prose-cut, multiple-modules-last-wins. Verified with a five-case smoke test.
+
+**Related memory:** [[bd-tool-and-helper-messages]] amended with all today's tool + workflow additions; [[deep-link-v2-moderation]] amended with the Player gate + URL strip; MEMORY.md index refreshed.
+
+---
+
 ## 2026-07-16 — bd_tool.js + Helper Messages in DB (big infrastructure day)
 
 **Landmark commits (chronological):**
