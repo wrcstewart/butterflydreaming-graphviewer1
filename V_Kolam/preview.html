@@ -497,8 +497,9 @@
     <div id="ev-actions">
       <button id="ev-freeze-btn" type="button" title="Toggle animation (freeze / unfreeze)">Freeze</button>
       <button id="ev-edit-btn"   type="button" title="Show or hide the script editor">Edit</button>
-      <button id="ev-prev-btn"   type="button" title="Previous script under this module" disabled>◀</button>
-      <button id="ev-next-btn"   type="button" title="Next script under this module"     disabled>▶</button>
+      <!-- ◀/▶ Prev/Next removed 2026-07-17: relied on BD's /api/module-sibling
+           endpoint, not available in the standalone GitHub Pages deployment. -->
+
     </div>
     <span id="bd-source-context"></span>
   </div>
@@ -571,30 +572,20 @@
     let currentTitle       = null;
     let currentName        = null;
 
-    // Virtual-start position (MM2, 2026-07-11).
-    // When the EV is arrived at with a ?data= payload, we cache that payload
-    // as a "virtual" position occupying slot 0 in the navigation list — the
-    // DB siblings start at slot 1. This lets the user navigate ▶ to the DB
-    // list and ◀ back to their arrival state (which may carry a script that
-    // was edited in the standalone before Enter-BD-ing back or paste-shared).
-    // ◀ from virtual is disabled; ◀ from the first DB sibling returns here.
-    let virtualStart   = null;   // snapshot of ?data= payload, or null
-    let atVirtualStart = false;  // true while we're viewing virtualStart
+    // Virtual-start state + Prev/Next sibling navigation retired 2026-07-17
+    // when EV moved to a standalone GitHub Pages deployment. Both features
+    // depended on BD's /api/module-sibling + /api/module-default endpoints,
+    // which don't exist in the Pages-hosted build. Freeze state only below.
 
     // Freeze state — preFreezeAngleDrift stores the drift value that was in
     // effect just before Freeze was pressed, so Unfreeze can restore it.
     let frozen             = false;
     let preFreezeAngleDrift = null;
 
-    // Module id derived from the URL path (`/bd_V_Kolam/preview.html` → `bd_V_Kolam`).
-    // Falls back to null if the path pattern doesn't match — in that case the
-    // /api/module-default fetch is skipped and we go straight to DEFAULT_SCRIPT.
-    function getModuleIdFromPath() {
-      const m = window.location.pathname.match(/^\/([^/]+)\//);
-      return m ? m[1] : null;
-    }
-    const moduleId = getModuleIdFromPath();
-    console.log('preview: module id from path =', moduleId);
+    // moduleId + getModuleIdFromPath retired 2026-07-17 — was only read
+    // by the (now-retired) /api/module-default + /api/module-sibling fetches.
+    // No live code path uses the module id any more. Left as breadcrumb
+    // for anyone tracing why URL path parsing disappeared.
 
     // ── Default script ────────────────────────────────────────────────────────
     // Symmetry 3 (unusual value) chosen deliberately so a default load is
@@ -811,43 +802,10 @@ F: F+F-F-F+F+F+F-F
       if (frozen) setFrozen(false, { silent: true });
     }
 
-    // Fetch the module's default node from BD's HTTP API. Returns the raw
-    // response body or null on failure. Kept as a bare fetch so ▶-from-
-    // virtual can call it without triggering the loader's own nav-state
-    // update (virtual overrides isFirst=false regardless of what the server
-    // says).
-    async function fetchModuleDefault() {
-      if (!moduleId) return null;
-      try {
-        const res = await fetch(`/api/module-default?module=${encodeURIComponent(moduleId)}`, {
-          cache: 'no-store'
-        });
-        if (!res.ok) return null;
-        return await res.json();
-      } catch (err) {
-        console.warn('preview: /api/module-default failed:', err);
-        return null;
-      }
-    }
-
-    // Initial-load convenience wrapper — used only on cold start when there
-    // was no ?data= / ?script= URL param. Delegates the fetch to
-    // fetchModuleDefault, then applies the response as the current view.
-    async function loadModuleDefault() {
-      const data = await fetchModuleDefault();
-      if (!data) return false;
-      console.log('preview: /api/module-default →', {
-        name: data.name, seq: data.seq, isFirst: data.isFirst, isLast: data.isLast
-      });
-      loadScript(data.script, {
-        node_url:    data.node_url,
-        source_text: data.source_text,
-        title:       data.title,
-        name:        data.name
-      });
-      updateEvNavState(data.isFirst, data.isLast);
-      return true;
-    }
+    // fetchModuleDefault + loadModuleDefault retired 2026-07-17. They hit
+    // BD's /api/module-default endpoint which doesn't exist in the standalone
+    // GitHub Pages deployment. Cold start (no URL params) now loads
+    // DEFAULT_SCRIPT directly.
 
     (async function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
@@ -869,26 +827,12 @@ F: F+F-F-F+F+F+F-F
               scriptLen: payload.script.length,
               ...bdReturnContext
             });
-            // MM2 — cache the arrival payload as a virtual "position 0"
-            // that we can navigate back to from the DB list. The DB siblings
-            // occupy positions 1, 2, 3, … starting from the module's first
-            // node by seq. ◀ disabled on virtual (nothing before), ▶ enabled
-            // (falls into the DB list).
-            virtualStart = {
-              script:      payload.script,
-              node_url:    payload.node_url    ?? null,
-              source_text: payload.source_text ?? null,
-              title:       payload.title       ?? null,
-              name:        payload.name        ?? null
-            };
-            atVirtualStart = true;
             loadScript(payload.script, {
               node_url:    payload.node_url    ?? null,
               source_text: payload.source_text ?? null,
               title:       payload.title       ?? null,
               name:        payload.name        ?? null
             });
-            updateEvNavState(true, !moduleId);
             return;
           }
           console.warn('preview: ?data payload missing string `script` field', payload);
@@ -907,9 +851,8 @@ F: F+F-F-F+F+F+F-F
         }
       }
 
-      // No URL params — try to fetch the module's default node from BD.
-      const ok = await loadModuleDefault();
-      if (!ok) loadScript(DEFAULT_SCRIPT);
+      // No URL params — load the built-in default script.
+      loadScript(DEFAULT_SCRIPT);
     })();
 
     // Defensive: keep the input → stepper sync wired up even though the
@@ -958,22 +901,11 @@ F: F+F-F-F+F+F+F-F
       return { url, returnPayload, scriptLen: script.length };
     }
 
-    // ── EV button strip (MM2) — Freeze / Edit / ◀ Prev / Next ▶ ────────────────
+    // ── EV button strip — Freeze / Edit ────────────────────────────────────
+    // ◀ Prev / Next ▶ + updateEvNavState retired 2026-07-17 (needed BD's
+    // /api/module-sibling, not in the standalone GitHub Pages build).
     const evFreezeBtn = document.getElementById('ev-freeze-btn');
     const evEditBtn   = document.getElementById('ev-edit-btn');
-    const evPrevBtn   = document.getElementById('ev-prev-btn');
-    const evNextBtn   = document.getElementById('ev-next-btn');
-
-    // NB: look buttons up by id here rather than closing over the const
-    // bindings above — updateEvNavState is called from loadInitialScript
-    // (module top level) before those `const`s finish initialising, and
-    // closing over them throws a TDZ ReferenceError.
-    function updateEvNavState(isFirst, isLast) {
-      const prev = document.getElementById('ev-prev-btn');
-      const next = document.getElementById('ev-next-btn');
-      if (prev) prev.disabled = !!isFirst || !currentNodeUrl;
-      if (next) next.disabled = !!isLast  || !currentNodeUrl;
-    }
 
     // Freeze — sends bd_param_update {angle_drift: 0} directly to the module
     // instead of rewriting the script. Stores the value in effect at the moment
@@ -1021,91 +953,8 @@ F: F+F-F-F+F+F+F-F
       });
     }
 
-    // Return to virtual position (MM2) — reinstate the cached ?data= payload
-    // as the current view. Called from navigateSibling when ◀ from the first
-    // DB sibling hits the module boundary AND virtualStart exists.
-    function goToVirtual() {
-      if (!virtualStart) return;
-      atVirtualStart = true;
-      loadScript(virtualStart.script, {
-        node_url:    virtualStart.node_url,
-        source_text: virtualStart.source_text,
-        title:       virtualStart.title,
-        name:        virtualStart.name
-      });
-      // ◀ disabled (nothing before virtual), ▶ enabled while we have a module id.
-      updateEvNavState(true, !moduleId);
-    }
-
-    // Prev / Next — fetch adjacent sibling under the same module.
-    async function navigateSibling(direction) {
-      // ── ▶ from virtual: land on the first DB sibling of this module ──
-      if (atVirtualStart) {
-        if (direction === 'prev') return;   // shouldn't fire; ◀ is disabled
-        if (evNextBtn) evNextBtn.disabled = true;
-        const data = await fetchModuleDefault();
-        if (data) {
-          loadScript(data.script, {
-            node_url:    data.node_url,
-            source_text: data.source_text,
-            title:       data.title,
-            name:        data.name
-          });
-          atVirtualStart = false;
-          // Virtual is before, so isFirst is always false from a DB position
-          // as long as virtualStart is cached.
-          updateEvNavState(false, data.isLast);
-        } else if (evNextBtn) {
-          evNextBtn.disabled = false;
-        }
-        return;
-      }
-
-      // ── DB position: fetch sibling from server ────────────────────────
-      if (!currentNodeUrl) return;
-      const btn = direction === 'next' ? evNextBtn : evPrevBtn;
-      if (btn) btn.disabled = true;
-      try {
-        const res = await fetch(
-          `/api/module-sibling?node_url=${encodeURIComponent(currentNodeUrl)}` +
-          `&direction=${direction}`,
-          { cache: 'no-store' }
-        );
-        if (!res.ok) {
-          console.warn('preview: /api/module-sibling failed:', res.status);
-          return;
-        }
-        const data = await res.json();
-        if (!data.node_url) {
-          // Boundary reached in this direction.
-          if (direction === 'prev' && virtualStart) {
-            // ◀ from first DB sibling with a cached virtualStart → return there.
-            goToVirtual();
-            return;
-          }
-          if (btn) btn.disabled = true;
-          return;
-        }
-        loadScript(data.script, {
-          node_url:    data.node_url,
-          source_text: data.source_text,
-          title:       data.title,
-          name:        data.name
-        });
-        // While virtualStart exists we're never truly at position 0 in the
-        // module list — virtual is. Override isFirst=false so ◀ stays live.
-        const displayIsFirst = virtualStart ? false : data.isFirst;
-        updateEvNavState(displayIsFirst, data.isLast);
-      } catch (err) {
-        console.warn('preview: navigateSibling error:', err);
-      } finally {
-        // Re-enable happens via updateEvNavState in the success path; on error
-        // we optimistically re-enable so the user isn't stuck.
-        if (btn && btn.disabled) btn.disabled = false;
-      }
-    }
-    if (evPrevBtn) evPrevBtn.addEventListener('click', () => navigateSibling('prev'));
-    if (evNextBtn) evNextBtn.addEventListener('click', () => navigateSibling('next'));
+    // goToVirtual + navigateSibling retired 2026-07-17. See comment above
+    // the button-const block for context.
 
     // Enter → navigate. 2026-07-15 (late) — wrapped in withUpdatePrompt so
     // the update-script dialog fires here too. Earlier concern about "dialog
