@@ -35,7 +35,10 @@
     <span id="default-save-status"></span>
     <span id="view-mode-toggle">
       <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
-      <label><input type="radio" name="view-mode" value="player"> Player</label>
+      <!-- Player starts hidden + disabled (2026-07-17). updateSendBtn re-
+           evaluates on each top-card content change and shows/enables
+           Player only when the card contains a %%bd_module directive. -->
+      <label style="display:none"><input type="radio" name="view-mode" value="player" disabled> Player</label>
     </span>
   </div>
   <div id="cy"></div>
@@ -144,6 +147,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=420"></script>
+  <script type="module" src="viewer.js?v=421"></script>
 </body>
 </html>

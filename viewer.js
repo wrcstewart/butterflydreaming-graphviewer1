@@ -511,6 +511,27 @@ function parseModuleId(text) {
   return match ? match[1] : null;
 }
 
+// 2026-07-17 — extract the MOST RECENT module-script paragraph from a
+// card's accumulated text. Chat cards can gather many node-taps (each
+// separated by a blank line per appendToCard's paragraph rule), and
+// only one of those paragraphs is the module script the user wants
+// baked into a deep-link URL — the rest is prior browsing noise.
+//
+// Algorithm: split on blank-line boundaries, scan paragraphs from
+// last to first, return the last one containing a `%%bd_module <id>`
+// line. Returns null when no module directive appears anywhere.
+//
+// Multi-line `%%bd_score [ … %%bd_]` blocks don't contain blank
+// lines in realistic authored content, so paragraph-split holds.
+function extractLatestModuleScript(text) {
+  if (typeof text !== 'string' || !text.includes('%%bd_module')) return null;
+  const paras = text.split(/\n{2,}/);
+  for (let i = paras.length - 1; i >= 0; i--) {
+    if (/^%%bd_module\s+\S+/m.test(paras[i])) return paras[i].trim();
+  }
+  return null;
+}
+
 // --- Neo4j → Cytoscape element builders ---
 
 function shortText(text, wordCount) {
@@ -1921,11 +1942,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function setSendBtn(el) { sendBtnEl = el; updateSendBtn(); }
 
   function updateSendBtn() {
-    if (!sendBtnEl) return;
     const top = topLocalCard();
     // Hidden ghost (N=0) is never sendable — it has no body the user can fill.
     const text = top && !top.hidden && top.body ? top.body.value : '';
-    sendBtnEl.disabled = !pairingState.active || !text.trim();
+    if (sendBtnEl) sendBtnEl.disabled = !pairingState.active || !text.trim();
+
+    // 2026-07-17 — Player radio visibility + enabled state gated on
+    // "top card contains a %%bd_module directive". If not, Player is
+    // hidden AND disabled (nothing to play). If the user is currently
+    // in Player mode and the module disappears from the top card,
+    // force back to Nodes via a bd:force-nodes-mode event that init()
+    // listens for (setViewMode isn't in this scope).
+    const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
+    const playerLabel = playerRadio ? playerRadio.closest('label') : null;
+    if (playerRadio && playerLabel) {
+      const hasModule = /^%%bd_module\s+\S+/m.test(text);
+      playerRadio.disabled = !hasModule;
+      playerLabel.style.display = hasModule ? '' : 'none';
+      if (!hasModule && playerRadio.checked) {
+        const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
+        if (nodesRadio) nodesRadio.checked = true;
+        playerRadio.checked = false;
+        document.dispatchEvent(new CustomEvent('bd:force-nodes-mode'));
+      }
+    }
   }
 
   // Click-time send: read the *current* textarea value (card.text isn't synced
@@ -3986,29 +4026,35 @@ async function init() {
         }
       }
 
-      // Panel text precedence:
-      //   1. Focused local-card textarea (chat mode, actively editing)
-      //   2. topLocalCard body (chat mode, not focused)
-      //   3. activeNode.data('text') — raw source of truth. This is what
-      //      setSystemText renders for a TextNode click, minus the display
-      //      header buildTooltipContent prepends. Reading the DOM instead
-      //      would include the welcome prefix + header + spacer divs + any
-      //      prior append (setSystemText never clears on no-meta inserts).
-      //   4. #default-card-body textContent — last-ditch welcome-message.
+      // Panel text precedence (updated 2026-07-17):
+      //   1. Focused local-card textarea — extract only the latest module
+      //      script paragraph, not the whole card
+      //   2. topLocalCard body — same extraction
+      //   3. activeNode.data('text') — raw source of truth (already a
+      //      clean module script for module nodes)
+      //   4. #default-card-body textContent — last-ditch welcome-message
+      // Reason for the extraction on tiers 1+2: cards accumulate
+      // paragraphs from every node-tap. Baking the whole card into a
+      // deep-link URL was including "text from previous browsing"
+      // (unrelated tapped nodes, curator prose, chat). extractLatest
+      // ModuleScript pulls just the last %%bd_module paragraph.
       let currentPanelText = '';
       const active = document.activeElement;
+      let cardText = null;
       if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
-        currentPanelText = active.value || '';
+        cardText = active.value || '';
       } else {
         const top = topLocalCard();
-        if (top && !top.hidden && top.body) {
-          currentPanelText = top.body.value || '';
-        } else if (activeNode) {
-          currentPanelText = activeNode.data('text') || '';
-        } else {
-          const defBody = document.getElementById('default-card-body');
-          currentPanelText = defBody ? (defBody.textContent || '') : '';
-        }
+        if (top && !top.hidden && top.body) cardText = top.body.value || '';
+      }
+      const extracted = cardText !== null ? extractLatestModuleScript(cardText) : null;
+      if (extracted) {
+        currentPanelText = extracted;
+      } else if (activeNode) {
+        currentPanelText = activeNode.data('text') || '';
+      } else {
+        const defBody = document.getElementById('default-card-body');
+        currentPanelText = defBody ? (defBody.textContent || '') : '';
       }
 
       const payload = {
@@ -4341,8 +4387,16 @@ async function init() {
   chatPanel.classList.add('active');
   chatBtn.classList.add('active');
   chatBtn.textContent = 'Join Remote';
-  document.querySelectorAll('#view-mode-toggle input[type="radio"]')
-    .forEach(r => { r.disabled = false; });
+  // Enable the Nodes radio unconditionally; Player is gated by
+  // updateSendBtn on top-card content (2026-07-17) — starts hidden
+  // + disabled in the HTML, becomes visible only when a %%bd_module
+  // directive appears in the top card.
+  const nodesRadioBoot = document.querySelector('#view-mode-toggle input[value="nodes"]');
+  if (nodesRadioBoot) nodesRadioBoot.disabled = false;
+  // Listen for the bd:force-nodes-mode event that updateSendBtn
+  // dispatches when the top card loses its module while Player is
+  // active — setViewMode is in this scope, updateSendBtn isn't.
+  document.addEventListener('bd:force-nodes-mode', () => setViewMode('nodes'));
   const copyDownBtnBoot = document.getElementById('copy-down-btn');
   if (copyDownBtnBoot) copyDownBtnBoot.disabled = false;
   ws.emit('msg', { type: 'enter_chat' });
