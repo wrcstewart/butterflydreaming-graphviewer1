@@ -6,6 +6,68 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-07-17/18 — EV extracted to its own repo + music player + ai_read scaffold
+
+**Landmark commits (BD side):** `0d2045c` (BD → Pages URL) → `0dfba8b` (retire Prev/Next + API-dependent code) → `345545d` (name in Copy Link payload + display) → `3583c04` (amber Copy Link) → `50ddc3f` (inline music player) → `e47f237` (nav_nodes ai_read scaffold).
+
+**Landmark commits (bd_V_Kolam repo, new):** `a03d5e6` (initial: preview.html + visual_module.html + README + CC0 LICENSE) → `00762ca` (Prev/Next retirement companion) → `8b072ef` (source-context node-name companion) → `87f3916` (amber Copy Link companion) → `39eb95a` (music player + 3 mp3s).
+
+**What shipped, by theme:**
+
+### EV → its own GitHub repo (public, CC0)
+
+New repo `github.com/wrcstewart/bd_V_Kolam` — public, CC0-1.0 licensed, served via GitHub Pages at `https://wrcstewart.github.io/bd_V_Kolam/preview.html`. Contains `preview.html`, `visual_module.html`, README, LICENSE, `.gitignore`.
+
+Repo name preserves the internal module id exactly (underscores + capital V) for grep consistency. Pages URL is case-sensitive.
+
+BD's `viewer.js` `standaloneBaseUrl` swapped from the localhost URL to the Pages URL — all three deep-link paths (Jump-to, Copy-Link-to, BD-self Copy Link) now produce URLs anyone on any network can open. EV → BD direction unchanged (was already targeting the Cloudflare tunnel at `graph.virtualfictions.uk`).
+
+### API-dependent code retired on the EV side
+
+Everything that assumed a co-hosted BD Express server got deleted:
+
+- ◀ Prev / Next ▶ buttons (relied on `/api/module-sibling`)
+- `navigateSibling()`, `goToVirtual()`, `updateEvNavState()`, `evPrevBtn`, `evNextBtn`
+- `fetchModuleDefault()`, `loadModuleDefault()` (relied on `/api/module-default`; DEFAULT_SCRIPT fallback covered the cold-boot no-params case anyway, but every load logged a stderr 404)
+- `virtualStart`, `atVirtualStart` state (only used by navigateSibling)
+- `moduleId`, `getModuleIdFromPath()` (only read by the retired fetches)
+
+~163 lines removed. Kept: Freeze, Edit, source-context, sliders, textarea, Copy Link, invite panel, `?data=` arrival flow. All changes replicated in both preview.html copies (BD's `V_Kolam/` + the new bd_V_Kolam repo).
+
+### Source-context now shows the node name
+
+Reported: after moving to standalone EV, the bottom-bar source-context text showed only `"bd_V_Kolam"` (module/gateway label) even when the sender was on `bd_V_Kolam_2` — losing the `_2` identifying the specific node.
+
+Fix: added `name` to the Copy Link payload in BD's `buildExternalWebsiteUrl` (was missing); EV's `renderSourceContext` now displays `name` alone when present (node names already carry the module prefix, so pairing with source_text read redundantly). Falls back to `source_text — title` for nodes without `name` (section-title TextNodes etc).
+
+### Amber Copy Link
+
+EV's side-panel Copy Link (the primary sharing action, directly below the script textarea) was inheriting `.action-bar button`'s teal-outline default, indistinguishable from Copy / ↓ / ↑. Given filled amber (`#a07820` bg, dark text, bold) to stand out. Same palette as the invite panel's `#bd-enter-btn`.
+
+### Inline music player
+
+Added to the right end of `#bd-bar` alongside Freeze/Edit/source-context: `<select>` track picker → play/pause button → `<audio preload="none">`. Three tracks hardcoded (EV has no server-side file discovery like BD does): `D_ChineseSad1.mp3` (63 MB, default), `A_GreatWall.mp3` (57 MB), `A_QiuFengCi.mp3` (844 KB).
+
+`preload="none"` + lazy `src` assignment (only set on first play) is load-bearing — otherwise every fresh EV load would eagerly download ~120 MB.
+
+The three mp3s pushed to the bd_V_Kolam repo. The two ~60 MB files tripped GitHub's 50 MB soft warning (`GH001: Large files detected`) but pushed successfully — well under the 100 MB hard limit. **No Git LFS needed at this scale.**
+
+### nav_nodes_text.md ai_read scaffold
+
+One-off transform: appended empty `%%bd_ai_read [ / %%bd_]` scaffolds to every block that didn't already have one. Opening + closing on their own lines with a blank between so a curator can just type between them. 171 got added; Root (which had one inline) untouched. Canonical form used, so sync-time normalisation is a no-op — what you write is exactly what lands in `node.text`.
+
+Script at scratchpad `add_ai_read_scaffold.js` — one-off, not committed.
+
+### Two-copy drift management
+
+`preview.html` + `visual_module.html` + the three mp3s now exist in TWO places (BD's `V_Kolam/` + bd_V_Kolam repo root). User's stated preference (2026-07-17): keep both copies, manage the push manually.
+
+Sync workflow: edit BD's copy first (all tooling geared there), `cp` overwrite EV's copy, `diff -q` verify byte-identical, commit + push both repos.
+
+**Related memory:** [[ev-standalone-deployment]] — new, comprehensive doc. MEMORY.md index refreshed.
+
+---
+
 ## 2026-07-17 — @flag review workflow + :User retired + Player gated + URLs stripped
 
 **Landmark commits:** `540b46b` (sync-helpers @flag gate) → `de85344` (retire :User nodes) → `fbad529` (backfill-urls) → `f36cd78` (multi-block write + dump-nav-nodes + nav_nodes_text.md) → `aeb2115` (Player visibility gate + deep-link URL strip) → `7fdf7bc` (extractor: line-walk not paragraph-split).
