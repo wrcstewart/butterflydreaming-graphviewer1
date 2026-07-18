@@ -373,6 +373,20 @@
     .action-bar button:active { background: #243f3b; }
     .action-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* 2026-07-17 — the side-panel Copy Link is the primary sharing
+       action (produces the URL a user would paste into a message /
+       another device). Given filled amber to stand out from the
+       teal-outlined siblings (Copy / ↓ / ↑) and echo the invite-
+       panel's #bd-enter-btn palette. */
+    #copy-link-btn {
+      background: #a07820;
+      color: #0a0a1a;
+      border: 1px solid #a07820;
+      font-weight: bold;
+    }
+    #copy-link-btn:hover  { background: #c9a227; border-color: #c9a227; color: #0a0a1a; }
+    #copy-link-btn:active { background: #8a6618; border-color: #8a6618; }
+
     #status {
       font-size: 0.75rem;
       font-style: italic;
