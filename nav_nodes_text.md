@@ -34,6 +34,10 @@ Designed to be intrinsically safe it aims to be a new conversational tool that i
 @set text:
 Some areas for conversation - your exploration is private up until a possible pairing with another user - from that point you would see each other's browsing. Regard the areas as words leading you on - not precise terms. Remember double click (or tap) to journey on...
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Settling — Entry
@@ -45,6 +49,10 @@ Some areas for conversation - your exploration is private up until a possible pa
 @set text:
 A short optional mindfulness settling — relaxing the mind for creative browsing, conversation and creation. Use the player at the screen bottom to hear. You can also optionally listen to some relaxing music. Then click the next node.
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Analytical — Family
@@ -54,6 +62,9 @@ A short optional mindfulness settling — relaxing the mind for creative browsin
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -64,6 +75,9 @@ A short optional mindfulness settling — relaxing the mind for creative browsin
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -74,6 +88,9 @@ A short optional mindfulness settling — relaxing the mind for creative browsin
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -84,6 +101,9 @@ A short optional mindfulness settling — relaxing the mind for creative browsin
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -97,6 +117,10 @@ A short optional mindfulness settling — relaxing the mind for creative browsin
 All the Arts ...visual - music - writing - drama - dance -film -media extensions
 Techniques - Themes - Emotions invoked - Inspirations 
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Body — Family
@@ -106,6 +130,9 @@ Techniques - Themes - Emotions invoked - Inspirations
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -116,6 +143,9 @@ Techniques - Themes - Emotions invoked - Inspirations
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -126,6 +156,9 @@ Techniques - Themes - Emotions invoked - Inspirations
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -136,6 +169,9 @@ Techniques - Themes - Emotions invoked - Inspirations
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -146,6 +182,9 @@ Techniques - Themes - Emotions invoked - Inspirations
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -156,6 +195,9 @@ Techniques - Themes - Emotions invoked - Inspirations
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -168,6 +210,10 @@ Techniques - Themes - Emotions invoked - Inspirations
 @set text:
 Lets us know the many that are missing!
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Elements — Family
@@ -177,6 +223,9 @@ Lets us know the many that are missing!
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -189,6 +238,10 @@ Lets us know the many that are missing!
 @set text:
 ButterflyDreaming aims to be a personally supportive tool - so navigation towards the emotions in the conversation is central. Journey on to find some areas to seed a conversation.
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Expansive Emotions — Family
@@ -198,6 +251,9 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -208,6 +264,9 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -218,6 +277,9 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -228,6 +290,9 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -238,6 +303,9 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -248,6 +316,9 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -260,6 +331,10 @@ ButterflyDreaming aims to be a personally supportive tool - so navigation toward
 @set text:
 Covers everything material - cosmos to quark - sky and earth - the biosphere.  Where we are a part. Where we need to dwell respectfully, and be aware. 
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Plants/Fungi — Family
@@ -269,6 +344,9 @@ Covers everything material - cosmos to quark - sky and earth - the biosphere.  W
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -279,6 +357,9 @@ Covers everything material - cosmos to quark - sky and earth - the biosphere.  W
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -289,6 +370,9 @@ Covers everything material - cosmos to quark - sky and earth - the biosphere.  W
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -301,6 +385,10 @@ Covers everything material - cosmos to quark - sky and earth - the biosphere.  W
 @set text:
 Themes where one might encounter discussion then maybe go "further"?
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Reflective — Family
@@ -310,6 +398,9 @@ Themes where one might encounter discussion then maybe go "further"?
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -320,6 +411,9 @@ Themes where one might encounter discussion then maybe go "further"?
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -332,6 +426,10 @@ Themes where one might encounter discussion then maybe go "further"?
 @set text:
 Butterfly Dreaming aspires to be a transformative experience. Central themes like Transcendent, Identity, Reflective and shared themes from the other areas. How to achieve a coherent journey?
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Symbolic — Family
@@ -343,6 +441,10 @@ Butterfly Dreaming aspires to be a transformative experience. Central themes lik
 @set text:
 ButterflyDreaming, despite its technical structure,  aims to be a loose associative experience. Symbols often rcommunicate what we can't quite say exactly ... you might find yourself mixing a colour or a shape or a story fragment into your conversational journey ...
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Threshold — Family
@@ -352,6 +454,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -362,6 +467,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -372,6 +480,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -382,6 +493,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -392,6 +506,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -402,6 +519,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -412,6 +532,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -422,6 +545,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -432,6 +558,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -442,6 +571,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -452,6 +584,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -462,6 +597,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -472,6 +610,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -482,6 +623,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -492,6 +636,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -502,6 +649,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -512,6 +662,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -522,6 +675,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -532,6 +688,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -542,6 +701,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -552,6 +714,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -562,6 +727,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -572,6 +740,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -582,6 +753,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -592,6 +766,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -602,6 +779,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -612,6 +792,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -622,6 +805,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -632,6 +818,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -642,6 +831,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -652,6 +844,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -662,6 +857,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -672,6 +870,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -682,6 +883,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -692,6 +896,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -702,6 +909,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -712,6 +922,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -722,6 +935,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -732,6 +948,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -742,6 +961,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -752,6 +974,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -762,6 +987,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -772,6 +1000,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -782,6 +1013,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -792,6 +1026,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -802,6 +1039,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -812,6 +1052,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -822,6 +1065,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -832,6 +1078,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -842,6 +1091,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -852,6 +1104,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -862,6 +1117,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -872,6 +1130,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -882,6 +1143,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -892,6 +1156,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -902,6 +1169,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -912,6 +1182,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -922,6 +1195,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -932,6 +1208,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -942,6 +1221,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -952,6 +1234,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -962,6 +1247,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -972,6 +1260,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -982,6 +1273,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -992,6 +1286,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1002,6 +1299,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1012,6 +1312,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1022,6 +1325,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1032,6 +1338,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1042,6 +1351,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1052,6 +1364,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1062,6 +1377,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1072,6 +1390,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1082,6 +1403,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1092,6 +1416,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1102,6 +1429,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1112,6 +1442,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1122,6 +1455,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1132,6 +1468,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1142,6 +1481,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1152,6 +1494,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1162,6 +1507,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1172,6 +1520,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1182,6 +1533,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1192,6 +1546,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1202,6 +1559,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1212,6 +1572,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1222,6 +1585,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1232,6 +1598,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1242,6 +1611,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1252,6 +1624,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1262,6 +1637,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1272,6 +1650,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1282,6 +1663,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1292,6 +1676,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1302,6 +1689,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1312,6 +1702,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1322,6 +1715,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1332,6 +1728,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1342,6 +1741,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1352,6 +1754,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1362,6 +1767,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1372,6 +1780,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1382,6 +1793,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1392,6 +1806,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1402,6 +1819,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1412,6 +1832,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1422,6 +1845,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1432,6 +1858,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1442,6 +1871,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1452,6 +1884,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1462,6 +1897,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1472,6 +1910,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1482,6 +1923,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1492,6 +1936,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1502,6 +1949,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1512,6 +1962,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1522,6 +1975,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1532,6 +1988,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1542,6 +2001,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1552,6 +2014,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1562,6 +2027,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1572,6 +2040,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1582,6 +2053,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1592,6 +2066,9 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @flag update_this: false
 
 @set text:
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1604,6 +2081,10 @@ ButterflyDreaming, despite its technical structure,  aims to be a loose associat
 @set text:
 Grimm's Fairy Tales. Collected by Jacob and Wilhelm Grimm. Translated by Margaret Hunt (1884). Public domain. Stories gathered from the villages of nineteenth century Germany - some ancient, some strange, some brutal, some tender: maps of the inner life.
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## null — TextNode (gateway)
@@ -1614,6 +2095,10 @@ Grimm's Fairy Tales. Collected by Jacob and Wilhelm Grimm. Translated by Margare
 
 @set text:
 Walt Whitman - selected poems from Leaves of Grass (1891). Public domain. American, 1819-1892. The great democratic voice of the nineteenth century - expansive, physical, contradictory, tender. A child asks what is the grass. The dead are not gone. The smallest sprout shows there is no total death. All goes onward and outward.
+
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1626,6 +2111,10 @@ Walt Whitman - selected poems from Leaves of Grass (1891). Public domain. Americ
 @set text:
 Tao Te Ching (excerpts). Attributed: Laozi, date: disputed but BCE. Version: McDonald. It has been described as the most influential text ever written. Not easy to fit the advice into busy western life but maybe useful to try — hence perhaps a good subject for conversation?
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## null — TextNode (gateway)
@@ -1636,6 +2125,10 @@ Tao Te Ching (excerpts). Attributed: Laozi, date: disputed but BCE. Version: McD
 
 @set text:
 Thomas Hardy. Thomas Hardy (1840-1928) wrote most of his greatest poetry late, and most of it looking backward. After the death of his first wife Emma in 1912 - from whom he had long been estranged - grief and remorse broke open in him a sequence of elegies, the Poems of 1912-13, that count among the most unguarded reckonings with loss in English. Several of those poems are gathered here, alongside earlier and later work in which the same preoccupations turn: the dead who will not quite leave, the word left unsaid, the small persisting life that outlasts what seemed permanent. Hardy is a poet of the threshold. His landscapes are populated by voices that may be the wind or may be the missed woman calling; his returning dead find their old rooms repainted and their place quietly taken. He gives no consolation he does not believe, and refuses none he has actually felt. In In Tenebris he coins his own word for the state he most often inhabits - unhope - not despair, which still strains against its condition, but the stillness on the far side of it, where there is nothing left to lose and so nothing left to fear. What recurs across these poems is less a philosophy than a weather: the dregs of winter, the harrowed clod, the thrush flinging its soul upon the growing gloom. Hardy looks steadily at impermanence and does not flinch, and in that steadiness something occasionally turns toward wonder - a blessed Hope he can hear in another but cannot claim for himself.
+
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1648,6 +2141,10 @@ Thomas Hardy. Thomas Hardy (1840-1928) wrote most of his greatest poetry late, a
 @set text:
 Zhuangzi - selections from the Inner Chapters. Attributed: Zhuang Zhou, 4th century BCE. Version: Legge (1891), public domain. The companion text to the Tao Te Ching - wilder, funnier, stranger. A giant bird that needs ninety thousand li of sky to turn around. A cook who carves an ox like a musician. A man who falls asleep and dreams he is a butterfly, then "wakes"...
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## bd_V_Kolam — TextNode (gateway)
@@ -1658,6 +2155,10 @@ Zhuangzi - selections from the Inner Chapters. Attributed: Zhuang Zhou, 4th cent
 
 @set text:
 Visual media nodes — pattern generators, L-systems and early visual experiments.
+
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1670,6 +2171,10 @@ Visual media nodes — pattern generators, L-systems and early visual experiment
 @set text:
 Clever Elsie
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Snow White [Grimm's Fairy Tales] — TextNode (section title)
@@ -1680,6 +2185,10 @@ Clever Elsie
 
 @set text:
 Snow White
+
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1692,6 +2201,10 @@ Snow White
 @set text:
 Song of Myself
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Tao Te Ching [Tao Te Ching] — TextNode (section title)
@@ -1702,6 +2215,10 @@ Song of Myself
 
 @set text:
 Tao Te Ching
+
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1714,6 +2231,10 @@ Tao Te Ching
 @set text:
 The Voice
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## His Visitor [Thomas Hardy] — TextNode (section title)
@@ -1724,6 +2245,10 @@ The Voice
 
 @set text:
 His Visitor
+
+%%bd_ai_read [
+
+%%bd_]
 
 ---
 
@@ -1736,6 +2261,10 @@ His Visitor
 @set text:
 The Walk
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Your Last Drive [Thomas Hardy] — TextNode (section title)
@@ -1747,6 +2276,10 @@ The Walk
 @set text:
 Your Last Drive
 
+%%bd_ai_read [
+
+%%bd_]
+
 ---
 
 ## Zhuangzi — Inner Chapters [Zhuangzi (Inner Chapters)] — TextNode (section title)
@@ -1757,3 +2290,7 @@ Your Last Drive
 
 @set text:
 Zhuangzi — Inner Chapters
+
+%%bd_ai_read [
+
+%%bd_]
