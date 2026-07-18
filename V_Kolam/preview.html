@@ -64,6 +64,38 @@
       margin-right: 12px;
     }
 
+    /* 2026-07-18 — inline audio player at the right end of #bd-bar.
+       Compact styling; matches the muted greyscale of the surrounding bar. */
+    #ev-media-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+    #ev-media-select {
+      background: #1a1a2a;
+      color: #cccccc;
+      border: 1px solid #444;
+      border-radius: 3px;
+      font-family: sans-serif;
+      font-size: 11px;
+      padding: 2px 4px;
+      max-width: 110px;
+    }
+    #ev-media-btn {
+      background: #1a1a2a;
+      color: #cccccc;
+      border: 1px solid #444;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 2px 8px;
+      min-width: 30px;
+    }
+    #ev-media-btn:hover  { background: #23233a; color: #fff; }
+    #ev-media-btn:active { background: #2f2f4a; }
+
     /* Invitation panel (2026-07-11) — floats above #bd-bar. Shown only when
        Edit is toggled on; hidden in basic mode. Contains an explainer
        sentence and two stacked call-to-action buttons (Jump In on top,
@@ -513,9 +545,20 @@
       <button id="ev-edit-btn"   type="button" title="Show or hide the script editor">Edit</button>
       <!-- ◀/▶ Prev/Next removed 2026-07-17: relied on BD's /api/module-sibling
            endpoint, not available in the standalone GitHub Pages deployment. -->
-
     </div>
     <span id="bd-source-context"></span>
+    <!-- 2026-07-18 — inline audio player, right end of #bd-bar. Hardcoded
+         track list (EV has no file-discovery API); preload="none" so the
+         60+ MB tracks don't download on page load. -->
+    <div id="ev-media-bar">
+      <select id="ev-media-select" title="Choose track">
+        <option value="D_ChineseSad1.mp3" selected>Chinese Sad</option>
+        <option value="A_GreatWall.mp3">Great Wall</option>
+        <option value="A_QiuFengCi.mp3">Qiu Feng Ci</option>
+      </select>
+      <button id="ev-media-btn" type="button" aria-label="play/pause">▶</button>
+      <audio id="ev-media-audio" preload="none"></audio>
+    </div>
   </div>
 
   <!-- Invitation panel: shown only when Edit is toggled on (body loses the
@@ -867,6 +910,46 @@ F: F+F-F-F+F+F+F-F
 
       // No URL params — load the built-in default script.
       loadScript(DEFAULT_SCRIPT);
+    })();
+
+    // ── Inline audio player (2026-07-18) ──────────────────────────────────
+    // Simple play/pause + track select. Audio source is set lazily on
+    // first play (or on track change with a play already in progress),
+    // so the 60+ MB tracks don't download at page load — preload="none"
+    // on the <audio> element handles the loadstart guard.
+    (function initMediaBar() {
+      const audio  = document.getElementById('ev-media-audio');
+      const btn    = document.getElementById('ev-media-btn');
+      const select = document.getElementById('ev-media-select');
+      if (!audio || !btn || !select) return;
+
+      function ensureSrc() {
+        // Only assign src when needed. Comparing to endsWith avoids the
+        // full-URL vs relative-name mismatch (audio.src is absolute).
+        const want = select.value;
+        if (!audio.src || !audio.src.endsWith(want)) audio.src = want;
+      }
+
+      btn.addEventListener('click', () => {
+        if (audio.paused) {
+          ensureSrc();
+          audio.play().then(() => { btn.textContent = '⏸'; })
+                      .catch(err => { console.warn('audio play failed', err); });
+        } else {
+          audio.pause();
+          btn.textContent = '▶';
+        }
+      });
+
+      audio.addEventListener('ended', () => { btn.textContent = '▶'; });
+
+      select.addEventListener('change', () => {
+        const wasPlaying = !audio.paused;
+        if (wasPlaying) audio.pause();
+        audio.src = select.value;
+        btn.textContent = '▶';
+        if (wasPlaying) audio.play().then(() => { btn.textContent = '⏸'; }).catch(() => {});
+      });
     })();
 
     // Defensive: keep the input → stepper sync wired up even though the
