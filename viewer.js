@@ -1608,9 +1608,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   // Routes a node-click insert to either the chat panel (Copy-collage workflow,
   // when chat mode is active) or the default panel (editable system card with
-  // Save button). The "Node: <name>" header added by buildTooltipContent is
-  // useful in the default panel as a save anchor, but it's noise in a chat
-  // card — strip it on chat-side inserts.
+  // Save button). The "Node: <name>\n" header added by buildTooltipContent is
+  // stripped on chat inserts, then a compact inline `<name>: ` prefix is
+  // prepended after text processing so the reader sees which node the excerpt
+  // came from (e.g. "Conversations: Some areas for ...").
   function routeNodeText(content, meta) {
     if (chatModeActive) {
       let text = content;
@@ -1635,6 +1636,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const curatorView = !!(devCodeEl && devCodeEl.value.trim());
       text = curatorView ? unnormalizeBotBlocks(text) : stripBotBlocks(text);
       text = text.replace(/\n{3,}/g, '\n\n').replace(/^\s+|\s+$/g, '');
+      if (meta && meta.name) {
+        text = text ? `${meta.name}: ${text}` : `${meta.name}:`;
+      }
       setChatText(text);
     } else {
       setSystemText(content, meta);
