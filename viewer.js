@@ -714,9 +714,10 @@ function buildStyle() {
     {
       selector: 'node[type="Entry"][name="Conversations"]',
       style: {
-        'width': 68,
-        'height': 68,
-        'text-max-width': '62px',
+        'width': 88,
+        'height': 76,
+        'shape': 'hexagon',
+        'text-max-width': '72px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
@@ -731,15 +732,15 @@ function buildStyle() {
     {
       selector: 'node[type="Family"]',
       style: {
-        'width': 80,
-        'height': 33,
+        'width': 60,
+        'height': 60,
         'background-color': function(node) {
           const name = node.data('name');
           return FAMILY_COLOURS[name] || node.data('colour') || '#aaaaaa';
         },
         'background-opacity': 1,
         'font-size': '10px',
-        'text-max-width': '72px',
+        'text-max-width': '54px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#666666').replace('#', '');
