@@ -787,13 +787,26 @@ async function cmdDumpNavNodes(outPath) {
   const target = outPath || 'nav_nodes_text.md';
   const rows = await runSession(async (s) => {
     const r = await s.run(
+      // Label derivation uses explicit precedence via CASE, NOT labels(n)[0],
+      // because once :SubFamily lands (or any future secondary label) Memgraph's
+      // label ordering is not stable. Ranking table below mirrors the CASE so
+      // the ORDER BY stays coherent even for multi-label nodes.
       `MATCH (n)
        WHERE 'Root' IN labels(n)
           OR 'Entry' IN labels(n)
           OR 'Family' IN labels(n)
           OR 'Cluster' IN labels(n)
           OR (n:TextNode AND (n.gateway = true OR n.section_title = true))
-       RETURN labels(n)[0] AS label,
+       WITH n,
+            CASE
+              WHEN 'Root'     IN labels(n) THEN 'Root'
+              WHEN 'Entry'    IN labels(n) THEN 'Entry'
+              WHEN 'Family'   IN labels(n) THEN 'Family'
+              WHEN 'Cluster'  IN labels(n) THEN 'Cluster'
+              WHEN 'TextNode' IN labels(n) THEN 'TextNode'
+              ELSE labels(n)[0]
+            END AS lbl
+       RETURN lbl AS label,
               n.name AS name,
               n.title AS title,
               n.text AS text,
@@ -803,7 +816,7 @@ async function cmdDumpNavNodes(outPath) {
               n.source_text AS source_text,
               n.seq AS seq
        ORDER BY
-         CASE labels(n)[0]
+         CASE lbl
            WHEN 'Root'     THEN 0
            WHEN 'Entry'    THEN 1
            WHEN 'Family'   THEN 2
@@ -960,6 +973,100 @@ async function cmdDumpSubfamilyCandidates(outPath) {
   return { path: target, candidates: rows.length, placeholders };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// apply-subfamily-labels — reads subfamily_candidates.md, adds the
+// `:SubFamily` label to every node whose block is flagged
+// `@flag is_subfamily: true`, then auto-resets those flags to false
+// so the file stays honest after each apply.
+//
+// Matches on url (durable UUID key); name is informational for logs.
+// Idempotent: SET n:SubFamily is a no-op if the label is already there.
+//
+// --dry-run reports what would be applied without writing to the DB
+// or the .md file.
+// ─────────────────────────────────────────────────────────────────────
+async function cmdApplySubfamilyLabels(mdPath, { dryRun = false } = {}) {
+  if (!fs.existsSync(mdPath)) {
+    process.stderr.write(`[bd_tool] apply-subfamily-labels: file not found: ${mdPath}\n`);
+    process.exit(1);
+  }
+  const md = fs.readFileSync(mdPath, 'utf8');
+
+  // Blocks are separated by `---` on its own line. Each block carries
+  // @match url:, @match name:, @flag is_subfamily: true|false.
+  const blocks = md.split(/^---\s*$/m);
+  const candidates = [];
+  for (const block of blocks) {
+    const flagMatch = block.match(/^@flag\s+is_subfamily:\s*(true|false)\s*$/mi);
+    if (!flagMatch) continue;
+    const urlMatch  = block.match(/^@match\s+url:\s*(.+?)\s*$/mi);
+    const nameMatch = block.match(/^@match\s+name:\s*(.+?)\s*$/mi);
+    if (!urlMatch) continue;
+    candidates.push({
+      url:     urlMatch[1].trim(),
+      name:    nameMatch ? nameMatch[1].trim() : null,
+      flagged: flagMatch[1].toLowerCase() === 'true',
+    });
+  }
+
+  const toApply = candidates.filter(c => c.flagged);
+  process.stderr.write(
+    `[bd_tool] apply-subfamily-labels: parsed ${candidates.length} block(s); `
+    + `${toApply.length} flagged is_subfamily: true\n`
+  );
+  for (const c of toApply) process.stderr.write(`  - ${c.name || c.url}\n`);
+
+  if (toApply.length === 0) {
+    return { total: candidates.length, flagged: 0, applied: 0, missing: [], dryRun };
+  }
+
+  if (dryRun) {
+    process.stderr.write(`[bd_tool] apply-subfamily-labels: DRY RUN — no DB write, no file write\n`);
+    return { total: candidates.length, flagged: toApply.length, applied: 0, dryRun: true };
+  }
+
+  const { applied, missing } = await runSession(async (s) => {
+    let count = 0;
+    const notFound = [];
+    for (const c of toApply) {
+      const r = await s.run(
+        `MATCH (n:Family { url: $url })
+         SET n:SubFamily
+         RETURN count(n) AS updated`,
+        { url: c.url }
+      );
+      const raw = r.records[0].get('updated');
+      const upd = typeof raw === 'number' ? raw : Number(raw);
+      if (upd > 0) count += upd;
+      else notFound.push(c);
+    }
+    return { applied: count, missing: notFound };
+  });
+
+  // Reset flags in the .md so the next round is honest. Only flip true→false;
+  // leave author-authored false values alone. Match is line-anchored + case-
+  // insensitive to mirror the parser above.
+  const updatedMd = md.replace(
+    /^(@flag\s+is_subfamily:\s*)true(\s*)$/gmi,
+    '$1false$2'
+  );
+  fs.writeFileSync(mdPath, updatedMd, 'utf8');
+
+  process.stderr.write(
+    `[bd_tool] apply-subfamily-labels: SET :SubFamily on ${applied} node(s); `
+    + `${missing.length} not found; flags reset in ${mdPath}\n`
+  );
+  for (const m of missing) process.stderr.write(`  ! not found: ${m.name || m.url}\n`);
+
+  return {
+    total: candidates.length,
+    flagged: toApply.length,
+    applied,
+    missing: missing.map(m => ({ name: m.name, url: m.url })),
+    dryRun: false,
+  };
+}
+
 async function cmdBackup(outPath) {
   const target = outPath || defaultBackupPath();
   const dir = path.dirname(target);
@@ -1002,6 +1109,7 @@ Usage:
   node bd_tool.js backfill-urls [--dry-run] [--labels L1,L2]
   node bd_tool.js dump-nav-nodes [<outPath>]
   node bd_tool.js dump-subfamily-candidates [<outPath>]
+  node bd_tool.js apply-subfamily-labels <subfamily_candidates.md> [--dry-run]
 
 Results are JSON on stdout. Progress + errors on stderr.
 `);
@@ -1056,6 +1164,11 @@ async function main() {
   } else if (cmd === 'dump-subfamily-candidates') {
     const outPath = args.find(a => !a.startsWith('--'));
     out = await cmdDumpSubfamilyCandidates(outPath);
+  } else if (cmd === 'apply-subfamily-labels') {
+    const mdPath = args.find(a => !a.startsWith('--'));
+    if (!mdPath) { process.stderr.write('apply-subfamily-labels: md path required\n'); process.exit(1); }
+    const dryRun = args.includes('--dry-run');
+    out = await cmdApplySubfamilyLabels(mdPath, { dryRun });
   } else if (cmd === 'backfill-urls') {
     const dryRun = args.includes('--dry-run');
     let labels = ['Cluster', 'Family'];
