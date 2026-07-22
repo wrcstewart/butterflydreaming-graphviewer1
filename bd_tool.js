@@ -729,52 +729,77 @@ async function cmdBackfillUrls(labels, opts) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// dump-nav-nodes — emit a multi-block .md file containing every node
-// in the "navigation hub" of the graph (Root + Entry + Family +
-// Cluster + gateway TextNodes + section_title TextNodes). Excludes
-// the ~186 content TextNodes (chapter/verse chunks) which are much
-// bigger + not part of the user's periodic review workflow.
+// dump-nav-nodes — emit a multi-block .md file containing the graph's
+// navigation spine, one block per node, in structural top-down order:
+//   Root → Entry (Settling, Conversations) → Family (top-level, alpha)
+//        → SubFamily (alpha) → Cluster (alpha)
 //
-// Format matches the `write` subcommand's patch format:
-//   ## <human title> — <label>
+// Each block shows the node's incoming parents with per-edge weight,
+// sorted by weight desc (strongest first). CONTAINS edges (Root/Entry
+// tier) have no weight — rendered as `(—)`.
+//
+// TextNodes (gateway/section-title/content) are deliberately excluded;
+// the file is the nav-structure review + text-edit surface, not the
+// full corpus. Add back with an --include-textnodes flag later if
+// needed.
+//
+// Block form (unchanged — still writable via `bd_tool.js write`):
+//   ## <name> — <label>
+//
 //   @match url: <url>
-//   @match name: <name>           (if node has one)
-//   @match title: <title>         (if node has title but no name — mainly
-//                                  for section_title TextNodes)
+//   @match name: <name>
 //   @flag update_this: false
 //
-//   @set text:
-//   <current text — empty body if node has no text yet>
+//   parents: <Parent1> (weight 0.7), <Parent2> (weight 0.5)     # or (—) for CONTAINS
+//                                                                # or "(none — top of tree)" for Root
 //
-// Blocks separated by `---`. Ordering: Root → Entry (alpha) → Family
-// (alpha) → Cluster (alpha) → gateway TextNodes (alpha by source_text)
-// → section_title TextNodes (alpha by source_text then seq).
+//   @set text:
+//   <current text>
 // ─────────────────────────────────────────────────────────────────────
 
 function labelHeader(row) {
-  const label = row.label;
-  const gateway = !!row.gateway;
-  const section_title = !!row.section_title;
-  if (label === 'TextNode') {
-    if (gateway) return `${row.name} — TextNode (gateway)`;
-    if (section_title) {
-      const anchor = row.title || row.name || '(untitled section)';
-      const src = row.source_text ? ` [${row.source_text}]` : '';
-      return `${anchor}${src} — TextNode (section title)`;
-    }
-    return `${row.name || row.title || '(unnamed)'} — TextNode`;
+  return `${row.name || '(unnamed)'} — ${row.label}`;
+}
+
+function renderParentsLine(row) {
+  const parents = row.parents || [];
+  if (row.label === 'Root' || parents.length === 0) {
+    return `parents: (none — top of tree)`;
   }
-  return `${row.name || '(unnamed)'} — ${label}`;
+  // Weight-desc, then alpha for ties. weight === null (CONTAINS edges)
+  // sorted after weighted parents.
+  const sorted = parents.slice().sort((a, b) => {
+    const aw = a.weight == null ? -Infinity : a.weight;
+    const bw = b.weight == null ? -Infinity : b.weight;
+    if (bw !== aw) return bw - aw;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  // Child-normalize: divide each DESCENDS_FROM weight by the sum of all
+  // DESCENDS_FROM weights on this node's incoming edges, so the block's
+  // parent weights sum to 1.0. CONTAINS edges (Root/Entry tier) have no
+  // weight — rendered as (—). If a node has ONLY CONTAINS parents, no
+  // normalization is possible; those blocks render weight-less.
+  const weighted    = sorted.filter(p => p.weight != null);
+  const contains    = sorted.filter(p => p.weight == null);
+  const totalWeight = weighted.reduce((s, p) => s + p.weight, 0);
+  const parts = [];
+  for (const p of weighted) {
+    const share = totalWeight > 0 ? p.weight / totalWeight : 0;
+    parts.push(`${p.name} (weight ${share.toFixed(3)})`);
+  }
+  for (const p of contains) parts.push(`${p.name} (—)`);
+  return `parents: ${parts.join(', ')}`;
 }
 
 function renderPatchBlock(row) {
   const lines = [];
   lines.push(`## ${labelHeader(row)}`);
   lines.push('');
-  if (row.url)   lines.push(`@match url: ${row.url}`);
-  if (row.name)  lines.push(`@match name: ${row.name}`);
-  if (row.title && !row.name) lines.push(`@match title: ${row.title}`);
+  if (row.url)  lines.push(`@match url: ${row.url}`);
+  if (row.name) lines.push(`@match name: ${row.name}`);
   lines.push(`@flag update_this: false`);
+  lines.push('');
+  lines.push(renderParentsLine(row));
   lines.push('');
   lines.push(`@set text:`);
   if (row.text && row.text.length > 0) {
@@ -786,76 +811,82 @@ function renderPatchBlock(row) {
 async function cmdDumpNavNodes(outPath) {
   const target = outPath || 'nav_nodes_text.md';
   const rows = await runSession(async (s) => {
+    // Label + group derivation: SubFamily checked BEFORE Family in every
+    // CASE so multi-labelled (:Family :SubFamily) nodes land in the
+    // SubFamily bucket. Group rank drives ordering:
+    //   0 Root, 1 Entry(Settling), 2 Entry(Conversations),
+    //   3 Family (top-level), 4 SubFamily, 5 Cluster
+    // Parents collected via pattern comprehension in one shot: incoming
+    // CONTAINS edges (Root→Entry tier, no weight) plus incoming
+    // DESCENDS_FROM edges (Entry→Family, Family↔SubFamily, Family/SubFamily
+    // →Cluster, all weighted).
     const r = await s.run(
-      // Label derivation uses explicit precedence via CASE, NOT labels(n)[0],
-      // because once :SubFamily lands (or any future secondary label) Memgraph's
-      // label ordering is not stable. Ranking table below mirrors the CASE so
-      // the ORDER BY stays coherent even for multi-label nodes.
       `MATCH (n)
-       WHERE 'Root' IN labels(n)
-          OR 'Entry' IN labels(n)
-          OR 'Family' IN labels(n)
-          OR 'Cluster' IN labels(n)
-          OR (n:TextNode AND (n.gateway = true OR n.section_title = true))
+       WHERE n:Root
+          OR (n:Entry AND (n.name = 'Settling' OR n.name = 'Conversations'))
+          OR n:Family
+          OR n:Cluster
        WITH n,
             CASE
-              WHEN 'Root'     IN labels(n) THEN 'Root'
-              WHEN 'Entry'    IN labels(n) THEN 'Entry'
-              WHEN 'Family'   IN labels(n) THEN 'Family'
-              WHEN 'Cluster'  IN labels(n) THEN 'Cluster'
-              WHEN 'TextNode' IN labels(n) THEN 'TextNode'
+              WHEN n:Root                                    THEN 'Root'
+              WHEN n:Entry                                   THEN 'Entry'
+              WHEN n:SubFamily                               THEN 'SubFamily'
+              WHEN n:Family                                  THEN 'Family'
+              WHEN n:Cluster                                 THEN 'Cluster'
               ELSE labels(n)[0]
-            END AS lbl
+            END AS lbl,
+            CASE
+              WHEN n:Root      THEN 0
+              WHEN n:Entry     THEN 1
+              WHEN n:SubFamily THEN 3
+              WHEN n:Family    THEN 2
+              WHEN n:Cluster   THEN 4
+              ELSE 9
+            END AS grp,
+            [(p)-[:CONTAINS]->(n) | {name: p.name, url: p.url, weight: null}] AS contParents,
+            [(p)-[dr:DESCENDS_FROM]->(n) | {name: p.name, url: p.url, weight: coalesce(dr.weight, 0)}] AS descParents
        RETURN lbl AS label,
+              grp AS grp,
               n.name AS name,
-              n.title AS title,
               n.text AS text,
               n.url  AS url,
-              coalesce(n.gateway, false)       AS gateway,
-              coalesce(n.section_title, false) AS section_title,
-              n.source_text AS source_text,
-              n.seq AS seq
-       ORDER BY
-         CASE lbl
-           WHEN 'Root'     THEN 0
-           WHEN 'Entry'    THEN 1
-           WHEN 'Family'   THEN 2
-           WHEN 'Cluster'  THEN 3
-           WHEN 'TextNode' THEN 4
-           ELSE 5
-         END,
-         CASE WHEN n.gateway = true THEN 0 ELSE 1 END,
-         n.source_text,
-         n.name,
-         n.seq`
+              contParents + descParents AS parents
+       ORDER BY grp, name`
     );
     return r.records.map(rec => ({
-      label:         rec.get('label'),
-      name:          rec.get('name'),
-      title:         rec.get('title'),
-      text:          rec.get('text'),
-      url:           rec.get('url'),
-      gateway:       rec.get('gateway'),
-      section_title: rec.get('section_title'),
-      source_text:   rec.get('source_text'),
-      seq:           rec.get('seq'),
+      label:   rec.get('label'),
+      grp:     rec.get('grp'),
+      name:    rec.get('name'),
+      text:    rec.get('text'),
+      url:     rec.get('url'),
+      parents: rec.get('parents') || [],
     }));
   });
 
   const header = [
-    `# Navigation node text — review sheet`,
+    `# Navigation nodes — structural review sheet`,
     '',
     `Generated by \`node bd_tool.js dump-nav-nodes\` on ${new Date().toISOString().slice(0, 10)}.`,
-    `Total: ${rows.length} nodes (Root + Entry + Family + Cluster + gateway/section-title TextNodes).`,
-    `Content-chunk TextNodes are deliberately excluded from this scope.`,
+    `Ordering: Root → Entry (alpha) → Family (top-level, alpha) → SubFamily (alpha)`,
+    `→ Cluster (alpha). All Label types sorted alphabetically within their group.`,
+    `Total: ${rows.length} blocks.`,
     '',
-    `To edit: change the body text under \`@set text:\`, flip \`@flag update_this:\` to \`true\`,`,
-    `save, then \`node bd_tool.js write nav_nodes_text.md\`. Only flagged blocks are applied;`,
-    `flags are auto-reset to \`false\` after each successful sync so this file stays honest.`,
+    `Each block shows \`parents:\` — the incoming edges up the DAG. Weights are`,
+    `**child-normalized**: for each node, its DESCENDS_FROM incoming weights are`,
+    `divided by their sum so the row totals 1.0. This is a display-only projection`,
+    `computed from the current DB values (which may still hold pre-normalization`,
+    `editorial weights). Sorted weight desc, strongest first. \`(—)\` for CONTAINS`,
+    `(Root/Entry tier — no weight). Root shows \`(none — top of tree)\`.`,
     '',
-    `Identity: url is the durable UUID key (all present after 2026-07-16 backfill); name`,
-    `is a friendly secondary anchor. Section-title TextNodes have no name — matched via`,
-    `\`@match title:\` fallback.`,
+    `The child-normalized values shown are the intended new canonical form. When`,
+    `write-back of edited weights is wired in, flipping \`@flag update_this: true\` on`,
+    `a block will persist that block's \`parents:\` row as the new DB edge weights.`,
+    '',
+    `To edit text: change the body under \`@set text:\`, flip \`@flag update_this:\``,
+    `to \`true\`, save, then \`node bd_tool.js write nav_nodes_text.md\`. Flags`,
+    `auto-reset after each successful sync.`,
+    '',
+    `Content-chunk / gateway / section-title TextNodes are deliberately excluded.`,
     '',
   ];
 
