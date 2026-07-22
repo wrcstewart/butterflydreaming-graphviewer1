@@ -2194,6 +2194,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.$('node[type="Cluster"].active-cluster').removeClass('active-cluster');
     clusterNode.addClass('active-cluster');
     lastClusterNode = clusterNode;
+    // The dev-write button captures hint_x/hint_y for lastParentNode's child
+    // edges. Cluster expand IS a first-class hint context (its gateways and
+    // Family parents are the "children" to arrange), so lastParentNode has
+    // to be the cluster — otherwise Write would silently record positions
+    // against whatever previous parent was set (e.g. the containing Family).
+    lastParentNode = clusterNode;
     currentClusterColour = clusterNode.data('colour');
     saveState();
     activeNodeId = clusterNode.id();
@@ -2218,11 +2224,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       e.source().visible() && e.target().visible() && e.data('type') !== 'CHILD'
     ).show();
 
-    runLayout(cy);
+    // Pass the cluster as parentNode so runLayout's hint scan finds edges
+    // touching it and can restore hint-based positions (previously null, so
+    // hint mode was always 'force' on cluster expand — no restore).
+    runLayout(cy, clusterNode);
 
+    // Fallback row layout for gateways when NO hints exist for them. If any
+    // gateway edge already carries hint_x/y, runLayout above has already
+    // placed them at the user's chosen positions — the row override would
+    // wipe that, so skip it in that case.
     setTimeout(() => {
       const gws = gwEdges.sources().filter(':visible');
       if (!gws.length) return;
+      const anyGwHint = gwEdges.some(e => e.data('hint_x') != null && e.data('hint_y') != null);
+      if (anyGwHint) return;
       const spacing = 130;
       const rowX = clusterNode.position().x - ((gws.length - 1) * spacing) / 2;
       const rowY = clusterNode.position().y + 150;
