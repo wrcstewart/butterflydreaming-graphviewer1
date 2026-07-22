@@ -311,6 +311,34 @@ app.post('/api/save-cluster-parents', async (req, res) => {
     }
     const clusterName = check.records[0].get('name');
 
+    // Zero-weights case → delete the Cluster IF no gateway TextNodes point
+    // at it (CONTAINS_CLUSTER incoming edges). Symmetric to the SubFamily
+    // delete rule. If gateways exist, refuse and let the curator resolve
+    // manually — the "reassign gateways" case is out of scope for now.
+    if (entries.length === 0) {
+      const gwCheck = await session.run(
+        `MATCH (gw:TextNode)-[:CONTAINS_CLUSTER]->(c:Cluster {url: $url})
+         RETURN count(gw) AS n`,
+        { url: cluster_url }
+      );
+      const gatewayCount = toNum(gwCheck.records[0].get('n'));
+      if (gatewayCount > 0) {
+        return res.status(400).json({
+          error: `Cannot delete "${clusterName}": has ${gatewayCount} gateway TextNode child(ren). Detach or reassign those first.`
+        });
+      }
+      await session.run(
+        `MATCH (c:Cluster {url: $url}) DETACH DELETE c`,
+        { url: cluster_url }
+      );
+      res.set('Cache-Control', 'no-store');
+      return res.json({
+        cluster: clusterName,
+        cluster_url,
+        deleted: true,
+      });
+    }
+
     // Step 1 — drop direct top-Family parents.
     const rm1 = await session.run(
       `MATCH (f:Family)-[r:DESCENDS_FROM]->(c:Cluster {url: $url})
@@ -355,6 +383,47 @@ app.post('/api/save-cluster-parents', async (req, res) => {
     });
   } catch (err) {
     console.error('[BD] /api/save-cluster-parents error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
+// POST /api/create-cluster
+// Body: { name: string }
+// Creates a new :Cluster node with empty text and a fresh URL. Name
+// uniqueness enforced across Family/SubFamily/Cluster (409 on collision).
+// Parents get attached in a follow-up via /api/save-cluster-parents.
+app.post('/api/create-cluster', async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name required' });
+  }
+  const trimmed = name.trim();
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    const exists = await session.run(
+      `MATCH (n)
+       WHERE (n:Family OR n:Cluster)
+         AND n.name = $name
+       RETURN labels(n) AS labels LIMIT 1`,
+      { name: trimmed }
+    );
+    if (exists.records.length > 0) {
+      const kinds = exists.records[0].get('labels');
+      return res.status(409).json({
+        error: `A ${kinds.join('+')} node named "${trimmed}" already exists.`
+      });
+    }
+    const url = 'butterflydreaming.org/n/' + crypto.randomUUID();
+    await session.run(
+      `CREATE (n:Cluster { name: $name, url: $url, text: '' })`,
+      { name: trimmed, url }
+    );
+    res.set('Cache-Control', 'no-store');
+    res.json({ url, name: trimmed });
+  } catch (err) {
+    console.error('[BD] /api/create-cluster error:', err.message);
     res.status(500).json({ error: err.message });
   } finally {
     await session.close();
