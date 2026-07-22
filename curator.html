@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BD Curator — Nav Structure</title>
+  <style>
+    :root {
+      --bg:        #0a0a1a;
+      --panel:     #14142a;
+      --panel-2:   #1c1c38;
+      --border:    #2e2e50;
+      --text:      #e6e6f0;
+      --text-dim:  #9090a8;
+      --accent:    #a07820;
+      --hover:     #24244a;
+      --selected:  #3a3a70;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; font-size: 14px; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+
+    header {
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { margin: 0; font-size: 15px; font-weight: 600; }
+    header .status { color: var(--text-dim); font-size: 12px; }
+
+    #text-panel {
+      padding: 12px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      min-height: 90px;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+    #text-panel .header {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    #text-panel .body {
+      font-size: 13px;
+    }
+    #text-panel .body.empty {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    #columns {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      overflow: hidden;
+      min-height: 0;
+    }
+    .col {
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .col-head {
+      padding: 8px 12px;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .col-head .count {
+      color: var(--text-dim);
+      font-weight: normal;
+      font-size: 12px;
+    }
+    .col-list {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .col-list .item {
+      padding: 6px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--panel-2);
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      border-left: 3px solid transparent;
+    }
+    .col-list .item:hover { background: var(--hover); }
+    .col-list .item.selected {
+      background: var(--selected);
+      color: white;
+    }
+    .col-list .item.parent-of-selected {
+      border-left-color: var(--accent);
+    }
+    .col-list .item .item-weight {
+      color: var(--accent);
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      min-width: 46px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .col-list .item .item-weight.empty {
+      color: transparent;
+    }
+    .col-list .item .item-hint {
+      color: var(--text-dim);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    /* Grouped SubFamily list — Family headers between SubFamily items */
+    .col-list .group-header {
+      padding: 6px 12px 2px;
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      background: rgba(255,255,255,0.02);
+      user-select: none;
+      border-bottom: 1px solid var(--panel-2);
+    }
+    .col-list .group-header:not(:first-child) {
+      margin-top: 4px;
+    }
+    .col-list .item.compact {
+      padding: 4px 12px;
+      font-size: 12.5px;
+    }
+
+    /* Editable weight cell — used when a Cluster is selected. Three states:
+         empty       (no value entered)      → dim placeholder
+         guess       (auto-seeded)           → grey italic
+         committed   (user-typed or real DB) → accent (amber) */
+    input.item-weight {
+      background: transparent;
+      border: 1px solid var(--panel-2);
+      border-radius: 3px;
+      color: var(--text-dim);
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      padding: 1px 4px;
+      width: 60px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    input.item-weight:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(160,120,32,0.08);
+    }
+    input.item-weight.guess {
+      color: #7a7a90;
+      font-style: italic;
+    }
+    input.item-weight.committed {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    /* Edit panel — sum + save. Visible only when a Cluster is selected. */
+    #edit-panel {
+      padding: 10px 16px;
+      background: var(--panel-2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    #edit-panel.hidden { display: none; }
+    #edit-panel .edit-label {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+    #edit-panel .edit-cluster-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+    #edit-panel .sum {
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+      padding: 3px 8px;
+      border-radius: 3px;
+    }
+    #edit-panel .sum.in-range {
+      color: var(--accent);
+      background: rgba(160,120,32,0.15);
+    }
+    #edit-panel .sum.out-of-range {
+      color: #ff8080;
+      background: rgba(255,80,80,0.10);
+    }
+    #edit-panel button {
+      background: var(--accent);
+      color: #0a0a1a;
+      border: none;
+      border-radius: 3px;
+      padding: 6px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #edit-panel button:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    #edit-panel .save-status {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-left: auto;
+    }
+
+    /* Add-new-SubFamily strip, fixed at the bottom of the SubFamily column */
+    #subfamily-add {
+      padding: 6px 10px;
+      border-top: 1px solid var(--border);
+      background: var(--panel-2);
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    #subfamily-add input {
+      flex: 1;
+      min-width: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 13px;
+    }
+    #subfamily-add input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    #subfamily-add button {
+      background: var(--accent);
+      color: #0a0a1a;
+      border: none;
+      border-radius: 3px;
+      padding: 4px 10px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    #subfamily-add button:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    #subfamily-add .add-status {
+      color: var(--text-dim);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    #subfamily-add .add-status.error { color: #ff8080; }
+    .col-list.empty::before {
+      content: attr(data-empty-msg);
+      display: block;
+      padding: 12px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    #parents-panel {
+      padding: 10px 16px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      min-height: 90px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #parents-panel .header {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    #parents-panel .parents-list {
+      display: table;
+      border-collapse: collapse;
+    }
+    #parents-panel .parent-row {
+      display: table-row;
+    }
+    #parents-panel .parent-name {
+      display: table-cell;
+      padding: 2px 20px 2px 0;
+    }
+    #parents-panel .parent-weight {
+      display: table-cell;
+      padding: 2px 0;
+      color: var(--accent);
+      font-family: ui-monospace, monospace;
+    }
+    #parents-panel .parent-weight-raw {
+      display: table-cell;
+      padding: 2px 0 2px 20px;
+      color: var(--text-dim);
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+    }
+    #parents-panel .empty {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+    #parents-panel .sum-row {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px solid var(--panel-2);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BD Curator — Nav Structure <span style="color: var(--text-dim); font-weight: normal;">(read-only)</span></h1>
+    <span class="status" id="status">loading…</span>
+  </header>
+
+  <div id="text-panel">
+    <div class="header" id="text-header">Selected node text</div>
+    <div class="body empty" id="text-body">Click a node in any column to see its text.</div>
+  </div>
+
+  <div id="columns">
+    <div class="col">
+      <div class="col-head">
+        Family <span class="count" id="count-fam">–</span>
+      </div>
+      <div class="col-list" id="col-family"></div>
+    </div>
+    <div class="col">
+      <div class="col-head">
+        SubFamily <span class="count" id="count-sub">–</span>
+      </div>
+      <div class="col-list empty" id="col-subfamily" data-empty-msg="Click a Family to filter."></div>
+      <div id="subfamily-add">
+        <input type="text" id="subfamily-add-input" placeholder="new SubFamily name…" maxlength="60">
+        <button id="subfamily-add-btn">Add</button>
+        <span class="add-status" id="subfamily-add-status"></span>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head">
+        Cluster <span class="count" id="count-cls">–</span>
+      </div>
+      <div class="col-list empty" id="col-cluster" data-empty-msg="Click a SubFamily to filter."></div>
+    </div>
+  </div>
+
+  <div id="edit-panel" class="hidden">
+    <span class="edit-label">Editing <span id="edit-label-kind">Cluster</span>:</span>
+    <span class="edit-cluster-name" id="edit-cluster-name"></span>
+    <span class="sum" id="edit-sum">Sum: 0.000 / 1.000</span>
+    <button id="save-btn" disabled>Save</button>
+    <span class="save-status" id="save-status"></span>
+  </div>
+
+  <div id="parents-panel">
+    <div class="header" id="parents-header">Parents of selected node</div>
+    <div id="parents-body">
+      <div class="empty">Nothing selected.</div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────────
+// State + data model.
+//
+// The API returns { families, subFamilies, clusters, edges } — a flat
+// snapshot of the nav DAG. We build a few lookup indexes over it:
+//   nodeByUrl:      url → { url, name, text, kind }
+//   childrenOf:     parentUrl → [childUrl, ...]  (via DESCENDS_FROM)
+//   parentsOf:      childUrl  → [{parent, weight}] (via DESCENDS_FROM)
+//
+// Weights shown are child-normalized: for each node, divide its incoming
+// weights by their sum so the row totals 1.0. The raw DB value is also
+// shown next to each for reference (that's what will actually get
+// re-written when phase-2 write-back lands).
+// ─────────────────────────────────────────────────────────────────────
+
+const state = {
+  data: null,
+  nodeByUrl:  new Map(),
+  childrenOf: new Map(),  // parentUrl → Set<childUrl>
+  parentsOf:  new Map(),  // childUrl  → [{parentUrl, weight}]
+  primaryFamilyOfSubFamily: new Map(),  // subFamilyUrl → familyUrl (highest raw weight)
+  primarySubFamilyOfFamily: new Map(),  // familyUrl → subFamilyUrl (highest raw weight — used for auto-seed)
+  selected: { family: null, subFamily: null, cluster: null },
+  activeCol: null,        // 'family' | 'subFamily' | 'cluster' — most recent click
+  // Per-Cluster edit state. clusterUrl → Map<subFamilyUrl, {weight, isGuess}>.
+  // Persists across selection changes so the user can drift between Clusters
+  // without losing pending edits. Cleared for a Cluster after successful save.
+  editState: new Map(),
+};
+
+async function load() {
+  const status = document.getElementById('status');
+  try {
+    status.textContent = 'fetching /api/nav-structure…';
+    const res = await fetch('/api/nav-structure');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    state.data = await res.json();
+    buildIndexes();
+    renderFamilyColumn();
+    updateCounts();
+    status.textContent = ready();
+  } catch (err) {
+    status.textContent = 'load failed: ' + err.message;
+    console.error(err);
+  }
+}
+
+function ready() {
+  const n = state.data;
+  return `${n.families.length} Family, ${n.subFamilies.length} SubFamily, ${n.clusters.length} Cluster, ${n.edges.length} edges`;
+}
+
+function buildIndexes() {
+  state.nodeByUrl.clear();
+  state.childrenOf.clear();
+  state.parentsOf.clear();
+  state.primaryFamilyOfSubFamily.clear();
+  state.primarySubFamilyOfFamily.clear();
+
+  const add = (n, kind) => state.nodeByUrl.set(n.url, { ...n, kind });
+  state.data.families   .forEach(n => add(n, 'Family'));
+  state.data.subFamilies.forEach(n => add(n, 'SubFamily'));
+  state.data.clusters   .forEach(n => add(n, 'Cluster'));
+  for (const e of state.data.edges) {
+    if (!state.childrenOf.has(e.from_url)) state.childrenOf.set(e.from_url, new Set());
+    state.childrenOf.get(e.from_url).add(e.to_url);
+    if (!state.parentsOf.has(e.to_url)) state.parentsOf.set(e.to_url, []);
+    state.parentsOf.get(e.to_url).push({ parentUrl: e.from_url, weight: e.weight });
+  }
+
+  // For each SubFamily, pick the Family parent with the highest raw weight —
+  // that's the group it appears under in the SubFamily column. Ordering is
+  // preserved under normalization (monotone) so raw is fine.
+  for (const sf of state.data.subFamilies) {
+    const parents = state.parentsOf.get(sf.url) || [];
+    let best = null;
+    for (const p of parents) {
+      const parent = state.nodeByUrl.get(p.parentUrl);
+      if (!parent || parent.kind !== 'Family') continue;
+      if (!best || p.weight > best.weight) best = p;
+    }
+    if (best) state.primaryFamilyOfSubFamily.set(sf.url, best.parentUrl);
+  }
+
+  // For each Family, pick its highest-weighted SubFamily child — used to
+  // auto-seed orphan Clusters ("if this Cluster used to point at Nature,
+  // suggest Nature's strongest SubFamily as the new parent").
+  for (const fam of state.data.families) {
+    const children = state.childrenOf.get(fam.url) || new Set();
+    let bestUrl = null;
+    let bestWeight = -Infinity;
+    for (const childUrl of children) {
+      const child = state.nodeByUrl.get(childUrl);
+      if (!child || child.kind !== 'SubFamily') continue;
+      const parents = state.parentsOf.get(childUrl) || [];
+      const edge = parents.find(p => p.parentUrl === fam.url);
+      if (!edge) continue;
+      if (edge.weight > bestWeight) { bestWeight = edge.weight; bestUrl = childUrl; }
+    }
+    if (bestUrl) state.primarySubFamilyOfFamily.set(fam.url, bestUrl);
+  }
+}
+
+function updateCounts() {
+  document.getElementById('count-fam').textContent = state.data.families.length;
+  document.getElementById('count-sub').textContent = state.data.subFamilies.length;
+  document.getElementById('count-cls').textContent = state.data.clusters.length;
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────
+
+// Weights map = { parentUrl → normalizedShare } for the CURRENTLY selected
+// node. Any item whose url is a key gets highlighted (accent left-border)
+// and shows its weight cell filled. Items not in the map get a blank
+// weight cell — the transparent-text trick preserves layout alignment
+// across the whole column.
+function renderList(colId, nodes, selectedUrl, onClick, emptyMsg, weightsMap, showWeightCol) {
+  const col = document.getElementById(colId);
+  col.innerHTML = '';
+  if (nodes.length === 0) {
+    col.classList.add('empty');
+    if (emptyMsg) col.dataset.emptyMsg = emptyMsg;
+    return;
+  }
+  col.classList.remove('empty');
+  const sorted = nodes.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  for (const n of sorted) {
+    const el = document.createElement('div');
+    const isParent = weightsMap && weightsMap.has(n.url);
+    let cls = 'item';
+    if (n.url === selectedUrl) cls += ' selected';
+    if (isParent)              cls += ' parent-of-selected';
+    el.className = cls;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'item-name';
+    nameSpan.textContent = n.name;
+    el.appendChild(nameSpan);
+
+    if (showWeightCol) {
+      const weightSpan = document.createElement('span');
+      weightSpan.className = 'item-weight' + (isParent ? '' : ' empty');
+      weightSpan.textContent = isParent ? weightsMap.get(n.url).toFixed(3) : '0.000';
+      el.appendChild(weightSpan);
+    }
+
+    el.addEventListener('click', () => onClick(n));
+    col.appendChild(el);
+  }
+}
+
+// Compute normalized parent-weights for the currently selected node,
+// restricted to a given parent kind ('Family' | 'SubFamily'). Returns
+// Map<parentUrl, normalizedShare>. Empty map if no selection or no parents.
+function parentWeightsFor(node, kind) {
+  const out = new Map();
+  if (!node) return out;
+  const parents = state.parentsOf.get(node.url) || [];
+  if (parents.length === 0) return out;
+  const total = parents.reduce((s, p) => s + p.weight, 0);
+  if (total <= 0) return out;
+  for (const p of parents) {
+    const parent = state.nodeByUrl.get(p.parentUrl);
+    if (!parent || parent.kind !== kind) continue;
+    out.set(p.parentUrl, p.weight / total);
+  }
+  return out;
+}
+
+// Family column mirrors SubFamily column structure now — flat list, but
+// weight cells become editable when a SubFamily is the current edit target.
+// Uses the same edit-state pattern.
+function renderFamilyColumn() {
+  const col = document.getElementById('col-family');
+  col.innerHTML = '';
+  col.classList.remove('empty');
+
+  const selectedNode = currentSelectedNode();
+  const editing = state.activeCol === 'subFamily' && !!state.selected.subFamily;
+  const parentWeights = parentWeightsFor(selectedNode, 'Family');
+
+  const sorted = state.data.families.slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const fam of sorted) {
+    col.appendChild(renderFamilyItem(fam, editing, parentWeights));
+  }
+}
+
+function renderFamilyItem(fam, editing, parentWeights) {
+  const el = document.createElement('div');
+  el.className = 'item';
+  if (state.selected.family?.url === fam.url) el.classList.add('selected');
+  const isParent = parentWeights.has(fam.url);
+  if (isParent) el.classList.add('parent-of-selected');
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'item-name';
+  nameSpan.textContent = fam.name;
+  el.appendChild(nameSpan);
+
+  if (editing) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'item-weight';
+    const entry = getEditStateEntry(state.selected.subFamily.url, fam.url);
+    if (entry) {
+      input.value = entry.weight.toFixed(3);
+      input.classList.add(entry.isGuess ? 'guess' : 'committed');
+    } else {
+      input.value = '';
+      input.placeholder = '0.000';
+    }
+    input.addEventListener('input', (e) => onWeightInput(fam.url, e.target));
+    input.addEventListener('click', (e) => e.stopPropagation());
+    el.appendChild(input);
+  } else {
+    const span = document.createElement('span');
+    span.className = 'item-weight' + (isParent ? '' : ' empty');
+    span.textContent = isParent ? parentWeights.get(fam.url).toFixed(3) : '0.000';
+    el.appendChild(span);
+  }
+
+  el.addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    onFamilyClick(fam);
+  });
+  return el;
+}
+
+// SubFamily column shows ALL 27 SubFamilies always, grouped by primary
+// Family parent, alphabetical within group. When a Cluster is selected,
+// each row's weight cell becomes editable — three visual states:
+//   empty     (not a parent, no edit)              → blank/dim
+//   guess     (auto-seeded, user hasn't touched)   → grey italic
+//   committed (real DB parent OR user-typed value) → accent (amber)
+// Save applies committed non-zero values as edges; the whole DB truth for
+// this Cluster's parents becomes exactly what's in the weight cells.
+function renderSubFamilyColumn() {
+  const col = document.getElementById('col-subfamily');
+  col.innerHTML = '';
+  col.classList.remove('empty');
+
+  const selectedNode = currentSelectedNode();
+  const selectedCluster = state.selected.cluster;
+  const editing = !!selectedCluster;
+  const parentWeights = parentWeightsFor(selectedNode, 'SubFamily');
+
+  // Group SubFamilies by primary Family parent
+  const groups = new Map();  // familyUrl → SubFamily[]
+  for (const sf of state.data.subFamilies) {
+    const key = state.primaryFamilyOfSubFamily.get(sf.url) || '__orphan__';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(sf);
+  }
+  for (const arr of groups.values()) {
+    arr.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Render Family headers in alphabetical order of Family name
+  const familyOrder = state.data.families.slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const fam of familyOrder) {
+    const subs = groups.get(fam.url) || [];
+    if (subs.length === 0) continue;
+    const hdr = document.createElement('div');
+    hdr.className = 'group-header';
+    hdr.textContent = `── ${fam.name} ──`;
+    col.appendChild(hdr);
+    for (const sf of subs) {
+      col.appendChild(renderSubFamilyItem(sf, editing, parentWeights));
+    }
+  }
+  // Orphan SubFamilies (shouldn't happen but defensive)
+  const orphans = groups.get('__orphan__') || [];
+  if (orphans.length > 0) {
+    const hdr = document.createElement('div');
+    hdr.className = 'group-header';
+    hdr.textContent = '── (no Family parent) ──';
+    col.appendChild(hdr);
+    for (const sf of orphans) {
+      col.appendChild(renderSubFamilyItem(sf, editing, parentWeights));
+    }
+  }
+}
+
+function renderSubFamilyItem(sf, editing, parentWeights) {
+  const el = document.createElement('div');
+  el.className = 'item compact';
+  if (state.selected.subFamily?.url === sf.url) el.classList.add('selected');
+  const isParent = parentWeights.has(sf.url);
+  if (isParent) el.classList.add('parent-of-selected');
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'item-name';
+  nameSpan.textContent = sf.name;
+  el.appendChild(nameSpan);
+
+  // Multi-parent hint (+N-1) where N = number of Family parents
+  const parents = state.parentsOf.get(sf.url) || [];
+  const familyParentCount = parents.filter(p => {
+    const n = state.nodeByUrl.get(p.parentUrl);
+    return n && n.kind === 'Family';
+  }).length;
+  if (familyParentCount > 1) {
+    const hint = document.createElement('span');
+    hint.className = 'item-hint';
+    hint.textContent = `(+${familyParentCount - 1})`;
+    hint.title = `${familyParentCount - 1} other Family parent(s)`;
+    el.appendChild(hint);
+  }
+
+  // Weight cell — editable input if editing, static span otherwise.
+  if (editing) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'item-weight';
+    const entry = getEditStateEntry(state.selected.cluster.url, sf.url);
+    if (entry) {
+      input.value = entry.weight.toFixed(3);
+      input.classList.add(entry.isGuess ? 'guess' : 'committed');
+    } else {
+      input.value = '';
+      input.placeholder = '0.000';
+    }
+    input.addEventListener('input', (e) => onWeightInput(sf.url, e.target));
+    input.addEventListener('click', (e) => e.stopPropagation());
+    el.appendChild(input);
+  } else {
+    const span = document.createElement('span');
+    span.className = 'item-weight' + (isParent ? '' : ' empty');
+    span.textContent = isParent ? parentWeights.get(sf.url).toFixed(3) : '0.000';
+    el.appendChild(span);
+  }
+
+  el.addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    onSubFamilyClick(sf);
+  });
+  return el;
+}
+
+// ─── Edit state helpers ────────────────────────────────────────────────
+
+function getEditStateEntry(clusterUrl, sfUrl) {
+  const map = state.editState.get(clusterUrl);
+  return map ? map.get(sfUrl) : null;
+}
+
+// Initialize edit state for a node on first selection. Behaviour depends
+// on node kind:
+//   Cluster:   seed from existing SubFamily parents (committed). If none
+//              (orphan Cluster), auto-seed guesses translating each Family
+//              parent's weight into that Family's primary SubFamily.
+//   SubFamily: seed from existing Family parents (committed). Newly created
+//              SubFamilies have no parents → empty map (all cells blank).
+function initEditStateIfMissing(node) {
+  if (state.editState.has(node.url)) return;
+  const map = new Map();
+  const parents = state.parentsOf.get(node.url) || [];
+  const targetParentKind = node.kind === 'Cluster' ? 'SubFamily' : 'Family';
+
+  const relevantParents = parents.filter(p => {
+    const n = state.nodeByUrl.get(p.parentUrl);
+    return n && n.kind === targetParentKind;
+  });
+
+  if (relevantParents.length > 0) {
+    const total = relevantParents.reduce((s, p) => s + p.weight, 0);
+    for (const p of relevantParents) {
+      map.set(p.parentUrl, { weight: total > 0 ? p.weight / total : 0, isGuess: false });
+    }
+  } else if (node.kind === 'Cluster') {
+    // Orphan Cluster — auto-seed from Family parents
+    const famParents = parents.filter(p => {
+      const n = state.nodeByUrl.get(p.parentUrl);
+      return n && n.kind === 'Family';
+    });
+    const total = famParents.reduce((s, p) => s + p.weight, 0);
+    if (total > 0) {
+      for (const p of famParents) {
+        const share = p.weight / total;
+        const targetSf = state.primarySubFamilyOfFamily.get(p.parentUrl);
+        if (!targetSf) continue;
+        const existing = map.get(targetSf);
+        if (existing) existing.weight += share;
+        else          map.set(targetSf, { weight: share, isGuess: true });
+      }
+    }
+  }
+  // SubFamily with no Family parents (new SubFamily) → empty map
+  state.editState.set(node.url, map);
+}
+
+// Which node is the current edit target? Deepest of the selection stack
+// that has an editable parent tier. Family selection has no edit tier
+// (Conversations→Family is fixed at 1.0), so it returns null.
+function currentEditTarget() {
+  if (state.activeCol === 'cluster'   && state.selected.cluster)   return state.selected.cluster;
+  if (state.activeCol === 'subFamily' && state.selected.subFamily) return state.selected.subFamily;
+  return null;
+}
+
+function onWeightInput(parentUrl, input) {
+  const target = currentEditTarget();
+  if (!target) return;
+  const val = parseFloat(input.value);
+  const map = state.editState.get(target.url) || new Map();
+  if (!isFinite(val) || val <= 0) {
+    map.delete(parentUrl);
+    input.classList.remove('guess', 'committed');
+  } else {
+    map.set(parentUrl, { weight: val, isGuess: false });
+    input.classList.remove('guess');
+    input.classList.add('committed');
+  }
+  state.editState.set(target.url, map);
+  renderEditPanel();
+}
+
+function renderEditPanel() {
+  const panel = document.getElementById('edit-panel');
+  const target = currentEditTarget();
+  if (!target) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  document.getElementById('edit-label-kind').textContent = target.kind;
+  document.getElementById('edit-cluster-name').textContent = target.name;
+
+  const map = state.editState.get(target.url) || new Map();
+  const entries = Array.from(map.values()).filter(v => v.weight > 0);
+  const sum = entries.reduce((s, v) => s + v.weight, 0);
+
+  // Sum in [0.99, 1.01] → normal save. Sum == 0 for SubFamily → save-as-
+  // delete (abort creation). Anything else → disable Save.
+  const inRange   = sum >= 0.99 && sum <= 1.01;
+  const zeroValid = target.kind === 'SubFamily' && sum === 0;
+  const canSave   = inRange || zeroValid;
+
+  const sumEl = document.getElementById('edit-sum');
+  if (zeroValid) {
+    sumEl.textContent = 'Sum: 0.000  →  Save will delete this SubFamily';
+    sumEl.className = 'sum out-of-range';
+  } else {
+    sumEl.textContent = `Sum: ${sum.toFixed(3)} / 1.000`;
+    sumEl.className = 'sum ' + (inRange ? 'in-range' : 'out-of-range');
+  }
+
+  document.getElementById('save-btn').disabled = !canSave;
+}
+
+async function onSaveClick() {
+  const target = currentEditTarget();
+  if (!target) return;
+  const map = state.editState.get(target.url) || new Map();
+  const weights = {};
+  for (const [url, v] of map) if (v.weight > 0) weights[url] = v.weight;
+  const totalWeight = Object.values(weights).reduce((s, w) => s + w, 0);
+
+  // SubFamily-only: zero weights = delete. Confirm first, warn about the
+  // Cluster-child reassignment consequences per the step-3 reparent rule.
+  if (target.kind === 'SubFamily' && totalWeight === 0) {
+    const childUrls = state.childrenOf.get(target.url) || new Set();
+    let msg = `Delete SubFamily "${target.name}"?`;
+    if (childUrls.size > 0) {
+      msg += `\n\nIt has ${childUrls.size} Cluster child(ren). For each:`;
+      msg += `\n • if other SubFamilies also parent it → our edge is dropped and their weights renormalized to sum to 1`;
+      msg += `\n • if we're its sole SubFamily parent → it's attached with weight 1 to our primary Family (temporary orphan — reparent in a later pass)`;
+    }
+    if (!confirm(msg)) return;
+  }
+
+  const saveBtn = document.getElementById('save-btn');
+  const statusEl = document.getElementById('save-status');
+  saveBtn.disabled = true;
+  statusEl.textContent = 'saving…';
+
+  const endpoint = target.kind === 'Cluster'
+    ? '/api/save-cluster-parents'
+    : '/api/save-subfamily-parents';
+  const bodyParam = target.kind === 'Cluster' ? 'cluster_url' : 'subfamily_url';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [bodyParam]: target.url, weights }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const result = await res.json();
+    if (result.deleted) {
+      const parts = [`${target.kind} "${target.name}" deleted`];
+      if (result.clusterChildren > 0) {
+        const bits = [];
+        if (result.renormalizedClusters > 0) bits.push(`${result.renormalizedClusters} renormalized`);
+        if (result.reassignedToFamily   > 0) bits.push(`${result.reassignedToFamily} attached to ${result.bestFamilyName}`);
+        parts.push(`(${result.clusterChildren} Cluster reassignments: ${bits.join(', ')})`);
+      }
+      statusEl.textContent = parts.join(' ');
+      state.selected.subFamily = null;
+      state.activeCol = state.selected.cluster ? 'cluster'
+                      : state.selected.family ? 'family'
+                      : null;
+    } else if (target.kind === 'Cluster') {
+      statusEl.textContent = `saved (–${result.removedFamilyEdges} Family, –${result.removedSubFamilyEdges} SubFamily, ↺${result.mergedEdges})`;
+    } else {
+      statusEl.textContent = `saved (–${result.removedFamilyEdges} Family edges, ↺${result.mergedEdges})`;
+    }
+    state.editState.delete(target.url);
+    await refetch();
+    // Re-seed the edit state from the just-saved DB values, so weight cells
+    // and the sum indicator stay populated when the same node is still
+    // selected. Without this the DOM shows empty inputs while the DB holds
+    // fresh values — and the next Save would read sum 0.000 and threaten
+    // to delete a SubFamily that was just successfully saved.
+    const stillThere = state.nodeByUrl.get(target.url);
+    const stillEditing = currentEditTarget();
+    if (stillThere && stillEditing && stillEditing.url === target.url) {
+      initEditStateIfMissing(stillEditing);
+      renderAll();
+    }
+  } catch (err) {
+    statusEl.textContent = 'save failed: ' + err.message;
+    saveBtn.disabled = false;
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 6000);
+}
+
+// Add a new SubFamily via /api/create-subfamily. Client-side uniqueness
+// check first (against Families, SubFamilies, AND Clusters). On success,
+// refetch and auto-select the new SubFamily so its Family column becomes
+// immediately editable.
+async function onAddSubFamilyClick() {
+  const input = document.getElementById('subfamily-add-input');
+  const btn   = document.getElementById('subfamily-add-btn');
+  const statusEl = document.getElementById('subfamily-add-status');
+  const name = input.value.trim();
+  if (!name) return;
+
+  const collides = [
+    ...state.data.families.map(n => n.name),
+    ...state.data.subFamilies.map(n => n.name),
+    ...state.data.clusters.map(n => n.name),
+  ].some(n => n.toLowerCase() === name.toLowerCase());
+  if (collides) {
+    statusEl.textContent = `"${name}" already exists`;
+    statusEl.classList.add('error');
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.classList.remove('error');
+  statusEl.textContent = 'creating…';
+  try {
+    const res = await fetch('/api/create-subfamily', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const result = await res.json();
+    input.value = '';
+    statusEl.textContent = '';
+    await refetch();
+    // Auto-select the new SubFamily (Family column now editable, all cells blank)
+    const newSf = state.nodeByUrl.get(result.url);
+    if (newSf) {
+      state.selected.subFamily = newSf;
+      state.selected.cluster   = null;
+      state.activeCol = 'subFamily';
+      initEditStateIfMissing(newSf);
+      renderAll();
+      // Move cursor to the first editable Family weight for convenience.
+      const firstInput = document.querySelector('#col-family input.item-weight');
+      if (firstInput) firstInput.focus();
+    }
+  } catch (err) {
+    statusEl.textContent = 'failed: ' + err.message;
+    statusEl.classList.add('error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function refetch() {
+  const status = document.getElementById('status');
+  status.textContent = 'refreshing…';
+  const res = await fetch('/api/nav-structure');
+  state.data = await res.json();
+  buildIndexes();
+  updateCounts();
+  status.textContent = ready();
+  renderAll();
+}
+
+function renderClusterColumn() {
+  const sf = state.selected.subFamily;
+  const fam = state.selected.family;
+  // Clusters shown = children of selected SubFamily. If no SubFamily is
+  // selected (user clicked a Family), we could optionally show Clusters
+  // that hang directly off the Family (the current pre-step-3 state has
+  // ~62 of these). Doing so makes the "orphan Cluster" set visible during
+  // phase 3 re-parenting work.
+  let list = [];
+  let emptyMsg = 'Click a SubFamily to filter.';
+  if (sf) {
+    const childUrls = state.childrenOf.get(sf.url) || new Set();
+    list = state.data.clusters.filter(c => childUrls.has(c.url));
+    emptyMsg = `${sf.name} has no Cluster children.`;
+  } else if (fam) {
+    const childUrls = state.childrenOf.get(fam.url) || new Set();
+    list = state.data.clusters.filter(c => childUrls.has(c.url));
+    emptyMsg = `${fam.name} has no direct Cluster children (all its Clusters live under a SubFamily).`;
+  }
+  // Cluster column has no weight column — Clusters have no children (leaves).
+  renderList('col-cluster', list, state.selected.cluster?.url,
+             onClusterClick, emptyMsg, null, false);
+}
+
+function renderTextPanel() {
+  const node = currentSelectedNode();
+  const header = document.getElementById('text-header');
+  const body   = document.getElementById('text-body');
+  if (!node) {
+    header.textContent = 'Selected node text';
+    body.textContent   = 'Click a node in any column to see its text.';
+    body.classList.add('empty');
+    return;
+  }
+  header.textContent = `${node.name} — ${node.kind}`;
+  if (node.text && node.text.trim()) {
+    body.textContent = node.text;
+    body.classList.remove('empty');
+  } else {
+    body.textContent = '(no text)';
+    body.classList.add('empty');
+  }
+}
+
+function renderParentsPanel() {
+  const node = currentSelectedNode();
+  const header = document.getElementById('parents-header');
+  const body   = document.getElementById('parents-body');
+  if (!node) {
+    header.textContent = 'Parents of selected node';
+    body.innerHTML = '<div class="empty">Nothing selected.</div>';
+    return;
+  }
+  header.textContent = `Parents of ${node.name} (${node.kind})`;
+  const parents = state.parentsOf.get(node.url) || [];
+  if (parents.length === 0) {
+    body.innerHTML = '<div class="empty">(no parents — top of tree)</div>';
+    return;
+  }
+  const total = parents.reduce((s, p) => s + p.weight, 0);
+  // Sort weight desc, then alpha
+  const sorted = parents.slice().sort((a, b) => {
+    if (b.weight !== a.weight) return b.weight - a.weight;
+    const an = state.nodeByUrl.get(a.parentUrl)?.name || '';
+    const bn = state.nodeByUrl.get(b.parentUrl)?.name || '';
+    return an.localeCompare(bn);
+  });
+  const rows = sorted.map(p => {
+    const parent = state.nodeByUrl.get(p.parentUrl);
+    const name   = parent ? parent.name : '(missing)';
+    const share  = total > 0 ? p.weight / total : 0;
+    return `<div class="parent-row">`
+         + `<span class="parent-name">${escapeHtml(name)}</span>`
+         + `<span class="parent-weight">${share.toFixed(3)}</span>`
+         + `<span class="parent-weight-raw">(raw ${p.weight.toFixed(3)})</span>`
+         + `</div>`;
+  }).join('');
+  const sumRow = `<div class="sum-row">Sum of normalized weights: 1.000 · Sum of raw weights: ${total.toFixed(3)}</div>`;
+  body.innerHTML = `<div class="parents-list">${rows}</div>${sumRow}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function currentSelectedNode() {
+  if (state.activeCol === 'cluster'   && state.selected.cluster)   return state.selected.cluster;
+  if (state.activeCol === 'subFamily' && state.selected.subFamily) return state.selected.subFamily;
+  if (state.activeCol === 'family'    && state.selected.family)    return state.selected.family;
+  // Fallback if activeCol got out of sync (shouldn't happen but safe)
+  return state.selected.cluster || state.selected.subFamily || state.selected.family;
+}
+
+// ─── Click handlers ──────────────────────────────────────────────────
+
+// Re-render every column on every selection change — cheap (few hundred
+// items max) and keeps the parent-highlight in sync across all tiers
+// when selection deepens.
+function renderAll() {
+  renderFamilyColumn();
+  renderSubFamilyColumn();
+  renderClusterColumn();
+  renderTextPanel();
+  renderParentsPanel();
+  renderEditPanel();
+}
+
+function onFamilyClick(n) {
+  const same = state.selected.family && state.selected.family.url === n.url;
+  state.selected.family    = { ...n, kind: 'Family' };
+  // Clicking a new Family clears deeper selections; re-clicking same
+  // keeps them (allows revisiting the parents panel for the Family).
+  if (!same) {
+    state.selected.subFamily = null;
+    state.selected.cluster   = null;
+  }
+  state.activeCol = 'family';
+  renderAll();
+}
+
+function onSubFamilyClick(n) {
+  const same = state.selected.subFamily && state.selected.subFamily.url === n.url;
+  state.selected.subFamily = { ...n, kind: 'SubFamily' };
+  if (!same) state.selected.cluster = null;
+  state.activeCol = 'subFamily';
+  initEditStateIfMissing(state.selected.subFamily);
+  renderAll();
+}
+
+function onClusterClick(n) {
+  state.selected.cluster = { ...n, kind: 'Cluster' };
+  state.activeCol = 'cluster';
+  initEditStateIfMissing(state.selected.cluster);
+  renderAll();
+}
+
+document.getElementById('save-btn').addEventListener('click', onSaveClick);
+document.getElementById('subfamily-add-btn').addEventListener('click', onAddSubFamilyClick);
+document.getElementById('subfamily-add-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') onAddSubFamilyClick();
+});
+load();
+</script>
+</body>
+</html>

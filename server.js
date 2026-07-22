@@ -199,6 +199,385 @@ app.get('/api/module-sibling', async (req, res) => {
   }
 });
 
+// GET /api/nav-structure
+// Returns the whole nav DAG in one JSON blob so the curator page (curator.html)
+// can build its Family / SubFamily / Cluster columns + parent-list panel
+// client-side. Read-only endpoint — phase 1 of the browser-based nav editor.
+//
+// Shape:
+//   { families: [...], subFamilies: [...], clusters: [...], edges: [...] }
+// Node objects: { url, name, text }
+// Edge objects: { from_url, from_name, to_url, to_name, weight }
+//   (from = parent, to = child; DESCENDS_FROM direction is Parent → Child)
+app.get('/api/nav-structure', async (req, res) => {
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    const nodesResult = await session.run(
+      `MATCH (n)
+       WHERE n:Family OR n:Cluster
+       RETURN
+         CASE
+           WHEN n:SubFamily THEN 'SubFamily'
+           WHEN n:Family    THEN 'Family'
+           WHEN n:Cluster   THEN 'Cluster'
+         END AS kind,
+         n.url  AS url,
+         n.name AS name,
+         n.text AS text
+       ORDER BY kind, name`
+    );
+    const families    = [];
+    const subFamilies = [];
+    const clusters    = [];
+    for (const rec of nodesResult.records) {
+      const node = {
+        url:  rec.get('url'),
+        name: rec.get('name'),
+        text: rec.get('text') || '',
+      };
+      const kind = rec.get('kind');
+      if      (kind === 'Family')    families.push(node);
+      else if (kind === 'SubFamily') subFamilies.push(node);
+      else if (kind === 'Cluster')   clusters.push(node);
+    }
+
+    const edgesResult = await session.run(
+      `MATCH (p)-[r:DESCENDS_FROM]->(c)
+       WHERE (p:Family OR p:Cluster) AND (c:Family OR c:Cluster)
+       RETURN p.url  AS from_url,
+              p.name AS from_name,
+              c.url  AS to_url,
+              c.name AS to_name,
+              coalesce(r.weight, 0) AS weight`
+    );
+    const edges = edgesResult.records.map(rec => ({
+      from_url:  rec.get('from_url'),
+      from_name: rec.get('from_name'),
+      to_url:    rec.get('to_url'),
+      to_name:   rec.get('to_name'),
+      weight:    toNum(rec.get('weight')),
+    }));
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ families, subFamilies, clusters, edges });
+  } catch (err) {
+    console.error('[BD] /api/nav-structure error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
+// POST /api/save-cluster-parents
+// Body: { cluster_url: string, weights: { <subFamilyUrl>: number, ... } }
+//
+// Semantics (idempotent, complete-truth-per-Cluster):
+//   1. DELETE every (f:Family AND NOT :SubFamily)-[:DESCENDS_FROM]->(c) —
+//      the direct top-Family parents vanish; a Cluster must attach via a
+//      SubFamily under the new model.
+//   2. DELETE every (sf:SubFamily)-[:DESCENDS_FROM]->(c) whose url is NOT
+//      in the incoming weights map — i.e. SubFamily parents the curator
+//      has zero'd out.
+//   3. MERGE (sf:SubFamily {url})-[:DESCENDS_FROM]->(c) SET weight for each
+//      entry in the map — creates missing edges, updates existing ones.
+//
+// Weights that come in as 0 (or missing) → that SubFamily is treated as
+// NOT a parent. The client is expected to omit zero entries; the server
+// only writes edges for weight > 0.
+app.post('/api/save-cluster-parents', async (req, res) => {
+  const { cluster_url, weights } = req.body || {};
+  if (!cluster_url || typeof cluster_url !== 'string') {
+    return res.status(400).json({ error: 'cluster_url required' });
+  }
+  if (!weights || typeof weights !== 'object') {
+    return res.status(400).json({ error: 'weights object required' });
+  }
+  // Filter to strictly positive numeric weights.
+  const entries = Object.entries(weights).filter(([, w]) =>
+    typeof w === 'number' && isFinite(w) && w > 0
+  );
+  const keep_urls = entries.map(([url]) => url);
+
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    // Verify cluster exists first, so an unrelated cypher error later doesn't
+    // mask a bad url.
+    const check = await session.run(
+      'MATCH (c:Cluster {url: $url}) RETURN c.name AS name',
+      { url: cluster_url }
+    );
+    if (check.records.length === 0) {
+      return res.status(404).json({ error: 'cluster not found' });
+    }
+    const clusterName = check.records[0].get('name');
+
+    // Step 1 — drop direct top-Family parents.
+    const rm1 = await session.run(
+      `MATCH (f:Family)-[r:DESCENDS_FROM]->(c:Cluster {url: $url})
+       WHERE NOT f:SubFamily
+       DELETE r
+       RETURN count(r) AS removed`,
+      { url: cluster_url }
+    );
+    const removedFamilyEdges = toNum(rm1.records[0].get('removed'));
+
+    // Step 2 — drop SubFamily parents the curator zero'd out.
+    const rm2 = await session.run(
+      `MATCH (sf:SubFamily)-[r:DESCENDS_FROM]->(c:Cluster {url: $url})
+       WHERE NOT sf.url IN $keep_urls
+       DELETE r
+       RETURN count(r) AS removed`,
+      { url: cluster_url, keep_urls }
+    );
+    const removedSubFamilyEdges = toNum(rm2.records[0].get('removed'));
+
+    // Step 3 — MERGE each kept SubFamily edge with its new weight.
+    let mergedEdges = 0;
+    for (const [sfUrl, weight] of entries) {
+      const r = await session.run(
+        `MATCH (sf:SubFamily {url: $sf_url})
+         MATCH (c:Cluster {url: $cluster_url})
+         MERGE (sf)-[e:DESCENDS_FROM]->(c)
+         SET e.weight = $weight
+         RETURN count(e) AS n`,
+        { sf_url: sfUrl, cluster_url, weight }
+      );
+      mergedEdges += toNum(r.records[0].get('n'));
+    }
+
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      cluster: clusterName,
+      cluster_url,
+      removedFamilyEdges,
+      removedSubFamilyEdges,
+      mergedEdges,
+    });
+  } catch (err) {
+    console.error('[BD] /api/save-cluster-parents error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
+// POST /api/create-subfamily
+// Body: { name: string }
+// Creates a new node with labels :Family:SubFamily, an empty text field,
+// and a fresh URL. Rejects if a Family/SubFamily/Cluster with the same
+// name already exists (surface as 409 for the client to show).
+app.post('/api/create-subfamily', async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name required' });
+  }
+  const trimmed = name.trim();
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    const exists = await session.run(
+      `MATCH (n)
+       WHERE (n:Family OR n:Cluster)
+         AND n.name = $name
+       RETURN labels(n) AS labels LIMIT 1`,
+      { name: trimmed }
+    );
+    if (exists.records.length > 0) {
+      const kinds = exists.records[0].get('labels');
+      return res.status(409).json({
+        error: `A ${kinds.join('+')} node named "${trimmed}" already exists.`
+      });
+    }
+    const url = 'butterflydreaming.org/n/' + crypto.randomUUID();
+    await session.run(
+      `CREATE (n:Family:SubFamily { name: $name, url: $url, text: '' })`,
+      { name: trimmed, url }
+    );
+    res.set('Cache-Control', 'no-store');
+    res.json({ url, name: trimmed });
+  } catch (err) {
+    console.error('[BD] /api/create-subfamily error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
+// POST /api/save-subfamily-parents
+// Body: { subfamily_url, weights: { <familyUrl>: number } }
+//
+// Symmetric to /api/save-cluster-parents but for the SubFamily→Family tier:
+//   - Zero-sum special case: if the SubFamily has NO Cluster children, the
+//     SubFamily itself is deleted (matches the user's "abort creation" rule).
+//     If it has Cluster children, delete is refused (would orphan them).
+//   - Otherwise: drop Family parents not in the map, MERGE the rest with
+//     their new weights.
+app.post('/api/save-subfamily-parents', async (req, res) => {
+  const { subfamily_url, weights } = req.body || {};
+  if (!subfamily_url || typeof subfamily_url !== 'string') {
+    return res.status(400).json({ error: 'subfamily_url required' });
+  }
+  if (!weights || typeof weights !== 'object') {
+    return res.status(400).json({ error: 'weights object required' });
+  }
+  const entries = Object.entries(weights).filter(([, w]) =>
+    typeof w === 'number' && isFinite(w) && w > 0
+  );
+  const keep_urls = entries.map(([url]) => url);
+
+  const session = driver.session({ database: 'memgraph' });
+  try {
+    const check = await session.run(
+      'MATCH (sf:SubFamily {url: $url}) RETURN sf.name AS name',
+      { url: subfamily_url }
+    );
+    if (check.records.length === 0) {
+      return res.status(404).json({ error: 'SubFamily not found' });
+    }
+    const subFamilyName = check.records[0].get('name');
+
+    // Zero-weights case: delete the SubFamily, reassigning Cluster children:
+    //   • For each Cluster child C:
+    //       - if OTHER SubFamily parents exist → remove our edge to C, then
+    //         renormalize the remaining SubFamily→C weights so they sum to 1.0
+    //       - if we are C's sole SubFamily parent → remove our edge, then
+    //         attach C directly to our most-weighted Family parent with
+    //         weight 1.0 (temporarily orphaned; user re-parents in a later pass)
+    //   • Then DETACH DELETE the SubFamily.
+    if (entries.length === 0) {
+      const childResult = await session.run(
+        `MATCH (sf:SubFamily {url: $url})-[:DESCENDS_FROM]->(c:Cluster)
+         RETURN c.url AS url, c.name AS name`,
+        { url: subfamily_url }
+      );
+      const clusterChildren = childResult.records.map(r => ({
+        url:  r.get('url'),
+        name: r.get('name'),
+      }));
+
+      // Look up our most-weighted Family parent for the sole-parent fallback.
+      // Only relevant if we have Cluster children to reassign.
+      let bestFamilyUrl  = null;
+      let bestFamilyName = null;
+      if (clusterChildren.length > 0) {
+        const famResult = await session.run(
+          `MATCH (f:Family)-[r:DESCENDS_FROM]->(sf:SubFamily {url: $url})
+           WHERE NOT f:SubFamily
+           RETURN f.url AS url, f.name AS name, coalesce(r.weight, 0) AS weight
+           ORDER BY weight DESC LIMIT 1`,
+          { url: subfamily_url }
+        );
+        if (famResult.records.length === 0) {
+          return res.status(400).json({
+            error: `Cannot delete "${subFamilyName}": has ${clusterChildren.length} Cluster child(ren) but no Family parent to hand them to. Assign a Family parent first, or reparent the Clusters manually.`
+          });
+        }
+        bestFamilyUrl  = famResult.records[0].get('url');
+        bestFamilyName = famResult.records[0].get('name');
+      }
+
+      let renormalizedClusters = 0;
+      let reassignedToFamily   = 0;
+
+      for (const c of clusterChildren) {
+        const otherResult = await session.run(
+          `MATCH (sf:SubFamily)-[r:DESCENDS_FROM]->(c:Cluster {url: $c_url})
+           WHERE sf.url <> $our_url
+           RETURN sf.url AS url, coalesce(r.weight, 0) AS weight`,
+          { c_url: c.url, our_url: subfamily_url }
+        );
+        const others = otherResult.records.map(r => ({
+          url:    r.get('url'),
+          weight: toNum(r.get('weight')),
+        }));
+
+        // Always drop our edge first — one query for either branch.
+        await session.run(
+          `MATCH (sf:SubFamily {url: $sf_url})-[r:DESCENDS_FROM]->(c:Cluster {url: $c_url})
+           DELETE r`,
+          { sf_url: subfamily_url, c_url: c.url }
+        );
+
+        if (others.length > 0) {
+          const total = others.reduce((s, o) => s + o.weight, 0);
+          if (total > 0) {
+            for (const o of others) {
+              await session.run(
+                `MATCH (sf:SubFamily {url: $sf_url})-[r:DESCENDS_FROM]->(c:Cluster {url: $c_url})
+                 SET r.weight = $w`,
+                { sf_url: o.url, c_url: c.url, w: o.weight / total }
+              );
+            }
+          }
+          renormalizedClusters++;
+        } else {
+          // Sole SubFamily parent — attach to our primary Family with weight 1
+          await session.run(
+            `MATCH (f:Family {url: $f_url})
+             MATCH (c:Cluster {url: $c_url})
+             MERGE (f)-[e:DESCENDS_FROM]->(c)
+             SET e.weight = 1.0`,
+            { f_url: bestFamilyUrl, c_url: c.url }
+          );
+          reassignedToFamily++;
+        }
+      }
+
+      // Finally, drop the SubFamily itself (DETACH cleans up Family parent edges)
+      await session.run(
+        `MATCH (sf:SubFamily {url: $url}) DETACH DELETE sf`,
+        { url: subfamily_url }
+      );
+
+      res.set('Cache-Control', 'no-store');
+      return res.json({
+        subFamily: subFamilyName,
+        subfamily_url,
+        deleted: true,
+        clusterChildren:      clusterChildren.length,
+        renormalizedClusters,
+        reassignedToFamily,
+        bestFamilyName,
+      });
+    }
+
+    // Normal path — sync Family parent edges to the incoming weights.
+    const rm = await session.run(
+      `MATCH (f:Family)-[r:DESCENDS_FROM]->(sf:SubFamily {url: $url})
+       WHERE NOT f.url IN $keep_urls
+       DELETE r
+       RETURN count(r) AS removed`,
+      { url: subfamily_url, keep_urls }
+    );
+    const removed = toNum(rm.records[0].get('removed'));
+
+    let merged = 0;
+    for (const [famUrl, weight] of entries) {
+      const r = await session.run(
+        `MATCH (f:Family {url: $f_url})
+         MATCH (sf:SubFamily {url: $sf_url})
+         MERGE (f)-[e:DESCENDS_FROM]->(sf)
+         SET e.weight = $weight
+         RETURN count(e) AS n`,
+        { f_url: famUrl, sf_url: subfamily_url, weight }
+      );
+      merged += toNum(r.records[0].get('n'));
+    }
+
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      subFamily: subFamilyName,
+      subfamily_url,
+      removedFamilyEdges: removed,
+      mergedEdges: merged,
+    });
+  } catch (err) {
+    console.error('[BD] /api/save-subfamily-parents error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await session.close();
+  }
+});
+
 const server = app.listen(8080, () =>
   console.log('ButterflyDreaming viewer running at http://localhost:8080')
 );
@@ -763,8 +1142,10 @@ io.on('connection', async (socket) => {
           socket.emit('msg', { type: 'write_hints', error: 'curation_disabled' });
           return;
         }
+        // 500 ms guard against accidental double-clicks. Was 8000 ms, which
+        // blocked the natural arrange → Write → arrange → Write curator cadence.
         const now = Date.now();
-        if (socket.data._lastHintWrite && now - socket.data._lastHintWrite < 8000) {
+        if (socket.data._lastHintWrite && now - socket.data._lastHintWrite < 500) {
           socket.emit('msg', { type: 'write_hints', error: 'rate_limited' });
           return;
         }
