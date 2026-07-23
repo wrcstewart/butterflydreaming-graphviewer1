@@ -173,3 +173,14 @@ Curator deletes (zero-weight save) fire `DETACH DELETE` — the node and all its
 - The `feedback_backup_safety` memory (in `.claude/…/memory/`) records the user preference behind this whole system.
 - The `bd-tool-and-helper-messages` memory covers the wider `bd_tool.js` CLI.
 - Historical: Memgraph backups exist from 2026-07-16 onward (before auto-backup landed, manual `bd_tool.js backup` was already the pattern for milestones).
+
+---
+
+## Appendix: property keys you'll see in a Memgraph backup
+
+If you open a `backups/memgraph_*.cypher` file (or run `bd_tool.js read <name>` on an edge), you'll notice **view-scoped hint properties** on `DESCENDS_FROM` edges since 2026-07-23:
+
+- `hint_x_<parentUuid>` / `hint_y_<parentUuid>` / `hint_scale_<parentUuid>` — layout position of a child relative to the parent whose UUID is in the suffix, at the time it was captured by `dev-write`. Same edge can carry multiple sets (one per view it participates in — Nature→Animals holds both Nature's and Animals's arrangements).
+- `hint_x` / `hint_y` / `hint_scale` — the older single-slot form, pre-2026-07-23. Kept on any edge that has them; the reader falls back to these when no view-scoped equivalent exists. Never overwritten by the new writes, so restoring an older backup just gives you the older single-slot behaviour transparently.
+
+See the `view-scoped-hints` memory (in `.claude/…/memory/`) for the full architecture.
