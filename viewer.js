@@ -2144,6 +2144,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     exitSnakeView();
     saveState();
     activeNodeId = node.id();
+    // Make every expand a first-class hint context: track the node as
+    // lastParentNode AND pass it to runLayout. Previously this was only
+    // set on Family/Cluster expand — so clicking Root/Entry (e.g.
+    // Conversations) or a TextNode left lastParentNode either null
+    // ("tap a family first" on Write) or stale from a prior Family view
+    // (Write silently captured against edges that aren't even visible).
+    // Passing the node into runLayout also enables hint restore on
+    // reload for these tiers, symmetric with the Cluster-expand fix.
+    lastParentNode = node;
     cy.elements().hide();
 
     if (node.data('type') === 'root') {
@@ -2157,7 +2166,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         .show();
     }
 
-    runLayout(cy);
+    runLayout(cy, node);
   }
 
   function expandToFamily(familyNode) {
