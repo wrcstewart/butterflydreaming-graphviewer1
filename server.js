@@ -1227,14 +1227,30 @@ io.on('connection', async (socket) => {
         socket.data._lastHintWrite = now;
         const s = driver.session({ database: 'memgraph' });
         try {
-          await s.run(
-            'UNWIND $hints AS h ' +
-            'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
-            'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y, r.hint_scale = h.hint_scale',
-            { hints: msg.hints }
-          );
+          // 2026-07-23 — view-scoped hint properties. Client sends each
+          // hint as { relId, props } where props is a pre-built map with
+          // keys like `hint_x_<parentUuid>` / `hint_y_<parentUuid>` /
+          // `hint_scale_<parentUuid>`. Same underlying edge can carry
+          // multiple hint sets (one per view it participates in), so
+          // arranging one view no longer overwrites hints written from
+          // another. `SET r += h.props` merges without disturbing other
+          // keys on the edge (weight, legacy bare hint_x, other views' hints).
+          //
+          // Backward compat: if the client sends the old flat shape
+          // (h.hint_x etc), we still honour it — writes to bare hint_x/y/
+          // scale. Old edges without view-scoped keys keep working via the
+          // reader's fallback path.
+          const usingProps = msg.hints.length > 0 && msg.hints[0].props;
+          const query = usingProps
+            ? 'UNWIND $hints AS h ' +
+              'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
+              'SET r += h.props'
+            : 'UNWIND $hints AS h ' +
+              'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
+              'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y, r.hint_scale = h.hint_scale';
+          await s.run(query, { hints: msg.hints });
           socket.emit('msg', { type: 'write_hints', ok: true, count: msg.hints.length });
-          console.log(`[BD] Hints written: ${msg.hints.length} edges by ${socket.data.userId}`);
+          console.log(`[BD] Hints written: ${msg.hints.length} edges by ${socket.data.userId} (${usingProps ? 'view-scoped' : 'legacy'})`);
         } catch (err) {
           console.error('[BD] write_hints error:', err.message);
           socket.emit('msg', { type: 'write_hints', error: err.message });

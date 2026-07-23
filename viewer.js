@@ -999,22 +999,43 @@ function runLayout(cy, parentNode = null) {
   // Edge direction is inconsistent in the DB (some stored child→parent, some parent→child),
   // so match on EITHER endpoint being the parent.  The "neighbour" end of each edge is
   // whichever endpoint is NOT the parent.
+  //
+  // 2026-07-23 — view-scoped hints. Each edge can carry MULTIPLE hint sets,
+  // keyed by the URL-UUID of the "viewing" parent that captured them:
+  //   hint_x_<uuid> / hint_y_<uuid> / hint_scale_<uuid>
+  // Same edge participates in ≥2 views (e.g. Nature→Animals is in both
+  // Nature's view AND Animals's view), and each view now stores its own
+  // hint set — no more clobbering. Bare hint_x/y/scale from before this
+  // change serve as fallback so old edges still restore.
   let hintMode    = 'force';
   let childEdges  = null;
   let hintedEdges = null;
+  let getHintX    = e => e.data('hint_x');
+  let getHintY    = e => e.data('hint_y');
+  let getHintScale = e => e.data('hint_scale');
   if (parentNode) {
     const pid = parentNode.id();
+    const parentUuid = (parentNode.data('url') || '').split('/').pop();
+    if (parentUuid) {
+      const kx = `hint_x_${parentUuid}`;
+      const ky = `hint_y_${parentUuid}`;
+      const ks = `hint_scale_${parentUuid}`;
+      // Prefer view-scoped values; fall back to bare keys for pre-scoping edges.
+      getHintX     = e => e.data(kx) != null ? e.data(kx) : e.data('hint_x');
+      getHintY     = e => e.data(ky) != null ? e.data(ky) : e.data('hint_y');
+      getHintScale = e => e.data(ks) != null ? e.data(ks) : e.data('hint_scale');
+    }
     childEdges  = visible.edges().filter(
       e => e.source().id() === pid || e.target().id() === pid
     );
-    hintedEdges = childEdges.filter(e => e.data('hint_x') != null && e.data('hint_y') != null);
+    hintedEdges = childEdges.filter(e => getHintX(e) != null && getHintY(e) != null);
     const total = childEdges.length;
     hintMode = total === 0 || hintedEdges.length === 0 ? 'force'
              : hintedEdges.length === total             ? 'preset'
              :                                            'hybrid';
-    const storedScaleLog = hintedEdges.length ? hintedEdges[0].data('hint_scale') : null;
+    const storedScaleLog = hintedEdges.length ? getHintScale(hintedEdges[0]) : null;
     const formulaScaleLog = 100 * Math.sqrt((total || 1) + 1);
-    console.log(`[BD] hint scan: parent=${parentNode.data('name')} total=${total} hinted=${hintedEdges.length} mode=${hintMode} hint_scale=${storedScaleLog?.toFixed(1)} formula_scale=${formulaScaleLog.toFixed(1)}`);
+    console.log(`[BD] hint scan: parent=${parentNode.data('name')} uuid=${parentUuid || '(none)'} total=${total} hinted=${hintedEdges.length} mode=${hintMode} hint_scale=${storedScaleLog?.toFixed(1)} formula_scale=${formulaScaleLog.toFixed(1)}`);
   }
 
   // Pre-position and pin section_title nodes at the top of the graph area.
@@ -1083,7 +1104,9 @@ function runLayout(cy, parentNode = null) {
     const area        = cy.container().getBoundingClientRect();
     // renderScale: use the stored capture scale if available (exact match to what the
     // user arranged). Fall back to sqrt formula for old hints that predate hint_scale.
-    const storedScale = hintedEdges.length ? hintedEdges[0].data('hint_scale') : null;
+    // Uses the view-scoped getter so we pick the current view's scale, not
+    // whichever view happened to Write last.
+    const storedScale = hintedEdges.length ? getHintScale(hintedEdges[0]) : null;
     const renderScale = storedScale != null ? storedScale
                       : 100 * Math.sqrt((childEdges.length || 1) + 1);
     // Centre the parent at the current viewport centre in graph space.
@@ -1098,8 +1121,8 @@ function runLayout(cy, parentNode = null) {
     hintedEdges.forEach(e => {
       const child = e.source().id() === pid ? e.target() : e.source();
       const pos = {
-        x: graphCx + e.data('hint_x') * renderScale,
-        y: graphCy + e.data('hint_y') * renderScale,
+        x: graphCx + getHintX(e) * renderScale,
+        y: graphCy + getHintY(e) * renderScale,
       };
       child.position(pos);
       pins.push({ nodeId: child.id(), position: { ...pos } });
@@ -1108,7 +1131,7 @@ function runLayout(cy, parentNode = null) {
     });
     if (hintMode === 'hybrid') {
       const centroid = { x: sumX / hintedEdges.length, y: sumY / hintedEdges.length };
-      childEdges.filter(e => e.data('hint_x') == null || e.data('hint_y') == null).forEach(e => {
+      childEdges.filter(e => getHintX(e) == null || getHintY(e) == null).forEach(e => {
         const c = e.source().id() === pid ? e.target() : e.source();
         c.position({ ...centroid });
       });
@@ -2948,6 +2971,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const code = devCodeEl.value.trim();
     if (!code) { devStatus('enter code'); return; }
 
+    // View-scoped property keys use the parent's URL-UUID as suffix so
+    // the same edge can hold independent hint sets for each view it
+    // participates in (e.g. Nature→Animals stores hint_x_<Nature_uuid>
+    // and hint_x_<Animals_uuid> side-by-side).
+    const parentUrl  = lastParentNode.data('url') || '';
+    const parentUuid = parentUrl.split('/').pop();
+    if (!parentUuid) { devStatus('parent has no URL — cannot save view-scoped hints'); return; }
+    const kx = `hint_x_${parentUuid}`;
+    const ky = `hint_y_${parentUuid}`;
+    const ks = `hint_scale_${parentUuid}`;
+
     const vis = cy.elements(':visible');
     const ppid = lastParentNode.id();
     const childEdges = vis.edges().filter(
@@ -2964,11 +2998,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const hints = [];
     childEdges.forEach(e => {
       const c = e.source().id() === ppid ? e.target() : e.source();
+      const hx = (c.position('x') - parentPos.x) / scale;
+      const hy = (c.position('y') - parentPos.y) / scale;
       hints.push({
-        relId:       e.data('raw_rel_id'),
-        hint_x:      (c.position('x') - parentPos.x) / scale,
-        hint_y:      (c.position('y') - parentPos.y) / scale,
-        hint_scale:  scale,
+        relId: e.data('raw_rel_id'),
+        // View-scoped only: keys carry the parent's UUID. Legacy bare
+        // hint_x/y/scale on this edge (if any) are left untouched — they
+        // become dead history that the reader ignores in favour of the
+        // view-scoped keys, but are still present for auditing.
+        props: {
+          [kx]: hx,
+          [ky]: hy,
+          [ks]: scale,
+        },
       });
     });
 
@@ -2978,12 +3020,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (!msg || msg.type !== 'write_hints') return;
       wsNow.off('msg', handler);
       if (msg.error) { devStatus(msg.error); return; }
-      // Update in-memory edge data so Reset/re-entry uses preset mode immediately.
-      // Match by raw_rel_id since childEdges and hints are built in the same order.
+      // Reflect the same keys into Cytoscape edge data so Reset / re-entry
+      // uses preset mode immediately (no reload required).
       const hintByRelId = new Map(hints.map(h => [h.relId, h]));
       childEdges.forEach(e => {
         const h = hintByRelId.get(e.data('raw_rel_id'));
-        if (h) { e.data('hint_x', h.hint_x); e.data('hint_y', h.hint_y); e.data('hint_scale', h.hint_scale); }
+        if (h) for (const [k, v] of Object.entries(h.props)) e.data(k, v);
       });
       editModeUnlocked = true;
       devStatus(`saved ${msg.count}`);
