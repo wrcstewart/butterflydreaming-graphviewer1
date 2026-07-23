@@ -259,6 +259,14 @@ async function cmdWrite(patchPath, opts) {
     };
   }
 
+  // Pre-flight backup — snapshot the DB and the source .md before any
+  // write. Skip only when nothing is actually flagged (there'd be no DB
+  // change to protect against) OR when the caller passes --no-backup.
+  const anyFlagged = parsed.patches.some(p => (p.flags && p.flags.update_this) === 'true');
+  if (anyFlagged && !(opts && opts.noBackup)) {
+    await preFlightBackup('write', patchPath);
+  }
+
   const results = await runSession(async (s) => {
     const arr = [];
     for (const patch of parsed.patches) {
@@ -604,6 +612,15 @@ async function cmdSyncHelpers(mdPath, opts) {
     };
   }
 
+  // Pre-flight backup — snapshot DB + helpers .md before syncing. Skip if
+  // nothing is flagged for update (nothing to protect) or on --no-backup.
+  const anyFlagged =
+    (parsed.hub.flags && parsed.hub.flags.update_this === 'true') ||
+    parsed.helpers.some(h => h.flags && h.flags.update_this === 'true');
+  if (anyFlagged && !(opts && opts.noBackup)) {
+    await preFlightBackup('sync-helpers', mdPath);
+  }
+
   const result = await runSession(s => syncHelpers(s, parsed.hub, parsed.helpers));
 
   // Write-back pass: for every block that was created OR updated (not
@@ -664,6 +681,58 @@ function defaultBackupPath() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Auto-backup helpers — used by every DB-mutating subcommand. Snapshots
+// both the DB (full DUMP DATABASE to cypher) and the source .md (a byte
+// copy of the file before any write-back). All artefacts land in
+// ./backups/ next to the manual `backup` command's output.
+//
+// Named with the subcommand tag so a directory listing tells you at a
+// glance what caused each snapshot. Skipped on --dry-run and --no-backup.
+// BackupNotes.md at the repo root documents restore procedures.
+// ─────────────────────────────────────────────────────────────────────
+
+function backupTimestamp() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_` +
+         `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function ensureBackupsDir() {
+  const dir = 'backups';
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function autoBackupMd(mdPath, tag, stamp) {
+  if (!fs.existsSync(mdPath)) return null;
+  const dir = ensureBackupsDir();
+  const base = path.basename(mdPath);
+  const target = path.join(dir, `${base}.${tag}_${stamp}.bak`);
+  fs.copyFileSync(mdPath, target);
+  return target;
+}
+
+async function autoBackupDb(tag, stamp) {
+  const dir = ensureBackupsDir();
+  const target = path.join(dir, `memgraph_${tag}_${stamp}.cypher`);
+  const result = await cmdBackup(target);
+  return result.path;
+}
+
+// preFlightBackup: run BEFORE any DB write. Returns { db, md } paths for
+// logging. Callers should skip on --dry-run and honour --no-backup.
+async function preFlightBackup(tag, mdPath) {
+  const stamp = backupTimestamp();
+  process.stderr.write(`[bd_tool] pre-flight backup (tag=${tag}, stamp=${stamp})\n`);
+  const mdBak = mdPath ? autoBackupMd(mdPath, tag, stamp) : null;
+  if (mdBak) process.stderr.write(`  .md → ${mdBak}\n`);
+  const dbBak = await autoBackupDb(tag, stamp);
+  process.stderr.write(`  DB  → ${dbBak}\n`);
+  return { db: dbBak, md: mdBak };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // backfill-urls — assign a `butterflydreaming.org/n/<uuid>` url property
 // to every node of the given labels that doesn't already have one
 // (2026-07-16). Corpus-wide UUID identity backfill; needed because
@@ -707,6 +776,10 @@ async function cmdBackfillUrls(labels, opts) {
     if (opts && opts.dryRun) {
       process.stderr.write('[bd_tool] --dry-run: no writes\n');
       return { candidates: candidates.length, updated: 0, applied: false, sample: candidates.slice(0, 10) };
+    }
+    // Pre-flight backup — DB only (no source .md for this command).
+    if (!(opts && opts.noBackup)) {
+      await preFlightBackup('backfill-urls', null);
     }
     const updates = candidates.map(c => ({ nid: c.nid, url: URL_PREFIX + crypto.randomUUID() }));
     const updRes = await s.run(
@@ -1016,7 +1089,7 @@ async function cmdDumpSubfamilyCandidates(outPath) {
 // --dry-run reports what would be applied without writing to the DB
 // or the .md file.
 // ─────────────────────────────────────────────────────────────────────
-async function cmdApplySubfamilyLabels(mdPath, { dryRun = false } = {}) {
+async function cmdApplySubfamilyLabels(mdPath, { dryRun = false, noBackup = false } = {}) {
   if (!fs.existsSync(mdPath)) {
     process.stderr.write(`[bd_tool] apply-subfamily-labels: file not found: ${mdPath}\n`);
     process.exit(1);
@@ -1054,6 +1127,11 @@ async function cmdApplySubfamilyLabels(mdPath, { dryRun = false } = {}) {
   if (dryRun) {
     process.stderr.write(`[bd_tool] apply-subfamily-labels: DRY RUN — no DB write, no file write\n`);
     return { total: candidates.length, flagged: toApply.length, applied: 0, dryRun: true };
+  }
+
+  // Pre-flight backup — snapshot DB + candidates .md before labelling.
+  if (!noBackup) {
+    await preFlightBackup('apply-subfamily-labels', mdPath);
   }
 
   const { applied, missing } = await runSession(async (s) => {
@@ -1134,13 +1212,19 @@ Usage:
   node bd_tool.js read-id <elementId>
   node bd_tool.js labels
   node bd_tool.js cypher <query> [<paramsJSON>]
-  node bd_tool.js write <patch.md> [--dry-run]
-  node bd_tool.js sync-helpers <helpers.md> [--dry-run]
+  node bd_tool.js write <patch.md> [--dry-run] [--no-backup]
+  node bd_tool.js sync-helpers <helpers.md> [--dry-run] [--no-backup]
   node bd_tool.js backup [<outPath>]
-  node bd_tool.js backfill-urls [--dry-run] [--labels L1,L2]
+  node bd_tool.js backfill-urls [--dry-run] [--no-backup] [--labels L1,L2]
   node bd_tool.js dump-nav-nodes [<outPath>]
   node bd_tool.js dump-subfamily-candidates [<outPath>]
-  node bd_tool.js apply-subfamily-labels <subfamily_candidates.md> [--dry-run]
+  node bd_tool.js apply-subfamily-labels <subfamily_candidates.md> [--dry-run] [--no-backup]
+
+Every DB-mutating subcommand (write, sync-helpers, backfill-urls,
+apply-subfamily-labels) does a pre-flight auto-backup by default:
+a full DB dump AND (where applicable) a copy of the source .md file,
+both stamped and dropped in ./backups/. Pass --no-backup to skip.
+See BackupNotes.md for restore procedures.
 
 Results are JSON on stdout. Progress + errors on stderr.
 `);
@@ -1179,13 +1263,15 @@ async function main() {
   } else if (cmd === 'write') {
     const patchPath = args.find(a => !a.startsWith('--'));
     if (!patchPath) { process.stderr.write('write: patch path required\n'); process.exit(1); }
-    const dryRun = args.includes('--dry-run');
-    out = await cmdWrite(patchPath, { dryRun });
+    const dryRun   = args.includes('--dry-run');
+    const noBackup = args.includes('--no-backup');
+    out = await cmdWrite(patchPath, { dryRun, noBackup });
   } else if (cmd === 'sync-helpers') {
     const mdPath = args.find(a => !a.startsWith('--'));
     if (!mdPath) { process.stderr.write('sync-helpers: helpers.md path required\n'); process.exit(1); }
-    const dryRun = args.includes('--dry-run');
-    out = await cmdSyncHelpers(mdPath, { dryRun });
+    const dryRun   = args.includes('--dry-run');
+    const noBackup = args.includes('--no-backup');
+    out = await cmdSyncHelpers(mdPath, { dryRun, noBackup });
   } else if (cmd === 'backup') {
     const outPath = args.find(a => !a.startsWith('--'));
     out = await cmdBackup(outPath);
@@ -1198,10 +1284,12 @@ async function main() {
   } else if (cmd === 'apply-subfamily-labels') {
     const mdPath = args.find(a => !a.startsWith('--'));
     if (!mdPath) { process.stderr.write('apply-subfamily-labels: md path required\n'); process.exit(1); }
-    const dryRun = args.includes('--dry-run');
-    out = await cmdApplySubfamilyLabels(mdPath, { dryRun });
+    const dryRun   = args.includes('--dry-run');
+    const noBackup = args.includes('--no-backup');
+    out = await cmdApplySubfamilyLabels(mdPath, { dryRun, noBackup });
   } else if (cmd === 'backfill-urls') {
-    const dryRun = args.includes('--dry-run');
+    const dryRun   = args.includes('--dry-run');
+    const noBackup = args.includes('--no-backup');
     let labels = ['Cluster', 'Family'];
     // Accept --labels=X,Y or --labels X,Y
     const eqArg = args.find(a => a.startsWith('--labels='));
@@ -1213,7 +1301,7 @@ async function main() {
         labels = args[li + 1].split(',').map(s => s.trim()).filter(Boolean);
       }
     }
-    out = await cmdBackfillUrls(labels, { dryRun });
+    out = await cmdBackfillUrls(labels, { dryRun, noBackup });
   } else {
     process.stderr.write(`unknown subcommand: ${cmd}\n`);
     printHelp();
