@@ -33,7 +33,7 @@ parents: (none — top of tree)
 
 @set text:
 Welcome to ButterflyDreaming, a free anonymous experimental social media graph that keeps no user data it : click (tap) a node to see content  - double click  to journey .
-Designed to be intrinsically safe it aims to be a new conversational tool that integrates well with other media. Use it to read, chat, write, create art and music. First just browse the system to discover some inspiration for conversation and discover how it works. Then press the Ready to Pair button. You will pair automatically if another User is ready. Then watch each other's browsing in the breadcrumb bars - the system will help find common ground. Start to Chat. It can be used for transitory or recorded conversations starting from no initial prompts or by sharing others' texts - this latter to include public domain writing. In brief it experiments with the recombination of texts and text driven media. Now double click the node to journey on. Then remember ...one click to read the content.{ work in progress 18/5/26} %%bd_ai_read [ButterflyDreaming may be read Butterfly dreaming - a reference to the the Zhuang Zi passage about the relation of knowledge to identity%%bd_]
+Designed to be intrinsically safe it aims to be a new conversational tool that integrates well with other media. Use it to read, chat, write, create art and music. First just browse the system to discover some inspiration for conversation and discover how it works. Then press the Ready to Pair button. You will pair automatically if another User is ready. Then watch each other's browsing in the breadcrumb bars - the system will help find common ground. Start to Chat. It can be used for transitory or recorded conversations starting from no initial prompts or by sharing others' texts - this latter to include public domain writing. In brief it experiments with the recombination of texts and text driven media. Now double click the node to journey on. Then remember ...one click to read the content.So now, double click the yellow disc, then tap the Settling triangle.{ work in progress 18/5/26} %%bd_ai_read [ButterflyDreaming may be read Butterfly dreaming - a reference to the the Zhuang Zi passage about the relation of knowledge to identity%%bd_]
 
 ---
 
@@ -41,7 +41,7 @@ Designed to be intrinsically safe it aims to be a new conversational tool that i
 
 @match url: butterflydreaming.org/n/7a3400f0-2e0a-4984-a8de-15bd4e476fc7
 @match name: Conversations
-@flag update_this: true
+@flag update_this: false
 
 parents: Settling (—)
 
@@ -54,12 +54,12 @@ Some areas for conversation - your exploration is private up until a possible pa
 
 @match url: butterflydreaming.org/n/09a929ac-4d05-442b-860c-5722ecf37792
 @match name: Settling
-@flag update_this: true
+@flag update_this: false
 
 parents: ButterflyDreaming (—)
 
 @set text:
-A short optional mindfulness settling — relaxing the mind for creative browsing, conversation and creation. Use the player at the screen bottom to hear. You can also optionally listen to some relaxing music. Then double click to find the next node.
+A short optional mindfulness settling — relaxing the mind for creative browsing, conversation and creation. Use the player at the screen bottom to hear. You can also optionally listen to some relaxing music. One thing of which to be aware: You are going to find a network of topics - the intent of Butterfly Dreaming is not to reduce the world into parts but the exact opposite - it's an experiment in combining the parts - so please regard the nodes as indicating starting points for conversation - start points for a journey - not a faithful map of reality.   Now double click to find the Conversations node.
 
 ---
 
@@ -81,7 +81,7 @@ Techniques - Themes - Emotions invoked - Inspirations
 
 @match url: butterflydreaming.org/n/6b6eaba3-5053-4359-b515-22315e2d826c
 @match name: Emotion
-@flag update_this: true
+@flag update_this: false
 
 parents: Conversations (weight 1.000)
 
