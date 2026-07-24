@@ -42,11 +42,13 @@ Inside a helper block:
 
 @helper name: helper-how-to
 @helper title: How-to
-@helper trigger: boot — sent once per user session when the chat panel first opens (paired with helper-nav-hint via sendInitialHelpersOnce)
+@helper trigger: boot — sent immediately on enter_chat as the FIRST card of the boot-helper sequence (see startBootHelperSequence). Root single-taps advance the sequence via `next_boot_helper`.
 @helper url: butterflydreaming.org/n/254bc69a-89b6-4bf8-9780-64c699f93139
 @flag update_this: false
 
 Tap a node to search for inspiration for a possible conversation and edit if you wish. Organise on new cards if you wish. Select text and copy will insert it on a new card. Send your top card to the system's Helper for comment — or your Remote once paired.
+
+Tap for next message from me.
 
 ---
 
@@ -54,11 +56,13 @@ Tap a node to search for inspiration for a possible conversation and edit if you
 
 @helper name: helper-nav-hint
 @helper title: Navigation gesture
-@helper trigger: boot — sent once per user session when the chat panel first opens (paired with helper-how-to via sendInitialHelpersOnce)
+@helper trigger: boot — sent as the LAST card of the sequence when the user single-taps Root after the how-to. Its trailing "Tap once more to choose next node" is the exit cue (2026-07-24: double-tap gesture retired — a single tap past the last chunk of a node with descendants now navigates).
 @helper url: butterflydreaming.org/n/a50dbc87-45d8-4356-9bbd-54fc6597ff6b
 @flag update_this: false
 
-Remember, one click (or tap) to see a node's content. Double click (tap) it to hop about.
+Every tap on a node reveals the next message about it. When you reach a message that ends "Tap once more to choose next node", one more tap navigates onward.
+
+Tap once more to choose next node.
 
 ---
 

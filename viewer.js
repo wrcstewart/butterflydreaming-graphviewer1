@@ -77,6 +77,81 @@ let editSelectedClusterId  = null;
 let editSelectedTextNodeId = null;
 let chipGridParams         = null;
 let chatModeActive         = true;   // 2026-07-15 — always on; chat panel is a permanent communication window. Kept as a variable for existing gates (routeNodeText, positionCyEl fallback, etc.); no longer toggled.
+
+// 2026-07-23 — boot-helper sequence gate. Server sends the first onboarding
+// card immediately with { bootHelperMoreAvailable: true } if more remain,
+// then subsequent cards on demand. Single-tap on Root advances the sequence
+// via `next_boot_helper` while this flag is true — Root's normal text-insert
+// resumes once the queue drains and the last card arrives with false.
+let bootHelperMoreAvailable = false;
+
+// 2026-07-24 — one-gesture UX. Node text is split into chunks on lines that
+// contain exactly `%%bd_chunk`; each single tap on the main canvas reveals
+// the next chunk. Switching to a different node resets the sequence. Past
+// the last chunk, the tap navigates into the node (or reshows the last
+// chunk if the node has no descendants). Double-tap is retired.
+//
+// readingState = { nodeId, chunkIndex, chunks, hasDescendants } while a
+// node's chunk sequence is being read. Cleared when the sequence completes
+// (navigate) or when a different node is tapped (fresh sequence starts).
+let readingState = null;
+
+const CHUNK_HINT_MORE     = 'Tap for next message from me.';
+const CHUNK_HINT_NAVIGATE = 'Tap once more to see connected nodes.';
+const CHUNK_HINT_NO_MORE  = 'There are not yet further descendants.';
+
+function splitNodeChunks(text) {
+  if (!text || typeof text !== 'string') return [];
+  // Split on lines that are EXACTLY the marker (optional trailing whitespace).
+  // Multiline flag needed; escape carefully. Empty chunks (marker at start/end
+  // or double-marker) are filtered out.
+  const parts = text.split(/^%%bd_chunk[ \t]*$/m).map(s => s.trim()).filter(s => s.length > 0);
+  return parts.map(extractChunkHint);
+}
+
+// Pull the `%%bd_hint <text>` directive out of a chunk (if present) and
+// return { body, hint }. The directive line is one-line: everything after
+// `%%bd_hint ` up to end of line becomes the hint. Anywhere in the chunk;
+// removed from the body when found. If absent, hint is null and the caller
+// falls back to the default auto-hint (Tap for next / Tap once more / No
+// further descendants).
+function extractChunkHint(chunk) {
+  const match = chunk.match(/^%%bd_hint[ \t]+(.+)$/m);
+  if (!match) return { body: chunk.trim(), hint: null };
+  const hint = match[1].trim();
+  const body = chunk.replace(match[0], '').replace(/\n{3,}/g, '\n\n').trim();
+  return { body, hint };
+}
+
+// Does tapping through this node's last chunk lead to a meaningful expand?
+//   Cluster        → has any CONTAINS_CLUSTER connection (gateway TextNode)
+//   TextNode       → has any CHILD connection (further verses)
+//   Root/Entry/Fam → has any DESCENDS_FROM or CONTAINS connection
+// If false, the last chunk's hint says "no further descendants" and taps
+// past it are silent no-ops.
+//
+// Direction-agnostic (`connectedEdges`, not `outgoers`) because the CF/SF
+// replacement loops in the graph load path force edge source/target to a
+// canonical side regardless of DB storage direction. E.g. for a SubFamily,
+// ALL its DESCENDS_FROM edges come out as incoming (Cluster→SubFamily via
+// CF, top-Family→SubFamily via SF) — `outgoers` would report zero and
+// wrongly fire "no further descendants".
+function hasNavDescendants(node) {
+  const type = node.data('type');
+  if (type === 'Cluster') {
+    return node.connectedEdges('[type="CONTAINS_CLUSTER"]').length > 0;
+  }
+  if (type === 'TextNode') {
+    return node.connectedEdges('[type="CHILD"]').length > 0;
+  }
+  return node.connectedEdges('[type="DESCENDS_FROM"], edge[type="CONTAINS"]').length > 0;
+}
+
+function getChunkHint(isLast, hasDescendants) {
+  if (!isLast) return CHUNK_HINT_MORE;
+  if (hasDescendants) return CHUNK_HINT_NAVIGATE;
+  return CHUNK_HINT_NO_MORE;
+}
 let chatStackEl            = null;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;     // unique id counter across all kinds
@@ -1256,13 +1331,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let dwellTimer = null;
   const history = [];
   let activeNodeId = null;
-  let touchPendingNodeId = null;
-  let tapResetTimer = null;
+  // 2026-07-24 — double-tap detection retired for main canvas. These
+  // pending/timer slots used to hold the deferred routeNodeText state;
+  // under the one-gesture chunk UX every tap fires immediately, so the
+  // slots are gone. Breadcrumb tap handlers (buddyCy/youCy) keep their
+  // own separate youDesktopTimer/youDesktopPending because breadcrumbs
+  // still use the single-tap-defers-then-double-tap-navigates model.
   let tooltipNodeId = null;
   let recentTouch = false;
   let recentTouchTimer = null;
-  let desktopPendingNodeId = null;
-  let desktopClickTimer = null;
   let lastClusterNode = null;
   let currentClusterColour = null;
   let lastParentNode = null;
@@ -1635,7 +1712,160 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // stripped on chat inserts, then a compact inline `<name>: ` prefix is
   // prepended after text processing so the reader sees which node the excerpt
   // came from (e.g. "Conversations: Some areas for ...").
+  //
+  // Boot-helper sequence override (2026-07-23): while onboarding cards are
+  // still queued, a single tap on Root triggers the next helper INSTEAD of
+  // inserting Root's welcome text. Once the queue drains (server sends the
+  // last card with bootHelperMoreAvailable=false), Root taps revert to
+  // normal text-insert behaviour.
+  // insertNodeChunkAsCard — display one chunk as a system-kind card in the
+  // chat stack. Body is a div, so it can hold two children: a chunk-text
+  // paragraph and a centred chunk-hint below it (styled via .chunk-hint CSS).
+  // Card head shows the numbered source label "<name> (N)". Prepended per
+  // BD's newest-on-top convention — a fresh card per chunk, not accumulated
+  // into a textarea, because textareas can't centre-align inline text.
+  function insertNodeChunkAsCard(chunkBody, hint, meta, chunkIndex) {
+    let text = chunkBody;
+    // Bot-context handling — paragraph-normalise, then strip/unnormalise
+    // per curator vs ordinary view. Same rules as the old routeNodeText
+    // chat-mode branch (see bot_context.md §4.1/§4.3).
+    text = text.replace(/(\s*)(%%bd_ai_read \[[\s\S]*?%%bd_\])(\s*)/g, '\n\n$2\n\n');
+    const devCodeEl = document.getElementById('dev-code');
+    const curatorView = !!(devCodeEl && devCodeEl.value.trim());
+    text = curatorView ? unnormalizeBotBlocks(text) : stripBotBlocks(text);
+    text = text.replace(/\n{3,}/g, '\n\n').replace(/^\s+|\s+$/g, '');
+
+    const nodeName = (meta && meta.name) || '(node)';
+    const label = (chunkIndex != null) ? `${nodeName} (${chunkIndex})` : nodeName;
+    const card = createCard({ kind: 'system', label });
+    if (!card || !card.body) return;
+
+    const body = card.body;
+    body.textContent = '';
+    if (text) {
+      const textEl = document.createElement('div');
+      textEl.className = 'chunk-text';
+      textEl.textContent = text;
+      body.appendChild(textEl);
+    }
+    if (hint) {
+      const hintEl = document.createElement('div');
+      hintEl.className = 'chunk-hint';
+      hintEl.textContent = hint;
+      body.appendChild(hintEl);
+    }
+    // Persist a plain-text form for copy/handleCardCopy consumers.
+    card.text = text + (hint ? '\n' + hint : '');
+  }
+
+  // advanceOrNavigate — the one-gesture UX entry point. Every tap on a
+  // main-canvas node routes here:
+  //   • Fresh node (readingState mismatch)  → set state, show chunk 0
+  //   • Same node, chunks remaining          → advance to next chunk
+  //   • Same node, past last chunk + descendants  → navigate into node
+  //   • Same node, past last chunk + no descendants → silent no-op
+  //   • No text at all                       → navigate immediately
+  //   • Root while boot-helper queue non-empty → next_boot_helper (unchanged)
+  function advanceOrNavigate(node) {
+    if (!node || !node.length) return;
+    const meta = navNodeMeta(node);
+
+    // Boot-helper override — while onboarding cards are queued, Root taps
+    // advance that sequence instead of showing chunks. Matches the pre-
+    // existing behaviour so the boot-helper system keeps working alongside.
+    if (meta && meta.label === 'Root' && bootHelperMoreAvailable) {
+      const wsNow = wsRef.current;
+      if (wsNow && wsNow.connected) wsNow.emit('msg', { type: 'next_boot_helper' });
+      return;
+    }
+
+    const nid = node.id();
+
+    // Different node → reset reading state to fresh chunks of the new node.
+    if (!readingState || readingState.nodeId !== nid) {
+      // Breadcrumb chip: add once per node visited, on the FRESH tap only —
+      // subsequent chunk-advance taps on the same node don't duplicate the chip.
+      const type = node.data('type');
+      if (type === 'Entry' || type === 'Family' || type === 'Cluster' || type === 'TextNode') {
+        addYouChip(node);
+      }
+      const rawText = node.data('text') || '';
+      const chunks = splitNodeChunks(rawText);   // → [{body, hint}, …]
+      const desc   = hasNavDescendants(node);
+      if (chunks.length === 0) {
+        if (desc) {
+          // No text but has descendants → straight to navigation. Feels
+          // right for empty-text nav nodes that are just "click through" points.
+          readingState = null;
+          navigateInto(node);
+        } else {
+          // No text AND no descendants → single "no further descendants"
+          // card so the tap has a visible response (better than silence).
+          readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: false };
+          insertNodeChunkAsCard('', getChunkHint(true, false), meta, 0);
+        }
+        return;
+      }
+      readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc };
+      const isLast = chunks.length === 1;
+      const c0     = chunks[0];
+      insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc), meta, 0);
+      return;
+    }
+
+    // Same node, past-last tap → navigate or no-op.
+    const nextIdx = readingState.chunkIndex + 1;
+    if (nextIdx >= readingState.chunks.length) {
+      if (readingState.hasDescendants) {
+        const target = node; // preserve variable for clarity
+        readingState = null;
+        navigateInto(target);
+      }
+      // else: silent no-op — user reads the last chunk again or moves on
+      return;
+    }
+
+    // Same node, more chunks → advance.
+    readingState.chunkIndex = nextIdx;
+    const isLast = nextIdx === readingState.chunks.length - 1;
+    const cn = readingState.chunks[nextIdx];
+    insertNodeChunkAsCard(
+      cn.body,
+      cn.hint || getChunkHint(isLast, readingState.hasDescendants),
+      meta,
+      nextIdx
+    );
+  }
+
+  // navigateInto — the pure "expand into this node" branch, extracted from
+  // handleNodeTap. Called by advanceOrNavigate when the user has tapped
+  // past the last chunk of a node that has descendants.
+  function navigateInto(node) {
+    const type = node.data('type');
+    if (type === 'Cluster') {
+      const target = (editModeActive && editSelectedClusterId && editSelectedClusterId !== node.id())
+        ? cy.getElementById(editSelectedClusterId)
+        : node;
+      expandToCluster(target);
+    } else if (type === 'Family') {
+      expandToFamily(node);
+    } else if (type === 'TextNode' && node.data('gateway')) {
+      handleGatewayClick(node);
+    } else if (type === 'TextNode' && node.data('section_title')) {
+      handleTitlePageTap(node);
+    } else {
+      expandToNode(node);
+    }
+  }
+
   function routeNodeText(content, meta) {
+    if (meta && meta.label === 'Root' && bootHelperMoreAvailable) {
+      const wsNow = wsRef.current;
+      if (wsNow && wsNow.connected) {
+        wsNow.emit('msg', { type: 'next_boot_helper' });
+      }
+      return;
+    }
     if (chatModeActive) {
       let text = content;
       if (meta && meta.name) {
@@ -1946,10 +2176,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Server's chat_ready signal: initial system batch is in. Promote the
   // chat panel by creating the user's first visible local card (N=1) on top.
   // Idempotent: if a visible local already exists, no-op.
+  //
+  // 2026-07-24 — also kick off Root's chunk-0 as the pre-tap onboarding
+  // card. Replaces the retired boot-helper batch: Root's first chunk
+  // ("Tap me to reveal my next message") appears at launch before any
+  // user interaction, teaching the tap gesture. readingState is now
+  // primed to Root so the user's first tap advances to chunk 1.
   function handleChatReady() {
     const top = topLocalCard();
-    if (top && !top.hidden) return;
+    if (top && !top.hidden) {
+      // Local already exists — still fire the initial Root chunk if we
+      // haven't shown one yet this session.
+      if (!readingState) primeRootReading();
+      return;
+    }
     createCard({ kind: 'local' });
+    primeRootReading();
+  }
+
+  function primeRootReading() {
+    const rootNode = cy.nodes('[type="root"]').first();
+    if (rootNode && rootNode.length) advanceOrNavigate(rootNode);
   }
 
   // Per-local-card counter for inbound partner messages
@@ -2850,99 +3097,43 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
+  // 2026-07-24 — one-gesture UX. Every tap on a main-canvas node routes
+  // through advanceOrNavigate, which either shows the next chunk of the
+  // node's text OR navigates into the node (if past its last chunk with
+  // descendants). Double-tap detection retired: no more 320/560 ms defer
+  // window, no more touchPendingNodeId / tapResetTimer state — every tap
+  // fires immediately. The message body itself tells the user what
+  // tapping does next (Tap for next / Tap once more to choose / no
+  // further descendants).
   cy.on('tap', 'node', evt => {
     const node = evt.target;
+    const type = node.data('type');
+    wsRef.lastActivity = Date.now();
+
+    // Special cases with their own semantics, unchanged by the chunk UX.
+    if (type === 'ClusterEditChip') {
+      applyEditChipSelection(node.data('mainClusterId'));
+      return;
+    }
+    if (editModeActive && node.hasClass('snake-section')) {
+      applyEditTextSelection(node);
+      return;
+    }
 
     if (isTouchEvent(evt)) {
       markRecentTouch();
       cancelDwell();
-
-      // Nodes with no tooltip content: first touch is a silent no-op (like desktop hover),
-      // second touch within 800ms navigates — same double-tap gate, no visible feedback
-      if (!buildTooltipContent(node)) {
-        const sameNode     = touchPendingNodeId === node.id();
-        const withinWindow = tapResetTimer !== null;
-        clearTimeout(tapResetTimer);
-        tapResetTimer = null;
-        if (sameNode && withinWindow) {
-          touchPendingNodeId = null;
-          handleNodeTap(node);
-        } else {
-          touchPendingNodeId = node.id();
-          tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
-        }
-        return;
-      }
-
-      const sameNode    = touchPendingNodeId === node.id();
-      const withinWindow = tapResetTimer !== null;
-      clearTimeout(tapResetTimer);
-      tapResetTimer = null;
-
-      if (sameNode && withinWindow) {
-        // Double tap (two taps within window) — navigate; deferred routeNodeText cancelled.
-        hideTooltip();
-        touchPendingNodeId = null;
-        clearReadMark();
-        handleNodeTap(node);
-      } else if (tooltipNodeId === node.id()) {
-        // Tap same node while its tooltip is showing — dismiss
-        hideTooltip();
-        touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => { touchPendingNodeId = null; tapResetTimer = null; }, 560);
-      } else {
-        // Touch: defer routeNodeText so a follow-up double-tap can pre-empt it
-        // (no text shown on double-tap, no flash).
-        hideTooltip();
-        markReadNode(node, cy);
-        const content = buildTooltipContent(node);
-        const meta    = navNodeMeta(node);
-        touchPendingNodeId = node.id();
-        tapResetTimer = setTimeout(() => {
-          routeNodeText(content, meta);
-          touchPendingNodeId = null;
-          tapResetTimer = null;
-        }, 560);
-      }
-      return;
     }
-
-    // Desktop: single click defers routeNodeText so a double-click can cancel
-    // it (no text shown on double-click). Double click navigates.
-    if (desktopPendingNodeId === node.id() && desktopClickTimer !== null) {
-      clearTimeout(desktopClickTimer);
-      desktopClickTimer = null;
-      desktopPendingNodeId = null;
-      hideTooltip();
-      clearReadMark();
-      handleNodeTap(node);
-    } else {
-      clearTimeout(desktopClickTimer);
-      markReadNode(node, cy);
-      const content = buildTooltipContent(node);
-      const meta    = navNodeMeta(node);
-      desktopPendingNodeId = node.id();
-      desktopClickTimer = setTimeout(() => {
-        routeNodeText(content, meta);
-        desktopClickTimer = null;
-        desktopPendingNodeId = null;
-      }, 320);
-    }
+    hideTooltip();
+    markReadNode(node, cy);
+    advanceOrNavigate(node);
   });
 
-  // Tap on empty canvas — hide tooltip and reset state
+  // Tap on empty canvas — just hide tooltip. Under the one-gesture model
+  // there's no pending tap state to reset.
   cy.on('tap', evt => {
     if (evt.target !== cy) return;
     hideTooltip();
-    if (isTouchEvent(evt)) {
-      clearTimeout(tapResetTimer);
-      tapResetTimer = null;
-      touchPendingNodeId = null;
-    } else {
-      clearTimeout(desktopClickTimer);
-      desktopClickTimer = null;
-      desktopPendingNodeId = null;
-    }
   });
 
   cy.on('render', positionEditorBar);
@@ -4446,6 +4637,12 @@ async function init() {
       // communications.md §1 — one inbound path, one rendering rule.
       if (typeof msg.text !== 'string') return;
       if (msg.channel === 'system') {
+        // Track boot-helper queue depth per server signal. Only update
+        // when the field is explicitly present so unrelated system
+        // cards (partner joined etc.) don't accidentally clear the flag.
+        if (typeof msg.bootHelperMoreAvailable === 'boolean') {
+          bootHelperMoreAvailable = msg.bootHelperMoreAvailable;
+        }
         prependSystemCard(msg.text);
       } else if (msg.channel === 'partner') {
         prependPartnerCard(msg.text);

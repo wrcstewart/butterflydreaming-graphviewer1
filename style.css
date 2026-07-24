@@ -348,6 +348,19 @@ html, body {
   white-space: pre-wrap;
 }
 
+/* 2026-07-24 — chunked node-message cards (system-kind, one per chunk).
+   The body holds a .chunk-text paragraph followed by a .chunk-hint line.
+   No blank line between them; the hint is centred + accent-coloured +
+   italic so it stands out as a directive from the tool. */
+.card.system .card-body .chunk-text {
+  white-space: pre-wrap;
+}
+.card.system .card-body .chunk-hint {
+  text-align: center;
+  color: #c8a050;
+  font-style: italic;
+}
+
 /* Body backgrounds — pure black for all kinds. The coloured head stripe
    already signals kind, and dim hue tints in the body were proving more
    confusing than helpful. N=k labels distinguish adjacent local cards. */
