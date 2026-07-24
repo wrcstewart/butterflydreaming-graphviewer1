@@ -6,6 +6,71 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-07-19 → 2026-07-24 — SubFamily label + curator browser + view-scoped hints + auto-backup + one-tap chunked UX
+
+Long span, many strands, all interconnected through the theme "make the graph properly navigable and editable". Runs across two dozen commits.
+
+**Landmark commits:** `0a0951f` (apply-subfamily-labels + label hardening) → `e3b0f41` (nav_nodes_text restructure + child-normalized weights) → `74a9c2b` (curator page + endpoints + hint rate-limit 8s→500ms) → `f75656e` (cluster hint context + chat prefix + node shapes) → `8390db1` (curator: Add Cluster + zero-weight delete) → `9999b5e` (expandToNode hint context) → `013160b` (pre-flight auto-backup on every DB-mutating subcommand) → `f14ed4f` (view-scoped hint properties) → `298b336` (nav_nodes_text flag reset) → `89e8417` (BackupNotes appendix) → `f59f3de` (**one-tap chunked node reading UX**).
+
+**What shipped, by theme:**
+
+### `:SubFamily` label rolled out; nav-node file restructured
+
+27 nodes tagged with `:SubFamily` alongside their existing `:Family` (dual-labelled — every SubFamily is still a Family for downstream code that queries by that label). Top 6 Families (Arts / Emotion / Nature / Reason / Spirit / Symbolic) remain single-labelled. Also fixed the Conversations→top-Family edge weights (all were 0.17, wrong under child-normalized convention; set to 1.0).
+
+`nav_nodes_text.md` regenerated with the new tier ordering: Root → Entry (alpha) → Family top-level (alpha) → SubFamily (alpha) → Cluster (alpha). Each block shows `parents:` with **child-normalized** weights — per node, incoming DESCENDS_FROM weights divided by their sum so each row totals 1.0. Display-only projection over raw DB values; write-back to migrate weights follows the same `@flag update_this` convention as text edits.
+
+### Browser-based curator at `/curator.html`
+
+Three-column layout (Family / SubFamily / Cluster) with click-to-drill filtering. When a Cluster is selected, its SubFamily-parent weights become editable in the SubFamily column with a Save that atomically replaces the Cluster's parent edges — deletes any direct top-Family attachments and merges the new SubFamily edges. Orphan Clusters auto-seed guesses (grey italic) translated from Family weights; guesses commit on any edit.
+
+When a SubFamily is selected, the Family column becomes editable — same shape, but for SubFamily→Family edges. Add-new-SubFamily + Add-new-Cluster strips below their columns. Zero-weight save on a SubFamily/Cluster deletes it (with safety checks: SubFamily delete relocates Cluster children per a documented rule; Cluster delete refuses if gateway TextNodes exist).
+
+Endpoints added: `GET /api/nav-structure`, `POST /api/save-cluster-parents`, `POST /api/save-subfamily-parents`, `POST /api/create-subfamily`, `POST /api/create-cluster`.
+
+Dev-write hint rate-limit reduced 8000 ms → 500 ms — the old window blocked the arrange→Write→arrange→Write curator cadence for legitimate use.
+
+### View-scoped layout hints (`hint_x_<parentUuid>`)
+
+The pre-existing `hint_x` / `hint_y` / `hint_scale` slots on edges were single-slotted per edge — but a DAG edge participates in ≥2 views (Nature→Animals is in Nature's view AND Animals's view). Whoever wrote last owned the slot; the other view's arrangement was clobbered.
+
+Now each edge can carry multiple hint sets keyed by the "viewing" parent's URL-UUID: `hint_x_<uuid>`, `hint_y_<uuid>`, `hint_scale_<uuid>`. Client sends a pre-built `props` map; server `SET r += h.props` (additive). Reader picks the set matching the current expand parent, falling back to the bare `hint_x` keys for edges written before this change. Zero-migration.
+
+Also fixed: `expandToCluster` and `expandToNode` were calling `runLayout(cy)` with no parent — hint restore silently skipped on Cluster / Root / Entry / TextNode expands. Now both set `lastParentNode` AND pass the node into runLayout, symmetric with the pre-existing `expandToFamily` behaviour.
+
+### Pre-flight auto-backup on every DB-mutating `bd_tool.js` subcommand
+
+Every subcommand that writes to Memgraph (`write`, `sync-helpers`, `apply-subfamily-labels`, `backfill-urls`) now snapshots both the DB (`DUMP DATABASE` → `.cypher`) AND the source `.md` (byte copy) into `./backups/` BEFORE touching Memgraph. Named `<original>.<tag>_<stamp>` so a `ls backups/` tells you which command produced each snapshot at a glance. `--dry-run` and `--no-backup` opt out. `cypher` is deliberately NOT wrapped (low-level tool — you own the safety).
+
+Full restore surface documented in `BackupNotes.md` at the repo root: coverage matrix, restore procedures per failure mode (bad write, bad label pass, full DB rollback via mgconsole). Appendix added covering the view-scoped hint property keys anyone might encounter when reading a `.cypher` backup file.
+
+### One-tap chunked node reading UX (2026-07-24)
+
+The big pivot at the end of the run. Node text becomes a chunk list split on lines that read exactly `%%bd_chunk`. Every single tap on the main canvas advances the current node's sequence; a fresh node resets; tapping past the last chunk on a node with descendants navigates in. **Double-tap detection retired entirely** on the main canvas — all four state slots removed, defer windows gone.
+
+Author-controlled tap hints via `%%bd_hint <one-line text>` inline in any chunk (extracted at parse time, removed from the displayed body). If absent, auto-defaults still fire: "Tap for next message from me." (non-last), "Tap once more to see connected nodes." (last-with-descendants), "There are not yet further descendants." (leaf).
+
+Chunks render as div-body system cards (one per chunk) with head label `<name> (N)` and a centred italic amber `.chunk-hint` line immediately below the chunk body. Local cards (textareas) can't do inline centring so system-kind cards are the natural fit; consequence — chunk cards stack newest-on-top per BD convention, so multi-chunk sequences read reverse-chronological.
+
+Boot-helper sequencing machinery from the intermediate iteration (2026-07-23 — added a `bootHelperQueue` on the server and a `next_boot_helper` handler so onboarding cards trickled in one-per-tap) is now **dormant**: `startBootHelperSequence` call in `enter_chat` is commented out (one line). Root's own chunk 0 becomes the eager pre-tap onboarding card, fired from `handleChatReady` via a new `primeRootReading` helper. All the machinery remains in place for a one-line re-enable if we ever want a supplementary boot batch again.
+
+Root and Settling authored per user's copy:
+- Root (0): welcome text + hint "Tap the ButterflyDreaming node below for its next message to you"
+- Root (1): "First just browse …" + hint "Tap once more to see a connected node - then just keep tapping!"
+- Settling: mindfulness copy (dropped the outdated "Now double click to find the Conversations node") + hint "When your ready tap the Settling Node to see its connection."
+
+### Small polish along the way
+
+- Chat card node-insert prepends `<name>: ` (or under the chunked UX, moved into the card head as `<name> (N)`).
+- Top-level Family nodes: 80×33 oval → 60×60 circle. Conversations Entry node: 68×68 default ellipse → 88×76 hexagon (2:√3 ratio for equal sides). Shape carries the tier signal without relying on colour, per the reduced-colour-vision preference.
+- `hasNavDescendants` uses direction-agnostic `connectedEdges` — the CF/SF replacement loops force edge source/target to canonical sides, so `outgoers` returned zero for every SubFamily and wrongly said "no further descendants".
+
+### Reversal path
+
+Each landmark commit reverts cleanly with `git revert`. All DB writes went through `bd_tool.js write` with auto-backup, so `backups/` has recoverable snapshots. Two dormant subsystems (boot-helper queue on the server, `bootHelperMoreAvailable` gate on the client) remain intact — never in the way, always available to re-enable.
+
+---
+
 ## 2026-07-17/18 — EV extracted to its own repo + music player + ai_read scaffold
 
 **Landmark commits (BD side):** `0d2045c` (BD → Pages URL) → `0dfba8b` (retire Prev/Next + API-dependent code) → `345545d` (name in Copy Link payload + display) → `3583c04` (amber Copy Link) → `50ddc3f` (inline music player) → `e47f237` (nav_nodes ai_read scaffold).
