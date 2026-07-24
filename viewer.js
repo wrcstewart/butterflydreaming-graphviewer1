@@ -1553,136 +1553,37 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   window.addEventListener('resize', panBuddyCyToLatest);
 
   // --- buddyCy chip interactions ---
+  //
+  // 2026-07-24 — single-tap navigates. Same one-gesture model as the main
+  // canvas: no defer windows, no double-tap detection. Tapping a chip
+  // re-enters that node's view (chip becomes the centre) via handleNodeTap,
+  // which dispatches to the right expand function per node type. The old
+  // buddyTouchPending / buddyDesktopPending timer state is retired.
 
   const buddyContainer = document.getElementById('cy-buddy');
-  let buddyTouchPending = null;
-  let buddyTouchTimer   = null;
-
-  function buildBuddyChipTooltip(chip) {
-    const main = cy.getElementById(chip.data('mainId'));
-    if (main.length) return buildTooltipContent(main);
-    return chip.data('display_name') || chip.data('name') || '';
-  }
-
-  let buddyDesktopPending = null;
-  let buddyDesktopTimer   = null;
 
   buddyCy.on('tap', 'node', evt => {
     const chip = evt.target;
     const main = cy.getElementById(chip.data('mainId'));
-
-    if (isTouchEvent(evt)) {
-      markRecentTouch();
-      const same     = buddyTouchPending === chip.id();
-      const inWindow = buddyTouchTimer !== null;
-      clearTimeout(buddyTouchTimer);
-      buddyTouchTimer = null;
-      if (same && inWindow) {
-        // Double tap — navigate; deferred routeNodeText cancelled.
-        buddyTouchPending = null;
-        hideTooltip();
-        clearReadMark();
-        if (main.length) handleNodeTap(main);
-      } else {
-        // Defer routeNodeText so a follow-up double-tap can pre-empt it.
-        markReadNode(chip, buddyCy);
-        const content = buildBuddyChipTooltip(chip);
-        const meta    = main.length ? navNodeMeta(main) : null;
-        buddyTouchPending = chip.id();
-        buddyTouchTimer = setTimeout(() => {
-          routeNodeText(content, meta);
-          buddyTouchPending = null;
-          buddyTouchTimer = null;
-        }, 560);
-      }
-      return;
-    }
-
-    // Desktop: deferred routeNodeText — single click shows after the window;
-    // double click cancels the deferred and navigates instead.
-    if (buddyDesktopPending === chip.id() && buddyDesktopTimer !== null) {
-      clearTimeout(buddyDesktopTimer);
-      buddyDesktopTimer = null;
-      buddyDesktopPending = null;
-      hideTooltip();
-      clearReadMark();
-      if (main.length) handleNodeTap(main);
-    } else {
-      clearTimeout(buddyDesktopTimer);
-      markReadNode(chip, buddyCy);
-      const content = buildBuddyChipTooltip(chip);
-      const meta    = main.length ? navNodeMeta(main) : null;
-      buddyDesktopPending = chip.id();
-      buddyDesktopTimer = setTimeout(() => {
-        routeNodeText(content, meta);
-        buddyDesktopTimer = null;
-        buddyDesktopPending = null;
-      }, 320);
-    }
+    if (!main.length) return;
+    if (isTouchEvent(evt)) markRecentTouch();
+    hideTooltip();
+    markReadNode(chip, buddyCy);
+    handleNodeTap(main);
   });
 
   // --- youCy chip interactions ---
 
   const youContainer = document.getElementById('cy-you');
-  let youTouchPending = null;
-  let youTouchTimer   = null;
-
-  let youDesktopPending = null;
-  let youDesktopTimer   = null;
 
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
     const main = cy.getElementById(chip.data('mainId'));
     if (!main.length) return;
-
-    if (isTouchEvent(evt)) {
-      markRecentTouch();
-      const same     = youTouchPending === chip.id();
-      const inWindow = youTouchTimer !== null;
-      clearTimeout(youTouchTimer);
-      youTouchTimer = null;
-      if (same && inWindow) {
-        // Double tap — navigate; deferred routeNodeText cancelled.
-        youTouchPending = null;
-        hideTooltip();
-        clearReadMark();
-        handleNodeTap(main);
-      } else {
-        // Defer routeNodeText so a follow-up double-tap can pre-empt it.
-        markReadNode(chip, youCy);
-        const content = buildTooltipContent(main);
-        const meta    = navNodeMeta(main);
-        youTouchPending = chip.id();
-        youTouchTimer = setTimeout(() => {
-          routeNodeText(content, meta);
-          youTouchPending = null;
-          youTouchTimer = null;
-        }, 560);
-      }
-      return;
-    }
-
-    // Desktop: deferred routeNodeText — single click shows after the window;
-    // double click cancels the deferred and navigates instead.
-    if (youDesktopPending === chip.id() && youDesktopTimer !== null) {
-      clearTimeout(youDesktopTimer);
-      youDesktopTimer = null;
-      youDesktopPending = null;
-      hideTooltip();
-      clearReadMark();
-      handleNodeTap(main);
-    } else {
-      clearTimeout(youDesktopTimer);
-      markReadNode(chip, youCy);
-      const content = buildTooltipContent(main);
-      const meta    = navNodeMeta(main);
-      youDesktopPending = chip.id();
-      youDesktopTimer = setTimeout(() => {
-        routeNodeText(content, meta);
-        youDesktopTimer = null;
-        youDesktopPending = null;
-      }, 320);
-    }
+    if (isTouchEvent(evt)) markRecentTouch();
+    hideTooltip();
+    markReadNode(chip, youCy);
+    handleNodeTap(main);
   });
 
   function markRecentTouch() {
@@ -1724,7 +1625,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Card head shows the numbered source label "<name> (N)". Prepended per
   // BD's newest-on-top convention — a fresh card per chunk, not accumulated
   // into a textarea, because textareas can't centre-align inline text.
-  function insertNodeChunkAsCard(chunkBody, hint, meta, chunkIndex) {
+  //
+  // TextNode chunks get an extra `.text-reading` class on the card element
+  // so CSS can dim the head + hint to 0.5 opacity — the actual verse/text
+  // content is the star; the metadata is distraction when reading.
+  function insertNodeChunkAsCard(chunkBody, hint, node, chunkIndex) {
     let text = chunkBody;
     // Bot-context handling — paragraph-normalise, then strip/unnormalise
     // per curator vs ordinary view. Same rules as the old routeNodeText
@@ -1735,10 +1640,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     text = curatorView ? unnormalizeBotBlocks(text) : stripBotBlocks(text);
     text = text.replace(/\n{3,}/g, '\n\n').replace(/^\s+|\s+$/g, '');
 
-    const nodeName = (meta && meta.name) || '(node)';
+    // Sensible head label per node type. TextNodes use title/source_text
+    // since they typically have no `name` property; nav nodes use `name`.
+    const nodeType = node && node.data ? node.data('type') : null;
+    const nodeName = (node && node.data)
+      ? (node.data('name') || node.data('title') || node.data('source_text') || 'TextNode')
+      : '(node)';
     const label = (chunkIndex != null) ? `${nodeName} (${chunkIndex})` : nodeName;
+
     const card = createCard({ kind: 'system', label });
     if (!card || !card.body) return;
+    // Tag every chunk card so it stands out in DOM inspection. Also bump
+    // opacity via inline style: createCard stamps `el.style.opacity = 0.85`
+    // (from card.volume) on EVERY card, and inline style beats CSS class
+    // selectors on the specificity ladder — so class-only dimming wouldn't
+    // be visible. Setting .style.opacity directly here wins cleanly.
+    // Newest chunk = 1.0 (full brightness); demoted priors = 0.4 (recessive).
+    if (card.el && card.el.classList) {
+      document.querySelectorAll('.card.chunk-current').forEach(el => {
+        el.classList.remove('chunk-current');
+        el.style.opacity = '0.4';
+      });
+      card.el.classList.add('chunk-card', 'chunk-current');
+      card.el.style.opacity = '1';
+      if (nodeType === 'TextNode') card.el.classList.add('text-reading');
+    }
 
     const body = card.body;
     body.textContent = '';
@@ -1802,14 +1728,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           // No text AND no descendants → single "no further descendants"
           // card so the tap has a visible response (better than silence).
           readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: false };
-          insertNodeChunkAsCard('', getChunkHint(true, false), meta, 0);
+          insertNodeChunkAsCard('', getChunkHint(true, false), node, 0);
         }
         return;
       }
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc };
       const isLast = chunks.length === 1;
       const c0     = chunks[0];
-      insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc), meta, 0);
+      insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc), node, 0);
       return;
     }
 
@@ -1832,7 +1758,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     insertNodeChunkAsCard(
       cn.body,
       cn.hint || getChunkHint(isLast, readingState.hasDescendants),
-      meta,
+      node,
       nextIdx
     );
   }
@@ -2241,16 +2167,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const text = top && !top.hidden && top.body ? top.body.value : '';
     if (sendBtnEl) sendBtnEl.disabled = !pairingState.active || !text.trim();
 
-    // 2026-07-17 — Player radio visibility + enabled state gated on
-    // "top card contains a %%bd_module directive". If not, Player is
-    // hidden AND disabled (nothing to play). If the user is currently
-    // in Player mode and the module disappears from the top card,
-    // force back to Nodes via a bd:force-nodes-mode event that init()
-    // listens for (setViewMode isn't in this scope).
+    // Player radio visibility. Two paths:
+    //  1. Legacy: user pasted / typed a module script into the top local
+    //     textarea — check `text` above.
+    //  2. Chunked UX (2026-07-24): user tapped a module TextNode; its
+    //     full text lives on node.data('text') via readingState.nodeId,
+    //     not in any editable card. Check the node text directly.
+    // If either path finds a %%bd_module directive, show + enable Player.
+    // If neither, hide + disable; if we're currently in Player mode when
+    // the module disappears, force back to Nodes via bd:force-nodes-mode.
     const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
     const playerLabel = playerRadio ? playerRadio.closest('label') : null;
     if (playerRadio && playerLabel) {
-      const hasModule = /^%%bd_module\s+\S+/m.test(text);
+      const MODULE_RE = /^%%bd_module\s+\S+/m;
+      let hasModule = MODULE_RE.test(text);
+      if (!hasModule && readingState && readingState.nodeId) {
+        const rn = cy.getElementById(readingState.nodeId);
+        if (rn && rn.length) hasModule = MODULE_RE.test(rn.data('text') || '');
+      }
       playerRadio.disabled = !hasModule;
       playerLabel.style.display = hasModule ? '' : 'none';
       if (!hasModule && playerRadio.checked) {

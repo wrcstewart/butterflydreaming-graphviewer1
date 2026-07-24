@@ -361,6 +361,19 @@ html, body {
   font-style: italic;
 }
 
+/* 2026-07-24 — TextNode chunk cards dim head + hint to 0.5 opacity so the
+   actual text content is the star. Header and hint are still visible for
+   orientation but don't compete with the reading experience. */
+.card.system.text-reading .card-head,
+.card.system.text-reading .card-body .chunk-hint {
+  opacity: 0.5;
+}
+
+/* Previous chunk cards dim to 0.4; newest chunk goes to 1.0. Managed
+   via inline style: createCard writes `el.style.opacity = 0.85` on every
+   card, and inline beats class selectors here — so insertNodeChunkAsCard
+   sets opacity on card.el.style directly. No CSS rule needed. */
+
 /* Body backgrounds — pure black for all kinds. The coloured head stripe
    already signals kind, and dim hue tints in the body were proving more
    confusing than helpful. N=k labels distinguish adjacent local cards. */
