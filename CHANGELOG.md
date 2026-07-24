@@ -58,6 +58,14 @@ Root and Settling authored per user's copy:
 - Root (0): welcome text + hint "Tap the ButterflyDreaming node below for its next message to you"
 - Root (1): "First just browse …" + hint "Tap once more to see a connected node - then just keep tapping!"
 - Settling: mindfulness copy (dropped the outdated "Now double click to find the Conversations node") + hint "When your ready tap the Settling Node to see its connection."
+- Conversations: body updated to swap "Remember double click (or tap) to journey on..." for "If you want to retrace your steps you can use the Back button (top left) or the breadcrumbs bar."
+
+**Polish batch (`52a79bd`, same day):**
+- **Breadcrumb chips → single-tap navigate** (buddyCy + youCy). Same one-gesture model as main canvas; retired 8 pending/timer state slots.
+- **`.text-reading` class** on TextNode chunk cards dims head + hint to 0.5 opacity so the actual verse/prose is the star during reading.
+- **Newest chunk spotlit, priors dimmed** — inline `el.style.opacity = 1` on the current chunk, `0.4` on demoted priors. Managed via inline style rather than CSS class because `createCard` writes an inline `opacity: 0.85` on every card at creation, and inline beats class-based rules on specificity (documented as a gotcha in [[chunked-ux]] memory G6 for future traps).
+- **Player-radio gate reads `readingState`** — `updateSendBtn` also inspects the currently-being-read node's text (via `readingState.nodeId`), so tapping a `bd_V_Kolam_*` module TextNode surfaces the Player radio again. Under the chunked UX the node text no longer lives in the top local textarea, so the old textarea-only check was missing it.
+- **`insertNodeChunkAsCard` takes the node** (was `meta`) so it can build a useful head label for TextNodes via `title`/`source_text`/`name` fallback — TextNode chunks previously fell through to a "(node)" placeholder.
 
 ### Small polish along the way
 
