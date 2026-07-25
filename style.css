@@ -391,37 +391,10 @@ html, body {
   font-style: italic;
 }
 
-#default-save-btn {
-  background: #1a1a2e;
-  border: 1px solid #555;
-  border-radius: 3px;
-  color: #cccccc;
-  font-family: sans-serif;
-  font-size: 11px;
-  line-height: 1.1;
-  padding: 4px 10px;
-  cursor: pointer;
-  text-align: center;
-}
-
-#default-save-btn:hover:not(:disabled) {
-  border-color: #aaa;
-  color: #fff;
-}
-
-#default-save-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-#default-save-status {
-  color: #cccccc;
-  font-family: sans-serif;
-  font-size: 10px;
-  line-height: 1.1;
-  text-align: center;
-  min-height: 1em;
-}
+/* 2026-07-25 — #default-save-btn and #default-save-status styles removed:
+   the Save button was orphaned by always-on-chat (default panel never got
+   the bdName/bdLabel metadata Save required) and has been retired. Node
+   text editing lives on the bd_tool.js write path via nav_nodes_text.md. */
 
 #chat-send-btn,
 #chat-new-card-btn {
@@ -457,8 +430,7 @@ html, body {
    Both sit between ↑ and the status span. Chat panel is always active
    now so the old #chat-panel.active gate is redundant; kept for safety
    in case display state is ever revisited. */
-#chat-new-card-btn,
-#copy-link-btn {
+#chat-new-card-btn {
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
@@ -474,10 +446,34 @@ html, body {
 }
 #chat-new-card-btn { display: none; }
 #chat-panel.active ~ #action-bar #chat-new-card-btn { display: inline-block; }
-#chat-new-card-btn:hover,
+#chat-new-card-btn:hover { border-color: #aaa; color: #fff; }
+
+/* 2026-07-25 — Copy Link promoted to top-row, filled system yellow so it
+   reads as the primary "share this state" affordance. Still lives in the
+   action-bar HTML but styled to escape via position:fixed. Anchored to
+   the right so its RH edge sits close to the LH edge of #pair-control
+   (Join Remote) — the anchor is stable across viewport widths. */
+#copy-link-btn {
+  position: fixed;
+  top: 34px;
+  right: 125px;          /* just left of #pair-control (right:8px + width ~130px) */
+  z-index: 10;
+  background: #FFD700;
+  color: #1a1a20;
+  border: 1px solid #a07820;
+  border-radius: 4px;
+  font-family: sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+  padding: 4px 10px;
+  cursor: pointer;
+  text-align: center;
+  min-width: 50px;
+}
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #aaa;
-  color: #fff;
+  background: #ffe555;
+  border-color: #d4a52e;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -517,7 +513,12 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-left: 8px;
+  /* 2026-07-25 — pushed toward the right edge of #action-bar. `margin-
+     left: auto` consumes remaining space to the left; `margin-right`
+     pulls the pair back inward from the very edge so the toggle stays
+     visible on narrow viewports (was cut off on iPhone at edge-flush). */
+  margin-left: auto;
+  margin-right: 50px;
   color: #ccc;
   font-family: sans-serif;
   font-size: 11px;
@@ -1000,21 +1001,34 @@ body.player-active #bd-invite-panel-viewer { display: block; }
      prevents the zoom-in / can't-zoom-back problem on iPhone. */
   font-size: 16px;
   padding: 2px 6px;
-  width: 77px;                          /* -20% from 96px (A50f) */
+  /* 4-char numeric code (2026-07-25). Password-mode bullets are wider
+     than digits — widened to ~62px so all four bullet markers are
+     visible without overflow. */
+  width: 62px;
+  text-align: center;
+  font-family: ui-monospace, monospace;
   border-radius: 3px;
 }
 
 #dev-code::placeholder { color: #555; }
 
+/* Wr / Re dev buttons. Compact labels + generous padding so the hit
+   area stays at least 44 px per side even though the visible label is
+   only 2 chars — meets Apple iOS touch-target minimums.
+   2026-07-25 — first .dev-btn (Wr) gets margin-left: 50px so the pair
+   sits well right of the code input, matching the layout brief. */
 .dev-btn {
   background: none;
   border: 1px solid #555;
   border-radius: 4px;
   color: #aaa;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 2px 8px;
-  line-height: 1.4;
+  padding: 6px 10px;
+  line-height: 1;
+  min-width: 32px;
+  text-align: center;
 }
 
 .dev-btn:hover { border-color: #aaa; color: #fff; }
@@ -1022,14 +1036,6 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #dev-status {
   color: #888;
   font-size: 11px;
-  white-space: nowrap;
-}
-
-#edit-mode-label {
-  color: #888;
-  font-size: 11px;
-  cursor: pointer;
-  user-select: none;
   white-space: nowrap;
 }
 

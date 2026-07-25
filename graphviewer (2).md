@@ -5906,3 +5906,557 @@ selection** (for example, *node clicks* feed the basket directly), then
 the only feature CM6 was providing — multi-range selection — becomes
 unnecessary, and the chat editor could revert to a plain `<textarea>`
 for full cross-OS reliability. See A42.
+Here is Amendment 42:
+
+---
+
+```markdown
+## Amendment 42 — graphviewer.md — 1 July 2026
+
+## Visual Media Module Integration — V_Kolam iframe
+
+### Overview
+
+A Kolam visual pattern generator is integrated into the viewer
+as an iframe. The script that drives it lives in a card in the
+existing card stack. Two buttons (Copy Down ↓, Copy Up ↑)
+transfer the script between the active card and the iframe.
+A Nodes/Player toggle on the control bar switches between the
+graph view and the iframe. The iframe starts in a waiting state
+until a script is pushed into it.
+
+---
+
+### 42.1 New Files
+
+In directory `V_Kolam/` (viewer project root), create two new
+files based on the reference copies already present:
+
+- `index.html` — based on `index_copy.html`
+- `visual_module.html` — based on `visual_module_copy.html`
+
+Leave `index_copy.html` and `visual_module_copy.html` untouched
+as reference originals. Do not modify them.
+
+A file `VISUAL_MODULE_SPEC.md` is also present for background
+reference — read it for context but note it may not be fully
+up to date, particularly regarding the spinner panel layout.
+
+---
+
+### 42.2 Serve V_Kolam Locally
+
+Add a static route to server.js:
+
+```javascript
+app.use('/visual1', express.static('./V_Kolam'));
+```
+
+Development URL: `http://localhost:8080/visual1/`
+Production URL (future): `https://wrcstewart.github.io/bd_visual_ws_1/`
+
+---
+
+### 42.3 Nodes/Player Toggle
+
+Add a two-option radio toggle to the viewer control bar:
+
+```html
+<label>
+    <input type="radio" name="view-mode" value="nodes" checked> Nodes
+</label>
+<label>
+    <input type="radio" name="view-mode" value="player"> Player
+</label>
+```
+
+**When Nodes selected:**
+- Show mainCy canvas
+- Hide iframe
+- youCy and buddyCy breadcrumb canvases restore to normal
+
+**When Player selected:**
+- Hide mainCy canvas
+- Show iframe loading `http://localhost:8080/visual1/`
+- iframe occupies the space vacated by the Cytoscape canvas
+- youCy and buddyCy breadcrumb canvases remain visible
+
+```html
+<iframe id="visual-iframe"
+        src="http://localhost:8080/visual1/"
+        style="display:none; width:100%; border:none;"
+        sandbox="allow-scripts allow-same-origin">
+</iframe>
+```
+
+Height of iframe should match the mainCy canvas height so the
+layout is unchanged when toggling between modes.
+
+---
+
+### 42.4 iframe Waiting State
+
+The iframe initialises in a waiting state — no rendering
+attempted. The canvas displays a simple centred message:
+
+```
+Waiting for script...
+```
+
+Spinners are present but greyed out (disabled) until a script
+arrives via postMessage. The waiting message disappears and
+spinners enable when the first `bd_script_update` message
+is received and applied.
+
+---
+
+### 42.5 Script Card
+
+The script that drives the visual module lives in a card in
+the existing card stack — a standard local card, no special
+colour or type. The card body contains the raw `%%bd_` script
+block including L-system rules and directives.
+
+No special card type is needed. The Copy Down and Copy Up
+buttons operate on whichever card currently has focus in
+the panel.
+
+---
+
+### 42.6 Copy Down Button (Card → iframe)
+
+A **Copy Down** button (↓) in the panel controls sends the
+current focused card body to the iframe:
+
+```javascript
+document.getElementById('copy-down-btn').addEventListener('click', () => {
+    const script = getCurrentCardBody();
+    document.getElementById('visual-iframe')
+        .contentWindow.postMessage({
+            type: 'bd_script_update',
+            script: script
+        }, '*');
+    // Enable Copy Up once a script has been sent
+    document.getElementById('copy-up-btn').disabled = false;
+});
+```
+
+The iframe receives this, populates spinners with the parsed
+parameter values, and renders the canvas.
+
+---
+
+### 42.7 Copy Up Button (iframe → Card)
+
+A **Copy Up** button (↑) in the panel controls requests the
+current script state from the iframe and places it in the
+focused card body.
+
+**Copy Up is disabled on initialisation.** It enables only
+after a successful Copy Down has been performed — i.e. once
+the iframe has received and applied a script and has
+meaningful state to return.
+
+```javascript
+// Initialise as disabled
+document.getElementById('copy-up-btn').disabled = true;
+
+document.getElementById('copy-up-btn').addEventListener('click', () => {
+    document.getElementById('visual-iframe')
+        .contentWindow.postMessage({
+            type: 'bd_script_request'
+        }, '*');
+});
+
+window.addEventListener('message', (e) => {
+    if (e.data.type === 'bd_script_response') {
+        setCurrentCardBody(e.data.script);
+    }
+});
+```
+
+---
+
+### 42.8 iframe postMessage Handlers
+
+In `index.html` / `visual_module.html`:
+
+```javascript
+window.addEventListener('message', (e) => {
+
+    if (e.data.type === 'bd_script_update') {
+        // Parse script, apply to spinners, render
+        applyScriptToSpinners(e.data.script);
+        rerender();
+        // Hide waiting message, enable spinners
+        showActiveState();
+    }
+
+    if (e.data.type === 'bd_script_request') {
+        // Compose current script from spinner values
+        const script = composeScriptFromSpinners();
+        window.parent.postMessage({
+            type: 'bd_script_response',
+            script: script
+        }, '*');
+    }
+
+    if (e.data.type === 'bd_param_update') {
+        // Single parameter update — future use
+        applyParam(e.data.param, e.data.value);
+        rerender();
+    }
+});
+```
+
+---
+
+### 42.9 Spinner Panel
+
+The visual module canvas and spinner side panel need to fit
+the space vacated by the Cytoscape canvas. Read the existing
+CSS in `index_copy.html` and `visual_module_copy.html` to
+determine current dimensions, then resize to fit.
+
+Convert all sliders to spinners (number inputs):
+
+```html
+<input type="number"
+       id="symmetry"
+       min="1" max="16" step="1" value="8">
+```
+
+Use the smallest legible font size consistent with the rest
+of the viewer (same as breadcrumb chips). Fit as many
+spinners as possible in a compact layout within the available
+panel width.
+
+---
+
+### 42.10 postMessage Protocol Summary
+
+| Message type | Direction | Payload | Purpose |
+|---|---|---|---|
+| `bd_script_update` | Viewer → iframe | `{ script: String }` | Push script, triggers render |
+| `bd_script_request` | Viewer → iframe | none | Request current script |
+| `bd_script_response` | iframe → Viewer | `{ script: String }` | Return current script state |
+| `bd_param_update` | Either direction | `{ param: String, value: Any }` | Single parameter — future use |
+
+---
+
+### 42.11 WebSocket Relay — Future
+
+WebSocket relay of `bd_param_update` messages to the buddy
+is not implemented in this amendment. The postMessage
+infrastructure established here is the foundation for it.
+When implemented, the viewer will relay incoming postMessages
+from the iframe to the buddy via the existing WebSocket
+connection, and relay incoming `media_param_update` WebSocket
+messages from the buddy into the local iframe via postMessage.
+
+---
+
+### 42.12 Verification Steps
+
+Report back after completing each step before proceeding:
+
+1. `http://localhost:8080/visual1/` serves correctly and
+   shows the waiting message on load
+2. Nodes/Player toggle correctly shows and hides iframe
+   and mainCy canvas
+3. Paste a test `%%bd_` script into a card, press Copy Down —
+   confirm iframe renders and spinners populate
+4. Adjust a spinner in the iframe, press Copy Up — confirm
+   card body updates with new script values
+5. Confirm Copy Up button is disabled on load and enables
+   after first successful Copy Down
+6. Console.log confirmation that postMessages are sent and
+   received correctly in both directions
+
+Do not proceed to WebSocket relay until all six steps
+are confirmed working.
+```
+
+---
+
+## Amendment 42 — Delta as shipped (2 July 2026, d89408c)
+
+The following differences from the spec above landed during
+implementation and are the current live behaviour on `main`:
+
+### 42.a Steppers, not spinners
+
+§42.9 called for `<input type="number">` spinners. Native
+spinners don't render on any mobile browser (iOS Safari, iOS
+Chrome, iOS Firefox, Android Chrome, Android Firefox), so
+every numeric-arg `%%bd_` directive is instead a `+/−`
+stepper (buttons flanking a value display, directive-name
+label beneath). Press-and-hold repeats at ~16 Hz after a
+400 ms delay. iOS-specific CSS hardening is required:
+`touch-action: manipulation` + the `-webkit-` triple
+(`user-select`, `touch-callout`, `tap-highlight-color`) on
+the button, plus the `user-select` / `touch-callout` pair on
+`.stepper-value` and `.control-row label`. See the
+media-module control convention in claude-code memory.
+
+### 42.b Preview harness (`V_Kolam/preview.html`)
+
+Reachable at `/visual1/preview.html`. Single side panel:
+textarea (top) → action row (Copy Link · Copy · ↓ · ↑)
+→ stepper column (all 10 numeric-arg directives, incl.
+`angle_minutes` which is hidden inside the module itself)
+→ status. Iframe fills the main area. Module's built-in
+controls are hidden via new `bd_ui_config` message.
+
+`?script=<base64 UTF-8>` in the URL IS the reproducible
+state. Copy Link encodes the current textarea; page load
+decodes the URL param and populates the textarea. No
+backend, no accounts. Same harness will scale up to the
+BD Player-mode surface without redesign.
+
+### 42.c postMessage protocol additions
+
+Two new message types added since §42.10 shipped:
+
+| Message type | Direction | Payload | Purpose |
+|---|---|---|---|
+| `bd_ui_config` | Host → module | `{ hideControls: Bool }` | Suppress module's internal stepper panel when a host harness supplies its own |
+| `bd_state_update` | module → Host | `{ angle, angle_minutes, angle_seconds }` | Broadcast every `driftTick` so a host's steppers/textarea can track drift live and Copy Link captures the currently-visible frame |
+
+`BD_READY`, `BD_ERROR` (module → host) are also part of the
+live wire — `BD_INIT` / `BD_STOP` / `BD_REQUEST_UPDATE` /
+`BD_UPDATE` remain as aliases for the frozen `_copy`
+reference harness.
+
+### 42.d WebSocket relay — still deferred
+
+§42.11 remains unimplemented. `bd_param_update` is reserved
+in the protocol but no live use yet.
+
+### 42.e Script is user intent, not runtime state (424a227)
+
+Rule: the `%%bd_` script represents what the user
+authored. Drift-driven runtime updates never rewrite it.
+
+Concretely:
+- `bd_state_update` from the module only moves the host
+  harness's stepper display spans (angle, angle_minutes).
+  The textarea is left untouched.
+- To bake the current drifted values into the script the
+  user presses ↑ (receive) explicitly.
+- Copy Link therefore captures the authored script, not
+  a mid-animation snapshot.
+
+### 42.f `angle_seconds` is internal-only (424a227)
+
+`angle_seconds` is a sub-arc-minute drift accumulator that
+lives only inside the module (hidden `<input id="angle-
+seconds-slider">`). It is not part of the shareable
+`%%bd_` surface:
+
+- `applyControlDirectives` does not write `%%bd_
+  angle_seconds` into the outgoing script.
+- `setControlValues` only touches the seconds slider if
+  the incoming script explicitly supplies it (legacy /
+  `_copy` reference harness path). Otherwise the running
+  accumulator survives re-renders triggered by any other
+  directive change.
+- `preview.html`'s `DEFAULT_SCRIPT` no longer includes
+  the line.
+
+Effect: scripts stay clean; drift keeps ticking at
+sub-minute resolution behind the scenes.
+
+## Amendment: MediaModule and Node Names V1.0 — graphviewer.md — 5 July 2026
+
+## Media Module Naming Convention and Node Restructure
+
+### Overview
+
+Establishes a consistent naming convention for media modules
+throughout the system — in node names, source_text properties,
+%%bd_module directives, and file references. Restructures the
+current Visual Test nodes to match the new convention and adds
+a second example media node.
+
+---
+
+### MM1.1 Naming Convention
+
+All media module identifiers follow this structure:
+| Part | Meaning | Example |
+|---|---|---|
+| prefix | Developer/origin identifier | bd = ButterflyDreaming platform |
+| type | Module type | V = visual, M = music |
+| name | Module name | Kolam |
+
+**ButterflyDreaming platform modules:** `bd_V_Kolam`, `bd_M_Music`
+
+**Third party modules** use their own prefix instead of `bd_`:
+`mj_V_Flower`, `xyz_M_Bass` etc. The prefix identifies the
+developer in the open protocol.
+
+The `%%bd_module` directive uses the module identifier without
+any file extension:
+
+| Part | Meaning | Example |
+|---|---|---|
+| prefix | Developer/origin identifier | bd = ButterflyDreaming platform |
+| type | Module type | V = visual, M = music |
+| name | Module name | Kolam |
+
+**ButterflyDreaming platform modules:** `bd_V_Kolam`, `bd_M_Music`
+
+**Third party modules** use their own prefix instead of `bd_`:
+`mj_V_Flower`, `xyz_M_Bass` etc. The prefix identifies the
+developer in the open protocol.
+
+The `%%bd_module` directive uses the module identifier without
+any file extension:
+The server maps `bd_V_Kolam` to the actual file path. No `.html`
+extension in the directive.
+
+---
+
+### MM1.2 Node Renaming — Memgraph Changes
+
+Please make the following Cypher changes to Memgraph:
+
+**Rename the Visual Tests gateway:**
+```cypher
+MATCH (n:TextNode {gateway: true, source_text: 'Visual Tests'})
+SET n.name = 'bd_V_Kolam',
+    n.source_text = 'bd_V_Kolam'
+```
+
+**Rename Kolam_1:**
+```cypher
+MATCH (n:TextNode {name: 'Kolam_1'})
+SET n.name = 'bd_V_Kolam_1',
+    n.source_text = 'bd_V_Kolam'
+```
+
+**Update the %%bd_module directive in bd_V_Kolam_1:**
+```cypher
+MATCH (n:TextNode {name: 'bd_V_Kolam_1'})
+SET n.text = '%%bd_module bd_V_Kolam\n%%bd_symmetry 8\n%%bd_depth 3\n%%bd_step 40\n%%bd_angle 68\n%%bd_angle_minutes 0\n%%bd_colour_speed 4\n%%bd_stroke angle\n%%bd_saturation 100\n%%bd_lightness 65\n%%bd_background #0a0a0f\n%%bd_weight 1.5\n%%bd_score [\naxiom: F+F+F+F+F+F+F+F\nF: F+F-F-F+F+F+F-F\n%%bd_]\n'
+```
+
+**Update Visual Test Cluster name:**
+```cypher
+MATCH (c:Cluster {name: 'Visual Test'})
+SET c.name = 'bd_V_Kolam',
+    c.display_name = 'bd_V_Kolam',
+    c.label = 'bd_V_Kolam'
+```
+
+---
+
+### MM1.3 Create bd_V_Kolam_2
+
+Create a second media TextNode as a child of the bd_V_Kolam
+gateway — same script as bd_V_Kolam_1 but with lightness 100:
+
+```cypher
+CREATE (n:TextNode {
+    name: 'bd_V_Kolam_2',
+    source_text: 'bd_V_Kolam',
+    url: 'butterflydreaming.org/n/' + randomUUID(),
+    text: '%%bd_module bd_V_Kolam\n%%bd_symmetry 8\n%%bd_depth 3\n%%bd_step 40\n%%bd_angle 68\n%%bd_angle_minutes 0\n%%bd_colour_speed 4\n%%bd_stroke angle\n%%bd_saturation 100\n%%bd_lightness 100\n%%bd_background #0a0a0f\n%%bd_weight 1.5\n%%bd_score [\naxiom: F+F+F+F+F+F+F+F\nF: F+F-F-F+F+F+F-F\n%%bd_]\n',
+    module_type: 'visual',
+    gateway: false,
+    tagging_status: 'complete',
+    seq: 2,
+    n_r: 0,
+    created_at: datetime('2026-07-05T10:00:00.000000Z')
+});
+
+MATCH (gw:TextNode {gateway: true, source_text: 'bd_V_Kolam'}),
+      (n:TextNode {name: 'bd_V_Kolam_2'})
+CREATE (gw)-[:CHILD {weight: 1.0, source: 'sequence',
+       created_at: datetime('2026-07-05T10:00:00.000000Z')}]->(n);
+
+MATCH (n:TextNode {name: 'bd_V_Kolam_2'}),
+      (c:Cluster {name: 'bd_V_Kolam'})
+CREATE (n)-[:CLUSTER_REL {tagged_as: 1.0}]->(c);
+```
+
+---
+
+### MM1.4 Update n_r Counts
+
+```cypher
+MATCH (gw:TextNode {gateway: true, source_text: 'bd_V_Kolam'})
+OPTIONAL MATCH (gw)-[:CHILD]->(child)
+WITH gw, count(child) AS child_count
+SET gw.n_r = child_count;
+
+MATCH (c:Cluster {name: 'bd_V_Kolam'})
+OPTIONAL MATCH (c)--(m)
+WHERE NOT m:Family AND NOT m:Root
+AND NOT (m:TextNode AND m.gateway = true)
+WITH c, count(m) AS rel_count
+SET c.n_r = rel_count;
+```
+
+---
+
+### MM1.5 Rebuild CONTAINS_CLUSTER
+
+```cypher
+MATCH (gw:TextNode {gateway: true, source_text: 'bd_V_Kolam'})
+-[r:CONTAINS_CLUSTER]->() DELETE r;
+
+MATCH (gw:TextNode {gateway: true, source_text: 'bd_V_Kolam'})
+MATCH (n:TextNode {source_text: 'bd_V_Kolam'})-[r]->(c:Cluster)
+WHERE n.gateway = false AND n.section_title IS NULL
+WITH gw, c, count(n) AS textCount
+CREATE (gw)-[:CONTAINS_CLUSTER {count: textCount}]->(c);
+```
+
+---
+
+### MM1.6 Update viewer.js — Module Name Mapping
+
+The viewer must map module identifiers to file paths. Add a
+module registry:
+
+```javascript
+const MODULE_REGISTRY = {
+    'bd_V_Kolam': '/visual1/index.html',
+    // future modules added here
+};
+
+function getModuleUrl(moduleId) {
+    return MODULE_REGISTRY[moduleId] || null;
+}
+```
+
+When loading a media TextNode into the Player iframe, use
+`getModuleUrl()` to resolve the file path from the module
+identifier found on the first `%%bd_module` line of the
+node's text property.
+
+---
+
+### MM1.7 Verification
+
+After all changes confirm:
+
+```cypher
+MATCH (gw:TextNode {gateway: true, source_text: 'bd_V_Kolam'})
+-[:CHILD]->(n:TextNode)
+RETURN n.name, n.seq, n.source_text, n.n_r
+ORDER BY n.seq
+```
+
+Expected: bd_V_Kolam_1 (seq 1) and bd_V_Kolam_2 (seq 2).
+
+```cypher
+MATCH (gw:TextNode {gateway: true, source_text: 'bd_V_Kolam'})
+-[:CONTAINS_CLUSTER]->(c:Cluster)
+RETURN c.name, c.n_r
+```
+
+Expected: bd_V_Kolam cluster with n_r = 2.
+

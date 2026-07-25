@@ -689,13 +689,11 @@ const sessions    = new Map();  // userId → socket (Socket.IO Socket)
 let   waitingUser = null;        // { userId, socket } | null
 const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
-// 2026-07-23 — boot helpers are now sequential, one per Root-tap. Queue
-// holds the REMAINING helpers to send for each user after the first
-// (which fires immediately on enter_chat). Presence of a userId in the
-// map serves as the "already started this session" guard, replacing the
-// old initialHelpersSent Set.
-const BOOT_HELPER_SEQUENCE = ['helper-how-to', 'helper-nav-hint'];
-const bootHelperQueue = new Map();  // userId → remaining helper-name string[]
+// 2026-07-23 boot-helper sequencing → RETIRED 2026-07-25 as part of the
+// chunked-UX consolidation. Root's own text (%%bd_chunk directives) now
+// handles onboarding directly. Helpers are still loaded from Memgraph
+// and sendable via sendHelperByName (used for pairing status messages
+// etc.); only the "sequential onboarding queue" layer is gone.
 
 // 2026-07-16 — helper messages loaded from Memgraph at boot instead
 // of the retired HOW_TO_TEXT / NAV_HINT_TEXT / NO_PARTNER_WAITING_TEXT /
@@ -826,46 +824,6 @@ async function loadHelpers() {
   }
 }
 
-// Send the boot-helper sequence one at a time. First call
-// (startBootHelperSequence) seeds the per-user queue and immediately
-// sends the first helper. Subsequent taps on Root reach the server as
-// `next_boot_helper` messages → sendNextBootHelper pops and sends the
-// next one until the queue drains. Every card carries an explicit
-// `bootHelperMoreAvailable` flag so the client can decide whether a
-// Root tap should advance the sequence (true) or fall through to normal
-// text-insert (false / undefined). To add more onboarding cards, extend
-// BOOT_HELPER_SEQUENCE and helper_messages.md — no code change needed
-// beyond that.
-function startBootHelperSequence(userId) {
-  if (bootHelperQueue.has(userId)) return;  // already started this session
-  bootHelperQueue.set(userId, BOOT_HELPER_SEQUENCE.slice(1));  // remaining after the first
-  sendBootHelper(userId, BOOT_HELPER_SEQUENCE[0]);
-}
-
-function sendNextBootHelper(userId) {
-  const q = bootHelperQueue.get(userId);
-  if (!q || q.length === 0) return;  // sequence complete or never started
-  const name = q.shift();
-  sendBootHelper(userId, name);
-}
-
-function sendBootHelper(userId, name) {
-  const h = helpersByName.get(name);
-  if (!h) {
-    console.error(`[BD] sendBootHelper: no such helper "${name}" in helpersByName (loaded ${helpersByName.size})`);
-    return;
-  }
-  const socket = sessions.get(userId);
-  if (!socket || !socket.connected) return;
-  const remaining = bootHelperQueue.get(userId);
-  socket.emit('msg', {
-    type: 'buddy_card',
-    channel: 'system',
-    text: h.text,
-    bootHelperMoreAvailable: !!(remaining && remaining.length > 0),
-  });
-}
-
 // Current connection-status text for `userId`.
 function statusTextFor(userId) {
   if (channelOpen(userId)) return "You're chatting — try putting a message above.";
@@ -927,11 +885,10 @@ async function executePurge(userId) {
     }
   }
   inChat.delete(userId);
-  bootHelperQueue.delete(userId);
   // 2026-07-16 — no longer any :User node to DETACH DELETE. viewer_id
   // is now generated in-memory via crypto.randomUUID; the connect
   // handler doesn't touch the DB. All ephemeral state above (sessions,
-  // pairedWith, inChat, bootHelperQueue) is Maps in this process.
+  // pairedWith, inChat) is Maps in this process.
   console.log(`[BD] User purged: ${userId}`);
 }
 
@@ -1022,8 +979,7 @@ io.on('connection', async (socket) => {
     // viewer_id is derived from crypto.randomUUID (globally unique,
     // no id() footgun to worry about). Prefix 'N_' preserved for log
     // grep continuity with older logs. Session state remains purely
-    // in-memory (sessions / pairedWith / inChat / bootHelperQueue),
-    // as it always was.
+    // in-memory (sessions / pairedWith / inChat), as it always was.
     const viewer_id = 'N_' + crypto.randomUUID().split('-')[0];
     socket.data.userId = viewer_id;
     sessions.set(viewer_id, socket);
@@ -1149,25 +1105,16 @@ io.on('connection', async (socket) => {
         if (socket.data.userId) sendToBuddy(socket.data.userId, { type: 'buddy_breadcrumb', data: msg.data });
         return;
       }
-      if (msg.type === 'next_boot_helper') {
-        // Client-triggered advance of the sequential onboarding cards.
-        // Silent no-op if the queue is empty (sequence complete) — the
-        // client's Root-tap handler always fires this on tap without
-        // needing to know the queue state, so responsibility for
-        // "should we advance?" sits on the server side.
-        if (socket.data.userId) sendNextBootHelper(socket.data.userId);
-        return;
-      }
       if (msg.type === 'enter_chat') {
         if (!socket.data.userId) return;
         inChat.set(socket.data.userId, true);
-        // 2026-07-24 — boot-helper auto-send retired. Root's own text
-        // (chunk 0) now IS the pre-tap onboarding card, shown eagerly by
-        // the client on chat_ready. The boot-helper mechanism is left in
-        // place (helpers still loaded from Memgraph, next_boot_helper
-        // handler still responds) so it can be re-enabled with one line
-        // if we ever want a supplementary boot batch again.
-        // startBootHelperSequence(socket.data.userId);
+        // 2026-07-25 — boot-helper machinery fully retired. Root's own
+        // %%bd_chunk text is the pre-tap onboarding surface, primed on
+        // the client via handleChatReady → primeRootReading. The old
+        // per-user boot helper queue (startBootHelperSequence /
+        // sendNextBootHelper / next_boot_helper handler) is gone —
+        // sendHelperByName still exists for one-off cards like
+        // helper-no-partner-waiting / helper-paired-success.
         // 2026-07-16 — status-card at enter_chat removed. Was sending
         // "Partner not available — please wait." unconditionally at
         // boot to every user (Helper (0.2)). Under always-on-chat that

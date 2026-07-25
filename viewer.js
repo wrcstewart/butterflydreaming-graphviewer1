@@ -78,12 +78,14 @@ let editSelectedTextNodeId = null;
 let chipGridParams         = null;
 let chatModeActive         = true;   // 2026-07-15 — always on; chat panel is a permanent communication window. Kept as a variable for existing gates (routeNodeText, positionCyEl fallback, etc.); no longer toggled.
 
-// 2026-07-23 — boot-helper sequence gate. Server sends the first onboarding
-// card immediately with { bootHelperMoreAvailable: true } if more remain,
-// then subsequent cards on demand. Single-tap on Root advances the sequence
-// via `next_boot_helper` while this flag is true — Root's normal text-insert
-// resumes once the queue drains and the last card arrives with false.
-let bootHelperMoreAvailable = false;
+// 2026-07-23 — boot-helper sequence gate. RETIRED 2026-07-25 as part of
+// the chunked-UX consolidation. Root's own text (via %%bd_chunk directives)
+// now handles onboarding directly. The server-side queue is still in place
+// but its call from enter_chat is commented out; this client flag was
+// referenced by routeNodeText's Root-tap override and by the buddy_card
+// receiver. Both branches now dead-simple since the flag is always false.
+// See CHANGELOG 2026-07-25 for the retirement rationale.
+// let bootHelperMoreAvailable = false;   // removed
 
 // 2026-07-24 — one-gesture UX. Node text is split into chunks on lines that
 // contain exactly `%%bd_chunk`; each single tap on the main canvas reveals
@@ -1682,6 +1684,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
     // Persist a plain-text form for copy/handleCardCopy consumers.
     card.text = text + (hint ? '\n' + hint : '');
+    return card;
   }
 
   // advanceOrNavigate — the one-gesture UX entry point. Every tap on a
@@ -1691,20 +1694,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //   • Same node, past last chunk + descendants  → navigate into node
   //   • Same node, past last chunk + no descendants → silent no-op
   //   • No text at all                       → navigate immediately
-  //   • Root while boot-helper queue non-empty → next_boot_helper (unchanged)
   function advanceOrNavigate(node) {
     if (!node || !node.length) return;
     const meta = navNodeMeta(node);
-
-    // Boot-helper override — while onboarding cards are queued, Root taps
-    // advance that sequence instead of showing chunks. Matches the pre-
-    // existing behaviour so the boot-helper system keeps working alongside.
-    if (meta && meta.label === 'Root' && bootHelperMoreAvailable) {
-      const wsNow = wsRef.current;
-      if (wsNow && wsNow.connected) wsNow.emit('msg', { type: 'next_boot_helper' });
-      return;
-    }
-
     const nid = node.id();
 
     // Different node → reset reading state to fresh chunks of the new node.
@@ -1727,15 +1719,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         } else {
           // No text AND no descendants → single "no further descendants"
           // card so the tap has a visible response (better than silence).
-          readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: false };
-          insertNodeChunkAsCard('', getChunkHint(true, false), node, 0);
+          readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: false, cardsByIdx: {} };
+          const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, false), node, 0);
+          if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
         }
         return;
       }
-      readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc };
+      readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc, cardsByIdx: {} };
       const isLast = chunks.length === 1;
       const c0     = chunks[0];
-      insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc), node, 0);
+      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc), node, 0);
+      if (c0Card) readingState.cardsByIdx[0] = c0Card;
       return;
     }
 
@@ -1755,12 +1749,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     readingState.chunkIndex = nextIdx;
     const isLast = nextIdx === readingState.chunks.length - 1;
     const cn = readingState.chunks[nextIdx];
-    insertNodeChunkAsCard(
+    const cnCard = insertNodeChunkAsCard(
       cn.body,
       cn.hint || getChunkHint(isLast, readingState.hasDescendants),
       node,
       nextIdx
     );
+    if (cnCard) {
+      readingState.cardsByIdx = readingState.cardsByIdx || {};
+      readingState.cardsByIdx[nextIdx] = cnCard;
+    }
   }
 
   // navigateInto — the pure "expand into this node" branch, extracted from
@@ -1784,14 +1782,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
+  // Legacy routeNodeText — the pre-chunked-UX tap-inserts-text-into-chat
+  // path. All main-canvas + breadcrumb taps now go through
+  // advanceOrNavigate / insertNodeChunkAsCard instead. Kept only as a
+  // safety belt for any residual callsite; the Root-tap boot-helper
+  // override that was here is retired.
   function routeNodeText(content, meta) {
-    if (meta && meta.label === 'Root' && bootHelperMoreAvailable) {
-      const wsNow = wsRef.current;
-      if (wsNow && wsNow.connected) {
-        wsNow.emit('msg', { type: 'next_boot_helper' });
-      }
-      return;
-    }
     if (chatModeActive) {
       let text = content;
       if (meta && meta.name) {
@@ -1913,7 +1909,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (kind === 'local') {
       body.value = '';
     } else {
-      body.contentEditable = 'false';
+      // 2026-07-25 — all card bodies editable by default. Edits are DOM-
+      // only (no DB write) so nothing bad happens; the user can rework
+      // wording for reading clarity or select-and-copy fragments cleanly.
+      // Was contentEditable = 'false' — that blocked in-panel edits on
+      // system/received cards, including chunk cards under the new UX.
+      body.contentEditable = 'true';
       body.textContent = '';
     }
 
@@ -3166,77 +3167,77 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     devStatus('reset');
   });
 
-  // --- Default panel node-text Save ---
+  // Sv (Save) — persist text edits from chunk cards of the currently-read
+  // node to the DB via edit_node_text. Reads back the DOM content of each
+  // chunk card (.chunk-text + .chunk-hint children), falls back to the
+  // original chunk data in readingState for chunks the user hasn't yet
+  // displayed. Reassembles the full text with %%bd_chunk between chunks
+  // and %%bd_hint <text> before each chunk's marker.
+  document.getElementById('dev-save').addEventListener('click', () => {
+    if (!readingState || !readingState.nodeId) { devStatus('tap a node first'); return; }
+    const code = document.getElementById('dev-code').value.trim();
+    if (!code) { devStatus('enter code'); return; }
+    const node = cy.getElementById(readingState.nodeId);
+    if (!node.length) { devStatus('node not found'); return; }
+    const type = node.data('type');
+    const labelByType = { root: 'Root', Entry: 'Entry', Family: 'Family', Cluster: 'Cluster' };
+    const label = labelByType[type];
+    if (!label) { devStatus(`cannot save ${type} nodes`); return; }
+    const name = node.data('name');
+    if (!name) { devStatus('node has no name'); return; }
 
-  const defaultSaveBtn    = document.getElementById('default-save-btn');
-  const defaultSaveStatus = document.getElementById('default-save-status');
-
-  function setSaveStatus(msg) {
-    if (!defaultSaveStatus) return;
-    defaultSaveStatus.textContent = msg;
-    clearTimeout(setSaveStatus._t);
-    if (msg) setSaveStatus._t = setTimeout(() => { defaultSaveStatus.textContent = ''; }, 3000);
-  }
-
-  updateSaveButtonState = function () {
-    if (!defaultSaveBtn) return;
-    const topEl   = defaultStackEl && defaultStackEl.firstElementChild;
-    const hasMeta = !!(topEl && topEl.dataset && topEl.dataset.bdName && topEl.dataset.bdLabel);
-    const hasCode = !!(devCodeEl && devCodeEl.value.trim());
-    defaultSaveBtn.disabled = !(hasMeta && hasCode);
-  };
-
-  if (devCodeEl) devCodeEl.addEventListener('input', updateSaveButtonState);
-
-  defaultSaveBtn.addEventListener('click', () => {
-    const topEl = defaultStackEl && defaultStackEl.firstElementChild;
-    if (!topEl) { setSaveStatus('no node'); return; }
-    const label = topEl.dataset.bdLabel;
-    const name  = topEl.dataset.bdName;
-    if (!label || !name) { setSaveStatus('no node'); return; }
-
-    const body = topEl.querySelector('.card-body');
-    if (!body) { setSaveStatus('no body'); return; }
-
-    // innerText preserves line breaks across the child block <div>s; textContent
-    // would smash them together. Trim a trailing newline so the saved text
-    // doesn't grow a blank line each round-trip.
-    const full     = (body.innerText || '').replace(/\n+$/, '');
-    const newline  = full.indexOf('\n');
-    const firstLine = newline === -1 ? full : full.slice(0, newline);
-    const rest      = newline === -1 ? ''   : full.slice(newline + 1);
-
-    const expected = `Node: ${name}`;
-    if (firstLine.trim() !== expected) {
-      setSaveStatus('first line must be "' + expected + '"');
-      return;
+    const cardsByIdx = readingState.cardsByIdx || {};
+    const parts = [];
+    for (let i = 0; i < readingState.chunks.length; i++) {
+      const cardRef = cardsByIdx[i];
+      let body, hint;
+      if (cardRef && cardRef.body) {
+        // Live DOM read — user may have edited these.
+        const textEl = cardRef.body.querySelector('.chunk-text');
+        const hintEl = cardRef.body.querySelector('.chunk-hint');
+        body = textEl ? textEl.textContent.trim() : '';
+        hint = hintEl ? hintEl.textContent.trim() : null;
+        // Only preserve author-supplied hints; strip auto-injected fallbacks
+        // that we don't want round-tripped back into the DB as if authored.
+        if (hint === CHUNK_HINT_MORE || hint === CHUNK_HINT_NAVIGATE || hint === CHUNK_HINT_NO_MORE) {
+          hint = readingState.chunks[i].hint || null;
+        }
+      } else {
+        const original = readingState.chunks[i];
+        body = original.body;
+        hint = original.hint;
+      }
+      let piece = body;
+      if (hint) piece += (piece ? '\n' : '') + `%%bd_hint ${hint}`;
+      parts.push(piece);
     }
-
-    const code = devCodeEl.value.trim();
-    if (!code) { setSaveStatus('enter code'); return; }
+    const text = parts.join('\n%%bd_chunk\n');
 
     const wsNow = wsRef.current;
-    if (!wsNow || !wsNow.connected) { setSaveStatus('ws not open'); return; }
-
-    function handler(m) {
+    if (!wsNow || !wsNow.connected) { devStatus('ws not open'); return; }
+    devStatus('saving…');
+    wsNow.on('msg', function handler(m) {
       if (!m || m.type !== 'edit_node_text') return;
       wsNow.off('msg', handler);
-      if (m.error) { setSaveStatus(m.error); return; }
-      setSaveStatus('saved');
-    }
-    wsNow.on('msg', handler);
-
-    // Normalise curator-authored [ … ] blocks into canonical %%bd_ai_read
-    // before persisting (bot_context.md §3). Server is a dumb store-and-forward.
-    wsNow.emit('msg', {
-      type:  'edit_node_text',
-      code,
-      label,
-      name,
-      text:  normalizeBotBlocks(rest),
+      if (m.error) { devStatus(m.error); return; }
+      devStatus(`saved ${name}`);
+      // Update in-memory node text so next tap re-parses the fresh chunks.
+      node.data('text', text);
+      // Also refresh readingState.chunks so subsequent Sv rounds see the
+      // committed content, not stale.
+      readingState.chunks = splitNodeChunks(text);
     });
-    setSaveStatus('saving…');
+    wsNow.emit('msg', { type: 'edit_node_text', code, label, name, text });
   });
+
+  // --- Default panel node-text Save --- RETIRED 2026-07-25
+  //
+  // The Save button was orphaned by always-on-chat (default panel never got
+  // the bdName/bdLabel metadata Save required). Button removed from HTML
+  // and CSS. Node text editing now goes through `bd_tool.js write` against
+  // nav_nodes_text.md — that path is documented in BackupNotes.md and the
+  // bd-tool-and-helper-messages memory. Server's edit_node_text handler is
+  // still live in case any other client path uses it.
 
   // --- Cluster editor bar buttons ---
 
@@ -4081,33 +4082,35 @@ async function init() {
   // handler below.
   const pairStatus = document.getElementById('pair-status');
 
-  document.getElementById('edit-mode-cb').addEventListener('change', e => {
-    if (editModeUnlocked) {
-      editModeActive = e.target.checked;
-      return;
-    }
-    // Validate against server using the code already in the dev-code field
-    const code = document.getElementById('dev-code').value.trim();
-    if (!code) { e.target.checked = false; return; }
-    const wsNow = wsRef.current;
-    if (!wsNow || !wsNow.connected) { e.target.checked = false; return; }
-    const devStatusEl = document.getElementById('dev-status');
-    wsNow.on('msg', function handler(msg) {
-      if (!msg || msg.type !== 'write_hints') return;
-      wsNow.off('msg', handler);
-      if (msg.ok) {
-        editModeUnlocked = true;
-        editModeActive = true;
-        document.getElementById('edit-mode-cb').checked = true;
-      } else {
-        devStatusEl.textContent = msg.error || 'bad code';
-        setTimeout(() => { devStatusEl.textContent = ''; }, 3000);
-        document.getElementById('edit-mode-cb').checked = false;
-        editModeActive = false;
-      }
-    });
-    wsNow.emit('msg', { type: 'write_hints', code, hints: [] });
-  });
+  // 2026-07-25 — Edit checkbox retired. editModeActive is now derived
+  // from "curation code field non-empty". Server-side code check still
+  // happens at real-write time (write_hints, edit_node_text, cluster
+  // edit save) — a wrong code silently unlocks edit mode client-side
+  // but any DB-write attempt fails meaningfully. Simpler than the old
+  // pre-validate-via-write_hints-ping dance.
+  //
+  // editModeUnlocked kept as a boolean, aliased to editModeActive here
+  // so any pre-existing check that reads `editModeUnlocked` still works.
+  (function wireEditModeToCodeField() {
+    const codeEl = document.getElementById('dev-code');
+    if (!codeEl) return;
+    // Sv/Wr/Re are visible only when the code field is filled to its full
+    // 4-char length — cuts clutter for ordinary readers who never touch it.
+    // Server still enforces the actual code on any DB-write attempt.
+    const devBtns = ['dev-save', 'dev-write', 'dev-reset']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    const sync = () => {
+      const val = codeEl.value.trim();
+      const active = !!val;
+      editModeActive = active;
+      editModeUnlocked = active;
+      const showBtns = val.length === 4;
+      devBtns.forEach(b => { b.style.display = showBtns ? '' : 'none'; });
+    };
+    codeEl.addEventListener('input', sync);
+    sync();
+  })();
 
   const { addBadge }      = setupNrBadges(cy);
   const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
@@ -4571,12 +4574,6 @@ async function init() {
       // communications.md §1 — one inbound path, one rendering rule.
       if (typeof msg.text !== 'string') return;
       if (msg.channel === 'system') {
-        // Track boot-helper queue depth per server signal. Only update
-        // when the field is explicitly present so unrelated system
-        // cards (partner joined etc.) don't accidentally clear the flag.
-        if (typeof msg.bootHelperMoreAvailable === 'boolean') {
-          bootHelperMoreAvailable = msg.bootHelperMoreAvailable;
-        }
         prependSystemCard(msg.text);
       } else if (msg.channel === 'partner') {
         prependPartnerCard(msg.text);

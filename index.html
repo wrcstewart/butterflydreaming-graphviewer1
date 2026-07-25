@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=117">
+  <link rel="stylesheet" href="style.css?v=124">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming Development</div>
@@ -23,7 +23,6 @@
     </div>
   </div>
   <div id="action-bar">
-    <button id="default-save-btn" type="button" disabled>Save</button>
     <button id="chat-send-btn" type="button" disabled>Send</button>
     <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
     <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
@@ -99,12 +98,17 @@
     <button id="chat-btn">Join Remote</button>
     <span id="pair-status"></span>
   </div>
+  <!-- 2026-07-25 — dev-panel simplified. Edit checkbox retired: editModeActive
+       is now derived from "code field non-empty" — entering the curation code
+       IS the edit-mode-on gesture. Save button removed (was orphaned since
+       always-on-chat — default panel is never written to). Code input sized to
+       4 chars, Wr/Re labels shortened, touch-safe spacing kept via padding. -->
   <div id="dev-panel">
-    <input type="password" id="dev-code" placeholder="code" autocomplete="off">
-    <button class="dev-btn" id="dev-write">Write</button>
-    <button class="dev-btn" id="dev-reset">Reset</button>
+    <input type="password" id="dev-code" placeholder="code" autocomplete="off" maxlength="4" inputmode="numeric" pattern="[0-9]*">
+    <button class="dev-btn" id="dev-save"  title="Save text edits from this node's chunk cards to the DB" style="display:none">Sv</button>
+    <button class="dev-btn" id="dev-write" title="Write layout position hints for the current view" style="display:none">Wr</button>
+    <button class="dev-btn" id="dev-reset" title="Reset layout of the current view (re-run fCoSE)" style="display:none">Re</button>
     <span id="dev-status"></span>
-    <label id="edit-mode-label"><input type="checkbox" id="edit-mode-cb"> Edit</label>
   </div>
 
   <!-- 2026-07-15 — Copy-Link update-script confirm dialog for BD.
@@ -147,6 +151,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=445"></script>
+  <script type="module" src="viewer.js?v=449"></script>
 </body>
 </html>
