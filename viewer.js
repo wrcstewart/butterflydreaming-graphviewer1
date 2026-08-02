@@ -118,9 +118,14 @@ function splitNodeChunks(text) {
 // falls back to the default auto-hint (Tap for next / Tap once more / No
 // further descendants).
 function extractChunkHint(chunk) {
-  const match = chunk.match(/^%%bd_hint[ \t]+(.+)$/m);
+  // `%%bd_hint <text>` → hint = <text>
+  // `%%bd_hint` (no body) → hint = '' (empty string, signals "suppress
+  //   the auto-hint here" — used on content chunks like poem stanzas
+  //   where the tap-hint would be misleading)
+  // no directive       → hint = null (caller falls back to getChunkHint)
+  const match = chunk.match(/^%%bd_hint(?:[ \t]+(.+))?[ \t]*$/m);
   if (!match) return { body: chunk.trim(), hint: null };
-  const hint = match[1].trim();
+  const hint = match[1] ? match[1].trim() : '';
   const body = chunk.replace(match[0], '').replace(/\n{3,}/g, '\n\n').trim();
   return { body, hint };
 }
@@ -149,9 +154,60 @@ function hasNavDescendants(node) {
   return node.connectedEdges('[type="DESCENDS_FROM"], edge[type="CONTAINS"]').length > 0;
 }
 
-function getChunkHint(isLast, hasDescendants) {
+// Inline colour-marker parser (2026-07-28). Curators can wrap short spans
+// in `<<yellow>>…<</>>` or `<<bread>>…<</>>` inside node text to paint
+// them the same colour as the UI element they refer to (Back button, local
+// breadcrumb strip). Renders as safe span elements — no innerHTML — so
+// arbitrary curator text can never inject markup.
+//
+// Extend by adding more names to HIGHLIGHT_ALLOWED + a CSS `.hi-<name>`
+// rule. Unknown names are left as literal text so a typo is visible, not
+// silently stripped.
+const HIGHLIGHT_ALLOWED = new Set(['yellow', 'bread']);
+const HIGHLIGHT_RE = /<<([a-z]+)>>([\s\S]*?)<<\/>>/g;
+function renderTextWithHighlights(container, text) {
+  if (!text) return;
+  HIGHLIGHT_RE.lastIndex = 0;
+  let cursor = 0;
+  let m;
+  while ((m = HIGHLIGHT_RE.exec(text)) !== null) {
+    if (m.index > cursor) {
+      container.appendChild(document.createTextNode(text.slice(cursor, m.index)));
+    }
+    const name = m[1];
+    const inner = m[2];
+    if (HIGHLIGHT_ALLOWED.has(name)) {
+      const span = document.createElement('span');
+      span.className = 'hi-' + name;
+      span.textContent = inner;
+      container.appendChild(span);
+    } else {
+      // Unknown colour name — surface it literally so the curator notices.
+      container.appendChild(document.createTextNode(m[0]));
+    }
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < text.length) {
+    container.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+}
+
+function getChunkHint(isLast, hasDescendants, node) {
   if (!isLast) return CHUNK_HINT_MORE;
-  if (hasDescendants) return CHUNK_HINT_NAVIGATE;
+  if (hasDescendants) {
+    // bd_V* TextNodes (visual-module preview nodes like bd_V_Kolam_1) get
+    // a nudge toward the Player toggle since that's the whole point of
+    // arriving here. The standard "Tap once more..." hint alone hides the
+    // fact that a live module is waiting to be tried.
+    if (node && node.data) {
+      const type = node.data('type');
+      const name = node.data('name') || '';
+      if (type === 'TextNode' && name.startsWith('bd_V')) {
+        return 'Try the Player (below right) or tap once more to see connected nodes.';
+      }
+    }
+    return CHUNK_HINT_NAVIGATE;
+  }
   return CHUNK_HINT_NO_MORE;
 }
 let chatStackEl            = null;
@@ -159,8 +215,6 @@ let cards                  = [];      // ordered bottom-up; cards[length-1] is t
 let nextCardSerial         = 1;     // unique id counter across all kinds
 let nextLocalSerial        = 1;     // "Local (k)" label counter — only locals consume it
 let defaultStackEl         = null;    // #default-stack — central system-message hub
-let currentCopyText        = null;    // most recently copied text — survives until next copy
-let currentCopyRange       = null;    // { cardId, from, to } of the source range
 
 function createSystemCardEl(label) {
   const el = document.createElement('div');
@@ -1343,6 +1397,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let recentTouch = false;
   let recentTouchTimer = null;
   let lastClusterNode = null;
+  // Fires the first time the user drills past a gateway TextNode into
+  // the title-node + text-node layout (see handleGatewayClick). One-shot
+  // per session — flip to false to re-arm, or drop the flag entirely to
+  // make the helper fire on every gateway click.
+  let gatewayHelperShown = false;
   let currentClusterColour = null;
   let lastParentNode = null;
   let lastReadNodeId = null;
@@ -1652,38 +1711,50 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const card = createCard({ kind: 'system', label });
     if (!card || !card.body) return;
-    // Tag every chunk card so it stands out in DOM inspection. Also bump
-    // opacity via inline style: createCard stamps `el.style.opacity = 0.85`
-    // (from card.volume) on EVERY card, and inline style beats CSS class
-    // selectors on the specificity ladder — so class-only dimming wouldn't
-    // be visible. Setting .style.opacity directly here wins cleanly.
-    // Newest chunk = 1.0 (full brightness); demoted priors = 0.4 (recessive).
+    // Tag every chunk card so it stands out in DOM inspection. Uniform
+    // stack contrast (top = 1.0, others = 0.7) is now handled by
+    // refreshCardOpacities in createCard — no per-chunk override needed.
     if (card.el && card.el.classList) {
-      document.querySelectorAll('.card.chunk-current').forEach(el => {
-        el.classList.remove('chunk-current');
-        el.style.opacity = '0.4';
-      });
-      card.el.classList.add('chunk-card', 'chunk-current');
-      card.el.style.opacity = '1';
+      card.el.classList.add('chunk-card');
       if (nodeType === 'TextNode') card.el.classList.add('text-reading');
     }
 
     const body = card.body;
     body.textContent = '';
+    // %%bd_center on its own line splits the chunk: everything before is
+    // left-aligned (default), everything after is centre-aligned. Simple
+    // author-controlled layout knob for call-to-action tails without
+    // needing a whole new chunk. Directive line is stripped.
     if (text) {
-      const textEl = document.createElement('div');
-      textEl.className = 'chunk-text';
-      textEl.textContent = text;
-      body.appendChild(textEl);
+      const centerRE = /^%%bd_center[ \t]*$/m;
+      const cm = text.match(centerRE);
+      const preText  = cm ? text.slice(0, cm.index).replace(/\s+$/, '') : text;
+      const postText = cm ? text.slice(cm.index + cm[0].length).replace(/^\s+/, '') : '';
+      if (preText) {
+        const el = document.createElement('div');
+        el.className = 'chunk-text';
+        renderTextWithHighlights(el, preText);
+        body.appendChild(el);
+      }
+      if (postText) {
+        const el = document.createElement('div');
+        el.className = 'chunk-text chunk-text--center';
+        renderTextWithHighlights(el, postText);
+        body.appendChild(el);
+      }
     }
     if (hint) {
       const hintEl = document.createElement('div');
       hintEl.className = 'chunk-hint';
-      hintEl.textContent = hint;
+      renderTextWithHighlights(hintEl, hint);
       body.appendChild(hintEl);
     }
-    // Persist a plain-text form for copy/handleCardCopy consumers.
     card.text = text + (hint ? '\n' + hint : '');
+    // Scroll the chat stack to the top so the newly-inserted chunk is in
+    // view. Without this, if the user has scrolled down to read a long
+    // earlier chunk, tapping to the next chunk (or into a new node) leaves
+    // the new card off-screen above the scroll position.
+    if (chatStackEl) chatStackEl.scrollTop = 0;
     return card;
   }
 
@@ -1711,24 +1782,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const chunks = splitNodeChunks(rawText);   // → [{body, hint}, …]
       const desc   = hasNavDescendants(node);
       if (chunks.length === 0) {
-        if (desc) {
-          // No text but has descendants → straight to navigation. Feels
-          // right for empty-text nav nodes that are just "click through" points.
-          readingState = null;
-          navigateInto(node);
-        } else {
-          // No text AND no descendants → single "no further descendants"
-          // card so the tap has a visible response (better than silence).
-          readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: false, cardsByIdx: {} };
-          const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, false), node, 0);
-          if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
-        }
+        // No text at all → still show a single placeholder chunk (hint
+        // only, empty body) so EVERY node follows the same "tap to read,
+        // tap again to advance" rhythm. Without this, empty-text nodes
+        // navigated on a single tap and inconsistency bit users who had
+        // learned to double-tap. The `desc` flag steers getChunkHint to
+        // the right message ("Tap once more..." vs "no further descendants").
+        readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: desc, cardsByIdx: {} };
+        const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, desc, node), node, 0);
+        if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
         return;
       }
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc, cardsByIdx: {} };
       const isLast = chunks.length === 1;
       const c0     = chunks[0];
-      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc), node, 0);
+      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc, node), node, 0);
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       return;
     }
@@ -1751,7 +1819,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const cn = readingState.chunks[nextIdx];
     const cnCard = insertNodeChunkAsCard(
       cn.body,
-      cn.hint || getChunkHint(isLast, readingState.hasDescendants),
+      cn.hint || getChunkHint(isLast, readingState.hasDescendants, node),
       node,
       nextIdx
     );
@@ -1865,29 +1933,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return null;
   }
 
-  // Most recent VISIBLE local — excludes the hidden N=0 ghost. Used by
-  // prependSystemCard so new status notifications pin themselves below the
-  // user's compose card instead of bumping it down the stack.
-  function topVisibleLocalCard() {
-    for (let i = cards.length - 1; i >= 0; i--) {
-      if (cards[i].kind === 'local' && !cards[i].hidden) return cards[i];
-    }
-    return null;
-  }
+  // Post-2026-07-25: no more N=0 ghost. topLocalCard() alone suffices;
+  // callers just null-check.
 
-  function createCard({ kind = 'local', label, hidden = false } = {}) {
+  function createCard({ kind = 'local', label } = {}) {
     if (!chatStackEl) return null;
     const id        = 'card_' + nextCardSerial;
     nextCardSerial++;
-    // Hidden ghost local takes serial 0 explicitly so user-facing N=1 stays
-    // the first visible serial. Visible locals consume nextLocalSerial.
-    const serial    = kind === 'local'
-      ? (hidden ? 0 : nextLocalSerial++)
-      : null;
-    const card      = { id, kind, serial, hidden, volume: 0.85, text: '' };
+    const serial    = kind === 'local' ? nextLocalSerial++ : null;
+    const card      = { id, kind, serial, volume: 0.85, text: '' };
 
     const el = document.createElement('div');
-    el.className          = 'card ' + kind + (hidden ? ' card-hidden' : '');
+    el.className          = 'card ' + kind;
     el.dataset.cardId     = id;
     el.style.opacity      = card.volume;
 
@@ -1924,52 +1981,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     card.body = body;
     cards.push(card);
 
-    // Hook OS-native copy. We do NOT preventDefault — system clipboard still gets the text,
-    // so the user can paste outside the app as a side effect.
-    body.addEventListener('copy', e => handleCardCopy(e, card));
-
     // Local cards drive the Send button's enable state (communications.md §6.1).
     if (kind === 'local') {
       body.addEventListener('input', updateSendBtn);
     }
     updateSendBtn();
+    refreshCardOpacities();
 
     return card;
   }
 
-  function handleCardCopy(_e, card) {
-    let from, to, text;
-    if (card.kind === 'local') {
-      from = card.body.selectionStart;
-      to   = card.body.selectionEnd;
-      text = card.body.value.slice(from, to);
-    } else {
-      const sel = window.getSelection();
-      text = sel ? sel.toString() : '';
-      if (text && sel.rangeCount) {
-        const r   = sel.getRangeAt(0);
-        const pre = r.cloneRange();
-        pre.selectNodeContents(card.body);
-        pre.setEnd(r.startContainer, r.startOffset);
-        from = pre.toString().length;
-        to   = from + r.toString().length;
-      } else {
-        from = to = 0;
-      }
+  // Uniform stack contrast (2026-07-25): whichever card is visually on top
+  // (last-pushed to `cards`, which is the DOM's firstElementChild after
+  // chatStackEl.prepend) reads at full brightness; every card beneath it
+  // reads dimmer, regardless of kind. Called after any card insertion so
+  // the previous top demotes automatically.
+  function refreshCardOpacities() {
+    const topIdx = cards.length - 1;
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i];
+      if (!c.el) continue;
+      c.el.style.opacity = (i === topIdx) ? '1' : '0.6';
     }
-
-    if (!text) return;   // empty selection — no-op
-
-    currentCopyText  = text;
-    currentCopyRange = { cardId: card.id, from, to };
-
-    // Destination = top local card. If source IS the top local, grow the stack
-    // with a new local above it. Copies from system/received cards land in the
-    // existing top local (creating one if there isn't one yet).
-    const dest = (card === topLocalCard())
-      ? createCard({ kind: 'local' })
-      : (topLocalCard() || createCard({ kind: 'local' }));
-    appendToCard(dest, text);
   }
 
   function setCardText(card, content) {
@@ -2079,11 +2112,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // AI-bot role a helper arriving now IS the most relevant card and
   // should read where the user's eye naturally lands (top). Also
   // matches user's mental model — "newer messages float up".
+  // Helper label: 'Helper (N.M)' when a Local exists (N=top local serial,
+  // M=count of helpers arrived during Local N's compose window); plain
+  // 'Helper' before any Local exists. Post-2026-07-25 no auto-Local at
+  // boot, so pre-Local helpers are the norm during the initial batch.
   function prependSystemCard(text) {
-    const parentN = topLocalCard() ? topLocalCard().serial : 0;
-    const m = (helperCountByN.get(parentN) || 0) + 1;
-    helperCountByN.set(parentN, m);
-    const sys = createCard({ kind: 'system', label: 'Helper (' + parentN + '.' + m + ')' });
+    const top = topLocalCard();
+    let label;
+    if (top) {
+      const parentN = top.serial;
+      const m = (helperCountByN.get(parentN) || 0) + 1;
+      helperCountByN.set(parentN, m);
+      label = 'Helper (' + parentN + '.' + m + ')';
+    } else {
+      label = 'Helper';
+    }
+    const sys = createCard({ kind: 'system', label });
     if (!sys) return;
     if (sys.body) {
       sys.body.textContent = text;
@@ -2091,34 +2135,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
-  // Called on Chat press: drop in a hidden N=0 ghost so the user's first
-  // visible card (N=1) lands above the server's initial how-to + status batch
-  // when chat_ready fires. The ghost anchors partner-card labels too — it
-  // gives topLocalCard().serial a defined value (0) in the brief window
-  // between Chat press and chat_ready.
-  function ensureLocalCard() {
-    if (!topLocalCard()) createCard({ kind: 'local', hidden: true });
-  }
-
-  // Server's chat_ready signal: initial system batch is in. Promote the
-  // chat panel by creating the user's first visible local card (N=1) on top.
-  // Idempotent: if a visible local already exists, no-op.
-  //
-  // 2026-07-24 — also kick off Root's chunk-0 as the pre-tap onboarding
-  // card. Replaces the retired boot-helper batch: Root's first chunk
-  // ("Tap me to reveal my next message") appears at launch before any
-  // user interaction, teaching the tap gesture. readingState is now
-  // primed to Root so the user's first tap advances to chunk 1.
+  // Server's chat_ready signal: initial system batch is in. Post-2026-07-25
+  // no auto-Local — the stack starts with just helper cards, and the user
+  // creates a Local themselves via New/Edit when they want to compose. Still
+  // kick off Root's chunk-0 as the pre-tap onboarding card so the first
+  // tap gesture is teachable without any Local present.
   function handleChatReady() {
-    const top = topLocalCard();
-    if (top && !top.hidden) {
-      // Local already exists — still fire the initial Root chunk if we
-      // haven't shown one yet this session.
-      if (!readingState) primeRootReading();
-      return;
-    }
-    createCard({ kind: 'local' });
-    primeRootReading();
+    if (!readingState) primeRootReading();
   }
 
   function primeRootReading() {
@@ -2138,16 +2161,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // message that arrived while Local (2) was on top". Preserves the
   // compose-card association that plain linear numbering lost.
   // Newest on top — createCard's prepend puts it at the absolute top.
+  // Partner label: 'Remote (N.M)' when a Local exists (N=top local serial,
+  // M=count of Remotes arrived during Local N's compose window); plain
+  // 'Remote' before any Local exists. Under the new no-auto-Local model,
+  // a paired user who never composes will just see 'Remote' cards.
   function prependPartnerCard(text) {
-    if (!topLocalCard()) {
-      // ensureLocalCard makes this unreachable in practice, but degrade gracefully.
-      createCard({ kind: 'local' });
-    }
     const top = topLocalCard();
-    const parentN = top ? top.serial : 0;
-    const m = (receivedCountByN.get(parentN) || 0) + 1;
-    receivedCountByN.set(parentN, m);
-    const rcv = createCard({ kind: 'received', label: 'Remote (' + parentN + '.' + m + ')' });
+    let label;
+    if (top) {
+      const parentN = top.serial;
+      const m = (receivedCountByN.get(parentN) || 0) + 1;
+      receivedCountByN.set(parentN, m);
+      label = 'Remote (' + parentN + '.' + m + ')';
+    } else {
+      label = 'Remote';
+    }
+    const rcv = createCard({ kind: 'received', label });
     if (!rcv) return;
     if (rcv.body) {
       rcv.body.textContent = text;
@@ -2164,8 +2193,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function updateSendBtn() {
     const top = topLocalCard();
-    // Hidden ghost (N=0) is never sendable — it has no body the user can fill.
-    const text = top && !top.hidden && top.body ? top.body.value : '';
+    const text = top && top.body ? top.body.value : '';
     if (sendBtnEl) sendBtnEl.disabled = !pairingState.active || !text.trim();
 
     // Player radio visibility. Two paths:
@@ -2201,7 +2229,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // on direct user typing). Returns true if the WS frame went out.
   function sendTopLocalCard() {
     const top = topLocalCard();
-    if (!top || top.hidden || !top.body) return false;
+    if (!top || !top.body) return false;
     const text = top.body.value;
     if (!text.trim()) return false;
     const wsNow = wsRef.current;
@@ -2508,6 +2536,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     ).show();
     lastParentNode = lastClusterNode;
     runLayout(cy, lastClusterNode);
+
+    // 2026-07-31 — first-time helper: user just arrived at the title-node
+    // + text-node layout for the first time this session; orient them.
+    if (!gatewayHelperShown) {
+      prependSystemCard(
+        'The grey nodes are title nodes — click once to see any ' +
+        'comments on the particular work and again to see the complete ' +
+        'work divided into parts. Or click the black text node directly ' +
+        'to view a particularly relevant section.'
+      );
+      gatewayHelperShown = true;
+    }
   }
 
   function exitSnakeView() {
@@ -3471,7 +3511,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar };
 
 }
 
@@ -4113,7 +4153,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, ensureLocalCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
@@ -4163,8 +4203,8 @@ async function init() {
   // gated on a successful Copy Down having happened first (§42.7).
   //
   // "Focused card" per the answer to Q3: whichever local card's textarea has
-  // DOM focus; fallback = topLocalCard() (which excludes the hidden ghost
-  // via the top.hidden check).
+  // DOM focus; fallback = topLocalCard() (may be null if the user hasn't
+  // pressed New/Edit yet — in which case there's no Local to copy into/out of).
   {
     const copyDownBtn = document.getElementById('copy-down-btn');
     const copyUpBtn   = document.getElementById('copy-up-btn');
@@ -4176,7 +4216,7 @@ async function init() {
         return active;
       }
       const top = topLocalCard();
-      return (top && !top.hidden && top.body) ? top.body : null;
+      return (top && top.body) ? top.body : null;
     }
 
     if (copyDownBtn) {
@@ -4269,7 +4309,7 @@ async function init() {
         cardText = active.value || '';
       } else {
         const top = topLocalCard();
-        if (top && !top.hidden && top.body) cardText = top.body.value || '';
+        if (top && top.body) cardText = top.body.value || '';
       }
       const extracted = cardText !== null ? extractLatestModuleScript(cardText) : null;
       if (extracted) {

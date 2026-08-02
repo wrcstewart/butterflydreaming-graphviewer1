@@ -119,11 +119,15 @@ html, body {
   top: 34px;
   left: 8px;
   z-index: 10;
-  background: #3d2e00;
+  /* 2026-07-28 — filled signal yellow (same as #copy-link-btn) since Back
+     is a primary navigation control and users were missing it in its dim
+     amber-on-amber form. Same colour language reads as "important". */
+  background: #FFD700;
   border: 1px solid #a07820;
   border-radius: 4px;
-  color: #ffd88a;
+  color: #1a1a20;
   font-size: 18px;
+  font-weight: 700;
   cursor: pointer;
   padding: 4px 12px;
   line-height: 1;
@@ -135,8 +139,8 @@ html, body {
 }
 
 #back-btn:hover {
-  border-color: #ffd88a;
-  color: #fff;
+  background: #ffe555;
+  border-color: #d4a52e;
 }
 
 #chat-btn:disabled {
@@ -156,7 +160,10 @@ html, body {
   right: 0;
   bottom: 63px;                          /* clears #cy-buddy (bottom: 37px, 23px tall) + 3px gap */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
-  background: #5a5000;                  /* brighter yellow — matches local card head */
+  /* 2026-07-28 — brightened from #5a5000 to #7f6d00 so the strip is
+     visibly present AND so `.hi-bread` highlight text can match it
+     exactly whilst staying readable on the recessed panel bg. */
+  background: #7f6d00;                  /* mustard — matches local card head + .hi-bread text */
   cursor: url('cursor-wings.svg') 16 16, auto;
   z-index: 5;
 }
@@ -184,7 +191,10 @@ html, body {
   height: 33dvh;
   flex-shrink: 0;
   align-self: center;
-  background: #3d2e00;                  /* dark amber — pairs with #action-bar (A50k) */
+  /* 2026-07-28 — dropped from solid #3d2e00 to rgba(...,0.55) so the frame
+     recedes visually. Panel is still there, but reads less as a bright
+     rectangle imposed on the page. */
+  background: rgba(61, 46, 0, 0.55);
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
@@ -207,7 +217,9 @@ html, body {
   align-items: center;
   gap: 8px;
   width: 100%;
-  background: #3d2e00;
+  /* 2026-07-28 — softened from solid #3d2e00 to rgba so the bar reads
+     as chrome, not as a bright rectangle. Same hue, less presence. */
+  background: rgba(61, 46, 0, 0.55);
   padding: 4px 8px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -220,7 +232,9 @@ html, body {
   height: 34dvh;                       /* doubled from 17dvh on 2026-06-23 to give system messages more room */
   flex-shrink: 0;
   align-self: center;
-  background: #3d2e00;                  /* dark amber — pairs with #action-bar (A50k) */
+  /* 2026-07-28 — matched to #chat-panel: rgba dark-amber at 0.55 alpha
+     so the frame recedes. */
+  background: rgba(61, 46, 0, 0.55);
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
@@ -313,7 +327,7 @@ html, body {
    throughout — body backgrounds are very dark so the head reads as a
    distinct stripe. Local takes the brighter yellow (user's compose
    area should stand out); system fades back to the dimmer green. */
-.card.local    .card-head { background: #5a5000; }   /* brighter yellow, matches #cy-you breadcrumb */
+.card.local    .card-head { background: #7f6d00; }   /* mustard, matches #cy-you breadcrumb + .hi-bread */
 .card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
 /* 2026-07-16 — system card head now uses the Root-node fill colour
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
@@ -355,10 +369,26 @@ html, body {
 .card.system .card-body .chunk-text {
   white-space: pre-wrap;
 }
+/* 2026-07-28 — author-triggered centre alignment via `%%bd_center` line
+   directive in node text. Everything after that line becomes centred so
+   short call-to-action tails read as one visual unit. Sits close to the
+   left-aligned intro above (just a newline's worth of space) so the two
+   read as one continuous chunk; the real breathing room goes below, via
+   .chunk-hint's margin-top — that stops the injected tap hint from
+   looking like it refers to the coloured phrase just above it. */
+.card.system .card-body .chunk-text--center {
+  text-align: center;
+  margin-top: 4px;
+}
 .card.system .card-body .chunk-hint {
   text-align: center;
   color: #c8a050;
   font-style: italic;
+  /* 2026-07-28 — line-space above the tap hint so it reads as a
+     separate advisory, not as a caption/continuation of the sentence
+     immediately above (which especially matters when that sentence
+     names a UI element like the Back button). */
+  margin-top: 22px;
 }
 
 /* 2026-07-24 — TextNode chunk cards dim head + hint to 0.5 opacity so the
@@ -367,6 +397,23 @@ html, body {
 .card.system.text-reading .card-head,
 .card.system.text-reading .card-body .chunk-hint {
   opacity: 0.5;
+}
+
+/* 2026-07-28 — Inline colour highlights inside chunk text (and hints).
+   Curator uses `<<yellow>>…<</>>` or `<<bread>>…<</>>` in node text to
+   paint short phrases the same colour as the UI element they name —
+   Back button (yellow), local breadcrumb strip (bread). Font weight
+   nudged up so the highlight reads clearly against the panel bg. */
+.hi-yellow {
+  color: #FFD700;
+  font-weight: 600;
+}
+.hi-bread {
+  /* Exact match with #cy-you and .card.local .card-head (all #7f6d00)
+     so the reader sees the same colour on the sentence and on the
+     local breadcrumb strip / local card headers. */
+  color: #7f6d00;
+  font-weight: 700;
 }
 
 /* Previous chunk cards dim to 0.4; newest chunk goes to 1.0. Managed
@@ -415,6 +462,13 @@ html, body {
   padding: 4px 10px;
 }
 
+/* 2026-07-28 — enabled Send button pops to white so the "ready to send"
+   state is unmistakable. Disabled state keeps the #cccccc + 0.4 opacity
+   dim; hover state further brightens border. */
+#chat-send-btn:not(:disabled) {
+  color: #fff;
+}
+
 #chat-send-btn:hover:not(:disabled),
 #chat-new-card-btn:hover {
   border-color: #aaa;
@@ -426,10 +480,11 @@ html, body {
   cursor: not-allowed;
 }
 
-/* 2026-07-15 — New Card + BD-self Copy Link are two-line narrow buttons.
-   Both sit between ↑ and the status span. Chat panel is always active
-   now so the old #chat-panel.active gate is redundant; kept for safety
-   in case display state is ever revisited. */
+/* 2026-07-25 — Renamed "New Card" → "New / Edit". Single-line label now
+   (was two-line New/Card) since it's the sole entry point to compose a
+   Local card — no auto-Local at boot any more, so this is where every
+   Local starts life. Chat panel is always active so the old .active gate
+   is dropped. */
 #chat-new-card-btn {
   background: #1a1a2e;
   border: 1px solid #555;
@@ -437,15 +492,13 @@ html, body {
   color: #cccccc;
   font-family: sans-serif;
   font-size: 10px;
-  line-height: 1.05;         /* tight — two lines don't need extra leading */
-  padding: 3px 5px;
+  line-height: 1.2;
+  padding: 4px 8px;
   cursor: pointer;
   text-align: center;
-  min-width: 30px;
+  min-width: 60px;
   flex-shrink: 0;
 }
-#chat-new-card-btn { display: none; }
-#chat-panel.active ~ #action-bar #chat-new-card-btn { display: inline-block; }
 #chat-new-card-btn:hover { border-color: #aaa; color: #fff; }
 
 /* 2026-07-25 — Copy Link promoted to top-row, filled system yellow so it
@@ -456,7 +509,7 @@ html, body {
 #copy-link-btn {
   position: fixed;
   top: 34px;
-  right: 125px;          /* just left of #pair-control (right:8px + width ~130px) */
+  right: 135px;          /* just left of #pair-control (right:8px + width ~130px) */
   z-index: 10;
   background: #FFD700;
   color: #1a1a20;
@@ -479,7 +532,12 @@ html, body {
 
 /* A42 §42.6 / §42.7 — Copy Down (↓) and Copy Up (↑) single-glyph buttons.
    Same visual family as the other action-bar buttons. Start disabled and
-   get enabled per chat-active + first-Copy-Down rules. */
+   get enabled per chat-active + first-Copy-Down rules.
+   2026-07-25 — hidden unless body.player-active. Their whole purpose is
+   swapping module scripts between the top Local card and the iframe, which
+   only makes sense while the iframe is visible. In Player mode the leftmost
+   arrow takes `margin-left: auto` from #view-mode-toggle so both arrows sit
+   tight against the Nodes/Player radio. */
 #copy-down-btn,
 #copy-up-btn {
   background: #1a1a2e;
@@ -503,6 +561,16 @@ html, body {
   opacity: 0.4;
   cursor: not-allowed;
 }
+body:not(.player-active) #copy-down-btn,
+body:not(.player-active) #copy-up-btn {
+  display: none;
+}
+body.player-active #copy-down-btn {
+  margin-left: auto;
+}
+body.player-active #view-mode-toggle {
+  margin-left: 0;
+}
 
 /* A42 §42.3 — Nodes/Player radio toggle in the action bar. Sits at the far
    right (margin-left: auto). Radios start disabled; JS clears the disabled
@@ -519,7 +587,9 @@ html, body {
      visible on narrow viewports (was cut off on iPhone at edge-flush). */
   margin-left: auto;
   margin-right: 50px;
-  color: #ccc;
+  /* 2026-07-28 — white text (was #ccc) so this important mode switch
+     doesn't get missed against the recessed action-bar background. */
+  color: #fff;
   font-family: sans-serif;
   font-size: 11px;
 }
@@ -994,9 +1064,13 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 
 #dev-code {
-  background: #111;
-  border: 1px solid #444;
-  color: #ccc;
+  /* 2026-07-28 — very low resting visibility: only the few curators who
+     know it's there should notice it. Transparent background + hairline
+     border in a colour that reads as noise against the app ground.
+     Focus + hover restore full contrast so it's usable when engaged. */
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
   /* iOS Safari auto-zooms any input under 16px on focus. Keeping >= 16px
      prevents the zoom-in / can't-zoom-back problem on iPhone. */
   font-size: 16px;
@@ -1008,9 +1082,20 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   text-align: center;
   font-family: ui-monospace, monospace;
   border-radius: 3px;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-#dev-code::placeholder { color: #555; }
+#dev-code:hover,
+#dev-code:focus {
+  background: #111;
+  border-color: #444;
+  color: #ccc;
+  outline: none;
+}
+
+#dev-code::placeholder { color: rgba(255, 255, 255, 0.15); }
+#dev-code:hover::placeholder,
+#dev-code:focus::placeholder { color: #555; }
 
 /* Wr / Re dev buttons. Compact labels + generous padding so the hit
    area stays at least 44 px per side even though the visible label is

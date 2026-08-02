@@ -676,7 +676,7 @@ F: F+F-F-F+F+F+F-F
       { name: 'step',         min: 10, max: 200,step: 1,   fallback: 40 },
       { name: 'angle',        min: 5,  max: 90, step: 1,   fallback: 45 },
       { name: 'angle_minutes',min: 0,  max: 59, step: 1,   fallback: 0 },
-      { name: 'angle_drift',  min: 0,  max: 10, step: 1,   fallback: 0 },
+      { name: 'angle_drift',  min: 0,  max: 100, step: 1,   fallback: 0 },
       { name: 'colour_speed', min: -2, max: 4,  step: 1,   fallback: 2,
         toDirective: (v) => String(Math.round((2 ** v) * 100) / 100),
         fromDirective: (v) => Math.round(Math.log2(Math.max(0.01, Number(v) || 1))) },

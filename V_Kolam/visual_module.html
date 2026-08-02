@@ -326,7 +326,7 @@
         <button class="step-btn" type="button" data-target="angle-drift-slider" data-delta="1">+</button>
       </div>
       <label>angle_drift</label>
-      <input id="angle-drift-slider" class="stepper-source" type="number" min="0" max="10" step="1" value="0">
+      <input id="angle-drift-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="0">
     </div>
 
     <div class="control-row">
@@ -512,7 +512,7 @@
       if (directives.angle_seconds !== undefined) {
         angleSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_seconds, 0), 0), 59));
       }
-      angleDriftSlider.value   = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 10));
+      angleDriftSlider.value   = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 100));
       manageDriftInterval();
       const colourSpeedValueParsed = Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16);
       const colourSpeedExponent = Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -2), 4);

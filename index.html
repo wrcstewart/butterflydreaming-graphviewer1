@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=124">
+  <link rel="stylesheet" href="style.css?v=132">
 </head>
 <body>
   <div id="title-bar">Butterfly Dreaming Development</div>
@@ -24,14 +24,17 @@
   </div>
   <div id="action-bar">
     <button id="chat-send-btn" type="button" disabled>Send</button>
-    <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
-    <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
-    <!-- 2026-07-15: New Card + BD-self Copy Link both live between ↑ and
-         the status span. Two-line labels so each button stays narrow —
-         phone real-estate on the action bar was tight. -->
-    <button id="chat-new-card-btn" type="button" title="Start a new local (compose) card at the top of the stack">New<br>Card</button>
+    <!-- 2026-07-25: sole entry point to create a Local card (no auto-Local
+         at boot). Label reads "New / Edit" — press creates a Local at top
+         and focuses it for editing. -->
+    <button id="chat-new-card-btn" type="button" title="Create a new Local card at the top of the stack and focus it for editing">New / Edit</button>
     <button id="copy-link-btn" type="button" title="Copy a link back to this BD state (current node + top card) to the clipboard">Copy<br>Link</button>
     <span id="default-save-status"></span>
+    <!-- Copy Down (↓) and Copy Up (↑) hidden until Player mode is active
+         (body.player-active). Positioned adjacent to the Nodes/Player radio
+         so the script-exchange controls sit next to the mode switch. -->
+    <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
+    <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
     <span id="view-mode-toggle">
       <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
       <!-- Player starts hidden + disabled (2026-07-17). updateSendBtn re-
@@ -151,6 +154,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=449"></script>
+  <script type="module" src="viewer.js?v=459"></script>
 </body>
 </html>
