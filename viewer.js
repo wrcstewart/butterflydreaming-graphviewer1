@@ -3029,7 +3029,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // with it selected. Capped to SESSION_TRACK_CAP most recent; oldest URL is
   // revoked when a new one pushes it out.
   function addSessionTrack({ label, audioData, mime, sizeBytes }) {
-    if (!audioData) return;
+    if (!audioData) {
+      console.warn('[addSessionTrack] no audioData — bail');
+      return;
+    }
     const blob = new Blob([audioData], { type: mime || 'audio/wav' });
     const url  = URL.createObjectURL(blob);
     sessionTracksList.push({ name: label || 'session', url, sizeBytes: sizeBytes || audioData.byteLength });
@@ -3037,6 +3040,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const oldest = sessionTracksList.shift();
       try { URL.revokeObjectURL(oldest.url); } catch (_) {}
     }
+    console.log('[addSessionTrack] added', { label, url, sessionCount: sessionTracksList.length });
     // Force a rebuild — if the bar is already open we still want the new option
     // to appear and be selected. Clearing dataset.node bypasses the same-node
     // early-return in toggleMediaBar.
@@ -4308,7 +4312,17 @@ async function init() {
     window.addEventListener('message', (e) => {
       const d = e && e.data;
       if (!d || d.type !== 'BD_MEDIA_BLOB') return;
-      addSessionTrack(d.payload || {});
+      console.log('[BD_MEDIA_BLOB] received', {
+        label: d.payload && d.payload.label,
+        sizeBytes: d.payload && d.payload.sizeBytes,
+        audioDataType: d.payload && d.payload.audioData &&
+                       (d.payload.audioData.constructor && d.payload.audioData.constructor.name)
+      });
+      try {
+        addSessionTrack(d.payload || {});
+      } catch (err) {
+        console.error('[BD_MEDIA_BLOB] addSessionTrack threw', err);
+      }
     });
 
     // Media-module Deep Link request. Module has already pushed its live script
