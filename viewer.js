@@ -3981,17 +3981,17 @@ async function init() {
       // stays sized correctly across the toggleChatMode → setViewMode('player')
       // rAF sequence used by the ?data= return-from-standalone flow.
       if (cyRect.width > 0 && cyRect.height > 0) {
-        // MM3 landscape right-reserve restored 2026-08-05 v6 (originally
-        // dropped in v3). V_Kolam's canvas + control-panel are right-
-        // aligned, and the invite panel lives in that band on the right —
-        // dropping the reserve pushed everything visually leftwards and
-        // exposed the empty area on Kolam. Portrait keeps the full width
-        // (panel there moves to bottom-left via CSS media query, not into
-        // a reserved band).
+        // MM3 landscape right-reserve — kept for DESKTOP landscape (V_Kolam
+        // needs the 100 px band for the invite panel on the right). v7:
+        // switched from orientation-based (innerWidth > innerHeight) to
+        // width-based (innerWidth > 767) so mobile-in-landscape (rotated
+        // phone / small tablet) falls into the SAME "no reserve, panel on
+        // bottom-left" path as portrait mobile. Matches the CSS media
+        // query for #bd-invite-panel-viewer.
         // Reserve width tracks the panel: max-width 76 + right 8 = 84,
         // rounded up to 100 for breathing room.
-        const isLandscape   = window.innerWidth > window.innerHeight;
-        const reserveRight  = isLandscape ? 100 : 0;
+        const isDesktop     = window.innerWidth > 767;
+        const reserveRight  = isDesktop ? 100 : 0;
         const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
         iframeEl.style.top    = cyRect.top    + 'px';
         iframeEl.style.left   = cyRect.left   + 'px';

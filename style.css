@@ -727,11 +727,14 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   letter-spacing: 0.02em;
 }
 
-/* Portrait — panel moves to the bottom-LEFT so it doesn't overlap the
-   module's right-side stepper column on mobile (v3 fix, retained after v6
-   restored the landscape right anchor). Clears the cy-buddy + cy-you
-   breadcrumb stack. */
-@media (max-aspect-ratio: 1/1) {
+/* Small viewport (mobile, either orientation) — panel moves to bottom-LEFT
+   so it doesn't overlap the module's right-side stepper column. Switched
+   from an aspect-ratio media query to width-based (max-width: 767px) v7
+   because "mobile landscape" (rotated phone / small tablet) needs the
+   same left-anchor as portrait — orientation-only detection was leaving
+   landscape phones with the desktop right anchor and colliding into the
+   module content. */
+@media (max-width: 767px) {
   #bd-invite-panel-viewer {
     top: auto;
     transform: none;
