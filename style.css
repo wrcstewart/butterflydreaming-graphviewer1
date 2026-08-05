@@ -639,9 +639,11 @@ body.player-active #view-mode-toggle {
      visually docking below the module's LH button column. Removes the overlap
      onto right-side stepper controls that caused problems on mobile / narrow
      landscape (user report). positionCyEl no longer reserves a right band —
-     iframe now spans the full #cy width. */
+     iframe now spans the full #cy width.
+     v4 — bumped bottom from 46 → 100 px so the panel clears the cy-buddy
+     (37+23) + cy-you (63+23) breadcrumb stack it was overhanging. */
   left: 8px;
-  bottom: 46px;                           /* clears the 40 px-ish action-bar with a gap */
+  bottom: 100px;
   max-width: 76px;                        /* 50 px button + 2×12 padding + 2 border */
   padding: 8px 12px;
   background: rgba(10, 10, 26, 0.95);
@@ -725,16 +727,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   letter-spacing: 0.02em;
 }
 
-/* Portrait / narrow — invite panel bumped further up from the very bottom
-   so it clears the cy-buddy / cy-you / media-bar stack. Left-anchored (was
-   right-anchored until 2026-08-05 v3, which overlapped the module's right-
-   side stepper column on mobile). */
-@media (max-aspect-ratio: 1/1) {
-  #bd-invite-panel-viewer {
-    bottom: 100px;                       /* clears cy-buddy(37+23)+cy-you(63+23) stack */
-    left: 8px;
-  }
-}
+/* Portrait override retired 2026-08-05 v4 — landscape and portrait now share
+   the same bottom-left anchor (bottom: 100px; left: 8px) via the base rule
+   above, so no orientation-specific tweak is needed. */
 
 #media-bar {
   display: none;

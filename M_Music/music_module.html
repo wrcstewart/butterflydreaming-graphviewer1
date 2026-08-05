@@ -109,26 +109,35 @@
       background: rgba(60, 15, 15, 0.55);
     }
 
-    /* Piece title — plain text pulled from the ABC's T: field. Small font,
-       centred; replaces the earlier abcjs SVG render which was either too
-       wide (desktop) or unreadably tiny (phone). */
+    /* Piece title — square panel, centred title text inside. 2026-08-05 v4:
+       promoted from a one-line strip to a square area (user request; leaves
+       room for a future waveform / visualisation to live here without
+       relayout). Sized larger on desktop, smaller on mobile. */
     #piece-title {
       flex: 0 0 auto;
+      width: 220px;
+      height: 220px;
+      aspect-ratio: 1 / 1;
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 15, 24, 0.55);
+      border: 1px solid rgba(74, 155, 142, 0.15);
+      border-radius: 6px;
+      padding: 12px;
       font-family: 'Georgia', 'Times New Roman', serif;
       font-style: italic;
-      font-size: 0.95rem;
+      font-size: 1rem;
       color: #e8e8e0;
       text-align: center;
-      padding: 2px 4px;
-      min-height: 1.2em;
-      max-width: 100%;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      word-wrap: break-word;
+      line-height: 1.3;
     }
 
-    /* Play/Stop row — single line, side by side, snug widths so both fit
-       even on narrow phones. */
+    /* Play/Stop row — single line, side by side. Widths trimmed ~5% smaller
+       on mobile (user 2026-08-05 v4). */
     .playback-row {
       flex: 0 0 auto;
       display: flex;
@@ -144,10 +153,10 @@
       font-family: Georgia, 'Times New Roman', serif;
       font-size: 0.85rem;
       letter-spacing: 0.05em;
-      padding: 5px 14px;
+      padding: 5px 13px;
       border-radius: 3px;
       text-transform: uppercase;
-      min-width: 62px;
+      min-width: 59px;
       touch-action: manipulation;
     }
     .playback-row button:hover:not(:disabled)  { background: #1a2a28; }
@@ -190,6 +199,9 @@
         align-self: stretch;
       }
       .control-row { flex: 1 1 30%; min-width: 90px; max-width: 200px; }
+      /* Smaller square on phones so the title doesn't consume the whole
+         middle band. */
+      #piece-title { width: 140px; height: 140px; font-size: 0.9rem; padding: 8px; }
     }
 
     .control-row {
