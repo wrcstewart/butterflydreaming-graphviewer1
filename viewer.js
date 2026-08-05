@@ -3560,7 +3560,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack };
 
 }
 
@@ -4202,7 +4202,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
