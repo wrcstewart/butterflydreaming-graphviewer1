@@ -629,13 +629,30 @@ function flattenProps(props) {
 // URL are decoupled deliberately — the identifier is the user-facing name
 // (bd_V_Kolam), the URL is an implementation detail (/bd_V_Kolam/index.html
 // after the 2026-07-05 full URL rename — path was /visual1/ before).
-const MODULE_REGISTRY = {
-  'bd_V_Kolam': '/bd_V_Kolam/index.html',
-  'bd_M_ABC':   '/bd_M_ABC/index.html',
+// Module registry (2026-08-05 v16) — consolidated from separate
+// MODULE_REGISTRY + hardcoded standaloneBaseUrl into one object with both
+// URLs per module. Keys match the `%%bd_module <id>` directive. Values:
+//   embedded   — served under BD (iframe src for Player mode)
+//   standalone — external stand-alone player (target for "Copy Link to")
+// Extendable in-place; when this grows past ~5 modules consider promoting
+// to a JSON manifest served from /api/modules.
+const MODULES = {
+  'bd_V_Kolam': {
+    embedded:   '/bd_V_Kolam/index.html',
+    standalone: 'https://wrcstewart.github.io/bd_V_Kolam/preview.html',
+  },
+  'bd_M_ABC': {
+    embedded:   '/bd_M_ABC/index.html',
+    standalone: 'https://wrcstewart.github.io/bd_M_ABC/preview.html',
+  },
 };
 
 function getModuleUrl(moduleId) {
-  return MODULE_REGISTRY[moduleId] || null;
+  return (MODULES[moduleId] && MODULES[moduleId].embedded) || null;
+}
+
+function getStandaloneUrl(moduleId) {
+  return (MODULES[moduleId] && MODULES[moduleId].standalone) || null;
 }
 
 // Extract the module identifier from a node's text: first line matching
@@ -4498,8 +4515,14 @@ async function init() {
       // trip and silently drops the standalone into DEFAULT_SCRIPT.
       // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      const standaloneBaseUrl = 'https://wrcstewart.github.io/bd_V_Kolam/preview.html';
-      const url = `${standaloneBaseUrl}?data=${encodeURIComponent(encoded)}`;
+      // v16: module-aware standalone URL. Read the module id from the
+      // current script (via %%bd_module directive) and route to the matching
+      // standalone. Falls back to bd_V_Kolam if the current text has no
+      // module directive — preserves the pre-v16 behaviour for unspecified /
+      // legacy cases.
+      const moduleId  = parseModuleId(payload.script) || 'bd_V_Kolam';
+      const baseUrl   = getStandaloneUrl(moduleId) || getStandaloneUrl('bd_V_Kolam');
+      const url = `${baseUrl}?data=${encodeURIComponent(encoded)}`;
       return { url, payload };
     }
 
