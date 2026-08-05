@@ -4272,13 +4272,39 @@ async function init() {
     const copyUpBtn   = document.getElementById('copy-up-btn');
     const iframeEl2   = document.getElementById('visual-iframe');
 
+    // Read/write helpers so callers don't have to know whether a card body is
+    // a textarea (Local cards) or a contentEditable div (system/received).
+    function getCardText(body) {
+      return body.tagName === 'TEXTAREA' ? body.value : body.textContent;
+    }
+    function setCardText(body, text) {
+      if (body.tagName === 'TEXTAREA') body.value = text;
+      else                              body.textContent = text;
+      body.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Return the "current" card body — whichever card the user is engaged with.
+    // 2026-08-05 v6 — widened from local-only to any card body (user report:
+    // "it needs to work with the script as it is in the panel not to need a
+    // new card"). Precedence:
+    //   1. Any focused editable body inside .card  (textarea or contentEditable div)
+    //   2. topLocalCard() body
+    //   3. Topmost card of any kind (system/received cards use contentEditable
+    //      divs; setCardText handles the type difference)
     function getFocusedCardBody() {
       const active = document.activeElement;
-      if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
+      if (active && (active.tagName === 'TEXTAREA' || active.isContentEditable)
+                 && active.closest('.card')) {
         return active;
       }
       const top = topLocalCard();
-      return (top && top.body) ? top.body : null;
+      if (top && top.body) return top.body;
+      const topEl = document.querySelector('#chat-stack .card');
+      if (topEl) {
+        const body = topEl.querySelector('.card-body');
+        if (body) return body;
+      }
+      return null;
     }
 
     if (copyDownBtn) {
@@ -4289,10 +4315,10 @@ async function init() {
         }
         const body = getFocusedCardBody();
         if (!body) {
-          console.warn('[Copy Down] no local card in focus — press New/Edit first');
+          console.warn('[Copy Down] no card body found — panel empty?');
           return;
         }
-        const script = body.value || '';
+        const script = getCardText(body) || '';
         console.log('[Copy Down] posting bd_script_update, len=', script.length);
         iframeEl2.contentWindow.postMessage(
           { type: 'bd_script_update', script },
@@ -4308,11 +4334,9 @@ async function init() {
           console.warn('[Copy Up] no visual iframe — bail');
           return;
         }
-        // Diagnostic: if there's no local card, the response has nowhere to
-        // land (bd_script_response handler needs a getFocusedCardBody target).
         const body = getFocusedCardBody();
         if (!body) {
-          console.warn('[Copy Up] no local card in focus — press New/Edit first (response would have nowhere to land)');
+          console.warn('[Copy Up] no card body found — response would have nowhere to land');
           return;
         }
         console.log('[Copy Up] posting bd_script_request');
@@ -4324,16 +4348,14 @@ async function init() {
     }
 
     // §42.7 — inbound bd_script_response from the iframe writes into the
-    // currently focused local card, mirroring the semantics of Copy Down's
-    // destination. dispatchEvent('input') triggers updateSendBtn so the Send
-    // button's enable state re-evaluates after the write.
+    // currently focused card body (2026-08-05 v6 — any kind, not just local).
+    // setCardText handles the textarea-vs-contentEditable-div type split.
     window.addEventListener('message', (e) => {
       const d = e && e.data;
       if (!d || d.type !== 'bd_script_response') return;
       const body = getFocusedCardBody();
       if (!body || typeof d.script !== 'string') return;
-      body.value = d.script;
-      body.dispatchEvent(new Event('input', { bubbles: true }));
+      setCardText(body, d.script);
     });
 
     // Media-module bake-to-mp3 payload → session-track ingestion.
@@ -4367,10 +4389,7 @@ async function init() {
       // shape since older modules may omit it.
       if (d.payload && typeof d.payload.text === 'string') {
         const body = getFocusedCardBody();
-        if (body) {
-          body.value = d.payload.text;
-          body.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+        if (body) setCardText(body, d.payload.text);
       }
       const copyLinkBtn = document.getElementById('copy-link-btn');
       if (copyLinkBtn) copyLinkBtn.click();
@@ -4386,8 +4405,7 @@ async function init() {
       if (typeof text !== 'string') return;
       const body = getFocusedCardBody();
       if (!body) return;
-      body.value = text;
-      body.dispatchEvent(new Event('input', { bubbles: true }));
+      setCardText(body, text);
     });
 
     // ── External Website URL builder (MM3, 2026-07-12) ────────────────────
