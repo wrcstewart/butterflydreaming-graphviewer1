@@ -102,19 +102,21 @@
       align-items: center;
     }
 
-    /* Portrait (mobile) — 2026-08-05 v8. Keep the row layout so canvas
-       sits in the centre with steppers as a narrow right column and BD's
-       extend panel gets the left gutter (via positionCyEl's left reserve).
-       Was previously stacked (canvas top / controls bottom band); the
-       stacked shape squeezed the canvas and put steppers in a wide bottom
-       band that overlapped with BD chrome. Now: control-panel down to
-       110 px so canvas gets ~200 px of centre width on a typical phone. */
-    @media (max-aspect-ratio: 1/1) {
+    /* Small iframe (mobile) — 2026-08-05 v11. Was gated on
+       max-aspect-ratio: 1/1 (portrait aspect) but on many mobile setups the
+       iframe ends up landscape-aspect, so the override never fired and the
+       panel stayed at its 220 px desktop width. Switched to max-width: 500 px
+       which reliably fires on any phone-sized iframe regardless of aspect.
+       Control-panel tightened further so the stepper column doesn't leave
+       empty space to its right — panel width now matches the stepper width
+       almost exactly (108 px = 100 px stepper + 2×4 padding). */
+    @media (max-width: 500px) {
       .canvas-wrapper { justify-content: center; }
       .control-panel {
-        flex: 0 0 116px !important;      /* fits 96 px control-row + 2×4 px padding + a hair */
+        flex: 0 0 108px !important;
         padding: 6px 4px;
       }
+      .control-row { width: 100px; }
     }
 
     /* Default (landscape) control panel — fixed 220 px column on the right.

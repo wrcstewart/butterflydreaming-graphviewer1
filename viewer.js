@@ -3994,7 +3994,7 @@ async function init() {
         // rounded up to 100 for breathing room.
         const isDesktop     = window.innerWidth > 767;
         const reserveRight  = isDesktop ? 100 : 0;
-        const reserveLeft   = isDesktop ? 0   : 100;
+        const reserveLeft   = isDesktop ? 0   : 88;
         const stampedWidth  = Math.max(0, cyRect.width - reserveRight - reserveLeft);
         iframeEl.style.top    = cyRect.top                 + 'px';
         iframeEl.style.left   = (cyRect.left + reserveLeft) + 'px';
