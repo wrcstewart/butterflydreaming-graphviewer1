@@ -277,11 +277,12 @@
 
   <div class="module-layout">
 
-    <!-- LH — 3 sharing/baking buttons. Play/Stop moved to the middle area v3
-         so BD's invite panel can dock below without overlapping steppers. -->
+    <!-- LH — sharing/baking buttons. Deep Link retired v15 (duplicated BD's
+         action-bar Copy Link exactly — same URL, same handler); Create mp3
+         moved up into the vacated slot. Remaining space reserved for
+         future fractal-generator controls. -->
     <aside class="lh-actions">
       <button id="copy-script-btn"  type="button" title="Copy the current ABC script (with %%bd_ directives) to the clipboard">Copy<br>Script</button>
-      <button id="deep-link-btn"    type="button" title="Copy a deep-link URL carrying this script back to Butterfly Dreaming">Deep<br>Link</button>
       <button id="bake-mp3-btn"     type="button" title="Render offline to WAV and add to the bottom-bar media player">Create<br>mp3</button>
     </aside>
 
@@ -321,7 +322,6 @@
     const playPauseBtn   = document.getElementById('play-pause-btn');
     const stopBtn        = document.getElementById('stop-btn');
     const copyScriptBtn  = document.getElementById('copy-script-btn');
-    const deepLinkBtn    = document.getElementById('deep-link-btn');
     const bakeMp3Btn     = document.getElementById('bake-mp3-btn');
     const pieceTitleEl   = document.getElementById('piece-title');
     const controlPanel   = document.getElementById('control-panel');
@@ -647,7 +647,6 @@
       stopBtn.disabled         = !ready;
       playPauseBtn.textContent = (playerState === 'playing') ? 'Pause' : 'Play';
       copyScriptBtn.disabled   = !storedText;
-      deepLinkBtn.disabled     = !storedText;
       bakeMp3Btn.disabled      = !ready || baking;
     }
     playPauseBtn.addEventListener('click', async () => {
@@ -694,13 +693,6 @@
         catch (_) { setStatus('Copy failed', true); }
         document.body.removeChild(ta);
       }
-    });
-
-    deepLinkBtn.addEventListener('click', () => {
-      const text = currentScriptWithParams();
-      postToParent({ type: 'BD_UPDATE', payload: { text } });
-      postToParent({ type: 'BD_MODULE_COPY_LINK_REQUEST', payload: { text } });
-      flashBtn(deepLinkBtn, 'Sent<br>→ BD');
     });
 
     // Snapshot the button's initial HTML ONCE at load. Reused as the restore
