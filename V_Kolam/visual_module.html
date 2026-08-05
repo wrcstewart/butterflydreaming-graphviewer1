@@ -102,24 +102,18 @@
       align-items: center;
     }
 
+    /* Portrait (mobile) — 2026-08-05 v8. Keep the row layout so canvas
+       sits in the centre with steppers as a narrow right column and BD's
+       extend panel gets the left gutter (via positionCyEl's left reserve).
+       Was previously stacked (canvas top / controls bottom band); the
+       stacked shape squeezed the canvas and put steppers in a wide bottom
+       band that overlapped with BD chrome. Now: control-panel down to
+       110 px so canvas gets ~200 px of centre width on a typical phone. */
     @media (max-aspect-ratio: 1/1) {
       .canvas-wrapper { justify-content: center; }
-    }
-
-    /* Narrow viewport (taller than wide) — stack canvas above controls
-       so the panel gets its own vertical band. */
-    @media (max-aspect-ratio: 1/1) {
-      .module-layout {
-        flex-direction: column;
-      }
       .control-panel {
-        flex: 0 0 40vh !important;       /* fixed band along the bottom */
-        flex-direction: row !important;
-        flex-wrap: wrap;
-      }
-      .control-row {
-        flex: 1 1 30%;
-        min-width: 90px;
+        flex: 0 0 116px !important;      /* fits 96 px control-row + 2×4 px padding + a hair */
+        padding: 6px 4px;
       }
     }
 
