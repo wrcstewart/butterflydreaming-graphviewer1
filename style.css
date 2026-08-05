@@ -635,15 +635,15 @@ body.player-active #view-mode-toggle {
    on portrait (media query below) — layout there stacks vertically. */
 #bd-invite-panel-viewer {
   position: fixed;
-  /* 2026-08-05 v3 — moved from vertically-centered right edge to bottom-left,
-     visually docking below the module's LH button column. Removes the overlap
-     onto right-side stepper controls that caused problems on mobile / narrow
-     landscape (user report). positionCyEl no longer reserves a right band —
-     iframe now spans the full #cy width.
-     v4 — bumped bottom from 46 → 100 px so the panel clears the cy-buddy
-     (37+23) + cy-you (63+23) breadcrumb stack it was overhanging. */
-  left: 8px;
-  bottom: 100px;
+  /* Landscape: back on the right, vertically centred (pre-v3 behaviour).
+     v3 moved it to bottom-left globally to fix a mobile-overlap issue, but
+     that broke V_Kolam's landscape layout — canvas + steppers are already
+     right-aligned; the 100 px right-reserve in positionCyEl exists to give
+     the panel that band. Portrait override below keeps the panel on the
+     LEFT where the mobile overlap actually happens. */
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   max-width: 76px;                        /* 50 px button + 2×12 padding + 2 border */
   padding: 8px 12px;
   background: rgba(10, 10, 26, 0.95);
@@ -727,9 +727,19 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   letter-spacing: 0.02em;
 }
 
-/* Portrait override retired 2026-08-05 v4 — landscape and portrait now share
-   the same bottom-left anchor (bottom: 100px; left: 8px) via the base rule
-   above, so no orientation-specific tweak is needed. */
+/* Portrait — panel moves to the bottom-LEFT so it doesn't overlap the
+   module's right-side stepper column on mobile (v3 fix, retained after v6
+   restored the landscape right anchor). Clears the cy-buddy + cy-you
+   breadcrumb stack. */
+@media (max-aspect-ratio: 1/1) {
+  #bd-invite-panel-viewer {
+    top: auto;
+    transform: none;
+    bottom: 100px;
+    right: auto;
+    left: 8px;
+  }
+}
 
 #media-bar {
   display: none;

@@ -3981,15 +3981,21 @@ async function init() {
       // stays sized correctly across the toggleChatMode → setViewMode('player')
       // rAF sequence used by the ?data= return-from-standalone flow.
       if (cyRect.width > 0 && cyRect.height > 0) {
-        // 2026-08-05 v3 — right-side reserve dropped. The invite panel moved
-        // to bottom-left (style.css #bd-invite-panel-viewer), so the iframe
-        // now spans the full #cy width in both orientations. Frees ~100 px
-        // of horizontal space for the module's steppers on mobile / narrow
-        // landscape and eliminates the overlap the panel had with the right-
-        // side stepper column.
+        // MM3 landscape right-reserve restored 2026-08-05 v6 (originally
+        // dropped in v3). V_Kolam's canvas + control-panel are right-
+        // aligned, and the invite panel lives in that band on the right —
+        // dropping the reserve pushed everything visually leftwards and
+        // exposed the empty area on Kolam. Portrait keeps the full width
+        // (panel there moves to bottom-left via CSS media query, not into
+        // a reserved band).
+        // Reserve width tracks the panel: max-width 76 + right 8 = 84,
+        // rounded up to 100 for breathing room.
+        const isLandscape   = window.innerWidth > window.innerHeight;
+        const reserveRight  = isLandscape ? 100 : 0;
+        const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
         iframeEl.style.top    = cyRect.top    + 'px';
         iframeEl.style.left   = cyRect.left   + 'px';
-        iframeEl.style.width  = cyRect.width  + 'px';
+        iframeEl.style.width  = stampedWidth  + 'px';
         iframeEl.style.height = cyRect.height + 'px';
       }
     }
