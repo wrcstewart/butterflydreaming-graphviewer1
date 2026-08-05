@@ -1,0 +1,877 @@
+<!-- ButterflyDreaming Music Module — music_module.html — BD Protocol v0.1 -->
+<!-- Musical counterpart to V_Kolam. Tone.js + abcjs, bass-recorder samples,
+     sliders converted to right-column steppers, LH button column, small
+     score render area (~20% of Kolam canvas). Bake-to-WAV feeds session
+     tracks into BD's #media-bar via BD_MEDIA_BLOB postMessage. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Music Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: #0a0a0f;
+      color: #e8e8e0;
+      font-family: Georgia, 'Times New Roman', serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #status {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      z-index: 10;
+      font-size: 0.7rem;
+      font-style: italic;
+      color: #9e9e90;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      background: rgba(10, 10, 15, 0.6);
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+
+    .module-layout {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      gap: 0;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    /* LH column — send/copy/bake buttons */
+    .lh-actions {
+      flex: 0 0 92px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px 5px;
+      background: rgba(15, 15, 24, 0.75);
+      border: 1px solid rgba(74, 155, 142, 0.2);
+      border-radius: 0.4rem;
+      overflow-y: auto;
+    }
+
+    .lh-actions button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.68rem;
+      letter-spacing: 0.03em;
+      padding: 6px 3px;
+      border-radius: 3px;
+      line-height: 1.15;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .lh-actions button:hover:not(:disabled)  { background: #1a2a28; }
+    .lh-actions button:active:not(:disabled) { background: #243f3b; }
+    .lh-actions button:disabled              { opacity: 0.4; cursor: not-allowed; }
+
+    /* Main area — score render + playback controls */
+    .main-area {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 4px 6px;
+      gap: 4px;
+    }
+
+    /* Score render — ~20% of a Kolam canvas. Compact horizontal strip.
+       abcjs SVG renders inside; overflow: auto if score is wider than the box. */
+    #abc-render {
+      flex: 0 0 auto;
+      max-height: 120px;
+      min-height: 90px;
+      background: #f4f2ea;
+      border: 1px solid rgba(74, 155, 142, 0.25);
+      border-radius: 3px;
+      overflow: auto;
+      padding: 4px 6px;
+    }
+
+    #abc-render svg {
+      display: block;
+      max-width: 100%;
+    }
+
+    .playback-controls {
+      display: flex;
+      gap: 6px;
+      flex: 0 0 auto;
+      align-items: center;
+    }
+
+    .playback-controls button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      padding: 5px 14px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .playback-controls button:hover:not(:disabled)  { background: #1a2a28; }
+    .playback-controls button:active:not(:disabled) { background: #243f3b; }
+    .playback-controls button:disabled              { opacity: 0.4; cursor: not-allowed; }
+
+    /* Right control panel — steppers per media-module convention */
+    .control-panel {
+      flex: 0 0 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 3px;
+      background: rgba(15, 15, 24, 0.75);
+      border: 1px solid rgba(74, 155, 142, 0.2);
+      padding: 6px 8px;
+      border-radius: 0.4rem;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    /* Portrait / narrow — stack: LH row on top, main-area middle, controls
+       band along bottom. Mirrors Kolam's landscape→portrait pivot. */
+    @media (max-aspect-ratio: 1/1) {
+      .module-layout { flex-direction: column; }
+      .lh-actions {
+        flex: 0 0 auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 5px 6px;
+      }
+      .lh-actions button { flex: 1 1 auto; min-width: 70px; }
+      .control-panel {
+        flex: 0 0 40vh;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+      .control-row { flex: 1 1 30%; min-width: 90px; max-width: 200px; }
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+    }
+
+    .control-row label {
+      font-size: 0.66rem;
+      letter-spacing: 0.02em;
+      color: #4a9b8e;
+      text-align: center;
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 3px;
+    }
+
+    .step-btn {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.95rem;
+      padding: 0;
+      width: 28px;
+      height: 24px;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 3px;
+      flex: 0 0 auto;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .step-btn:hover:not(:disabled)  { background: #1a2a28; }
+    .step-btn:active:not(:disabled) { background: #243f3b; }
+    .step-btn:disabled              { opacity: 0.4; cursor: not-allowed; }
+
+    .stepper-value {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.8rem;
+      color: #e8e8e0;
+      background: #0f0f18;
+      border: 1px solid #2a2a3a;
+      padding: 2px;
+      border-radius: 3px;
+      min-width: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    /* Copy-flash feedback on LH action buttons */
+    .lh-actions button.flash {
+      background: #243f3b;
+      color: #a0e0d0;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="status">Loading samples…</div>
+
+  <div class="module-layout">
+
+    <!-- LH — Copy Script / Deep Link / Create mp3 -->
+    <aside class="lh-actions">
+      <button id="copy-script-btn"  type="button" title="Copy the current ABC script (with %%bd_ directives) to the clipboard">Copy<br>Script</button>
+      <button id="deep-link-btn"    type="button" title="Copy a deep-link URL carrying this script back to Butterfly Dreaming">Deep<br>Link</button>
+      <button id="bake-mp3-btn"     type="button" title="Render offline to WAV and add to the bottom-bar media player">Create<br>mp3</button>
+    </aside>
+
+    <!-- Main — small score render + play/stop -->
+    <section class="main-area">
+      <div id="abc-render" title="ABC score (compact debug/preview render)"></div>
+      <div class="playback-controls">
+        <button id="play-pause-btn" type="button" disabled>Play</button>
+        <button id="stop-btn"       type="button" disabled>Stop</button>
+      </div>
+    </section>
+
+    <!-- Right — steppers (one per %%bd_ numeric-arg directive) -->
+    <aside id="control-panel" class="control-panel"><!-- injected --></aside>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js"></script>
+
+  <script>
+    'use strict';
+
+    // ── Element refs ──────────────────────────────────────────────────────────
+    const statusEl       = document.getElementById('status');
+    const playPauseBtn   = document.getElementById('play-pause-btn');
+    const stopBtn        = document.getElementById('stop-btn');
+    const copyScriptBtn  = document.getElementById('copy-script-btn');
+    const deepLinkBtn    = document.getElementById('deep-link-btn');
+    const bakeMp3Btn     = document.getElementById('bake-mp3-btn');
+    const abcRenderEl    = document.getElementById('abc-render');
+    const controlPanel   = document.getElementById('control-panel');
+
+    // ── Module state ──────────────────────────────────────────────────────────
+    let samplerReady  = false;
+    let abcReady      = false;
+    let playerState   = 'stopped'; // 'stopped' | 'playing' | 'paused' | 'finished'
+    let notePart      = null;
+    let noteEvents    = [];
+    let endTimeSecs   = 0;
+    let storedText    = '';        // full incoming script (all %%bd_ + ABC block)
+    let loopEnabled   = true;
+    let loopGapSecs   = 6;
+    let loopTimer     = null;
+    let baking        = false;
+
+    // ── Stepper spec (mirrors music_1's %%bd_ numeric-arg directives) ─────────
+    // reverb_decay + vibrato_frequency use log10 for perceptual scaling;
+    // loop stored as 0/1 with 'off'/'on' UI display.
+    const STEPPERS = [
+      { name: 'reverb_wet',        min: 0,  max: 1,  step: 0.05, fallback: 0.35 },
+      { name: 'reverb_decay',      min: 0.1,max: 20, step: 0.1,  fallback: 2.5,  logStep: true },
+      { name: 'vibrato_frequency', min: 0.5,max: 20, step: 0.1,  fallback: 5.0,  logStep: true },
+      { name: 'vibrato_depth',     min: 0,  max: 1,  step: 0.05, fallback: 0.2 },
+      { name: 'chorus_wet',        min: 0,  max: 1,  step: 0.05, fallback: 0.3 },
+      { name: 'chorus_depth',      min: 0,  max: 1,  step: 0.05, fallback: 0.4 },
+      { name: 'loop',              min: 0,  max: 1,  step: 1,    fallback: 1,   isToggle: true },
+      { name: 'loop_gap',          min: 0,  max: 30, step: 1,    fallback: 6 }
+    ];
+
+    // Build stepper DOM
+    STEPPERS.forEach((s) => {
+      const row = document.createElement('div');
+      row.className = 'control-row';
+      row.innerHTML = `
+        <div class="stepper">
+          <button class="step-btn" type="button" data-name="${s.name}" data-delta="-1">−</button>
+          <span class="stepper-value" data-name="${s.name}">${formatDisplay(s, s.fallback)}</span>
+          <button class="step-btn" type="button" data-name="${s.name}" data-delta="1">+</button>
+        </div>
+        <label>${s.name}</label>
+      `;
+      controlPanel.appendChild(row);
+    });
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const setStatus  = (msg) => { statusEl.textContent = msg; };
+    const postToParent = (msg) => window.parent.postMessage(msg, '*');
+
+    function formatDisplay(spec, val) {
+      if (spec.isToggle) return val >= 0.5 ? 'on' : 'off';
+      if (spec.step >= 1) return String(Math.round(val));
+      if (val < 1) return val.toFixed(2);
+      if (val < 10) return val.toFixed(1);
+      return String(Math.round(val));
+    }
+
+    function getStepperValue(name) {
+      const s = STEPPERS.find(x => x.name === name);
+      if (!s) return null;
+      const span = controlPanel.querySelector(`.stepper-value[data-name="${name}"]`);
+      if (!span) return s.fallback;
+      const txt = span.textContent.trim();
+      if (s.isToggle) return txt === 'on' ? 1 : 0;
+      const v = parseFloat(txt);
+      return Number.isFinite(v) ? v : s.fallback;
+    }
+
+    function setStepperValue(name, val) {
+      const s = STEPPERS.find(x => x.name === name);
+      if (!s) return;
+      let clamped = Math.max(s.min, Math.min(s.max, val));
+      if (s.isToggle) clamped = clamped >= 0.5 ? 1 : 0;
+      const span = controlPanel.querySelector(`.stepper-value[data-name="${name}"]`);
+      if (span) span.textContent = formatDisplay(s, clamped);
+      applyParam(name, clamped);
+    }
+
+    // ── Audio chain: Sampler → Chorus → Vibrato → Reverb → Destination ───────
+    const reverb  = new Tone.Reverb({ decay: 2.5 });
+    reverb.wet.value = 0.35;
+    const vibrato = new Tone.Vibrato({ frequency: 5, depth: 0.2, type: 'sine' });
+    const chorus  = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.4, wet: 0.3 });
+    chorus.start();
+    const sampler = new Tone.Sampler({
+      urls: {
+        'F#2': 'bass_recorder_Fs2.mp3',
+        'C3':  'bass_recorder_C3.mp3',
+        'G#3': 'bass_recorder_Gs3.mp3',
+        'E4':  'bass_recorder_E4.mp3'
+      },
+      baseUrl: './bass-recorder/',
+      onerror: (err) => {
+        const msg = `Failed to load samples: ${err}`;
+        console.error(msg); setStatus(msg);
+        postToParent({ type: 'BD_ERROR', payload: { message: msg } });
+      }
+    });
+    sampler.connect(chorus);
+    chorus.connect(vibrato);
+    vibrato.connect(reverb);
+    reverb.toDestination();
+
+    Promise.all([Tone.loaded(), reverb.ready]).then(() => {
+      samplerReady = true;
+      setStatus(abcReady ? 'Ready — press Play' : 'Ready');
+      updateControls();
+    });
+
+    // Apply a param value to the actual audio node (single dispatch point,
+    // called from stepper edits AND from applyBdParams on BD_INIT).
+    let decayTimer = null;
+    function applyParam(name, val) {
+      switch (name) {
+        case 'reverb_wet':        reverb.wet.value = val; break;
+        case 'reverb_decay':
+          reverb.decay = val;
+          clearTimeout(decayTimer);
+          decayTimer = setTimeout(() => { try { reverb.generate(); } catch(_) {} }, 150);
+          break;
+        case 'vibrato_frequency': vibrato.frequency.value = val; break;
+        case 'vibrato_depth':     vibrato.depth.value = val; break;
+        case 'chorus_wet':        chorus.wet.value = val; break;
+        case 'chorus_depth':      chorus.depth = val; break;
+        case 'loop':              loopEnabled = val >= 0.5; break;
+        case 'loop_gap':          loopGapSecs = val; break;
+      }
+    }
+
+    postToParent({ type: 'BD_READY' });
+
+    // ── %%bd_ parameter parsing ───────────────────────────────────────────────
+    function parseBdParams(text) {
+      const out = {};
+      for (const s of STEPPERS) {
+        const re = new RegExp(`^%%bd_${s.name}\\s+(\\S+)`, 'm');
+        const m = text.match(re);
+        if (!m) continue;
+        if (s.isToggle) {
+          out[s.name] = /^(true|1|on)$/i.test(m[1]) ? 1 : 0;
+        } else {
+          const v = parseFloat(m[1]);
+          if (Number.isFinite(v)) out[s.name] = v;
+        }
+      }
+      return out;
+    }
+
+    function encodeBdParams(text) {
+      let result = text;
+      for (const s of STEPPERS) {
+        const val = getStepperValue(s.name);
+        const line = `%%bd_${s.name} ${s.isToggle ? (val >= 0.5 ? 'true' : 'false')
+                                                  : (s.step >= 1 ? Math.round(val) : val.toFixed(2))}`;
+        const re = new RegExp(`^%%bd_${s.name}\\s+.*$`, 'm');
+        if (re.test(result)) result = result.replace(re, line);
+        else {
+          const lines = result.split('\n');
+          let idx = lines.findIndex(l => /^%%bd_score/.test(l));
+          if (idx === -1) idx = lines.findIndex(l => /^X:/m.test(l));
+          if (idx === -1) idx = lines.length;
+          lines.splice(idx, 0, line);
+          result = lines.join('\n');
+        }
+      }
+      return result;
+    }
+
+    // Extract ABC content — %%bd_score [ ... %%bd_] block, else fall back to full text
+    function extractScore(text) {
+      const m = text.match(/^%%bd_score\s*\[\s*\n([\s\S]*?)^%%bd_\]$/m);
+      return m ? m[1] : text;
+    }
+
+    // ── Stepper interaction ───────────────────────────────────────────────────
+    function stepControl(name, dir) {
+      const s = STEPPERS.find(x => x.name === name);
+      if (!s) return;
+      let cur = getStepperValue(name);
+      let next;
+      if (s.logStep) {
+        // Log-step: constant ratio (10^(1/12) ~ semitone-ish). Keeps small values
+        // fine-grained and large values coarse. Adjust ratio to taste.
+        const ratio = 1.15;
+        next = dir > 0 ? cur * ratio : cur / ratio;
+      } else {
+        next = cur + dir * s.step;
+      }
+      next = Math.max(s.min, Math.min(s.max, next));
+      next = parseFloat(next.toFixed(4));
+      if (formatDisplay(s, next) === formatDisplay(s, cur)) return;
+      setStepperValue(name, next);
+    }
+
+    controlPanel.addEventListener('pointerdown', (event) => {
+      const btn = event.target.closest('.step-btn');
+      if (!btn || btn.disabled) return;
+      event.preventDefault();
+      try { btn.setPointerCapture(event.pointerId); } catch (_) {}
+      const name  = btn.dataset.name;
+      const delta = parseFloat(btn.dataset.delta);
+      stepControl(name, delta);
+      let repeatTimer = null;
+      const holdTimer = setTimeout(() => {
+        repeatTimer = setInterval(() => stepControl(name, delta), 80);
+      }, 400);
+      const stop = () => {
+        clearTimeout(holdTimer);
+        if (repeatTimer) clearInterval(repeatTimer);
+        btn.removeEventListener('pointerup',     stop);
+        btn.removeEventListener('pointercancel', stop);
+        btn.removeEventListener('pointerleave',  stop);
+      };
+      btn.addEventListener('pointerup',     stop);
+      btn.addEventListener('pointercancel', stop);
+      btn.addEventListener('pointerleave',  stop);
+    });
+
+    // ── ABC pitch → Tone.js note ──────────────────────────────────────────────
+    const DIATONIC = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    const ACC_MAP  = { sharp: '#', flat: 'b', dblsharp: '##', dblflat: 'bb' };
+    function abcPitchToTone(abcPitch, accidental) {
+      const octave  = 4 + Math.floor(abcPitch / 7);
+      const noteIdx = ((abcPitch % 7) + 7) % 7;
+      const acc     = ACC_MAP[accidental] || '';
+      return `${DIATONIC[noteIdx]}${acc}${octave}`;
+    }
+
+    function parseBPM(abcText) {
+      const frac = abcText.match(/Q:\s*(\d+)\/(\d+)\s*=\s*(\d+)/);
+      if (frac) { const [, a, b, n] = frac.map(Number); return 4 * n * a / b; }
+      const simple = abcText.match(/Q:\s*(\d+)/);
+      if (simple) return parseInt(simple[1], 10);
+      return 120;
+    }
+
+    function extractNotes(parsed) {
+      const notes = [];
+      const tune = parsed && parsed[0];
+      if (!tune || !tune.lines) return notes;
+      let t = 0;
+      for (const line of tune.lines) {
+        if (!line.staff) continue;
+        for (const staff of line.staff) {
+          if (!staff.voices) continue;
+          for (const voice of staff.voices) {
+            for (const elem of voice) {
+              if (elem.el_type !== 'note') continue;
+              if (elem.rest) { t += elem.duration; continue; }
+              if (!elem.pitches || elem.pitches.length === 0) continue;
+              const elemTime = t;
+              elem.pitches.forEach(p => {
+                notes.push({
+                  time: elemTime,
+                  tonePitch: abcPitchToTone(p.pitch, p.accidental),
+                  durationWhole: elem.duration
+                });
+              });
+              t += elem.duration;
+            }
+          }
+        }
+      }
+      return notes;
+    }
+
+    function buildEvents(notes, bpm) {
+      const secondsPerWhole = 240 / bpm;
+      const events = [];
+      let endTime = 0;
+      for (const n of notes) {
+        const timeSecs = n.time * secondsPerWhole;
+        const durSecs  = n.durationWhole * secondsPerWhole;
+        events.push({ time: timeSecs, note: n.tonePitch, duration: durSecs });
+        if (timeSecs + durSecs > endTime) endTime = timeSecs + durSecs;
+      }
+      return { events, endTime };
+    }
+
+    // ── Score render (abcjs) ──────────────────────────────────────────────────
+    function renderScore(abcText) {
+      try {
+        ABCJS.renderAbc(abcRenderEl, abcText, {
+          scale: 0.6,               // compact — this is a debug/preview strip
+          responsive: 'resize',
+          staffwidth: 700,
+          paddingtop: 4,
+          paddingbottom: 4,
+          paddingleft: 0,
+          paddingright: 0
+        });
+      } catch (err) {
+        console.warn('abcjs render failed', err);
+      }
+    }
+
+    // ── Playback scheduling ───────────────────────────────────────────────────
+    function teardownPlayback() {
+      clearTimeout(loopTimer);
+      loopTimer = null;
+      if (notePart) { notePart.stop(0); notePart.dispose(); notePart = null; }
+      Tone.Transport.stop();
+      Tone.Transport.cancel(0);
+    }
+
+    function startPlayback() {
+      teardownPlayback();
+      notePart = new Tone.Part((time, ev) => {
+        sampler.triggerAttackRelease(ev.note, ev.duration, time);
+      }, noteEvents);
+      notePart.start(0);
+      Tone.Transport.scheduleOnce(() => {
+        if (loopEnabled) {
+          setStatus('Looping…');
+          loopTimer = setTimeout(() => { startPlayback(); }, loopGapSecs * 1000);
+        } else {
+          playerState = 'finished';
+          setStatus('Finished');
+          updateControls();
+        }
+      }, endTimeSecs + 0.05);
+      Tone.Transport.start();
+      playerState = 'playing';
+      setStatus('Playing');
+      updateControls();
+    }
+
+    function updateControls() {
+      const ready = samplerReady && abcReady;
+      playPauseBtn.disabled    = !ready;
+      stopBtn.disabled         = !ready;
+      playPauseBtn.textContent = (playerState === 'playing') ? 'Pause' : 'Play';
+      copyScriptBtn.disabled   = !storedText;
+      deepLinkBtn.disabled     = !storedText;
+      bakeMp3Btn.disabled      = !ready || baking;
+    }
+
+    playPauseBtn.addEventListener('click', async () => {
+      await Tone.start();
+      if (playerState === 'playing') {
+        Tone.Transport.pause(); playerState = 'paused'; setStatus('Paused');
+      } else if (playerState === 'paused') {
+        Tone.Transport.start(); playerState = 'playing'; setStatus('Playing');
+      } else {
+        startPlayback();
+      }
+      updateControls();
+    });
+
+    stopBtn.addEventListener('click', () => {
+      teardownPlayback();
+      playerState = 'stopped';
+      setStatus('Stopped');
+      updateControls();
+    });
+
+    // ── LH buttons ────────────────────────────────────────────────────────────
+    function currentScriptWithParams() {
+      return encodeBdParams(storedText || '');
+    }
+
+    function flashBtn(btn, label) {
+      const orig = btn.innerHTML;
+      btn.classList.add('flash');
+      btn.innerHTML = label;
+      setTimeout(() => { btn.classList.remove('flash'); btn.innerHTML = orig; }, 1200);
+    }
+
+    // Copy Script — put the full script (with %%bd_ block) on the clipboard.
+    // Tries navigator.clipboard, falls back to a hidden textarea + execCommand.
+    copyScriptBtn.addEventListener('click', async () => {
+      const text = currentScriptWithParams();
+      try {
+        await navigator.clipboard.writeText(text);
+        flashBtn(copyScriptBtn, 'Copied<br>✓');
+      } catch (_) {
+        // legacy fallback
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        Object.assign(ta.style, { position:'fixed', left:'-9999px', opacity:'0' });
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try { document.execCommand('copy'); flashBtn(copyScriptBtn, 'Copied<br>✓'); }
+        catch (_) { setStatus('Copy failed'); }
+        document.body.removeChild(ta);
+      }
+    });
+
+    // Deep Link — ask BD to build a shareable URL using this live script.
+    // BD has the node/source-text context we don't; it also handles clipboard
+    // fallbacks (async → execCommand → visible textarea).
+    deepLinkBtn.addEventListener('click', () => {
+      const text = currentScriptWithParams();
+      // Push the live state to the parent's card first so BD's Copy Link uses
+      // the up-to-date script, THEN request BD to run its Copy Link flow.
+      postToParent({ type: 'BD_UPDATE', payload: { text } });
+      postToParent({ type: 'BD_MODULE_COPY_LINK_REQUEST', payload: { text } });
+      flashBtn(deepLinkBtn, 'Sent<br>→ BD');
+    });
+
+    // Create mp3 — Tone.Offline render → WAV blob → post to BD's #media-bar
+    // as a session track.
+    bakeMp3Btn.addEventListener('click', async () => {
+      if (baking || !abcReady) return;
+      baking = true; updateControls();
+      const origLabel = bakeMp3Btn.innerHTML;
+      bakeMp3Btn.innerHTML = 'Baking…';
+      setStatus('Rendering to WAV…');
+      try {
+        const buffer = await renderOfflineToBuffer();
+        const wavBytes = audioBufferToWav(buffer);
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        const label = `abc @ ${hh}:${mm}:${ss}`;
+        // NOTE: no transferables — the message passes through the index.html
+        // relay before reaching BD, and a transferred ArrayBuffer detaches after
+        // the first hop. Structured clone is slower for a ~30 MB WAV but the
+        // bake is a one-shot user action; the copy cost is acceptable.
+        postToParent({
+          type: 'BD_MEDIA_BLOB',
+          payload: {
+            label,
+            audioData: wavBytes.buffer,
+            mime: 'audio/wav',
+            sizeBytes: wavBytes.byteLength
+          }
+        });
+        setStatus(`Baked ${label} (${(wavBytes.byteLength / (1024*1024)).toFixed(1)} MB)`);
+        flashBtn(bakeMp3Btn, 'Sent<br>↓');
+      } catch (err) {
+        console.error('bake failed', err);
+        setStatus(`Bake failed: ${err.message}`);
+      } finally {
+        baking = false;
+        bakeMp3Btn.innerHTML = origLabel;
+        updateControls();
+      }
+    });
+
+    // ── Offline render (Tone.js OfflineContext) ───────────────────────────────
+    // Rebuild the same audio graph inside an OfflineContext, schedule the notes,
+    // return the rendered AudioBuffer. Faster-than-real-time; keeps live audio
+    // untouched.
+    async function renderOfflineToBuffer() {
+      const wet         = getStepperValue('reverb_wet');
+      const decay       = getStepperValue('reverb_decay');
+      const vFreq       = getStepperValue('vibrato_frequency');
+      const vDepth      = getStepperValue('vibrato_depth');
+      const cWet        = getStepperValue('chorus_wet');
+      const cDepth      = getStepperValue('chorus_depth');
+      const durationSec = endTimeSecs + Math.max(decay, 0.5) + 0.5;
+
+      // Tone.Offline sets a fresh context; audio graph is created inside the
+      // callback so all nodes belong to the offline context, not the live one.
+      // Samples re-fetch inside the offline context (cache hit — same URL).
+      const toneBuf = await Tone.Offline(async () => {
+        const rev = new Tone.Reverb({ decay: Math.max(0.1, decay), wet }).toDestination();
+        await rev.ready;
+        const vib = new Tone.Vibrato({ frequency: vFreq, depth: vDepth, type: 'sine' }).connect(rev);
+        const cho = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: cDepth, wet: cWet }).connect(vib);
+        cho.start();
+        const smp = new Tone.Sampler({
+          urls: {
+            'F#2': 'bass_recorder_Fs2.mp3',
+            'C3':  'bass_recorder_C3.mp3',
+            'G#3': 'bass_recorder_Gs3.mp3',
+            'E4':  'bass_recorder_E4.mp3'
+          },
+          baseUrl: './bass-recorder/'
+        }).connect(cho);
+        await Tone.loaded();
+        for (const ev of noteEvents) {
+          smp.triggerAttackRelease(ev.note, ev.duration, ev.time);
+        }
+      }, durationSec);
+      // .get() unwraps Tone's ToneAudioBuffer → native AudioBuffer
+      return toneBuf.get();
+    }
+
+    // Minimal AudioBuffer → WAV (16-bit PCM) encoder.
+    // Handles mono/stereo; interleaves channels; writes standard RIFF header.
+    function audioBufferToWav(buffer) {
+      const numCh   = buffer.numberOfChannels;
+      const sr      = buffer.sampleRate;
+      const numSamp = buffer.length;
+      const bytesPerSample = 2;
+      const blockAlign     = numCh * bytesPerSample;
+      const byteRate       = sr * blockAlign;
+      const dataSize       = numSamp * blockAlign;
+      const bufferSize     = 44 + dataSize;
+      const out = new Uint8Array(bufferSize);
+      const view = new DataView(out.buffer);
+
+      // RIFF header
+      writeStr(view, 0, 'RIFF');
+      view.setUint32(4, bufferSize - 8, true);
+      writeStr(view, 8, 'WAVE');
+      writeStr(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);         // subchunk1 size
+      view.setUint16(20, 1, true);          // PCM
+      view.setUint16(22, numCh, true);
+      view.setUint32(24, sr, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);         // bits per sample
+      writeStr(view, 36, 'data');
+      view.setUint32(40, dataSize, true);
+
+      // interleaved PCM samples
+      const channels = [];
+      for (let c = 0; c < numCh; c++) channels.push(buffer.getChannelData(c));
+      let offset = 44;
+      for (let i = 0; i < numSamp; i++) {
+        for (let c = 0; c < numCh; c++) {
+          let s = Math.max(-1, Math.min(1, channels[c][i]));
+          s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          view.setInt16(offset, s, true);
+          offset += 2;
+        }
+      }
+      return out;
+
+      function writeStr(v, off, s) {
+        for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+      }
+    }
+
+    // ── Apply BD_INIT payload ─────────────────────────────────────────────────
+    function processScript(text) {
+      storedText = text || '';
+      const params = parseBdParams(storedText);
+      for (const s of STEPPERS) {
+        const v = params[s.name] !== undefined ? params[s.name] : s.fallback;
+        setStepperValue(s.name, v);
+      }
+      const abcText = extractScore(storedText);
+      renderScore(abcText);
+      let parsed;
+      try { parsed = ABCJS.parseOnly(abcText); }
+      catch (_) {
+        setStatus('Failed to parse ABC');
+        postToParent({ type: 'BD_ERROR', payload: { message: 'Failed to parse ABC' } });
+        return;
+      }
+      const notes = extractNotes(parsed);
+      if (notes.length === 0) {
+        setStatus('No playable notes');
+        abcReady = false; updateControls();
+        return;
+      }
+      const bpm = parseBPM(abcText);
+      Tone.Transport.bpm.value = bpm;
+      const built = buildEvents(notes, bpm);
+      noteEvents = built.events;
+      endTimeSecs = built.endTime;
+      teardownPlayback();
+      playerState = 'stopped';
+      abcReady = true;
+      setStatus(samplerReady ? 'Ready — press Play' : 'Loading samples…');
+      updateControls();
+    }
+
+    // ── postMessage listener ──────────────────────────────────────────────────
+    // Supports both music_1's BD_INIT/BD_STOP shape AND the Kolam-style
+    // bd_script_update / bd_script_request messages so this module drops into
+    // BD's existing MM2 loader without special-casing.
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      const type = data.type;
+      try {
+        if (type === 'BD_INIT') {
+          processScript(data.payload && data.payload.text);
+        } else if (type === 'bd_script_update') {
+          processScript(typeof data.script === 'string' ? data.script : '');
+        } else if (type === 'bd_script_request') {
+          const text = currentScriptWithParams();
+          postToParent({ type: 'bd_script_response', script: text });
+        } else if (type === 'BD_STOP') {
+          teardownPlayback();
+          playerState = 'stopped'; setStatus('Stopped'); updateControls();
+        }
+      } catch (err) {
+        console.error('music_module: postMessage error', err);
+      }
+    });
+  </script>
+</body>
+</html>

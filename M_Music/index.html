@@ -1,0 +1,67 @@
+<!-- ButterflyDreaming Music Module — index.html — iframe wrapper -->
+<!-- Loaded by BD's #visual-iframe at /bd_M_ABC/. Thin relay between the
+     grandparent viewer and the inner music_module.html iframe. Mirrors
+     V_Kolam/index.html structure — same RELAY_DOWN set, extended RELAY_UP
+     to carry BD_MEDIA_BLOB (bake-to-mp3 → session-track ingestion) and
+     BD_MODULE_COPY_LINK_REQUEST (module-side Deep Link → BD's Copy Link). -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Music Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0a0f;
+      overflow: hidden;
+    }
+    #module-frame {
+      display: block; width: 100%; height: 100%; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="module-frame"
+          src="music_module.html"
+          title="ButterflyDreaming Music Module">
+  </iframe>
+
+  <script>
+    'use strict';
+
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update', 'BD_INIT', 'BD_STOP']);
+    const RELAY_UP   = new Set([
+      'BD_READY',
+      'bd_script_response',
+      'bd_param_update',
+      'BD_UPDATE',                    // module → BD: live-state sync
+      'BD_ERROR',
+      'BD_MEDIA_BLOB',                // module → BD: bake-to-mp3 payload
+      'BD_MODULE_COPY_LINK_REQUEST'   // module → BD: build a Copy Link URL
+    ]);
+
+    const moduleFrame = document.getElementById('module-frame');
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      if (event.source === moduleFrame.contentWindow) {
+        if (RELAY_UP.has(data.type)) {
+          // ArrayBuffers in the payload need transferable handling — clone by
+          // reference where possible. postMessage to the same tab's parent
+          // handles this transparently.
+          window.parent.postMessage(data, '*');
+        }
+        return;
+      }
+
+      if (event.source === window.parent && RELAY_DOWN.has(data.type)) {
+        moduleFrame.contentWindow.postMessage(data, '*');
+      }
+    });
+  </script>
+</body>
+</html>

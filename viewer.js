@@ -51,7 +51,12 @@ const DWELL_FIRE = 300;   // ms before DWELL_MS to fire prefetch query
 const BARS_BOTTOM = 80;  // title(~21) + bc-spacer(50) + a few px — breadcrumbs moved to bottom in A51; cy.top is now set dynamically and is the real ceiling for tooltips
 
 const isTouchDevice = navigator.maxTouchPoints > 0;
-let mediaFilesList = [];  // populated via WebSocket on connect
+let mediaFilesList = [];  // disk files from server, populated via WebSocket on connect
+// Session-scoped audio tracks produced by media modules (e.g. bd_M_ABC bake-to-mp3).
+// Each entry: { name, url (blob URL), sizeBytes }. Capped to last 5 — oldest URL
+// revoked when a 6th arrives so memory doesn't grow unbounded across a long session.
+let sessionTracksList = [];
+const SESSION_TRACK_CAP = 5;
 const helpText = isTouchDevice
   ? 'Tap to read — double tap to navigate.'
   : 'Click to read — double click to navigate.';
@@ -626,7 +631,7 @@ function flattenProps(props) {
 // after the 2026-07-05 full URL rename — path was /visual1/ before).
 const MODULE_REGISTRY = {
   'bd_V_Kolam': '/bd_V_Kolam/index.html',
-  // future modules added here
+  'bd_M_ABC':   '/bd_M_ABC/index.html',
 };
 
 function getModuleUrl(moduleId) {
@@ -2954,6 +2959,32 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (wasPlaying) audio.play().then(() => { btn.textContent = '⏸'; }).catch(() => {});
   }
 
+  // Build the media-bar's <select> HTML combining disk files + session tracks
+  // (with an <optgroup> divider when both are present so the source is clear).
+  function buildMediaSelectHtml(selectedValue) {
+    let html = `<select class="mp-select">`;
+    const useGroups = mediaFilesList.length > 0 && sessionTracksList.length > 0;
+    if (mediaFilesList.length > 0) {
+      if (useGroups) html += `<optgroup label="Files">`;
+      for (const f of mediaFilesList) {
+        const sel = f.name === selectedValue ? ' selected' : '';
+        html += `<option value="${f.name}"${sel}>${formatOption(f)}</option>`;
+      }
+      if (useGroups) html += `</optgroup>`;
+    }
+    if (sessionTracksList.length > 0) {
+      if (useGroups) html += `<optgroup label="Session">`;
+      for (const t of sessionTracksList) {
+        const sel = t.url === selectedValue ? ' selected' : '';
+        const mb  = (t.sizeBytes / (1024 * 1024)).toFixed(1);
+        html += `<option value="${t.url}"${sel}>${t.name}: ${mb} MB</option>`;
+      }
+      if (useGroups) html += `</optgroup>`;
+    }
+    html += `</select>`;
+    return html;
+  }
+
   function toggleMediaBar(label, audioSrc) {
     if (mediaBar.classList.contains('active') && mediaBar.dataset.node === label) {
       return;  // already open — only ✕ closes the player
@@ -2961,14 +2992,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const existingAudio = mediaBar.querySelector('audio');
     if (existingAudio) { existingAudio.pause(); existingAudio.src = ''; }
 
-    const selectHtml = `<select class="mp-select">` +
-      mediaFilesList.map(f =>
-        `<option value="${f.name}"${f.name === audioSrc ? ' selected' : ''}>${formatOption(f)}</option>`
-      ).join('') +
-      `</select>`;
-
     mediaBar.innerHTML =
-      selectHtml +
+      buildMediaSelectHtml(audioSrc) +
       `<button class="mp-btn" aria-label="play">▶</button>` +
       `<audio src="${audioSrc}"></audio>` +
       `<button class="media-close" aria-label="close">✕</button>`;
@@ -2998,6 +3023,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       mediaBar.innerHTML = '';
     }
   });
+
+  // Accept an in-memory audio blob from a media module (e.g. bd_M_ABC's
+  // Create-mp3 bake), register it as a session track, and open the media bar
+  // with it selected. Capped to SESSION_TRACK_CAP most recent; oldest URL is
+  // revoked when a new one pushes it out.
+  function addSessionTrack({ label, audioData, mime, sizeBytes }) {
+    if (!audioData) return;
+    const blob = new Blob([audioData], { type: mime || 'audio/wav' });
+    const url  = URL.createObjectURL(blob);
+    sessionTracksList.push({ name: label || 'session', url, sizeBytes: sizeBytes || audioData.byteLength });
+    while (sessionTracksList.length > SESSION_TRACK_CAP) {
+      const oldest = sessionTracksList.shift();
+      try { URL.revokeObjectURL(oldest.url); } catch (_) {}
+    }
+    // Force a rebuild — if the bar is already open we still want the new option
+    // to appear and be selected. Clearing dataset.node bypasses the same-node
+    // early-return in toggleMediaBar.
+    mediaBar.dataset.node = '';
+    toggleMediaBar(label, url);
+  }
 
   // Tap handler
 
@@ -4253,6 +4298,50 @@ async function init() {
       const body = getFocusedCardBody();
       if (!body || typeof d.script !== 'string') return;
       body.value = d.script;
+      body.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // Media-module bake-to-mp3 payload → session-track ingestion.
+    // Module produces a WAV in-memory via Tone.Offline, ships the raw bytes as
+    // an ArrayBuffer through the iframe relay; here we wrap in a Blob, mint a
+    // blob URL, and open the bottom-bar player with it selected.
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_MEDIA_BLOB') return;
+      addSessionTrack(d.payload || {});
+    });
+
+    // Media-module Deep Link request. Module has already pushed its live script
+    // to the focused card via BD_UPDATE; simulate a click on the action-bar's
+    // Copy Link button so the existing URL-build + clipboard flow runs unchanged.
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_MODULE_COPY_LINK_REQUEST') return;
+      // First, mirror BD_UPDATE semantics — the module's payload.text should
+      // land in the focused card so Copy Link picks it up. Guard on payload
+      // shape since older modules may omit it.
+      if (d.payload && typeof d.payload.text === 'string') {
+        const body = getFocusedCardBody();
+        if (body) {
+          body.value = d.payload.text;
+          body.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      const copyLinkBtn = document.getElementById('copy-link-btn');
+      if (copyLinkBtn) copyLinkBtn.click();
+    });
+
+    // BD_UPDATE from a media module — mirror its live script into the focused
+    // card. Legacy music_1 semantic (Send Back). Modern modules use
+    // bd_script_response, but this keeps drop-in compatibility.
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_UPDATE') return;
+      const text = d.payload && d.payload.text;
+      if (typeof text !== 'string') return;
+      const body = getFocusedCardBody();
+      if (!body) return;
+      body.value = text;
       body.dispatchEvent(new Event('input', { bubbles: true }));
     });
 

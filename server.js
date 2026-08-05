@@ -71,6 +71,18 @@ app.use('/bd_V_Kolam', express.static('./V_Kolam', {
   }
 }));
 
+// bd_M_ABC music module bundle. Served path /bd_M_ABC/ maps to on-disk
+// M_Music/ directory, matching the V_Kolam served-path / on-disk-dir split.
+app.use('/bd_M_ABC', express.static('./M_Music', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 const driver = neo4j.driver(
   'bolt://localhost:7687',
   neo4j.auth.basic('memgraph', 'memgraph')
