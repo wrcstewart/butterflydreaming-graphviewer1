@@ -3981,22 +3981,25 @@ async function init() {
       // stays sized correctly across the toggleChatMode → setViewMode('player')
       // rAF sequence used by the ?data= return-from-standalone flow.
       if (cyRect.width > 0 && cyRect.height > 0) {
-        // MM3 landscape right-reserve — kept for DESKTOP landscape (V_Kolam
-        // needs the 100 px band for the invite panel on the right). v7:
-        // switched from orientation-based (innerWidth > innerHeight) to
-        // width-based (innerWidth > 767) so mobile-in-landscape (rotated
-        // phone / small tablet) falls into the SAME "no reserve, panel on
-        // bottom-left" path as portrait mobile. Matches the CSS media
-        // query for #bd-invite-panel-viewer.
-        // Reserve width tracks the panel: max-width 76 + right 8 = 84,
+        // MM3 right-reserve for DESKTOP landscape (V_Kolam needs the 100 px
+        // band for the invite panel on the right).
+        //
+        // v8: MOBILE gets a symmetric LEFT reserve instead. The invite panel
+        // sits on the bottom-LEFT on small viewports (< 768 px) — without
+        // reserving space, the module iframe extended under the panel and
+        // Kolam's canvas + steppers appeared overlapped by it. Shifting the
+        // iframe right by 100 px lets the panel sit in its own gutter.
+        //
+        // Reserve width tracks the panel: max-width 76 + edge 8 = 84,
         // rounded up to 100 for breathing room.
         const isDesktop     = window.innerWidth > 767;
         const reserveRight  = isDesktop ? 100 : 0;
-        const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
-        iframeEl.style.top    = cyRect.top    + 'px';
-        iframeEl.style.left   = cyRect.left   + 'px';
-        iframeEl.style.width  = stampedWidth  + 'px';
-        iframeEl.style.height = cyRect.height + 'px';
+        const reserveLeft   = isDesktop ? 0   : 100;
+        const stampedWidth  = Math.max(0, cyRect.width - reserveRight - reserveLeft);
+        iframeEl.style.top    = cyRect.top                 + 'px';
+        iframeEl.style.left   = (cyRect.left + reserveLeft) + 'px';
+        iframeEl.style.width  = stampedWidth               + 'px';
+        iframeEl.style.height = cyRect.height              + 'px';
       }
     }
   }
