@@ -232,7 +232,12 @@ html, body {
   padding: 20px;
   line-height: 1.4;
 }
-@media (max-width: 767px) and (orientation: landscape) {
+/* v14: was `max-width: 767px and orientation: landscape` but a rotated
+   phone has width > 767 in landscape (e.g. iPhone 14 Pro Max = 932 wide).
+   Detect short-landscape via max-height instead. Any device where the
+   viewport height is ≤ 500 px AND orientation is landscape counts as a
+   phone or small tablet that can't fit BD's layout. */
+@media (orientation: landscape) and (max-height: 500px) {
   #rotate-to-portrait { display: flex; }
 }
 
