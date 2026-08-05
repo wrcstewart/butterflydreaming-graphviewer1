@@ -4283,21 +4283,39 @@ async function init() {
 
     if (copyDownBtn) {
       copyDownBtn.addEventListener('click', () => {
+        if (!iframeEl2) {
+          console.warn('[Copy Down] no visual iframe — bail');
+          return;
+        }
         const body = getFocusedCardBody();
-        if (!body || !iframeEl2) return;
+        if (!body) {
+          console.warn('[Copy Down] no local card in focus — press New/Edit first');
+          return;
+        }
         const script = body.value || '';
+        console.log('[Copy Down] posting bd_script_update, len=', script.length);
         iframeEl2.contentWindow.postMessage(
           { type: 'bd_script_update', script },
           '*'
         );
-        // §42.6 — enable Copy Up once a script has been sent.
         if (copyUpBtn) copyUpBtn.disabled = false;
       });
     }
 
     if (copyUpBtn) {
       copyUpBtn.addEventListener('click', () => {
-        if (!iframeEl2) return;
+        if (!iframeEl2) {
+          console.warn('[Copy Up] no visual iframe — bail');
+          return;
+        }
+        // Diagnostic: if there's no local card, the response has nowhere to
+        // land (bd_script_response handler needs a getFocusedCardBody target).
+        const body = getFocusedCardBody();
+        if (!body) {
+          console.warn('[Copy Up] no local card in focus — press New/Edit first (response would have nowhere to land)');
+          return;
+        }
+        console.log('[Copy Up] posting bd_script_request');
         iframeEl2.contentWindow.postMessage(
           { type: 'bd_script_request' },
           '*'

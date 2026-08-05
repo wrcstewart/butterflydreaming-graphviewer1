@@ -112,11 +112,13 @@
     /* Piece title — square panel, centred title text inside. 2026-08-05 v4:
        promoted from a one-line strip to a square area (user request; leaves
        room for a future waveform / visualisation to live here without
-       relayout). Sized larger on desktop, smaller on mobile. */
+       relayout). v5: width-only + aspect-ratio derives height so max-width
+       clamping (narrow phones) keeps the square square rather than tall.
+       Height explicitly UNSET so aspect-ratio governs. */
     #piece-title {
       flex: 0 0 auto;
       width: 220px;
-      height: 220px;
+      height: auto;
       aspect-ratio: 1 / 1;
       max-width: 100%;
       display: flex;
@@ -201,7 +203,7 @@
       .control-row { flex: 1 1 30%; min-width: 90px; max-width: 200px; }
       /* Smaller square on phones so the title doesn't consume the whole
          middle band. */
-      #piece-title { width: 140px; height: 140px; font-size: 0.9rem; padding: 8px; }
+      #piece-title { width: 140px; font-size: 0.9rem; padding: 8px; }
     }
 
     .control-row {
