@@ -102,15 +102,15 @@
       align-items: center;
     }
 
-    /* Small iframe (mobile) — 2026-08-05 v11. Was gated on
-       max-aspect-ratio: 1/1 (portrait aspect) but on many mobile setups the
-       iframe ends up landscape-aspect, so the override never fired and the
-       panel stayed at its 220 px desktop width. Switched to max-width: 500 px
-       which reliably fires on any phone-sized iframe regardless of aspect.
-       Control-panel tightened further so the stepper column doesn't leave
-       empty space to its right — panel width now matches the stepper width
-       almost exactly (108 px = 100 px stepper + 2×4 padding). */
+    /* Small iframe (mobile) — 2026-08-05 v13. Kolam-specific gutter for BD's
+       extend panel (which sits at bottom-left of viewport, ~84 px wide).
+       Was previously a global iframe left-reserve in positionCyEl (v8) but
+       that shifted every module including music_module unnecessarily. Now
+       Kolam handles it via a padding-left on the flex layout — canvas +
+       control-panel shift right by 88 px, extend panel sits in the gutter.
+       Music module has its own portrait rules and doesn't need this. */
     @media (max-width: 500px) {
+      .module-layout { padding-left: 88px; }
       .canvas-wrapper { justify-content: center; }
       .control-panel {
         flex: 0 0 108px !important;

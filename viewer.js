@@ -3984,22 +3984,21 @@ async function init() {
         // MM3 right-reserve for DESKTOP landscape (V_Kolam needs the 100 px
         // band for the invite panel on the right).
         //
-        // v8: MOBILE gets a symmetric LEFT reserve instead. The invite panel
-        // sits on the bottom-LEFT on small viewports (< 768 px) — without
-        // reserving space, the module iframe extended under the panel and
-        // Kolam's canvas + steppers appeared overlapped by it. Shifting the
-        // iframe right by 100 px lets the panel sit in its own gutter.
-        //
-        // Reserve width tracks the panel: max-width 76 + edge 8 = 84,
-        // rounded up to 100 for breathing room.
+        // v13 — MOBILE left-reserve REMOVED. Was globally shifting every
+        // module iframe right by 88 px which caused unwanted crosstalk on
+        // music_module (its top-row LH-actions + centred title + Play/Stop
+        // all shifted right). Instead each module handles its own gutter
+        // for BD's extend panel via its own CSS (V_Kolam adds padding-left
+        // in its portrait media query; music_module accepts the panel
+        // overlapping only its bottom stepper-band, which was invisible-
+        // anyway on the leftmost steppers).
         const isDesktop     = window.innerWidth > 767;
         const reserveRight  = isDesktop ? 100 : 0;
-        const reserveLeft   = isDesktop ? 0   : 88;
-        const stampedWidth  = Math.max(0, cyRect.width - reserveRight - reserveLeft);
-        iframeEl.style.top    = cyRect.top                 + 'px';
-        iframeEl.style.left   = (cyRect.left + reserveLeft) + 'px';
-        iframeEl.style.width  = stampedWidth               + 'px';
-        iframeEl.style.height = cyRect.height              + 'px';
+        const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
+        iframeEl.style.top    = cyRect.top    + 'px';
+        iframeEl.style.left   = cyRect.left   + 'px';
+        iframeEl.style.width  = stampedWidth  + 'px';
+        iframeEl.style.height = cyRect.height + 'px';
       }
     }
   }
