@@ -3981,19 +3981,15 @@ async function init() {
       // stays sized correctly across the toggleChatMode → setViewMode('player')
       // rAF sequence used by the ?data= return-from-standalone flow.
       if (cyRect.width > 0 && cyRect.height > 0) {
-        // MM3 (2026-07-12) — reserve a band on the right of the iframe on
-        // landscape viewports for #bd-invite-panel-viewer. Portrait
-        // (aspect ratio ≤ 1) keeps the full-width iframe; the invite panel
-        // there uses fixed positioning at bottom-right and overlays the
-        // right edge of the visual.
-        // Reserve width tracks the panel: max-width 76 + right 8 = 84,
-        // rounded up to 100 for breathing room.
-        const isLandscape   = window.innerWidth > window.innerHeight;
-        const reserveRight  = isLandscape ? 100 : 0;
-        const stampedWidth  = Math.max(0, cyRect.width - reserveRight);
+        // 2026-08-05 v3 — right-side reserve dropped. The invite panel moved
+        // to bottom-left (style.css #bd-invite-panel-viewer), so the iframe
+        // now spans the full #cy width in both orientations. Frees ~100 px
+        // of horizontal space for the module's steppers on mobile / narrow
+        // landscape and eliminates the overlap the panel had with the right-
+        // side stepper column.
         iframeEl.style.top    = cyRect.top    + 'px';
         iframeEl.style.left   = cyRect.left   + 'px';
-        iframeEl.style.width  = stampedWidth  + 'px';
+        iframeEl.style.width  = cyRect.width  + 'px';
         iframeEl.style.height = cyRect.height + 'px';
       }
     }
