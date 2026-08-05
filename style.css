@@ -212,6 +212,30 @@ html, body {
    (chat or default). Always visible. Save left-aligned, Send to its right,
    then the status span. Dark amber to pair visually with the panels above
    it (A50k). */
+/* Phone-in-landscape overlay (2026-08-05 v10) — BD's layout isn't feasible
+   on a phone in landscape; show a rotate-to-portrait message instead of
+   trying to squeeze into ~350×160 px of usable viewport. Fires only on
+   small viewport (< 768 px) AND landscape orientation. Hidden on desktop
+   landscape and phone-portrait. */
+#rotate-to-portrait {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(10, 8, 4, 0.96);
+  color: #FFD700;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  text-align: center;
+  padding: 20px;
+  line-height: 1.4;
+}
+@media (max-width: 767px) and (orientation: landscape) {
+  #rotate-to-portrait { display: flex; }
+}
+
 #action-bar {
   display: flex;
   align-items: center;
