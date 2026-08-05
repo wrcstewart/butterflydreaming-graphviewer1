@@ -684,10 +684,14 @@
       flashBtn(deepLinkBtn, 'Sent<br>→ BD');
     });
 
+    // Snapshot the button's initial HTML ONCE at load. Reused as the restore
+    // target so nested state changes (Baking… → finally-restore) can't race
+    // with flashBtn's async setTimeout capture.
+    const BAKE_BTN_INITIAL = bakeMp3Btn.innerHTML;
+
     bakeMp3Btn.addEventListener('click', async () => {
       if (baking || !abcReady) return;
       baking = true; updateControls();
-      const origLabel = bakeMp3Btn.innerHTML;
       bakeMp3Btn.innerHTML = 'Baking…';
       setStatus('Rendering to WAV…');
       try {
@@ -714,14 +718,13 @@
             sizeBytes: wavBytes.byteLength
           }
         });
-        setStatus(`Baked ${label} (${(wavBytes.byteLength / (1024*1024)).toFixed(1)} MB) — check bottom bar`);
-        flashBtn(bakeMp3Btn, 'Sent<br>↓');
+        setStatus(`Baked ${label} (${(wavBytes.byteLength / (1024*1024)).toFixed(1)} MB) — see bottom bar`);
       } catch (err) {
         console.error('[bd_M_ABC] bake failed', err);
         setStatus('Bake failed: ' + err.message, true);
       } finally {
         baking = false;
-        bakeMp3Btn.innerHTML = origLabel;
+        bakeMp3Btn.innerHTML = BAKE_BTN_INITIAL;
         updateControls();
       }
     });

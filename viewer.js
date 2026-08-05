@@ -2985,31 +2985,48 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return html;
   }
 
+  // Loop preference persists within the session — once the user turns loop on
+  // for one track, it stays on for the next auto-opened track.
+  let mediaLoopOn = false;
+
   function toggleMediaBar(label, audioSrc) {
     if (mediaBar.classList.contains('active') && mediaBar.dataset.node === label) {
-      return;  // already open — only ✕ closes the player
+      return;
     }
     const existingAudio = mediaBar.querySelector('audio');
     if (existingAudio) { existingAudio.pause(); existingAudio.src = ''; }
 
+    // Close (✕) button dropped 2026-08-05: once the bar has a track it stays
+    // put, and the space matters more than the ability to hide it.
+    // Loop (↻) toggle added: browsers give <audio loop> for free; the button
+    // just flips audio.loop and keeps its own visual on/off state.
     mediaBar.innerHTML =
       buildMediaSelectHtml(audioSrc) +
       `<button class="mp-btn" aria-label="play">▶</button>` +
-      `<audio src="${audioSrc}"></audio>` +
-      `<button class="media-close" aria-label="close">✕</button>`;
+      `<button class="mp-loop" aria-label="loop" title="Loop this track">↻</button>` +
+      `<audio src="${audioSrc}"${mediaLoopOn ? ' loop' : ''}></audio>`;
 
     mediaBar.dataset.node = label;
     mediaBar.classList.add('active');
 
-    const audio  = mediaBar.querySelector('audio');
-    const btn    = mediaBar.querySelector('.mp-btn');
-    const select = mediaBar.querySelector('.mp-select');
+    const audio    = mediaBar.querySelector('audio');
+    const btn      = mediaBar.querySelector('.mp-btn');
+    const loopBtn  = mediaBar.querySelector('.mp-loop');
+    const select   = mediaBar.querySelector('.mp-select');
+
+    audio.loop = mediaLoopOn;
+    loopBtn.classList.toggle('on', mediaLoopOn);
 
     btn.addEventListener('click', () => {
       if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
       else              { audio.pause(); btn.textContent = '▶'; }
     });
-    audio.addEventListener('ended', () => { btn.textContent = '▶'; });
+    loopBtn.addEventListener('click', () => {
+      mediaLoopOn = !mediaLoopOn;
+      audio.loop  = mediaLoopOn;
+      loopBtn.classList.toggle('on', mediaLoopOn);
+    });
+    audio.addEventListener('ended', () => { if (!audio.loop) btn.textContent = '▶'; });
     audio.addEventListener('loadstart', () => setDownloading(true));
     audio.addEventListener('canplay', () => setDownloading(false));
     select.addEventListener('change', () => loadMediaTrack(audio, btn, select.value));

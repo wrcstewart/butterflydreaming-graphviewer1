@@ -904,6 +904,25 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   border-color: #fff;
 }
 
+/* Loop toggle (2026-08-05) — outlined resting, filled amber when engaged. */
+.mp-loop {
+  background: none;
+  border: 1px solid #888;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 7px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.mp-loop:hover     { border-color: #fff; }
+.mp-loop.on        {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: #FFD700;
+  color: #FFD700;
+}
+
 
 #loading-overlay {
   display: none;
