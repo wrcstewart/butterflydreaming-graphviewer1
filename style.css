@@ -674,7 +674,9 @@ body.player-active #view-mode-toggle {
   top: 50%;
   transform: translateY(-50%);
   max-width: 76px;                        /* 50 px button + 2×12 padding + 2 border */
-  padding: 8px 12px;
+  /* 2026-08-08 — vertical padding was 8 px each; per user "too generous"
+     took 8 off top and 8 off bottom (net −16 px overall panel height). */
+  padding: 0 12px;
   background: rgba(10, 10, 26, 0.95);
   border: 1px solid #333;
   border-radius: 6px;
@@ -773,9 +775,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 
 /* v-check canary — RGB rotation (feedback_canary_rotation). Currently
-   BLUE (invite-panel nudge up, 2026-08-08); next = red. */
+   RED (invite-panel vertical padding shrink, 2026-08-08); next = green. */
 #bd-invite-text-viewer {
-  color: #4080ff !important;
+  color: #e04040 !important;
 }
 
 #media-bar {
