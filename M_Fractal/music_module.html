@@ -131,18 +131,20 @@
        .abc-and-play row. .playback-row itself is now a vertical stack
        inside that row (buttons above/below each other in the gutter). */
     .abc-and-play {
+      /* 2026-08-08 — space-evenly so Play/Stop stack lands more central
+         within the right-hand empty space rather than crowding abc-pane. */
       flex: 0 0 auto;
       display: flex;
       flex-direction: row;
-      gap: 10px;
       align-items: center;
-      justify-content: center;
+      justify-content: space-evenly;
+      align-self: stretch;
     }
     .playback-row {
       flex: 0 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       justify-content: center;
       align-items: stretch;
     }
@@ -152,24 +154,26 @@
       color: #4a9b8e;
       cursor: pointer;
       font-family: Georgia, 'Times New Roman', serif;
-      font-size: 0.85rem;
+      /* 2026-08-08 — Play/Stop scaled up 20 %: font 0.85 → 1.02rem,
+         padding 5/13 → 6/16, min-width 59 → 71. */
+      font-size: 1.02rem;
       letter-spacing: 0.05em;
-      padding: 5px 13px;
+      padding: 6px 16px;
       border-radius: 3px;
       text-transform: uppercase;
-      min-width: 59px;
+      min-width: 71px;
       touch-action: manipulation;
     }
     .playback-row button:hover:not(:disabled)  { background: #1a2a28; }
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently GREEN (Play/Stop moved next to abc-pane + #status
-       hidden, 2026-08-08); next = blue. */
+       Currently BLUE (Play/Stop 20% bigger + centred in gutter,
+       2026-08-08); next = red. */
     #play-pause-btn {
-      background: #00CC00 !important;
-      color: #0a0a1a !important;
-      border-color: #00CC00 !important;
+      background: #2A6DFF !important;
+      color: #ffffff !important;
+      border-color: #2A6DFF !important;
       font-weight: bold;
     }
 
