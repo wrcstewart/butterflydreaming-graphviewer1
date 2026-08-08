@@ -756,21 +756,25 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   letter-spacing: 0.02em;
 }
 
-/* Small viewport (mobile, either orientation) — panel moves to bottom-LEFT
-   so it doesn't overlap the module's right-side stepper column. Switched
-   from an aspect-ratio media query to width-based (max-width: 767px) v7
-   because "mobile landscape" (rotated phone / small tablet) needs the
-   same left-anchor as portrait — orientation-only detection was leaving
-   landscape phones with the desktop right anchor and colliding into the
-   module content. */
+/* Small viewport (mobile, either orientation) — 2026-08-08 v2: bottom-
+   anchored so the panel doesn't drift with Safari's variable-height
+   address bar. Sits in the empty gutter to the LEFT of the module's
+   centred #abc-pane. Panel width 76 px slots into the ~125 px gutter. */
 @media (max-width: 767px) {
   #bd-invite-panel-viewer {
     top: auto;
     transform: none;
-    bottom: 100px;
+    bottom: 25vh;
     right: auto;
     left: 8px;
   }
+}
+
+/* v-check canary — RGB rotation (feedback_canary_rotation). Currently
+   GREEN (invite-panel reposition v2 + steppers 2-col + min_pentatonic
+   rename, 2026-08-08); next = blue. */
+#bd-invite-text-viewer {
+  color: #40c040 !important;
 }
 
 #media-bar {

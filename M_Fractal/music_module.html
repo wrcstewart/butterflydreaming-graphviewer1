@@ -156,11 +156,12 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently BLUE (BD-embed wire-in 2026-08-08); next = red. */
+       Currently RED (min_pentatonic rename + steppers 2-col, 2026-08-08);
+       next = green. */
     #play-pause-btn {
-      background: #2A6DFF !important;
+      background: #d03030 !important;
       color: #ffffff !important;
-      border-color: #2A6DFF !important;
+      border-color: #d03030 !important;
       font-weight: bold;
     }
 
@@ -197,7 +198,7 @@
         flex-wrap: wrap;
         align-self: stretch;
       }
-      .control-row { flex: 1 1 30%; min-width: 90px; max-width: 200px; }
+      .control-row { flex: 1 1 45%; min-width: 140px; max-width: 100%; }
       #abc-pane { width: 140px; font-size: 1.01rem; padding: 6px 8px; }
     }
 
@@ -334,12 +335,16 @@
     // instead'. Old 'pentatonic' name kept as an alias so scripts saved
     // before this change still parse.
     const SCALES = {
-      minor:            [0, 2, 3, 5, 7, 8, 10],   // natural minor / Aeolian
-      major:            [0, 2, 4, 5, 7, 9, 11],
-      minor_pentatonic: [0, 3, 5, 7, 10],
-      blues:            [0, 3, 5, 6, 7, 10]
+      minor:         [0, 2, 3, 5, 7, 8, 10],   // natural minor / Aeolian
+      major:         [0, 2, 4, 5, 7, 9, 11],
+      min_pentatonic:[0, 3, 5, 7, 10],
+      blues:         [0, 3, 5, 6, 7, 10]
     };
-    const SCALE_ALIASES = { pentatonic: 'minor_pentatonic' };
+    // Aliases preserve backward compatibility with scripts that use the
+    // pre-2026-08-08 name 'minor_pentatonic' (and the older shorthand
+    // 'pentatonic'). New canonical name is 'min_pentatonic' — narrower
+    // stepper cell + fits comfortably in 2-column mobile layout.
+    const SCALE_ALIASES = { pentatonic: 'min_pentatonic', minor_pentatonic: 'min_pentatonic' };
     const SCALE_NAMES = Object.keys(SCALES);
     const NOTE_NAMES  = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     // ABC key-signature strings for each scale (used in the K: header).
@@ -347,10 +352,10 @@
     // implicitly via the key signature — cleaner-reading ABC than K:maj
     // + explicit accidentals would be.
     const SCALE_TO_ABC_KEY_SUFFIX = {
-      minor:            'min',
-      major:            'maj',
-      minor_pentatonic: 'min',
-      blues:            'maj'
+      minor:         'min',
+      major:         'maj',
+      min_pentatonic:'min',
+      blues:         'maj'
     };
 
     // ── Steppers ────────────────────────────────────────────────────────────
@@ -459,7 +464,7 @@
         },
         iterations: 5,
         angle:      90,
-        scale:      'minor_pentatonic',
+        scale:      'min_pentatonic',
         root:       0,
         rootOctave: -1,  // matches DEFAULT_SCRIPT %%bd_root C, (tonic = C3)
         stepSeconds:  0.2,

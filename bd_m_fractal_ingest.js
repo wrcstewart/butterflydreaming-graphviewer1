@@ -42,7 +42,7 @@ const CONTENT1_TEXT =
   '%%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY\n' +
   '%%bd_iterations 5\n' +
   '%%bd_angle 90\n' +
-  '%%bd_scale minor_pentatonic\n' +
+  '%%bd_scale min_pentatonic\n' +
   '%%bd_root C,\n' +
   '%%bd_step_seconds 0.2\n' +
   '%%bd_vertical_time 0.2\n' +
