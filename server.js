@@ -83,6 +83,18 @@ app.use('/bd_M_ABC', express.static('./M_Music', {
   }
 }));
 
+// bd_M_Fractal L-system music module bundle. On-disk M_Fractal/ mirrors the
+// standalone at github.com/wrcstewart/bd_M_Fractal (two-copy convention).
+app.use('/bd_M_Fractal', express.static('./M_Fractal', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 const driver = neo4j.driver(
   'bolt://localhost:7687',
   neo4j.auth.basic('memgraph', 'memgraph')

@@ -1,0 +1,62 @@
+<!-- ButterflyDreaming Fractal Music Module — index.html — iframe wrapper -->
+<!-- Loaded by BD's #visual-iframe at /bd_M_Fractal/. Thin relay between the
+     grandparent viewer and the inner music_module.html iframe. Mirrors
+     M_Music/index.html (bd_M_ABC sibling) — same RELAY_UP/DOWN sets. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Fractal Music Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0a0f;
+      overflow: hidden;
+    }
+    #module-frame {
+      display: block; width: 100%; height: 100%; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="module-frame"
+          src="music_module.html"
+          title="ButterflyDreaming Fractal Music Module">
+  </iframe>
+
+  <script>
+    'use strict';
+
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update', 'BD_INIT', 'BD_STOP']);
+    const RELAY_UP   = new Set([
+      'BD_READY',
+      'bd_script_response',
+      'bd_param_update',
+      'BD_UPDATE',
+      'BD_ERROR',
+      'BD_MEDIA_BLOB',
+      'BD_MODULE_COPY_LINK_REQUEST'
+    ]);
+
+    const moduleFrame = document.getElementById('module-frame');
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      if (event.source === moduleFrame.contentWindow) {
+        if (RELAY_UP.has(data.type)) {
+          window.parent.postMessage(data, '*');
+        }
+        return;
+      }
+
+      if (event.source === window.parent && RELAY_DOWN.has(data.type)) {
+        moduleFrame.contentWindow.postMessage(data, '*');
+      }
+    });
+  </script>
+</body>
+</html>

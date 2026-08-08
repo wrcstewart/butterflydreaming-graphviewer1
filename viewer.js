@@ -645,6 +645,10 @@ const MODULES = {
     embedded:   '/bd_M_ABC/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_ABC/preview.html',
   },
+  'bd_M_Fractal': {
+    embedded:   '/bd_M_Fractal/index.html',
+    standalone: 'https://wrcstewart.github.io/bd_M_Fractal/preview.html',
+  },
 };
 
 function getModuleUrl(moduleId) {
@@ -4479,14 +4483,16 @@ async function init() {
       // deep-link URL was including "text from previous browsing"
       // (unrelated tapped nodes, curator prose, chat). extractLatest
       // ModuleScript pulls just the last %%bd_module paragraph.
+      // Use the SAME card getFocusedCardBody targets — the bd_script_response
+      // handler writes there via setCardText, so this is the freshest source.
+      // Previously this only checked topLocalCard (a textarea), but responses
+      // often land in contentEditable DIVs (system/helper cards) — mismatch
+      // caused stale DB text to be shipped in the URL after a successful pull.
       let currentPanelText = '';
-      const active = document.activeElement;
+      const focusedBody = getFocusedCardBody();
       let cardText = null;
-      if (active && active.tagName === 'TEXTAREA' && active.closest('.card.local')) {
-        cardText = active.value || '';
-      } else {
-        const top = topLocalCard();
-        if (top && top.body) cardText = top.body.value || '';
+      if (focusedBody) {
+        cardText = getCardText(focusedBody);
       }
       const extracted = cardText !== null ? extractLatestModuleScript(cardText) : null;
       if (extracted) {
