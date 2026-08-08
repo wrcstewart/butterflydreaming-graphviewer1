@@ -764,17 +764,18 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   #bd-invite-panel-viewer {
     top: auto;
     transform: none;
-    bottom: 25vh;
+    /* 2026-08-08 v3: nudged up ~one step-btn (22 px) per user request
+       so the panel is fully clear of the stepper column. */
+    bottom: calc(25vh + 22px);
     right: auto;
     left: 8px;
   }
 }
 
 /* v-check canary — RGB rotation (feedback_canary_rotation). Currently
-   GREEN (invite-panel reposition v2 + steppers 2-col + min_pentatonic
-   rename, 2026-08-08); next = blue. */
+   BLUE (invite-panel nudge up, 2026-08-08); next = red. */
 #bd-invite-text-viewer {
-  color: #40c040 !important;
+  color: #4080ff !important;
 }
 
 #media-bar {

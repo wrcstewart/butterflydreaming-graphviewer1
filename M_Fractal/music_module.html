@@ -81,19 +81,15 @@
       align-items: center;
     }
 
+    /* BD-embedded 2026-08-08: status hidden per user request — the
+       "N notes, X.Xs" info line + load/error prose all suppressed here.
+       The standalone copy still shows it. Any error surfacing that
+       previously reached the user via setStatus() is now silent inside
+       BD; errors still log to console.error via the module's error
+       handler. Kept the element in the DOM (rather than removing) so
+       the JS setStatus() call sites don't need branching. */
     #status {
-      flex: 0 0 auto;
-      align-self: stretch;
-      font-size: 0.78rem;
-      font-style: italic;
-      color: #9e9e90;
-      letter-spacing: 0.03em;
-      text-align: center;
-      background: rgba(15, 15, 24, 0.55);
-      border: 1px solid rgba(74, 155, 142, 0.15);
-      border-radius: 3px;
-      padding: 4px 6px;
-      min-height: 22px;
+      display: none;
     }
     #status.err {
       color: #f2a0a0;
@@ -131,12 +127,24 @@
       color: #6a6a60;
     }
 
+    /* 2026-08-08 — Play/Stop moved to the right of #abc-pane via
+       .abc-and-play row. .playback-row itself is now a vertical stack
+       inside that row (buttons above/below each other in the gutter). */
+    .abc-and-play {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
     .playback-row {
       flex: 0 0 auto;
       display: flex;
+      flex-direction: column;
       gap: 8px;
       justify-content: center;
-      align-items: center;
+      align-items: stretch;
     }
     .playback-row button {
       background: #0f0f18;
@@ -156,12 +164,12 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently RED (min_pentatonic rename + steppers 2-col, 2026-08-08);
-       next = green. */
+       Currently GREEN (Play/Stop moved next to abc-pane + #status
+       hidden, 2026-08-08); next = blue. */
     #play-pause-btn {
-      background: #d03030 !important;
-      color: #ffffff !important;
-      border-color: #d03030 !important;
+      background: #00CC00 !important;
+      color: #0a0a1a !important;
+      border-color: #00CC00 !important;
       font-weight: bold;
     }
 
@@ -279,10 +287,12 @@
 
     <section class="main-area">
       <div id="status">Loading samples…</div>
-      <div id="abc-pane" title="Derived ABC (read-only; select + Cmd-C to copy, or use 'Copy for ABC Player')"></div>
-      <div class="playback-row">
-        <button id="play-pause-btn" type="button" disabled>Play</button>
-        <button id="stop-btn"       type="button" disabled>Stop</button>
+      <div class="abc-and-play">
+        <div id="abc-pane" title="Derived ABC (read-only; select + Cmd-C to copy, or use 'Copy for ABC Player')"></div>
+        <div class="playback-row">
+          <button id="play-pause-btn" type="button" disabled>Play</button>
+          <button id="stop-btn"       type="button" disabled>Stop</button>
+        </div>
       </div>
     </section>
 
