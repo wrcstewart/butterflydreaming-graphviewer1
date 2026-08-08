@@ -1,118 +1,129 @@
-# FractalMusic — planning notes for `bd_M_Hilbert` module
+# FractalMusic — bd_M_Fractal implementation notes
 
-*Captured 2026-08-02 during exploratory discussion. No code changes made.
-Notes to think through before committing to a direction.*
+*Originally a planning doc (2026-08-02). Rewritten 2026-08-08 to
+document what was actually built. Original open-questions section
+has been retired — decisions are captured in the "resolved" section
+below.*
 
-## Proposed placement in the graph
+## Status
 
-Mirrors the visual side (`V_Graphic → bd_V_Kolam → bd_V_Kolam_1 …`):
+**Built and deployed** as a standalone at
+[github.com/wrcstewart/bd_M_Fractal](https://github.com/wrcstewart/bd_M_Fractal).
+Live at **`https://wrcstewart.github.io/bd_M_Fractal/preview.html`**.
 
-- **SubFamily**: `M_Music`
-- **Cluster**: `bd_M_Hilbert`
-- **Gateway TextNode**: `BD_M_HILBERT` (or `bd_M_Hilbert` — see naming decision below)
-- **Content TextNodes**: `bd_M_Hilbert_001`, `bd_M_Hilbert_002`, …
+**Not yet done:**
+- Embedded copy at `graphviewer1/M_Fractal/` (mirror of the bd_M_ABC
+  dev-sync pattern).
+- MODULES registry entry in `viewer.js` (`bd_M_Fractal: { embedded,
+  standalone }`).
+- DB nodes: SubFamily M_Music already has bd_M_ABC; would add a
+  parallel `bd_M_Fractal` Cluster + gateway + first content node via
+  an ingest script analogous to `bd_m_abc_ingest.js`.
+- Deep-link round-trip verification.
+- Cosmetic ABC accidental cleanup (minor scales use `^D` for E♭ etc.
+  Audio-correct via enharmonic equivalence, visually unconventional).
 
-Naming convention still needs deciding — user first wrote uppercase gateway; existing `bd_V_Kolam` corpus is lowercase throughout.
+## What it does
 
-## What already exists
+L-system grammar in the script → interpret as a 2-D turtle path →
+sonify horizontal segments as notes (y-coordinate maps to scale
+degree, run length maps to duration) → build 3-note chords by
+looking ahead at future notes in the sequence → emit as ABC →
+play via Tone.js + bass-recorder sampler.
 
-**Repo**: `github.com/wrcstewart/butterflydreaming_music_1`
-**Live**: `wrcstewart.github.io/butterflydreaming_music_1/`
+## Design decisions (resolved from the original planning doc)
 
-Extremely close in architecture to V_Kolam. Same shell pattern:
+The 2026-08-02 planning doc listed six open questions. Resolutions:
 
-- `index.html` (~280 lines) — send-to-player shell with textarea + iframe container
-- `music_module.html` (~410 lines) — the iframe module: Tone.js + abcjs, 4 external bass-recorder samples (F#2, C3, G#3, E4 mp3s)
-- postMessage protocol identical: `BD_READY` / `BD_INIT` / `BD_UPDATE` / `BD_STOP` / `BD_ERROR`
-- Score wrapped in `%%bd_score [ ... %%bd_]` (mirrors `%%bd_ai_read` bracket convention)
+1. **Naming**: renamed from `bd_M_Hilbert` → `bd_M_Fractal`. The
+   module handles any 90° L-system grammar; Hilbert is one example.
+   Default demo is the Peano curve (denser, richer musically).
+2. **Persistence**: **grammar canonical**. The script (persisted in
+   BD/deep-links) contains only the grammar + params. The derived
+   ABC is displayed in a read-only pane inside the module and is a
+   computed artefact — never stored. Handoff to the ABC-editing world
+   is via the "Copy for ABC Player" button that wraps the derived
+   ABC in a `%%bd_module bd_M_ABC` script for pasting into any
+   bd_M_ABC node.
+3. **Repo strategy**: mirror the bd_V_Kolam pattern — separate
+   public standalone repo, CC0. Two-copy dev-sync convention will
+   apply when the embedded BD copy is added.
+4. **Deterministic-only L-systems**: yes (v1). Stochastic /
+   context-sensitive L-systems deferred.
+5. **Alphabet mapping**: turtle-graphics style. Only F (draw
+   forward), + (turn CCW), - (turn CW), and non-drawing recursive
+   placeholders (any single letter with a rule). Angle configurable
+   via `%%bd_angle` (default 90°).
+6. **Additional score-side edits**: tempo via `%%bd_step_seconds`
+   (real seconds per horizontal segment, cleaner than BPM for this
+   domain). Meter and key are computed from `%%bd_scale` +
+   `%%bd_root`. Effect params (reverb / vibrato / chorus / loop)
+   are individual directives, script-editable and stepper-editable.
 
-**Existing directives (already implemented in music_1):**
+## Pipeline (canonical)
 
-| Directive | Range |
-|---|---|
-| `%%bd_reverb_wet` | 0–1 |
-| `%%bd_reverb_decay` | seconds |
-| `%%bd_vibrato_frequency` | Hz (log 0.5–20) |
-| `%%bd_vibrato_depth` | 0–1 |
-| `%%bd_chorus_wet` | 0–1 |
-| `%%bd_chorus_depth` | 0–1 |
-| `%%bd_loop` | true/false |
-| `%%bd_loop_gap` | seconds |
-| `%%bd_score` | ABC block |
+```
+grammar (%%bd_ directives)
+  ├→ parseGrammarFromScript
+  └→ expandLSystem (DFS streaming, memory O(iter))
+       ↓ symbols (up to MAX_TURTLE_INPUT_CHARS)
+     turtleWalk
+       ↓ segments with symIdx
+     skip mechanism (slice past iter-(N-1) prefix)
+       ↓ post-skip segments
+     collapseRuns (merge consecutive same-y horizontals)
+       ↓ runs
+     applyPitchReflection (bounce between ±scaleLength walls)
+       ↓ runs with effective-y pitches
+     tonic scan (slice to first horizontal at y ≡ 0 mod scaleLen)
+       ↓ pitched runs
+     chord voicing (base + offset2 note -12 + offset3 note +12)
+       ↓ ABC string with chord brackets
+     abcjs.parseOnly → extractNotes → Tone.Part → sampler + effects
+       ↓ audio
+```
 
-Audio chain: Sampler → Chorus → Vibrato → Reverb → Destination. Roughly 80% of what the new module needs is already there.
+## Key subtleties (would trip up a re-implementer)
 
-## The new design problem: two-stage generation
+- **DFS shared prefix**: iter N and iter (N-1) emit the same first
+  L(N-1) symbols. Without the skip step, bumping iterations doesn't
+  audibly change the piece's start.
+- **Self-similar deltas**: even after skip, the local delta shape of
+  Peano at high iterations mimics low-iteration structure. Fix:
+  seed pitch reflection from raw-y (mod scaleLength) rather than 0
+  so different absolute y positions → different scale degrees.
+- **Tonic scan**: raw-y seed means iterations start on random scale
+  degrees. Not musically satisfying. Scan forward to first horizontal
+  at y ≡ 0 (tonic in some octave) so every iteration opens on the
+  root.
+- **Memory ceiling**: at very high iterations (Peano iter 9+) the
+  skip-size alone can exceed JS heap. Effective-iter guard walks the
+  requested iter down until skip fits under a 5M-symbol emission cap.
+- **Chord voice octave spread**: base note unchanged, offset2 voice
+  −12 semitones, offset3 voice +12 semitones. Spreads chord ~3
+  octaves. If a shift would push a note off the piano ([21, 108]),
+  that voice keeps its original octave.
 
-V_Kolam has one stage: **directives → visual**. User tweaks a slider, image redraws directly.
+## Where things live
 
-`bd_M_Hilbert` has two: **grammar → ABC → sound**. That intermediate ABC representation is what makes this genuinely new.
+- **Repo root** (this project): planning + integration when it happens.
+- **Standalone repo** [`bd_M_Fractal`](https://github.com/wrcstewart/bd_M_Fractal):
+  the actual code. `music_module.html` (the generator + player),
+  `preview.html` (standalone harness), `bass-recorder/*.mp3` (samples).
+- **README** at the standalone repo has the developer-oriented docs:
+  directive reference, pipeline diagram, extension recipes for
+  AI-assisted forking. Point external devs there, not here.
 
-Three real UX questions fall out:
+## Related
 
-### 1. Which is the source of truth — grammar or ABC?
-
-- **Grammar canonical** (recommended): ABC is a computed byproduct, always regenerated. User cannot hand-tweak ABC persistently. Cleanest, deterministic, best for pairing (both users see identical output).
-- **Both editable**: needs a "which is stale" indicator + rules for what happens when both diverge. Adds cognitive load; makes pairing messier.
-- **ABC canonical**: grammar is just a scratchpad; once ABC is generated, it's the source. Defeats most of the L-system point for later re-generation.
-
-Working recommendation: **grammar is source of truth, ABC is a computed cache**.
-
-### 2. When does grammar → ABC fire?
-
-Options:
-
-- **Explicit "Regenerate" button** in the module UI — fastest iteration during authoring.
-- **Auto-regenerate on Copy Down (↓)** — safety net so preview always reflects current grammar.
-- **Copy Up (↑) sends what's currently in module** — no auto-regen; user may have paused mid-edit.
-
-Recommendation: **explicit Regenerate button + auto-regen on Copy Down**. Copy Up is passive (sends current state).
-
-Not recommended: real-time regeneration on every keystroke in the grammar block — expensive and noisy for the reader/listener.
-
-### 3. What ends up persisted in the node text?
-
-Three viable answers — this is where user needs to decide:
-
-**A. Grammar only.** Deterministic, no sync bugs, joint users always identical. Cannot hand-edit ABC persistently.
-
-**B. Grammar + generated ABC together.** Both stored, ABC refreshed on regen. Larger nodes; risk of grammar/ABC drift if a curator manually edits only one.
-
-**C. Grammar OR ABC (author picks).** New directive `%%bd_generator lsystem|abc` says which is canonical per-node. Both families coexist. Most flexible; more UX surface.
-
-Working preference: **A** for a first pass; extend to C if authors ask for it.
-
-## Proposed new directives (grammar side)
-
-Sketch — subject to change:
-
-- `%%bd_generator lsystem` — identifies the generator (absence → treat `%%bd_score` as canonical, existing behaviour)
-- `%%bd_lsystem_axiom <string>` — starting symbol(s)
-- `%%bd_lsystem_rule <symbol>: <expansion>` — one rule per line, repeatable
-- `%%bd_lsystem_iterations <n>` — how many times to apply rules
-- `%%bd_lsystem_alphabet [<mapping>]` — bracket block: symbol → ABC-fragment mapping (turtle-graphics style, e.g. `F` = note, `+` = up semitone, `-` = down, `[` `]` = save/restore state)
-
-Alternative: bundle grammar into a single multi-line `%%bd_grammar [ … %%bd_]` block for authoring convenience (all L-system stuff visually contiguous in the panel).
-
-## Repo layout options
-
-**A. New repo `bd_M_Hilbert` (recommended)** — matches `bd_V_Kolam` pattern exactly. Standalone at `wrcstewart.github.io/bd_M_Hilbert/preview.html`. Two-copy dev-sync with BD-embedded copy at `M_Music/music_module.html` in `graphviewer1`. `music_1` stays as the "bass recorder exemplar" ancestor.
-
-**B. Rename `music_1` → `bd_M_Hilbert`** — reuses existing repo + Pages URL. Cleaner history but breaks any existing links to `music_1`; loses the exemplar framing.
-
-**C. Fork `music_1`, keep both** — duplicates code; risk of bug-fix drift between the two.
-
-## Open decisions before starting
-
-1. Naming: lowercase throughout (`bd_M_Hilbert` for both cluster and gateway) or uppercase gateway (`BD_M_HILBERT`)?
-2. Persistence: grammar only, grammar+ABC, or author-picks?
-3. Repo: new `bd_M_Hilbert`, rename `music_1`, or fork?
-4. Deterministic-only L-systems for v1? (I'd say yes — stochastic complicates pairing.)
-5. Turtle-graphics-style alphabet mapping, or direct symbol→pitch table?
-6. Additional score-side edits: metre/key/tempo directives at grammar level, or leave those hardcoded in the alphabet expansion?
-
-## Related notes
-
-- [Note on Cluster-Textnode edges.md](Note%20on%20Cluster-Textnode%20edges.md) — how CLUSTER_REL weights work when adding this cluster
-- [du_fu_plan.md](du_fu_plan.md) + [du_fu_ingest.js](du_fu_ingest.js) — ingestion pattern to follow when creating the first `bd_M_Hilbert_*` content node
-- `MUSIC_MODULE_SPEC.md` in the music_1 repo — the module contract for future extensions
+- `bd_M_ABC` — sibling module for direct ABC playback
+  (`github.com/wrcstewart/bd_M_ABC`). Chord-form ABC produced by
+  bd_M_Fractal can be pasted straight into a bd_M_ABC node via the
+  Copy for ABC Player button.
+- `bd_V_Kolam` — visual L-system counterpart
+  (`github.com/wrcstewart/bd_V_Kolam`). Same two-copy pattern.
+- `Note on Cluster-Textnode edges.md` in this directory — CLUSTER_REL
+  weight scheme that would apply when adding bd_M_Fractal content
+  nodes to the graph.
+- `du_fu_ingest.js` — template for the ingest script that will create
+  the bd_M_Fractal DB nodes when we integrate.
