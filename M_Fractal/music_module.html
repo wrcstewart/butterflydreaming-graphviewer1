@@ -102,10 +102,13 @@
        to lift the ABC (or uses "Copy for ABC Player" for a fully-wrapped
        bd_M_ABC-ready script). */
     #abc-pane {
+      /* 2026-08-09 — dropped aspect-ratio: 1/1 (was cramping ABC lines
+         into awkward wraps). Now 80% wider than before, height fixed
+         at the pre-change value so the vertical footprint stays the
+         same and text has room to breathe horizontally. */
       flex: 0 0 auto;
-      width: 220px;
-      height: auto;
-      aspect-ratio: 1 / 1;
+      width: 396px;
+      height: 220px;
       max-width: 100%;
       background: rgba(15, 15, 24, 0.55);
       border: 1px solid rgba(74, 155, 142, 0.15);
@@ -131,14 +134,17 @@
        .abc-and-play row. .playback-row itself is now a vertical stack
        inside that row (buttons above/below each other in the gutter). */
     .abc-and-play {
-      /* 2026-08-08 — space-evenly so Play/Stop stack lands more central
-         within the right-hand empty space rather than crowding abc-pane. */
+      /* 2026-08-09 — space-between plus a small padding-right nudges
+         Play/Stop to the right side of the row (was space-evenly which
+         kept them near-centre). abc-pane hugs left, Play/Stop hug right. */
       flex: 0 0 auto;
       display: flex;
       flex-direction: row;
       align-items: center;
-      justify-content: space-evenly;
+      justify-content: space-between;
       align-self: stretch;
+      padding: 0 12px 0 0;
+      gap: 8px;
     }
     .playback-row {
       flex: 0 0 auto;
@@ -168,12 +174,12 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently BLUE (Play/Stop 20% bigger + centred in gutter,
-       2026-08-08); next = red. */
+       Currently RED (abc-pane widened 80% + Play/Stop shifted right,
+       2026-08-09); next = green. */
     #play-pause-btn {
-      background: #2A6DFF !important;
+      background: #d03030 !important;
       color: #ffffff !important;
-      border-color: #2A6DFF !important;
+      border-color: #d03030 !important;
       font-weight: bold;
     }
 
@@ -211,7 +217,7 @@
         align-self: stretch;
       }
       .control-row { flex: 1 1 45%; min-width: 140px; max-width: 100%; }
-      #abc-pane { width: 140px; font-size: 1.01rem; padding: 6px 8px; }
+      #abc-pane { width: 252px; height: 140px; font-size: 1.01rem; padding: 6px 8px; }
     }
 
     .control-row {
