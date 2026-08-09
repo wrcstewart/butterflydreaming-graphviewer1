@@ -756,15 +756,16 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 
 /* Shared object of both verb-buttons above — sits below them so the panel
    reads "Jump to External / Website" / "Copy Link to External / Website".
-   Forced to two lines via <br> in the markup. */
+   Forced to two lines via <br> in the markup. 2026-08-09 — font unified
+   with #bd-invite-text-viewer above (sans-serif, blue) per user request;
+   was Georgia italic amber. */
 #bd-invite-target-viewer {
   margin: 8px 0 0 0;
   text-align: center;
-  color: #d4a017;
-  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #4080ff;
+  font-family: sans-serif;
   font-size: 12px;
   font-weight: bold;
-  font-style: italic;
   line-height: 1.1;
   letter-spacing: 0.02em;
 }
@@ -784,10 +785,11 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   }
 }
 
-/* v-check canary — RGB rotation (feedback_canary_rotation). Currently
-   GREEN (extend panel back up 1.5vh, 2026-08-09); next = blue. */
+/* 2026-08-09 — Extend label now permanent blue to match the
+   External Website label below. Canary role for CSS/module changes
+   moved to the play button in music_module.html. */
 #bd-invite-text-viewer {
-  color: #40c040 !important;
+  color: #4080ff !important;
 }
 
 #media-bar {
