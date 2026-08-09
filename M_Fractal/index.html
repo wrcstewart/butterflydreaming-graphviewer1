@@ -29,7 +29,7 @@
   <script>
     'use strict';
 
-    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update', 'BD_INIT', 'BD_STOP']);
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update', 'BD_INIT', 'BD_STOP', 'BD_INFO_DIALOG_RESULT']);
     const RELAY_UP   = new Set([
       'BD_READY',
       'bd_script_response',
@@ -37,7 +37,8 @@
       'BD_UPDATE',
       'BD_ERROR',
       'BD_MEDIA_BLOB',
-      'BD_MODULE_COPY_LINK_REQUEST'
+      'BD_MODULE_COPY_LINK_REQUEST',
+      'BD_INFO_DIALOG_REQUEST'
     ]);
 
     const moduleFrame = document.getElementById('module-frame');

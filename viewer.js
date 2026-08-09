@@ -4479,6 +4479,63 @@ async function init() {
       setCardText(body, d.script);
     });
 
+    // 2026-08-09 — BD-level bake/save info dialog. Renders in BD's DOM
+    // (not the module iframe) so it can overlay the extend panel and use
+    // the full viewport height (button row was being clipped inside the
+    // iframe on iPhone). Module posts BD_INFO_DIALOG_REQUEST; we show the
+    // dialog and post BD_INFO_DIALOG_RESULT back with {action, dontShowAgain}.
+    function showBakeInfoDialogInBD(actionLabel, respond) {
+      const existing = document.getElementById('bake-info-modal');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'bake-info-modal';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#1a1a2e;color:#eee;border:1px solid #555;border-radius:6px;padding:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;font-family:sans-serif;font-size:14px;line-height:1.45;box-sizing:border-box;';
+      const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      card.innerHTML =
+        '<div style="font-weight:bold;font-size:16px;margin-bottom:10px;">About ' + esc(actionLabel) + '</div>' +
+        '<div style="margin-bottom:10px;">' +
+          '<strong>Bake</strong> renders the current fractal music offline into a WAV file and drops it into the audio player at the bottom of the screen — so you can play it back while browsing other nodes. ' +
+          '<strong>Save wav</strong> downloads that same WAV file to your device.' +
+        '</div>' +
+        '<div style="margin-bottom:10px;color:#c9a227;">' +
+          'Longer tunes take longer to bake — several seconds is normal.' +
+        '</div>' +
+        '<div style="margin-bottom:14px;color:#ff8080;">' +
+          '<strong>Known limitation — Safari Private Browsing:</strong> Safari 17+ deliberately injects random noise into all Web Audio API output in Private mode as an anti-fingerprinting measure. The bake will sound like noise. Use a regular (non-private) Safari tab, or Chrome/Firefox (private tabs OK there).' +
+        '</div>' +
+        '<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;cursor:pointer;">' +
+          '<input type="checkbox" id="bake-info-noshow" style="width:18px;height:18px;"> Don’t show this again this session' +
+        '</label>' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+          '<button id="bake-info-cancel" type="button" style="padding:10px 18px;background:#4a4a4a;color:#eee;border:none;border-radius:4px;font-size:14px;font-family:sans-serif;cursor:pointer;">Cancel</button>' +
+          '<button id="bake-info-ok"     type="button" style="padding:10px 18px;background:#4080ff;color:#fff;border:none;border-radius:4px;font-size:14px;font-family:sans-serif;font-weight:bold;cursor:pointer;">Continue</button>' +
+        '</div>';
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      const finish = (action) => {
+        const dontShowAgain = !!document.getElementById('bake-info-noshow').checked;
+        overlay.remove();
+        respond({ action, dontShowAgain });
+      };
+      document.getElementById('bake-info-ok').onclick     = () => finish('continue');
+      document.getElementById('bake-info-cancel').onclick = () => finish('cancel');
+    }
+
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_INFO_DIALOG_REQUEST') return;
+      const iframeSrc = e.source;
+      showBakeInfoDialogInBD(d.actionLabel || 'Bake', (result) => {
+        try {
+          if (iframeSrc && iframeSrc.postMessage) {
+            iframeSrc.postMessage({ type: 'BD_INFO_DIALOG_RESULT', action: result.action, dontShowAgain: result.dontShowAgain }, '*');
+          }
+        } catch (_) {}
+      });
+    });
+
     // Media-module bake-to-mp3 payload → session-track ingestion.
     // Module produces a WAV in-memory via Tone.Offline, ships the raw bytes as
     // an ArrayBuffer through the iframe relay; here we wrap in a Blob, mint a
