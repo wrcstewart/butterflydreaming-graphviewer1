@@ -176,12 +176,13 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently RED (iPad extend-panel raise, 2026-08-09);
-       next = green. */
+       Currently GREEN (bake: full effect chain restored, diagnostic
+       scaffolding stripped, Safari Private mode caveat documented,
+       2026-08-09); next = blue. */
     #play-pause-btn {
-      background: #d03030 !important;
-      color: #ffffff !important;
-      border-color: #d03030 !important;
+      background: #00CC00 !important;
+      color: #0a0a1a !important;
+      border-color: #00CC00 !important;
       font-weight: bold;
     }
 
@@ -1443,8 +1444,55 @@
       }
     });
 
+    // iOS Safari workaround (2026-08-09): OfflineAudioContext.decodeAudioData
+    // on mp3 returns garbage on iOS, causing bakes to sound like noise while
+    // live playback (which uses the online AudioContext) works fine. Fix:
+    // decode the samples ONCE with the LIVE AudioContext (which iOS handles
+    // correctly), cache the AudioBuffers, and feed them directly to the
+    // offline Sampler — Tone.Sampler accepts pre-decoded AudioBuffers in the
+    // `urls` map, bypassing the offline decode entirely. Cross-context reuse
+    // works as long as sample rates match, which they do (Tone.Offline
+    // defaults to the live context's sample rate).
+    const SAMPLE_URLS = {
+      'F#2': 'bass_recorder_Fs2.mp3',
+      'C3':  'bass_recorder_C3.mp3',
+      'G#3': 'bass_recorder_Gs3.mp3',
+      'E4':  'bass_recorder_E4.mp3'
+    };
+    // 2026-08-09 iteration 3 — cache ArrayBuffers (fetch once) and decode
+    // fresh inside the offline context per render. Previous attempt used
+    // LIVE-context-decoded AudioBuffers passed cross-context to the offline
+    // Sampler — iOS Safari plays those as garbled data (audio envelope
+    // right, waveform content noise), plus Tone.Limiter also fails cross-
+    // context. Decoding inside the offline context keeps everything in one
+    // AudioContext family.
+    let cachedSampleArrayBuffers = null;
+    async function getSampleArrayBuffers() {
+      if (cachedSampleArrayBuffers) return cachedSampleArrayBuffers;
+      const entries = await Promise.all(
+        Object.entries(SAMPLE_URLS).map(async ([note, path]) => {
+          const res = await fetch('./bass-recorder/' + path);
+          if (!res.ok) throw new Error(`fetch ${path}: HTTP ${res.status}`);
+          const arr = await res.arrayBuffer();
+          return [note, arr];
+        })
+      );
+      cachedSampleArrayBuffers = Object.fromEntries(entries);
+      return cachedSampleArrayBuffers;
+    }
+
+    // Bake pipeline note (2026-08-09):
+    //  - Samples fetched once as ArrayBuffers, cached; decode happens
+    //    INSIDE the offline context per bake so the AudioBuffers are
+    //    native to that context (never cross AudioContext boundaries).
+    //  - Tone.Limiter tail keeps summed chord amplitudes under control.
+    //  - audioBufferToWav also normalises if peak > 1.0 (belt-and-braces).
+    //  - KNOWN CAVEAT: Safari's Private Browsing mode breaks
+    //    OfflineAudioContext + Tone effects (Reverb / Chorus produce
+    //    ~1000× over-amplitude — bake sounds like noise). No known code
+    //    workaround; users must bake in a REGULAR Safari tab. Chrome /
+    //    Firefox / other-browser private tabs are fine.
     async function renderOfflineToBuffer() {
-      // Use current stepper values so the bake reflects live tweaks.
       const rWet   = getStepperValue('reverb_wet');
       const rDecay = getStepperValue('reverb_decay');
       const vFreq  = getStepperValue('vibrato_frequency');
@@ -1452,24 +1500,29 @@
       const cWet   = getStepperValue('chorus_wet');
       const cDepth = getStepperValue('chorus_depth');
       const durationSec = endTimeSecs + Math.max(rDecay, 0.5) + 0.5;
+
+      const sampleArrayBuffers = await getSampleArrayBuffers();
+      const liveRate = Tone.getContext().sampleRate;
+
       const toneBuf = await Tone.Offline(async () => {
-        const rev = new Tone.Reverb({ decay: Math.max(0.1, rDecay), wet: rWet }).toDestination();
+        const offlineRaw = Tone.getContext().rawContext;
+        // Decode fresh inside the offline context (fresh ArrayBuffer copies
+        // because decodeAudioData consumes the buffer).
+        const decodedInline = {};
+        for (const [note, arr] of Object.entries(sampleArrayBuffers)) {
+          const copy = arr.slice(0);
+          decodedInline[note] = await offlineRaw.decodeAudioData(copy);
+        }
+        const lim = new Tone.Limiter(-1).toDestination();
+        const rev = new Tone.Reverb({ decay: Math.max(0.1, rDecay), wet: rWet }).connect(lim);
         await rev.ready;
         const vib = new Tone.Vibrato({ frequency: vFreq, depth: vDepth, type: 'sine' }).connect(rev);
         const cho = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: cDepth, wet: cWet }).connect(vib);
         cho.start();
-        const smp = new Tone.Sampler({
-          urls: {
-            'F#2': 'bass_recorder_Fs2.mp3',
-            'C3':  'bass_recorder_C3.mp3',
-            'G#3': 'bass_recorder_Gs3.mp3',
-            'E4':  'bass_recorder_E4.mp3'
-          },
-          baseUrl: './bass-recorder/'
-        }).connect(cho);
+        const smp = new Tone.Sampler({ urls: decodedInline }).connect(cho);
         await Tone.loaded();
         for (const ev of noteEvents) smp.triggerAttackRelease(ev.note, ev.duration, ev.time);
-      }, durationSec);
+      }, durationSec, 2, liveRate);
       return toneBuf.get();
     }
     function audioBufferToWav(buffer) {
@@ -1482,9 +1535,24 @@
       view.setUint32(24,sr,true); view.setUint32(28,br,true); view.setUint16(32,ba,true);
       view.setUint16(34,16,true); w(36,'data'); view.setUint32(40,ds,true);
       const ch = []; for (let c=0;c<numCh;c++) ch.push(buffer.getChannelData(c));
+      // 2026-08-09 — belt-and-braces normalisation. If peak absolute
+      // sample exceeds 1.0, scale everything down so peak lands at 0.98.
+      // Backstop for the in-chain limiter (upstream from us); without
+      // this, any over-range samples were being clipped to ±1 by the
+      // Int16 conversion, which on iOS turned an over-loud bake into
+      // pure noise.
+      let peak = 0;
+      for (let c = 0; c < numCh; c++) {
+        const data = ch[c];
+        for (let i = 0; i < numSamp; i++) {
+          const a = Math.abs(data[i]);
+          if (a > peak) peak = a;
+        }
+      }
+      const scale = peak > 1.0 ? (0.98 / peak) : 1.0;
       let offset = 44;
       for (let i=0;i<numSamp;i++) for (let c=0;c<numCh;c++) {
-        let s = Math.max(-1, Math.min(1, ch[c][i]));
+        let s = Math.max(-1, Math.min(1, ch[c][i] * scale));
         s = s < 0 ? s*0x8000 : s*0x7FFF;
         view.setInt16(offset, s, true); offset += 2;
       }

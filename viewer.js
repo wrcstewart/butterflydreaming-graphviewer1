@@ -4094,6 +4094,11 @@ async function init() {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
         enableCopyUp();
         console.log('[MM1.6] onReady: bd_script_update posted');
+        // 2026-08-09 — module (and its abc-pane) is now up; re-anchor
+        // the extend panel. Delay one frame so the abc-pane has done
+        // its first layout pass.
+        requestAnimationFrame(() => positionExtendPanel());
+        setTimeout(() => positionExtendPanel(), 150);
       } catch (err) {
         console.warn('[MM1.6] onReady: postMessage failed', err);
       }
@@ -4118,6 +4123,10 @@ async function init() {
       const nodeId = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
                      (typeof getActiveNodeId    === 'function' && getActiveNodeId());
       if (nodeId) loadModuleForNode(nodeId);
+      // 2026-08-09 — position the extend panel now and again after a
+      // paint so we catch the iframe layout stabilising.
+      positionExtendPanel();
+      requestAnimationFrame(() => positionExtendPanel());
     } else {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
@@ -4146,8 +4155,80 @@ async function init() {
   window.addEventListener('resize', () => {
     if (visualIframe && visualIframe.classList.contains('active')) {
       positionCyEl();
+      positionExtendPanel();
     }
   });
+
+  // 2026-08-09 — JS-anchored extend-panel positioning. CSS-only rules
+  // (media queries with vh offsets) couldn't reliably align the panel
+  // with the module's #abc-pane across phone / iPad / desktop because
+  // the two live in different coordinate systems: extend panel is in
+  // BD's DOM (viewport-relative), abc-pane is inside the same-origin
+  // module iframe. Formula: get iframe rect + abc-pane rect through
+  // iframe.contentDocument, sum them, set panel's inline top/left to
+  // align with abc-pane's top-left corner (offset a few px so the
+  // panel sits *beside* it, not on top). Falls back to CSS defaults
+  // when the loaded module has no #abc-pane (e.g. V_Kolam).
+  function positionExtendPanel() {
+    const panel = document.getElementById('bd-invite-panel-viewer');
+    if (!panel) return;
+    if (!document.body.classList.contains('player-active')) return;
+    const outerIframe = document.getElementById('visual-iframe');
+    if (!outerIframe) return;
+
+    // v2 (2026-08-09) — walk the iframe chain summing each level's rect
+    // offsets, because getBoundingClientRect() is relative to the *own*
+    // iframe's viewport, NOT the top-level document. First cut assumed
+    // otherwise and stuck the panel at the top of the screen.
+    let topPx  = null;
+    let leftPx = null;
+    try {
+      const outerRect = outerIframe.getBoundingClientRect();
+      const outerDoc  = outerIframe.contentDocument;
+      if (!outerDoc) throw new Error('no outer doc');
+
+      // Two possible shapes:
+      //  a) Relay wrapper (music modules): outer doc has #module-frame
+      //     iframe → inner doc has #abc-pane.
+      //  b) Single-iframe module: outer doc has #abc-pane directly.
+      const inner = outerDoc.getElementById('module-frame');
+      let abcPane = null;
+      let innerOffsetTop = 0, innerOffsetLeft = 0;
+      if (inner) {
+        const innerRect = inner.getBoundingClientRect();
+        innerOffsetTop  = innerRect.top;   // relative to outerDoc's viewport
+        innerOffsetLeft = innerRect.left;
+        const innerDoc  = inner.contentDocument;
+        if (innerDoc) abcPane = innerDoc.getElementById('abc-pane');
+      }
+      if (!abcPane) abcPane = outerDoc.getElementById('abc-pane');
+
+      if (abcPane) {
+        const abcRect = abcPane.getBoundingClientRect();
+        // Sum: main-viewport-y-of-outer + outer-viewport-y-of-inner + inner-viewport-y-of-abc
+        topPx  = outerRect.top  + innerOffsetTop  + abcRect.top;
+        leftPx = outerRect.left + 8;                             // panel hugs left edge of iframe
+      }
+    } catch (_) {
+      // Cross-origin or DOM not ready — fall through to CSS defaults.
+    }
+
+    if (topPx === null) {
+      // Clear inline overrides so the CSS media-query defaults win.
+      panel.style.top = '';
+      panel.style.left = '';
+      panel.style.right = '';
+      panel.style.bottom = '';
+      panel.style.transform = '';
+      return;
+    }
+
+    panel.style.top       = topPx + 'px';
+    panel.style.left      = leftPx + 'px';
+    panel.style.right     = 'auto';
+    panel.style.bottom    = 'auto';
+    panel.style.transform = 'none';
+  }
 
   // 2026-07-15 — Chat is now always active from boot (no toggle). The
   // chat button is now the Join / Leave button: press Join to enter the
