@@ -134,16 +134,18 @@
        .abc-and-play row. .playback-row itself is now a vertical stack
        inside that row (buttons above/below each other in the gutter). */
     .abc-and-play {
-      /* 2026-08-09 — space-between plus a small padding-right nudges
-         Play/Stop to the right side of the row (was space-evenly which
-         kept them near-centre). abc-pane hugs left, Play/Stop hug right. */
+      /* 2026-08-09 v2 — abc-pane on the left, Play/Stop on the right,
+         both clearing the fixed-overlay extend-panel (mobile) on the
+         left edge (via padding-left in the mobile media query, since
+         only mobile positions the extend panel on the left; desktop
+         places it right-side). */
       flex: 0 0 auto;
       display: flex;
       flex-direction: row;
       align-items: center;
       justify-content: space-between;
       align-self: stretch;
-      padding: 0 12px 0 0;
+      padding: 0 12px;
       gap: 8px;
     }
     .playback-row {
@@ -174,12 +176,12 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently RED (abc-pane widened 80% + Play/Stop shifted right,
-       2026-08-09); next = green. */
+       Currently GREEN (abc-pane cleared past extend panel on mobile,
+       2026-08-09); next = blue. */
     #play-pause-btn {
-      background: #d03030 !important;
-      color: #ffffff !important;
-      border-color: #d03030 !important;
+      background: #00CC00 !important;
+      color: #0a0a1a !important;
+      border-color: #00CC00 !important;
       font-weight: bold;
     }
 
@@ -217,7 +219,19 @@
         align-self: stretch;
       }
       .control-row { flex: 1 1 45%; min-width: 140px; max-width: 100%; }
-      #abc-pane { width: 252px; height: 140px; font-size: 1.01rem; padding: 6px 8px; }
+      /* Mobile: abc-pane can grow, but max-width caps it so it plus the
+         cleared left gutter and the Play/Stop stack all fit within the
+         viewport without horizontal overflow. */
+      #abc-pane {
+        width: 252px;
+        height: 140px;
+        max-width: calc(100vw - 200px);   /* 90 padding-left + 8 gap + ~80 play + 12 padding-right + safety */
+        font-size: 1.01rem;
+        padding: 6px 8px;
+      }
+      /* Push abc-pane past the fixed extend-panel overlay on the left
+         (panel is at left:8, width up to 76 → right edge ~84 px). */
+      .abc-and-play { padding-left: 90px; }
     }
 
     .control-row {
