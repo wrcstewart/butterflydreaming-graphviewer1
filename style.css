@@ -643,6 +643,10 @@ body:not(.player-active) #copy-up-btn {
 #view-mode-toggle input[type="radio"] {
   cursor: pointer;
   margin: 0;
+  /* 2026-08-09 — green radio dot (matches Player/Nodes mode-toggle
+     semantic of "go / active"). accent-color is respected by Safari,
+     Chrome, Firefox for native form controls. */
+  accent-color: #00b050;
 }
 #view-mode-toggle input[type="radio"]:disabled,
 #view-mode-toggle input[type="radio"]:disabled + span,
@@ -766,11 +770,12 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   letter-spacing: 0.02em;
 }
 
-/* Small viewport (mobile, either orientation) — 2026-08-08 v2: bottom-
-   anchored so the panel doesn't drift with Safari's variable-height
-   address bar. Sits in the empty gutter to the LEFT of the module's
-   centred #abc-pane. Panel width 76 px slots into the ~125 px gutter. */
-@media (max-width: 767px) {
+/* Small viewport (mobile OR tablet) — 2026-08-09 v6: breakpoint raised
+   from 767 → 1024 so iPad (portrait 768–1024, iPad Mini landscape 1024)
+   gets the same left-anchored panel as iPhone. Was leaving iPad on the
+   desktop right-anchor path, which collided with the module's own right
+   stepper column. */
+@media (max-width: 1024px) {
   #bd-invite-panel-viewer {
     top: auto;
     transform: none;
