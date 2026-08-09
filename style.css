@@ -621,18 +621,24 @@ body:not(.player-active) #copy-up-btn {
   color: #fff;
   font-family: sans-serif;
   font-size: 11px;
-  /* 2026-08-09 — 25 % up: was font 11 px + native radio dot. `zoom` is
-     the cleanest way to scale the whole radio+label group (input dot
-     size, spacing, text) atomically without messing with input-scaling
-     tricks. Well supported in Safari, Chrome, Firefox as of 2024. */
-  zoom: 1.25;
+  /* 2026-08-09 v2 — another +25 % (1.25 × 1.25 ≈ 1.5625) per user;
+     originals felt sluggish on mobile. `zoom` scales input dot, labels,
+     and internal gap atomically. */
+  zoom: 1.5625;
 }
 #view-mode-toggle label {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   cursor: pointer;
   user-select: none;
+  /* 2026-08-09 v2 — enlarge the tap zone (was gap-3px, no padding, so
+     only the tiny radio dot + text glyphs were tappable). Padding here
+     stretches the whole <label> hit area; touch-action: manipulation
+     removes the ~300 ms double-tap-zoom hesitation iOS Safari adds. */
+  padding: 6px 4px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.15);
 }
 #view-mode-toggle input[type="radio"] {
   cursor: pointer;
@@ -780,10 +786,10 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 
 /* v-check canary — RGB rotation (feedback_canary_rotation). Currently
-   GREEN (arrows-left + radios 25% bigger + auto-Player, 2026-08-09);
-   next = blue. */
+   BLUE (radios another +25% + bigger tap zone + touch-action, 2026-08-09);
+   next = red. */
 #bd-invite-text-viewer {
-  color: #40c040 !important;
+  color: #4080ff !important;
 }
 
 #media-bar {
