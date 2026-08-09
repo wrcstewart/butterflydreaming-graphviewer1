@@ -777,18 +777,17 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   #bd-invite-panel-viewer {
     top: auto;
     transform: none;
-    /* 2026-08-09 v4: nudged DOWN 3vh (previous v3 crept up).
-       Was calc(25vh + 22px), now calc(22vh + 22px). */
-    bottom: calc(22vh + 22px);
+    /* 2026-08-09 v5: v4 (22vh) overshot; back up 1.5vh to 23.5vh. */
+    bottom: calc(23.5vh + 22px);
     right: auto;
     left: 8px;
   }
 }
 
 /* v-check canary — RGB rotation (feedback_canary_rotation). Currently
-   RED (extend panel dropped 3vh, 2026-08-09); next = green. */
+   GREEN (extend panel back up 1.5vh, 2026-08-09); next = blue. */
 #bd-invite-text-viewer {
-  color: #e04040 !important;
+  color: #40c040 !important;
 }
 
 #media-bar {
