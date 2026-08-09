@@ -176,13 +176,12 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
     /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently GREEN (bake: full effect chain restored, diagnostic
-       scaffolding stripped, Safari Private mode caveat documented,
-       2026-08-09); next = blue. */
+       Currently BLUE (bake/save info dialog with Safari Private
+       warning, 2026-08-09); next = red. */
     #play-pause-btn {
-      background: #00CC00 !important;
-      color: #0a0a1a !important;
-      border-color: #00CC00 !important;
+      background: #2A6DFF !important;
+      color: #ffffff !important;
+      border-color: #2A6DFF !important;
       font-weight: bold;
     }
 
@@ -1390,8 +1389,52 @@
     }
 
     // ── Bake / Save wav / Save midi — reused pattern from bd_M_ABC ──────────
+    // First-tap info dialog explains what Bake / Save wav do and warns
+    // about the Safari-Private-Browsing anti-fingerprinting bug (Safari 17+
+    // injects random noise into all Web Audio output in Private mode, which
+    // makes the bake sound like noise). Session-scoped: once acknowledged
+    // with "Don't show again", subsequent clicks skip straight through.
+    let bakeDialogAckd = false;
+    function showBakeInfoDialog(actionLabel, proceed) {
+      if (bakeDialogAckd) { proceed(); return; }
+      const existing = document.getElementById('bake-info-modal');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'bake-info-modal';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#1a1a2e;color:#eee;border:1px solid #555;border-radius:6px;padding:16px;max-width:520px;width:100%;font-family:sans-serif;font-size:14px;line-height:1.45;';
+      card.innerHTML =
+        '<div style="font-weight:bold;font-size:16px;margin-bottom:10px;">About ' + actionLabel + '</div>' +
+        '<div style="margin-bottom:10px;">' +
+          '<strong>Bake</strong> renders the current fractal music offline into a WAV file and drops it into the audio player at the bottom of the screen — so you can play it back while browsing other nodes. ' +
+          '<strong>Save wav</strong> downloads that same WAV file to your device.' +
+        '</div>' +
+        '<div style="margin-bottom:10px;color:#c9a227;">' +
+          'Longer tunes take longer to bake — several seconds is normal.' +
+        '</div>' +
+        '<div style="margin-bottom:14px;color:#ff8080;">' +
+          '<strong>Known limitation — Safari Private Browsing:</strong> Safari 17+ deliberately injects random noise into all Web Audio API output in Private mode as an anti-fingerprinting measure. The bake will sound like noise. Use a regular (non-private) Safari tab, or Chrome/Firefox (private tabs OK there).' +
+        '</div>' +
+        '<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;cursor:pointer;">' +
+          '<input type="checkbox" id="bake-info-noshow" style="width:18px;height:18px;"> Don’t show this again this session' +
+        '</label>' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+          '<button id="bake-info-cancel" type="button" style="padding:10px 18px;background:#4a4a4a;color:#eee;border:none;border-radius:4px;font-size:14px;font-family:sans-serif;cursor:pointer;">Cancel</button>' +
+          '<button id="bake-info-ok"     type="button" style="padding:10px 18px;background:#4080ff;color:#fff;border:none;border-radius:4px;font-size:14px;font-family:sans-serif;font-weight:bold;cursor:pointer;">Continue</button>' +
+        '</div>';
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      document.getElementById('bake-info-ok').onclick = () => {
+        if (document.getElementById('bake-info-noshow').checked) bakeDialogAckd = true;
+        overlay.remove();
+        proceed();
+      };
+      document.getElementById('bake-info-cancel').onclick = () => overlay.remove();
+    }
+
     const BAKE_BTN_INITIAL = bakeMp3Btn.innerHTML;
-    bakeMp3Btn.addEventListener('click', async () => {
+    async function doBake() {
       if (baking || !abcReady) return;
       baking = true; updateControls();
       bakeMp3Btn.innerHTML = 'Baking…';
@@ -1417,7 +1460,12 @@
         bakeMp3Btn.innerHTML = BAKE_BTN_INITIAL;
         updateControls();
       }
+    }
+    bakeMp3Btn.addEventListener('click', () => {
+      if (baking || !abcReady) return;
+      showBakeInfoDialog('Bake', doBake);
     });
+
     function downloadBlob(blob, filename) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1427,8 +1475,10 @@
     }
     downloadBtn.addEventListener('click', () => {
       if (!lastBakedBlob) return;
-      const safe = lastBakedLabel.replace(/[^A-Za-z0-9._-]+/g, '_') || 'bake';
-      downloadBlob(lastBakedBlob, `${safe}.wav`);
+      showBakeInfoDialog('Save wav', () => {
+        const safe = lastBakedLabel.replace(/[^A-Za-z0-9._-]+/g, '_') || 'bake';
+        downloadBlob(lastBakedBlob, `${safe}.wav`);
+      });
     });
     saveMidiBtn.addEventListener('click', () => {
       if (!derivedAbc || typeof ABCJS === 'undefined' || !ABCJS.synth) return;
