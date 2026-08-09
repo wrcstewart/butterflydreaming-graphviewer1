@@ -714,11 +714,13 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   gap: 5px;
 }
 
-/* Jump to — solid muted amber. Fixed 50 px width; longer labels wrap
-   inside the button. */
+/* 2026-08-09 — Jump to and Copy Link to unified: grey background,
+   blue text (matches Extend / External Website labels above/below).
+   Was amber solid / amber-outline; user asked for a quieter, more
+   uniform panel look. */
 #jump-to-ext-btn {
-  background: #a07820;
-  color: #0a0a1a;
+  background: #4a4a4a;
+  color: #4080ff;
   border: none;
   border-radius: 3px;
   padding: 5px 4px;
@@ -730,16 +732,14 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   line-height: 1.15;
   white-space: normal;
 }
-#jump-to-ext-btn:hover { background: #c9a227; }
+#jump-to-ext-btn:hover { background: #5c5c5c; }
 
-/* Copy Link to — outlined muted amber, secondary. Wraps to 2 lines
-   inside 50 px ("Copy Link" / "to"). */
 #copy-link-to-ext-btn {
-  background: transparent;
-  color: #a07820;
-  border: 1px solid #a07820;
+  background: #4a4a4a;
+  color: #4080ff;
+  border: none;
   border-radius: 3px;
-  padding: 4px 4px;
+  padding: 5px 4px;
   font-size: 11px;
   cursor: pointer;
   font-weight: bold;
@@ -748,11 +748,7 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   line-height: 1.15;
   white-space: normal;
 }
-#copy-link-to-ext-btn:hover {
-  background: rgba(160, 120, 32, 0.15);
-  color: #c9a227;
-  border-color: #c9a227;
-}
+#copy-link-to-ext-btn:hover { background: #5c5c5c; }
 
 /* Shared object of both verb-buttons above — sits below them so the panel
    reads "Jump to External / Website" / "Copy Link to External / Website".
