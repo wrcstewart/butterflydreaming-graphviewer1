@@ -2217,6 +2217,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function setSendBtn(el) { sendBtnEl = el; updateSendBtn(); }
 
+  let prevHasModule = false;
   function updateSendBtn() {
     const top = topLocalCard();
     const text = top && top.body ? top.body.value : '';
@@ -2248,6 +2249,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         playerRadio.checked = false;
         document.dispatchEvent(new CustomEvent('bd:force-nodes-mode'));
       }
+      // 2026-08-09 — auto-switch to Player mode on false→true transition
+      // (a module script has just "landed"). Manual Nodes selection on a
+      // module node is respected: subsequent updateSendBtn calls see
+      // prevHasModule=true and don't re-auto-switch. Navigating away
+      // (hasModule→false) resets prevHasModule; coming back re-fires.
+      if (hasModule && !prevHasModule && !playerRadio.checked) {
+        playerRadio.checked = true;
+        playerRadio.dispatchEvent(new Event('change'));
+      }
+      prevHasModule = hasModule;
     }
   }
 

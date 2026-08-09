@@ -594,12 +594,12 @@ body:not(.player-active) #copy-down-btn,
 body:not(.player-active) #copy-up-btn {
   display: none;
 }
-body.player-active #copy-down-btn {
-  margin-left: auto;
-}
-body.player-active #view-mode-toggle {
-  margin-left: 0;
-}
+/* 2026-08-09 — arrows moved left by one button-width per user request.
+   Previously: copy-down-btn took margin-left: auto and view-mode-toggle
+   margin-left: 0, so both stuck together on the right. Now arrows sit
+   right after Copy Link (default gap only), and the view-mode-toggle
+   keeps its base margin-left: auto so it pushes to the right edge and
+   grows the empty space between arrows and radios. */
 
 /* A42 §42.3 — Nodes/Player radio toggle in the action bar. Sits at the far
    right (margin-left: auto). Radios start disabled; JS clears the disabled
@@ -621,6 +621,11 @@ body.player-active #view-mode-toggle {
   color: #fff;
   font-family: sans-serif;
   font-size: 11px;
+  /* 2026-08-09 — 25 % up: was font 11 px + native radio dot. `zoom` is
+     the cleanest way to scale the whole radio+label group (input dot
+     size, spacing, text) atomically without messing with input-scaling
+     tricks. Well supported in Safari, Chrome, Firefox as of 2024. */
+  zoom: 1.25;
 }
 #view-mode-toggle label {
   display: inline-flex;
@@ -775,9 +780,10 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 
 /* v-check canary — RGB rotation (feedback_canary_rotation). Currently
-   RED (invite-panel vertical padding shrink, 2026-08-08); next = green. */
+   GREEN (arrows-left + radios 25% bigger + auto-Player, 2026-08-09);
+   next = blue. */
 #bd-invite-text-viewer {
-  color: #e04040 !important;
+  color: #40c040 !important;
 }
 
 #media-bar {
