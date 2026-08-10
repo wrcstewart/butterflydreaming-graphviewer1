@@ -4172,6 +4172,21 @@ async function init() {
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
+    // 2026-08-10 — on desktop (viewport > 1024px) the module doesn't
+    // stack — .lh-actions occupies the LEFT column with the row of
+    // Copy Grammar / Copy ABC / Bake / Save wav / Save midi buttons.
+    // Anchoring the panel at iframe.left + 8 (mobile placement) covers
+    // those buttons. Clear inline overrides and let the CSS defaults win
+    // (right: 8px, vertically centred) — that's the correct desktop
+    // placement and never collides with module content on wide viewports.
+    if (window.innerWidth > 1024) {
+      panel.style.top       = '';
+      panel.style.left      = '';
+      panel.style.right     = '';
+      panel.style.bottom    = '';
+      panel.style.transform = '';
+      return;
+    }
     if (!document.body.classList.contains('player-active')) return;
     const outerIframe = document.getElementById('visual-iframe');
     if (!outerIframe) return;
