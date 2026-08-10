@@ -11,17 +11,35 @@ below.*
 [github.com/wrcstewart/bd_M_Fractal](https://github.com/wrcstewart/bd_M_Fractal).
 Live at **`https://wrcstewart.github.io/bd_M_Fractal/preview.html`**.
 
-**Not yet done:**
-- Embedded copy at `graphviewer1/M_Fractal/` (mirror of the bd_M_ABC
-  dev-sync pattern).
-- MODULES registry entry in `viewer.js` (`bd_M_Fractal: { embedded,
-  standalone }`).
-- DB nodes: SubFamily M_Music already has bd_M_ABC; would add a
-  parallel `bd_M_Fractal` Cluster + gateway + first content node via
-  an ingest script analogous to `bd_m_abc_ingest.js`.
-- Deep-link round-trip verification.
+**Done since (as of 2026-08-10):**
+- Embedded copy at `graphviewer1/M_Fractal/` (mirrors the standalone
+  music_module.html + samples, with a thin `index.html` relay).
+- `MODULES` registry entry in `viewer.js`:
+  `bd_M_Fractal: { embedded: '/bd_M_Fractal/index.html', standalone: 'https://wrcstewart.github.io/bd_M_Fractal/preview.html' }`.
+- Server route: `/bd_M_Fractal` → `./M_Fractal` (HTML no-cache).
+- DB: SubFamily M_Music → Cluster `bd_M_Fractal` → gateway TextNode
+  `bd_M_Fractal` → content TextNode `bd_M_Fractal_001` via
+  [bd_m_fractal_ingest.js](bd_m_fractal_ingest.js). URLs backfilled.
+- Deep-link round-trip verified (BD → standalone with edited script,
+  standalone → BD via node_url match).
+- Save-wav / Save-midi work (sandbox now includes `allow-downloads`).
+- Layout adapted for iPhone / iPad (breakpoint 500 → 1024; extend
+  panel JS-anchored to abc-pane on ≤ 1024, CSS-default on desktop).
+- min_pentatonic canonical scale name (alias: `minor_pentatonic`,
+  `pentatonic`).
+- Bake / Save wav first-tap info dialog surfaces the Safari Private
+  Browsing caveat (see [[safari-private-bake]] memory note): Apple's
+  Safari-17+ anti-fingerprinting noise on `getChannelData` breaks the
+  bake in Private tabs; no code fix, users must use a regular tab or
+  Chrome/Firefox. Dialog rendered at BD level via
+  `BD_INFO_DIALOG_REQUEST`/`RESULT` postMessage (module iframe can't
+  overlay BD chrome or fit iPhone viewport heights).
+
+**Still deferred:**
 - Cosmetic ABC accidental cleanup (minor scales use `^D` for E♭ etc.
   Audio-correct via enharmonic equivalence, visually unconventional).
+- Standalone `preview.html` doesn't handle `BD_INFO_DIALOG_REQUEST`;
+  module falls back to `window.confirm()` (native, ugly but works).
 
 ## What it does
 
