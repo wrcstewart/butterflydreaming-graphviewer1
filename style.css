@@ -236,8 +236,14 @@ html, body {
    phone has width > 767 in landscape (e.g. iPhone 14 Pro Max = 932 wide).
    Detect short-landscape via max-height instead. Any device where the
    viewport height is ≤ 500 px AND orientation is landscape counts as a
-   phone or small tablet that can't fit BD's layout. */
-@media (orientation: landscape) and (max-height: 500px) {
+   phone or small tablet that can't fit BD's layout.
+   v15 (2026-08-10): add a second rule for iPad-in-landscape — heights
+   are 768–1024 (well above the 500 threshold) but aspect-ratio is 4:3
+   or thinner, which never fits BD's layout well. Desktop 16:9/16:10
+   monitors have aspect-ratio ≥ 1.6 so aren't caught. Phone landscape
+   has aspect-ratio ~2:1 so is caught only by the max-height rule. */
+@media (orientation: landscape) and (max-height: 500px),
+       (orientation: landscape) and (max-aspect-ratio: 4/3) {
   #rotate-to-portrait { display: flex; }
 }
 

@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=155">
+  <link rel="stylesheet" href="style.css?v=156">
 </head>
 <body>
-  <!-- Small-viewport landscape overlay. Displayed via CSS media query only
-       when width < 768 px AND orientation is landscape — i.e. a phone in
-       landscape, where BD's layout doesn't fit usefully. Hidden on desktop,
-       hidden on phone-portrait. -->
+  <!-- Small-viewport landscape overlay. Displayed via CSS media query on
+       (a) landscape + max-height 500px — phones in landscape, or
+       (b) landscape + aspect-ratio ≤ 4/3 — iPads in landscape.
+       BD's layout doesn't fit either usefully. Hidden on desktop and on
+       portrait orientation. -->
   <div id="rotate-to-portrait" role="dialog" aria-live="polite">
     <div>
       <div style="font-size:2rem;line-height:1;">↺</div>
-      <div style="margin-top:12px;">Please rotate your phone to portrait mode.</div>
+      <div style="margin-top:12px;">Please rotate your device to portrait mode.</div>
       <div style="margin-top:6px;font-size:0.85em;opacity:0.7;">Butterfly Dreaming needs the vertical space.</div>
     </div>
   </div>
