@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BD Speech Editor Prototype v0.1</title>
+  <style>
+    :root {
+      --bg:        #0a0a1a;
+      --panel:     #14142a;
+      --panel-2:   #1c1c38;
+      --border:    #2e2e50;
+      --text:      #e6e6f0;
+      --text-dim:  #9090a8;
+      --accent:    #a07820;
+      --accent-2:  #c9a227;
+      --ok:        #40c040;
+      --warn:      #e0a040;
+      --err:       #ff8080;
+      --listening: #d03030;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--text);
+      font-family: sans-serif; font-size: 14px;
+      height: 100%;
+    }
+    #app {
+      display: flex; flex-direction: column;
+      height: 100vh; gap: 6px; padding: 6px;
+    }
+    header {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; padding: 8px 10px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      font-size: 12px;
+    }
+    header label { color: var(--text-dim); margin-right: 4px; }
+    header select, header input[type="number"], header input[type="range"] {
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 3px 6px; font-size: 12px;
+    }
+    header .group {
+      display: flex; align-items: center; gap: 6px;
+      padding: 2px 8px; border-left: 1px solid var(--border);
+    }
+    header .group:first-child { border-left: none; padding-left: 0; }
+
+    #panes {
+      display: flex; gap: 6px; flex: 1 1 auto; min-height: 0;
+    }
+    .pane {
+      flex: 1 1 50%; display: flex; flex-direction: column;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; overflow: hidden;
+    }
+    .pane-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--text-dim);
+    }
+    .pane-head strong { color: var(--accent-2); font-size: 13px; letter-spacing: 0.05em; }
+    .pane-head select {
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 2px 6px; font-size: 11px; margin-left: auto;
+    }
+    .pane textarea {
+      flex: 1 1 auto; width: 100%;
+      background: #0f0f1e; color: var(--text);
+      border: none; padding: 10px;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 16px;         /* ≥16px so iOS Safari doesn't auto-zoom on focus */
+      line-height: 1.5;
+      resize: none; outline: none;
+    }
+    .pane textarea[readonly] { background: #0c0c18; color: #d0d0e0; }
+
+    #preview-pane {
+      flex: 0 0 auto; max-height: 25vh;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; padding: 8px 10px;
+      font-family: Georgia, serif; font-size: 14px; line-height: 1.5;
+      overflow: auto; color: var(--text);
+      display: none;
+    }
+    #preview-pane.active { display: block; }
+    #preview-pane .match { background: rgba(160, 120, 32, 0.35); border-radius: 2px; padding: 0 1px; }
+    #preview-pane .original { color: var(--text); }
+    #preview-pane .head { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+
+    #transcript-bar {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; padding: 6px 10px;
+      font-size: 12px; min-height: 46px;
+    }
+    #transcript-bar .row { display: flex; gap: 8px; }
+    #transcript-bar .label { color: var(--text-dim); flex: 0 0 60px; }
+    #transcript-bar .text { flex: 1; font-family: Georgia, serif; font-size: 14px; }
+    #interim-text { color: var(--text-dim); font-style: italic; }
+    #final-text { color: var(--text); }
+
+    #control-bar {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; padding: 8px 10px;
+      display: flex; gap: 10px; align-items: center;
+    }
+    #control-bar button {
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 8px 16px; font-size: 14px; cursor: pointer;
+      font-family: sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(255,255,255,0.15);
+    }
+    #control-bar button:hover:not(:disabled) { border-color: var(--accent); }
+    #control-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #mic-btn {
+      background: var(--accent) !important; color: #0a0a1a !important;
+      font-weight: bold; border-color: var(--accent) !important;
+      /* Enlarged 2026-08-12 to reduce hit-target misses reported when
+         users seemed to need "two taps" to start recording. */
+      min-width: 180px;
+      min-height: 44px;
+      padding: 10px 22px !important;
+      font-size: 15px !important;
+    }
+    #mic-btn.listening {
+      background: var(--listening) !important; color: #fff !important;
+      border-color: var(--listening) !important;
+    }
+    /* Persistent listening indicator — pulses red while recording so the
+       user is always sure whether their voice is being captured. Placed
+       inside #control-bar to the right of the mic button. */
+    #listen-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #333; flex: 0 0 auto;
+      transition: background 0.15s;
+    }
+    #listen-dot.active {
+      background: var(--listening);
+      animation: pulse 0.9s ease-in-out infinite;
+      box-shadow: 0 0 8px var(--listening);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.55; transform: scale(0.82); }
+    }
+    /* Live input-level meter — mapped from -60 dBFS (empty) to 0 dBFS
+       (full-scale). Bar changes colour as it climbs: green normal, amber
+       loud, red clipping so a glance tells you whether the mic is
+       hearing you and whether you're saturating it. */
+    #level-meter {
+      flex: 0 0 auto; width: 120px; height: 12px;
+      background: #14141c; border: 1px solid var(--border);
+      border-radius: 2px; overflow: hidden;
+      position: relative;
+    }
+    #level-meter .bar {
+      height: 100%; width: 0%;
+      background: var(--ok);
+      transition: width 60ms linear, background 120ms linear;
+    }
+    #level-meter .bar.mid  { background: var(--warn); }
+    #level-meter .bar.hot  { background: var(--err); }
+    #level-meter .tick     {
+      position: absolute; top: 0; bottom: 0; width: 1px;
+      background: rgba(255,255,255,0.15);
+    }
+    #level-numeric {
+      flex: 0 0 auto; font-family: 'SF Mono', 'Consolas', monospace;
+      font-size: 11px; color: var(--text-dim); min-width: 84px;
+    }
+    #status {
+      color: var(--text-dim); font-size: 12px;
+      margin-left: auto;
+    }
+    #status.err { color: var(--err); }
+    #status.ok  { color: var(--ok); }
+
+    #log-panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; padding: 6px 10px;
+      max-height: 18vh; overflow: auto;
+      font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px;
+      color: var(--text-dim);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    #log-panel .log-head {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: sans-serif; color: var(--text);
+      margin-bottom: 4px; padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    #log-panel .log-head button {
+      background: var(--panel-2); color: var(--text-dim);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 2px 8px; font-size: 11px; cursor: pointer;
+    }
+    #log-panel .entry { margin: 2px 0; }
+    #log-panel .entry.match { color: var(--accent-2); }
+    #log-panel .entry.err   { color: var(--err); }
+    #log-panel .entry.info  { color: var(--text-dim); }
+
+    /* Mobile stack: on narrow viewport, panes go vertical. */
+    @media (max-width: 767px) {
+      #panes { flex-direction: column; }
+      .pane  { flex: 1 1 auto; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="group">
+        <label>Engine</label>
+        <select id="engine-select">
+          <option value="whisper">Whisper (WASM/WebGPU)</option>
+          <!-- Future engines slot in here per §5.5 adapter contract. -->
+        </select>
+      </div>
+      <div class="group">
+        <label>Mode</label>
+        <select id="mode-select">
+          <option value="push">Push-to-talk</option>
+          <!-- Continuous later. -->
+        </select>
+      </div>
+      <div class="group">
+        <label>Bias</label>
+        <label style="color:var(--text)"><input type="checkbox" id="bias-source" checked> src</label>
+        <label style="color:var(--text)"><input type="checkbox" id="bias-dest" checked> dst</label>
+        <input type="number" id="bias-boost" min="0" max="10" step="0.5" value="5" title="Boost value (Web Speech API convention, 0–10, ~ln(prior))" style="width:52px;">
+      </div>
+      <div class="group">
+        <label>Splice</label>
+        <label style="color:var(--text)">minlen <input type="range" id="thr-minlen" min="1" max="10" step="1" value="3" style="width:70px;"> <span id="thr-minlen-val">3</span></label>
+        <label style="color:var(--text)">score <input type="range" id="thr-score" min="0" max="20" step="0.5" value="4" style="width:70px;"> <span id="thr-score-val">4</span></label>
+        <label style="color:var(--text)">phon <input type="range" id="thr-phon" min="0" max="1" step="0.1" value="0.6" style="width:60px;"> <span id="thr-phon-val">0.6</span></label>
+      </div>
+      <div class="group">
+        <label>Align</label>
+        <select id="align-mode">
+          <option value="keep">1 · Keep all</option>
+          <option value="mark">2 · Mark matches (preview)</option>
+          <option value="drop">3 · Drop matches (experimental)</option>
+        </select>
+      </div>
+      <div class="group">
+        <label style="color:var(--text)"><input type="checkbox" id="compression-toggle" checked title="On (default): mic runs through a DynamicsCompressor before Whisper. Off: raw mic, useful for A/B testing accuracy and hearing what the compressor is doing."> compression</label>
+      </div>
+    </header>
+
+    <div id="panes">
+      <div class="pane">
+        <div class="pane-head">
+          <strong>SOURCE</strong>
+          <span>(read-aloud from)</span>
+          <select id="corpus-select">
+            <option value="empty">— empty —</option>
+            <option value="fox">Pangram sample</option>
+            <option value="paste">Editable — paste your own</option>
+          </select>
+          <button id="paste-btn" type="button" style="margin-left:6px;background:var(--panel);color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer;" title="Try to read clipboard directly (may fail silently in some browsers — use ⌘V / long-press paste in the source pane instead)">Paste ↩</button>
+        </div>
+        <textarea id="source-pane" readonly placeholder="Load a corpus fragment via the selector above, or paste text here after removing the readonly attribute via DevTools during testing."></textarea>
+      </div>
+      <div class="pane">
+        <div class="pane-head">
+          <strong>DESTINATION</strong>
+          <span>(edit target)</span>
+        </div>
+        <textarea id="dest-pane" placeholder="Recognised speech lands here. Tap the mic and speak; release to transcribe."></textarea>
+      </div>
+    </div>
+
+    <div id="preview-pane">
+      <div class="head">Preview (Option 2 marking / Option 3 drop): matched spans against source</div>
+      <div id="preview-body"></div>
+    </div>
+
+    <div id="transcript-bar">
+      <div class="row"><span class="label">Interim:</span><span class="text" id="interim-text">—</span></div>
+      <div class="row"><span class="label">Final:</span><span class="text" id="final-text">—</span></div>
+      <div class="row"><span class="label">Mic:</span><span class="text" id="mic-report">—</span></div>
+    </div>
+
+    <div id="control-bar">
+      <button id="mic-btn" type="button" title="Press and hold to record; release to transcribe">🎤 Mic</button>
+      <div id="listen-dot" aria-hidden="true" title="Listening indicator (pulses red while capturing audio)"></div>
+      <div id="level-meter" title="Mic input level. Green normal, amber loud, red clipping. Should move while you speak."><div class="bar"></div><div class="tick" style="left:33%"></div><div class="tick" style="left:66%"></div></div>
+      <div id="level-numeric" title="Live peak dBFS. Should sit around -20 to -6 while speaking; -60 = silence; 0 = full-scale/clipping.">peak: —</div>
+      <button id="clear-dest-btn" type="button">Clear destination</button>
+      <button id="copy-src-to-dest-btn" type="button" title="Copy source pane text into destination">Copy →</button>
+      <button id="undo-btn" type="button" title="Undo last insertion (browser undo)">Undo</button>
+      <div id="status">initialising…</div>
+    </div>
+
+    <div id="log-panel">
+      <div class="log-head">
+        <span>Alignment log — every span the aligner would have matched (regardless of active mode) is recorded here.</span>
+        <button id="log-clear-btn" type="button">Clear</button>
+      </div>
+      <div id="log-body"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    'use strict';
+
+    // ── Small utilities ───────────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+
+    function setStatus(text, kind = '') {
+      const el = $('status');
+      el.textContent = text;
+      el.className = kind;
+    }
+
+    function logEntry(text, kind = 'info') {
+      const el = document.createElement('div');
+      el.className = 'entry ' + kind;
+      const ts = new Date();
+      const tsStr = [ts.getHours(), ts.getMinutes(), ts.getSeconds()]
+        .map(v => String(v).padStart(2, '0')).join(':');
+      el.textContent = `[${tsStr}] ${text}`;
+      const body = $('log-body');
+      body.appendChild(el);
+      body.parentElement.scrollTop = body.parentElement.scrollHeight;
+    }
+
+    // ── Bias-prompt builder (B1: Whisper prompt conditioning) ────────────
+    // Builds a short prime string from source + destination panes to feed
+    // to Whisper's decoder as `prompt_ids`. Whisper's decoder window caps
+    // prompt+output at ~448 tokens so we aim for ~200 tokens of prompt
+    // (~130 words at Whisper's BPE tokeniser).
+    //
+    // The builder identifies "tricky" words in the source that Whisper is
+    // most likely to get wrong (proper nouns, long uncommon words,
+    // hyphenated compounds) and boosts them by REPEATING them in the
+    // prompt — each repetition costs its own token slot but pushes
+    // Whisper's next-token distribution toward the tricky word. The bias
+    // slider maps to repetition count:
+    //   boost 1–3 → 1× (tricky words appear once like other vocab)
+    //   boost 4–6 → 2× (moderate priming)
+    //   boost 7–10 → 3× (strong priming, e.g. "huntsman huntsman huntsman")
+    //
+    // Returns { text, meta } where meta.tricky is the list of tricky words
+    // and meta.repetition is how many times each was included. The caller
+    // logs both so the user can see what's being primed.
+    const BIAS_COMMON_WORDS = new Set(
+      // ~200 most frequent English function + light content words. Anything
+      // NOT here counts as "distinctive" and is worth including in the prompt
+      // budget. Kept short by design — a 5000-word list would exclude too
+      // many legitimately tricky words like "huntsman" that are only rare
+      // relative to conversational speech.
+      ('the a an and or but if so as is was were been be am are has have had ' +
+       'do does did will would could should may might must can shall to of ' +
+       'in on at by for with from up out over under above below between ' +
+       'again then once all any some no not yes only own same other ' +
+       'i you he she it we they my your his her its our their me him us them ' +
+       'this that these those here there when where why how what who which while ' +
+       'about into onto upon through than though until after before because ' +
+       'one two three four five six seven eight nine ten hundred thousand ' +
+       'first last next new old good bad big little long short more most less least ' +
+       'like just now still ever even never also very too rather quite ' +
+       'day night morning evening year day time hour minute today yesterday ' +
+       'come go went gone see saw seen say said know knew known think thought ' +
+       'take took taken make made give gave given get got look looked ' +
+       'want wanted need needed use used find found feel felt work worked ' +
+       'call called seem seemed try tried ask asked leave left put ' +
+       'man woman child man men women people boy girl thing things ' +
+       'way ways part parts side sides place places case cases point points ' +
+       'life world hand head eye eyes face body foot feet water fire earth air ' +
+       'yes no okay ok').split(/\s+/)
+    );
+    const BIAS_MAX_TOKENS = 200;
+    const APPROX_TOKENS_PER_WORD = 1.4;   // Whisper's BPE, empirical average
+    const BIAS_MAX_WORDS = Math.floor(BIAS_MAX_TOKENS / APPROX_TOKENS_PER_WORD);  // ~142
+
+    function repetitionForBoost(boost) {
+      if (boost >= 7) return 3;
+      if (boost >= 4) return 2;
+      return 1;
+    }
+    function scoreTrickiness(surface, isMidSentenceCap, isCommon) {
+      let s = 0;
+      if (!isCommon)                      s += 1;   // distinctive
+      if (surface.length >= 8)            s += 1;   // long
+      if (surface.includes('-'))          s += 1;   // hyphenated compound
+      if (isMidSentenceCap)               s += 2;   // proper-noun signal
+      return s;
+    }
+
+    // Walk source text, return per-unique-word info:
+    //   surface (most-common capitalisation), isCommon, isMidSentenceCap,
+    //   score, count. Sentence starts inferred from previous token ending
+    //   with . ! or ?
+    function analyseSourceWords(text) {
+      const info = new Map();   // lc → { surface, isCommon, midCap, score, count }
+      let sentenceStart = true;
+      const tokRe = /\S+/g;
+      let m;
+      while ((m = tokRe.exec(text)) !== null) {
+        const raw   = m[0];
+        const clean = raw.replace(/^[^\w'-]+|[^\w'-]+$/g, '');  // strip surrounding punct
+        const lc    = clean.toLowerCase();
+        const trailingTerminator = /[.!?]$/.test(raw);
+        if (lc) {
+          const isCommon = BIAS_COMMON_WORDS.has(lc);
+          const isMidCap = !sentenceStart && /^[A-Z]/.test(clean);
+          let entry = info.get(lc);
+          if (!entry) {
+            entry = { surface: clean, isCommon, midCap: isMidCap, score: 0, count: 0 };
+            info.set(lc, entry);
+          }
+          entry.count++;
+          if (isMidCap) entry.midCap = true;
+          // Recompute score with observations to date
+          entry.score = scoreTrickiness(entry.surface, entry.midCap, entry.isCommon);
+        }
+        sentenceStart = trailingTerminator;
+      }
+      return info;
+    }
+
+    function buildBiasPrompt() {
+      const useSource = $('bias-source').checked;
+      const useDest   = $('bias-dest').checked;
+      const boost     = Number($('bias-boost').value);
+      if (boost <= 0) return { text: '', meta: null };
+      const parts = [];
+      if (useSource) parts.push(stripDirectiveBlocks($('source-pane').value));
+      if (useDest)   parts.push(stripDirectiveBlocks($('dest-pane').value));
+      const text = parts.join('\n').trim();
+      if (!text) return { text: '', meta: null };
+
+      const info = analyseSourceWords(text);
+      const rep  = repetitionForBoost(boost);
+      // Split unique words into three bands by score
+      const tricky      = [];  // score ≥ 2 (worth repeating)
+      const distinctive = [];  // score 1 (worth once)
+      // Iterate in insertion order (which is order-of-first-appearance
+      // in the source) so the prompt reads in a natural sequence.
+      for (const [lc, e] of info) {
+        if (e.isCommon) continue;
+        if (e.score >= 2) tricky.push(e.surface);
+        else              distinctive.push(e.surface);
+      }
+
+      // Approximate token accounting via word count. Priority order:
+      //   1. Tricky words × rep
+      //   2. Opening line(s) up to a third of budget
+      //   3. Remaining distinctive vocab
+      //   4. If STILL room: whole source (short-source path)
+      const wholeWordCount = text.split(/\s+/).length;
+      const shortSourcePath = wholeWordCount <= BIAS_MAX_WORDS - (tricky.length * rep);
+      const promptChunks = [];
+      let used = 0;
+
+      if (shortSourcePath) {
+        // Short source: include tricky words repeated, then the source verbatim.
+        // Repeating tricky words FIRST gives them a stronger prior even when
+        // the whole source is present.
+        const trickyRepeated = tricky.flatMap(w => Array(rep).fill(w));
+        if (trickyRepeated.length) {
+          promptChunks.push(trickyRepeated.join(' '));
+          used += trickyRepeated.length;
+        }
+        promptChunks.push(text);
+        return {
+          text: promptChunks.join('\n'),
+          meta: { tricky, rep, path: 'short' }
+        };
+      }
+
+      // Long source: budgeted.
+      const trickyRepeated = tricky.flatMap(w => Array(rep).fill(w));
+      if (trickyRepeated.length && used + trickyRepeated.length <= BIAS_MAX_WORDS) {
+        promptChunks.push(trickyRepeated.join(' '));
+        used += trickyRepeated.length;
+      }
+      // Opening lines up to a third of the remaining budget
+      const openingBudget = Math.floor(BIAS_MAX_WORDS / 3);
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      let openingUsed = 0;
+      for (const line of lines) {
+        const lw = line.split(/\s+/).length;
+        if (openingUsed + lw > openingBudget || used + lw > BIAS_MAX_WORDS) break;
+        promptChunks.push(line);
+        openingUsed += lw;
+        used += lw;
+      }
+      // Remaining budget → non-tricky distinctive vocab
+      for (const w of distinctive) {
+        if (used >= BIAS_MAX_WORDS) break;
+        promptChunks.push(w);
+        used++;
+      }
+      return {
+        text: promptChunks.join(' '),
+        meta: { tricky, rep, path: 'long' }
+      };
+    }
+
+    // ── Phonetic key (lightweight approximation of Double Metaphone) ──────
+    // Not a full DM — 30 lines vs 200. Handles the common recognition-error
+    // classes: silent letters, common consonant digraphs (th/ph/sh/ch/gh),
+    // vowel variance, doubled consonants. Good enough for the prototype's
+    // fuzzy-match; can be upgraded to full DM if false-positive rate hurts.
+    function phoneticKey(word) {
+      let w = (word || '').toLowerCase().replace(/[^a-z]/g, '');
+      if (!w) return '';
+      // Strip silent leading letters
+      w = w.replace(/^(kn|gn|pn|wr|ps)/, m => m[1]);
+      w = w.replace(/^x/, 's');
+      // Digraphs → single symbols (uppercase to avoid re-substitution)
+      w = w.replace(/ph/g, 'F');
+      w = w.replace(/th/g, '0');    // "0" for theta sound
+      w = w.replace(/sh/g, 'S');
+      w = w.replace(/ch/g, 'C');
+      w = w.replace(/[cq]k?/g, 'K');
+      w = w.replace(/gh/g, '');     // usually silent
+      w = w.replace(/wh/g, 'W');
+      // Collapse doubled letters
+      w = w.replace(/(.)\1+/g, '$1');
+      // Reduce vowels except leading
+      const leading = w[0] && /[aeiou]/.test(w[0]) ? w[0] : '';
+      w = leading + w.slice(leading ? 1 : 0).replace(/[aeiou]/g, '');
+      // Reduce y (semi-vowel)
+      w = w.replace(/y/g, '');
+      return w;
+    }
+
+    // ── Tokeniser ────────────────────────────────────────────────────────
+    // Returns [{surface, phon, start, end}] where start/end are char offsets
+    // in the original string. Used for both the source (indexed for search)
+    // and the utterance (aligned against source).
+    function tokenise(text) {
+      const tokens = [];
+      const re = /\b[\w']+\b/g;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const surface = m[0].toLowerCase();
+        // Skip anything inside a %%bd_ … %%bd_] block (D4) — treat those
+        // regions as non-matchable. Cheap heuristic: check for the marker
+        // on the same line and don't index the line's tokens.
+        tokens.push({
+          surface,
+          phon: phoneticKey(surface),
+          start: m.index,
+          end: m.index + m[0].length
+        });
+      }
+      return tokens;
+    }
+
+    // Strip %%bd_ …%%bd_] regions from a copy of the text for alignment
+    // purposes only (per §5.4 "Directive blocks are excluded from matching").
+    // The original text is preserved for display; we tokenise the stripped
+    // version and re-map offsets back through a lookup.
+    function stripDirectiveBlocks(text) {
+      let out = '';
+      let inBlock = false;
+      for (const line of text.split('\n')) {
+        if (/^%%bd_[\w]+\s*\[/.test(line)) { inBlock = true; out += '\n'; continue; }
+        if (/^%%bd_\]/.test(line))        { inBlock = false; out += '\n'; continue; }
+        if (inBlock)                      { out += '\n'; continue; }
+        if (/^%%bd_/.test(line))          { out += '\n'; continue; }
+        out += line + '\n';
+      }
+      return out;
+    }
+
+    // ── Local alignment (Smith-Waterman over tokens) ─────────────────────
+    // Scores: surface match = +2, phonetic match = +1, mismatch = -1,
+    // affine gap open = -2, gap extend = -1. Returns an array of matched
+    // spans in `a` (the utterance) with their positions in `b` (the source).
+    // Simple traceback finds one best span at a time, then masks it and
+    // repeats to catch multiple non-overlapping spans (a la BLAST).
+    function alignLocal(aToks, bToks, opts) {
+      const {
+        minLen        = 3,
+        minScore      = 4,
+        phonWeight    = 0.5,
+        matchScore    = 2,
+        mismatchScore = -1,
+        gapOpen       = -2,
+        gapExtend     = -1
+      } = opts || {};
+      const n = aToks.length, m = bToks.length;
+      if (!n || !m) return [];
+
+      // Score function between two tokens
+      function score(a, b) {
+        if (a.surface === b.surface) return matchScore;
+        if (a.phon && b.phon && a.phon === b.phon) {
+          return matchScore * phonWeight;   // partial credit for phonetic-only
+        }
+        return mismatchScore;
+      }
+
+      // DP matrix
+      const H = new Array(n + 1);
+      const traceback = new Array(n + 1);
+      for (let i = 0; i <= n; i++) {
+        H[i] = new Float32Array(m + 1);
+        traceback[i] = new Int8Array(m + 1);
+      }
+
+      const results = [];
+      const usedA = new Uint8Array(n);   // mark used token positions in `a`
+
+      // Iterate: find best span, record, mask, repeat until nothing over threshold.
+      for (let iter = 0; iter < 10; iter++) {
+        // Reset matrices
+        for (let i = 0; i <= n; i++) {
+          H[i].fill(0);
+          traceback[i].fill(0);
+        }
+        let bestScore = 0, bestI = 0, bestJ = 0;
+        for (let i = 1; i <= n; i++) {
+          if (usedA[i - 1]) continue;    // skip already-used utterance tokens
+          for (let j = 1; j <= m; j++) {
+            const diag = H[i - 1][j - 1] + score(aToks[i - 1], bToks[j - 1]);
+            const up   = H[i - 1][j] + (traceback[i - 1][j] === 2 ? gapExtend : gapOpen);
+            const left = H[i][j - 1] + (traceback[i][j - 1] === 3 ? gapExtend : gapOpen);
+            let best = 0, tb = 0;
+            if (diag > best) { best = diag; tb = 1; }
+            if (up   > best) { best = up;   tb = 2; }
+            if (left > best) { best = left; tb = 3; }
+            H[i][j] = best;
+            traceback[i][j] = tb;
+            if (best > bestScore) { bestScore = best; bestI = i; bestJ = j; }
+          }
+        }
+        if (bestScore < minScore) break;
+
+        // Traceback to find the span
+        let i = bestI, j = bestJ;
+        const aIdxs = [], bIdxs = [];
+        while (i > 0 && j > 0 && H[i][j] > 0) {
+          const tb = traceback[i][j];
+          if (tb === 1) { aIdxs.push(i - 1); bIdxs.push(j - 1); i--; j--; }
+          else if (tb === 2) { i--; }
+          else if (tb === 3) { j--; }
+          else break;
+        }
+        aIdxs.reverse(); bIdxs.reverse();
+        if (aIdxs.length < minLen) break;
+
+        // Mask these `a` tokens so the next iteration finds a different span
+        for (const k of aIdxs) usedA[k] = 1;
+
+        results.push({
+          aStart: aIdxs[0], aEnd: aIdxs[aIdxs.length - 1],
+          bStart: bIdxs[0], bEnd: bIdxs[bIdxs.length - 1],
+          score: bestScore,
+          length: aIdxs.length
+        });
+      }
+      return results;
+    }
+
+    // ── Engine adapter interface (§5.5) ──────────────────────────────────
+    // Any concrete engine must satisfy this shape; adapters are constructed
+    // by the App and swapped at runtime. `setPhrases` is a no-op on engines
+    // that don't support native biasing (WASM engines fall back to B2 post-
+    // hoc correction).
+    class EngineAdapter {
+      constructor() {}
+      async available() { return 'unavailable'; }
+      async install()   { return false; }
+      setPhrases(_entries) {}
+      async start()  { throw new Error('start() not implemented'); }
+      async stop()   { throw new Error('stop() not implemented'); }
+      // Callbacks (assign from outside)
+      onInterim(_text) {}
+      onFinal(_text, _confidence) {}
+      onError(_err)   {}
+    }
+
+    // ── Whisper via transformers.js ──────────────────────────────────────
+    // Push-to-talk: MediaRecorder captures a whole utterance, then Whisper
+    // transcribes the buffer in one go. WebGPU where available (iPhone 15+,
+    // iPad M-series, most desktops); WASM fallback via transformers.js
+    // internals. Model: whisper-tiny.en (~40 MB, English only, fast on iOS).
+    // Swap to whisper-base.en later for accuracy if latency permits.
+    class WhisperEngine extends EngineAdapter {
+      constructor() {
+        super();
+        this.pipeline   = null;
+        this.recorder   = null;
+        this.chunks     = [];
+        this.stream     = null;
+        this.loading    = false;
+        this.audioCtx   = null;
+        // Live input monitor
+        this.analyser   = null;
+        this.monitorSrc = null;
+        this.rafId      = null;
+        this.stats      = null;   // Accumulated during recording; reported on stop
+      }
+      // Additional callbacks the app can override
+      onLevel(_peak, _rms) {}          // called ~60×/s while recording, values in linear 0..1
+      onQualityReport(_report) {}      // called once when recording stops
+      async available() {
+        // Assume available; transformers.js loads on-demand.
+        // Real installation state resolves during install().
+        return this.pipeline ? 'available' : 'downloadable';
+      }
+      async install() {
+        if (this.pipeline) return true;
+        if (this.loading) return false;
+        this.loading = true;
+        // 2026-08-12 — upgraded from whisper-tiny.en (~40 MB) to
+        // whisper-base.en (~74 MB) for a notable accuracy bump on the
+        // corpus's literary/archaic register. Still cached by the browser
+        // after the first download, so it's one-time per browser.
+        setStatus('Loading Whisper base.en (~74 MB, one-time)…', '');
+        try {
+          const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');
+          const { pipeline, env } = mod;
+          // Cache model files in the browser between sessions.
+          env.allowLocalModels = false;
+          env.useBrowserCache  = true;
+          this.pipeline = await pipeline(
+            'automatic-speech-recognition',
+            'onnx-community/whisper-base.en',
+            { device: 'webgpu' }   // transformers.js falls back to wasm if webgpu unavailable
+          ).catch(async (e) => {
+            // WebGPU init can fail on Safari; retry with wasm explicitly.
+            console.warn('WebGPU pipeline failed, retrying with wasm:', e);
+            return pipeline(
+              'automatic-speech-recognition',
+              'onnx-community/whisper-base.en',
+              { device: 'wasm' }
+            );
+          });
+          setStatus('Whisper ready', 'ok');
+          logEntry(`Whisper loaded, backend: ${this.pipeline.model.session?.handler?.name || 'unknown'}`, 'info');
+          return true;
+        } catch (err) {
+          console.error('Whisper install failed', err);
+          setStatus('Whisper load failed: ' + err.message, 'err');
+          logEntry('install error: ' + err.message, 'err');
+          this.onError(err);
+          return false;
+        } finally {
+          this.loading = false;
+        }
+      }
+      async start() {
+        if (!this.pipeline) {
+          const ok = await this.install();
+          if (!ok) throw new Error('Whisper not available');
+        }
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,   // ask the browser to apply its own AGC first
+              sampleRate: 48000
+            }
+          });
+        } catch (err) {
+          setStatus('Microphone denied: ' + err.message, 'err');
+          this.onError(err);
+          throw err;
+        }
+        // Route mic through a Web Audio graph:
+        //   mediaStreamSource → DynamicsCompressor → gain → destination
+        // MediaRecorder then captures from the PROCESSED stream, so Whisper
+        // and the WAV path never see clipped audio even if the browser AGC
+        // has under-attenuated a loud input. Compressor is set with a soft
+        // knee at -12 dBFS and 4:1 ratio — inaudible on normal speech, only
+        // engages on peaks. Belt-and-braces: browser AGC + our compressor.
+        if (!this.audioCtx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          this.audioCtx = new Ctx();
+        }
+        // iOS Safari sometimes lands in suspended state; a mic press is a
+        // user gesture so resume() is allowed here.
+        if (this.audioCtx.state === 'suspended') {
+          try { await this.audioCtx.resume(); } catch (_) {}
+        }
+        this.graphSource     = this.audioCtx.createMediaStreamSource(this.stream);
+        this.makeupGain      = this.audioCtx.createGain();
+        this.makeupGain.gain.value = 1.0;   // leave at unity; can be raised later if quiet talkers need it
+        this.destNode        = this.audioCtx.createMediaStreamDestination();
+        // Compression toggle: when checked, insert a DynamicsCompressor
+        // between source and gain. When unchecked, the mic goes raw so the
+        // user can A/B compare (hearing Whisper's accuracy without any
+        // pre-processing). The state is snapshotted at start-of-recording;
+        // changing the checkbox mid-recording has no effect until next tap.
+        const compressionOn = document.getElementById('compression-toggle').checked;
+        this.compressor = null;
+        if (compressionOn) {
+          this.compressor = this.audioCtx.createDynamicsCompressor();
+          this.compressor.threshold.value = -12;
+          this.compressor.knee.value      = 6;
+          this.compressor.ratio.value     = 4;
+          this.compressor.attack.value    = 0.003;
+          this.compressor.release.value   = 0.10;
+          this.graphSource.connect(this.compressor);
+          this.compressor.connect(this.makeupGain);
+        } else {
+          this.graphSource.connect(this.makeupGain);
+        }
+        this.makeupGain.connect(this.destNode);
+        this.processedStream = this.destNode.stream;
+        logEntry(`recording start: compression=${compressionOn ? 'on' : 'off'}`, 'info');
+
+        this.chunks = [];
+        this.recorder = new MediaRecorder(this.processedStream);
+        this.recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) this.chunks.push(e.data);
+        };
+        this.recorder.onstop = async () => {
+          this._stopMonitor();
+          const report = this._finaliseReport();
+          try { this.onQualityReport(report); } catch (_) {}
+          // Release mic + audio graph FIRST so the browser's "mic in use"
+          // indicator disappears immediately. Whisper transcription can
+          // then take its time on the already-buffered chunks without the
+          // red bar hanging in Safari's tab strip.
+          this._disconnectGraph();
+          if (this.stream) {
+            for (const track of this.stream.getTracks()) track.stop();
+            this.stream = null;
+          }
+          await this._transcribeBuffered();
+        };
+        this._startMonitor();
+        this.recorder.start();
+      }
+      _disconnectGraph() {
+        try { this.graphSource && this.graphSource.disconnect(); } catch (_) {}
+        try { this.compressor && this.compressor.disconnect(); } catch (_) {}
+        try { this.makeupGain && this.makeupGain.disconnect(); } catch (_) {}
+        this.graphSource = this.compressor = this.makeupGain = this.destNode = this.processedStream = null;
+      }
+      _startMonitor() {
+        // Tap the POST-compressor node so the level meter + quality report
+        // reflect the signal MediaRecorder / Whisper actually get, not the
+        // raw pre-compression mic input. Otherwise the meter would still
+        // read HOT even when the compressor has knocked peaks down.
+        try {
+          this.analyser = this.audioCtx.createAnalyser();
+          this.analyser.fftSize = 2048;
+          this.analyser.smoothingTimeConstant = 0.1;
+          this.makeupGain.connect(this.analyser);
+          this.stats = {
+            frames: 0, silentFrames: 0, clipFrames: 0,
+            peakMax: 0, rmsSum: 0, startedAt: performance.now()
+          };
+          const buf = new Float32Array(this.analyser.fftSize);
+          const CLIP_THRESHOLD    = 0.99;
+          const SILENCE_THRESHOLD = 0.01;    // ~-40 dBFS
+          const loop = () => {
+            if (!this.analyser) return;
+            this.analyser.getFloatTimeDomainData(buf);
+            let sumSq = 0, peak = 0;
+            for (let i = 0; i < buf.length; i++) {
+              const v = buf[i];
+              sumSq += v * v;
+              const a = v < 0 ? -v : v;
+              if (a > peak) peak = a;
+            }
+            const rms = Math.sqrt(sumSq / buf.length);
+            this.stats.frames++;
+            this.stats.rmsSum += rms;
+            if (peak > this.stats.peakMax) this.stats.peakMax = peak;
+            if (peak >= CLIP_THRESHOLD)     this.stats.clipFrames++;
+            if (peak < SILENCE_THRESHOLD)   this.stats.silentFrames++;
+            try { this.onLevel(peak, rms); } catch (_) {}
+            this.rafId = requestAnimationFrame(loop);
+          };
+          this.rafId = requestAnimationFrame(loop);
+        } catch (err) {
+          console.warn('audio monitor failed to start', err);
+        }
+      }
+      _stopMonitor() {
+        if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
+        this.analyser = null;
+      }
+      _finaliseReport() {
+        const s = this.stats || {};
+        const durSec = ((performance.now() - (s.startedAt || performance.now())) / 1000);
+        const meanRms = s.frames ? (s.rmsSum / s.frames) : 0;
+        const toDb = (v) => v > 0 ? 20 * Math.log10(v) : -Infinity;
+        const peakDb  = toDb(s.peakMax || 0);
+        const meanDb  = toDb(meanRms);
+        const silentPct = s.frames ? (s.silentFrames / s.frames * 100) : 0;
+        const clipPct   = s.frames ? (s.clipFrames   / s.frames * 100) : 0;
+        // Quality verdict
+        let verdict = 'ok';
+        const warnings = [];
+        if (peakDb < -40) { verdict = 'bad';  warnings.push('very quiet — check mic permissions / distance'); }
+        else if (peakDb < -25) { verdict = 'weak'; warnings.push('quiet — speak closer or louder'); }
+        // Near-clipping headroom check: even without actual clip frames,
+        // a peak above -3 dB means the next louder syllable will saturate.
+        if (peakDb > -1)      { if (verdict === 'ok') verdict = 'hot'; warnings.push('very loud — samples on the edge of clipping'); }
+        else if (peakDb > -3) { if (verdict === 'ok') verdict = 'hot'; warnings.push('loud — reduce mic gain for headroom'); }
+        if (clipPct > 1)  { verdict = 'hot'; warnings.push(`${clipPct.toFixed(1)}% clipping — too loud / too close`); }
+        if (silentPct > 90) { verdict = 'bad'; warnings.push('almost entirely silent'); }
+        return { durSec, peakDb, meanDb, silentPct, clipPct, verdict, warnings };
+      }
+      async stop() {
+        if (this.recorder && this.recorder.state === 'recording') {
+          this.recorder.stop();
+        }
+      }
+      async _transcribeBuffered() {
+        if (!this.chunks.length) return;
+        setStatus('Transcribing…', '');
+        try {
+          const blob = new Blob(this.chunks, { type: this.recorder.mimeType || 'audio/webm' });
+          const audioData = await this._decodeToFloat32Mono16k(blob);
+
+          // Biasing prompt (B1 in the design doc). Loud diagnostics so we
+          // can see WHERE biasing dropped out when accuracy doesn't improve.
+          const generate_kwargs = {};
+          const srcOn   = document.getElementById('bias-source').checked;
+          const dstOn   = document.getElementById('bias-dest').checked;
+          const boost   = Number(document.getElementById('bias-boost').value);
+          const srcLen  = document.getElementById('source-pane').value.length;
+          const dstLen  = document.getElementById('dest-pane').value.length;
+          try {
+            const built = buildBiasPrompt();
+            const promptText = built.text;
+            const meta       = built.meta;
+            if (!promptText) {
+              logEntry(`bias off (src=${srcOn} dst=${dstOn} boost=${boost} srclen=${srcLen} dstlen=${dstLen})`, 'info');
+            } else {
+              const promptIds = await this._tokenisePrompt(promptText);
+              if (!promptIds || !promptIds.length) {
+                logEntry(`bias tokenise returned empty for prompt of ${promptText.length} chars — check console`, 'err');
+              } else {
+                generate_kwargs.prompt_ids = promptIds;
+                logEntry(`bias prompt: ${promptIds.length} tokens · path=${meta.path} · "${promptText.slice(0, 80).replace(/\s+/g, ' ')}${promptText.length > 80 ? '…' : ''}"`, 'info');
+                if (meta.tricky.length) {
+                  logEntry(`bias tricky ×${meta.rep}: ${meta.tricky.join(', ')}`, 'match');
+                }
+              }
+            }
+          } catch (bpErr) {
+            console.warn('bias prompt build/tokenise failed', bpErr);
+            logEntry('bias prompt error: ' + bpErr.message, 'err');
+          }
+
+          const t0 = performance.now();
+          const result = await this.pipeline(audioData, {
+            chunk_length_s: 30,
+            stride_length_s: 5,
+            return_timestamps: false,
+            generate_kwargs
+          });
+          const dt = ((performance.now() - t0) / 1000).toFixed(1);
+          const text = (result?.text || '').trim();
+          setStatus(`Transcribed in ${dt}s`, 'ok');
+          logEntry(`Whisper: "${text}" (${dt}s${generate_kwargs.prompt_ids ? ', biased' : ''})`, 'info');
+          this.onFinal(text, 1.0);
+        } catch (err) {
+          console.error('Whisper transcribe failed', err);
+          setStatus('Transcribe failed: ' + err.message, 'err');
+          this.onError(err);
+        }
+      }
+
+      // Tokenise a bias-prompt string via the loaded Whisper tokenizer.
+      // Returns an array of token IDs or null if the tokenizer isn't
+      // reachable in the expected shape. Whisper's decoder window caps
+      // total prompt+output at ~448 tokens, so we clamp the returned
+      // prompt to ~200 tokens to leave room for the transcription itself.
+      //
+      // transformers.js v3 tokenizers are callable — `tok(text, opts)`
+      // returns `{ input_ids: Tensor }`. `.encode(text)` also exists but
+      // signature differs from HF Python. Try callable first, fall back
+      // to encode, and log the shape we actually got for diagnosis.
+      async _tokenisePrompt(text) {
+        const tok = this.pipeline && this.pipeline.tokenizer;
+        if (!tok) {
+          logEntry('bias tokenise: pipeline.tokenizer is undefined', 'err');
+          return null;
+        }
+        let ids = null;
+        try {
+          // Prefer callable form (transformers.js standard)
+          if (typeof tok === 'function' || typeof tok.__call__ === 'function') {
+            const enc = await tok(' ' + text, { add_special_tokens: false });
+            // enc.input_ids is typically a Tensor with a .tolist() method
+            let raw = enc && (enc.input_ids || enc);
+            if (raw && typeof raw.tolist === 'function') {
+              const list = raw.tolist();
+              ids = Array.isArray(list[0]) ? list[0] : list;
+            } else if (raw && raw.data) {
+              ids = Array.from(raw.data);
+            } else if (Array.isArray(raw)) {
+              ids = raw;
+            } else {
+              logEntry('bias tokenise: unrecognised enc shape · ' + typeof raw, 'err');
+              return null;
+            }
+          } else if (typeof tok.encode === 'function') {
+            const enc = tok.encode(' ' + text);
+            ids = Array.isArray(enc) ? enc : (enc?.tolist ? enc.tolist() : Array.from(enc));
+          } else {
+            logEntry('bias tokenise: tokenizer has neither callable nor encode()', 'err');
+            return null;
+          }
+        } catch (e) {
+          console.warn('tokenizer call failed', e);
+          logEntry('bias tokenise threw: ' + e.message, 'err');
+          return null;
+        }
+        if (!ids || !ids.length) {
+          logEntry('bias tokenise: got zero tokens', 'err');
+          return null;
+        }
+        // Clamp to leading 200 tokens (leaves ~248 for the transcription).
+        const MAX_PROMPT_TOKENS = 200;
+        if (ids.length > MAX_PROMPT_TOKENS) ids = ids.slice(0, MAX_PROMPT_TOKENS);
+        return Array.from(ids, (v) => typeof v === 'bigint' ? Number(v) : Number(v));
+      }
+      async _decodeToFloat32Mono16k(blob) {
+        // Whisper expects mono 16-kHz Float32. Decode via a temporary
+        // AudioContext, downmix if stereo, and resample using
+        // OfflineAudioContext.
+        if (!this.audioCtx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          this.audioCtx = new Ctx();
+        }
+        const arrayBuffer = await blob.arrayBuffer();
+        const decoded = await this.audioCtx.decodeAudioData(arrayBuffer);
+        const targetRate = 16000;
+        const targetLen  = Math.ceil(decoded.duration * targetRate);
+        const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        const offline = new OfflineCtx(1, targetLen, targetRate);
+        const src = offline.createBufferSource();
+        src.buffer = decoded;
+        src.connect(offline.destination);
+        src.start(0);
+        const rendered = await offline.startRendering();
+        return rendered.getChannelData(0);
+      }
+    }
+
+    // ── App ──────────────────────────────────────────────────────────────
+    const engines = { whisper: new WhisperEngine() };
+    let engine = engines.whisper;
+
+    // Wire engine callbacks
+    engine.onInterim = (text) => { $('interim-text').textContent = text || '—'; };
+    engine.onError   = (err)  => {
+      logEntry('engine error: ' + (err?.message || err), 'err');
+      // On transcription failure, don't leave the button stuck in
+      // 'processing' — return to 'ready' so the user can try again.
+      if (micState === 'processing') { micState = 'ready'; refreshMicUI(); }
+    };
+    engine.onFinal   = (text) => {
+      $('final-text').textContent = text || '—';
+      $('interim-text').textContent = '—';
+      handleFinalTranscript(text);
+      // Transcription complete → un-freeze the button.
+      if (micState === 'processing') { micState = 'ready'; refreshMicUI(); }
+    };
+    // Live level meter: map linear peak (0..1) to dBFS then to bar width
+    // scaled from -60 → 0 dBFS. Colour bands: green under -12, amber
+    // -12→-3, red above -3 (near clipping).
+    engine.onLevel = (peak) => {
+      const dbfs = peak > 0 ? 20 * Math.log10(peak) : -60;
+      const pct = Math.max(0, Math.min(100, ((dbfs + 60) / 60) * 100));
+      const bar = $('level-meter').querySelector('.bar');
+      bar.style.width = pct + '%';
+      bar.classList.remove('mid', 'hot');
+      if (dbfs > -3)      bar.classList.add('hot');
+      else if (dbfs > -12) bar.classList.add('mid');
+      $('level-numeric').textContent = 'peak: ' + (dbfs > -60 ? dbfs.toFixed(1) : '−∞') + ' dB';
+    };
+    engine.onQualityReport = (r) => {
+      const line = `peak ${r.peakDb.toFixed(1)} dB · mean ${r.meanDb.toFixed(1)} dB · silence ${r.silentPct.toFixed(0)}% · clip ${r.clipPct.toFixed(1)}% · ${r.durSec.toFixed(1)}s`;
+      // Colour the verdict tag
+      const verdictColour = {
+        ok:   'var(--ok)',
+        weak: 'var(--warn)',
+        hot:  'var(--warn)',
+        bad:  'var(--err)'
+      }[r.verdict] || 'var(--text)';
+      const micEl = $('mic-report');
+      micEl.innerHTML = `<span style="color:${verdictColour};font-weight:bold;">${r.verdict.toUpperCase()}</span> — ${line}` +
+        (r.warnings.length ? ` <span style="color:var(--warn);">(${r.warnings.join('; ')})</span>` : '');
+      // Detailed line also in the log for later inspection
+      logEntry('mic ' + r.verdict + ': ' + line + (r.warnings.length ? ' [' + r.warnings.join('; ') + ']' : ''),
+               r.verdict === 'ok' ? 'info' : (r.verdict === 'bad' ? 'err' : 'match'));
+    };
+
+    // Threshold slider live-update
+    for (const id of ['minlen', 'score', 'phon']) {
+      $('thr-' + id).addEventListener('input', (e) => {
+        $('thr-' + id + '-val').textContent = e.target.value;
+      });
+    }
+
+    // Corpus loader
+    const SAMPLES = {
+      empty: '',
+      // Public-domain pangrams — safe placeholder text for aligner testing.
+      // Contains repeated common words to test false-positive behaviour on
+      // short spans (the `and the` failure mode called out in §5.4).
+      fox: [
+        'The quick brown fox jumps over the lazy dog.',
+        'A wizard was walking down the road when he met a farmer.',
+        'The farmer had a dog and the dog was old and the fox was young.',
+        'Now is the time for all good folk to come to the aid of the party.'
+      ].join('\n')
+    };
+    function loadCorpus(key) {
+      if (key === 'paste') {
+        // Simpler / more reliable than navigator.clipboard.readText():
+        // just enable the pane and let the user paste with their normal
+        // gesture (⌘V, right-click, long-press). Clipboard API often fails
+        // silently when the trigger isn't an obvious button click.
+        const ta = $('source-pane');
+        ta.removeAttribute('readonly');
+        ta.value = '';
+        ta.placeholder = 'Paste text here (⌘V / long-press).';
+        ta.focus();
+        setStatus('Source pane editable — paste your text with ⌘V / long-press.', 'ok');
+        return;
+      }
+      $('source-pane').setAttribute('readonly', 'true');
+      $('source-pane').value = SAMPLES[key] || '';
+    }
+    $('corpus-select').addEventListener('change', (e) => loadCorpus(e.target.value));
+
+    // Dedicated Paste button — invoked directly by a click, which is a
+    // proper user gesture, so navigator.clipboard.readText() has the best
+    // chance of succeeding. Falls back to editable-pane if the API rejects.
+    $('paste-btn').addEventListener('click', async () => {
+      const ta = $('source-pane');
+      ta.removeAttribute('readonly');
+      try {
+        const clip = await navigator.clipboard.readText();
+        if (clip) {
+          ta.value = clip;
+          setStatus(`Pasted ${clip.length} chars from clipboard.`, 'ok');
+          return;
+        }
+      } catch (err) {
+        // Fall through to manual-paste fallback
+        setStatus('Clipboard API blocked — paste manually into source pane (⌘V).', 'warn');
+      }
+      ta.value = '';
+      ta.placeholder = 'Paste text here (⌘V / long-press).';
+      ta.focus();
+    });
+
+    // Mic button state machine. Explicit two-step flow per user request:
+    //   1. loading         — model downloading (disabled, greyed)
+    //   2. need-permission — model ready, button reads "Use Speech" (blue).
+    //                        One click → browser permission prompt.
+    //   3. ready           — permission granted, button reads "Hold to
+    //                        Record" (amber, focused, ready). One
+    //                        press-and-hold → immediate recording.
+    //   4. recording       — pulsing red, "Recording…"
+    //   5. processing      — hold released, awaiting Whisper transcription.
+    //                        Amber-dimmed, "Transcribing…", disabled.
+    //                        Returns to 'ready' when engine.onFinal fires.
+    //   6. error           — "Retry", tap to re-run boot
+    let micState = 'loading';
+    let recording = false;
+    const micBtn = $('mic-btn');
+
+    function refreshMicUI() {
+      micBtn.disabled = false;
+      micBtn.classList.remove('listening');
+      micBtn.style.background = '';
+      micBtn.style.borderColor = '';
+      micBtn.style.color = '';
+      switch (micState) {
+        case 'loading':
+          micBtn.disabled = true;
+          micBtn.textContent = 'Loading…';
+          break;
+        case 'need-permission':
+          micBtn.textContent = 'Use Speech';
+          micBtn.style.background = '#4080ff';
+          micBtn.style.borderColor = '#4080ff';
+          micBtn.style.color = '#ffffff';
+          break;
+        case 'ready':
+          // Amber default via CSS (#mic-btn class rules)
+          micBtn.textContent = '🎤 Hold to Record';
+          break;
+        case 'recording':
+          micBtn.classList.add('listening');
+          micBtn.textContent = '🎤 Recording…';
+          break;
+        case 'processing':
+          micBtn.disabled = true;
+          micBtn.textContent = '🎤 Transcribing…';
+          micBtn.style.opacity = '0.65';
+          break;
+        case 'error':
+          micBtn.textContent = 'Retry';
+          break;
+      }
+      // Clear the opacity applied by 'processing' when leaving it
+      if (micState !== 'processing') micBtn.style.opacity = '';
+      // Keep focus on the mic button across every state change, unless
+      // the user is actively editing a text field. Deferred to next
+      // animation frame — calling focus() synchronously inside the same
+      // handler that triggered the state change (e.g. click → focus →
+      // more click routing) has been observed to leave the browser in a
+      // half-focused state where the very next pointerdown doesn't fire
+      // as expected. rAF-deferring gives layout/paint a chance to settle.
+      if (micState !== 'loading') {
+        const active = document.activeElement;
+        const isEditing = active && (
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable
+        );
+        if (!isEditing) {
+          requestAnimationFrame(() => micBtn.focus());
+        }
+      }
+    }
+
+    async function grantMicPermission() {
+      setStatus('Requesting microphone permission…', '');
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release immediately — we only needed the permission grant.
+        // Subsequent recordings will re-open the mic without prompting.
+        for (const t of s.getTracks()) t.stop();
+        micState = 'ready';
+        refreshMicUI();
+        // Focus so the next press-and-hold is the ONLY action needed —
+        // no preliminary click to focus. Also makes Space bar work as
+        // press-and-hold via the keydown/keyup handlers below.
+        micBtn.focus();
+        setStatus('Ready — press and hold "Hold to Record" to speak.', 'ok');
+        logEntry('microphone permission granted', 'info');
+      } catch (err) {
+        micState = 'error';
+        refreshMicUI();
+        setStatus('Microphone permission denied: ' + err.message, 'err');
+        logEntry('mic permission denied: ' + err.message, 'err');
+      }
+    }
+
+    // Recording lifecycle. The `recording` flag flips synchronously on
+    // pointerdown so an immediately-following pointerup can see it —
+    // engine.start() takes ~200 ms (getUserMedia + graph build) and if
+    // the flag isn't already true when release fires, the release is
+    // ignored and the mic gets stuck open.  Reciprocally: if the user
+    // released BEFORE start() finished, we call stop() immediately after.
+    async function startRecording() {
+      if (recording || micState !== 'ready') return;
+      recording  = true;
+      micState   = 'recording';
+      refreshMicUI();
+      $('listen-dot').classList.add('active');
+      try {
+        await engine.start();
+        // Check whether the user released while start() was still awaiting.
+        if (!recording) {
+          await engine.stop();
+        }
+      } catch (err) {
+        recording = false;
+        micState  = 'ready';
+        refreshMicUI();
+        $('listen-dot').classList.remove('active');
+      }
+    }
+    async function stopRecording() {
+      if (!recording) return;
+      recording = false;
+      // Move to 'processing' so the button visibly shows "Transcribing…"
+      // between finger-release and Whisper delivering the text. The state
+      // returns to 'ready' inside engine.onFinal below.
+      micState  = 'processing';
+      refreshMicUI();
+      $('listen-dot').classList.remove('active');
+      const bar = $('level-meter').querySelector('.bar');
+      bar.style.width = '0%';
+      bar.classList.remove('mid', 'hot');
+      $('level-numeric').textContent = 'peak: —';
+      try { await engine.stop(); } catch (_) {}
+    }
+
+    // Button click routing per current state. Pointerdown is the primary
+    // path. We DO NOT preventDefault — doing so blocked native focus-on-
+    // click and required every following click to first re-focus the
+    // button (the "needs two clicks" bug the user reported). Click is a
+    // belt-and-braces backup guarded by a recent-action timestamp so it
+    // doesn't double-fire when pointerdown already handled the same tap.
+    let holdStarted = false;
+    let recentPointerAction = 0;
+    // Temporary diagnostic logging — remove once first-hold reliably works.
+    const T0 = performance.now();
+    const ev = (name, extra) => {
+      const t = (performance.now() - T0).toFixed(0);
+      console.log(`[mic ${name}] t=${t}ms state=${micState}${extra ? ' ' + extra : ''}`);
+    };
+    const tgtDesc = (e) => `target=${e.target && e.target.tagName}#${e.target && e.target.id}`;
+    micBtn.addEventListener('pointerdown', (e) => {
+      ev('pointerdown', `${tgtDesc(e)} active=${document.activeElement && document.activeElement.tagName}#${document.activeElement && document.activeElement.id}`);
+      if (micState === 'loading') return;
+      recentPointerAction = Date.now();
+      if (micState === 'need-permission') {
+        grantMicPermission();
+        return;
+      }
+      if (micState === 'error') {
+        boot();
+        return;
+      }
+      if (micState === 'ready') {
+        holdStarted = true;
+        try { micBtn.setPointerCapture(e.pointerId); } catch (_) {}
+        startRecording();
+      }
+    });
+    micBtn.addEventListener('pointerup', (e) => {
+      ev('pointerup', `${tgtDesc(e)} holdStarted=${holdStarted} recording=${recording}`);
+      if (holdStarted) { holdStarted = false; stopRecording(); }
+    });
+    micBtn.addEventListener('pointercancel', (e) => {
+      ev('pointercancel', `${tgtDesc(e)} holdStarted=${holdStarted}`);
+      if (holdStarted) { holdStarted = false; stopRecording(); }
+    });
+    micBtn.addEventListener('click', (e) => {
+      ev('click', `${tgtDesc(e)} sinceDown=${Date.now() - recentPointerAction}ms`);
+      if (Date.now() - recentPointerAction < 500) return;
+      if (micState === 'need-permission') { grantMicPermission(); return; }
+      if (micState === 'error')           { boot(); return; }
+    });
+    micBtn.addEventListener('focus', () => ev('focus'));
+    micBtn.addEventListener('blur',  () => ev('blur'));
+    // Page-wide click logger — surfaces clicks that landed ANYWHERE else,
+    // so if a "missing first tap" is really a missed hit-target, we see it.
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target === micBtn) return;   // already logged above
+      const t = (performance.now() - T0).toFixed(0);
+      const rect = micBtn.getBoundingClientRect();
+      const dxCentre = Math.round(e.clientX - (rect.left + rect.width / 2));
+      const dyCentre = Math.round(e.clientY - (rect.top + rect.height / 2));
+      console.log(`[page pd] t=${t}ms target=${e.target && e.target.tagName}#${e.target && e.target.id || ''}.${e.target && e.target.className || ''} at (${e.clientX},${e.clientY}) micBtn Δ=(${dxCentre},${dyCentre})`);
+    }, true);   // capture phase so nothing swallows it
+    // Keyboard accessibility: Space / Enter on a focused button acts as
+    // click; browser fires a plain click event, no pointerdown. Handle it.
+    micBtn.addEventListener('keydown', (e) => {
+      if (micState !== 'ready') return;
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!recording) startRecording();
+      }
+    });
+    micBtn.addEventListener('keyup', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        if (recording) stopRecording();
+      }
+    });
+    // pointerup / pointercancel wired above in the diagnostic block.
+    // pointerleave intentionally NOT wired — setPointerCapture keeps
+    // events flowing to the button even when the finger drifts off it.
+
+    // Handle a finalised transcript from the engine
+    function handleFinalTranscript(text) {
+      if (!text) return;
+      const alignMode = $('align-mode').value;
+
+      // Compute alignment regardless of mode, so we log "would-have-matched"
+      // spans per §5.3 (decide from data, not intuition).
+      const srcText = stripDirectiveBlocks($('source-pane').value);
+      const uttTokens = tokenise(text);
+      const srcTokens = tokenise(srcText);
+      const opts = {
+        minLen:     Number($('thr-minlen').value),
+        minScore:   Number($('thr-score').value),
+        phonWeight: Number($('thr-phon').value)
+      };
+      const matches = alignLocal(uttTokens, srcTokens, opts);
+
+      // Log every match the aligner found, whether or not the current mode
+      // will act on it.
+      if (matches.length) {
+        for (const m of matches) {
+          const aWords = uttTokens.slice(m.aStart, m.aEnd + 1).map(t => t.surface).join(' ');
+          const bWords = srcTokens.slice(m.bStart, m.bEnd + 1).map(t => t.surface).join(' ');
+          logEntry(`match len=${m.length} score=${m.score.toFixed(1)}  utt:"${aWords}"  src:"${bWords}"`, 'match');
+        }
+      } else {
+        logEntry(`no matches for utterance (${uttTokens.length} tokens)`, 'info');
+      }
+
+      // Apply the active mode
+      let toInsert = text;
+      if (alignMode === 'drop' && matches.length) {
+        toInsert = buildTextWithMatchesRemoved(text, uttTokens, matches);
+      }
+      insertAtCursor($('dest-pane'), toInsert.trim() + ' ');
+
+      // Preview pane for mode 2 (mark) and mode 3 (drop)
+      const preview = $('preview-pane');
+      const body = $('preview-body');
+      if ((alignMode === 'mark' || alignMode === 'drop') && matches.length) {
+        preview.classList.add('active');
+        body.innerHTML = buildMarkedPreviewHtml(text, uttTokens, matches, alignMode);
+      } else {
+        preview.classList.remove('active');
+        body.innerHTML = '';
+      }
+    }
+
+    function insertAtCursor(ta, text) {
+      // setRangeText preserves the native undo stack (D5).
+      // Selection UX (added by user request): the newly-inserted text is
+      // auto-selected so a single Delete keystroke removes the whole
+      // recognition if the user wants to redo. Before inserting, if a
+      // selection is already active (usually our previous auto-selection),
+      // collapse it to its END so the new text APPENDS after it rather
+      // than replacing it — both recognitions are kept, only the newest
+      // is selected. To explicitly replace the previous recognition,
+      // press Delete first.
+      ta.focus();
+      if (ta.selectionStart !== ta.selectionEnd) {
+        ta.setSelectionRange(ta.selectionEnd, ta.selectionEnd);
+      }
+      const start = ta.selectionStart, end = ta.selectionEnd;
+      ta.setRangeText(text, start, end, 'select');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function buildTextWithMatchesRemoved(text, uttTokens, matches) {
+      // Zero out matched token character ranges in the utterance.
+      const marks = new Uint8Array(text.length);
+      for (const m of matches) {
+        for (let i = m.aStart; i <= m.aEnd; i++) {
+          const t = uttTokens[i];
+          for (let k = t.start; k < t.end; k++) marks[k] = 1;
+        }
+      }
+      let out = '';
+      for (let i = 0; i < text.length; i++) if (!marks[i]) out += text[i];
+      return out.replace(/\s+/g, ' ').trim();
+    }
+
+    function buildMarkedPreviewHtml(text, uttTokens, matches, alignMode) {
+      const marks = new Uint8Array(text.length);
+      for (const m of matches) {
+        for (let i = m.aStart; i <= m.aEnd; i++) {
+          const t = uttTokens[i];
+          for (let k = t.start; k < t.end; k++) marks[k] = 1;
+        }
+      }
+      const escape = (s) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      let html = '', cur = 0, inMatch = false;
+      const openMatch  = alignMode === 'drop'
+        ? '<span class="match" style="text-decoration:line-through;opacity:0.5;">'
+        : '<span class="match">';
+      for (let i = 0; i < text.length; i++) {
+        const now = marks[i] === 1;
+        if (now !== inMatch) {
+          if (i > cur) html += (inMatch ? '' : '<span class="original">') + escape(text.slice(cur, i)) + (inMatch ? '</span>' : '</span>');
+          cur = i;
+          html += now ? openMatch : '<span class="original">';
+          inMatch = now;
+        }
+      }
+      html += escape(text.slice(cur)) + '</span>';
+      return html;
+    }
+
+    // Utility buttons
+    $('clear-dest-btn').addEventListener('click', () => {
+      $('dest-pane').focus();
+      $('dest-pane').setRangeText('', 0, $('dest-pane').value.length, 'end');
+    });
+    $('copy-src-to-dest-btn').addEventListener('click', () => {
+      const src = $('source-pane').value;
+      insertAtCursor($('dest-pane'), src);
+    });
+    $('undo-btn').addEventListener('click', () => {
+      $('dest-pane').focus();
+      document.execCommand('undo');
+    });
+    $('log-clear-btn').addEventListener('click', () => { $('log-body').innerHTML = ''; });
+
+    // Boot: log environment, then eagerly load Whisper so the user isn't
+    // waiting the first time they tap the mic. When BD-integrated later,
+    // this call could be deferred (guarded by e.g. a "load-on-demand"
+    // flag) since Whisper's 74 MB weight isn't free on cellular.
+    async function boot() {
+      logEntry('BD Speech Editor v0.1 booted', 'info');
+      logEntry(`UA: ${navigator.userAgent}`, 'info');
+      const hasGetUM = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      const hasMR    = typeof MediaRecorder !== 'undefined';
+      const hasWebGPU = 'gpu' in navigator;
+      logEntry(`features: getUserMedia=${hasGetUM} MediaRecorder=${hasMR} WebGPU=${hasWebGPU}`, 'info');
+      if (!hasGetUM || !hasMR) {
+        micState = 'error';
+        refreshMicUI();
+        setStatus('This browser lacks microphone or MediaRecorder support.', 'err');
+        return;
+      }
+      micState = 'loading';
+      refreshMicUI();
+      const ok = await engine.install();
+      if (!ok) {
+        micState = 'error';
+        refreshMicUI();
+        return;   // status already set by engine.install() on failure
+      }
+      micState = 'need-permission';
+      refreshMicUI();
+      // Focus the "Use Speech" button so keyboard users can press Space
+      // to trigger the permission grant, and so first-time users see a
+      // visible focus ring guiding them to the entry point.
+      micBtn.focus();
+      setStatus('Model loaded. Click "Use Speech" to enable the microphone.', 'ok');
+    }
+    boot();
+  </script>
+</body>
+</html>
