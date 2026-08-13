@@ -180,14 +180,20 @@ The last principle is the anchor: quotes/wraps/marks accumulate; content doesn't
 
 ## 9. Boot & UX flow
 
+Three-state hybrid model (settled 2026-08-13 after several iterations):
+
 1. Page loads → button disabled, greyed **"Loading…"**. Whisper base.en (~74 MB, one-time) starts downloading.
-2. Model ready → button blue, focused, labelled **"Use Speech"**. Status: `Model loaded. Click "Use Speech" to enable the microphone.`
-3. Click Use Speech → browser permission prompt → grant → button turns amber, focused, labelled **"🎤 Hold to Record"**. Multiple `focus()` calls across a few frames to survive the modal permission dialog.
-4. Press and hold → immediately red **"🎤 Recording…"** with pulsing indicator. `recording` flag flips synchronously so an immediately-following release is captured (fixes the "needs two clicks" race).
-5. Release → button dims to **"🎤 Transcribing…"** (disabled) while Whisper runs on the captured PCM. `setPointerCapture` prevents finger-drift cancellations.
+2. Model ready → button blue, focused, labelled **"Use Mic"**. Status: `Model loaded. Click "Use Mic" to enable the microphone.`
+3. **Single click on Use Mic** → browser permission prompt → grant → `useMic` flag set true, button turns amber labelled **"🎤 Press to Record"**, focused.
+4. **Press and hold** on Press to Record → button turns red **"🎤 Recording…"** with pulsing level indicator. `recording` flag flips synchronously; `setPointerCapture` prevents finger-drift cancellations.
+5. **Release** → button dims to **"🎤 Transcribing…"** (disabled) while Whisper runs on the captured PCM. Mic is released immediately so the browser's "in use" indicator disappears.
 6. Transcription done → button returns to armed amber; recognised text (with §5/§6 markup) lands in the destination, auto-selected.
 
-Backup click handler and rAF-deferred focus present as belt-and-braces for weak-battery Bluetooth mice and Safari's occasional pointerdown-drop after modal dialogs.
+**Event routing:** state 1 (Use Mic) uses `click`; states 3–4 (record/stop) use `pointerdown`/`pointerup` for natural press-and-hold. The two event families never overlap on the same state so Safari can't confuse them.
+
+**Stale-event guard:** every pointer/click event compares `performance.now() - event.timeStamp` against a 500 ms threshold. Safari holds pointer events behind modal permission dialogs and dispatches them all when the dialog closes; the queued events carry old timestamps and are dropped silently (`[mic pointerdown-STALE age=Xms — dropped]` in the console log). This eliminated the "needs two clicks" pattern that had plagued this UI across multiple redesign attempts.
+
+**Focus restoration:** `window.focus` and `document.visibilitychange` handlers re-focus the mic button when tab regains focus and state is armed for a user gesture, so keyboard Space still fires the button.
 
 ---
 

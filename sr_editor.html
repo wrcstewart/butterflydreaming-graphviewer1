@@ -68,10 +68,11 @@
       font-size: 12px; color: var(--text-dim);
     }
     .pane-head strong { color: var(--accent-2); font-size: 13px; letter-spacing: 0.05em; }
-    /* Canary — RGB rotation (feedback_canary_rotation). Currently GREEN
-       (ins-wrap now embeds em-dashes inside {?} so they survive Accept,
-       2026-08-13); next rotation = blue. */
-    #source-pane-label { background: #40c040; color: #fff; padding: 2px 8px; border-radius: 3px; }
+    /* Canary — RGB rotation (feedback_canary_rotation). Currently BLUE
+       (three-state hybrid: click to grant mic, press-and-hold to record;
+       stale-event guard via timeStamp filters Safari's queued events,
+       2026-08-13); next rotation = red. */
+    #source-pane-label { background: #4080ff; color: #fff; padding: 2px 8px; border-radius: 3px; }
     .pane-head select {
       background: var(--panel); color: var(--text);
       border: 1px solid var(--border); border-radius: 3px;
@@ -1504,20 +1505,30 @@
       ta.focus();
     });
 
-    // Mic button state machine. Explicit two-step flow per user request:
-    //   1. loading         — model downloading (disabled, greyed)
-    //   2. need-permission — model ready, button reads "Use Speech" (blue).
-    //                        One click → browser permission prompt.
-    //   3. ready           — permission granted, button reads "Hold to
-    //                        Record" (amber, focused, ready). One
-    //                        press-and-hold → immediate recording.
-    //   4. recording       — pulsing red, "Recording…"
-    //   5. processing      — hold released, awaiting Whisper transcription.
-    //                        Amber-dimmed, "Transcribing…", disabled.
-    //                        Returns to 'ready' when engine.onFinal fires.
-    //   6. error           — "Retry", tap to re-run boot
+    // Mic button — THREE-STATE HYBRID model (2026-08-13 per user):
+    //   1. loading         — model downloading (disabled)
+    //   2. need-permission — blue "Use Mic". Single CLICK → permission
+    //                        prompt; on grant → useMic flag true, state
+    //                        becomes 'ready'.
+    //   3. ready           — amber "Press to Record". PRESS AND HOLD →
+    //                        recording. Release → stop and transcribe.
+    //   4. recording       — red "Recording…". Release → stop.
+    //   5. processing      — dimmed "Transcribing…" (disabled).
+    //   6. error           — "Retry".
+    //
+    // State 1 uses click (single-tap). States 3/4 use pointerdown/up
+    // (press-and-hold, natural mapping of "press to record").
+    //
+    // Safari-queued-event defence: every pointer event is checked for
+    // staleness via event.timeStamp. Real user events have timestamps
+    // within a few ms of performance.now(); Safari's queued events (held
+    // behind the permission modal) have timestamps SECONDS older —
+    // we drop those silently.
+    const STALE_EVENT_MS = 500;
     let micState = 'loading';
+    let useMic   = false;
     let recording = false;
+    let holdStarted = false;
     const micBtn = $('mic-btn');
 
     function refreshMicUI() {
@@ -1532,14 +1543,13 @@
           micBtn.textContent = 'Loading…';
           break;
         case 'need-permission':
-          micBtn.textContent = 'Use Speech';
+          micBtn.textContent = 'Use Mic';
           micBtn.style.background = '#4080ff';
           micBtn.style.borderColor = '#4080ff';
           micBtn.style.color = '#ffffff';
           break;
         case 'ready':
-          // Amber default via CSS (#mic-btn class rules)
-          micBtn.textContent = '🎤 Hold to Record';
+          micBtn.textContent = '🎤 Press to Record';
           break;
         case 'recording':
           micBtn.classList.add('listening');
@@ -1554,7 +1564,6 @@
           micBtn.textContent = 'Retry';
           break;
       }
-      // Clear the opacity applied by 'processing' when leaving it
       if (micState !== 'processing') micBtn.style.opacity = '';
       // Keep focus on the mic button across every state change, unless
       // the user is actively editing a text field. Deferred to next
@@ -1579,21 +1588,15 @@
       setStatus('Requesting microphone permission…', '');
       try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Release immediately — we only needed the permission grant.
-        // Subsequent recordings will re-open the mic without prompting.
+        // Release immediately — subsequent getUserMedia calls won't prompt
+        // because permission is now sticky for the origin.
         for (const t of s.getTracks()) t.stop();
+        useMic = true;
         micState = 'ready';
         refreshMicUI();
-        // Focus hardening: browsers sometimes "steal" focus for a beat
-        // after a modal permission dialog closes. Call focus() multiple
-        // times across a few animation frames to catch whichever tick
-        // the browser is ready to accept it on.
         micBtn.focus();
-        requestAnimationFrame(() => micBtn.focus());
-        setTimeout(() => micBtn.focus(), 100);
-        setTimeout(() => micBtn.focus(), 250);
-        setStatus('Ready — press and hold "Hold to Record" to speak.', 'ok');
-        logEntry('microphone permission granted — focused mic button', 'info');
+        setStatus('Ready — press Mic to record, press again to stop.', 'ok');
+        logEntry('microphone permission granted · useMic=true', 'info');
       } catch (err) {
         micState = 'error';
         refreshMicUI();
@@ -1602,31 +1605,23 @@
       }
     }
 
-    // Focus restoration: whenever the tab regains focus or becomes
-    // visible again, if we're in a state where the mic button is the
-    // user's next likely action, put focus back on it. Handles the
-    // "click, then permission dialog, then focus went to the browser
-    // chrome / body somewhere" pattern that has been intermittent.
-    window.addEventListener('focus', () => {
-      if ((micState === 'ready' || micState === 'need-permission') &&
-          document.activeElement !== micBtn) {
-        micBtn.focus();
-      }
-    });
+    // Focus restoration on tab regain so keyboard Space still fires the
+    // button when appropriate.
+    function reFocusIfArmed() {
+      const armed = (micState === 'need-permission' || micState === 'ready');
+      if (armed && document.activeElement !== micBtn) micBtn.focus();
+    }
+    window.addEventListener('focus', reFocusIfArmed);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' &&
-          (micState === 'ready' || micState === 'need-permission') &&
-          document.activeElement !== micBtn) {
-        micBtn.focus();
-      }
+      if (document.visibilityState === 'visible') reFocusIfArmed();
     });
 
-    // Recording lifecycle. The `recording` flag flips synchronously on
-    // pointerdown so an immediately-following pointerup can see it —
-    // engine.start() takes ~200 ms (getUserMedia + graph build) and if
-    // the flag isn't already true when release fires, the release is
-    // ignored and the mic gets stuck open.  Reciprocally: if the user
-    // released BEFORE start() finished, we call stop() immediately after.
+    // Recording lifecycle — click-to-toggle. startRecording() sets state
+    // to 'recording' synchronously (button turns red immediately even
+    // while engine.start()'s getUserMedia is awaiting). If the user
+    // clicks again to stop before start() finishes (unusual — takes
+    // ~200 ms), stopRecording() has already fired stop() which no-ops
+    // if the recorder hasn't been created yet; we recover cleanly.
     async function startRecording() {
       if (recording || micState !== 'ready') return;
       recording  = true;
@@ -1635,7 +1630,8 @@
       $('listen-dot').classList.add('active');
       try {
         await engine.start();
-        // Check whether the user released while start() was still awaiting.
+        // If user already clicked to stop while start was awaiting,
+        // recording will be false — bring the engine down cleanly.
         if (!recording) {
           await engine.stop();
         }
@@ -1668,76 +1664,69 @@
     // button (the "needs two clicks" bug the user reported). Click is a
     // belt-and-braces backup guarded by a recent-action timestamp so it
     // doesn't double-fire when pointerdown already handled the same tap.
-    let holdStarted = false;
-    let recentPointerAction = 0;
-    // Temporary diagnostic logging — remove once first-hold reliably works.
+    // Diagnostic logging (light, retained while confirming the fix).
     const T0 = performance.now();
     const ev = (name, extra) => {
       const t = (performance.now() - T0).toFixed(0);
       console.log(`[mic ${name}] t=${t}ms state=${micState}${extra ? ' ' + extra : ''}`);
     };
     const tgtDesc = (e) => `target=${e.target && e.target.tagName}#${e.target && e.target.id}`;
-    micBtn.addEventListener('pointerdown', (e) => {
-      ev('pointerdown', `${tgtDesc(e)} active=${document.activeElement && document.activeElement.tagName}#${document.activeElement && document.activeElement.id}`);
-      if (micState === 'loading') return;
-      recentPointerAction = Date.now();
-      if (micState === 'need-permission') {
-        grantMicPermission();
-        return;
-      }
-      if (micState === 'error') {
-        boot();
-        return;
-      }
-      if (micState === 'ready') {
-        holdStarted = true;
-        try { micBtn.setPointerCapture(e.pointerId); } catch (_) {}
-        startRecording();
-      }
-    });
-    micBtn.addEventListener('pointerup', (e) => {
-      ev('pointerup', `${tgtDesc(e)} holdStarted=${holdStarted} recording=${recording}`);
-      if (holdStarted) { holdStarted = false; stopRecording(); }
-    });
-    micBtn.addEventListener('pointercancel', (e) => {
-      ev('pointercancel', `${tgtDesc(e)} holdStarted=${holdStarted}`);
-      if (holdStarted) { holdStarted = false; stopRecording(); }
-    });
+    // Reject events whose timeStamp is more than STALE_EVENT_MS older
+    // than performance.now(). Safari queues pointer events behind modal
+    // dialogs and dispatches them all when the dialog closes; those
+    // late-firing events carry OLD timestamps and are our unwanted noise.
+    const isStale = (e) => {
+      const age = performance.now() - (e.timeStamp || 0);
+      return age > STALE_EVENT_MS;
+    };
+
+    // CLICK — state-1 permission grant + state 5/6 recovery.
+    // NOT used for recording start/stop (which are hold-based below).
     micBtn.addEventListener('click', (e) => {
-      ev('click', `${tgtDesc(e)} sinceDown=${Date.now() - recentPointerAction}ms`);
-      if (Date.now() - recentPointerAction < 500) return;
+      const age = (performance.now() - (e.timeStamp || 0)).toFixed(0);
+      if (isStale(e)) {
+        ev('click-STALE', `${tgtDesc(e)} age=${age}ms — dropped`);
+        return;
+      }
+      ev('click', `${tgtDesc(e)} age=${age}ms useMic=${useMic}`);
       if (micState === 'need-permission') { grantMicPermission(); return; }
       if (micState === 'error')           { boot(); return; }
+      // Ready/recording clicks are handled by pointerdown/up below —
+      // ignore here so a lone click (no genuine press) doesn't fire twice.
+    });
+
+    // POINTERDOWN — state-3 press-and-hold START.
+    micBtn.addEventListener('pointerdown', (e) => {
+      const age = (performance.now() - (e.timeStamp || 0)).toFixed(0);
+      if (isStale(e)) {
+        ev('pointerdown-STALE', `${tgtDesc(e)} age=${age}ms — dropped`);
+        return;
+      }
+      ev('pointerdown', `${tgtDesc(e)} age=${age}ms`);
+      if (micState !== 'ready') return;
+      holdStarted = true;
+      try { micBtn.setPointerCapture(e.pointerId); } catch (_) {}
+      startRecording();
+    });
+
+    // POINTERUP — state-4 hold RELEASE → stop recording.
+    micBtn.addEventListener('pointerup', (e) => {
+      const age = (performance.now() - (e.timeStamp || 0)).toFixed(0);
+      if (isStale(e)) {
+        ev('pointerup-STALE', `${tgtDesc(e)} age=${age}ms — dropped`);
+        return;
+      }
+      ev('pointerup', `${tgtDesc(e)} age=${age}ms holdStarted=${holdStarted}`);
+      if (holdStarted) { holdStarted = false; stopRecording(); }
+    });
+
+    micBtn.addEventListener('pointercancel', (e) => {
+      if (isStale(e)) return;
+      ev('pointercancel', `${tgtDesc(e)}`);
+      if (holdStarted) { holdStarted = false; stopRecording(); }
     });
     micBtn.addEventListener('focus', () => ev('focus'));
     micBtn.addEventListener('blur',  () => ev('blur'));
-    // Page-wide click logger — surfaces clicks that landed ANYWHERE else,
-    // so if a "missing first tap" is really a missed hit-target, we see it.
-    document.addEventListener('pointerdown', (e) => {
-      if (e.target === micBtn) return;   // already logged above
-      const t = (performance.now() - T0).toFixed(0);
-      const rect = micBtn.getBoundingClientRect();
-      const dxCentre = Math.round(e.clientX - (rect.left + rect.width / 2));
-      const dyCentre = Math.round(e.clientY - (rect.top + rect.height / 2));
-      console.log(`[page pd] t=${t}ms target=${e.target && e.target.tagName}#${e.target && e.target.id || ''}.${e.target && e.target.className || ''} at (${e.clientX},${e.clientY}) micBtn Δ=(${dxCentre},${dyCentre})`);
-    }, true);   // capture phase so nothing swallows it
-    // Keyboard accessibility: Space / Enter on a focused button acts as
-    // click; browser fires a plain click event, no pointerdown. Handle it.
-    micBtn.addEventListener('keydown', (e) => {
-      if (micState !== 'ready') return;
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        if (!recording) startRecording();
-      }
-    });
-    micBtn.addEventListener('keyup', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') {
-        if (recording) stopRecording();
-      }
-    });
-    // pointerup / pointercancel wired above in the diagnostic block.
-    // pointerleave intentionally NOT wired — setPointerCapture keeps
-    // events flowing to the button even when the finger drifts off it.
 
     // Handle a finalised transcript from the engine
     function handleFinalTranscript(text) {
@@ -1891,7 +1880,7 @@
     // this call could be deferred (guarded by e.g. a "load-on-demand"
     // flag) since Whisper's 74 MB weight isn't free on cellular.
     async function boot() {
-      logEntry('BD Speech Editor v0.1 booted (whisper-base.en · direct-PCM · substitute {?…} · 2026-08-13)', 'info');
+      logEntry('BD Speech Editor v0.1 booted (three-state hybrid + stale-event guard · substitute {?…} · 2026-08-13)', 'info');
       logEntry(`UA: ${navigator.userAgent}`, 'info');
       const hasGetUM   = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
       const hasWorklet = !!(window.AudioContext &&
@@ -1913,13 +1902,14 @@
         refreshMicUI();
         return;   // status already set by engine.install() on failure
       }
+      // If we already have permission from a prior page in this browser
+      // session, useMic could be pre-set true. For simplicity always
+      // start in need-permission and let the first click check via
+      // getUserMedia (permission if remembered will just resolve fast).
       micState = 'need-permission';
       refreshMicUI();
-      // Focus the "Use Speech" button so keyboard users can press Space
-      // to trigger the permission grant, and so first-time users see a
-      // visible focus ring guiding them to the entry point.
       micBtn.focus();
-      setStatus('Model loaded. Click "Use Speech" to enable the microphone.', 'ok');
+      setStatus('Model loaded. Click "Use Mic" to enable the microphone.', 'ok');
     }
     boot();
   </script>
