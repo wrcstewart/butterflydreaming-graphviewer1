@@ -217,3 +217,52 @@ Bumping to `whisper-small.en` (~244 MB) gains ~2 percentage points but costs ~6�
 - **D5 (native undo)**: all destination mutations via `setRangeText`; verified undo/redo works across insertion and Accept.
 - **D6 (screening at utterance boundaries)**: transcription only runs on release; interim results (Whisper doesn't emit them anyway) would not fire screening. Deferred until BD integration.
 - **D7 (no signal to remote)**: no remote in prototype. When integrated, the receiver will get final text — same as if it had been typed.
+
+## 12. Browser stack — today's compromises, tomorrow's design (2026-08-13)
+
+BD is a long-horizon project. It will spend years being built and, hopefully, more years being used. The stack under it — WebGPU, transformers.js, ONNX Runtime Web, iOS Safari's ML support — is currently unfinished. Design the module for the maturity we expect it to arrive at, not the state of things today. Note the compromises so future-you knows why the code looks the way it does and when it's safe to relax them.
+
+### 12.1 Current situation (August 2026)
+
+- **WebGPU on iOS Safari 26 silently crashes the tab** during `pipeline({device: 'webgpu'})` init, before any `.catch()` fallback runs. Not our bug — a known-broken upstream cluster (see below).
+- **WASM path works** on iPhone Safari 26 for `whisper-base.en` (~74 MB). Slower than WebGPU would be, but stable.
+- **WASM isn't universally safe on iOS either** — huggingface/transformers.js#1241 reports `whisper-base` crash-looping on iPad iOS 18.3.2 even on the WASM backend, no console output.
+- Even on desktop, Safari has WebGPU off by default; users' desktops report `WebGPU=false` in the features log. So the WebGPU code path was buying us nothing on Safari desktop and crashing us on iOS.
+
+### 12.2 What's in the code because of 12.1
+
+- **`device: 'wasm'` is called with no fallback.** No try-WebGPU-then-WASM dance. See `install()` in both `sr_editor.html` and `bd_SR_Editor/index.html`. Mirroring policy: BD dev copy and standalone stay in sync; do not diverge just because "standalone is the iOS test bed."
+- **Progress-checkpoint instrumentation.** `progress(step, detail)` writes to console + source pane + localStorage. `reportPreviousCrash()` IIFE surfaces the previous session's last-reached checkpoint at boot if the tab died. Keeps the silent-crash class of upstream bugs debuggable. Cheap; keep it.
+- **Adapter interface has a second-engine slot** (`EngineAdapter` base class + registered engines dropdown). Currently only Whisper is implemented. sherpa-onnx or whisper-turbo can slot in without touching the app.
+
+### 12.3 When to reconsider (and how to tell)
+
+- **Re-enable WebGPU:** wait for a transformers.js release note that explicitly claims iOS-Safari-WebGPU-ready. Likely tied to ONNX Runtime Web landing the pending float16 PRs (iOS Safari WebGPU is float16-only; the current runtime tries float32). Don't re-enable on our own initiative from "it works on my desktop now" — the failure mode is a silent tab kill, which won't show up in any dev environment we control.
+- **Model upgrade beyond base.en:** re-test on a real iPhone before shipping. 74 MB → 244 MB (`whisper-small.en`) roughly triples the WASM memory footprint; may push mid-tier phones over the safe budget even when it fits on the newest ones.
+- **New engine (sherpa-onnx, whisper-turbo, whatever ships):** implement it behind the `EngineAdapter` interface; add to the dropdown; keep Whisper/transformers.js selectable so we can A/B rather than committing.
+
+### 12.4 Forward-looking design stance
+
+The point: BD is not a "ship this quarter" product. The right timescale for these bet-hedging decisions is *years*. That means:
+
+- Don't hard-couple to any single engine. Adapter interface stays.
+- Don't hard-code around today's specific bugs — comment them (as here) and code the fix cleanly, so the next stack refresh doesn't have to reverse-engineer why WebGPU was disabled.
+- Keep the crash-diagnostics instrumentation on. It costs almost nothing and buys us the ability to debug a class of upstream bugs (silent tab kill) that will keep happening on new devices / new stack versions for years.
+- Prefer standards-track APIs (Web Audio, Web Speech API where available, WebGPU when it stabilises) over vendor-specific paths, even when the vendor path is nicer today.
+- Every time you touch this module, do a quick "is this still true?" pass on §12.1 — the situation IS drifting, just slowly. If the compromises above become unnecessary, delete the comments and simplify.
+
+### 12.5 Upstream tracker (as of 2026-08-13)
+
+Watch these for the situation improving:
+
+- huggingface/transformers.js#973 — [safari] Unexpected restarts (float16 root cause suspected)
+- huggingface/transformers.js#1242 — v3 crashes on iOS/macOS (memory growth)
+- huggingface/transformers.js#1298 — Whisper web demo not working on iOS (Xenova's own demo)
+- huggingface/transformers.js#1241 — whisper-base crashing on iPad WASM
+- huggingface/transformers.js#1518 — Still crashing WebGPU translation pipeline
+- huggingface/transformers.js#1424 — Problems with WebGPU on Apple M3 Pro
+
+Alternative engines to keep on the radar:
+
+- [whisper-turbo](https://github.com/FL33TW00D/whisper-turbo) — cited in #973 as a working mobile-WebGPU Whisper implementation on a different runtime
+- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — already the intended second engine per Design Notes §3

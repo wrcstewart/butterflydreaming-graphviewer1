@@ -447,6 +447,20 @@ schema questions follow:
 
 ---
 
+## 7a. Designing for tomorrow's browser stack (added 2026-08-13)
+
+BD is a long-horizon project. The client-side ML stack it rides on — WebGPU, transformers.js, ONNX Runtime Web, iOS Safari's ML support — is currently under-baked. The right stance is to design for the maturity we expect the stack to reach *by the time this module is in real use*, while shipping code that survives today's stack as it actually is.
+
+Practical implications baked into the prototype:
+
+- The engine sits behind an adapter interface (`EngineAdapter`), so Whisper/transformers.js is not the only ASR path we can wire up. sherpa-onnx (§3) or whisper-turbo can slot in with no app-level rewrite.
+- The current implementation is WASM-only because iOS Safari 26's WebGPU support silently crashes tabs during model init — a widely reported, still-open cluster of upstream bugs (see [SR_Editor_Rules_v0.1.md §12](SR_Editor_Rules_v0.1.md) for tracker links). WebGPU can be re-enabled when transformers.js explicitly claims iOS-Safari-WebGPU-ready.
+- The prototype carries a small crash-diagnostics harness (checkpoint trail written to console, source pane, and localStorage; previous-session's last-reached checkpoint surfaced at boot). Cheap; catches the class of "silent tab kill" bugs that any long-lived browser project will keep encountering.
+
+The forward-looking bet: model sizes will shrink, WebGPU will stabilise on all mainstream mobile OSes, and float16-precision inference will become universal. When that happens the current WASM-only compromise dissolves and the module gets faster / more accurate for free. Until then the code is polite about the state it's in but doesn't hard-couple to it.
+
+Every future revision should do a quick "is §12 of the Rules doc still true?" pass and simplify wherever it isn't. The situation IS drifting — just slowly.
+
 ## 8. Longer-term possibilities noted, not designed
 
 Free inclusion of text from earlier browsed nodes is interesting rather than
