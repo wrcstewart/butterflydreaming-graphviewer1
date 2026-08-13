@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Explicit cache-defeating so Safari doesn't cling to stale copies
+       between iterations. Also add ?v=N to the URL if it still lingers. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>BD Speech Editor Prototype v0.1</title>
   <style>
     :root {
@@ -63,6 +68,10 @@
       font-size: 12px; color: var(--text-dim);
     }
     .pane-head strong { color: var(--accent-2); font-size: 13px; letter-spacing: 0.05em; }
+    /* Canary — RGB rotation (feedback_canary_rotation). Currently RED
+       (direct-PCM AudioWorklet capture, MediaRecorder retired 2026-08-13);
+       next rotation = green. */
+    #source-pane-label { background: #d03030; color: #fff; padding: 2px 8px; border-radius: 3px; }
     .pane-head select {
       background: var(--panel); color: var(--text);
       border: 1px solid var(--border); border-radius: 3px;
@@ -127,6 +136,12 @@
       min-height: 44px;
       padding: 10px 22px !important;
       font-size: 15px !important;
+    }
+    /* Strongly visible focus indicator so the user can tell at a glance
+       whether the button is armed for keyboard (Space/Enter) input. */
+    #mic-btn:focus {
+      outline: 3px solid #4080ff !important;
+      outline-offset: 3px !important;
     }
     #mic-btn.listening {
       background: var(--listening) !important; color: #fff !important;
@@ -257,7 +272,7 @@
     <div id="panes">
       <div class="pane">
         <div class="pane-head">
-          <strong>SOURCE</strong>
+          <strong id="source-pane-label">SOURCE</strong>
           <span>(read-aloud from)</span>
           <select id="corpus-select">
             <option value="empty">— empty —</option>
@@ -665,6 +680,40 @@
       return results;
     }
 
+    // ── Merge overlapping chunk outputs (own-chunk long audio) ───────────
+    // Whisper is called on overlapping ~25 s chunks. When we concatenate
+    // outputs naively we get repeated words at each seam. Detect the
+    // longest word-level suffix of the previous chunk that matches a
+    // prefix of the current chunk, drop that many words from the current
+    // chunk before appending. n-gram matching up to 15 words handles the
+    // 3 s (~7-word) overlap window with room to spare.
+    function mergeChunkOutputs(parts) {
+      if (!parts.length) return '';
+      if (parts.length === 1) return parts[0];
+      const normWords = (s) => (s || '').toLowerCase()
+        .replace(/[^\w\s']/g, ' ')
+        .split(/\s+/).filter(Boolean);
+      let out = parts[0];
+      for (let i = 1; i < parts.length; i++) {
+        const prev = normWords(out);
+        const curr = normWords(parts[i]);
+        let overlap = 0;
+        const maxOverlap = Math.min(15, prev.length, curr.length);
+        for (let n = maxOverlap; n >= 1; n--) {
+          const prevTail = prev.slice(prev.length - n).join(' ');
+          const currHead = curr.slice(0, n).join(' ');
+          if (prevTail === currHead) { overlap = n; break; }
+        }
+        // Rebuild the appended chunk with the first `overlap` original
+        // (punctuated) words stripped. Word count is preserved by the
+        // whitespace split because punctuation stays attached to words.
+        const currRaw = parts[i].trim().split(/\s+/);
+        const tail    = currRaw.slice(overlap).join(' ');
+        if (tail) out += ' ' + tail;
+      }
+      return out;
+    }
+
     // ── Engine adapter interface (§5.5) ──────────────────────────────────
     // Any concrete engine must satisfy this shape; adapters are constructed
     // by the App and swapped at runtime. `setPhrases` is a no-op on engines
@@ -693,8 +742,10 @@
       constructor() {
         super();
         this.pipeline   = null;
-        this.recorder   = null;
-        this.chunks     = [];
+        this.recorderNode = null;   // AudioWorkletNode for direct-PCM capture
+        this.rawChunks    = [];     // Float32Array chunks pushed from the worklet
+        this.recording    = false;
+        this._workletRegistered = false;
         this.stream     = null;
         this.loading    = false;
         this.audioCtx   = null;
@@ -772,31 +823,27 @@
           this.onError(err);
           throw err;
         }
-        // Route mic through a Web Audio graph:
-        //   mediaStreamSource → DynamicsCompressor → gain → destination
-        // MediaRecorder then captures from the PROCESSED stream, so Whisper
-        // and the WAV path never see clipped audio even if the browser AGC
-        // has under-attenuated a loud input. Compressor is set with a soft
-        // knee at -12 dBFS and 4:1 ratio — inaudible on normal speech, only
-        // engages on peaks. Belt-and-braces: browser AGC + our compressor.
+        // 2026-08-13 — Capture PCM DIRECTLY via an AudioWorkletNode
+        // instead of MediaRecorder. Safari's MediaRecorder silently
+        // truncated recordings to ~2/3 of wallclock duration regardless
+        // of container format (webm OR mp4). Direct PCM sidesteps the
+        // whole encode-then-decode-then-resample chain and gives us the
+        // raw samples the mic delivered, sample-for-sample.
         if (!this.audioCtx) {
           const Ctx = window.AudioContext || window.webkitAudioContext;
           this.audioCtx = new Ctx();
         }
-        // iOS Safari sometimes lands in suspended state; a mic press is a
-        // user gesture so resume() is allowed here.
         if (this.audioCtx.state === 'suspended') {
           try { await this.audioCtx.resume(); } catch (_) {}
         }
-        this.graphSource     = this.audioCtx.createMediaStreamSource(this.stream);
-        this.makeupGain      = this.audioCtx.createGain();
-        this.makeupGain.gain.value = 1.0;   // leave at unity; can be raised later if quiet talkers need it
-        this.destNode        = this.audioCtx.createMediaStreamDestination();
-        // Compression toggle: when checked, insert a DynamicsCompressor
-        // between source and gain. When unchecked, the mic goes raw so the
-        // user can A/B compare (hearing Whisper's accuracy without any
-        // pre-processing). The state is snapshotted at start-of-recording;
-        // changing the checkbox mid-recording has no effect until next tap.
+        // Register the PCM-recording worklet once per AudioContext.
+        if (!this._workletRegistered) {
+          await this._registerRecordingWorklet();
+          this._workletRegistered = true;
+        }
+        this.graphSource = this.audioCtx.createMediaStreamSource(this.stream);
+        this.makeupGain  = this.audioCtx.createGain();
+        this.makeupGain.gain.value = 1.0;
         const compressionOn = document.getElementById('compression-toggle').checked;
         this.compressor = null;
         if (compressionOn) {
@@ -811,38 +858,52 @@
         } else {
           this.graphSource.connect(this.makeupGain);
         }
-        this.makeupGain.connect(this.destNode);
-        this.processedStream = this.destNode.stream;
-        logEntry(`recording start: compression=${compressionOn ? 'on' : 'off'}`, 'info');
-
-        this.chunks = [];
-        this.recorder = new MediaRecorder(this.processedStream);
-        this.recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) this.chunks.push(e.data);
+        // Route makeupGain → AudioWorkletNode (captures PCM). Also
+        // separately taps analyser off makeupGain (in _startMonitor).
+        this.rawChunks    = [];
+        this.recorderNode = new AudioWorkletNode(this.audioCtx, 'pcm-recorder', {
+          numberOfOutputs: 0    // consumer-only; no need to route to destination
+        });
+        this.recorderNode.port.onmessage = (e) => {
+          if (e.data && e.data.length) this.rawChunks.push(e.data);
         };
-        this.recorder.onstop = async () => {
-          this._stopMonitor();
-          const report = this._finaliseReport();
-          try { this.onQualityReport(report); } catch (_) {}
-          // Release mic + audio graph FIRST so the browser's "mic in use"
-          // indicator disappears immediately. Whisper transcription can
-          // then take its time on the already-buffered chunks without the
-          // red bar hanging in Safari's tab strip.
-          this._disconnectGraph();
-          if (this.stream) {
-            for (const track of this.stream.getTracks()) track.stop();
-            this.stream = null;
-          }
-          await this._transcribeBuffered();
-        };
+        this.makeupGain.connect(this.recorderNode);
+        this.recorderSampleRate = this.audioCtx.sampleRate;   // remembered for resampling
+        logEntry(`recording start: compression=${compressionOn ? 'on' : 'off'} · srcRate=${this.recorderSampleRate}Hz · worklet=direct-PCM`, 'info');
         this._startMonitor();
-        this.recorder.start();
+        this.recording = true;
+      }
+      async _registerRecordingWorklet() {
+        // Register once per AudioContext. Inline via Blob URL — no build
+        // step, no external file. The worklet's process() copies each
+        // 128-frame input block to a fresh Float32Array and posts it up.
+        const code = `
+          class PCMRecorder extends AudioWorkletProcessor {
+            process(inputs) {
+              const input = inputs[0];
+              if (input && input.length > 0 && input[0]) {
+                // Copy — the underlying render buffer is reused per call.
+                this.port.postMessage(new Float32Array(input[0]));
+              }
+              return true;
+            }
+          }
+          registerProcessor('pcm-recorder', PCMRecorder);
+        `;
+        const blob = new Blob([code], { type: 'application/javascript' });
+        const url  = URL.createObjectURL(blob);
+        try {
+          await this.audioCtx.audioWorklet.addModule(url);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
       }
       _disconnectGraph() {
-        try { this.graphSource && this.graphSource.disconnect(); } catch (_) {}
-        try { this.compressor && this.compressor.disconnect(); } catch (_) {}
-        try { this.makeupGain && this.makeupGain.disconnect(); } catch (_) {}
-        this.graphSource = this.compressor = this.makeupGain = this.destNode = this.processedStream = null;
+        try { this.graphSource   && this.graphSource.disconnect(); }   catch (_) {}
+        try { this.compressor    && this.compressor.disconnect(); }    catch (_) {}
+        try { this.makeupGain    && this.makeupGain.disconnect(); }    catch (_) {}
+        try { this.recorderNode  && this.recorderNode.disconnect(); }  catch (_) {}
+        this.graphSource = this.compressor = this.makeupGain = this.recorderNode = null;
       }
       _startMonitor() {
         // Tap the POST-compressor node so the level meter + quality report
@@ -912,16 +973,45 @@
         return { durSec, peakDb, meanDb, silentPct, clipPct, verdict, warnings };
       }
       async stop() {
-        if (this.recorder && this.recorder.state === 'recording') {
-          this.recorder.stop();
+        if (!this.recording) return;
+        this.recording = false;
+        // Everything is synchronous / fast here: stop the meter, emit
+        // quality report, disconnect the graph and release the mic. Then
+        // fire-and-forget the transcription so the caller returns fast
+        // (mic-in-use indicator disappears immediately; UI transitions
+        // to 'processing' state; transcription runs in the background
+        // and eventually calls onFinal to send us back to 'ready').
+        this._stopMonitor();
+        const report = this._finaliseReport();
+        try { this.onQualityReport(report); } catch (_) {}
+        // Snapshot chunks + sample rate before we tear the graph down.
+        const chunks = this.rawChunks || [];
+        const srcRate = this.recorderSampleRate || (this.audioCtx && this.audioCtx.sampleRate) || 48000;
+        this.rawChunks = [];
+        this._disconnectGraph();
+        if (this.stream) {
+          for (const track of this.stream.getTracks()) track.stop();
+          this.stream = null;
         }
+        this._transcribeCapturedPCM(chunks, srcRate).catch(err => {
+          console.error('transcribe failed', err);
+          setStatus('Transcribe failed: ' + err.message, 'err');
+          this.onError(err);
+        });
       }
-      async _transcribeBuffered() {
-        if (!this.chunks.length) return;
+      async _transcribeCapturedPCM(chunks, srcRate) {
+        if (!chunks.length) return;
         setStatus('Transcribing…', '');
         try {
-          const blob = new Blob(this.chunks, { type: this.recorder.mimeType || 'audio/webm' });
-          const audioData = await this._decodeToFloat32Mono16k(blob);
+          // Concatenate all Float32 chunks into one contiguous buffer.
+          let totalLen = 0;
+          for (const c of chunks) totalLen += c.length;
+          const combined = new Float32Array(totalLen);
+          let off = 0;
+          for (const c of chunks) { combined.set(c, off); off += c.length; }
+          logEntry(`captured ${chunks.length} PCM chunks · ${(combined.length / srcRate).toFixed(2)}s @ ${srcRate}Hz (${combined.length} samples)`, 'info');
+          // Resample to 16 kHz for Whisper.
+          const audioData = await this._resamplePCMTo16k(combined, srcRate);
 
           // Biasing prompt (B1 in the design doc). Loud diagnostics so we
           // can see WHERE biasing dropped out when accuracy doesn't improve.
@@ -954,15 +1044,61 @@
             logEntry('bias prompt error: ' + bpErr.message, 'err');
           }
 
+          // Own-chunking (2026-08-13). Whisper's decoder is architecturally
+          // capped at a 30 s spectrogram window. transformers.js CAN chunk
+          // long audio itself when chunk_length_s is set, but combining
+          // that with prompt_ids drops tail chunks silently (user hit this
+          // on a 34 s recording that transcribed to ~60 % of what was
+          // spoken). We chunk ourselves so biasing applies to every chunk.
+          //
+          //   Chunk length: 25 s (headroom below the 30 s hard cap)
+          //   Overlap:      3 s  (Whisper produces cleaner starts when
+          //                       it has some prior context)
+          const SR = 16000;
+          const CHUNK_SEC   = 25;
+          const OVERLAP_SEC = 3;
+          const chunkSamples   = CHUNK_SEC   * SR;
+          const overlapSamples = OVERLAP_SEC * SR;
+          const stride         = chunkSamples - overlapSamples;
+          const duration = audioData.length / SR;
+
           const t0 = performance.now();
-          const result = await this.pipeline(audioData, {
-            chunk_length_s: 30,
-            stride_length_s: 5,
-            return_timestamps: false,
-            generate_kwargs
-          });
+          let text;
+          logEntry(`transcribe path: audioData=${audioData.length} samples · duration=${duration.toFixed(1)}s · CHUNK_SEC=${CHUNK_SEC}`, 'info');
+
+          if (duration <= CHUNK_SEC + 1) {
+            // Short audio — single shot
+            logEntry(`taking SHORT path (${duration.toFixed(1)}s ≤ ${CHUNK_SEC + 1}s)`, 'info');
+            const result = await this.pipeline(audioData, {
+              return_timestamps: false,
+              generate_kwargs
+            });
+            text = (result && result.text || '').trim();
+          } else {
+            // Long audio — pre-chunk into overlapping 25 s segments and
+            // transcribe each with the same bias prompt, then stitch.
+            const segs = [];
+            for (let start = 0; start < audioData.length; start += stride) {
+              const end = Math.min(start + chunkSamples, audioData.length);
+              segs.push(audioData.subarray(start, end));
+              if (end === audioData.length) break;
+            }
+            logEntry(`own-chunk ${duration.toFixed(1)}s → ${segs.length} × ${CHUNK_SEC}s (overlap ${OVERLAP_SEC}s)`, 'info');
+            const parts = [];
+            for (let i = 0; i < segs.length; i++) {
+              setStatus(`Transcribing chunk ${i + 1}/${segs.length}…`, '');
+              const r = await this.pipeline(segs[i], {
+                return_timestamps: false,
+                generate_kwargs
+              });
+              const chunkText = (r && r.text || '').trim();
+              parts.push(chunkText);
+              logEntry(`chunk ${i + 1}/${segs.length} (${(segs[i].length / SR).toFixed(1)}s): "${chunkText.slice(0, 70).replace(/\s+/g, ' ')}${chunkText.length > 70 ? '…' : ''}"`, 'info');
+            }
+            text = mergeChunkOutputs(parts);
+          }
+
           const dt = ((performance.now() - t0) / 1000).toFixed(1);
-          const text = (result?.text || '').trim();
           setStatus(`Transcribed in ${dt}s`, 'ok');
           logEntry(`Whisper: "${text}" (${dt}s${generate_kwargs.prompt_ids ? ', biased' : ''})`, 'info');
           this.onFinal(text, 1.0);
@@ -1028,25 +1164,28 @@
         if (ids.length > MAX_PROMPT_TOKENS) ids = ids.slice(0, MAX_PROMPT_TOKENS);
         return Array.from(ids, (v) => typeof v === 'bigint' ? Number(v) : Number(v));
       }
-      async _decodeToFloat32Mono16k(blob) {
-        // Whisper expects mono 16-kHz Float32. Decode via a temporary
-        // AudioContext, downmix if stereo, and resample using
-        // OfflineAudioContext.
-        if (!this.audioCtx) {
-          const Ctx = window.AudioContext || window.webkitAudioContext;
-          this.audioCtx = new Ctx();
-        }
-        const arrayBuffer = await blob.arrayBuffer();
-        const decoded = await this.audioCtx.decodeAudioData(arrayBuffer);
+      async _resamplePCMTo16k(samples, srcRate) {
+        // Direct PCM in, resample to 16 kHz mono for Whisper. If already
+        // at 16 kHz, return unchanged. Uses OfflineAudioContext for the
+        // resample — decodeAudioData is NOT involved (that's what was
+        // silently truncating on Safari).
         const targetRate = 16000;
-        const targetLen  = Math.ceil(decoded.duration * targetRate);
+        if (srcRate === targetRate) return samples;
+        const targetLen  = Math.ceil(samples.length * targetRate / srcRate);
         const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        // Some Safari versions throw if source rate matches context rate
+        // but sizes differ; use OfflineAudioContext at target rate.
         const offline = new OfflineCtx(1, targetLen, targetRate);
+        // Create a buffer at SOURCE rate, load our PCM, play into offline
+        // at target rate — the AudioContext handles the resampling.
+        const buffer = offline.createBuffer(1, samples.length, srcRate);
+        buffer.copyToChannel(samples, 0);
         const src = offline.createBufferSource();
-        src.buffer = decoded;
+        src.buffer = buffer;
         src.connect(offline.destination);
         src.start(0);
         const rendered = await offline.startRendering();
+        logEntry(`resample: ${samples.length}@${srcRate}Hz → ${rendered.length}@${targetRate}Hz (${(rendered.length/targetRate).toFixed(2)}s)`, 'info');
         return rendered.getChannelData(0);
       }
     }
@@ -1241,12 +1380,16 @@
         for (const t of s.getTracks()) t.stop();
         micState = 'ready';
         refreshMicUI();
-        // Focus so the next press-and-hold is the ONLY action needed —
-        // no preliminary click to focus. Also makes Space bar work as
-        // press-and-hold via the keydown/keyup handlers below.
+        // Focus hardening: browsers sometimes "steal" focus for a beat
+        // after a modal permission dialog closes. Call focus() multiple
+        // times across a few animation frames to catch whichever tick
+        // the browser is ready to accept it on.
         micBtn.focus();
+        requestAnimationFrame(() => micBtn.focus());
+        setTimeout(() => micBtn.focus(), 100);
+        setTimeout(() => micBtn.focus(), 250);
         setStatus('Ready — press and hold "Hold to Record" to speak.', 'ok');
-        logEntry('microphone permission granted', 'info');
+        logEntry('microphone permission granted — focused mic button', 'info');
       } catch (err) {
         micState = 'error';
         refreshMicUI();
@@ -1254,6 +1397,25 @@
         logEntry('mic permission denied: ' + err.message, 'err');
       }
     }
+
+    // Focus restoration: whenever the tab regains focus or becomes
+    // visible again, if we're in a state where the mic button is the
+    // user's next likely action, put focus back on it. Handles the
+    // "click, then permission dialog, then focus went to the browser
+    // chrome / body somewhere" pattern that has been intermittent.
+    window.addEventListener('focus', () => {
+      if ((micState === 'ready' || micState === 'need-permission') &&
+          document.activeElement !== micBtn) {
+        micBtn.focus();
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' &&
+          (micState === 'ready' || micState === 'need-permission') &&
+          document.activeElement !== micBtn) {
+        micBtn.focus();
+      }
+    });
 
     // Recording lifecycle. The `recording` flag flips synchronously on
     // pointerdown so an immediately-following pointerup can see it —
@@ -1500,16 +1662,18 @@
     // this call could be deferred (guarded by e.g. a "load-on-demand"
     // flag) since Whisper's 74 MB weight isn't free on cellular.
     async function boot() {
-      logEntry('BD Speech Editor v0.1 booted', 'info');
+      logEntry('BD Speech Editor v0.1 booted (direct-PCM worklet capture 2026-08-13)', 'info');
       logEntry(`UA: ${navigator.userAgent}`, 'info');
-      const hasGetUM = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-      const hasMR    = typeof MediaRecorder !== 'undefined';
-      const hasWebGPU = 'gpu' in navigator;
-      logEntry(`features: getUserMedia=${hasGetUM} MediaRecorder=${hasMR} WebGPU=${hasWebGPU}`, 'info');
-      if (!hasGetUM || !hasMR) {
+      const hasGetUM   = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      const hasWorklet = !!(window.AudioContext &&
+                            window.AudioContext.prototype &&
+                            (window.AudioWorkletNode || (window.AudioContext.prototype.audioWorklet)));
+      const hasWebGPU  = 'gpu' in navigator;
+      logEntry(`features: getUserMedia=${hasGetUM} AudioWorklet=${hasWorklet} WebGPU=${hasWebGPU}`, 'info');
+      if (!hasGetUM || !hasWorklet) {
         micState = 'error';
         refreshMicUI();
-        setStatus('This browser lacks microphone or MediaRecorder support.', 'err');
+        setStatus('This browser lacks microphone or AudioWorklet support.', 'err');
         return;
       }
       micState = 'loading';
