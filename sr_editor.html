@@ -68,10 +68,10 @@
       font-size: 12px; color: var(--text-dim);
     }
     .pane-head strong { color: var(--accent-2); font-size: 13px; letter-spacing: 0.05em; }
-    /* Canary — RGB rotation (feedback_canary_rotation). Currently RED
-       (direct-PCM AudioWorklet capture, MediaRecorder retired 2026-08-13);
-       next rotation = green. */
-    #source-pane-label { background: #d03030; color: #fff; padding: 2px 8px; border-radius: 3px; }
+    /* Canary — RGB rotation (feedback_canary_rotation). Currently GREEN
+       (ins-wrap now embeds em-dashes inside {?} so they survive Accept,
+       2026-08-13); next rotation = blue. */
+    #source-pane-label { background: #40c040; color: #fff; padding: 2px 8px; border-radius: 3px; }
     .pane-head select {
       background: var(--panel); color: var(--text);
       border: 1px solid var(--border); border-radius: 3px;
@@ -262,6 +262,7 @@
           <option value="keep">1 · Keep all</option>
           <option value="mark">2 · Mark matches (preview)</option>
           <option value="drop">3 · Drop matches (experimental)</option>
+          <option value="sub" selected>4 · Substitute {?…}</option>
         </select>
       </div>
       <div class="group">
@@ -311,6 +312,7 @@
       <button id="clear-dest-btn" type="button">Clear destination</button>
       <button id="copy-src-to-dest-btn" type="button" title="Copy source pane text into destination">Copy →</button>
       <button id="undo-btn" type="button" title="Undo last insertion (browser undo)">Undo</button>
+      <button id="accept-subs-btn" type="button" title="Strip {?…} tentative-substitution markers throughout the destination pane">Accept {?…}</button>
       <div id="status">initialising…</div>
     </div>
 
@@ -654,17 +656,34 @@
         }
         if (bestScore < minScore) break;
 
-        // Traceback to find the span
+        // Traceback to find the span AND record per-position operations.
+        // Ops distinguish:
+        //   'match' — surface identical (aTok.surface === bTok.surface)
+        //   'sub'   — accepted diagonal but surfaces differ (phonetic-only)
+        //   'ins'   — utterance has an extra token (gap in source)
+        //   'del'   — source has a token utterance missed (gap in utterance)
         let i = bestI, j = bestJ;
         const aIdxs = [], bIdxs = [];
+        const ops = [];
         while (i > 0 && j > 0 && H[i][j] > 0) {
           const tb = traceback[i][j];
-          if (tb === 1) { aIdxs.push(i - 1); bIdxs.push(j - 1); i--; j--; }
-          else if (tb === 2) { i--; }
-          else if (tb === 3) { j--; }
-          else break;
+          if (tb === 1) {
+            const aTok = aToks[i - 1];
+            const bTok = bToks[j - 1];
+            const kind = (aTok.surface === bTok.surface) ? 'match' : 'sub';
+            ops.push({ type: kind, aIdx: i - 1, bIdx: j - 1 });
+            aIdxs.push(i - 1); bIdxs.push(j - 1);
+            i--; j--;
+          } else if (tb === 2) {
+            ops.push({ type: 'ins', aIdx: i - 1 });
+            i--;
+          } else if (tb === 3) {
+            ops.push({ type: 'del', bIdx: j - 1 });
+            j--;
+          } else break;
         }
         aIdxs.reverse(); bIdxs.reverse();
+        ops.reverse();
         if (aIdxs.length < minLen) break;
 
         // Mask these `a` tokens so the next iteration finds a different span
@@ -674,7 +693,8 @@
           aStart: aIdxs[0], aEnd: aIdxs[aIdxs.length - 1],
           bStart: bIdxs[0], bEnd: bIdxs[bIdxs.length - 1],
           score: bestScore,
-          length: aIdxs.length
+          length: aIdxs.length,
+          ops
         });
       }
       return results;
@@ -712,6 +732,185 @@
         if (tail) out += ' ' + tail;
       }
       return out;
+    }
+
+    // ── Substitution: non-destructive tentative-suggestion markup ────────
+    // Consume Smith-Waterman ops per matched span, produce a marked-up
+    // utterance string with `{?…}` around every stretch the reviewer
+    // should double-check. Nothing is ever deleted — the user hits
+    // "Accept {?…}" to strip markers when happy.
+    //
+    // Rules (Option 2, agreed with user 2026-08-13, iteration expected):
+    //   sub  — Whisper misheard a source word. Substitute source form,
+    //          wrap `{?source}` — visible correction.
+    //   del  — Source has a word Whisper skipped. Insert `{?source}` at
+    //          the position after the previous matched utterance token.
+    //          Consecutive del ops group into one `{?word1 word2}`.
+    //   ins  — Whisper (or the reader) produced a word not in source.
+    //          Wrap `{?extra}` — original word preserved so a genuine
+    //          aside survives; the marker prompts review. Consecutive
+    //          ins ops group into one `{?word1 word2}` covering the
+    //          whole aside.
+    //   Text outside any matched span → left as-is (user commentary,
+    //          typed or spoken). Em-dash separators are inserted at the
+    //          boundary between commentary and the aligned quote so the
+    //          two are visually distinct — skipped when the boundary
+    //          already carries obvious punctuation (:.,!?—-).
+    //
+    // Contiguous ops of the same "gap" type (ins-run or del-run) are
+    // grouped so a two-word aside is one review point, not two.
+    //
+    // Returns { text, subs } where subs is a per-edit log for the user.
+    function applySubstitutions(uttText, uttTokens, srcTokens, matches) {
+      if (!matches.length) return { text: uttText, subs: [] };
+      const edits = [];   // {start, end, insert, kind, from, to}
+
+      // Em-dash boundary insertion. For each matched span with spoken
+      // (or typed) commentary immediately before or after, insert an
+      // em-dash separator so the aligned quote is visually distinct.
+      // If the boundary carries soft-sentence punctuation (. , ; :),
+      // REPLACE it with the em-dash so we don't get ". — " duplication.
+      // Stronger punctuation (! ? " ' — -) or an alphanumeric run gets
+      // the em-dash inserted alongside.
+      const SOFT_PUNCT_RE = /[.,;:]/;
+      function findLastNonSpaceBeforePos(text, pos) {
+        for (let i = pos - 1; i >= 0; i--) {
+          if (!/\s/.test(text[i])) return { char: text[i], idx: i };
+        }
+        return null;
+      }
+      function findFirstNonSpaceFromPos(text, pos) {
+        for (let i = pos; i < text.length; i++) {
+          if (!/\s/.test(text[i])) return { char: text[i], idx: i };
+        }
+        return null;
+      }
+      for (const match of matches) {
+        const hasBefore = match.aStart > 0;
+        const hasAfter  = match.aEnd   < uttTokens.length - 1;
+        if (hasBefore) {
+          const pos  = uttTokens[match.aStart].start;
+          const info = findLastNonSpaceBeforePos(uttText, pos);
+          if (info) {
+            if (SOFT_PUNCT_RE.test(info.char)) {
+              // Replace the soft punctuation with " —"
+              edits.push({
+                start: info.idx, end: info.idx + 1,
+                insert: ' —',
+                kind: 'sep-before-repl', from: info.char, to: '—'
+              });
+            } else {
+              edits.push({
+                start: pos, end: pos,
+                insert: '— ',
+                kind: 'sep-before', from: '', to: '—'
+              });
+            }
+          }
+        }
+        if (hasAfter) {
+          const pos  = uttTokens[match.aEnd].end;
+          const info = findFirstNonSpaceFromPos(uttText, pos);
+          if (info) {
+            if (SOFT_PUNCT_RE.test(info.char)) {
+              // Replace the soft punctuation with "— " (dash then space)
+              edits.push({
+                start: info.idx, end: info.idx + 1,
+                insert: '— ',
+                kind: 'sep-after-repl', from: info.char, to: '—'
+              });
+            } else {
+              edits.push({
+                start: pos, end: pos,
+                insert: ' —',
+                kind: 'sep-after', from: '', to: '—'
+              });
+            }
+          }
+        }
+      }
+
+      for (const match of matches) {
+        for (let opIdx = 0; opIdx < match.ops.length; opIdx++) {
+          const op = match.ops[opIdx];
+
+          if (op.type === 'sub') {
+            const aTok = uttTokens[op.aIdx];
+            const bTok = srcTokens[op.bIdx];
+            edits.push({
+              start: aTok.start, end: aTok.end,
+              insert: '{?' + bTok.surface + '}',
+              kind: 'sub', from: aTok.surface, to: bTok.surface
+            });
+          } else if (op.type === 'ins') {
+            // Skip if part of an in-progress group (previous op was also
+            // an ins we already handled).
+            const prev = opIdx > 0 ? match.ops[opIdx - 1] : null;
+            if (prev && prev.type === 'ins') continue;
+            // Find last ins in this contiguous group.
+            let last = opIdx;
+            while (last + 1 < match.ops.length && match.ops[last + 1].type === 'ins') {
+              last++;
+            }
+            const firstTok = uttTokens[op.aIdx];
+            const lastTok  = uttTokens[match.ops[last].aIdx];
+            const original = uttText.slice(firstTok.start, lastTok.end);
+            // Wrap `{?— original —}` — em-dashes INSIDE the tentative
+            // markers so that when Accept strips `{?` and `}` the em-dashes
+            // remain as a permanent literary aside marker. sub/del don't
+            // get this treatment: they're source content, not user additions.
+            edits.push({
+              start: firstTok.start, end: lastTok.end,
+              insert: '{?— ' + original + ' —}',
+              kind: 'ins-wrap',
+              from: original,
+              to: '{?— ' + original + ' —}'
+            });
+          } else if (op.type === 'del') {
+            // Skip if part of an in-progress group.
+            const prev = opIdx > 0 ? match.ops[opIdx - 1] : null;
+            if (prev && prev.type === 'del') continue;
+            // Collect contiguous del ops.
+            const bIdxs = [op.bIdx];
+            let k = opIdx + 1;
+            while (k < match.ops.length && match.ops[k].type === 'del') {
+              bIdxs.push(match.ops[k].bIdx);
+              k++;
+            }
+            const words = bIdxs.map(bi => srcTokens[bi].surface).join(' ');
+            // Anchor: end of previous matched/subbed utterance token,
+            // else the start of the match's first aligned token.
+            let anchorTok = null;
+            for (let j = opIdx - 1; j >= 0; j--) {
+              const p = match.ops[j];
+              if (p.type === 'match' || p.type === 'sub') {
+                anchorTok = uttTokens[p.aIdx];
+                break;
+              }
+            }
+            const pos = anchorTok ? anchorTok.end : uttTokens[match.aStart].start;
+            edits.push({
+              start: pos, end: pos,
+              insert: ' {?' + words + '}',
+              kind: 'del', from: '(missing)', to: words
+            });
+          }
+        }
+      }
+
+      // Apply in reverse position order so earlier offsets stay valid.
+      edits.sort((a, b) => b.start - a.start || b.end - a.end);
+      let out = uttText;
+      for (const e of edits) {
+        out = out.slice(0, e.start) + e.insert + out.slice(e.end);
+      }
+      return { text: out, subs: edits };
+    }
+
+    // Strip all tentative-suggestion markers from a string.
+    // Matches `{?content}` where content has no closing brace inside.
+    function stripTentativeMarkers(text) {
+      return text.replace(/\{\?([^}]+)\}/g, '$1');
     }
 
     // ── Engine adapter interface (§5.5) ──────────────────────────────────
@@ -767,10 +966,15 @@
         if (this.pipeline) return true;
         if (this.loading) return false;
         this.loading = true;
-        // 2026-08-12 — upgraded from whisper-tiny.en (~40 MB) to
-        // whisper-base.en (~74 MB) for a notable accuracy bump on the
-        // corpus's literary/archaic register. Still cached by the browser
-        // after the first download, so it's one-time per browser.
+        // 2026-08-13 — REVERTED small.en → base.en. small.en gained ~2 pp
+        // accuracy (94.8% → 96.7% on Snow White) but took 18 s to
+        // transcribe 35 s of audio on WASM (~6× slower than base). base.en
+        // + planned B2 phonetic substitution should close most of the gap
+        // at ~3 s per transcription. Substitution plan (2026-08-13 user):
+        // suspect substitutions get wrapped in |?…|| markers in the
+        // textarea. Accept button strips markers. This is a "tentative
+        // suggestion" markdown that may find other uses in BD (e.g. chat
+        // messaging where a proposed rewording needs partner approval).
         setStatus('Loading Whisper base.en (~74 MB, one-time)…', '');
         try {
           const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');
@@ -1568,6 +1772,13 @@
       let toInsert = text;
       if (alignMode === 'drop' && matches.length) {
         toInsert = buildTextWithMatchesRemoved(text, uttTokens, matches);
+      } else if (alignMode === 'sub' && matches.length) {
+        const result = applySubstitutions(text, uttTokens, srcTokens, matches);
+        toInsert = result.text;
+        // Log the substitutions the user should review.
+        for (const s of result.subs) {
+          logEntry(`sub ${s.kind}: ${s.from} → ${s.to}`, 'match');
+        }
       }
       insertAtCursor($('dest-pane'), toInsert.trim() + ' ');
 
@@ -1655,6 +1866,24 @@
       $('dest-pane').focus();
       document.execCommand('undo');
     });
+    // Accept — strip all tentative-substitution markers ({?…}) throughout
+    // the destination. Uses setRangeText to preserve the browser undo stack
+    // so the user can Undo → Accept → Undo to review what changed.
+    $('accept-subs-btn').addEventListener('click', () => {
+      const ta = $('dest-pane');
+      const before = ta.value;
+      const after  = stripTentativeMarkers(before);
+      if (before === after) {
+        setStatus('No {?…} markers to strip.', 'ok');
+        return;
+      }
+      ta.focus();
+      ta.setRangeText(after, 0, before.length, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      const count = (before.match(/\{\?[^}]+\}/g) || []).length;
+      setStatus(`Accepted ${count} tentative substitution${count === 1 ? '' : 's'}.`, 'ok');
+      logEntry(`accepted ${count} tentative markers → clean text`, 'info');
+    });
     $('log-clear-btn').addEventListener('click', () => { $('log-body').innerHTML = ''; });
 
     // Boot: log environment, then eagerly load Whisper so the user isn't
@@ -1662,7 +1891,7 @@
     // this call could be deferred (guarded by e.g. a "load-on-demand"
     // flag) since Whisper's 74 MB weight isn't free on cellular.
     async function boot() {
-      logEntry('BD Speech Editor v0.1 booted (direct-PCM worklet capture 2026-08-13)', 'info');
+      logEntry('BD Speech Editor v0.1 booted (whisper-base.en · direct-PCM · substitute {?…} · 2026-08-13)', 'info');
       logEntry(`UA: ${navigator.userAgent}`, 'info');
       const hasGetUM   = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
       const hasWorklet = !!(window.AudioContext &&
