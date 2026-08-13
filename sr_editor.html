@@ -68,10 +68,10 @@
       font-size: 12px; color: var(--text-dim);
     }
     .pane-head strong { color: var(--accent-2); font-size: 13px; letter-spacing: 0.05em; }
-    /* Canary — RGB rotation (feedback_canary_rotation). Currently RED
-       (log + status readable on iPhone: white text, larger font,
-       taller max-height, 2026-08-13); next rotation = green. */
-    #source-pane-label { background: #d03030; color: #fff; padding: 2px 8px; border-radius: 3px; }
+    /* Canary — RGB rotation (feedback_canary_rotation). Currently GREEN
+       (WASM-only + textarea iOS-scroll fix mirrored from standalone,
+       2026-08-13); next rotation = blue. */
+    #source-pane-label { background: #4caf50; color: #fff; padding: 2px 8px; border-radius: 3px; }
     .pane-head select {
       background: var(--panel); color: var(--text);
       border: 1px solid var(--border); border-radius: 3px;
@@ -250,7 +250,7 @@
       <div class="group">
         <label>Engine</label>
         <select id="engine-select">
-          <option value="whisper">Whisper (WASM/WebGPU)</option>
+          <option value="whisper">Whisper (WASM)</option>
           <!-- Future engines slot in here per §5.5 adapter contract. -->
         </select>
       </div>
@@ -949,11 +949,10 @@
     }
 
     // ── Whisper via transformers.js ──────────────────────────────────────
-    // Push-to-talk: MediaRecorder captures a whole utterance, then Whisper
-    // transcribes the buffer in one go. WebGPU where available (iPhone 15+,
-    // iPad M-series, most desktops); WASM fallback via transformers.js
-    // internals. Model: whisper-tiny.en (~40 MB, English only, fast on iOS).
-    // Swap to whisper-base.en later for accuracy if latency permits.
+    // Push-to-talk: AudioWorklet captures direct PCM, then Whisper
+    // transcribes the buffer in one go. WASM-only (WebGPU attempt
+    // crashed iOS Safari 26 tab during adapter init, before catch()
+    // fallback ran). Model: whisper-base.en (~74 MB, English).
     class WhisperEngine extends EngineAdapter {
       constructor() {
         super();
@@ -999,21 +998,19 @@
           // Cache model files in the browser between sessions.
           env.allowLocalModels = false;
           env.useBrowserCache  = true;
+          // 2026-08-13 — FORCE WASM. iOS Safari 26 crashed the tab
+          // during WebGPU adapter init inside pipeline(), before the
+          // .catch() fallback ever ran. WebGPU wasn't giving us
+          // anything on desktop either (Safari has it off by default).
+          // WASM everywhere is the cleaner, iOS-safe path. Mirrors
+          // the bd_SR_Editor standalone. See [[sr-editor]] memory.
           this.pipeline = await pipeline(
             'automatic-speech-recognition',
             'onnx-community/whisper-base.en',
-            { device: 'webgpu' }   // transformers.js falls back to wasm if webgpu unavailable
-          ).catch(async (e) => {
-            // WebGPU init can fail on Safari; retry with wasm explicitly.
-            console.warn('WebGPU pipeline failed, retrying with wasm:', e);
-            return pipeline(
-              'automatic-speech-recognition',
-              'onnx-community/whisper-base.en',
-              { device: 'wasm' }
-            );
-          });
-          setStatus('Whisper ready', 'ok');
-          logEntry(`Whisper loaded, backend: ${this.pipeline.model.session?.handler?.name || 'unknown'}`, 'info');
+            { device: 'wasm' }
+          );
+          setStatus('Whisper ready (WASM)', 'ok');
+          logEntry('Whisper loaded — WASM backend confirmed', 'info');
           return true;
         } catch (err) {
           console.error('Whisper install failed', err);
