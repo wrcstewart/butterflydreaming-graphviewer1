@@ -45,24 +45,25 @@ html, body {
   font-family: sans-serif;
 }
 
-/* Canary — 2026-08-14 — Pair button painted GREEN (media-bar depth
-   parity pass: mp-btn / mp-loop / mp-select shrunk so media-bar sits
-   at the same height as user-count + copy-link; player recentred at
-   left:50%). Rotation: blue → red → green → blue. Next = blue. */
+/* 2026-08-14 — Pair button promoted to BD's system yellow (#FFD700),
+   matching #back-btn and #view-mode-toggle. All three top-row primary
+   controls now share the same visual language. Canary role moved OFF
+   this button and onto #copy-link-btn (below). */
 #chat-btn {
-  background: #1e6b1e;
-  border: 1px solid #4caf50;
+  background: #FFD700;
+  border: 1px solid #a07820;
   border-radius: 4px;
-  color: #ffffff;
+  color: #1a1a20;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 3px 7px;                     /* -36% horizontal padding from 11px (A50f) — tighter buttons */
+  padding: 3px 10px;                    /* slight bump so Pair reads at parity with Back's 4px 12px */
   line-height: 1.4;
 }
 
 #chat-btn:hover:not(:disabled) {
-  border-color: #ffd88a;
-  color: #fff;
+  background: #ffe555;
+  border-color: #d4a52e;
 }
 
 /* Fallback for plain-HTTP LAN access where navigator.clipboard.writeText is
@@ -100,10 +101,13 @@ html, body {
 }
 #copy-link-fallback .fb-hint { opacity: 0.75; }
 
+/* 2026-08-14 — .active no longer swaps the palette; label already
+   communicates the state (Pair ↔ Unpair). Kept as a no-op selector
+   in case other code toggles .active for state tracking. */
 #chat-btn.active {
-  border-color: #ffd88a;
-  background: #5a4400;
-  color: #fff;
+  background: #FFD700;
+  border-color: #a07820;
+  color: #1a1a20;
 }
 
 #back-btn {
@@ -529,12 +533,11 @@ html, body {
 }
 #chat-new-card-btn:hover { border-color: #aaa; color: #fff; }
 
-/* 2026-08-14 — Copy Link demoted from top-row filled-yellow CTA to the
-   bottom-row utility strip. Sits at bottom-right, same visual language as
-   #media-bar (centre) and #user-count-panel (bottom-left): translucent
-   black rectangle, thin grey border, small white sans-serif — reads as
-   "developer readout / share utility" rather than primary UX. Label now
-   single-line ("Copy Link"). */
+/* Copy Link — bottom-row utility strip, same visual family as #media-bar
+   and #user-count-panel. Now also the CANARY host: border colour rotates
+   red → green → blue on every commit to a cached BD viewer file so the
+   user can spot cache staleness at a glance without needing to hunt for
+   a version number. 2026-08-14: initial canary colour BLUE. Next = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -542,18 +545,18 @@ html, body {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 1px solid #444;
+  border: 2px solid #4080ff;             /* CANARY — blue */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
   font-weight: 400;
   line-height: 1.4;
-  padding: 3px 8px;
+  padding: 2px 8px;                     /* -1px vertical to compensate for the 2px canary border, keeps trio height parity */
   cursor: pointer;
   white-space: nowrap;
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #888;
+  border-color: #7fb0ff;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -600,57 +603,58 @@ body:not(.player-active) #copy-up-btn {
    keeps its base margin-left: auto so it pushes to the right edge and
    grows the empty space between arrows and radios. */
 
-/* A42 §42.3 — Nodes/Player radio toggle in the action bar. Sits at the far
-   right (margin-left: auto). Radios start disabled; JS clears the disabled
-   attribute when chat becomes active and restores it (plus forces back to
-   Nodes) when chat closes. Faded look while disabled makes the state clear
-   without needing a colour cue. */
+/* 2026-08-14 — radio group promoted OUT of #action-bar layout into the
+   top row alongside #back-btn (left) and #pair-control (right). Sits on
+   BD's system yellow (#FFD700) so it reads as a primary mode selector,
+   visually paired with the yellow Back + Pair buttons that flank it.
+   All three radios (Nodes / Player / Edit) always visible; disabled state
+   is contextual and will get a click-time explanatory message soon. */
 #view-mode-toggle {
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  /* 2026-07-25 — pushed toward the right edge of #action-bar. `margin-
-     left: auto` consumes remaining space to the left; `margin-right`
-     pulls the pair back inward from the very edge so the toggle stays
-     visible on narrow viewports (was cut off on iPhone at edge-flush). */
-  margin-left: auto;
-  margin-right: 50px;
-  /* 2026-07-28 — white text (was #ccc) so this important mode switch
-     doesn't get missed against the recessed action-bar background. */
-  color: #fff;
+  gap: 8px;
+  background: #FFD700;
+  border: 1px solid #a07820;
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: #1a1a20;                        /* dark text on yellow */
   font-family: sans-serif;
-  font-size: 11px;
-  /* 2026-08-09 v2 — another +25 % (1.25 × 1.25 ≈ 1.5625) per user;
-     originals felt sluggish on mobile. `zoom` scales input dot, labels,
-     and internal gap atomically. */
-  zoom: 1.5625;
+  font-size: 13px;
+  font-weight: 600;
 }
 #view-mode-toggle label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   cursor: pointer;
   user-select: none;
-  /* 2026-08-09 v2 — enlarge the tap zone (was gap-3px, no padding, so
-     only the tiny radio dot + text glyphs were tappable). Padding here
-     stretches the whole <label> hit area; touch-action: manipulation
-     removes the ~300 ms double-tap-zoom hesitation iOS Safari adds. */
-  padding: 6px 4px;
+  padding: 2px 4px;                      /* tap-zone */
   touch-action: manipulation;
-  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.15);
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.15);
 }
 #view-mode-toggle input[type="radio"] {
   cursor: pointer;
   margin: 0;
-  /* 2026-08-09 — green radio dot (matches Player/Nodes mode-toggle
-     semantic of "go / active"). accent-color is respected by Safari,
-     Chrome, Firefox for native form controls. */
+  /* Green accent stays — reads well on yellow and keeps the "go / active"
+     semantic from the previous action-bar incarnation. */
   accent-color: #00b050;
+  /* Slightly larger so the tap target isn't a pinhead on iPhone.
+     accent-color survives width/height changes on all evergreen browsers. */
+  width: 15px;
+  height: 15px;
 }
 #view-mode-toggle input[type="radio"]:disabled,
-#view-mode-toggle input[type="radio"]:disabled + span,
-#view-mode-toggle:has(input:disabled) label {
-  opacity: 0.4;
+#view-mode-toggle input[type="radio"]:disabled + span {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+#view-mode-toggle label:has(input:disabled) {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 

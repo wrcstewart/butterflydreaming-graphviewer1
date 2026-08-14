@@ -2242,7 +2242,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (rn && rn.length) hasModule = MODULE_RE.test(rn.data('text') || '');
       }
       playerRadio.disabled = !hasModule;
-      playerLabel.style.display = hasModule ? '' : 'none';
+      // 2026-08-14 — Player label always visible now (part of the yellow
+      // top-row radio group alongside Nodes + Edit). Only the disabled
+      // attribute is contextual; visibility isn't. Clicking the disabled
+      // radio will surface an explanatory message (TBD).
       if (!hasModule && playerRadio.checked) {
         const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
         if (nodesRadio) nodesRadio.checked = true;

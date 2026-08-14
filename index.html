@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=159">
+  <link rel="stylesheet" href="style.css?v=160">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -52,12 +52,16 @@
          so the script-exchange controls sit next to the mode switch. -->
     <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
     <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
+    <!-- 2026-08-14 — radio group promoted to top row (position:fixed, yellow
+         background). All three radios always visible; each is disabled when
+         the current context can't support it (Player unless top card has a
+         %%bd_module directive; Edit until its action is wired). A helpful
+         message on click of a disabled radio is planned (TBD) — the always-
+         visible layout is what lets the message have an anchor to fire from. -->
     <span id="view-mode-toggle">
       <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
-      <!-- Player starts hidden + disabled (2026-07-17). updateSendBtn re-
-           evaluates on each top-card content change and shows/enables
-           Player only when the card contains a %%bd_module directive. -->
-      <label style="display:none"><input type="radio" name="view-mode" value="player" disabled> Player</label>
+      <label><input type="radio" name="view-mode" value="player" disabled> Player</label>
+      <label><input type="radio" name="view-mode" value="edit"   disabled> Edit</label>
     </span>
   </div>
   <div id="cy"></div>
@@ -171,6 +175,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=484"></script>
+  <script type="module" src="viewer.js?v=485"></script>
 </body>
 </html>
