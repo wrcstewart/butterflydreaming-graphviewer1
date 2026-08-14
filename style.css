@@ -45,12 +45,12 @@ html, body {
   font-family: sans-serif;
 }
 
-/* Canary — 2026-08-14 — Pair button painted BLUE for this button-
-   rationalisation pass. Rotates red → green → blue per commit to a
-   cached BD viewer file. Next rotation = red. */
+/* Canary — 2026-08-14 — Pair button painted RED (bottom row style pass:
+   Copy Link relocated + restyled, media-bar shifted 5% left, user-count
+   harmonised). Rotation: blue → red → green → blue. Next = green. */
 #chat-btn {
-  background: #1e5aa8;
-  border: 1px solid #4080ff;
+  background: #8a1e1e;
+  border: 1px solid #ff5555;
   border-radius: 4px;
   color: #ffffff;
   font-size: 14px;
@@ -528,32 +528,32 @@ html, body {
 }
 #chat-new-card-btn:hover { border-color: #aaa; color: #fff; }
 
-/* 2026-07-25 — Copy Link promoted to top-row, filled system yellow so it
-   reads as the primary "share this state" affordance. Still lives in the
-   action-bar HTML but styled to escape via position:fixed. Anchored to
-   the right so its RH edge sits close to the LH edge of #pair-control
-   (Pair) — the anchor is stable across viewport widths. */
+/* 2026-08-14 — Copy Link demoted from top-row filled-yellow CTA to the
+   bottom-row utility strip. Sits at bottom-right, same visual language as
+   #media-bar (centre) and #user-count-panel (bottom-left): translucent
+   black rectangle, thin grey border, small white sans-serif — reads as
+   "developer readout / share utility" rather than primary UX. Label now
+   single-line ("Copy Link"). */
 #copy-link-btn {
   position: fixed;
-  top: 34px;
-  right: 135px;          /* just left of #pair-control (right:8px + width ~130px) */
+  bottom: 6px;
+  right: 8px;
   z-index: 10;
-  background: #FFD700;
-  color: #1a1a20;
-  border: 1px solid #a07820;
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 0;
   font-family: sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.1;
-  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 3px 8px;
   cursor: pointer;
-  text-align: center;
-  min-width: 50px;
+  white-space: nowrap;
 }
 #copy-link-btn:hover:not(:disabled) {
-  background: #ffe555;
-  border-color: #d4a52e;
+  border-color: #888;
+  color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -804,8 +804,8 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #media-bar {
   display: none;
   position: fixed;
-  bottom: 2px;                          /* very bottom of the viewport (A50d — was 8px) */
-  left: 50%;
+  bottom: 6px;                          /* 2026-08-14 — raised 4 px so it aligns with #user-count-panel and #copy-link-btn on the same bottom row */
+  left: 45%;                            /* 2026-08-14 — shifted 5% to the left to open room for #copy-link-btn on the right of the same row */
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid #444;
@@ -1208,17 +1208,20 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #user-count-panel {
   position: fixed;
   /* 2026-08-14 — moved from top-right (inside old #title-bar band) to
-     bottom-left alongside #media-bar. Connection count is developer /
-     popularity info, not primary UX; belongs at the bottom edge with
-     other technical readouts, not competing with the top button row. */
+     bottom-left alongside #media-bar and #copy-link-btn. Connection
+     count is developer / popularity info, not primary UX; belongs at
+     the bottom edge with other technical readouts. Style harmonised
+     with #media-bar and #copy-link-btn — one visual family across
+     the bottom utility row. */
   bottom: 6px;
   left: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid #666;
-  color: #ccc;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid #444;
+  color: #fff;
   font-size: 11px;
   font-family: sans-serif;
   padding: 3px 8px;
+  white-space: nowrap;
   z-index: 20;                          /* above media-bar just in case */
   display: none;
 }
