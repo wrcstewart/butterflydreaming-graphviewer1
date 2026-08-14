@@ -217,6 +217,15 @@ function getChunkHint(isLast, hasDescendants, node) {
 }
 let chatStackEl            = null;    // #chat-stack — History panel (older cards)
 let currentStackEl         = null;    // #current-stack — Current panel (single newest card); 2026-08-14 split
+
+// 2026-08-14 — initial-root zoom-down factor. cy.fit on a single 76 px root
+// in an ~800 px canvas zooms in aggressively (~5×) so root ends up filling
+// half the viewport. We halve-plus-a-bit so root reads as a comfortable
+// medium-sized node, not the visual focus of the whole page. Applied at both
+// the initial (pre-boot-settled) fit and the authoritative post-rAF re-fit.
+// Only affects the one-node initial view; multi-node fits (nav, back-button)
+// land at a natural comfortable zoom without needing this clamp.
+const ROOT_INITIAL_ZOOM_FACTOR = 0.7;
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;     // unique id counter across all kinds
 let nextLocalSerial        = 1;     // "Local (k)" label counter — only locals consume it
@@ -3917,13 +3926,23 @@ async function init() {
   nodesById.forEach(nd => elements.push({ data: nd }));
   edgesById.forEach(ed => elements.push({ data: ed }));
 
-  // Pin #cy's top to the bottom of #default-panel BEFORE cytoscape constructs,
+  // Pin #cy's top to the bottom of the panel stack BEFORE cytoscape constructs,
   // so the initial cy.fit() uses the real canvas dimensions. If this runs after
   // init, the root ends up off-centre (mis-fit against the CSS fallback rect),
   // visible especially on iPhone after #default-panel grew to 34dvh.
+  // 2026-08-14 v3 — panel split: #chat-panel (History) is now the last flow
+  // element above #cy. #action-bar sits MID-STACK between #current-panel and
+  // #chat-panel, so pinning cy.top to action-bar's bottom made cy overlap
+  // History (root ended up rendered in the visible bottom half of an
+  // over-tall canvas). Reference chat-panel here — same fix mirrors the
+  // positionCyEl() reordering. default-panel is the pre-boot fallback for
+  // the very-first-tap-not-yet-happened case; action-bar retained as a
+  // last-resort defensive fallback.
   {
-    const refEl = document.getElementById('action-bar')
+    const chatPanelEl = document.getElementById('chat-panel');
+    const refEl = (chatPanelEl && chatPanelEl.getBoundingClientRect().height > 0 ? chatPanelEl : null)
               || document.getElementById('default-panel')
+              || document.getElementById('action-bar')
               || document.getElementById('cy-you');
     const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
     const cyEarly = document.getElementById('cy');
@@ -3959,16 +3978,13 @@ async function init() {
   cy.elements().hide();
   const root = cy.nodes('[type="root"]').first();
   root.show();
+  // Rough initial fit — cy container may still be resizing as boot
+  // completes (chat-panel .active toggle at line ~5010 hides the taller
+  // default-panel and reveals the shorter chat-panel, so cy grows). The
+  // authoritative re-fit is scheduled below inside the boot's rAF.
   cy.fit(root, fitPadding(cy, 120));
-  // 2026-08-14 — cy.fit on a single small node zooms aggressively (76 px
-  // root in an ~800 px canvas → zoom ~5×, root fills half the viewport).
-  // User wants the initial root at ~50 % of that diameter. Halve the
-  // fit-derived zoom, pivoting on the root's own position so it stays
-  // centred; re-centre for good measure. Only applies to this initial
-  // one-node fit — subsequent cy.fit calls (nav, back-button) frame
-  // multiple nodes so the zoom naturally lands at a comfortable level.
   if (cy.zoom() > 1.5) {
-    cy.zoom({ level: cy.zoom() * 0.5, position: root.position() });
+    cy.zoom({ level: cy.zoom() * ROOT_INITIAL_ZOOM_FACTOR, position: root.position() });
     cy.center(root);
   }
 
@@ -5083,7 +5099,32 @@ async function init() {
   const copyDownBtnBoot = document.getElementById('copy-down-btn');
   if (copyDownBtnBoot) copyDownBtnBoot.disabled = false;
   ws.emit('msg', { type: 'enter_chat' });
-  requestAnimationFrame(() => positionCyEl());
+  requestAnimationFrame(() => {
+    positionCyEl();
+    // 2026-08-14 v3 — authoritative post-boot re-fit for the initial-root
+    // view. Necessary because:
+    //   1) The synchronous cy.fit(root) up in setupCy ran BEFORE chat-panel
+    //      became .active. At that point default-panel (34dvh) was the last
+    //      visible panel; chat-panel (25dvh) took over during boot but
+    //      cytoscape's internal container rect stayed cached at the taller
+    //      pre-boot size, so root ended up placed in the lower portion of
+    //      the settled cy area.
+    //   2) positionCyEl above just stamped the correct cy.style.top for the
+    //      settled layout — cy.resize() forces cytoscape to re-read.
+    // Only re-fit if root is still the only visible node (very-first-view
+    // state). If the user tapped something in the rAF window we don't want
+    // to snap them back to root.
+    const rootNode = cy.nodes('[type="root"]').first();
+    const visibleCount = cy.nodes(':visible').length;
+    if (rootNode && rootNode.length && rootNode.visible() && visibleCount === 1) {
+      cy.resize();
+      cy.fit(rootNode, fitPadding(cy, 120));
+      if (cy.zoom() > 1.5) {
+        cy.zoom({ level: cy.zoom() * ROOT_INITIAL_ZOOM_FACTOR, position: rootNode.position() });
+        cy.center(rootNode);
+      }
+    }
+  });
 
   // MM1 (2026-07-05) — Return-from-standalone flow. When the URL carries a
   // ?data=<base64 JSON> payload (produced by the standalone player's
