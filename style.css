@@ -36,13 +36,20 @@ html, body {
 #pair-control {
   position: fixed;
   top: 6px;                              /* 2026-08-14 — raised from 34px into vacated title-bar row */
-  right: 8px;
+  /* 2026-08-14 v2 — panel-aligned on desktop: 30% from right edge lines
+     up with the 40%-wide centred panel's right edge. Mobile override
+     below restores the edge-flush 8 px so we don't waste horizontal
+     space when the panel goes full-width. */
+  right: 30%;
   display: flex;
   align-items: center;
   gap: 8px;
   z-index: 10;
   font-size: 11px;
   font-family: sans-serif;
+}
+@media (max-width: 767px) {
+  #pair-control { right: 8px; }
 }
 
 /* 2026-08-14 — Pair button promoted to BD's system yellow (#FFD700),
@@ -114,7 +121,9 @@ html, body {
   display: none;
   position: fixed;
   top: 6px;                              /* 2026-08-14 — raised from 34px into vacated title-bar row */
-  left: 8px;
+  /* 2026-08-14 v2 — panel-aligned on desktop; edge-flush on mobile
+     (media query at bottom of #back-btn block). */
+  left: 30%;
   z-index: 10;
   /* 2026-07-28 — filled signal yellow (same as #copy-link-btn) since Back
      is a primary navigation control and users were missing it in its dim
@@ -133,6 +142,9 @@ html, body {
 
 #back-btn.visible {
   display: block;
+}
+@media (max-width: 767px) {
+  #back-btn { left: 8px; }
 }
 
 #back-btn:hover {
@@ -191,7 +203,7 @@ html, body {
 #current-panel {
   display: flex;
   width: 40%;                           /* matches #chat-panel */
-  height: 118px;                        /* slightly more than a fresh empty Local card (head ~24 + body ~72 + padding 8) */
+  height: 180px;                        /* 2026-08-14 v2 — bumped from 118 (+50 %) so a fresh Local card renders at ~4 rows of body height rather than 2 — matches user's "roughly the depth of a new card when created" */
   flex-shrink: 0;
   align-self: center;
   background: rgba(61, 46, 0, 0.55);
@@ -289,13 +301,20 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  /* 2026-07-28 — softened from solid #3d2e00 to rgba so the bar reads
-     as chrome, not as a bright rectangle. Same hue, less presence. */
-  background: rgba(61, 46, 0, 0.55);
+  /* 2026-08-14 v2 — shrunk to match panel width (40%) and centred so it
+     visually sits under #current-panel and above #chat-panel as their
+     shared divider / control strip. Grey background (was dark amber)
+     helps it read as a chrome divider rather than a third amber panel.
+     Mobile override restores full-width. */
+  width: 40%;
+  align-self: center;
+  background: rgba(70, 70, 70, 0.55);
   padding: 4px 8px;
   box-sizing: border-box;
   flex-shrink: 0;
+}
+@media (max-width: 767px) {
+  #action-bar { width: 100%; }
 }
 
 /* Default (system-message) panel — visible whenever the chat panel is not active */
@@ -586,16 +605,20 @@ html, body {
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-14:
-   RED (panel-split commit — #current-panel + promoteCurrentToHistory).
-   Next rotation = green. */
+   GREEN (desktop panel-alignment pass — top-row buttons + bottom trio
+   pulled inward to 30% margins so they line up with the 40%-wide panel
+   column; action-bar shrunk to panel width + grey background; Current
+   panel bumped 118→180 px). Next rotation = blue. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
-  right: 8px;
+  /* 2026-08-14 v2 — panel-aligned on desktop; edge-flush on mobile
+     (media query below). */
+  right: 30%;
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff5555;             /* CANARY — red */
+  border: 2px solid #4caf50;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -605,8 +628,11 @@ html, body {
   cursor: pointer;
   white-space: nowrap;
 }
+@media (max-width: 767px) {
+  #copy-link-btn { right: 8px; }
+}
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #ff9999;
+  border-color: #7fd07f;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1269,9 +1295,11 @@ body.player-active #bd-invite-panel-viewer { display: block; }
      count is developer / popularity info, not primary UX; belongs at
      the bottom edge with other technical readouts. Style harmonised
      with #media-bar and #copy-link-btn — one visual family across
-     the bottom utility row. */
+     the bottom utility row.
+     v2 — panel-aligned on desktop: left:30% lines up with the panel's
+     left edge. Mobile override restores the edge-flush 8 px. */
   bottom: 6px;
-  left: 8px;
+  left: 30%;
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid #444;
   color: #fff;
@@ -1281,6 +1309,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   white-space: nowrap;
   z-index: 20;                          /* above media-bar just in case */
   display: none;
+}
+@media (max-width: 767px) {
+  #user-count-panel { left: 8px; }
 }
 
 #user-count-panel.active {
