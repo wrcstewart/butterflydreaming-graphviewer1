@@ -2846,6 +2846,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     if (clusterNode && clusterNode.length) clusterNode.show();
     titlePage.show();
+    // 2026-08-14 — also surface the gateway node for this work. It's the
+    // upstream link between Cluster and Title in the reading breadcrumb;
+    // hiding it here forced the user to mentally interpolate the connection.
+    // Match by source_text (both gateway and title carry the work name).
+    const workText = titlePage.data('source_text');
+    const gatewayNode = workText
+      ? cy.nodes('[type="TextNode"][?gateway]').filter(n => n.data('source_text') === workText).first()
+      : null;
+    if (gatewayNode && gatewayNode.length) gatewayNode.show();
 
     const count    = parts.length;
     const cols     = Math.min(15, Math.max(5, Math.round(Math.sqrt(count))));
@@ -2902,10 +2911,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const positions = {};
 
     if (!editModeActive) {
-      // Non-edit: cluster above title, title above grid
+      // Non-edit: cluster on top, then Gateway + Title side by side, then grid.
+      // 2026-08-14 — gateway now takes the row that used to hold the title
+      // (directly under the Cluster); title has been moved to the right of
+      // the gateway on the same row. Gives the user the full reading
+      // breadcrumb Cluster → Gateway → Title(s) → text-nodes without the
+      // gateway going missing on entry to reading mode.
       if (clusterNode && clusterNode.length)
         positions[clusterNode.id()] = { x: clusterX, y: headerY };
-      positions[titlePage.id()] = { x: clusterX, y: headerY + stepY };
+      const titleRowY = headerY + stepY;
+      if (gatewayNode && gatewayNode.length) {
+        positions[gatewayNode.id()] = { x: clusterX, y: titleRowY };
+        // 140 px offset: TextNode default width is 120, so centres at 0 and 140
+        // leave a 20 px gap between the two node edges. Enough breathing room
+        // without pushing title off-canvas on narrow viewports.
+        positions[titlePage.id()] = { x: clusterX + 140, y: titleRowY };
+      } else {
+        // No gateway found → keep the pre-2026-08-14 layout (title stays
+        // in the row directly below Cluster).
+        positions[titlePage.id()] = { x: clusterX, y: titleRowY };
+      }
       const gridY = headerY + stepY * 2;
       parts.forEach((n, i) => {
         const row      = Math.floor(i / dispCols);
