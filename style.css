@@ -605,10 +605,10 @@ html, body {
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-14:
-   GREEN (desktop panel-alignment pass — top-row buttons + bottom trio
-   pulled inward to 30% margins so they line up with the 40%-wide panel
-   column; action-bar shrunk to panel width + grey background; Current
-   panel bumped 118→180 px). Next rotation = blue. */
+   BLUE (small fix pass — dropped stray promoteCurrentToHistory calls
+   on node tap + enterNode so Current stays populated between clicks;
+   initial root zoom clamped so the root doesn't render huge on load).
+   Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -618,7 +618,7 @@ html, body {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4caf50;             /* CANARY — green */
+  border: 2px solid #4080ff;             /* CANARY — blue */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -632,7 +632,7 @@ html, body {
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #7fd07f;
+  border-color: #7fb0ff;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }

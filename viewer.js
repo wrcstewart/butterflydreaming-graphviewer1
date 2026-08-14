@@ -3224,12 +3224,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       cancelDwell();
     }
     hideTooltip();
-    // 2026-08-14 — panel split: single-tap on a node counts as a focus
-    // shift, so demote whatever's currently in the Current pane down
-    // to History even if the tap doesn't itself add a card. Downstream
-    // createCard calls (routeNodeText / chunk system) are idempotent —
-    // they'll find Current already empty on their own promote pass.
-    promoteCurrentToHistory();
+    // 2026-08-14 v2 — no promoteCurrentToHistory() here. Original spec
+    // promoted on every node tap; in practice a same-node re-tap or a
+    // pure-navigation tap doesn't create a card downstream, leaving the
+    // Current pane visibly empty for no benefit. Promote only when new
+    // content is actually arriving — that's inside createCard. Result:
+    // Current stays populated with the last card until the NEXT tap
+    // (on a new node) brings a new card that displaces it.
     markReadNode(node, cy);
     advanceOrNavigate(node);
   });
@@ -3637,14 +3638,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // read-tap's own tooltip/panel routing (caller handles that separately).
   function enterNode(node) {
     if (!node || !node.length) return;
-    // 2026-08-14 — panel split: a single-tap on a node counts as "focus
-    // has shifted", so whatever card is currently in the Current pane
-    // gets pushed into History even if the tap doesn't itself create a
-    // new card (e.g. re-tapping an already-read node). No-op when Current
-    // is empty. Cards created downstream by routeNodeText / chunk system
-    // hit createCard which does its own promotion (idempotent — the
-    // second call finds Current already empty).
-    promoteCurrentToHistory();
+    // 2026-08-14 v2 — no promote here either. Any card that follows this
+    // programmatic navigation (return-from-standalone auto-loads a
+    // system/local card) goes through createCard, which handles the
+    // Current-slot rotation. Firing promote here as well was leaving
+    // Current empty until the follow-up card arrived, which the user
+    // read as a bug (see cy.on('tap','node') comment above).
     markReadNode(node, cy);
     expandToNode(node);
   }
@@ -3961,6 +3960,17 @@ async function init() {
   const root = cy.nodes('[type="root"]').first();
   root.show();
   cy.fit(root, fitPadding(cy, 120));
+  // 2026-08-14 — cy.fit on a single small node zooms aggressively (76 px
+  // root in an ~800 px canvas → zoom ~5×, root fills half the viewport).
+  // User wants the initial root at ~50 % of that diameter. Halve the
+  // fit-derived zoom, pivoting on the root's own position so it stays
+  // centred; re-centre for good measure. Only applies to this initial
+  // one-node fit — subsequent cy.fit calls (nav, back-button) frame
+  // multiple nodes so the zoom naturally lands at a comfortable level.
+  if (cy.zoom() > 1.5) {
+    cy.zoom({ level: cy.zoom() * 0.5, position: root.position() });
+    cy.center(root);
+  }
 
   const MAX_IDLE_MS = 60 * 60 * 1000; // 60 min idle → session considered ended
   const wsRef = { current: ws, lastActivity: Date.now(), maxIdleMs: MAX_IDLE_MS };
