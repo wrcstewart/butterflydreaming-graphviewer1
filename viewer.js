@@ -1016,16 +1016,18 @@ function buildStyle() {
       selector: 'edge[type="CHILD"]',
       style: {
         'target-arrow-shape': 'triangle',
-        // 2026-08-14 — gateway→title edges: dimmer opacity (0.5) and
-        // half-scale arrow (0.6). The bright white line + bulky arrow
-        // dominated the graph on gateway open and felt mathematical /
-        // over-emphasised. Non-gateway CHILD edges keep the previous
-        // 0.7 / 1.2 defaults.
+        // 2026-08-14 — softened for all reading-sequence CHILD edges
+        // (any TextNode-sourced CHILD — covers gateway→title, title→text-
+        // node, AND text-node→text-node hops). Opacity 0.5 + arrow-scale
+        // 0.6 across the board so the descendant graph inside a work reads
+        // as a calm sequence rather than a forbidding directed graph with
+        // bright bulky arrows. Non-TextNode-sourced CHILD edges (if any)
+        // keep the 0.7 / 1.2 defaults.
         'arrow-scale': function(edge) {
-          return edge.source().data('gateway') ? 0.6 : 1.2;
+          return edge.source().data('type') === 'TextNode' ? 0.6 : 1.2;
         },
         'opacity': function(edge) {
-          return edge.source().data('gateway') ? 0.5 : 0.7;
+          return edge.source().data('type') === 'TextNode' ? 0.5 : 0.7;
         },
         'width': function(edge) {
           const isGateway = edge.source().data('gateway');

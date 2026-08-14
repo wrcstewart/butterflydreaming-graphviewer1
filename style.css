@@ -605,9 +605,9 @@ html, body {
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-14:
-   GREEN (gateway→title edge softening — opacity 0.7 → 0.5, arrow-scale
-   1.2 → 0.6 so the bright white line + bulky arrow no longer dominate
-   the graph when a gateway is opened). Next rotation = blue. */
+   BLUE (softening extended to ALL TextNode-sourced CHILD edges — the
+   whole reading-sequence descendant graph now uses 0.5 opacity + 0.6
+   arrow-scale, not just the gateway→title hop). Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -617,7 +617,7 @@ html, body {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4caf50;             /* CANARY — green */
+  border: 2px solid #4080ff;             /* CANARY — blue */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -631,7 +631,7 @@ html, body {
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #7fd07f;
+  border-color: #7fb0ff;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
