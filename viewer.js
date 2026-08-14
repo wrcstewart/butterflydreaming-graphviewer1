@@ -4250,12 +4250,13 @@ async function init() {
   // pair queue (curation-code-gated for the arriver), press Leave to
   // unpair or to walk out of the wait queue. Label reflects state.
   function updateJoinButtonLabel() {
-    // 2026-07-16 — idle label kept as "Join Remote" so it lines up with
-    // the NO_PARTNER_WAITING_TEXT helper copy on the server ("If someone
-    // remote presses Join you will be paired automatically"). Toggled
-    // state reads "Say: Bye" — a farewell prompt rather than a state
-    // label, framing the button press as a courtesy send-off.
-    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Say: Bye' : 'Join Remote';
+    // 2026-08-14 — labels shortened to Pair / Unpair as part of the
+    // button-rationalisation pass. Tightens visual footprint in the
+    // top row and is more direct about what the button does (previously
+    // "Join Remote" / "Say: Bye"). Server-side NO_PARTNER_WAITING_TEXT
+    // helper copy still references the older "Join" verb; update there
+    // if drift becomes confusing.
+    chatBtn.textContent = (pairingState.active || pairingState.waiting) ? 'Unpair' : 'Pair';
   }
 
   function togglePair() {
@@ -5000,12 +5001,12 @@ async function init() {
   //     the user picks Player, no pair needed
   //   - Copy Down is enabled from the start (Copy Up still waits for a
   //     Copy Down press — that gate is independent)
-  //   - Pair-toggle button starts labelled "Join Remote"; togglePair +
-  //     the pair-state message handlers below keep the label in sync
-  //     (Join Remote ↔ Say: Bye, per updateJoinButtonLabel)
+  //   - Pair-toggle button starts labelled "Pair"; togglePair + the
+  //     pair-state message handlers below keep the label in sync
+  //     (Pair ↔ Unpair, per updateJoinButtonLabel)
   chatPanel.classList.add('active');
   chatBtn.classList.add('active');
-  chatBtn.textContent = 'Join Remote';
+  chatBtn.textContent = 'Pair';
   // Enable the Nodes radio unconditionally; Player is gated by
   // updateSendBtn on top-card content (2026-07-17) — starts hidden
   // + disabled in the HTML, becomes visible only when a %%bd_module

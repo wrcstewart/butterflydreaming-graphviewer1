@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=156">
+  <link rel="stylesheet" href="style.css?v=157">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -20,7 +20,11 @@
     </div>
   </div>
 
-  <div id="title-bar">Butterfly Dreaming Development</div>
+  <!-- 2026-08-14 — #title-bar removed. Its "Butterfly Dreaming Development"
+       label was cosmetic-only; the vacated top row now hosts the raised
+       #back-btn and #pair-control (previously sat one row down at top:34px).
+       Frees ~22 px of vertical space for a taller split panel in the edit
+       mode being prepared. -->
   <div id="bc-spacer"></div>
   <div id="cy-buddy"></div>
   <div id="cy-you"></div>
@@ -111,7 +115,7 @@
   <div id="user-count-panel"></div>
   <button id="back-btn">←</button>
   <div id="pair-control">
-    <button id="chat-btn">Join Remote</button>
+    <button id="chat-btn">Pair</button>
     <span id="pair-status"></span>
   </div>
   <!-- 2026-07-25 — dev-panel simplified. Edit checkbox retired: editModeActive
@@ -167,6 +171,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=483"></script>
+  <script type="module" src="viewer.js?v=484"></script>
 </body>
 </html>

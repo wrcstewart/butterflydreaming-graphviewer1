@@ -14,19 +14,8 @@ html, body {
   flex-direction: column;
 }
 
-#title-bar {
-  width: 100%;
-  padding: 4px 110px 4px 12px;          /* right padding reserves room for #user-count-panel */
-  font-size: 13px;
-  font-family: sans-serif;
-  font-style: italic;
-  color: #ffd88a;
-  text-align: left;
-  flex-shrink: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* 2026-08-14 — #title-bar rule removed alongside the element itself.
+   Vacated top row now hosts #back-btn + #pair-control at top:6px. */
 
 #bc-spacer {
   height: 50px;
@@ -46,7 +35,7 @@ html, body {
 
 #pair-control {
   position: fixed;
-  top: 34px;
+  top: 6px;                              /* 2026-08-14 — raised from 34px into vacated title-bar row */
   right: 8px;
   display: flex;
   align-items: center;
@@ -56,11 +45,14 @@ html, body {
   font-family: sans-serif;
 }
 
+/* Canary — 2026-08-14 — Pair button painted BLUE for this button-
+   rationalisation pass. Rotates red → green → blue per commit to a
+   cached BD viewer file. Next rotation = red. */
 #chat-btn {
-  background: #3d2e00;
-  border: 1px solid #a07820;
+  background: #1e5aa8;
+  border: 1px solid #4080ff;
   border-radius: 4px;
-  color: #ffd88a;
+  color: #ffffff;
   font-size: 14px;
   cursor: pointer;
   padding: 3px 7px;                     /* -36% horizontal padding from 11px (A50f) — tighter buttons */
@@ -116,7 +108,7 @@ html, body {
 #back-btn {
   display: none;
   position: fixed;
-  top: 34px;
+  top: 6px;                              /* 2026-08-14 — raised from 34px into vacated title-bar row */
   left: 8px;
   z-index: 10;
   /* 2026-07-28 — filled signal yellow (same as #copy-link-btn) since Back
@@ -540,7 +532,7 @@ html, body {
    reads as the primary "share this state" affordance. Still lives in the
    action-bar HTML but styled to escape via position:fixed. Anchored to
    the right so its RH edge sits close to the LH edge of #pair-control
-   (Join Remote) — the anchor is stable across viewport widths. */
+   (Pair) — the anchor is stable across viewport widths. */
 #copy-link-btn {
   position: fixed;
   top: 34px;
@@ -1215,15 +1207,19 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 
 #user-count-panel {
   position: fixed;
-  top: 4px;                              /* aligns with #title-bar text */
-  right: 16px;
+  /* 2026-08-14 — moved from top-right (inside old #title-bar band) to
+     bottom-left alongside #media-bar. Connection count is developer /
+     popularity info, not primary UX; belongs at the bottom edge with
+     other technical readouts, not competing with the top button row. */
+  bottom: 6px;
+  left: 8px;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid #666;
-  color: #ccc;                          /* was #888 — brighter for visibility against #title-bar yellow */
+  color: #ccc;
   font-size: 11px;
   font-family: sans-serif;
   padding: 3px 8px;
-  z-index: 20;                          /* above pair-control and dev-panel just in case */
+  z-index: 20;                          /* above media-bar just in case */
   display: none;
 }
 
