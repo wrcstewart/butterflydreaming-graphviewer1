@@ -45,12 +45,13 @@ html, body {
   font-family: sans-serif;
 }
 
-/* Canary — 2026-08-14 — Pair button painted RED (bottom row style pass:
-   Copy Link relocated + restyled, media-bar shifted 5% left, user-count
-   harmonised). Rotation: blue → red → green → blue. Next = green. */
+/* Canary — 2026-08-14 — Pair button painted GREEN (media-bar depth
+   parity pass: mp-btn / mp-loop / mp-select shrunk so media-bar sits
+   at the same height as user-count + copy-link; player recentred at
+   left:50%). Rotation: blue → red → green → blue. Next = blue. */
 #chat-btn {
-  background: #8a1e1e;
-  border: 1px solid #ff5555;
+  background: #1e6b1e;
+  border: 1px solid #4caf50;
   border-radius: 4px;
   color: #ffffff;
   font-size: 14px;
@@ -805,11 +806,11 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   display: none;
   position: fixed;
   bottom: 6px;                          /* 2026-08-14 — raised 4 px so it aligns with #user-count-panel and #copy-link-btn on the same bottom row */
-  left: 45%;                            /* 2026-08-14 — shifted 5% to the left to open room for #copy-link-btn on the right of the same row */
+  left: 50%;                            /* 2026-08-14 — recentred (5% shift undone; Copy Link fits fine at right:8px without moving the player) */
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid #444;
-  padding: 3px 8px;
+  padding: 0 6px;                       /* 2026-08-14 — removed vertical padding; inner mp-btn/mp-loop/mp-select shrunk to match user-count + copy-link depth */
   color: #fff;
   font-size: 11px;
   font-family: sans-serif;
@@ -820,7 +821,7 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #media-bar.active {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;                             /* 2026-08-14 — tightened (was 6px) so shrunk controls sit close-packed */
 }
 
 #cluster-editor-bar {
@@ -930,8 +931,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   color: #ccc;
   font-size: 11px;
   font-family: sans-serif;
-  padding: 1px 3px;
-  min-width: 130px;
+  padding: 0 3px;                       /* 2026-08-14 — trimmed for bottom-row height parity */
+  min-width: 110px;                     /* 2026-08-14 — was 130px; tighter media-bar footprint */
+  height: 18px;                         /* 2026-08-14 — explicit so Safari's native dropdown chrome doesn't push media-bar taller than sibling utility panels */
   cursor: pointer;
 }
 
@@ -955,10 +957,10 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   border: 1px solid #888;
   border-radius: 4px;
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;                      /* 2026-08-14 — was 13px; shrunk for bottom-row parity */
   cursor: pointer;
-  padding: 2px 8px;
-  line-height: 1.4;
+  padding: 0 6px;                       /* 2026-08-14 — was 2px 8px; media-bar depth now matches user-count + copy-link */
+  line-height: 18px;                    /* 2026-08-14 — explicit for consistent height alongside .mp-select */
   flex-shrink: 0;
 }
 
@@ -966,16 +968,17 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   border-color: #fff;
 }
 
-/* Loop toggle (2026-08-05) — outlined resting, filled amber when engaged. */
+/* Loop toggle (2026-08-05) — outlined resting, filled amber when engaged.
+   2026-08-14 — matches new .mp-btn dimensions (bottom-row parity pass). */
 .mp-loop {
   background: none;
   border: 1px solid #888;
   border-radius: 4px;
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
-  padding: 2px 7px;
-  line-height: 1.4;
+  padding: 0 5px;
+  line-height: 18px;
   flex-shrink: 0;
 }
 .mp-loop:hover     { border-color: #fff; }
