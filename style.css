@@ -18,7 +18,7 @@ html, body {
    Vacated top row now hosts #back-btn + #pair-control at top:6px. */
 
 #bc-spacer {
-  height: 50px;
+  height: 40px;                          /* 2026-08-14 — reduced from 50px (title-bar gone; top-row buttons now at top:6px extending to ~34px, so 40px clears them with a 6 px gap) */
   flex-shrink: 0;
 }
 
@@ -181,11 +181,52 @@ html, body {
   cursor: url('cursor-wings.svg') 16 16, auto !important;
 }
 
+/* 2026-08-14 — panel split. #current-panel above action-bar holds
+   only the newest card (or arrived remote/system/helper card); the
+   older stack lives below the bar in #chat-panel (which retains its
+   old id but plays the role of "History"). Together with the action-
+   bar between them they form the SR-destination-over-source layout
+   we'll host the Edit-mode SR controls on. */
+
+#current-panel {
+  display: flex;
+  width: 40%;                           /* matches #chat-panel */
+  height: 118px;                        /* slightly more than a fresh empty Local card (head ~24 + body ~72 + padding 8) */
+  flex-shrink: 0;
+  align-self: center;
+  background: rgba(61, 46, 0, 0.55);
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+}
+@media (max-width: 767px) {
+  #current-panel { width: 100%; }
+}
+#current-stack {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;                        /* iOS: lets internal overflow-y actually activate inside a flex column */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-content: flex-start;
+  gap: 6px;
+  padding: 4px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  background: #0a0a1a;
+  border: 1px solid #444;
+  border-radius: 6px;
+}
+
 #chat-panel {
   display: none;
   width: 40%;                           /* A51e — matches #default-panel so the panel width
                                            is constant whether chat-mode is on or off */
-  height: 33dvh;
+  height: 25dvh;                        /* 2026-08-14 — reduced from 33dvh; #current-panel above the bar now takes 118 px of the previously-single-panel budget */
   flex-shrink: 0;
   align-self: center;
   /* 2026-07-28 — dropped from solid #3d2e00 to rgba(...,0.55) so the frame
@@ -313,8 +354,11 @@ html, body {
   overflow-y: auto;
 }
 
-/* chat-panel system card — pure black body; head stripe carries the kind signal */
-#chat-stack .card.system {
+/* Panel-hosted system card — pure black body; head stripe carries the kind
+   signal. 2026-08-14 — extended to #current-stack (system cards may live in
+   either half of the split now). */
+#chat-stack .card.system,
+#current-stack .card.system {
   background: #000;
 }
 
@@ -323,6 +367,7 @@ html, body {
   min-width: 0;
   width: 100%;
   height: 100%;
+  min-height: 0;                       /* 2026-08-14 — iOS: lets internal overflow-y actually activate inside a flex column (same fix used in sr_editor.html + #current-stack) */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;             /* top-down; newest card prepended so it sits at top */
@@ -330,6 +375,8 @@ html, body {
   gap: 6px;
   padding: 4px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: #0a0a1a;
   border: 1px solid #444;
   border-radius: 6px;
@@ -363,8 +410,10 @@ html, body {
 .card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
 /* 2026-07-16 — system card head now uses the Root-node fill colour
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
-   on bright yellow fails luminance contrast (see [[user-colour-vision]]). */
-#chat-stack .card.system .card-head { background: #FFD700; color: #1a1a20; }
+   on bright yellow fails luminance contrast (see [[user-colour-vision]]).
+   2026-08-14 — extended to #current-stack. */
+#chat-stack .card.system .card-head,
+#current-stack .card.system .card-head { background: #FFD700; color: #1a1a20; }
 
 .card-body {
   width: 100%;
@@ -389,6 +438,7 @@ html, body {
    (2026-07-16 — needed for the multi-paragraph Helper message on
    ready_to_pair with no partner). */
 #chat-stack .card.system .card-body,
+#current-stack .card.system .card-body,
 .card.received .card-body {
   min-height: 0;
   white-space: pre-wrap;
@@ -534,10 +584,10 @@ html, body {
 #chat-new-card-btn:hover { border-color: #aaa; color: #fff; }
 
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
-   and #user-count-panel. Now also the CANARY host: border colour rotates
-   red → green → blue on every commit to a cached BD viewer file so the
-   user can spot cache staleness at a glance without needing to hunt for
-   a version number. 2026-08-14: initial canary colour BLUE. Next = red. */
+   and #user-count-panel. CANARY host: border colour rotates
+   blue → red → green per commit to a cached BD viewer file. 2026-08-14:
+   RED (panel-split commit — #current-panel + promoteCurrentToHistory).
+   Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -545,7 +595,7 @@ html, body {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4080ff;             /* CANARY — blue */
+  border: 2px solid #ff5555;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -556,7 +606,7 @@ html, body {
   white-space: nowrap;
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #7fb0ff;
+  border-color: #ff9999;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }

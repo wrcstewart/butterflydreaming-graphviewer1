@@ -215,11 +215,24 @@ function getChunkHint(isLast, hasDescendants, node) {
   }
   return CHUNK_HINT_NO_MORE;
 }
-let chatStackEl            = null;
+let chatStackEl            = null;    // #chat-stack — History panel (older cards)
+let currentStackEl         = null;    // #current-stack — Current panel (single newest card); 2026-08-14 split
 let cards                  = [];      // ordered bottom-up; cards[length-1] is the top
 let nextCardSerial         = 1;     // unique id counter across all kinds
 let nextLocalSerial        = 1;     // "Local (k)" label counter — only locals consume it
 let defaultStackEl         = null;    // #default-stack — central system-message hub
+
+// 2026-08-14 — promote whatever card is currently in #current-stack down to
+// the top of #chat-stack (History). Called from createCard() before inserting
+// a fresh card, and from enterNode() so a pure node-tap navigation also clears
+// Current even when no new card follows. No-op if Current is empty.
+function promoteCurrentToHistory() {
+  if (!currentStackEl || !chatStackEl) return;
+  const top = currentStackEl.firstElementChild;
+  if (!top) return;
+  chatStackEl.prepend(top);              // moves the DOM node atomically; keeps cards[] intact (cards[] tracks logical state, not DOM parent)
+  chatStackEl.scrollTop = 0;             // freshly-arrived history card is what the eye expects to see
+}
 
 function createSystemCardEl(label) {
   const el = document.createElement('div');
@@ -2002,7 +2015,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
 
     el.append(head, body);
-    chatStackEl.prepend(el);                // newest card visually on top; older cards push down
+    // 2026-08-14 — split-panel insertion: promote the previous "current"
+    // card down into History, then land the new card in the empty Current
+    // slot. Guard for boot ordering (currentStackEl may not yet be bound
+    // if createCard is somehow called before init runs).
+    if (currentStackEl) {
+      promoteCurrentToHistory();
+      currentStackEl.prepend(el);
+      currentStackEl.scrollTop = 0;
+    } else {
+      chatStackEl.prepend(el);              // fallback to legacy single-stack behaviour
+    }
     card.el   = el;
     card.body = body;
     cards.push(card);
@@ -3201,6 +3224,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       cancelDwell();
     }
     hideTooltip();
+    // 2026-08-14 — panel split: single-tap on a node counts as a focus
+    // shift, so demote whatever's currently in the Current pane down
+    // to History even if the tap doesn't itself add a card. Downstream
+    // createCard calls (routeNodeText / chunk system) are idempotent —
+    // they'll find Current already empty on their own promote pass.
+    promoteCurrentToHistory();
     markReadNode(node, cy);
     advanceOrNavigate(node);
   });
@@ -3608,6 +3637,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // read-tap's own tooltip/panel routing (caller handles that separately).
   function enterNode(node) {
     if (!node || !node.length) return;
+    // 2026-08-14 — panel split: a single-tap on a node counts as "focus
+    // has shifted", so whatever card is currently in the Current pane
+    // gets pushed into History even if the tap doesn't itself create a
+    // new card (e.g. re-tapping an already-read node). No-op when Current
+    // is empty. Cards created downstream by routeNodeText / chunk system
+    // hit createCard which does its own promotion (idempotent — the
+    // second call finds Current already empty).
+    promoteCurrentToHistory();
     markReadNode(node, cy);
     expandToNode(node);
   }
@@ -3989,14 +4026,16 @@ async function init() {
   // pressable at any time.)
 
   function positionCyEl() {
-    // A50j: #action-bar is always visible and sits below whichever panel
-    // (chat or default) is showing in DOM flow — so cy always pins to its
-    // bottom. Fall back to the active panel / breadcrumb if the bar is
-    // missing for any reason.
+    // 2026-08-14 — panel split changes what sits at the bottom of the
+    // panel stack. Layout is now:
+    //   #current-panel  →  #action-bar  →  #chat-panel  →  cy
+    // so #chat-panel (History) is the last flow element above cy.
+    // #action-bar is NO LONGER the correct pin — it's mid-stack now.
+    // Fall back through the pre-split candidates for defensive safety.
     const refEl =
-      document.getElementById('action-bar') ||
       (chatModeActive && chatPanel.getBoundingClientRect().height > 0 ? chatPanel : null) ||
       document.getElementById('default-panel') ||
+      document.getElementById('action-bar') ||
       document.getElementById('cy-you');
     const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
     cyEl.style.top = topPx;
@@ -4305,13 +4344,20 @@ async function init() {
   chatBtn.addEventListener('click', togglePair);
 
   chatStackEl    = document.getElementById('chat-stack');
+  currentStackEl = document.getElementById('current-stack');   // 2026-08-14 split
   defaultStackEl = document.getElementById('default-stack');
 
   const newCardBtn = document.getElementById('chat-new-card-btn');
   if (newCardBtn) {
     newCardBtn.addEventListener('click', () => {
       const card = createCard({ kind: 'local' });
-      if (chatStackEl) chatStackEl.scrollTop = 0;
+      // 2026-08-14 — reset both panes' scroll positions after a new card
+      // arrives (History freshly-topped by promotion; Current freshly-
+      // populated). createCard already sets scrollTop=0 on both, but we
+      // keep this line as a belt-and-braces for the "user clicked New
+      // then scrolled" edge case.
+      if (currentStackEl) currentStackEl.scrollTop = 0;
+      if (chatStackEl)    chatStackEl.scrollTop    = 0;
       if (card && card.body && card.body.focus) {
         try { card.body.focus(); } catch (_) {}
       }
@@ -4439,7 +4485,11 @@ async function init() {
       }
       const top = topLocalCard();
       if (top && top.body) return top.body;
-      const topEl = document.querySelector('#chat-stack .card');
+      // 2026-08-14 — panel split: the newest card lives in #current-stack
+      // now, older cards in #chat-stack. Check both, current-first.
+      const topEl =
+        document.querySelector('#current-stack .card') ||
+        document.querySelector('#chat-stack .card');
       if (topEl) {
         const body = topEl.querySelector('.card-body');
         if (body) return body;

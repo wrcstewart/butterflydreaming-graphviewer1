@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=160">
+  <link rel="stylesheet" href="style.css?v=161">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -28,16 +28,16 @@
   <div id="bc-spacer"></div>
   <div id="cy-buddy"></div>
   <div id="cy-you"></div>
-  <div id="chat-panel">
-    <div id="chat-stack"></div>
-  </div>
-  <div id="default-panel">
-    <div id="default-stack">
-      <div class="card system">
-        <div class="card-head">System</div>
-        <div class="card-body" id="default-card-body">Welcome! Please click or tap the node below to start your journey</div>
-      </div>
-    </div>
+  <!-- 2026-08-14 — panel split. Newest card (or freshly-arrived remote /
+       system / helper card) lives in #current-panel; anything older gets
+       pushed into #chat-panel (which is now the History panel).
+       #action-bar sits BETWEEN them and, in Edit mode, will host the SR
+       editor's mic + Accept controls (Current = destination, History =
+       source in SR terminology). Promotion triggers (all handled in
+       createCard, plus enterNode for pure navigations that don't create
+       a card): new card created, new info arrives, single-tap on a node. -->
+  <div id="current-panel">
+    <div id="current-stack"></div>
   </div>
   <div id="action-bar">
     <button id="chat-send-btn" type="button" disabled>Send</button>
@@ -63,6 +63,22 @@
       <label><input type="radio" name="view-mode" value="player" disabled> Player</label>
       <label><input type="radio" name="view-mode" value="edit"   disabled> Edit</label>
     </span>
+  </div>
+  <!-- History panel (was the sole chat panel pre-split). Sits BELOW the
+       action-bar; holds everything except the single newest card, which
+       lives up in #current-panel. #chat-panel / #chat-stack IDs kept to
+       avoid a big rename churn — role is now "history" but the DOM name
+       stays for compat with the many existing selectors. -->
+  <div id="chat-panel">
+    <div id="chat-stack"></div>
+  </div>
+  <div id="default-panel">
+    <div id="default-stack">
+      <div class="card system">
+        <div class="card-head">System</div>
+        <div class="card-body" id="default-card-body">Welcome! Please click or tap the node below to start your journey</div>
+      </div>
+    </div>
   </div>
   <div id="cy"></div>
   <!-- No hardcoded src: viewer.js's MM1.6 loader owns the iframe's URL and
@@ -175,6 +191,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=485"></script>
+  <script type="module" src="viewer.js?v=486"></script>
 </body>
 </html>
