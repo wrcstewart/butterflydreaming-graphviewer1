@@ -1016,8 +1016,17 @@ function buildStyle() {
       selector: 'edge[type="CHILD"]',
       style: {
         'target-arrow-shape': 'triangle',
-        'arrow-scale': 1.2,
-        'opacity': 0.7,
+        // 2026-08-14 — gateway→title edges: dimmer opacity (0.5) and
+        // half-scale arrow (0.6). The bright white line + bulky arrow
+        // dominated the graph on gateway open and felt mathematical /
+        // over-emphasised. Non-gateway CHILD edges keep the previous
+        // 0.7 / 1.2 defaults.
+        'arrow-scale': function(edge) {
+          return edge.source().data('gateway') ? 0.6 : 1.2;
+        },
+        'opacity': function(edge) {
+          return edge.source().data('gateway') ? 0.5 : 0.7;
+        },
         'width': function(edge) {
           const isGateway = edge.source().data('gateway');
           const rs = edge.data('rel_source');
