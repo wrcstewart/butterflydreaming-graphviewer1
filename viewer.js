@@ -4707,6 +4707,14 @@ async function init() {
   // uses mode to pick the boundary separator (' ' vs ' — ') when
   // adjacent text exists.
   function srAlignAndMark(uttText, srcText) {
+    // 2026-08-15 — strip leading/trailing quote marks from Whisper
+    // output. Whisper sometimes wraps a recording it perceives as a
+    // direct quotation / recitation in " " or ' ' (typical when the
+    // speaker's cadence reads as "reading aloud"). Not user-spoken;
+    // remove before alignment / insertion so we don't drag them into
+    // the destination. Handles straight " ' plus curly " " ' '.
+    const QUOTE_RE = /^["'“”‘’]+\s*|\s*["'“”‘’]+$/g;
+    uttText = (uttText || '').replace(QUOTE_RE, '');
     if (!uttText || !srcText) return { text: uttText, mode: 'free' };
     try {
       const uttToks = srTokenise(uttText);
