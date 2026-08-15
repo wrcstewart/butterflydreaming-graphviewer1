@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=170">
+  <link rel="stylesheet" href="style.css?v=171">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -40,6 +40,13 @@
     <div id="current-stack"></div>
   </div>
   <div id="action-bar">
+    <!-- 2026-08-15 — SR mic controls. Visible only in Edit mode via
+         body.edit-active CSS gate. Three-state hybrid button copied
+         from sr_editor.html (click to grant permission → press-hold
+         to record). Level meter to its right; primer floats over the
+         row while permission dialog is up (see #mic-primer below). -->
+    <button id="sr-mic-btn" type="button" title="Click to grant mic; press-and-hold to record">🎤 Use Mic</button>
+    <div id="sr-level-meter" title="Mic input level. Green normal, amber loud, red clipping."><div class="bar"></div></div>
     <button id="chat-send-btn" type="button" disabled>Send</button>
     <!-- 2026-07-25: sole entry point to create a Local card (no auto-Local
          at boot). Label reads "New / Edit" — press creates a Local at top
@@ -172,6 +179,16 @@
     </div>
   </div>
 
+  <!-- 2026-08-15 — SR mic primer. Shown while browser permission
+       dialog is up between "Use Mic" click and accept/deny; also shown
+       when user first arrives in Edit mode (until they press mic).
+       Copy: "Dictate one sentence at a time" — chosen 2026-08-15. -->
+  <div id="sr-mic-primer" hidden aria-live="polite">
+    Dictate <strong>one sentence at a time</strong>. The pause between
+    recordings lets you scroll the source or review what landed in the
+    destination.
+  </div>
+
   <div id="loading-overlay">
     <div id="loading-box">
       <p id="loading-msg">Connecting…</p>
@@ -191,6 +208,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=492"></script>
+  <script type="module" src="viewer.js?v=493"></script>
 </body>
 </html>

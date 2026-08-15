@@ -1,5 +1,9 @@
 // viewer.js — ButterflyDreaming Graph Viewer
 
+// 2026-08-15 — Speech-recognition module (Whisper + AudioWorklet + biasing).
+// Ported from sr_editor.html; used in Edit mode. See sr_module.js.
+import { createEngine as createSREngine, buildBiasPrompt as srBuildBiasPrompt, stripDirectiveBlocks as srStripDirectives } from './sr_module.js';
+
 // ── Client → server log forwarding (2026-07-12) ──────────────────────
 // Copy every console.log/info/warn/error and uncaught error / unhandled
 // promise rejection to the server terminal via Socket.IO, so we don't
@@ -4428,6 +4432,218 @@ async function init() {
   chatStackEl    = document.getElementById('chat-stack');
   currentStackEl = document.getElementById('current-stack');   // 2026-08-14 split
   defaultStackEl = document.getElementById('default-stack');
+
+  // ── SR (Speech Recognition) wire-up — 2026-08-15 ─────────────────────
+  // MVP1 scope:
+  //   - Mic button in action-bar (visible only in Edit mode)
+  //   - Click "Use Mic" → grants browser permission (one-shot)
+  //   - Press-and-hold once granted → capture PCM
+  //   - Release → transcribe via Whisper (bias from visible History)
+  //   - Final text lands in the top Local card in #current-stack
+  // NOT YET (MVP2):
+  //   - Alignment / {?…} substitution (sr_module.js exports available;
+  //     just not called here yet)
+  //   - Accept-{?…} button
+  //   - Quality report banner
+  const srMicBtn      = document.getElementById('sr-mic-btn');
+  const srLevelMeter  = document.getElementById('sr-level-meter');
+  const srMicPrimer   = document.getElementById('sr-mic-primer');
+  const srLevelBar    = srLevelMeter ? srLevelMeter.querySelector('.bar') : null;
+  let   srMicState    = 'need-permission';   // need-permission | ready | recording | processing | error
+  let   srUseMic      = false;
+  let   srBiasSnapshot = '';                  // captured at record-start; passed to stop()
+
+  // Snapshot the alignment source at record-start. Per 2026-08-15 design
+  // discussion: "passage being aligned needs to be deduced as a subset of
+  // what is approximately visible on screen." Card counts as visible if
+  // its bounding rect intersects #chat-stack's viewport rect. Bodies are
+  // concatenated with single spaces (collage style — no paragraph
+  // separators; user prefers contiguous stream). Directive blocks are
+  // stripped so %%bd_module etc. don't corrupt the bias / (future)
+  // alignment source.
+  function snapshotVisibleHistorySource() {
+    if (!chatStackEl) return '';
+    const pane = chatStackEl.getBoundingClientRect();
+    const parts = [];
+    for (const cardEl of chatStackEl.querySelectorAll('.card')) {
+      const r = cardEl.getBoundingClientRect();
+      if (r.bottom <= pane.top || r.top >= pane.bottom) continue;
+      const body = cardEl.querySelector('.card-body');
+      if (!body) continue;
+      const raw = (body.value !== undefined ? body.value : body.textContent) || '';
+      parts.push(srStripDirectives(raw));
+    }
+    return parts.join(' ').trim();
+  }
+
+  function refreshSRMicUI() {
+    if (!srMicBtn) return;
+    srMicBtn.classList.remove('listening', 'processing');
+    srMicBtn.disabled = false;
+    switch (srMicState) {
+      case 'need-permission': srMicBtn.textContent = '🎤 Use Mic'; break;
+      case 'ready':           srMicBtn.textContent = '🎤 Press to Record'; break;
+      case 'recording':
+        srMicBtn.textContent = '🎤 Recording…';
+        srMicBtn.classList.add('listening');
+        break;
+      case 'processing':
+        srMicBtn.textContent = '🎤 Transcribing…';
+        srMicBtn.classList.add('processing');
+        srMicBtn.disabled = true;
+        break;
+      case 'error':           srMicBtn.textContent = '🎤 Retry';        break;
+    }
+  }
+
+  const srEngine = createSREngine({
+    onStatus: (msg, kind) => console.log('[SR status]', kind || 'info', msg),
+    onLog:    (msg, kind) => console.log('[SR log]',    kind || 'info', msg),
+    onLevel:  (peak) => {
+      if (!srLevelBar) return;
+      const dbfs = peak > 0 ? 20 * Math.log10(peak) : -60;
+      const pct = Math.max(0, Math.min(100, ((dbfs + 60) / 60) * 100));
+      srLevelBar.style.width = pct + '%';
+      srLevelBar.classList.remove('mid', 'hot');
+      if (dbfs > -3)       srLevelBar.classList.add('hot');
+      else if (dbfs > -12) srLevelBar.classList.add('mid');
+    },
+    onFinal:  (text) => {
+      insertTranscriptIntoCurrent(text);
+      if (srMicState === 'processing') { srMicState = 'ready'; refreshSRMicUI(); }
+    },
+    onError:  (err) => {
+      console.warn('[SR] engine error', err);
+      if (srMicState === 'processing' || srMicState === 'recording') {
+        srMicState = 'ready';
+        refreshSRMicUI();
+      }
+    },
+    compressionOn: true,
+  });
+
+  // Insert final Whisper text into the top Local card of #current-stack.
+  // If there's no Local card in Current, create one first (via createCard).
+  // Auto-select the inserted text so a single Delete wipes it for retry
+  // (matches sr_editor.html behaviour).
+  function insertTranscriptIntoCurrent(text) {
+    const clean = (text || '').trim();
+    if (!clean) return;
+    // Find or create top Local card in Current
+    let top = topLocalCard();
+    const topInCurrent = top && top.el && currentStackEl && currentStackEl.contains(top.el);
+    if (!topInCurrent) {
+      top = createCard({ kind: 'local' });
+    }
+    if (!top || !top.body) return;
+    const body = top.body;
+    const existing = body.value || '';
+    // Append with a single space separator if there's already content;
+    // otherwise just set. Select the newly-inserted portion so Delete
+    // wipes it cleanly.
+    let insertStart, insertEnd, newValue;
+    if (existing) {
+      const sep = /[\s]$/.test(existing) ? '' : ' ';
+      insertStart = existing.length + sep.length;
+      newValue = existing + sep + clean;
+      insertEnd = newValue.length;
+    } else {
+      insertStart = 0;
+      newValue = clean;
+      insertEnd = clean.length;
+    }
+    body.value = newValue;
+    // Trigger the input event so updateSendBtn / any other listeners fire
+    try { body.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    // Auto-select the just-inserted range
+    try {
+      body.focus({ preventScroll: true });
+      body.setSelectionRange(insertStart, insertEnd);
+    } catch (_) {}
+  }
+
+  // Stale-event guard (sr_editor.html: filters Safari's dead-letter queue
+  // of pointer events held behind the permission modal). If an event's
+  // timestamp is > 500ms old, drop it.
+  function srStaleEvent(evt) {
+    return evt && typeof evt.timeStamp === 'number' &&
+           (performance.now() - evt.timeStamp) > 500;
+  }
+
+  async function srGrantMic(evt) {
+    if (srStaleEvent(evt)) return;
+    if (srMicPrimer) srMicPrimer.hidden = false;
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const t of s.getTracks()) t.stop();
+      srUseMic  = true;
+      srMicState = 'ready';
+      refreshSRMicUI();
+    } catch (err) {
+      srMicState = 'error';
+      refreshSRMicUI();
+      console.warn('[SR] mic denied:', err.message);
+    } finally {
+      if (srMicPrimer) srMicPrimer.hidden = true;
+    }
+  }
+
+  async function srStartRecording(evt) {
+    if (srStaleEvent(evt)) return;
+    if (srMicState !== 'ready') return;
+    // 2026-08-15 — snapshot the alignment / bias source at pointerdown.
+    // User can't scroll while holding mic; whatever is visible right now
+    // is the reading source for the recording that's about to happen.
+    srBiasSnapshot = snapshotVisibleHistorySource();
+    srMicState = 'recording';
+    refreshSRMicUI();
+    try {
+      await srEngine.start();
+    } catch (err) {
+      srMicState = 'ready';
+      refreshSRMicUI();
+      console.warn('[SR] start failed', err);
+    }
+  }
+
+  async function srStopRecording() {
+    if (srMicState !== 'recording') return;
+    srMicState = 'processing';
+    refreshSRMicUI();
+    // Build bias prompt from the snapshot taken at pointerdown.
+    let biasText = '';
+    if (srBiasSnapshot) {
+      const built = srBuildBiasPrompt(srBiasSnapshot, 4);
+      biasText = built.text || '';
+    }
+    try {
+      await srEngine.stop(biasText);
+    } catch (err) {
+      srMicState = 'ready';
+      refreshSRMicUI();
+      console.warn('[SR] stop failed', err);
+    }
+  }
+
+  if (srMicBtn) {
+    // State 1 (idle): click grants permission
+    srMicBtn.addEventListener('click', (evt) => {
+      if (srMicState === 'need-permission' || srMicState === 'error') {
+        srGrantMic(evt);
+      }
+    });
+    // States 3-4 (ready → recording): press-and-hold
+    // Uses pointerdown/pointerup (unified across mouse+touch); passive
+    // for scroll-perf (we're not preventing default anyway).
+    srMicBtn.addEventListener('pointerdown', (evt) => {
+      if (srMicState === 'ready') srStartRecording(evt);
+    });
+    srMicBtn.addEventListener('pointerup',     () => { if (srMicState === 'recording') srStopRecording(); });
+    srMicBtn.addEventListener('pointercancel', () => { if (srMicState === 'recording') srStopRecording(); });
+    srMicBtn.addEventListener('pointerleave',  () => { if (srMicState === 'recording') srStopRecording(); });
+    refreshSRMicUI();
+  }
+  // ── end SR wire-up ────────────────────────────────────────────────────
 
   const newCardBtn = document.getElementById('chat-new-card-btn');
   if (newCardBtn) {

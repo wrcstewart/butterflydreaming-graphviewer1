@@ -564,14 +564,19 @@ html, body {
    the bdName/bdLabel metadata Save required) and has been retired. Node
    text editing lives on the bd_tool.js write path via nav_nodes_text.md. */
 
-/* 2026-08-15 — Send + New hidden by default; only surfaced when Edit
-   mode is engaged (body.edit-active toggled by setViewMode('edit')).
-   User's spec: these two are compose-side controls that belong in Edit
-   mode; the top row's Nodes/Player/Edit radio is what governs when
-   they're relevant. */
+/* 2026-08-15 — Send + New + SR mic controls hidden by default; only
+   surfaced when Edit mode is engaged (body.edit-active toggled by
+   setViewMode('edit')). User's spec: these are compose-side controls
+   that belong in Edit mode; the top row's Nodes/Player/Edit radio is
+   what governs when they're relevant. */
+#chat-send-btn,
+#chat-new-card-btn,
+#sr-mic-btn,
+#sr-level-meter {
+  display: none;
+}
 #chat-send-btn,
 #chat-new-card-btn {
-  display: none;
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
@@ -587,6 +592,87 @@ body.edit-active #chat-send-btn,
 body.edit-active #chat-new-card-btn {
   display: inline-block;
 }
+body.edit-active #sr-mic-btn { display: inline-block; }
+body.edit-active #sr-level-meter { display: block; }
+
+/* SR mic button — three-state hybrid.
+   - default (idle):  "🎤 Use Mic" — amber, ready for click-to-grant
+   - .listening:      "🎤 Recording…" — red, holding to capture
+   - .processing:     "🎤 Transcribing…" — dim, waiting on Whisper */
+#sr-mic-btn {
+  background: #FFD700;
+  border: 1px solid #a07820;
+  border-radius: 4px;
+  color: #1a1a20;
+  font-family: sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 3px 8px;
+  cursor: pointer;
+  min-width: 80px;
+  touch-action: manipulation;
+}
+#sr-mic-btn.listening {
+  background: #d03030;
+  border-color: #ff5555;
+  color: #ffffff;
+}
+#sr-mic-btn.processing {
+  background: #444;
+  border-color: #666;
+  color: #ccc;
+  opacity: 0.7;
+  cursor: default;
+}
+#sr-mic-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Level meter — thin bar next to the mic button.
+   Bar fills 0-100% width; green normal, amber loud, red clipping. */
+#sr-level-meter {
+  width: 60px;
+  height: 8px;
+  background: #1a1a2e;
+  border: 1px solid #444;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+#sr-level-meter .bar {
+  height: 100%;
+  width: 0%;
+  background: #4caf50;
+  transition: width 60ms linear;
+}
+#sr-level-meter .bar.mid { background: #FFD700; }
+#sr-level-meter .bar.hot { background: #ff5555; }
+
+/* SR mic primer — appears in Edit mode over the panel area while the
+   browser permission prompt is up, and again on any transcription
+   error state. Positioned to be visible without depending on the user
+   looking at the source pane. */
+#sr-mic-primer {
+  position: fixed;
+  left: 50%;
+  top: 90px;                            /* below the yellow top row */
+  transform: translateX(-50%);
+  z-index: 25;
+  max-width: 460px;
+  padding: 10px 14px;
+  background: rgba(0, 40, 90, 0.95);
+  border: 1px solid #4080ff;
+  border-radius: 6px;
+  color: #ffffff;
+  font-family: sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+#sr-mic-primer[hidden] { display: none; }
 
 #chat-send-btn {
   font-size: 11px;
@@ -635,9 +721,9 @@ body.edit-active #chat-new-card-btn {
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-15:
-   RED (pair-status moved to position:absolute below the Pair button so
-   its text can never drag the button leftward into the radio group).
-   Next rotation = green. */
+   GREEN (SR MVP1 — sr_module.js port + Mic button + level meter in
+   action-bar, Edit-mode-gated, snapshot-visible-History bias, top
+   Local card gets the transcript). Next rotation = blue. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -647,7 +733,7 @@ body.edit-active #chat-new-card-btn {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff5555;             /* CANARY — red */
+  border: 2px solid #4caf50;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -661,7 +747,7 @@ body.edit-active #chat-new-card-btn {
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #ff9999;
+  border-color: #7fd07f;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
