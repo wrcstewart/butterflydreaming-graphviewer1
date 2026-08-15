@@ -310,6 +310,13 @@ html, body {
   align-self: center;
   background: rgba(70, 70, 70, 0.55);
   padding: 4px 8px;
+  /* 2026-08-15 — fixed min-height so the bar's depth stays constant
+     across Nodes / Edit / Player modes. Without this, entering Edit
+     mode surfaces Send + New and the bar grows ~22 px, pushing
+     #chat-panel down and shrinking #cy below it. 34 px = ~22 px
+     tallest child (Send/New with border) + 8 px total padding + a
+     hair of breathing room. */
+  min-height: 34px;
   box-sizing: border-box;
   flex-shrink: 0;
 }
@@ -615,9 +622,9 @@ body.edit-active #chat-new-card-btn {
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-15:
-   GREEN (Edit-mode wiring — Send/New hidden except in Edit; Pair press
-   auto-engages Edit; Unpair does NOT exit Edit; Edit radio always
-   enabled). Next rotation = blue. */
+   BLUE (action-bar min-height 34 px — depth stays constant across
+   Nodes/Edit/Player so entering Edit doesn't push chat-panel down).
+   Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -627,7 +634,7 @@ body.edit-active #chat-new-card-btn {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4caf50;             /* CANARY — green */
+  border: 2px solid #4080ff;             /* CANARY — blue */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -641,7 +648,7 @@ body.edit-active #chat-new-card-btn {
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #7fd07f;
+  border-color: #7fb0ff;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
