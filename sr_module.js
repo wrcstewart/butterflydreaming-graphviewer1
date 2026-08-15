@@ -340,7 +340,15 @@ export function extendBoundaries(matches, uttToks, srcToks, opts = {}) {
 //          is REPLACED with the em-dash to avoid ". — " doubling.
 //
 // Returns { text, subs } where subs is the per-edit log.
-export function applySubstitutions(uttText, uttTokens, srcTokens, matches) {
+// opts.mode: 'bound' | 'free' (default 'free').
+//   bound → ins ops wrap as `{?word}` (no em-dashes; Accept strips
+//           cleanly since a Whisper hallucination in a reading is
+//           almost never a literary aside).
+//   free  → ins ops wrap as `{?— word —}` (em-dashes INSIDE so they
+//           survive Accept as permanent aside markers, per 2026-08-13
+//           spec — genuine asides in free dictation).
+export function applySubstitutions(uttText, uttTokens, srcTokens, matches, opts = {}) {
+  const mode = opts.mode || 'free';
   if (!matches.length) return { text: uttText, subs: [] };
   const edits = [];
   const SOFT_PUNCT_RE = /[.,;:]/;
@@ -397,7 +405,13 @@ export function applySubstitutions(uttText, uttTokens, srcTokens, matches) {
         const firstTok = uttTokens[op.aIdx];
         const lastTok  = uttTokens[match.ops[last].aIdx];
         const original = uttText.slice(firstTok.start, lastTok.end);
-        edits.push({ start: firstTok.start, end: lastTok.end, insert: '{?— ' + original + ' —}', kind: 'ins-wrap', from: original, to: '{?— ' + original + ' —}' });
+        // 2026-08-15 — em-dashes only for free-mode ins (genuine asides).
+        // Bound-mode ins is almost always a Whisper hallucination in the
+        // middle of a reading, so a plain wrap so Accept strips cleanly.
+        const wrapped = mode === 'bound'
+          ? '{?' + original + '}'
+          : '{?— ' + original + ' —}';
+        edits.push({ start: firstTok.start, end: lastTok.end, insert: wrapped, kind: mode === 'bound' ? 'ins-wrap-bound' : 'ins-wrap-free', from: original, to: wrapped });
       } else if (op.type === 'del') {
         const prev = opIdx > 0 ? match.ops[opIdx - 1] : null;
         if (prev && prev.type === 'del') continue;

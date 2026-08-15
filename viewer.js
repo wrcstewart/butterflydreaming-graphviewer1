@@ -4624,8 +4624,21 @@ async function init() {
       const afterTrimmed  = afterRaw.replace(/^\s+/, '');
       const hasBefore = beforeTrimmed.length > 0;
       const hasAfter  = afterTrimmed.length > 0;
+      // 2026-08-15 — mid-passage lowercase. If we're inserting after
+      // existing non-terminal text (anything except . ! ?), lowercase
+      // the FIRST alpha char of the new content. Whisper always emits
+      // sentence-initial caps; makes no sense mid-sentence.
+      let body = clean;
+      if (hasBefore) {
+        const lastChar = beforeTrimmed.slice(-1);
+        if (!/[.!?]/.test(lastChar)) {
+          // Find first letter and lowercase it. Skip over any {? marker
+          // opening (e.g. "{?Foo}" → "{?foo}") for cleaner reading.
+          body = body.replace(/^(\{\?)?([A-Z])/, (m, prefix, ch) => (prefix || '') + ch.toLowerCase());
+        }
+      }
       const sep = isFree ? ' — ' : ' ';
-      let insertText = clean;
+      let insertText = body;
       if (hasBefore) insertText = sep + insertText;
       if (hasAfter)  insertText = insertText + sep;
       // Absorb the adjacent whitespace we trimmed off so we replace it
@@ -4702,10 +4715,44 @@ async function init() {
       if (!matches.length) return { text: uttText, mode: 'free' };
       const preRatio = matches.reduce((s, m) => s + m.length, 0) / uttToks.length;
       const mode = preRatio >= 0.7 ? 'bound' : 'free';
+      // Snapshot the primary match's boundaries BEFORE extension so we
+      // can log what the extension added.
+      const firstMatch = matches.reduce((f, m) => m.aStart < f.aStart ? m : f, matches[0]);
+      const lastMatch  = matches.reduce((l, m) => m.aEnd   > l.aEnd   ? m : l, matches[0]);
+      const preFirst = { aStart: firstMatch.aStart, bStart: firstMatch.bStart };
+      const preLast  = { aEnd:   lastMatch.aEnd,   bEnd:   lastMatch.bEnd   };
       matches = srExtendBoundaries(matches, uttToks, srcToks, { boundThreshold: 0.7 });
-      const { text: marked, subs } = srApplySubstitutions(uttText, uttToks, srcToks, matches);
+      const { text: marked, subs } = srApplySubstitutions(uttText, uttToks, srcToks, matches, { mode });
       const postMatched = matches.reduce((s, m) => s + m.length, 0);
       console.log(`[SR] alignment: ${matches.length} match(es), pre-ratio ${(preRatio*100).toFixed(0)}% → ${mode} mode, ${postMatched}/${uttToks.length} tokens after extend, ${subs.length} edit(s)`);
+      // Detail log: what the boundary extension paired up (2026-08-15
+      // diagnostic — helps trace cases like Whisper condensing "of late
+      // to" → "o" where positional 1:1 pairing can't fully recover).
+      if (mode === 'bound') {
+        const backAdded = preFirst.aStart - firstMatch.aStart;
+        const fwdAdded  = lastMatch.aEnd - preLast.aEnd;
+        if (backAdded) {
+          const pairs = [];
+          for (let k = 1; k <= backAdded; k++) {
+            const aIdx = preFirst.aStart - k, bIdx = preFirst.bStart - k;
+            if (aIdx < 0 || bIdx < 0) break;
+            pairs.push(`utt[${aIdx}]"${uttToks[aIdx].surface}"→src[${bIdx}]"${srcToks[bIdx].surface}"`);
+          }
+          console.log(`[SR] extend backward (${backAdded}): ${pairs.join(', ')}`);
+        }
+        if (fwdAdded) {
+          const pairs = [];
+          for (let k = 1; k <= fwdAdded; k++) {
+            const aIdx = preLast.aEnd + k, bIdx = preLast.bEnd + k;
+            if (aIdx >= uttToks.length || bIdx >= srcToks.length) break;
+            pairs.push(`utt[${aIdx}]"${uttToks[aIdx].surface}"→src[${bIdx}]"${srcToks[bIdx].surface}"`);
+          }
+          console.log(`[SR] extend forward  (${fwdAdded}): ${pairs.join(', ')}`);
+        }
+        if (!backAdded && !fwdAdded) {
+          console.log(`[SR] no extension (match already spans utt[${firstMatch.aStart}..${lastMatch.aEnd}] of ${uttToks.length}, src[${firstMatch.bStart}..${lastMatch.bEnd}] of ${srcToks.length})`);
+        }
+      }
       return { text: marked, mode };
     } catch (err) {
       console.warn('[SR] alignment failed, using raw text', err);

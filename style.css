@@ -741,9 +741,8 @@ body.edit-active #sr-accept-btn  { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-15:
-   RED (SR inter-injection boundaries — free injections adjacent to
-   existing text get ' — ' separators, bound stay as spaces; adjacent
-   whitespace absorbed to avoid doubling). Next rotation = green. */
+   GREEN (SR mid-passage lowercase + bound-mode ins-wrap without em-dashes
+   + boundary-extension diagnostic log). Next rotation = blue. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -753,7 +752,7 @@ body.edit-active #sr-accept-btn  { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff5555;             /* CANARY — red */
+  border: 2px solid #4caf50;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -767,7 +766,7 @@ body.edit-active #sr-accept-btn  { display: inline-block; }
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #ff9999;
+  border-color: #7fd07f;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
