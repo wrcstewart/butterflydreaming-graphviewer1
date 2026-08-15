@@ -8,6 +8,7 @@ import {
   stripDirectiveBlocks as srStripDirectives,
   tokenise             as srTokenise,
   alignLocal           as srAlignLocal,
+  extendBoundaries     as srExtendBoundaries,
   applySubstitutions   as srApplySubstitutions,
   stripTentativeMarkers as srStripTentative,
 } from './sr_module.js';
@@ -4675,10 +4676,19 @@ async function init() {
     try {
       const uttToks = srTokenise(uttText);
       const srcToks = srTokenise(srcText);
-      const matches = srAlignLocal(uttToks, srcToks, { minLen: 3, minScore: 4, phonWeight: 0.5 });
+      let matches = srAlignLocal(uttToks, srcToks, { minLen: 3, minScore: 4, phonWeight: 0.5 });
       if (!matches.length) return uttText;
+      // 2026-08-15 — bound-mode boundary extension. If ≥ 70 % of the
+      // utterance already aligned, treat it as a continuous reading and
+      // extend the first-match backward + last-match forward to cover
+      // Whisper's mangled opening / trailing tokens as source substitutions
+      // rather than free commentary. No-op if ratio below threshold.
+      const preRatio = matches.reduce((s, m) => s + m.length, 0) / uttToks.length;
+      matches = srExtendBoundaries(matches, uttToks, srcToks, { boundThreshold: 0.7 });
       const { text: marked, subs } = srApplySubstitutions(uttText, uttToks, srcToks, matches);
-      console.log(`[SR] alignment: ${matches.length} match(es), ${subs.length} edit(s)`);
+      const postMatched = matches.reduce((s, m) => s + m.length, 0);
+      const mode = preRatio >= 0.7 ? 'bound' : 'free';
+      console.log(`[SR] alignment: ${matches.length} match(es), pre-ratio ${(preRatio*100).toFixed(0)}% → ${mode} mode, ${postMatched}/${uttToks.length} tokens after extend, ${subs.length} edit(s)`);
       return marked;
     } catch (err) {
       console.warn('[SR] alignment failed, using raw text', err);

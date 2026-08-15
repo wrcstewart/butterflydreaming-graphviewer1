@@ -264,6 +264,60 @@ export function alignLocal(aToks, bToks, opts) {
   return results;
 }
 
+// ── Bound-mode boundary extension (2026-08-15) ─────────────────────────
+// When ≥ 70 % of the utterance already aligns to source, the user was
+// almost certainly reading continuously and the unmatched leading /
+// trailing tokens are Whisper misheard-openings, not free commentary.
+// Extend the first match backward and the last match forward, pairing
+// each extension step with the corresponding source token. Extension
+// stops when EITHER the utterance OR the source runs out — the residual
+// utterance tokens outside the extended range are then genuinely free.
+//
+// Extensions are added as synthetic 'sub' ops so the existing
+// applySubstitutions renderer wraps them `{?source-word}` with no new
+// rendering path. Also updates aStart/aEnd/bStart/bEnd/length in place
+// so em-dash boundary logic in applySubstitutions still fires correctly
+// (hasBefore / hasAfter checks use the extended boundaries).
+//
+// No manual override: auto-classify by match density only (user's 2026-
+// 08-15 call: "auto is enough for now").
+// No extension cap: read passages and free speech are short enough that
+// walking all the way to the boundary is safe.
+export function extendBoundaries(matches, uttToks, srcToks, opts = {}) {
+  const { boundThreshold = 0.7 } = opts;
+  if (!matches.length || !uttToks.length) return matches;
+  const totalMatched = matches.reduce((sum, m) => sum + m.length, 0);
+  const ratio = totalMatched / uttToks.length;
+  if (ratio < boundThreshold) return matches;
+
+  // Find first (smallest aStart) and last (largest aEnd). May be same match.
+  let first = matches[0], last = matches[0];
+  for (const m of matches) {
+    if (m.aStart < first.aStart) first = m;
+    if (m.aEnd   > last.aEnd)    last  = m;
+  }
+
+  // Extend backward from first match; stop when EITHER side runs out.
+  while (first.aStart > 0 && first.bStart > 0) {
+    const aIdx = first.aStart - 1;
+    const bIdx = first.bStart - 1;
+    first.ops.unshift({ type: 'sub', aIdx, bIdx });
+    first.aStart = aIdx;
+    first.bStart = bIdx;
+    first.length++;
+  }
+  // Extend forward from last match; stop when EITHER side runs out.
+  while (last.aEnd < uttToks.length - 1 && last.bEnd < srcToks.length - 1) {
+    const aIdx = last.aEnd + 1;
+    const bIdx = last.bEnd + 1;
+    last.ops.push({ type: 'sub', aIdx, bIdx });
+    last.aEnd = aIdx;
+    last.bEnd = bIdx;
+    last.length++;
+  }
+  return matches;
+}
+
 // ── Substitution renderer (alignment mode 4) ───────────────────────────
 // Consume Smith-Waterman ops per matched span, produce a marked-up
 // utterance string with `{?…}` around every stretch the reviewer should
