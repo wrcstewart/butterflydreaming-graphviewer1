@@ -266,3 +266,111 @@ Alternative engines to keep on the radar:
 
 - [whisper-turbo](https://github.com/FL33TW00D/whisper-turbo) — cited in #973 as a working mobile-WebGPU Whisper implementation on a different runtime
 - [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — already the intended second engine per Design Notes §3
+
+## 13. BD integration (2026-08-15)
+
+MVP shipped. The full read-and-weave loop is live inside the graph viewer's Edit mode. Ordered log of the decisions and their rationale:
+
+### 13.1 Architecture
+
+- **New file `sr_module.js`** at BD repo root. UI-agnostic ES module: `createEngine`, `buildBiasPrompt`, `stripDirectiveBlocks`, `tokenise`, `phoneticKey`, `alignLocal`, `extendBoundaries`, `applySubstitutions`, `stripTentativeMarkers`, `mergeChunkOutputs`. Third copy of the engine after standalone (`bd_SR_Editor/index.html`) and BD dev copy (`sr_editor.html`) — but this one is DOM-decoupled so BD can wire its own UI without pulling in the SR editor page. Callbacks (`onStatus / onLog / onLevel / onFinal / onError / onQuality`) let the caller route feedback to whatever UI slots make sense.
+- **viewer.js imports** all exports and wires them into a ~350-line SR block near the end of `init()`. Mic button + level meter + Accept in the action-bar; primer floats over the top row while the browser permission dialog is up.
+
+### 13.2 UI additions (Edit-mode-gated via `body.edit-active`)
+
+- **🎤 Use Mic → Press to Record → Recording… → Transcribing…** three-state hybrid button (click-to-grant, press-hold-to-record). Stale-event guard against Safari's dead-letter queue from the modal permission dialog (ports the fix from sr_editor).
+- **Level meter** — 60×8 px bar next to the mic; green normal, amber loud, red clipping.
+- **Accept ✎ button** — strips `{?` and `}` throughout the top Local card via `setRangeText` (preserves browser undo stack).
+- **Mic primer panel** — fixed centre-top, deep-blue translucent, text: "Dictate one sentence at a time. The pause between recordings lets you scroll the source or review what landed in the destination." Auto-hides on browser accept/deny.
+
+### 13.3 Model pre-warm
+
+Whisper's ~74 MB model downloads lazily on first mic press → user-visible ~2 s delay on that first press. Fix: `setViewMode('edit')` dispatches `bd:edit-mode-enter` on first entry; SR wire-up listens and calls `srEngine.install()` fire-and-forget. Model loads in parallel with everything else the user does in Edit mode. Idempotent — later re-entries are cheap.
+
+### 13.4 Source snapshot (alignment + bias)
+
+At **pointerdown** on the mic (not release), snapshot the alignment source:
+- Walk `#chat-stack`'s cards, keep any whose bounding rect intersects the pane's viewport rect (partial visibility counts).
+- Concatenate their `.card-body` values with **single-space separators** (collage-style, no paragraph markers — user's 2026-08-15 spec).
+- Strip `%%bd_…` directive blocks.
+- Store in `srSourceSnapshot` — used for BOTH the bias prompt (broader vocab priming) AND the post-hoc alignment (narrower, precise).
+
+Rationale for snapshot-at-press: user can't scroll while holding mic (finger committed); whatever's visible at press-time IS the reading source; captured once, held for the recording's duration; robust against any layout shifts before Whisper returns.
+
+### 13.5 Caret memory
+
+Pressing the mic transfers focus AWAY from any Current textarea, wiping the visible caret. But the user's insertion intent was where they'd positioned the cursor.
+
+Fix: delegated listeners on `#current-stack` for `focusin / input / keyup / mouseup / focusout` update a module-level `srCaretSnapshot` `{textarea, selectionStart, selectionEnd}` on every relevant interaction. Insertion prefers this saved position when the referenced textarea is still in Current; fallback to append-to-top-Local otherwise. Snapshot self-heals: refreshed after each insertion, invalidated when the tracked textarea moves to History.
+
+### 13.6 Bound vs free mode auto-classification
+
+`srAlignAndMark` computes `matched-tokens / utterance-tokens` from the raw `alignLocal` output. Threshold **0.7** (user's 2026-08-15 call, "system works quite well, be strict") → mode is **bound**; below → **free**. Returned alongside the marked text so downstream insertion knows what separator to use.
+
+### 13.7 Bound-mode boundary extension
+
+When bound-mode detected, extend the first match backward and the last match forward:
+- **Backward** from `firstMatch`: pair `utt[aStart-k]` with `src[bStart-k]` as a synthetic `sub` op. Stop when EITHER side runs out (utterance-start or source-start reached).
+- **Forward** from `lastMatch`: symmetric.
+
+Extensions become plain `sub` ops so the existing `applySubstitutions` wraps them `{?source-word}` with no new rendering path. `aStart / aEnd / bStart / bEnd / length` all updated in place so the em-dash boundary check in `applySubstitutions` respects the extended span (no spurious "—" at the now-extended utterance-start).
+
+No manual override (user: "auto is enough for now"). No extension cap (user: "read passages or free speech is fairly short"). 1:1 positional pairing has a known weakness: when Whisper condenses source words into fewer tokens (e.g. "of late to" → "o"), the paired source-word may be positionally-adjacent but semantically off (e.g. `{?to}` for the "o"). Live with it; user can review the `{?…}` markers before Accept.
+
+### 13.8 Substitution renderer — mode-aware
+
+`applySubstitutions(uttText, uttTokens, srcTokens, matches, {mode})`:
+
+- `sub` → `{?source-form}` — plain wrap.
+- `del` → `{?word}` inserted at anchor position; consecutive dels grouped as `{?word1 word2}`.
+- `ins`:
+  - **mode='bound'** → `{?word}` — plain wrap. In a reading, ins ops are almost always Whisper hallucinations, not literary asides — Accept strips cleanly and the word integrates as regular text.
+  - **mode='free'** → `{?— word —}` — em-dashes INSIDE the markers so they survive Accept as permanent aside markers (2026-08-13 free-mode spec).
+- Em-dash boundaries at commentary/quote transitions unchanged (soft punctuation `. , ; :` at boundary REPLACED with em-dash to avoid `. — ` doubling).
+
+### 13.9 Inter-injection boundary marks
+
+When inserting a fresh transcript adjacent to existing text in Current:
+- **New = bound** → single-space separator (reading continues cleanly).
+- **New = free** → `' — '` em-dash separator (marks commentary against surrounding text).
+- Adjacent whitespace on either side is **absorbed into the replacement range** so we never get `'  '` doubling or `'. — '` after punctuation.
+- Applied at BOTH ends if inserting mid-text; only leading side if at very end; empty pane, no separator.
+- Decision uses mode of the NEW injection only — no tracking of past regions' modes. Simpler and reads well in practice.
+
+### 13.10 Mid-passage lowercase
+
+If inserting after non-terminal text (anything except `. ! ?`), lowercase the first alpha character of the new injection. Whisper always emits sentence-initial caps; makes no sense mid-sentence. Also handles `{?Foo}` → `{?foo}` by skipping the marker prefix.
+
+### 13.11 Quote-strip
+
+Whisper sometimes wraps a recording it perceives as a direct quotation / recitation in `"…"` or `'…'` (typical when the speaker's cadence reads as "reading aloud"). Strip leading/trailing quote characters at the top of `srAlignAndMark`. Handles straight `" '` plus curly `“ ” ‘ ’`.
+
+### 13.12 Diagnostic logging
+
+Every recording now emits a console line like:
+
+```
+[SR] alignment: 1 match(es), pre-ratio 87% → bound mode, 24/24 tokens after extend, 6 edit(s)
+[SR] extend backward (1): utt[0]"o"→src[8]"to"
+```
+
+Or, if no extension happened:
+
+```
+[SR] no extension (match already spans utt[0..15] of 16, src[6..21] of 40)
+```
+
+Makes it easy to trace what a given utterance was classified as and what the extension paired up.
+
+### 13.13 Known Whisper limits (no code fix)
+
+- **Uncommon words with unusual stress get mis-decoded.** Snow White's "Huntsman" is a known win with bias; "Prologue" / "Epilogue" observed 2026-08-15 as "Pro-log" / "Happy log" (Hardy's poem, not in bias). User workaround: type tricky words into a Current or History card BEFORE recording so they enter the bias prompt.
+- **Punctuation is Whisper's call**, not the source's — periods where the source has commas, quotes around recitation-cadence recordings (we strip those; see §13.11), unpredictable capitalisation.
+
+### 13.14 NOT YET (future work, deferred)
+
+- **Persistent tricky-vocabulary side panel.** A small always-visible pane where the user maintains a hand-curated list of tricky words (Prologue, Epilogue, proper nouns, technical terms, etc.). Words get **always** prepended to the bias prompt regardless of what's in History/Current. Would solve the Prologue/Epilogue class of misrecognition permanently for a given corpus without requiring the user to plant the words in a card before every recording. Idea only — not implemented 2026-08-15.
+- **Compressor toggle** in the action-bar (default ON; toggle for A/B testing hot vs. dry mic).
+- **Quality-report banner** on release (peak/mean dBFS, silence %, clip %, verdict OK / WEAK / HOT / BAD) — currently just logged to console.
+- **Manual bound/free override** — user can hint the mode via a small "🎤 Reading" toggle. User's 2026-08-15 call: not yet.
+- **Non-1:1 boundary extension** — handle Whisper's word-condensation cases ("of late to" → "o") where positional 1:1 pairing marks the wrong source-word. Would need fuzzy source-alignment with variable spans. Complex — defer until it hurts.
