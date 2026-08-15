@@ -158,8 +158,21 @@ html, body {
 }
 
 #pair-status {
+  /* 2026-08-15 — lifted OUT of the #pair-control flex flow. When pair-
+     status had text like "Waiting…" or "Another BD tab on this device
+     is already waiting to chat…", the shrink-wrapping flex container
+     grew leftward and dragged #chat-btn across the top row into the
+     radio group. Absolute-positioned under the button keeps the button
+     rock-steady at right:30% regardless of what text lands here. */
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  max-width: 30vw;
   color: #aaa;
-  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: right;
 }
 
 
@@ -622,9 +635,9 @@ body.edit-active #chat-new-card-btn {
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-15:
-   BLUE (action-bar min-height 34 px — depth stays constant across
-   Nodes/Edit/Player so entering Edit doesn't push chat-panel down).
-   Next rotation = red. */
+   RED (pair-status moved to position:absolute below the Pair button so
+   its text can never drag the button leftward into the radio group).
+   Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -634,7 +647,7 @@ body.edit-active #chat-new-card-btn {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4080ff;             /* CANARY — blue */
+  border: 2px solid #ff5555;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -648,7 +661,7 @@ body.edit-active #chat-new-card-btn {
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #7fb0ff;
+  border-color: #ff9999;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
