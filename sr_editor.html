@@ -117,9 +117,40 @@
     #final-text { color: var(--text); }
 
     #control-bar {
+      /* 2026-08-15 — position:relative so #mic-primer (absolute) anchors
+         inside this bar. */
+      position: relative;
       background: var(--panel); border: 1px solid var(--border);
       border-radius: 4px; padding: 8px 10px;
       display: flex; gap: 10px; align-items: center;
+    }
+    /* 2026-08-15 — mic primer, mirror of bd_SR_Editor standalone. Floats
+       to the right of the mic button between Use Mic press and browser
+       accept/deny; may overlay sibling controls at that instant. */
+    #mic-primer {
+      position: absolute;
+      left: 195px;
+      top: 6px;
+      right: 6px;
+      max-width: 460px;
+      min-height: 44px;
+      padding: 8px 12px;
+      background: rgba(0, 40, 90, 0.95);
+      border: 1px solid #4080ff;
+      border-radius: 6px;
+      color: #ffffff;
+      font-family: sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      z-index: 20;
+      pointer-events: none;
+    }
+    #mic-primer[hidden] { display: none; }
+    @media (max-width: 600px) {
+      #mic-primer {
+        left: 6px; top: auto; bottom: -80px; right: 6px;
+        font-size: 12px;
+      }
     }
     #control-bar button {
       background: var(--panel-2); color: var(--text);
@@ -331,6 +362,15 @@
       <button id="undo-btn" type="button" title="Undo last insertion (browser undo)">Undo</button>
       <button id="accept-subs-btn" type="button" title="Strip {?…} tentative-substitution markers throughout the destination pane">Accept {?…}</button>
       <div id="status">initialising…</div>
+      <!-- 2026-08-15 — mic primer (mirror of bd_SR_Editor). Shown on Use
+           Mic press; hidden on browser accept/deny. -->
+      <div id="mic-primer" hidden aria-live="polite">
+        Your browser is about to ask permission for the microphone — tap
+        <strong>Allow</strong>.<br><br>
+        Then dictate <strong>one sentence at a time</strong>. The pause
+        between recordings lets you scroll the source or review what
+        landed in the destination.
+      </div>
     </div>
 
     <div id="log-panel">
@@ -1598,6 +1638,10 @@
     }
 
     async function grantMicPermission() {
+      // 2026-08-15 — mirror of bd_SR_Editor: show primer between Use Mic
+      // press and browser accept/deny; hide in finally so both paths clear.
+      const primer = document.getElementById('mic-primer');
+      if (primer) primer.hidden = false;
       setStatus('Requesting microphone permission…', '');
       try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1615,6 +1659,8 @@
         refreshMicUI();
         setStatus('Microphone permission denied: ' + err.message, 'err');
         logEntry('mic permission denied: ' + err.message, 'err');
+      } finally {
+        if (primer) primer.hidden = true;
       }
     }
 
