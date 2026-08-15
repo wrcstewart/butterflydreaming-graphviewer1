@@ -4566,8 +4566,10 @@ async function init() {
       // snapshot; wrap detected substitutions in {?…} markers with em-dash
       // boundaries at commentary/quote transitions. Falls back to raw text
       // if no significant match found (snapshot empty, no overlap, etc.).
-      const marked = srAlignAndMark(text, srSourceSnapshot);
-      insertTranscriptIntoCurrent(marked);
+      // Mode threads through to insertion so free-mode injections get
+      // em-dash separators against adjacent existing content.
+      const { text: marked, mode } = srAlignAndMark(text, srSourceSnapshot);
+      insertTranscriptIntoCurrent(marked, mode);
       if (srMicState === 'processing') { srMicState = 'ready'; refreshSRMicUI(); }
     },
     onError:  (err) => {
@@ -4592,34 +4594,62 @@ async function init() {
   //   2. Else fall back to appending to the end of the top Local card in
   //      Current (creating one if none exists).
   //
-  // Inserted text is auto-selected (setRangeText 'select') so a single
-  // Delete wipes it for a redo. Then srCaretSnapshot is updated to the
-  // just-inserted range so consecutive recordings chain naturally.
-  function insertTranscriptIntoCurrent(text) {
+  // Boundary separator between the new injection and adjacent existing
+  // text depends on mode:
+  //   mode='bound' → ' ' (space) — reading continues, no visual break
+  //   mode='free'  → ' — ' — em-dash marks commentary against neighbouring text
+  // Any adjacent whitespace on either side of the insertion point is
+  // absorbed into the replaced range so we don't get double-spaces or
+  // "space then em-dash" doubling.
+  //
+  // Inserted text (including any boundary marks) is auto-selected via
+  // setRangeText 'select' so a single Delete wipes the whole insertion
+  // for a redo. srCaretSnapshot is refreshed to the new selection so
+  // consecutive recordings chain naturally.
+  function insertTranscriptIntoCurrent(text, mode) {
     const clean = (text || '').trim();
     if (!clean) return;
+    const isFree = (mode === 'free');
+
+    // Helper: given the raw existing value and a [start, end] range for
+    // insertion, compute the actual replacement range (absorbing adjacent
+    // whitespace) and the composed insertText (with boundary marks
+    // prepended/appended if adjacent non-whitespace exists).
+    function composeInsertion(value, start, end) {
+      // Collapse selection to its end (append after previous auto-select).
+      if (start !== end) start = end;
+      const beforeRaw = value.slice(0, start);
+      const afterRaw  = value.slice(end);
+      const beforeTrimmed = beforeRaw.replace(/\s+$/, '');
+      const afterTrimmed  = afterRaw.replace(/^\s+/, '');
+      const hasBefore = beforeTrimmed.length > 0;
+      const hasAfter  = afterTrimmed.length > 0;
+      const sep = isFree ? ' — ' : ' ';
+      let insertText = clean;
+      if (hasBefore) insertText = sep + insertText;
+      if (hasAfter)  insertText = insertText + sep;
+      // Absorb the adjacent whitespace we trimmed off so we replace it
+      // rather than leaving it in place next to our new separator.
+      const trailingWSLen = beforeRaw.length - beforeTrimmed.length;
+      const leadingWSLen  = afterRaw.length  - afterTrimmed.length;
+      return {
+        insertText,
+        replaceStart: start - trailingWSLen,
+        replaceEnd:   end + leadingWSLen,
+      };
+    }
 
     // Path 1: use saved caret if valid
     if (srCaretSnapshot && srCaretSnapshot.textarea &&
         currentStackEl && currentStackEl.contains(srCaretSnapshot.textarea)) {
       const ta = srCaretSnapshot.textarea;
-      let start = Math.min(srCaretSnapshot.selectionStart, ta.value.length);
-      let end   = Math.min(srCaretSnapshot.selectionEnd,   ta.value.length);
-      // Collapse selection to its end so we append AFTER a previous auto-
-      // selection rather than REPLACE it. User can press Delete first to
-      // wipe explicitly.
-      if (start !== end) start = end;
-      // Add a leading space if the char before the caret isn't whitespace
-      // (and we're not at the very start).
-      const before = ta.value.slice(0, start);
-      const needsLeadingSpace = start > 0 && !/\s$/.test(before);
-      const insertText = (needsLeadingSpace ? ' ' : '') + clean;
+      const savedStart = Math.min(srCaretSnapshot.selectionStart, ta.value.length);
+      const savedEnd   = Math.min(srCaretSnapshot.selectionEnd,   ta.value.length);
+      const { insertText, replaceStart, replaceEnd } = composeInsertion(ta.value, savedStart, savedEnd);
       try {
         ta.focus({ preventScroll: true });
-        ta.setRangeText(insertText, start, end, 'select');
+        ta.setRangeText(insertText, replaceStart, replaceEnd, 'select');
         ta.dispatchEvent(new Event('input', { bubbles: true }));
-        // Refresh the caret snapshot to the just-inserted range so
-        // subsequent recordings continue from the right place.
         srCaretSnapshot = {
           textarea:       ta,
           selectionStart: ta.selectionStart,
@@ -4627,7 +4657,7 @@ async function init() {
         };
       } catch (err) {
         console.warn('[SR] caret-anchored insert failed, falling back', err);
-        srCaretSnapshot = null;   // force fallback below
+        srCaretSnapshot = null;
       }
       if (srCaretSnapshot) return;
     }
@@ -4638,30 +4668,17 @@ async function init() {
     if (!topInCurrent) top = createCard({ kind: 'local' });
     if (!top || !top.body) return;
     const body = top.body;
-    const existing = body.value || '';
-    let insertStart, insertEnd, newValue;
-    if (existing) {
-      const sep = /\s$/.test(existing) ? '' : ' ';
-      insertStart = existing.length + sep.length;
-      newValue = existing + sep + clean;
-      insertEnd = newValue.length;
-    } else {
-      insertStart = 0;
-      newValue = clean;
-      insertEnd = clean.length;
-    }
-    body.value = newValue;
-    try { body.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    const endPos = body.value.length;
+    const { insertText, replaceStart, replaceEnd } = composeInsertion(body.value, endPos, endPos);
     try {
       body.focus({ preventScroll: true });
-      body.setSelectionRange(insertStart, insertEnd);
+      body.setRangeText(insertText, replaceStart, replaceEnd, 'select');
+      body.dispatchEvent(new Event('input', { bubbles: true }));
     } catch (_) {}
-    // Prime the caret snapshot to the just-inserted range so the next
-    // recording can use Path 1.
     srCaretSnapshot = {
       textarea:       body,
-      selectionStart: insertStart,
-      selectionEnd:   insertEnd,
+      selectionStart: body.selectionStart,
+      selectionEnd:   body.selectionEnd,
     };
   }
 
@@ -4671,28 +4688,28 @@ async function init() {
   // untouched if no match survives; otherwise returns text with sub/del/
   // ins spans wrapped in `{?…}` and em-dash boundaries where the quote
   // meets user commentary.
+  // Returns { text, mode } where mode ∈ 'bound' | 'free'. Bound = the
+  // utterance overwhelmingly aligned to source (≥ 70 %); Free = it did
+  // not, so the transcription is treated as commentary. Insertion code
+  // uses mode to pick the boundary separator (' ' vs ' — ') when
+  // adjacent text exists.
   function srAlignAndMark(uttText, srcText) {
-    if (!uttText || !srcText) return uttText;
+    if (!uttText || !srcText) return { text: uttText, mode: 'free' };
     try {
       const uttToks = srTokenise(uttText);
       const srcToks = srTokenise(srcText);
       let matches = srAlignLocal(uttToks, srcToks, { minLen: 3, minScore: 4, phonWeight: 0.5 });
-      if (!matches.length) return uttText;
-      // 2026-08-15 — bound-mode boundary extension. If ≥ 70 % of the
-      // utterance already aligned, treat it as a continuous reading and
-      // extend the first-match backward + last-match forward to cover
-      // Whisper's mangled opening / trailing tokens as source substitutions
-      // rather than free commentary. No-op if ratio below threshold.
+      if (!matches.length) return { text: uttText, mode: 'free' };
       const preRatio = matches.reduce((s, m) => s + m.length, 0) / uttToks.length;
+      const mode = preRatio >= 0.7 ? 'bound' : 'free';
       matches = srExtendBoundaries(matches, uttToks, srcToks, { boundThreshold: 0.7 });
       const { text: marked, subs } = srApplySubstitutions(uttText, uttToks, srcToks, matches);
       const postMatched = matches.reduce((s, m) => s + m.length, 0);
-      const mode = preRatio >= 0.7 ? 'bound' : 'free';
       console.log(`[SR] alignment: ${matches.length} match(es), pre-ratio ${(preRatio*100).toFixed(0)}% → ${mode} mode, ${postMatched}/${uttToks.length} tokens after extend, ${subs.length} edit(s)`);
-      return marked;
+      return { text: marked, mode };
     } catch (err) {
       console.warn('[SR] alignment failed, using raw text', err);
-      return uttText;
+      return { text: uttText, mode: 'free' };
     }
   }
 
