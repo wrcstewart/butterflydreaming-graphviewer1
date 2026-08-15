@@ -4245,7 +4245,16 @@ async function init() {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
       document.body.classList.remove('player-active');
+      const wasEdit = document.body.classList.contains('edit-active');
       document.body.classList.toggle('edit-active', mode === 'edit');
+      // 2026-08-15 — first entry into Edit mode kicks off Whisper model
+      // download in the background so the first mic press doesn't pay a
+      // ~2 s cold-start. Fire-and-forget: async, non-blocking, idempotent
+      // (subsequent enters return immediately if the pipeline is loaded).
+      // Listeners in the SR wire-up further down in init() pick this up.
+      if (mode === 'edit' && !wasEdit) {
+        document.dispatchEvent(new CustomEvent('bd:edit-mode-enter'));
+      }
       // Cy's internal size may have gone stale while it was hidden (any
       // resize / rAF re-fit was skipped). Re-sync after a frame so the
       // container has real dimensions again, then re-fit to whatever
@@ -4624,6 +4633,20 @@ async function init() {
       console.warn('[SR] stop failed', err);
     }
   }
+
+  // 2026-08-15 — kick off Whisper model download on first entry to Edit
+  // mode so first mic press doesn't pay a ~2 s cold-start. install() is
+  // idempotent: returns immediately if pipeline already loaded, so
+  // repeated Edit re-entries are cheap. Fire-and-forget (background).
+  function srWarmUp() {
+    srEngine.install().catch(err => {
+      console.warn('[SR] pre-warm install failed', err);
+    });
+  }
+  document.addEventListener('bd:edit-mode-enter', srWarmUp);
+  // If Edit is already active at wire-up time (defensive — user pressing
+  // Pair before this code runs), warm up now.
+  if (document.body.classList.contains('edit-active')) srWarmUp();
 
   if (srMicBtn) {
     // State 1 (idle): click grants permission
