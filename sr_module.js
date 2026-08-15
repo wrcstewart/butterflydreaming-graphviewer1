@@ -264,6 +264,115 @@ export function alignLocal(aToks, bToks, opts) {
   return results;
 }
 
+// ── Substitution renderer (alignment mode 4) ───────────────────────────
+// Consume Smith-Waterman ops per matched span, produce a marked-up
+// utterance string with `{?…}` around every stretch the reviewer should
+// double-check. Nothing is ever deleted — the user hits Accept to strip
+// markers when happy.
+//
+// Rules (settled 2026-08-13 for sr_editor; ported unchanged for BD):
+//   sub  — Whisper misheard a source word. Substitute source form,
+//          wrap `{?source}` — visible correction.
+//   del  — Source has a word Whisper skipped. Insert `{?source}` at
+//          the position after the previous matched utterance token.
+//          Consecutive del ops group into one `{?word1 word2}`.
+//   ins  — Whisper (or the reader) produced a word not in source.
+//          Wrap `{?— extra —}` — em-dashes INSIDE the markers so that
+//          when Accept strips `{?` and `}` the em-dashes remain as a
+//          permanent literary aside marker. Consecutive ins ops group.
+//   Text outside any matched span → left as-is. Em-dash separators are
+//          inserted at the boundary between commentary and the aligned
+//          quote; soft-sentence punctuation (. , ; :) at the boundary
+//          is REPLACED with the em-dash to avoid ". — " doubling.
+//
+// Returns { text, subs } where subs is the per-edit log.
+export function applySubstitutions(uttText, uttTokens, srcTokens, matches) {
+  if (!matches.length) return { text: uttText, subs: [] };
+  const edits = [];
+  const SOFT_PUNCT_RE = /[.,;:]/;
+  function findLastNonSpaceBeforePos(text, pos) {
+    for (let i = pos - 1; i >= 0; i--) {
+      if (!/\s/.test(text[i])) return { char: text[i], idx: i };
+    }
+    return null;
+  }
+  function findFirstNonSpaceFromPos(text, pos) {
+    for (let i = pos; i < text.length; i++) {
+      if (!/\s/.test(text[i])) return { char: text[i], idx: i };
+    }
+    return null;
+  }
+  for (const match of matches) {
+    const hasBefore = match.aStart > 0;
+    const hasAfter  = match.aEnd   < uttTokens.length - 1;
+    if (hasBefore) {
+      const pos  = uttTokens[match.aStart].start;
+      const info = findLastNonSpaceBeforePos(uttText, pos);
+      if (info) {
+        if (SOFT_PUNCT_RE.test(info.char)) {
+          edits.push({ start: info.idx, end: info.idx + 1, insert: ' —', kind: 'sep-before-repl', from: info.char, to: '—' });
+        } else {
+          edits.push({ start: pos, end: pos, insert: '— ', kind: 'sep-before', from: '', to: '—' });
+        }
+      }
+    }
+    if (hasAfter) {
+      const pos  = uttTokens[match.aEnd].end;
+      const info = findFirstNonSpaceFromPos(uttText, pos);
+      if (info) {
+        if (SOFT_PUNCT_RE.test(info.char)) {
+          edits.push({ start: info.idx, end: info.idx + 1, insert: '— ', kind: 'sep-after-repl', from: info.char, to: '—' });
+        } else {
+          edits.push({ start: pos, end: pos, insert: ' —', kind: 'sep-after', from: '', to: '—' });
+        }
+      }
+    }
+  }
+  for (const match of matches) {
+    for (let opIdx = 0; opIdx < match.ops.length; opIdx++) {
+      const op = match.ops[opIdx];
+      if (op.type === 'sub') {
+        const aTok = uttTokens[op.aIdx];
+        const bTok = srcTokens[op.bIdx];
+        edits.push({ start: aTok.start, end: aTok.end, insert: '{?' + bTok.surface + '}', kind: 'sub', from: aTok.surface, to: bTok.surface });
+      } else if (op.type === 'ins') {
+        const prev = opIdx > 0 ? match.ops[opIdx - 1] : null;
+        if (prev && prev.type === 'ins') continue;
+        let last = opIdx;
+        while (last + 1 < match.ops.length && match.ops[last + 1].type === 'ins') last++;
+        const firstTok = uttTokens[op.aIdx];
+        const lastTok  = uttTokens[match.ops[last].aIdx];
+        const original = uttText.slice(firstTok.start, lastTok.end);
+        edits.push({ start: firstTok.start, end: lastTok.end, insert: '{?— ' + original + ' —}', kind: 'ins-wrap', from: original, to: '{?— ' + original + ' —}' });
+      } else if (op.type === 'del') {
+        const prev = opIdx > 0 ? match.ops[opIdx - 1] : null;
+        if (prev && prev.type === 'del') continue;
+        const bIdxs = [op.bIdx];
+        let k = opIdx + 1;
+        while (k < match.ops.length && match.ops[k].type === 'del') { bIdxs.push(match.ops[k].bIdx); k++; }
+        const words = bIdxs.map(bi => srcTokens[bi].surface).join(' ');
+        let anchorTok = null;
+        for (let j = opIdx - 1; j >= 0; j--) {
+          const p = match.ops[j];
+          if (p.type === 'match' || p.type === 'sub') { anchorTok = uttTokens[p.aIdx]; break; }
+        }
+        const pos = anchorTok ? anchorTok.end : uttTokens[match.aStart].start;
+        edits.push({ start: pos, end: pos, insert: ' {?' + words + '}', kind: 'del', from: '(missing)', to: words });
+      }
+    }
+  }
+  edits.sort((a, b) => b.start - a.start || b.end - a.end);
+  let out = uttText;
+  for (const e of edits) out = out.slice(0, e.start) + e.insert + out.slice(e.end);
+  return { text: out, subs: edits };
+}
+
+// Strip `{?…}` markers throughout a string. Em-dashes inside ins-wraps
+// (`{?— word —}`) survive as permanent literary asides, per the design.
+export function stripTentativeMarkers(text) {
+  return (text || '').replace(/\{\?([^}]+)\}/g, '$1');
+}
+
 // ── Merge overlapping own-chunk outputs ────────────────────────────────
 export function mergeChunkOutputs(parts) {
   if (!parts.length) return '';

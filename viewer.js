@@ -2,7 +2,15 @@
 
 // 2026-08-15 — Speech-recognition module (Whisper + AudioWorklet + biasing).
 // Ported from sr_editor.html; used in Edit mode. See sr_module.js.
-import { createEngine as createSREngine, buildBiasPrompt as srBuildBiasPrompt, stripDirectiveBlocks as srStripDirectives } from './sr_module.js';
+import {
+  createEngine       as createSREngine,
+  buildBiasPrompt    as srBuildBiasPrompt,
+  stripDirectiveBlocks as srStripDirectives,
+  tokenise             as srTokenise,
+  alignLocal           as srAlignLocal,
+  applySubstitutions   as srApplySubstitutions,
+  stripTentativeMarkers as srStripTentative,
+} from './sr_module.js';
 
 // ── Client → server log forwarding (2026-07-12) ──────────────────────
 // Copy every console.log/info/warn/error and uncaught error / unhandled
@@ -4460,7 +4468,10 @@ async function init() {
   const srLevelBar    = srLevelMeter ? srLevelMeter.querySelector('.bar') : null;
   let   srMicState    = 'need-permission';   // need-permission | ready | recording | processing | error
   let   srUseMic      = false;
-  let   srBiasSnapshot = '';                  // captured at record-start; passed to stop()
+  // 2026-08-15 MVP2 — snapshot captured at record-start of visible-History
+  // text. Feeds BOTH the bias prompt (widens Whisper's vocab) AND the post-
+  // hoc alignment (finds source spans and marks them {?…} in the output).
+  let   srSourceSnapshot = '';
 
   // Snapshot the alignment source at record-start. Per 2026-08-15 design
   // discussion: "passage being aligned needs to be deduced as a subset of
@@ -4518,7 +4529,12 @@ async function init() {
       else if (dbfs > -12) srLevelBar.classList.add('mid');
     },
     onFinal:  (text) => {
-      insertTranscriptIntoCurrent(text);
+      // 2026-08-15 MVP2 — align transcription against the record-start
+      // snapshot; wrap detected substitutions in {?…} markers with em-dash
+      // boundaries at commentary/quote transitions. Falls back to raw text
+      // if no significant match found (snapshot empty, no overlap, etc.).
+      const marked = srAlignAndMark(text, srSourceSnapshot);
+      insertTranscriptIntoCurrent(marked);
       if (srMicState === 'processing') { srMicState = 'ready'; refreshSRMicUI(); }
     },
     onError:  (err) => {
@@ -4571,6 +4587,28 @@ async function init() {
     } catch (_) {}
   }
 
+  // 2026-08-15 MVP2 — alignment + {?…} substitution wrapper. Uses the
+  // Smith-Waterman aligner from sr_module.js. Same thresholds as sr_editor
+  // defaults (minLen 3, minScore 4, phonWeight 0.5). Returns raw text
+  // untouched if no match survives; otherwise returns text with sub/del/
+  // ins spans wrapped in `{?…}` and em-dash boundaries where the quote
+  // meets user commentary.
+  function srAlignAndMark(uttText, srcText) {
+    if (!uttText || !srcText) return uttText;
+    try {
+      const uttToks = srTokenise(uttText);
+      const srcToks = srTokenise(srcText);
+      const matches = srAlignLocal(uttToks, srcToks, { minLen: 3, minScore: 4, phonWeight: 0.5 });
+      if (!matches.length) return uttText;
+      const { text: marked, subs } = srApplySubstitutions(uttText, uttToks, srcToks, matches);
+      console.log(`[SR] alignment: ${matches.length} match(es), ${subs.length} edit(s)`);
+      return marked;
+    } catch (err) {
+      console.warn('[SR] alignment failed, using raw text', err);
+      return uttText;
+    }
+  }
+
   // Stale-event guard (sr_editor.html: filters Safari's dead-letter queue
   // of pointer events held behind the permission modal). If an event's
   // timestamp is > 500ms old, drop it.
@@ -4603,7 +4641,7 @@ async function init() {
     // 2026-08-15 — snapshot the alignment / bias source at pointerdown.
     // User can't scroll while holding mic; whatever is visible right now
     // is the reading source for the recording that's about to happen.
-    srBiasSnapshot = snapshotVisibleHistorySource();
+    srSourceSnapshot = snapshotVisibleHistorySource();
     srMicState = 'recording';
     refreshSRMicUI();
     try {
@@ -4621,8 +4659,8 @@ async function init() {
     refreshSRMicUI();
     // Build bias prompt from the snapshot taken at pointerdown.
     let biasText = '';
-    if (srBiasSnapshot) {
-      const built = srBuildBiasPrompt(srBiasSnapshot, 4);
+    if (srSourceSnapshot) {
+      const built = srBuildBiasPrompt(srSourceSnapshot, 4);
       biasText = built.text || '';
     }
     try {
@@ -4665,6 +4703,34 @@ async function init() {
     srMicBtn.addEventListener('pointercancel', () => { if (srMicState === 'recording') srStopRecording(); });
     srMicBtn.addEventListener('pointerleave',  () => { if (srMicState === 'recording') srStopRecording(); });
     refreshSRMicUI();
+  }
+  // 2026-08-15 MVP2 — Accept button: strip {?…} tentative markers
+  // throughout the top Local card in Current. Em-dashes inside ins-wraps
+  // survive as permanent literary asides (that's why they were placed
+  // INSIDE the markers by applySubstitutions). Uses setRangeText so the
+  // browser's native undo stack retains the pre-accept state for one
+  // Cmd/Ctrl-Z back to markers.
+  const srAcceptBtn = document.getElementById('sr-accept-btn');
+  if (srAcceptBtn) {
+    srAcceptBtn.addEventListener('click', () => {
+      const top = topLocalCard();
+      if (!top || !top.body) return;
+      const before = top.body.value || '';
+      const after  = srStripTentative(before);
+      if (before === after) {
+        console.log('[SR] no {?…} markers to strip');
+        return;
+      }
+      try {
+        top.body.focus({ preventScroll: true });
+        top.body.setRangeText(after, 0, before.length, 'end');
+        top.body.dispatchEvent(new Event('input', { bubbles: true }));
+        const count = (before.match(/\{\?[^}]+\}/g) || []).length;
+        console.log(`[SR] accepted ${count} tentative marker(s)`);
+      } catch (err) {
+        console.warn('[SR] accept failed', err);
+      }
+    });
   }
   // ── end SR wire-up ────────────────────────────────────────────────────
 
