@@ -4472,6 +4472,38 @@ async function init() {
   // text. Feeds BOTH the bias prompt (widens Whisper's vocab) AND the post-
   // hoc alignment (finds source spans and marks them {?…} in the output).
   let   srSourceSnapshot = '';
+  // 2026-08-15 — caret snapshot for insertion targeting. Pressing-and-
+  // holding the mic button transfers focus AWAY from any Current textarea,
+  // wiping the visible caret. We track caret position on every relevant
+  // interaction (focus/input/keyup/mouseup/focusout) with textareas inside
+  // #current-stack, so at transcript-arrival time we know exactly where
+  // the user was editing. Falls back to "append to end of top Local card"
+  // if no valid caret snapshot exists (e.g. user hasn't touched Current
+  // yet, or the tracked textarea has since moved to History).
+  let   srCaretSnapshot = null;   // {textarea, selectionStart, selectionEnd}
+
+  // Continuously track caret position in any Current textarea. Delegated
+  // listeners so we don't have to re-attach when cards get created /
+  // promoted. On focusout we snapshot the position of the element LOSING
+  // focus (that's the useful moment: after this, activeElement moves to
+  // the mic button and the natural cursor is gone).
+  function captureCaretIfInCurrent(fromEl) {
+    const el = fromEl || document.activeElement;
+    if (el && el.tagName === 'TEXTAREA' && currentStackEl && currentStackEl.contains(el)) {
+      srCaretSnapshot = {
+        textarea:       el,
+        selectionStart: el.selectionStart,
+        selectionEnd:   el.selectionEnd,
+      };
+    }
+  }
+  if (currentStackEl) {
+    currentStackEl.addEventListener('focusin',  () => captureCaretIfInCurrent());
+    currentStackEl.addEventListener('input',    () => captureCaretIfInCurrent());
+    currentStackEl.addEventListener('keyup',    () => captureCaretIfInCurrent());
+    currentStackEl.addEventListener('mouseup',  () => captureCaretIfInCurrent());
+    currentStackEl.addEventListener('focusout', (e) => captureCaretIfInCurrent(e.target));
+  }
 
   // Snapshot the alignment source at record-start. Per 2026-08-15 design
   // discussion: "passage being aligned needs to be deduced as a subset of
@@ -4547,28 +4579,68 @@ async function init() {
     compressionOn: true,
   });
 
-  // Insert final Whisper text into the top Local card of #current-stack.
-  // If there's no Local card in Current, create one first (via createCard).
-  // Auto-select the inserted text so a single Delete wipes it for retry
-  // (matches sr_editor.html behaviour).
+  // Insert final Whisper text into a Current textarea.
+  //
+  // Priority order (2026-08-15):
+  //   1. If srCaretSnapshot points to a textarea still in Current, insert
+  //      at that saved caret position. Preserves the user's cursor after
+  //      the mic-button focus grab wiped it. If the saved range was a
+  //      selection, collapse to its end first (matches sr_editor's
+  //      "append after previous auto-selection" rule — Delete first, then
+  //      re-record, if you want to REPLACE the previous one).
+  //   2. Else fall back to appending to the end of the top Local card in
+  //      Current (creating one if none exists).
+  //
+  // Inserted text is auto-selected (setRangeText 'select') so a single
+  // Delete wipes it for a redo. Then srCaretSnapshot is updated to the
+  // just-inserted range so consecutive recordings chain naturally.
   function insertTranscriptIntoCurrent(text) {
     const clean = (text || '').trim();
     if (!clean) return;
-    // Find or create top Local card in Current
+
+    // Path 1: use saved caret if valid
+    if (srCaretSnapshot && srCaretSnapshot.textarea &&
+        currentStackEl && currentStackEl.contains(srCaretSnapshot.textarea)) {
+      const ta = srCaretSnapshot.textarea;
+      let start = Math.min(srCaretSnapshot.selectionStart, ta.value.length);
+      let end   = Math.min(srCaretSnapshot.selectionEnd,   ta.value.length);
+      // Collapse selection to its end so we append AFTER a previous auto-
+      // selection rather than REPLACE it. User can press Delete first to
+      // wipe explicitly.
+      if (start !== end) start = end;
+      // Add a leading space if the char before the caret isn't whitespace
+      // (and we're not at the very start).
+      const before = ta.value.slice(0, start);
+      const needsLeadingSpace = start > 0 && !/\s$/.test(before);
+      const insertText = (needsLeadingSpace ? ' ' : '') + clean;
+      try {
+        ta.focus({ preventScroll: true });
+        ta.setRangeText(insertText, start, end, 'select');
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        // Refresh the caret snapshot to the just-inserted range so
+        // subsequent recordings continue from the right place.
+        srCaretSnapshot = {
+          textarea:       ta,
+          selectionStart: ta.selectionStart,
+          selectionEnd:   ta.selectionEnd,
+        };
+      } catch (err) {
+        console.warn('[SR] caret-anchored insert failed, falling back', err);
+        srCaretSnapshot = null;   // force fallback below
+      }
+      if (srCaretSnapshot) return;
+    }
+
+    // Path 2: fallback — append to end of top Local card in Current
     let top = topLocalCard();
     const topInCurrent = top && top.el && currentStackEl && currentStackEl.contains(top.el);
-    if (!topInCurrent) {
-      top = createCard({ kind: 'local' });
-    }
+    if (!topInCurrent) top = createCard({ kind: 'local' });
     if (!top || !top.body) return;
     const body = top.body;
     const existing = body.value || '';
-    // Append with a single space separator if there's already content;
-    // otherwise just set. Select the newly-inserted portion so Delete
-    // wipes it cleanly.
     let insertStart, insertEnd, newValue;
     if (existing) {
-      const sep = /[\s]$/.test(existing) ? '' : ' ';
+      const sep = /\s$/.test(existing) ? '' : ' ';
       insertStart = existing.length + sep.length;
       newValue = existing + sep + clean;
       insertEnd = newValue.length;
@@ -4578,13 +4650,18 @@ async function init() {
       insertEnd = clean.length;
     }
     body.value = newValue;
-    // Trigger the input event so updateSendBtn / any other listeners fire
     try { body.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
-    // Auto-select the just-inserted range
     try {
       body.focus({ preventScroll: true });
       body.setSelectionRange(insertStart, insertEnd);
     } catch (_) {}
+    // Prime the caret snapshot to the just-inserted range so the next
+    // recording can use Path 1.
+    srCaretSnapshot = {
+      textarea:       body,
+      selectionStart: insertStart,
+      selectionEnd:   insertEnd,
+    };
   }
 
   // 2026-08-15 MVP2 — alignment + {?…} substitution wrapper. Uses the
