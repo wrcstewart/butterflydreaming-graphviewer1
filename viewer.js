@@ -4221,6 +4221,7 @@ async function init() {
       // MM3 (2026-07-12) — body class so CSS can gate the invite panel
       // on Player mode. Hidden by default; visible while player-active.
       document.body.classList.add('player-active');
+      document.body.classList.remove('edit-active');
       // MM1.6 Strategy B — on entering Player mode, load the current node's
       // module so the user sees the visual immediately without having to
       // press Copy Down.
@@ -4232,9 +4233,15 @@ async function init() {
       positionExtendPanel();
       requestAnimationFrame(() => positionExtendPanel());
     } else {
+      // 'nodes' or 'edit' — both keep cy visible + hide iframe. The only
+      // difference is body.edit-active, which CSS uses to surface the
+      // compose controls (Send + New) that belong to Edit mode. Toggled
+      // rather than blindly added/removed so 'nodes' explicitly clears it
+      // (and 'edit' explicitly sets it).
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
       document.body.classList.remove('player-active');
+      document.body.classList.toggle('edit-active', mode === 'edit');
       // Cy's internal size may have gone stale while it was hidden (any
       // resize / rAF re-fit was skipped). Re-sync after a frame so the
       // container has real dimensions again, then re-fit to whatever
@@ -4372,6 +4379,10 @@ async function init() {
       // live partner. Server's unpair handler notifies the buddy via
       // buddy_disconnected (if paired) and drops "Partner disconnected."
       // in their chat log. This user does NOT auto re-queue.
+      // 2026-08-15 — Unpair does NOT deactivate Edit mode. User's spec:
+      // once Edit is engaged, only a radio press exits Edit. Unpair only
+      // undoes the pair state, not the compose mode. So we deliberately
+      // do not touch #view-mode-toggle or body.edit-active here.
       console.log('[pair-debug] Leave press → unpair (active=', pairingState.active, ', waiting=', pairingState.waiting, ')');
       wsNow.emit('msg', { type: 'unpair' });
       pairingState.active = false;
@@ -4394,6 +4405,15 @@ async function init() {
     wsNow.emit('msg', { type: 'ready_to_pair', code });
     pairingState.waiting = true;
     updateJoinButtonLabel();
+    // 2026-08-15 — pressing Pair also engages Edit mode (compose posture).
+    // User's spec: Pair-and-Edit are entered together; Edit stays on after
+    // Unpair; only the radios exit Edit. Idempotent if Edit is already
+    // selected.
+    const editRadio = document.querySelector('#view-mode-toggle input[value="edit"]');
+    if (editRadio && !editRadio.checked) {
+      editRadio.checked = true;
+      setViewMode('edit');
+    }
   }
 
   // A42 §42.3 — Nodes/Player radio change handler.

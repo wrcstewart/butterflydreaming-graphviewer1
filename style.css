@@ -544,8 +544,14 @@ html, body {
    the bdName/bdLabel metadata Save required) and has been retired. Node
    text editing lives on the bd_tool.js write path via nav_nodes_text.md. */
 
+/* 2026-08-15 — Send + New hidden by default; only surfaced when Edit
+   mode is engaged (body.edit-active toggled by setViewMode('edit')).
+   User's spec: these two are compose-side controls that belong in Edit
+   mode; the top row's Nodes/Player/Edit radio is what governs when
+   they're relevant. */
 #chat-send-btn,
 #chat-new-card-btn {
+  display: none;
   background: #1a1a2e;
   border: 1px solid #555;
   border-radius: 3px;
@@ -556,6 +562,10 @@ html, body {
   padding: 3px 6px;
   cursor: pointer;
   text-align: center;
+}
+body.edit-active #chat-send-btn,
+body.edit-active #chat-new-card-btn {
+  display: inline-block;
 }
 
 #chat-send-btn {
@@ -604,10 +614,10 @@ html, body {
 
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
-   blue → red → green per commit to a cached BD viewer file. 2026-08-14:
-   RED (reading-mode layout — gateway now surfaced under the Cluster,
-   title moved to the right on the same row so the full reading
-   breadcrumb Cluster → Gateway → Title stays on screen). Next = green. */
+   blue → red → green per commit to a cached BD viewer file. 2026-08-15:
+   GREEN (Edit-mode wiring — Send/New hidden except in Edit; Pair press
+   auto-engages Edit; Unpair does NOT exit Edit; Edit radio always
+   enabled). Next rotation = blue. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -617,7 +627,7 @@ html, body {
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff5555;             /* CANARY — red */
+  border: 2px solid #4caf50;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -631,7 +641,7 @@ html, body {
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #ff9999;
+  border-color: #7fd07f;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
