@@ -116,6 +116,16 @@ let chatModeActive         = true;   // 2026-07-15 — always on; chat panel is 
 // (navigate) or when a different node is tapped (fresh sequence starts).
 let readingState = null;
 
+// 2026-08-16 — Unified Focus Model (see unified_focus_spec.md). When on, ONE
+// tap on a node reveals its text card AND expands its neighbourhood together,
+// instead of the current tap-through-chunks-then-navigate rhythm. Default OFF
+// during the cautious migration: flag-off preserves the exact legacy
+// behaviour, so this scaffold ships with zero user-visible change. The Root
+// boot sequence (staged messages 0/1) is a separate machine, still TODO —
+// so leave this OFF until that lands, or Root will focus-expand instead of
+// running the guided intro.
+const UNIFIED_FOCUS = false;
+
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';
 const CHUNK_HINT_NAVIGATE = 'Tap once more to see connected nodes.';
 const CHUNK_HINT_NO_MORE  = 'There are not yet further descendants.';
@@ -2041,6 +2051,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: desc, cardsByIdx: {} };
         const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, desc, node), node, 0);
         if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
+        // Unified focus: reveal the neighbourhood on the SAME fresh tap.
+        if (UNIFIED_FOCUS && desc) navigateInto(node);
         return;
       }
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc, cardsByIdx: {} };
@@ -2048,8 +2060,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const c0     = chunks[0];
       const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc, node), node, 0);
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
+      // Unified focus: text + neighbourhood together, one tap (spec §3).
+      if (UNIFIED_FOCUS && desc) navigateInto(node);
       return;
     }
+
+    // Unified focus: the node is already focused + expanded from the fresh
+    // tap, so re-tapping it is a no-op. Chunk-advance and past-last navigation
+    // are retired here (chunking is Root-only, run by the boot machine). This
+    // keeps 1 click = 1 breadcrumb (spec §3, D4).
+    if (UNIFIED_FOCUS) return;
 
     // Same node, past-last tap → navigate or no-op.
     const nextIdx = readingState.chunkIndex + 1;
