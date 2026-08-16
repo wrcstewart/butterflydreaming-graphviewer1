@@ -904,21 +904,19 @@ function buildStyle() {
       }
     },
     {
-      // 2026-08-16 — Gateways navigation-aid node. Created via bd_tool.js
-      // cypher: hangs off Settling via DESCENDS_FROM; links to every
-      // gateway TextNode via GATEWAY_LINK (new edge type). White square,
-      // black font. Size 26 ≈ 1/3 of the Conversations node (76 tall) —
-      // compact per user 2026-08-16.
+      // 2026-08-16 — Gateways navigation-aid node. White square, black
+      // font. Size 32 (was 26; +20 % per user — 26 was truncating the
+      // label). Still compact (~40 % of the Conversations node's 76 px).
       selector: 'node[type="Entry"][name="Gateways"]',
       style: {
         'shape': 'square',
-        'width': 26,
-        'height': 26,
+        'width': 32,
+        'height': 32,
         'background-color': '#ffffff',
         'background-opacity': 1,
         'color': '#000000',
-        'font-size': '8px',
-        'text-max-width': '24px',
+        'font-size': '10px',
+        'text-max-width': '30px',
         'border-width': 1,
         'border-color': '#000000',
         'border-opacity': 1,
