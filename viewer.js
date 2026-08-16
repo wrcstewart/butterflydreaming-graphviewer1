@@ -1184,6 +1184,15 @@ function buildStyle() {
       style: {
         'background-color': '#cccccc',
         'color': '#1a1a1a',
+        // 2026-08-16 — keep the pinned title fully tappable even in a dense
+        // work. Tao Te Ching has 82 content nodes; fcose lays some of them
+        // over the title, and the overlapping (later-drawn) node was stealing
+        // the tap so only the title's exposed top edge fired. z-index draws
+        // the title on top so it wins the hit-test; text-events makes the
+        // whole label (not just the small node box) a tap target. Sparse
+        // works never overlapped, which is why only Tao Te Ching showed it.
+        'z-index': 20,
+        'text-events': 'yes',
       }
     },
     {
