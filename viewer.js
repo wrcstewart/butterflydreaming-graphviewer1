@@ -1106,11 +1106,11 @@ function buildStyle() {
       }
     },
     {
-      // 2026-08-16 — reading-spine signalling (see applySeqSignals). Every
-      // visible CHILD hop from one content TextNode to its successor within a
-      // work gets a bold amber edge + double-size arrowhead, so the user can
-      // see at a glance which node is "next" and flick through the work. Class
-      // applied at layout time; placed after the CHILD rule so it wins.
+      // 2026-08-16 — reading-spine signalling (see applySeqSignals). ONLY the
+      // central (just-tapped) node's forward hop to its successor gets a bold
+      // amber edge + double-size arrowhead (tap 19 → arrow 19→20), pointing
+      // the way to the next node. Class applied at layout time; placed after
+      // the CHILD rule so it wins.
       selector: 'edge.seq-edge',
       style: {
         'line-color': '#e0a020',
@@ -1315,26 +1315,29 @@ function buildStyle() {
 
 // --- Layout ---
 
-// 2026-08-16 — reading-spine signalling. Tag every VISIBLE CHILD hop from one
-// content TextNode to its successor within a work (source & target both
-// TextNode, source not a gateway) so the amber `.seq-edge` / `.seq-successor`
-// styles apply. Recomputed each layout since the visible set changes per view.
-// Cleared first so stale marks from a previous view don't linger.
-function applySeqSignals(cy) {
+// 2026-08-16 — reading-spine signalling. Mark ONLY the single forward hop from
+// the CENTRAL (just-tapped) node to its successor, e.g. tap 19 → amber arrow
+// 19→20 and only node 20 bordered. NOT the backward 18→19 hop, NOT any other
+// node's hops. `centralNode` is runLayout's parentNode (what expandToNode
+// passes = the tapped node). Cleared first so a prior view's mark doesn't
+// linger. No-op unless the central node is a content TextNode (not a gateway).
+function applySeqSignals(cy, centralNode) {
   cy.edges('.seq-edge').removeClass('seq-edge');
   cy.nodes('.seq-successor').removeClass('seq-successor');
-  const seqEdges = cy.edges('edge[type="CHILD"]').filter(e => {
-    if (!e.visible()) return false;
-    const s = e.source(), t = e.target();
-    return s.data('type') === 'TextNode' && t.data('type') === 'TextNode' && !s.data('gateway');
-  });
-  seqEdges.addClass('seq-edge');
-  seqEdges.targets().filter(':visible').addClass('seq-successor');
+  if (!centralNode || !centralNode.length) return;
+  if (centralNode.data('type') !== 'TextNode' || centralNode.data('gateway')) return;
+  const fwd = centralNode.connectedEdges('edge[type="CHILD"]').filter(e =>
+    e.source().id() === centralNode.id() &&
+    e.target().data('type') === 'TextNode' &&
+    e.visible() && e.target().visible()
+  );
+  fwd.addClass('seq-edge');
+  fwd.targets().addClass('seq-successor');
 }
 
 function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
-  applySeqSignals(cy);
+  applySeqSignals(cy, parentNode);
   if (visible.nodes().length <= 1) {
     cy.fit(visible, fitPadding(cy, 120));
     return;

@@ -748,9 +748,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-16:
-   GREEN (reading-spine signalling — amber successor edge + double arrow +
-   amber successor border; thick amber central-node border). Next
-   rotation = red. */
+   RED (reading-spine scoped to central node's single forward hop only —
+   tap 19 → amber arrow 19→20, not 18→19 or others). Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -760,7 +759,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
