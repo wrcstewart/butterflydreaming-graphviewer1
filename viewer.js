@@ -2930,8 +2930,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // the gateway on the same row. Gives the user the full reading
       // breadcrumb Cluster → Gateway → Title(s) → text-nodes without the
       // gateway going missing on entry to reading mode.
+      // 2026-08-16 — raise Cluster by 25 % of its own depth so on iPhone
+      // reading mode the Cluster no longer visibly hangs over the Gateway
+      // beneath it. Active-cluster height is 48 → 25 % ≈ 12 px lift. Only
+      // affects the initial vertical position (cy.fit re-frames after).
+      const CLUSTER_LIFT = 12;
       if (clusterNode && clusterNode.length)
-        positions[clusterNode.id()] = { x: clusterX, y: headerY };
+        positions[clusterNode.id()] = { x: clusterX, y: headerY - CLUSTER_LIFT };
       const titleRowY = headerY + stepY;
       if (gatewayNode && gatewayNode.length) {
         positions[gatewayNode.id()] = { x: clusterX, y: titleRowY };
@@ -4533,19 +4538,29 @@ async function init() {
     if (!srMicBtn) return;
     srMicBtn.classList.remove('listening', 'processing');
     srMicBtn.disabled = false;
+    // 2026-08-16 — icon-only across all states to save action-bar width.
+    // State communicated via CSS class (colour) and the title attribute
+    // (hover text on desktop, VoiceOver readout on iOS).
+    srMicBtn.textContent = '🎤';
     switch (srMicState) {
-      case 'need-permission': srMicBtn.textContent = '🎤 Use Mic'; break;
-      case 'ready':           srMicBtn.textContent = '🎤 Press to Record'; break;
+      case 'need-permission':
+        srMicBtn.title = 'Click to grant microphone permission';
+        break;
+      case 'ready':
+        srMicBtn.title = 'Press and hold to record';
+        break;
       case 'recording':
-        srMicBtn.textContent = '🎤 Recording…';
         srMicBtn.classList.add('listening');
+        srMicBtn.title = 'Release to transcribe';
         break;
       case 'processing':
-        srMicBtn.textContent = '🎤 Transcribing…';
         srMicBtn.classList.add('processing');
         srMicBtn.disabled = true;
+        srMicBtn.title = 'Transcribing…';
         break;
-      case 'error':           srMicBtn.textContent = '🎤 Retry';        break;
+      case 'error':
+        srMicBtn.title = 'Click to retry';
+        break;
     }
   }
 
