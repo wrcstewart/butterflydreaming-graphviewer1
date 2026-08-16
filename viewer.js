@@ -122,13 +122,14 @@ let readingState = null;
 // always excluded — it runs the staged boot (message 0 → message 1 + Settling)
 // regardless of this flag.
 //
-// Cautious migration: OFF by default for everyone, opt-in per-visit with the
-// URL param ?uf=1. This lets the model be felt end-to-end without changing
-// the default experience. Flip the default to `true` once it's proven on
-// desktop + iPhone (migration step 7).
+// Migration step 7 (2026-08-16) — now ON by default for everyone. Unified
+// one-tap is behaviourally the same outputs the old two-tap flow produced
+// (fresh tap's text card + past-last tap's navigateInto), collapsed into one
+// tap with a single breadcrumb. Escape hatch: append ?uf=0 to fall back to
+// the legacy tap-through-chunks-then-navigate behaviour if anything misbehaves.
 const UNIFIED_FOCUS = (() => {
-  try { return new URLSearchParams(location.search).get('uf') === '1'; }
-  catch (_) { return false; }
+  try { return new URLSearchParams(location.search).get('uf') !== '0'; }
+  catch (_) { return true; }
 })();
 
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';

@@ -158,9 +158,10 @@ shippable and reversible.
 5. **Player arming.** Wire the auto-switch-to-player default with the
    invite-note fallback as a sub-flag, so we can flip it by feel.
 6. **Breadcrumb dedupe.** Push on focus-change only; dedupe repeats.
-7. **Bake-in.** Once it feels right on desktop + iPhone, flip `UNIFIED_FOCUS`
-   default on. Leave the old path one release, then remove `advanceOrNavigate`'s
-   chunk-advance/past-last branches (keeping the Root-boot use).
+7. **Bake-in.** — ✅ done. `UNIFIED_FOCUS` now defaults ON for everyone; escape
+   hatch `?uf=0` falls back to the legacy behaviour. The legacy path is kept in
+   `advanceOrNavigate` for now (reachable via `?uf=0`); remove it in a later
+   pass once the one-tap model has proven out, preserving the Root-boot use.
 
 Each step: verify on desktop + iPhone before the next. No step removes the old
 path until step 7.
