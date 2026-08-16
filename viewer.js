@@ -904,6 +904,27 @@ function buildStyle() {
       }
     },
     {
+      // 2026-08-16 — Gateways navigation-aid node. Created via bd_tool.js
+      // cypher: hangs off Settling via DESCENDS_FROM; links to every
+      // gateway TextNode via GATEWAY_LINK (new edge type). White square,
+      // black font. Size 26 ≈ 1/3 of the Conversations node (76 tall) —
+      // compact per user 2026-08-16.
+      selector: 'node[type="Entry"][name="Gateways"]',
+      style: {
+        'shape': 'square',
+        'width': 26,
+        'height': 26,
+        'background-color': '#ffffff',
+        'background-opacity': 1,
+        'color': '#000000',
+        'font-size': '8px',
+        'text-max-width': '24px',
+        'border-width': 1,
+        'border-color': '#000000',
+        'border-opacity': 1,
+      }
+    },
+    {
       selector: 'node[type="Entry"][name="Conversations"]',
       style: {
         'width': 88,
@@ -1078,6 +1099,20 @@ function buildStyle() {
     {
       selector: 'edge[type="DESCENDS_FROM"]',
       style: { 'opacity': 0.7, 'target-arrow-shape': 'none' }
+    },
+    {
+      // 2026-08-16 — GATEWAY_LINK: navigation-aid edges from each
+      // gateway TextNode to the Gateways Entry node. Subtle so a fan
+      // of many edges radiating from Gateways doesn't dominate the
+      // canvas visually. Distinct edge type so upstream views can
+      // filter these out later ("show me only 'real' descent edges").
+      selector: 'edge[type="GATEWAY_LINK"]',
+      style: {
+        'width': 0.6,
+        'opacity': 0.4,
+        'line-color': '#888888',
+        'target-arrow-shape': 'none',
+      }
     },
     {
       selector: 'edge[type="CLUSTER_REL"]',
