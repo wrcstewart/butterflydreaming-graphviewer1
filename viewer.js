@@ -4507,6 +4507,18 @@ async function init() {
         selectionEnd:   el.selectionEnd,
       };
     }
+    refreshWrapBtnEnabled();
+  }
+  // 2026-08-16 — Wrap-{?} button is enabled only when the tracked
+  // Current textarea has a non-collapsed selection. Fires on every
+  // caret-tracking event via captureCaretIfInCurrent above.
+  function refreshWrapBtnEnabled() {
+    const btn = document.getElementById('sr-wrap-btn');
+    if (!btn) return;
+    const s = srCaretSnapshot;
+    const hasSel = !!(s && s.textarea && s.selectionStart !== s.selectionEnd &&
+                      currentStackEl && currentStackEl.contains(s.textarea));
+    btn.disabled = !hasSel;
   }
   if (currentStackEl) {
     currentStackEl.addEventListener('focusin',  () => captureCaretIfInCurrent());
@@ -4515,6 +4527,21 @@ async function init() {
     currentStackEl.addEventListener('mouseup',  () => captureCaretIfInCurrent());
     currentStackEl.addEventListener('focusout', (e) => captureCaretIfInCurrent(e.target));
   }
+  // selectionchange fires globally on the document — catches keyboard/
+  // touch selection expansion inside textareas even between the events
+  // above. Lightweight guard: only refresh Wrap-btn state (don't re-
+  // snapshot the caret unless activeElement is a Current textarea).
+  document.addEventListener('selectionchange', () => {
+    const ae = document.activeElement;
+    if (ae && ae.tagName === 'TEXTAREA' && currentStackEl && currentStackEl.contains(ae)) {
+      srCaretSnapshot = {
+        textarea:       ae,
+        selectionStart: ae.selectionStart,
+        selectionEnd:   ae.selectionEnd,
+      };
+    }
+    refreshWrapBtnEnabled();
+  });
 
   // Snapshot the alignment source at record-start. Per 2026-08-15 design
   // discussion: "passage being aligned needs to be deduced as a subset of
@@ -4884,30 +4911,76 @@ async function init() {
     refreshSRMicUI();
   }
   // 2026-08-15 MVP2 — Accept button: strip {?…} tentative markers
-  // throughout the top Local card in Current. Em-dashes inside ins-wraps
+  // throughout the top card in Current. Em-dashes inside ins-wraps
   // survive as permanent literary asides (that's why they were placed
-  // INSIDE the markers by applySubstitutions). Uses setRangeText so the
-  // browser's native undo stack retains the pre-accept state for one
-  // Cmd/Ctrl-Z back to markers.
+  // INSIDE the markers by applySubstitutions).
+  // 2026-08-16 — broadened from topLocalCard() to "top card in Current,
+  // whatever kind" so it also strips markers from a Received partner
+  // card (arrives with {?…} from the sender's Wrap button below).
+  // Textareas use setRangeText (preserves undo stack); received/system
+  // cards are contenteditable divs — use .textContent.
+  function topBodyInCurrent() {
+    if (!currentStackEl) return null;
+    const cardEl = currentStackEl.querySelector('.card');
+    return cardEl ? cardEl.querySelector('.card-body') : null;
+  }
   const srAcceptBtn = document.getElementById('sr-accept-btn');
   if (srAcceptBtn) {
     srAcceptBtn.addEventListener('click', () => {
-      const top = topLocalCard();
-      if (!top || !top.body) return;
-      const before = top.body.value || '';
+      const body = topBodyInCurrent();
+      if (!body) return;
+      const isTextarea = body.tagName === 'TEXTAREA';
+      const before = isTextarea ? (body.value || '') : (body.textContent || '');
       const after  = srStripTentative(before);
       if (before === after) {
         console.log('[SR] no {?…} markers to strip');
         return;
       }
       try {
-        top.body.focus({ preventScroll: true });
-        top.body.setRangeText(after, 0, before.length, 'end');
-        top.body.dispatchEvent(new Event('input', { bubbles: true }));
+        if (isTextarea) {
+          body.focus({ preventScroll: true });
+          body.setRangeText(after, 0, before.length, 'end');
+          body.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+          body.textContent = after;
+        }
         const count = (before.match(/\{\?[^}]+\}/g) || []).length;
         console.log(`[SR] accepted ${count} tentative marker(s)`);
       } catch (err) {
         console.warn('[SR] accept failed', err);
+      }
+    });
+  }
+
+  // 2026-08-16 — Wrap-{?} button. Wraps the current selection in a
+  // Current textarea with {?…} tentative-review markers. Sent verbatim
+  // over the wire (sendTopLocalCard reads body.value as-is), so the
+  // paired remote sees the markers and can Accept-strip them.
+  // Enabled state managed by refreshWrapBtnEnabled above.
+  const srWrapBtn = document.getElementById('sr-wrap-btn');
+  if (srWrapBtn) {
+    srWrapBtn.addEventListener('click', () => {
+      const s = srCaretSnapshot;
+      if (!s || !s.textarea || !currentStackEl || !currentStackEl.contains(s.textarea)) return;
+      const ta = s.textarea;
+      const start = Math.min(s.selectionStart, ta.value.length);
+      const end   = Math.min(s.selectionEnd,   ta.value.length);
+      if (start >= end) return;
+      const selected = ta.value.slice(start, end);
+      const wrapped  = '{?' + selected + '}';
+      try {
+        ta.focus({ preventScroll: true });
+        ta.setRangeText(wrapped, start, end, 'select');
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        srCaretSnapshot = {
+          textarea:       ta,
+          selectionStart: ta.selectionStart,
+          selectionEnd:   ta.selectionEnd,
+        };
+        refreshWrapBtnEnabled();
+        console.log(`[SR] wrapped ${selected.length}-char selection in {?…}`);
+      } catch (err) {
+        console.warn('[SR] wrap failed', err);
       }
     });
   }
