@@ -748,9 +748,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-16:
-   GREEN (Unified Focus Model flag scaffold — UNIFIED_FOCUS const, default
-   off, one-tap focus path wired behind it; zero user-visible change). Next
-   rotation = red. */
+   RED (Root boot: tap Root → message 1 reveals Settling; new CTA. Unified
+   one-tap model opt-in via ?uf=1). Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -760,7 +759,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

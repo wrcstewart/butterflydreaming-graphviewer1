@@ -117,14 +117,19 @@ let chatModeActive         = true;   // 2026-07-15 — always on; chat panel is 
 let readingState = null;
 
 // 2026-08-16 — Unified Focus Model (see unified_focus_spec.md). When on, ONE
-// tap on a node reveals its text card AND expands its neighbourhood together,
-// instead of the current tap-through-chunks-then-navigate rhythm. Default OFF
-// during the cautious migration: flag-off preserves the exact legacy
-// behaviour, so this scaffold ships with zero user-visible change. The Root
-// boot sequence (staged messages 0/1) is a separate machine, still TODO —
-// so leave this OFF until that lands, or Root will focus-expand instead of
-// running the guided intro.
-const UNIFIED_FOCUS = false;
+// tap on a non-Root node reveals its text card AND expands its neighbourhood
+// together, instead of the tap-through-chunks-then-navigate rhythm. Root is
+// always excluded — it runs the staged boot (message 0 → message 1 + Settling)
+// regardless of this flag.
+//
+// Cautious migration: OFF by default for everyone, opt-in per-visit with the
+// URL param ?uf=1. This lets the model be felt end-to-end without changing
+// the default experience. Flip the default to `true` once it's proven on
+// desktop + iPhone (migration step 7).
+const UNIFIED_FOCUS = (() => {
+  try { return new URLSearchParams(location.search).get('uf') === '1'; }
+  catch (_) { return false; }
+})();
 
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';
 const CHUNK_HINT_NAVIGATE = 'Tap once more to see connected nodes.';
@@ -2029,6 +2034,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!node || !node.length) return;
     const meta = navNodeMeta(node);
     const nid = node.id();
+    // Root is the one node that keeps chunk-advance (the staged boot: message
+    // 0 → tap → message 1 + Settling revealed). So the unified one-tap expand
+    // never applies to Root, even when UNIFIED_FOCUS is on.
+    const isRoot = node.data('type') === 'root';
 
     // Different node → reset reading state to fresh chunks of the new node.
     if (!readingState || readingState.nodeId !== nid) {
@@ -2052,7 +2061,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, desc, node), node, 0);
         if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
         // Unified focus: reveal the neighbourhood on the SAME fresh tap.
-        if (UNIFIED_FOCUS && desc) navigateInto(node);
+        if (UNIFIED_FOCUS && desc && !isRoot) navigateInto(node);
         return;
       }
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc, cardsByIdx: {} };
@@ -2061,15 +2070,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc, node), node, 0);
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
-      if (UNIFIED_FOCUS && desc) navigateInto(node);
+      if (UNIFIED_FOCUS && desc && !isRoot) navigateInto(node);
       return;
     }
 
-    // Unified focus: the node is already focused + expanded from the fresh
-    // tap, so re-tapping it is a no-op. Chunk-advance and past-last navigation
-    // are retired here (chunking is Root-only, run by the boot machine). This
-    // keeps 1 click = 1 breadcrumb (spec §3, D4).
-    if (UNIFIED_FOCUS) return;
+    // Unified focus (non-Root): the node is already focused + expanded from
+    // the fresh tap, so re-tapping it is a no-op. Chunk-advance and past-last
+    // navigation are retired here. Keeps 1 click = 1 breadcrumb (spec §3, D4).
+    // Root falls through to the chunk path below so its staged boot still runs.
+    if (UNIFIED_FOCUS && !isRoot) return;
 
     // Same node, past-last tap → navigate or no-op.
     const nextIdx = readingState.chunkIndex + 1;
@@ -2097,6 +2106,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       readingState.cardsByIdx = readingState.cardsByIdx || {};
       readingState.cardsByIdx[nextIdx] = cnCard;
     }
+
+    // Root boot (unconditional, both modes): on reaching the last message,
+    // reveal Settling — Root's sole neighbour — so the user can tap straight
+    // into it, matching the "Tap the Settling node to advance" CTA. No extra
+    // "navigate" tap needed. navigateInto → expandToNode(root) shows
+    // root + Settling and runs the parentIsRoot nav layout.
+    if (isRoot && isLast && hasNavDescendants(node)) navigateInto(node);
   }
 
   // navigateInto — the pure "expand into this node" branch, extracted from

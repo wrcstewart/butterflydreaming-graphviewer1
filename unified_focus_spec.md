@@ -139,16 +139,22 @@ retires the past-last navigation for non-Root nodes.
 Flag: `UNIFIED_FOCUS` (default **off** initially). Each step is independently
 shippable and reversible.
 
-1. **Trace & spec** — done (this document + §6).
-2. **Flag scaffold.** Add `UNIFIED_FOCUS` const, default off. No behaviour
-   change. Canary/cache-bust as usual.
-3. **Uniform focus path.** In `advanceOrNavigate`, when the flag is on and the
-   node is **not** in a Root-boot context: on the fresh tap, render the text
-   card **and** call `navigateInto(node)` together; skip the past-last
-   navigation branch. Old path stays intact when flag is off — side-by-side.
-4. **Root boot state machine.** Implement B0–B3 behind the flag: virtual node,
-   message (0)/(1) from Root's two chunks, Settling reveal, hand-off to uniform
-   focus. Reuse `parentIsRoot` layout.
+1. **Trace & spec** — ✅ done (this document + §6).
+2. **Flag scaffold.** — ✅ done. `UNIFIED_FOCUS` now reads the URL param `?uf=1`
+   (default off). Opt-in per visit so the model can be felt end-to-end without
+   changing the default experience.
+3. **Uniform focus path.** — ✅ done. In `advanceOrNavigate`, when `?uf=1` and
+   the node is **not** Root: fresh tap renders the text card **and** calls
+   `navigateInto(node)`; re-tapping the focused node is a no-op. Legacy path
+   intact when the flag is off.
+4. **Root boot.** — ✅ core done (ships for ALL users, not flag-gated, because
+   Root already has its two `%%bd_chunk` messages and its only neighbour is
+   Settling): B0 = Root alone + message (0) (existing `primeRootReading` +
+   boot-time `root.show()`); tap Root → message (1) and, on reaching the last
+   chunk, `navigateInto(Root)` reveals Settling (`parentIsRoot` nav layout);
+   tap Settling → normal focus shows Gateways/Conversations/Root. Message (1)'s
+   existing onboarding body was kept; only its closing hint changed to "Tap the
+   Settling node to advance".
 5. **Player arming.** Wire the auto-switch-to-player default with the
    invite-note fallback as a sub-flag, so we can flip it by feel.
 6. **Breadcrumb dedupe.** Push on focus-change only; dedupe repeats.
