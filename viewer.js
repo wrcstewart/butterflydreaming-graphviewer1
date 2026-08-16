@@ -2924,32 +2924,37 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const positions = {};
 
     if (!editModeActive) {
-      // Non-edit: cluster on top, then Gateway + Title side by side, then grid.
-      // 2026-08-14 — gateway now takes the row that used to hold the title
-      // (directly under the Cluster); title has been moved to the right of
-      // the gateway on the same row. Gives the user the full reading
-      // breadcrumb Cluster → Gateway → Title(s) → text-nodes without the
-      // gateway going missing on entry to reading mode.
-      // 2026-08-16 — raise Cluster by 25 % of its own depth so on iPhone
-      // reading mode the Cluster no longer visibly hangs over the Gateway
-      // beneath it. Active-cluster height is 48 → 25 % ≈ 12 px lift. Only
-      // affects the initial vertical position (cy.fit re-frames after).
-      const CLUSTER_LIFT = 12;
+      // Non-edit reading-mode layout (rev 2026-08-16):
+      //   [Cluster]   [Gateway]   [Title]      ← ONE row, spanning grid width
+      //        ↓ 5 px gap                       ← gap between header row and grid
+      //   [ text-node snake grid ]
+      //
+      // Cluster's LEFT edge = grid's left edge; Title's RIGHT edge = grid's
+      // right edge; Gateway centred between them. Row bottom sits 5 px
+      // above the grid top. Cluster row absent-gateway falls back to a
+      // two-node distribution (Cluster left, Title right).
+      // Node dimensions used are the CSS defaults from the style block:
+      //   active-cluster: 98 × 48; TextNode (gateway/title): 120 × 34.
+      const CLUSTER_W = 98,  CLUSTER_H = 48;
+      const NODE_W    = 120, NODE_H    = 34;
+      const rowH      = Math.max(CLUSTER_H, NODE_H);
+      const HEADER_GAP = 5;
+
+      const gridLeftEdge  = originX - dispNodeW / 2;
+      const gridRightEdge = originX + (dispCols - 1) * stepX + dispNodeW / 2;
+      const clusterCenterX = gridLeftEdge  + CLUSTER_W / 2;
+      const titleCenterX   = gridRightEdge - NODE_W    / 2;
+      const gatewayCenterX = (clusterCenterX + titleCenterX) / 2;
+
+      const rowCenterY = 0;   // arbitrary reference; cy.fit re-frames anyway
+      const gridY = rowCenterY + rowH / 2 + HEADER_GAP + dispNodeH / 2;
+
       if (clusterNode && clusterNode.length)
-        positions[clusterNode.id()] = { x: clusterX, y: headerY - CLUSTER_LIFT };
-      const titleRowY = headerY + stepY;
-      if (gatewayNode && gatewayNode.length) {
-        positions[gatewayNode.id()] = { x: clusterX, y: titleRowY };
-        // 140 px offset: TextNode default width is 120, so centres at 0 and 140
-        // leave a 20 px gap between the two node edges. Enough breathing room
-        // without pushing title off-canvas on narrow viewports.
-        positions[titlePage.id()] = { x: clusterX + 140, y: titleRowY };
-      } else {
-        // No gateway found → keep the pre-2026-08-14 layout (title stays
-        // in the row directly below Cluster).
-        positions[titlePage.id()] = { x: clusterX, y: titleRowY };
-      }
-      const gridY = headerY + stepY * 2;
+        positions[clusterNode.id()] = { x: clusterCenterX, y: rowCenterY };
+      if (gatewayNode && gatewayNode.length)
+        positions[gatewayNode.id()] = { x: gatewayCenterX, y: rowCenterY };
+      positions[titlePage.id()]     = { x: titleCenterX,   y: rowCenterY };
+
       parts.forEach((n, i) => {
         const row      = Math.floor(i / dispCols);
         const col      = i % dispCols;
