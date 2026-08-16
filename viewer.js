@@ -1106,6 +1106,34 @@ function buildStyle() {
       }
     },
     {
+      // 2026-08-16 — reading-spine signalling (see applySeqSignals). Every
+      // visible CHILD hop from one content TextNode to its successor within a
+      // work gets a bold amber edge + double-size arrowhead, so the user can
+      // see at a glance which node is "next" and flick through the work. Class
+      // applied at layout time; placed after the CHILD rule so it wins.
+      selector: 'edge.seq-edge',
+      style: {
+        'line-color': '#e0a020',
+        'target-arrow-color': '#e0a020',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 1.2,          // ~2x the softened 0.6 TextNode-CHILD arrow
+        'width': 2.5,                // thicker than the ~0.6 default hop
+        'opacity': 0.95,
+        'z-index': 15,
+      }
+    },
+    {
+      // The successor node itself — 2x-ish border in amber so the "next" node
+      // reads as the target of the amber arrow. The central (just-tapped) node
+      // gets its own thicker amber border via markReadNode (inline → wins).
+      selector: 'node.seq-successor',
+      style: {
+        'border-width': 4,
+        'border-color': '#e0a020',
+        'border-opacity': 1,
+      }
+    },
+    {
       // Synthetic root→family edges: invisible but present for fCoSE layout
       selector: 'edge[type="__root_edge__"]',
       style: {
@@ -1287,8 +1315,26 @@ function buildStyle() {
 
 // --- Layout ---
 
+// 2026-08-16 — reading-spine signalling. Tag every VISIBLE CHILD hop from one
+// content TextNode to its successor within a work (source & target both
+// TextNode, source not a gateway) so the amber `.seq-edge` / `.seq-successor`
+// styles apply. Recomputed each layout since the visible set changes per view.
+// Cleared first so stale marks from a previous view don't linger.
+function applySeqSignals(cy) {
+  cy.edges('.seq-edge').removeClass('seq-edge');
+  cy.nodes('.seq-successor').removeClass('seq-successor');
+  const seqEdges = cy.edges('edge[type="CHILD"]').filter(e => {
+    if (!e.visible()) return false;
+    const s = e.source(), t = e.target();
+    return s.data('type') === 'TextNode' && t.data('type') === 'TextNode' && !s.data('gateway');
+  });
+  seqEdges.addClass('seq-edge');
+  seqEdges.targets().filter(':visible').addClass('seq-successor');
+}
+
 function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
+  applySeqSignals(cy);
   if (visible.nodes().length <= 1) {
     cy.fit(visible, fitPadding(cy, 120));
     return;
@@ -1589,7 +1635,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (lastReadNodeId && lastReadNodeCy) {
       try { lastReadNodeCy.getElementById(lastReadNodeId).removeStyle('border-width border-color border-opacity'); } catch (_) {}
     }
-    cytoNode.style({ 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
+    // 2026-08-16 — the central (just-tapped) node on the MAIN canvas gets a
+    // thick amber border ("you are here" on the reading spine — pairs with the
+    // amber successor edge/border below). Breadcrumb trail chips (youCy/buddyCy)
+    // keep the original subtle 2px grey so the small chips don't get heavy.
+    const central = instanceCy === cy;
+    cytoNode.style(central
+      ? { 'border-width': 5, 'border-color': '#e0a020', 'border-opacity': 1 }
+      : { 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
     lastReadNodeId = cytoNode.id();
     lastReadNodeCy = instanceCy;
   }

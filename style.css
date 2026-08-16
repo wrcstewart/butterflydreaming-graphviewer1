@@ -748,9 +748,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-16:
-   RED (section-title nodes z-index + text-events so a dense work's overlapping
-   content nodes can't steal the title's tap — Tao Te Ching fix). Next
-   rotation = green. */
+   GREEN (reading-spine signalling — amber successor edge + double arrow +
+   amber successor border; thick amber central-node border). Next
+   rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -760,7 +760,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff4040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
