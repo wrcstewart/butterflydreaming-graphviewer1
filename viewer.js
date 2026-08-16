@@ -905,18 +905,18 @@ function buildStyle() {
     },
     {
       // 2026-08-16 — Gateways navigation-aid node. White square, black
-      // font. Size 32 (was 26; +20 % per user — 26 was truncating the
-      // label). Still compact (~40 % of the Conversations node's 76 px).
+      // font. Size 38 (was 32; +20 % per user 2026-08-16). Still compact
+      // (~50 % of the Conversations node's 76 px).
       selector: 'node[type="Entry"][name="Gateways"]',
       style: {
         'shape': 'square',
-        'width': 32,
-        'height': 32,
+        'width': 38,
+        'height': 38,
         'background-color': '#ffffff',
         'background-opacity': 1,
         'color': '#000000',
-        'font-size': '10px',
-        'text-max-width': '30px',
+        'font-size': '12px',
+        'text-max-width': '36px',
         'border-width': 1,
         'border-color': '#000000',
         'border-opacity': 1,
