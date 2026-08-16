@@ -827,6 +827,12 @@ function buildEdgeData(r, n, m) {
     raw_rel_id: getElementId(r),  // preserved after ed.id is overwritten with cf_/sf_/r_ prefix
     source: getElementId(n),
     target: getElementId(m),
+    // 2026-08-16 — endpoint names carried on the edge so stylesheet selectors
+    // can single out specific hops (e.g. the faint Gateways nav-aid edge)
+    // without a post-load tagging pass. Cytoscape selectors can't reach into
+    // an edge's endpoint node data, so we denormalise the names here.
+    source_name: (n.properties && n.properties.name) || '',
+    target_name: (m.properties && m.properties.name) || '',
     rel_source: props.source,  // preserve Neo4j 'source' prop ('seed'/'dyad') before Cytoscape overwrites it
     type,
     colour: EDGE_COLOURS[type] || '#666666',
@@ -1100,6 +1106,37 @@ function buildStyle() {
       style: { 'opacity': 0.7, 'target-arrow-shape': 'none' }
     },
     {
+      // 2026-08-16 — Main route highlight. CONTAINS is used ONLY for the
+      // primary spine Root → Settling → Conversations (verified: exactly
+      // two CONTAINS edges in the DB). Render it bright with a small arrow
+      // so the eye reads it as THE way in, distinct from the many faint
+      // descent / nav-aid edges. Luminance-forward (not hue) for reduced-
+      // colour-vision legibility.
+      selector: 'edge[type="CONTAINS"]',
+      style: {
+        'line-color': '#e0e0e0',
+        'target-arrow-color': '#e0e0e0',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.65,
+        'opacity': 0.95,
+        'width': 1.8,
+        'curve-style': 'bezier',
+      }
+    },
+    {
+      // 2026-08-16 — the Settling ↔ Gateways nav-aid hop (Gateways
+      // DESCENDS_FROM Settling). Deliberately faint and arrowless so it
+      // reads as an optional side-door, NOT part of the bright main spine.
+      // More specific than the generic DESCENDS_FROM rule above, so it wins.
+      selector: 'edge[type="DESCENDS_FROM"][source_name="Gateways"]',
+      style: {
+        'line-color': '#5a5a5a',
+        'opacity': 0.28,
+        'width': 0.6,
+        'target-arrow-shape': 'none',
+      }
+    },
+    {
       // 2026-08-16 — GATEWAY_LINK: navigation-aid edges from each
       // gateway TextNode to the Gateways Entry node. Subtle so a fan
       // of many edges radiating from Gateways doesn't dominate the
@@ -1306,8 +1343,18 @@ function runLayout(cy, parentNode = null) {
     : cy.collection();
 
   const hasRoot = visible.nodes().filter(n => n.data('type') === 'root').length > 0;
+  // Distinguish the root SPLASH (parent is the root itself) from a nav-layer
+  // view that merely keeps root visible as a neighbour — e.g. the Settling
+  // view (parent = Settling, an Entry) still shows ButterflyDreaming above it.
+  // 2026-08-16 — the hardcoded hasRoot layout below used to fire for BOTH,
+  // silently discarding curated hints in the Settling view (Write saved the
+  // hints to the DB fine, but re-entry overwrote them with an even spread).
+  // Now the fixed nav layout only owns the splash, or an un-curated view with
+  // no hints; once a view carries hints (preset/hybrid) we honour them even
+  // when root is on screen.
+  const parentIsRoot = !parentNode || parentNode.data('type') === 'root';
 
-  if (hasRoot) {
+  if (hasRoot && (parentIsRoot || hintMode === 'force')) {
     // Nav-layer view: use preset layout so nodes hold exact computed positions.
     // Positions are derived from the graph container (not the window) so the
     // arrangement stays correct if a sidebar shrinks the available area.
