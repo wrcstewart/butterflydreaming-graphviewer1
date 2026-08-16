@@ -748,9 +748,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-16:
-   BLUE (Wrap-{?} button — manual selection-wrap for review handoff to
-   paired remote; Accept broadened to any Current top card kind).
-   Next rotation = red. */
+   RED (local breadcrumbs cached to localStorage every 5 s + on hop +
+   on unload; restored at boot so reload no longer wipes the trail).
+   Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -760,7 +760,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4080ff;             /* CANARY — blue */
+  border: 2px solid #ff5555;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -774,7 +774,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   #copy-link-btn { right: 8px; }
 }
 #copy-link-btn:hover:not(:disabled) {
-  border-color: #7fb0ff;
+  border-color: #ff9999;
   color: #fff;
 }
 #copy-link-btn:disabled { opacity: 0.4; cursor: not-allowed; }

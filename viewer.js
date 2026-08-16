@@ -1596,6 +1596,103 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     youChipX    += w + 7;
     lastYouChipId = id;
     panYouCyToLatest();
+    saveYouBreadcrumbs();                       // 2026-08-16 — cache after every hop
+  }
+
+  // 2026-08-16 — breadcrumb persistence. Save on every hop + every 5 s
+  // + on beforeunload; restore at boot. Kills the "blank breadcrumb bar
+  // after reload → have to re-navigate to test" friction. Only the local
+  // "you" chips are persisted — buddy chips are tied to a pair session
+  // and mean nothing after the WS drops.
+  const BD_YOU_CRUMBS_KEY   = 'bd_you_breadcrumbs';
+  const BD_YOU_CRUMBS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;   // 7 days
+  let   restoringYouCrumbs  = false;            // guard: don't re-save while restore is in flight
+
+  function saveYouBreadcrumbs() {
+    if (restoringYouCrumbs) return;
+    try {
+      const chips = youCy.nodes().map(n => n.data());
+      if (!chips.length) {
+        localStorage.removeItem(BD_YOU_CRUMBS_KEY);
+        return;
+      }
+      const payload = { savedAt: Date.now(), chips };
+      localStorage.setItem(BD_YOU_CRUMBS_KEY, JSON.stringify(payload));
+    } catch (_) { /* quota / disabled — silent */ }
+  }
+
+  function addYouChipFromData(d) {
+    // Chip-render logic mirrors addYouChip's, but works off a saved
+    // data dict (from localStorage) instead of a live main-graph node.
+    // Skips the pair-broadcast (restore fires pre-pair).
+    const type = d.type;
+    const isSubfamily = !!d.subfamily;
+    const abbreviated = type === 'TextNode' && !d.gateway && !d.section_title &&
+                        d.source_text && d.source_text === lastYouSourceText;
+    const id = 'you_' + (youChipCount++);
+    if (lastYouChipId) {
+      const prev = youCy.getElementById(lastYouChipId);
+      if (prev.length) prev.removeClass('latest');
+    }
+    youCy.add({
+      group: 'nodes',
+      data: {
+        id, type,
+        display_name:   abbreviated ? String(d.seq ?? '?') : (d.display_name || ''),
+        colour:         d.colour || '#444444',
+        name:           d.name || '',
+        url:            d.url || null,
+        mainId:         d.mainId,
+        source_text:    d.source_text || null,
+        seq:            d.seq ?? null,
+        clusterNodeId:  d.clusterNodeId || null,
+        gateway:        !!d.gateway,
+        section_title:  !!d.section_title,
+        subfamily:      isSubfamily,
+      },
+      position: { x: 0, y: 11 }
+    });
+    const chip = youCy.getElementById(id);
+    chip.addClass('breadcrumb-chip');
+    if (abbreviated) chip.addClass('abbreviated');
+    if (isSubfamily) chip.addClass('subfamily');
+    const w = chip.width();
+    chip.position({ x: youChipX + w / 2, y: 11 });
+    lastYouSourceText = type === 'TextNode' ? (d.source_text || null) : null;
+    if (lastYouChipId) {
+      youCy.add({
+        group: 'edges',
+        data: {
+          id: 'you_e_' + id,
+          source: lastYouChipId, target: id,
+          colour: '#333333', weight: 0.2,
+        }
+      });
+    }
+    chip.addClass('latest');
+    youChipX += w + 7;
+    lastYouChipId = id;
+  }
+
+  function restoreYouBreadcrumbs() {
+    let raw;
+    try { raw = localStorage.getItem(BD_YOU_CRUMBS_KEY); } catch (_) { return; }
+    if (!raw) return;
+    let payload;
+    try { payload = JSON.parse(raw); } catch (_) { return; }
+    if (!payload || !Array.isArray(payload.chips) || !payload.chips.length) return;
+    if (payload.savedAt && (Date.now() - payload.savedAt) > BD_YOU_CRUMBS_MAX_AGE_MS) {
+      try { localStorage.removeItem(BD_YOU_CRUMBS_KEY); } catch (_) {}
+      return;
+    }
+    restoringYouCrumbs = true;
+    try {
+      for (const chipData of payload.chips) addYouChipFromData(chipData);
+      panYouCyToLatest();
+      console.log(`[BD] restored ${payload.chips.length} breadcrumb chip(s) from cache`);
+    } finally {
+      restoringYouCrumbs = false;
+    }
   }
 
   function panYouCyToLatest() {
@@ -3716,7 +3813,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs };
 
 }
 
@@ -5040,7 +5137,19 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+
+  // 2026-08-16 — Breadcrumb persistence triggers.
+  //   1. Restore right after setupInteractions returns (youCy is live;
+  //      main cy graph is loaded; safe to reference mainIds).
+  //   2. Save every 5 s as a safety net for hops that somehow bypass
+  //      the addYouChip-tail save (shouldn't happen, but cheap insurance).
+  //   3. Save on pagehide / beforeunload so a fresh reload always has
+  //      the latest state.
+  try { restoreYouBreadcrumbs(); } catch (err) { console.warn('[BD] breadcrumb restore threw', err); }
+  setInterval(() => { try { saveYouBreadcrumbs(); } catch (_) {} }, 5000);
+  window.addEventListener('pagehide',      () => { try { saveYouBreadcrumbs(); } catch (_) {} });
+  window.addEventListener('beforeunload',  () => { try { saveYouBreadcrumbs(); } catch (_) {} });
 
   // Bind Send button — must run AFTER setupInteractions destructure because
   // setSendBtn is an immediate call (not deferred into a closure like newCard's
