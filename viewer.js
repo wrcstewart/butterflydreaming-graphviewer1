@@ -1639,12 +1639,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       try { lastReadNodeCy.getElementById(lastReadNodeId).removeStyle('border-width border-color border-opacity'); } catch (_) {}
     }
     // 2026-08-16 — the central (just-tapped) node on the MAIN canvas gets a
-    // thick amber border ("you are here" on the reading spine — pairs with the
-    // amber successor edge/border below). Breadcrumb trail chips (youCy/buddyCy)
-    // keep the original subtle 2px grey so the small chips don't get heavy.
+    // thick WHITE border ("you are here"); only the successor is amber, so the
+    // white central vs amber next reads as a clear non-hue (colour + luminance)
+    // distinction. Breadcrumb trail chips (youCy/buddyCy) keep the original
+    // subtle 2px grey so the small chips don't get heavy.
     const central = instanceCy === cy;
     cytoNode.style(central
-      ? { 'border-width': 5, 'border-color': '#e0a020', 'border-opacity': 1 }
+      ? { 'border-width': 5, 'border-color': '#ffffff', 'border-opacity': 1 }
       : { 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
     lastReadNodeId = cytoNode.id();
     lastReadNodeCy = instanceCy;
