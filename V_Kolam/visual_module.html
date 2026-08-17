@@ -110,12 +110,14 @@
        control-panel shift right by 88 px, extend panel sits in the gutter.
        Music module has its own portrait rules and doesn't need this. */
     @media (max-width: 500px) {
-      /* 2026-08-17 — left gutter removed. It reserved 88px for BD's Extension
-         panel on the left; that panel now sits as a horizontal bar UNDER the
-         canvas (BD positionExtendPanel .under-canvas), so the canvas reclaims
-         the width. Steppers unchanged (still the right column). */
-      .module-layout { padding-left: 0; }
-      .canvas-wrapper { justify-content: center; }
+      /* 2026-08-17 — keep the 88px band so the canvas holds its former (small)
+         size + position; the Extension bar now sits UNDER the canvas (BD
+         positionExtendPanel .under-canvas), and the small canvas sits high
+         enough that the bar clears the breadcrumbs. Top-align the canvas so its
+         top lines up with the stepper column top (was vertically centred,
+         which left a gap above it). */
+      .module-layout { padding-left: 88px; }
+      .canvas-wrapper { justify-content: center; align-items: flex-start; }
       .control-panel {
         flex: 0 0 108px !important;
         padding: 6px 4px;
