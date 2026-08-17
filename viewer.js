@@ -1386,29 +1386,17 @@ function runLayout(cy, parentNode = null) {
     console.log(`[BD] hint scan: parent=${parentNode.data('name')} uuid=${parentUuid || '(none)'} total=${total} hinted=${hintedEdges.length} mode=${hintMode} hint_scale=${storedScaleLog?.toFixed(1)} formula_scale=${formulaScaleLog.toFixed(1)}`);
   }
 
-  // Pre-position and pin section_title nodes at the top of the graph area.
-  // They connect to TextNodes via PART_OF (not to parentNode), so they never
-  // appear in childEdges.  Pinning before layout avoids a post-layout jump.
-  // Only active when parentNode is known (gateway and family views); not for
-  // the root splash or restoreState paths.
+  // 2026-08-17 — title-at-top pinning DISABLED. It used to place section-title
+  // nodes at y = centre − 100·√(nodeCount). In the now-primary text-node views
+  // the title (linked to the central node via PART_OF, so it's in the view)
+  // sat far above everything, inflating the cy.fit bounds so the rest of the
+  // graph zoomed down to tiny. With titlePins left empty, fcose places the
+  // title naturally beside its content and the view scales tightly. The
+  // seq-grid (gateway) branch below positions titles itself (titleY =
+  // clusterY − 150) and is unaffected. To restore the old behaviour,
+  // repopulate titlePins from titleNodes here.
   const titleNodes = visible.nodes().filter(n => !!n.data('section_title'));
   const titlePins  = [];
-  if (titleNodes.length > 0 && parentNode) {
-    const tArea  = cy.container().getBoundingClientRect();
-    const tZoom  = cy.zoom() || 1;
-    const gcx    = (tArea.width  / 2 - cy.pan().x) / tZoom;
-    const gcy    = (tArea.height / 2 - cy.pan().y) / tZoom;
-    const spread = 100 * Math.sqrt(visible.nodes().length);
-    const sep    = Math.min(200, spread * 1.4 / Math.max(1, titleNodes.length));
-    titleNodes.forEach((n, i) => {
-      const pos = {
-        x: gcx + (i - (titleNodes.length - 1) / 2) * sep,
-        y: gcy - spread,
-      };
-      n.position(pos);
-      titlePins.push({ nodeId: n.id(), position: { ...pos } });
-    });
-  }
 
   // Seq-grid: detect gateway view with un-curated TextNodes that carry seq numbers.
   // section_title nodes are excluded — they go to the top via titlePins.
