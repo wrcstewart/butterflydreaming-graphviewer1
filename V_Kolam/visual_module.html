@@ -111,13 +111,13 @@
        Music module has its own portrait rules and doesn't need this. */
     @media (max-width: 500px) {
       /* 2026-08-17 — keep the 88px band so the canvas holds its former (small)
-         size + position; the Extension bar now sits UNDER the canvas (BD
-         positionExtendPanel .under-canvas), and the small canvas sits high
-         enough that the bar clears the breadcrumbs. Top-align the canvas so its
-         top lines up with the stepper column top (was vertically centred,
-         which left a gap above it). */
+         size + position; the Extension bar sits UNDER the canvas (BD
+         positionExtendPanel .under-canvas). Drop the canvas to the BOTTOM
+         (align-items: flex-end) with a padding-bottom that reserves room for
+         the Extension bar just beneath it — so the bar lands just above the
+         breadcrumbs and the canvas sits just above the bar. */
       .module-layout { padding-left: 88px; }
-      .canvas-wrapper { justify-content: center; align-items: flex-start; }
+      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px; }
       .control-panel {
         flex: 0 0 108px !important;
         padding: 6px 4px;

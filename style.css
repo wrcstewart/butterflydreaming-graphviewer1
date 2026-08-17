@@ -771,8 +771,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   RED (Kolam mobile: Extension bar now a horizontal strip under the canvas —
-   positionExtendPanel .under-canvas). Next rotation = green. */
+   GREEN (Kolam Extension bar: Jump/Copy Link relabel, shorter buttons, tiny
+   External Website caption, dropped toward the breadcrumbs). Next rotation
+   = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -782,7 +783,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff4040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1047,15 +1048,31 @@ body.player-active #bd-invite-panel-viewer { display: block; }
    and desktop clears the class. */
 #bd-invite-panel-viewer.under-canvas {
   max-width: none;
-  padding: 4px 8px;
+  padding: 5px 8px;                       /* 2026-08-17 — ~20% deeper to seat the caption */
 }
 #bd-invite-panel-viewer.under-canvas #bd-invite-actions-viewer {
-  flex-direction: row;
+  flex-direction: row;                    /* Jump | Copy Link on one row */
   gap: 6px;
+  margin-bottom: 2px;
 }
-#bd-invite-panel-viewer.under-canvas #bd-invite-text-viewer,
-#bd-invite-panel-viewer.under-canvas #bd-invite-target-viewer {
+/* "Extension" header dropped; the two buttons + a tiny caption remain. */
+#bd-invite-panel-viewer.under-canvas #bd-invite-text-viewer {
   display: none;
+}
+/* Buttons: single line, auto width to fit "Copy Link", ~70% of prior depth. */
+#bd-invite-panel-viewer.under-canvas #jump-to-ext-btn,
+#bd-invite-panel-viewer.under-canvas #copy-link-to-ext-btn {
+  width: auto;
+  white-space: nowrap;
+  padding: 2px 8px;
+  line-height: 1.1;
+}
+/* Tiny "External Website" caption under the buttons. */
+#bd-invite-panel-viewer.under-canvas #bd-invite-target-viewer {
+  display: block;
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.1;
 }
 
 /* 2026-08-09 — Extend label now permanent blue to match the
