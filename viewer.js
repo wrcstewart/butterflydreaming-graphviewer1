@@ -989,10 +989,11 @@ function buildStyle() {
     {
       selector: 'node[type="Family"].subfamily',
       style: {
-        'width': 53,
+        'width': 56,            // 2026-08-17 — +5% (was 53) so labels fit; also offsets the
+                                // 5px central-node border which straddles the edge (~2.5px inward)
         'height': 22,
         'font-size': '6.8px',   // 2026-08-17 — −8% then −8% again (8→7.4→6.8) so SubFamily labels fit the node
-        'text-max-width': '48px',
+        'text-max-width': '52px',
       }
     },
     {
