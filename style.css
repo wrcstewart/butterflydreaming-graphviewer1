@@ -771,9 +771,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   GREEN (ABC ext panel now under its #piece-title square like Kolam;
-   positionExtendPanel generalised, Fractal keeps left gutter). Next
-   rotation = red. */
+   RED (ABC mobile: steppers scroll, square+ext bar dropped to just above the
+   breadcrumbs + 70px left, 'Ready' message removed). Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -783,7 +782,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

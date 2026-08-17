@@ -195,22 +195,28 @@
         padding: 5px 4px;
         align-self: flex-start;
       }
-      /* (1) stepper column: vertical + scrollable, width unchanged (200). */
+      /* (1) stepper column: vertical + scrollable, width unchanged (200).
+         align-self: stretch so it fills the row height and actually scrolls. */
       .control-panel {
         flex: 0 0 200px;
-        max-height: 100%;
         flex-direction: column;
         flex-wrap: nowrap;
         overflow-y: auto;
-        align-self: flex-start;
+        align-self: stretch;
+        min-height: 0;
       }
       .control-row { flex: 0 0 auto; width: 100%; min-width: 0; max-width: none; }
       /* (2) central square + play/stop 50% smaller. */
       #piece-title { width: 70px; font-size: 0.7rem; padding: 5px; }
       .playback-row button { min-width: 30px; padding: 3px 7px; font-size: 0.7rem; }
-      /* (4) shift the square/main-area 20px left to make room for the ↓↑
-         arrows on its right; ext panel follows (BD anchors it to the square). */
-      .main-area { transform: translateX(-20px); }
+      /* Drop the square + play/stop to the BOTTOM (so the ext bar under them
+         lands just above the breadcrumbs) and shift ~70px left to clear the ↓↑
+         arrows on the right. padding-bottom reserves room for the ext bar. */
+      .main-area {
+        justify-content: flex-end;
+        padding-bottom: 54px;
+        transform: translateX(-70px);
+      }
     }
 
     .control-row {
@@ -461,7 +467,7 @@
 
     Promise.all([Tone.loaded(), reverb.ready]).then(() => {
       samplerReady = true;
-      setStatus(abcReady ? 'Ready — press Play' : 'Ready');
+      setStatus('');   // 2026-08-17 — no "Ready — press Play" clutter; errors still shown
       updateControls();
     });
 

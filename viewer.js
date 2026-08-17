@@ -4756,10 +4756,18 @@ async function init() {
         // the left-gutter #abc-pane path above. Horizontal strip centred just
         // BELOW the square.
         const kolamCanvas = innerDoc && innerDoc.getElementById('kolam-canvas');
-        const square = kolamCanvas || (innerDoc && innerDoc.getElementById('piece-title'));
+        const abcSquare   = innerDoc && innerDoc.getElementById('piece-title');
+        const square = kolamCanvas || abcSquare;
         if (square) {
           const cRect = square.getBoundingClientRect();
-          topPx  = outerRect.top  + innerOffsetTop  + cRect.bottom + 6;              // just under the square
+          // Vertical anchor: just below the square (Kolam) OR below the whole
+          // ABC group (play/stop) so the bar doesn't wedge between them.
+          let bottomRect = cRect;
+          if (abcSquare && !kolamCanvas) {
+            const pr = innerDoc.querySelector('.playback-row');
+            if (pr) bottomRect = pr.getBoundingClientRect();
+          }
+          topPx  = outerRect.top  + innerOffsetTop  + bottomRect.bottom + 6;         // just under the square/group
           leftPx = outerRect.left + innerOffsetLeft + cRect.left + cRect.width / 2;  // square centre-x
           centerUnderCanvas = true;
           // Kolam-only extras: grow the History pane and stack the ↓↑ arrows to
