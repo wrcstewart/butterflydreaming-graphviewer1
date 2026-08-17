@@ -13,6 +13,9 @@
 //     Section-title   gateway: false, section_title: true,  seq: 0
 //                     text = about this piece (date + brief context)
 //     Content chunks  gateway: false, seq: 1..N (no section_title property)
+//                     title = <same as the Section-title's title> — REQUIRED, or
+//                     the node label falls back to source_text ("Poems of Du Fu")
+//                     instead of "<seq>: <piece title>" like every other work
 //                     text = 4-line chunks (or natural stanza units)
 //                     Each ends with a bare `%%bd_hint` line so no auto-
 //                     hint renders under it (chunks are read directly
@@ -196,19 +199,19 @@ async function run() {
         n_r: 0, selects: 0, views: 0, fusions: 0
       })
       CREATE (c1:TextNode {
-        url: $c1Url, gateway: false, seq: 1, source_text: $work, text: $c1Text,
+        url: $c1Url, gateway: false, seq: 1, source_text: $work, title: 'Dreaming of Li Bai', text: $c1Text,
         n_r: 0, selects: 0, views: 0, fusions: 0
       })
       CREATE (c2:TextNode {
-        url: $c2Url, gateway: false, seq: 2, source_text: $work, text: $c2Text,
+        url: $c2Url, gateway: false, seq: 2, source_text: $work, title: 'Dreaming of Li Bai', text: $c2Text,
         n_r: 0, selects: 0, views: 0, fusions: 0
       })
       CREATE (c3:TextNode {
-        url: $c3Url, gateway: false, seq: 3, source_text: $work, text: $c3Text,
+        url: $c3Url, gateway: false, seq: 3, source_text: $work, title: 'Dreaming of Li Bai', text: $c3Text,
         n_r: 0, selects: 0, views: 0, fusions: 0
       })
       CREATE (c4:TextNode {
-        url: $c4Url, gateway: false, seq: 4, source_text: $work, text: $c4Text,
+        url: $c4Url, gateway: false, seq: 4, source_text: $work, title: 'Dreaming of Li Bai', text: $c4Text,
         n_r: 0, selects: 0, views: 0, fusions: 0
       })
       CREATE (gw)-[:CHILD]->(st)
