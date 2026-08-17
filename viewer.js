@@ -3560,8 +3560,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let multiTouchRecent = false;
   const trackTouches = (e) => {
     activeTouches = (e.touches && e.touches.length) || 0;
-    if (activeTouches >= 2) multiTouchRecent = true;
-    else if (activeTouches === 0) {
+    if (activeTouches >= 2) {
+      multiTouchRecent = true;
+      // THE actual mobile Nodes-mode glitch: a finger resting on a node during
+      // a pinch never fires tapdrag for itself, so its 400 ms dwell survives and
+      // pops the node tooltip near the top (looked like the control bar coming
+      // back with the node's text). Kill any pending dwell AND hide any tooltip
+      // already showing the instant a second finger lands.
+      cancelDwell();
+      hideTooltip();
+    } else if (activeTouches === 0) {
       setTimeout(() => { if (activeTouches === 0) multiTouchRecent = false; }, 250);
     }
   };

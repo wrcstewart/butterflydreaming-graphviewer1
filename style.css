@@ -771,8 +771,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   RED (pinch guard v2 — document-capture live-finger-count latch so
-   during-pinch node taps are reliably dropped). Next rotation = green. */
+   GREEN (real fix — pinch cancels the long-press node tooltip that was
+   popping near the top mid-pinch; HUD data pinpointed it). Next
+   rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -782,7 +783,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff4040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
