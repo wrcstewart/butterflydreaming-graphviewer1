@@ -2278,7 +2278,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Post-2026-07-25: no more N=0 ghost. topLocalCard() alone suffices;
   // callers just null-check.
 
-  function createCard({ kind = 'local', label } = {}) {
+  function createCard({ kind = 'local', label, toHistory = false } = {}) {
     if (!chatStackEl) return null;
     const id        = 'card_' + nextCardSerial;
     nextCardSerial++;
@@ -2322,7 +2322,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // card down into History, then land the new card in the empty Current
     // slot. Guard for boot ordering (currentStackEl may not yet be bound
     // if createCard is somehow called before init runs).
-    if (currentStackEl) {
+    if (toHistory && chatStackEl) {
+      // 2026-08-17 — land straight in History (older slot) WITHOUT displacing
+      // whatever is in Current. Used for the Player helper card so the node's
+      // script card keeps the Current pane.
+      chatStackEl.prepend(el);
+    } else if (currentStackEl) {
       // 2026-08-17 — Nodes mode is a single scrollable pane: every card stays
       // in #current-stack (no promotion to History). Edit/Player keep the
       // split (newest in Current, previous promoted to History).
@@ -2473,7 +2478,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // M=count of helpers arrived during Local N's compose window); plain
   // 'Helper' before any Local exists. Post-2026-07-25 no auto-Local at
   // boot, so pre-Local helpers are the norm during the initial batch.
-  function prependSystemCard(text) {
+  function prependSystemCard(text, { toHistory = false } = {}) {
     const top = topLocalCard();
     let label;
     if (top) {
@@ -2484,7 +2489,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       label = 'Helper';
     }
-    const sys = createCard({ kind: 'system', label });
+    const sys = createCard({ kind: 'system', label, toHistory });
     if (!sys) return;
     if (sys.body) {
       sys.body.textContent = text;
@@ -4594,10 +4599,11 @@ async function init() {
       document.body.classList.remove('edit-active');
       reflowCardsForMode();   // 2026-08-17 — leave the single-pane merge if coming from Nodes
       // 2026-08-17 — first Player entry this session: drop a Helper card into
-      // the Current pane explaining the ↓↑ arrows and the Copy button. Once
-      // only (like gatewayHelperShown), so it doesn't spam on every toggle.
+      // HISTORY (toHistory) explaining the ↓↑ arrows and the Copy button, so the
+      // node's script card keeps the Current pane. Once only (like
+      // gatewayHelperShown) so it doesn't spam on every Player toggle.
       if (!playerHelperShown) {
-        prependSystemCard('Use the up and down arrows to send information between steppers and the script. Use Copy to create a link to an external website - send your pattern to your friends - uses very little data.');
+        prependSystemCard('Use the up and down arrows to send information between steppers and the script. Use Copy to create a link to an external website - send your pattern to your friends - uses very little data.', { toHistory: true });
         playerHelperShown = true;
       }
       // MM1.6 Strategy B — on entering Player mode, load the current node's
