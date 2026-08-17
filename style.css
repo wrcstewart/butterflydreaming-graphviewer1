@@ -771,8 +771,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   RED (Kolam player mobile: History pane grown down to just above the canvas
-   top, layered above the frozen module iframe). Next rotation = green. */
+   GREEN (Kolam player mobile: ↓↑ arrows moved left of the stepper column
+   aligned to the top stepper; canvas shifted 15% left). Next rotation
+   = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -782,7 +783,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff4040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -835,6 +836,20 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 body:not(.player-active) #copy-down-btn,
 body:not(.player-active) #copy-up-btn {
   display: none;
+}
+
+/* 2026-08-17 — Kolam player (mobile): the ↓↑ (Copy Down/Up) arrows move OUT of
+   the control bar to sit just left of the stepper column, stacked, aligned with
+   the top stepper. `right` places them left of the ~108px column; `top` is set
+   per-button by positionExtendPanel to the canvas top. z-index above the iframe
+   (1) and History pane (2). The control bar keeps its space for pairing/edit. */
+@media (max-width: 767px) {
+  body.player-active #copy-up-btn,
+  body.player-active #copy-down-btn {
+    position: fixed;
+    right: 116px;
+    z-index: 7;
+  }
 }
 /* 2026-08-09 — arrows moved left by one button-width per user request.
    Previously: copy-down-btn took margin-left: auto and view-mode-toggle

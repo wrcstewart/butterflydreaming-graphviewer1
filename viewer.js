@@ -4665,11 +4665,16 @@ async function init() {
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
-    // 2026-08-17 — release any History-pane height grown for the Kolam player;
-    // the Kolam branch below re-grows it each call when applicable (mobile
-    // Player). Cleared here so leaving Kolam/Player/desktop restores CSS height.
+    // 2026-08-17 — release any inline geometry we grew for the Kolam player
+    // (History-pane height, ↓↑ arrow tops); the Kolam branch below re-applies
+    // each call when applicable (mobile Player). Cleared here so leaving Kolam/
+    // Player/desktop restores CSS defaults.
     const histReset = document.getElementById('chat-panel');
     if (histReset) histReset.style.height = '';
+    const cuReset = document.getElementById('copy-up-btn');
+    const cdReset = document.getElementById('copy-down-btn');
+    if (cuReset) cuReset.style.top = '';
+    if (cdReset) cdReset.style.top = '';
     // 2026-08-10 — on desktop (viewport > 1024px) the module doesn't
     // stack — .lh-actions occupies the LEFT column with the row of
     // Copy Grammar / Copy ABC / Bake / Save wav / Save midi buttons.
@@ -4731,16 +4736,25 @@ async function init() {
           topPx  = outerRect.top  + innerOffsetTop  + cRect.bottom + 6;              // just under the canvas
           leftPx = outerRect.left + innerOffsetLeft + cRect.left + cRect.width / 2;  // canvas centre-x
           centerUnderCanvas = true;
+          const canvasTopVp = outerRect.top + innerOffsetTop + cRect.top;
+          const onPhone = window.innerWidth <= 767;
           // 2026-08-17 — grow the History pane (#chat-panel) DOWN so its bottom
           // sits just above the canvas top. The module iframe is frozen +
           // z-index 1 in Player mode, so CSS layers #chat-panel above it
           // (body.player-active rule) and here we anchor its height to the live
           // canvas top. Mobile only.
           const histPane = document.getElementById('chat-panel');
-          if (histPane && histPane.classList.contains('active') && window.innerWidth <= 767) {
-            const canvasTopVp = outerRect.top + innerOffsetTop + cRect.top;
+          if (histPane && histPane.classList.contains('active') && onPhone) {
             const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
             if (h > 0) histPane.style.height = h + 'px';
+          }
+          // 2026-08-17 — ↓↑ arrows stacked just left of the stepper column (CSS
+          // `right`), TOP arrow aligned with the canvas top (= top stepper).
+          if (onPhone) {
+            const cUp = document.getElementById('copy-up-btn');
+            const cDown = document.getElementById('copy-down-btn');
+            if (cUp)   cUp.style.top   = Math.round(canvasTopVp) + 'px';
+            if (cDown) cDown.style.top = Math.round(canvasTopVp + 26) + 'px';
           }
         }
       }

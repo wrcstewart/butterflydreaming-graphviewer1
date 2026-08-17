@@ -118,6 +118,10 @@
          breadcrumbs and the canvas sits just above the bar. */
       .module-layout { padding-left: 88px; }
       .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px; }
+      /* 2026-08-17 — shift canvas 15% left to free room between it and the
+         stepper column for BD's ↓↑ arrows. The Extension bar follows (BD
+         centres it on the live canvas rect). */
+      .canvas-wrapper canvas { transform: translateX(-15%); }
       .control-panel {
         flex: 0 0 108px !important;
         padding: 6px 4px;
