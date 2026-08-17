@@ -397,6 +397,20 @@
     const canvas         = document.getElementById('kolam-canvas');
     const ctx            = canvas.getContext('2d');
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
+    const controlPanel   = document.querySelector('.control-panel');
+    const moduleLayout   = document.querySelector('.module-layout');
+
+    // 2026-08-17 — mobile only: the canvas is dropped to the bottom of its
+    // wrapper, so push the stepper column's content down to start level with
+    // the canvas top. Desktop keeps the steppers flush to the top.
+    function alignStepperTop() {
+      if (!controlPanel || !moduleLayout) return;
+      if (window.innerWidth > 500) { controlPanel.style.paddingTop = ''; return; }
+      const offset = Math.max(0, Math.round(
+        canvas.getBoundingClientRect().top - moduleLayout.getBoundingClientRect().top
+      ));
+      controlPanel.style.paddingTop = offset + 'px';
+    }
 
     function updateCanvasSize() {
       // A42 §42.9 — canvas is square; take the smaller of the wrapper's
@@ -409,6 +423,7 @@
         canvas.width = size;
         canvas.height = size;
       }
+      alignStepperTop();
     }
 
     // ── Module state ──────────────────────────────────────────────────────────
