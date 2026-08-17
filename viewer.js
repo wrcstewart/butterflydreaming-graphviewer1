@@ -2359,11 +2359,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // reads dimmer, regardless of kind. Called after any card insertion so
   // the previous top demotes automatically.
   function refreshCardOpacities() {
-    const topIdx = cards.length - 1;
+    // 2026-08-17 — opacity is determined by the PANE, not insertion order:
+    // History pane (#chat-stack) is always the dimmer version; Current pane
+    // (and the Nodes single pane) is always full white. Previously the
+    // last-inserted card was bright regardless of pane, which lit the History
+    // helper while dimming the Current script.
     for (let i = 0; i < cards.length; i++) {
       const c = cards[i];
       if (!c.el) continue;
-      c.el.style.opacity = (i === topIdx) ? '1' : '0.6';
+      const inHistory = !!(chatStackEl && chatStackEl.contains(c.el));
+      c.el.style.opacity = inHistory ? '0.6' : '1';
     }
   }
 
@@ -4038,7 +4043,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs };
+  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -4581,6 +4586,8 @@ async function init() {
       const kids = Array.from(currentStackEl.children);
       for (let i = 1; i < kids.length; i++) chatStackEl.appendChild(kids[i]);
     }
+    // 2026-08-17 — cards changed pane → re-evaluate pane-based opacity.
+    refreshCardOpacities();
   }
 
   // 2026-08-17 — one-shot helper card on first Player entry (see below).
@@ -5452,7 +5459,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
