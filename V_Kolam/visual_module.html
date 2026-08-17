@@ -118,13 +118,16 @@
          breadcrumbs and the canvas sits just above the bar. */
       .module-layout { padding-left: 88px; }
       .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px; }
-      /* 2026-08-17 — shift canvas 15% left to free room between it and the
-         stepper column for BD's ↓↑ arrows. The Extension bar follows (BD
+      /* 2026-08-17 — shift canvas 15% + 20px left to free room between it and
+         the stepper column for BD's ↓↑ arrows. The Extension bar follows (BD
          centres it on the live canvas rect). */
-      .canvas-wrapper canvas { transform: translateX(-15%); }
+      .canvas-wrapper canvas { transform: translateX(calc(-15% - 20px)); }
       .control-panel {
         flex: 0 0 108px !important;
         padding: 6px 4px;
+        /* 2026-08-17 — very dark amber so the stepper panel reads as its own
+           block, set off from the ↓↑ arrows sitting just to its left. */
+        background: rgba(38, 27, 0, 0.92);
       }
       .control-row { width: 100px; }
     }
