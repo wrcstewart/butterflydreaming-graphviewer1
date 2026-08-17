@@ -3546,23 +3546,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // fires immediately. The message body itself tells the user what
   // tapping does next (Tap for next / Tap once more to choose / no
   // further descendants).
-  // 2026-08-17 — pinch guard. On mobile a two-finger pinch-zoom where one
-  // finger lands on a node makes Cytoscape fire a spurious 'tap' on that node.
-  // In the one-tap model that created a reading card mid-gesture and left the
-  // panes half-reverted (the collapsed control bar flashing back with the
-  // text). Track whether the current touch sequence ever had ≥2 fingers; the
-  // node-tap handler ignores the tap if so. A fresh single-finger touchstart
-  // resets the flag, so the next clean tap works normally.
-  let touchSeqWasMultiTouch = false;
-  {
-    const cont = cy.container();
-    if (cont) {
-      cont.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) touchSeqWasMultiTouch = false;
-        if (e.touches.length >= 2)  touchSeqWasMultiTouch = true;
-      }, { passive: true });
+  // 2026-08-17 v2 — pinch guard. On mobile a two-finger pinch-zoom with a
+  // finger on a node makes Cytoscape fire a spurious 'tap' on that node, which
+  // creates a reading card mid-gesture and leaves the panes half-reverted (the
+  // collapsed control bar flashing back with the text). v1 listened on
+  // cy.container() with a fragile length===1 reset that could clear mid-pinch
+  // (and the container may not even see the events during a captured pinch).
+  // v2 tracks the LIVE global finger count on document (capture phase, so it
+  // fires before Cytoscape): the moment ≥2 fingers are down we latch
+  // multiTouchRecent, and only clear it 250 ms after ALL fingers lift — so any
+  // tap during OR right after a pinch is dropped, while a later clean tap works.
+  let activeTouches = 0;
+  let multiTouchRecent = false;
+  const trackTouches = (e) => {
+    activeTouches = (e.touches && e.touches.length) || 0;
+    if (activeTouches >= 2) multiTouchRecent = true;
+    else if (activeTouches === 0) {
+      setTimeout(() => { if (activeTouches === 0) multiTouchRecent = false; }, 250);
     }
-  }
+  };
+  document.addEventListener('touchstart',  trackTouches, { capture: true, passive: true });
+  document.addEventListener('touchend',    trackTouches, { capture: true, passive: true });
+  document.addEventListener('touchcancel', trackTouches, { capture: true, passive: true });
 
   // 2026-08-17 — opt-in debug HUD (?dbg=1) for the mobile pinch / Nodes-mode
   // layout glitch. Renders live touch + layout state to a fixed on-screen box
@@ -3576,7 +3581,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const paint = () => {
       const cyEl2 = document.getElementById('cy');
       hud.textContent =
-        'touches:' + liveTouches +
+        'touches:' + liveTouches + ' guard:' + (multiTouchRecent ? 'ON' : 'off') +
         '\nbody:' + (document.body.className || '(nodes)') +
         '\ncy.top:' + (cyEl2 ? getComputedStyle(cyEl2).top : '?') +
         '\ncur:' + h('current-panel') + ' bar:' + h('action-bar') + ' hist:' + h('chat-panel') +
@@ -3594,9 +3599,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const type = node.data('type');
     wsRef.lastActivity = Date.now();
 
-    // Pinch guard: drop taps that happened inside a multi-touch (pinch-zoom)
-    // sequence so brushing a node while zooming doesn't fire a navigation.
-    if (touchSeqWasMultiTouch) return;
+    // Pinch guard: drop taps that fired during (or within 250 ms of) a
+    // multi-touch pinch so brushing a node while zooming doesn't navigate.
+    if (multiTouchRecent) return;
 
     // Special cases with their own semantics, unchanged by the chunk UX.
     if (type === 'ClusterEditChip') {
