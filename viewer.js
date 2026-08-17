@@ -4578,6 +4578,9 @@ async function init() {
     }
   }
 
+  // 2026-08-17 — one-shot helper card on first Player entry (see below).
+  let playerHelperShown = false;
+
   function setViewMode(mode) {
     if (mode === 'player') {
       // Refresh the iframe rect from #cy in case anything shifted since the
@@ -4590,6 +4593,13 @@ async function init() {
       document.body.classList.add('player-active');
       document.body.classList.remove('edit-active');
       reflowCardsForMode();   // 2026-08-17 — leave the single-pane merge if coming from Nodes
+      // 2026-08-17 — first Player entry this session: drop a Helper card into
+      // the Current pane explaining the ↓↑ arrows and the Copy button. Once
+      // only (like gatewayHelperShown), so it doesn't spam on every toggle.
+      if (!playerHelperShown) {
+        prependSystemCard('Use the up and down arrows to send information between steppers and the script. Use Copy to create a link to an external website - send your pattern to your friends - uses very little data.');
+        playerHelperShown = true;
+      }
       // MM1.6 Strategy B — on entering Player mode, load the current node's
       // module so the user sees the visual immediately without having to
       // press Copy Down.
