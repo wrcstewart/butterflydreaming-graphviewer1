@@ -182,28 +182,35 @@
       max-height: 100%;
     }
 
-    /* Portrait / narrow — LH row on top, main-area middle, controls band bottom */
+    /* Portrait / narrow — 2026-08-17 Kolam-like ROW (was a vertical stack):
+       lh-actions (left edge) | main-area (square, shifted left to clear the ↓↑
+       arrows) | scrollable stepper COLUMN (right). Prep for moving the ↓↑
+       arrows beside the stepper column. Desktop unchanged. */
     @media (max-aspect-ratio: 1/1) {
-      .module-layout { flex-direction: column; }
+      .module-layout { flex-direction: row; }
+      /* lh-actions: keep the left-edge column (Copy Script / Bake). */
       .lh-actions {
         flex: 0 0 auto;
-        flex-direction: row;
-        flex-wrap: wrap;
-        padding: 5px 6px;
-        align-self: stretch;
+        flex-direction: column;
+        padding: 5px 4px;
+        align-self: flex-start;
       }
-      .lh-actions button { flex: 1 1 auto; min-width: 70px; }
+      /* (1) stepper column: vertical + scrollable, width unchanged (200). */
       .control-panel {
-        flex: 0 0 auto;
-        max-height: 40vh;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-self: stretch;
+        flex: 0 0 200px;
+        max-height: 100%;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        overflow-y: auto;
+        align-self: flex-start;
       }
-      .control-row { flex: 1 1 30%; min-width: 90px; max-width: 200px; }
-      /* Smaller square on phones so the title doesn't consume the whole
-         middle band. */
-      #piece-title { width: 140px; font-size: 0.9rem; padding: 8px; }
+      .control-row { flex: 0 0 auto; width: 100%; min-width: 0; max-width: none; }
+      /* (2) central square + play/stop 50% smaller. */
+      #piece-title { width: 70px; font-size: 0.7rem; padding: 5px; }
+      .playback-row button { min-width: 30px; padding: 3px 7px; font-size: 0.7rem; }
+      /* (4) shift the square/main-area 20px left to make room for the ↓↑
+         arrows on its right; ext panel follows (BD anchors it to the square). */
+      .main-area { transform: translateX(-20px); }
     }
 
     .control-row {
