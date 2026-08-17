@@ -401,15 +401,18 @@
     const moduleLayout   = document.querySelector('.module-layout');
 
     // 2026-08-17 — mobile only: the canvas is dropped to the bottom of its
-    // wrapper, so push the stepper column's content down to start level with
-    // the canvas top. Desktop keeps the steppers flush to the top.
+    // wrapper, so bring the WHOLE stepper panel (background + scroll area) down
+    // to start level with the canvas top. margin-top (not padding-top) so the
+    // panel box itself moves — the space above the canvas stays genuinely empty
+    // (for the history pane to expand into) and the shorter scroll area can't
+    // scroll back up above the canvas. Desktop keeps the panel flush to the top.
     function alignStepperTop() {
       if (!controlPanel || !moduleLayout) return;
-      if (window.innerWidth > 500) { controlPanel.style.paddingTop = ''; return; }
+      if (window.innerWidth > 500) { controlPanel.style.marginTop = ''; return; }
       const offset = Math.max(0, Math.round(
         canvas.getBoundingClientRect().top - moduleLayout.getBoundingClientRect().top
       ));
-      controlPanel.style.paddingTop = offset + 'px';
+      controlPanel.style.marginTop = offset + 'px';
     }
 
     function updateCanvasSize() {
