@@ -147,7 +147,7 @@
       flex-direction: column;
       gap: 1px;                            /* 2026-07-12 -50% from 2 px */
       flex: 0 0 auto;
-      width: 96px;
+      width: 94px;                         /* 2026-08-17 — with 34px buttons, centres sit ~60px apart (was 70) → ~15% closer */
       margin-bottom: 3px;                  /* 2026-07-12 -50% from 6 px */
     }
 
@@ -175,10 +175,10 @@
       border: 1px solid #4a9b8e;
       color: #4a9b8e;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 1rem;
+      font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
-      width: 26px;
-      height: 26px;
+      width: 34px;                             /* 2026-08-17 — +30% (was 26) for easier mobile taps */
+      height: 34px;                            /* 2026-08-17 — +30% (was 26) */
       line-height: 1;
       text-transform: none;
       letter-spacing: 0;
@@ -202,11 +202,11 @@
       align-items: center;
       justify-content: center;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.78rem;
+      font-size: 0.7rem;                       /* 2026-08-17 — was 0.78; narrower value span (bigger buttons + closer centres) still fits "100" */
       color: #e8e8e0;
       background: #0f0f18;
       border: 1px solid #2a2a3a;
-      padding: 2px;
+      padding: 1px;                            /* 2026-08-17 — was 2px, reclaim width for the 3-char readout */
       border-radius: 3px;
       min-width: 0;
       user-select: none;
@@ -328,7 +328,7 @@
     <div class="control-row">
       <div class="stepper">
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="-1">−</button>
-        <span class="stepper-value" data-target="colour-speed-slider">4.0x</span>
+        <span class="stepper-value" data-target="colour-speed-slider">34</span>
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="1">+</button>
       </div>
       <label>colour_speed</label>
@@ -531,8 +531,16 @@
         const input = targetId && document.getElementById(targetId);
         if (!input) return;
         if (targetId === 'colour-speed-slider') {
+          // 2026-08-17 — show colour_speed as an integer 1..100 so the readout
+          // stays ≤3 chars (was e.g. "0.25x"/"16.0x", 5 chars). Maps the 7-step
+          // exponent (-2..4) onto 1..100 with higher = faster cycling
+          // (exp 4 = slowest → 1, exp -2 = fastest → 100). The underlying
+          // exponent/multiplier model, rendering, and script round-trip are
+          // unchanged — this is display-only.
           const exp = parseFloat(input.value);
-          span.textContent = Number.isFinite(exp) ? `${(2 ** exp).toFixed(1)}x` : input.value;
+          span.textContent = Number.isFinite(exp)
+            ? String(Math.round(((4 - exp) / 6) * 99 + 1))
+            : input.value;
         } else {
           span.textContent = input.value;
         }
