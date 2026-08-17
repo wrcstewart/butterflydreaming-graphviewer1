@@ -2842,6 +2842,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // hint mode was always 'force' on cluster expand — no restore).
     runLayout(cy, clusterNode);
 
+    // 2026-08-17 — re-apply the white active-node border. The tap handler runs
+    // markReadNode(cluster) BEFORE this expand, but exitSnakeView() above wipes
+    // border styles off ALL Cluster nodes — so the just-set border was lost on
+    // the first tap (a second, no-op same-node tap re-set it). Re-mark here so
+    // the border lands on the very first cluster tap.
+    markReadNode(clusterNode, cy);
+
     // Fallback row layout for gateways when NO hints exist for them. If any
     // gateway edge already carries hint_x/y, runLayout above has already
     // placed them at the user's chosen positions — the row override would
