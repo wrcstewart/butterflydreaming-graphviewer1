@@ -20,10 +20,16 @@
 //                     through sequentially — auto-hints would mislead).
 //
 //   Edges within the work (structural):
-//     Gateway  -[CHILD]->   Section-title    (drilling past gateway lands here)
-//     Chunk    -[PART_OF]-> Section-title    (snake view enumerates via this)
-//     NO CHILD chain between content chunks — they're leaves.
-//     NO CHILD from Section-title to any chunk — PART_OF is enough.
+//     Gateway      -[CHILD]->   Section-title   (drilling past gateway lands here)
+//     Section-title-[CHILD]->   Chunk 1         (start of the reading chain)
+//     Chunk n      -[CHILD]->   Chunk n+1       (reading chain; source:'sequence',
+//                                                weight:0.75 — matches every other
+//                                                work; powers seq-nav + reading spine)
+//     Chunk        -[PART_OF]-> Section-title   (snake view enumerates via this)
+//   2026-08-17 — the CHILD reading chain (title→1→2→…→N) is REQUIRED. It was
+//   originally omitted here ("chunks are leaves"), which left Poems of Du Fu the
+//   only work without a forward reading spine; fixed retroactively and in this
+//   template so future ingests match.
 //
 //   Edges to Clusters:
 //     Gateway -[CONTAINS_CLUSTER {count}]-> Cluster
@@ -210,6 +216,12 @@ async function run() {
       CREATE (c2)-[:PART_OF]->(st)
       CREATE (c3)-[:PART_OF]->(st)
       CREATE (c4)-[:PART_OF]->(st)
+      // 2026-08-17 — reading chain: title→1→2→3→4. source:'sequence' + weight:0.75
+      // match every other work (edge width fn + reading-spine .seq-edge rely on it).
+      CREATE (st)-[:CHILD {source:'sequence', weight:0.75}]->(c1)
+      CREATE (c1)-[:CHILD {source:'sequence', weight:0.75}]->(c2)
+      CREATE (c2)-[:CHILD {source:'sequence', weight:0.75}]->(c3)
+      CREATE (c3)-[:CHILD {source:'sequence', weight:0.75}]->(c4)
       `,
       {
         work: WORK,
