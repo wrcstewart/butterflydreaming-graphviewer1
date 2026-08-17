@@ -991,7 +991,7 @@ function buildStyle() {
       style: {
         'width': 53,
         'height': 22,
-        'font-size': '7.4px',   // 2026-08-17 — −8% (was 8px) so SubFamily labels fit the node
+        'font-size': '6.8px',   // 2026-08-17 — −8% then −8% again (8→7.4→6.8) so SubFamily labels fit the node
         'text-max-width': '48px',
       }
     },
