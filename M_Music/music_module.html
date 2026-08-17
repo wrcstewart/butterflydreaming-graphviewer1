@@ -186,7 +186,11 @@
        lh-actions (left edge) | main-area (square, shifted left to clear the ↓↑
        arrows) | scrollable stepper COLUMN (right). Prep for moving the ↓↑
        arrows beside the stepper column. Desktop unchanged. */
-    @media (max-aspect-ratio: 1/1) {
+    @media (max-width: 500px) {
+      /* 2026-08-17 — was max-aspect-ratio:1/1, but in Player mode the module
+         iframe is often slightly WIDER than tall (the panes above eat height),
+         so that portrait query never matched and none of these mobile rules
+         applied. Width-based (like Kolam) matches reliably on phones (~390px). */
       .module-layout { flex-direction: row; }
       /* lh-actions: keep the left-edge column (Copy Script / Bake). */
       .lh-actions {
