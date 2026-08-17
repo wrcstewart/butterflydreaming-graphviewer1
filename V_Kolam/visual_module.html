@@ -262,7 +262,8 @@
 </head>
 <body>
 
-  <div id="status">Ready</div>
+  <!-- 2026-08-17 — starts EMPTY (was "Ready"); still used for error text via setStatus. -->
+  <div id="status"></div>
 
   <div class="module-layout">
 
@@ -1004,7 +1005,7 @@
         // Apply symmetry
         applySymmetry(offscreen, params.symmetry);
 
-        setStatus('Ready');
+        setStatus('');   // 2026-08-17 — no "Ready" clutter; errors still shown via setStatus
 
         lastError = null;
 
