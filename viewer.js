@@ -4751,33 +4751,39 @@ async function init() {
         topPx  = outerRect.top  + innerOffsetTop  + abcRect.top;
         leftPx = outerRect.left + 8;                             // panel hugs left edge of iframe
       } else {
-        // Kolam (2026-08-17) — place the Extension bar as a horizontal strip
-        // centred just BELOW the canvas square, instead of the old left gutter.
+        // 2026-08-17 — under-square Extension bar for modules with a central
+        // square: Kolam (#kolam-canvas) and ABC (#piece-title). Fractal keeps
+        // the left-gutter #abc-pane path above. Horizontal strip centred just
+        // BELOW the square.
         const kolamCanvas = innerDoc && innerDoc.getElementById('kolam-canvas');
-        if (kolamCanvas) {
-          const cRect = kolamCanvas.getBoundingClientRect();
-          topPx  = outerRect.top  + innerOffsetTop  + cRect.bottom + 6;              // just under the canvas
-          leftPx = outerRect.left + innerOffsetLeft + cRect.left + cRect.width / 2;  // canvas centre-x
+        const square = kolamCanvas || (innerDoc && innerDoc.getElementById('piece-title'));
+        if (square) {
+          const cRect = square.getBoundingClientRect();
+          topPx  = outerRect.top  + innerOffsetTop  + cRect.bottom + 6;              // just under the square
+          leftPx = outerRect.left + innerOffsetLeft + cRect.left + cRect.width / 2;  // square centre-x
           centerUnderCanvas = true;
-          const canvasTopVp = outerRect.top + innerOffsetTop + cRect.top;
-          const onPhone = window.innerWidth <= 767;
-          // 2026-08-17 — grow the History pane (#chat-panel) DOWN so its bottom
-          // sits just above the canvas top. The module iframe is frozen +
-          // z-index 1 in Player mode, so CSS layers #chat-panel above it
-          // (body.player-active rule) and here we anchor its height to the live
-          // canvas top. Mobile only.
-          const histPane = document.getElementById('chat-panel');
-          if (histPane && histPane.classList.contains('active') && onPhone) {
-            const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
-            if (h > 0) histPane.style.height = h + 'px';
-          }
-          // 2026-08-17 — ↓↑ arrows stacked just left of the stepper column (CSS
-          // `right`), TOP arrow aligned with the canvas top (= top stepper).
-          if (onPhone) {
-            const cUp = document.getElementById('copy-up-btn');
-            const cDown = document.getElementById('copy-down-btn');
-            if (cUp)   cUp.style.top   = Math.round(canvasTopVp) + 'px';
-            if (cDown) cDown.style.top = Math.round(canvasTopVp + 26) + 'px';
+          // Kolam-only extras: grow the History pane and stack the ↓↑ arrows to
+          // the canvas top. ABC positions its own arrows separately (later).
+          if (kolamCanvas) {
+            const canvasTopVp = outerRect.top + innerOffsetTop + cRect.top;
+            const onPhone = window.innerWidth <= 767;
+            // Grow the History pane (#chat-panel) DOWN so its bottom sits just
+            // above the canvas top. The module iframe is frozen + z-index 1 in
+            // Player mode, so CSS layers #chat-panel above it and here we anchor
+            // its height to the live canvas top. Mobile only.
+            const histPane = document.getElementById('chat-panel');
+            if (histPane && histPane.classList.contains('active') && onPhone) {
+              const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
+              if (h > 0) histPane.style.height = h + 'px';
+            }
+            // ↓↑ arrows stacked just left of the stepper column (CSS `right`),
+            // TOP arrow aligned with the canvas top (= top stepper).
+            if (onPhone) {
+              const cUp = document.getElementById('copy-up-btn');
+              const cDown = document.getElementById('copy-down-btn');
+              if (cUp)   cUp.style.top   = Math.round(canvasTopVp) + 'px';
+              if (cDown) cDown.style.top = Math.round(canvasTopVp + 26) + 'px';
+            }
           }
         }
       }
