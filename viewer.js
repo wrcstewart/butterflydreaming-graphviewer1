@@ -3546,10 +3546,32 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // fires immediately. The message body itself tells the user what
   // tapping does next (Tap for next / Tap once more to choose / no
   // further descendants).
+  // 2026-08-17 — pinch guard. On mobile a two-finger pinch-zoom where one
+  // finger lands on a node makes Cytoscape fire a spurious 'tap' on that node.
+  // In the one-tap model that created a reading card mid-gesture and left the
+  // panes half-reverted (the collapsed control bar flashing back with the
+  // text). Track whether the current touch sequence ever had ≥2 fingers; the
+  // node-tap handler ignores the tap if so. A fresh single-finger touchstart
+  // resets the flag, so the next clean tap works normally.
+  let touchSeqWasMultiTouch = false;
+  {
+    const cont = cy.container();
+    if (cont) {
+      cont.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) touchSeqWasMultiTouch = false;
+        if (e.touches.length >= 2)  touchSeqWasMultiTouch = true;
+      }, { passive: true });
+    }
+  }
+
   cy.on('tap', 'node', evt => {
     const node = evt.target;
     const type = node.data('type');
     wsRef.lastActivity = Date.now();
+
+    // Pinch guard: drop taps that happened inside a multi-touch (pinch-zoom)
+    // sequence so brushing a node while zooming doesn't fire a navigation.
+    if (touchSeqWasMultiTouch) return;
 
     // Special cases with their own semantics, unchanged by the chunk UX.
     if (type === 'ClusterEditChip') {
