@@ -771,8 +771,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   GREEN (cluster tap now gets its white active border on the FIRST tap —
-   re-marked after exitSnakeView's border wipe). Next rotation = red. */
+   RED (Kolam mobile: Extension bar now a horizontal strip under the canvas —
+   positionExtendPanel .under-canvas). Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -782,7 +782,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1037,6 +1037,25 @@ body.player-active #bd-invite-panel-viewer { display: block; }
     /* v7 was 50vh+22px; +30 px to raise the panel further. */
     bottom: calc(50vh + 52px);
   }
+}
+
+/* 2026-08-17 — Kolam mobile: Extension panel as a HORIZONTAL bar centred under
+   the canvas. positionExtendPanel adds .under-canvas and sets top/left/
+   transform (translateX(-50%)) from the live canvas rect; here we lay the two
+   buttons side by side and drop the verbose stacked labels for a compact strip.
+   Only Kolam gets .under-canvas — music modules keep the vertical left panel,
+   and desktop clears the class. */
+#bd-invite-panel-viewer.under-canvas {
+  max-width: none;
+  padding: 4px 8px;
+}
+#bd-invite-panel-viewer.under-canvas #bd-invite-actions-viewer {
+  flex-direction: row;
+  gap: 6px;
+}
+#bd-invite-panel-viewer.under-canvas #bd-invite-text-viewer,
+#bd-invite-panel-viewer.under-canvas #bd-invite-target-viewer {
+  display: none;
 }
 
 /* 2026-08-09 — Extend label now permanent blue to match the

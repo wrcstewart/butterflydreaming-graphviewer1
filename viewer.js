@@ -4673,6 +4673,7 @@ async function init() {
     // (right: 8px, vertically centred) — that's the correct desktop
     // placement and never collides with module content on wide viewports.
     if (window.innerWidth > 1024) {
+      panel.classList.remove('under-canvas');
       panel.style.top       = '';
       panel.style.left      = '';
       panel.style.right     = '';
@@ -4690,32 +4691,42 @@ async function init() {
     // otherwise and stuck the panel at the top of the screen.
     let topPx  = null;
     let leftPx = null;
+    let centerUnderCanvas = false;   // 2026-08-17 — Kolam mobile: horizontal bar centred under the canvas
     try {
       const outerRect = outerIframe.getBoundingClientRect();
       const outerDoc  = outerIframe.contentDocument;
       if (!outerDoc) throw new Error('no outer doc');
 
-      // Two possible shapes:
-      //  a) Relay wrapper (music modules): outer doc has #module-frame
-      //     iframe → inner doc has #abc-pane.
+      // Module shapes:
+      //  a) Relay wrapper (music modules): outer doc has #module-frame iframe
+      //     → inner doc has #abc-pane.
       //  b) Single-iframe module: outer doc has #abc-pane directly.
+      //  c) Kolam: relay wrapper → inner doc has #kolam-canvas (no abc-pane).
       const inner = outerDoc.getElementById('module-frame');
-      let abcPane = null;
-      let innerOffsetTop = 0, innerOffsetLeft = 0;
+      let innerOffsetTop = 0, innerOffsetLeft = 0, innerDoc = null;
       if (inner) {
         const innerRect = inner.getBoundingClientRect();
         innerOffsetTop  = innerRect.top;   // relative to outerDoc's viewport
         innerOffsetLeft = innerRect.left;
-        const innerDoc  = inner.contentDocument;
-        if (innerDoc) abcPane = innerDoc.getElementById('abc-pane');
+        innerDoc        = inner.contentDocument;
       }
-      if (!abcPane) abcPane = outerDoc.getElementById('abc-pane');
+      const abcPane = (innerDoc && innerDoc.getElementById('abc-pane')) || outerDoc.getElementById('abc-pane');
 
       if (abcPane) {
         const abcRect = abcPane.getBoundingClientRect();
         // Sum: main-viewport-y-of-outer + outer-viewport-y-of-inner + inner-viewport-y-of-abc
         topPx  = outerRect.top  + innerOffsetTop  + abcRect.top;
         leftPx = outerRect.left + 8;                             // panel hugs left edge of iframe
+      } else {
+        // Kolam (2026-08-17) — place the Extension bar as a horizontal strip
+        // centred just BELOW the canvas square, instead of the old left gutter.
+        const kolamCanvas = innerDoc && innerDoc.getElementById('kolam-canvas');
+        if (kolamCanvas) {
+          const cRect = kolamCanvas.getBoundingClientRect();
+          topPx  = outerRect.top  + innerOffsetTop  + cRect.bottom + 6;              // just under the canvas
+          leftPx = outerRect.left + innerOffsetLeft + cRect.left + cRect.width / 2;  // canvas centre-x
+          centerUnderCanvas = true;
+        }
       }
     } catch (_) {
       // Cross-origin or DOM not ready — fall through to CSS defaults.
@@ -4723,6 +4734,7 @@ async function init() {
 
     if (topPx === null) {
       // Clear inline overrides so the CSS media-query defaults win.
+      panel.classList.remove('under-canvas');
       panel.style.top = '';
       panel.style.left = '';
       panel.style.right = '';
@@ -4731,11 +4743,15 @@ async function init() {
       return;
     }
 
+    // .under-canvas drives the horizontal layout (buttons in a row, labels
+    // hidden) for the Kolam under-canvas placement; music modules keep the
+    // vertical left-gutter panel.
+    panel.classList.toggle('under-canvas', centerUnderCanvas);
     panel.style.top       = topPx + 'px';
     panel.style.left      = leftPx + 'px';
     panel.style.right     = 'auto';
     panel.style.bottom    = 'auto';
-    panel.style.transform = 'none';
+    panel.style.transform = centerUnderCanvas ? 'translateX(-50%)' : 'none';
   }
 
   // 2026-07-15 — Chat is now always active from boot (no toggle). The
