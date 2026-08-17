@@ -337,6 +337,25 @@ html, body {
   #action-bar { width: 100%; }
 }
 
+/* 2026-08-17 — Nodes-mode single reading pane. In Nodes mode the user only
+   reads + navigates, so the Current/History split, the dividing action-bar
+   strip and its compose tools are idle. Collapse to ONE scrollable pane: all
+   cards live in the (taller) Current pane, History is hidden, and the bar box
+   is zero-height — handing the reclaimed depth to #cy (positionCyEl anchors #cy
+   to #current-panel in this mode). The mode radios (top) and Copy Link (bottom)
+   are position:fixed, so the collapsed bar box doesn't hide them. Card DOM is
+   merged into the single pane on mode toggle (reflowCardsForMode). Edit/Player
+   restore the split via body.edit-active / body.player-active. */
+body:not(.edit-active):not(.player-active) #chat-panel.active { display: none; }
+body:not(.edit-active):not(.player-active) #current-panel { height: 34dvh; }
+body:not(.edit-active):not(.player-active) #action-bar {
+  min-height: 0;
+  height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
 /* Default (system-message) panel — visible whenever the chat panel is not active */
 #default-panel {
   display: flex;
@@ -752,8 +771,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   RED (history pane #chat-panel 25dvh → 20dvh; current pane unchanged —
-   more room for #cy). Next rotation = green. */
+   GREEN (Nodes mode = one scrollable reading pane — History + dividing bar
+   collapsed, Current pane expanded, reclaimed depth to #cy; Edit/Player
+   restore the split). Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -763,7 +783,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff4040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

@@ -2322,7 +2322,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // slot. Guard for boot ordering (currentStackEl may not yet be bound
     // if createCard is somehow called before init runs).
     if (currentStackEl) {
-      promoteCurrentToHistory();
+      // 2026-08-17 — Nodes mode is a single scrollable pane: every card stays
+      // in #current-stack (no promotion to History). Edit/Player keep the
+      // split (newest in Current, previous promoted to History).
+      const singlePane = !document.body.classList.contains('edit-active') &&
+                         !document.body.classList.contains('player-active');
+      if (!singlePane) promoteCurrentToHistory();
       currentStackEl.prepend(el);
       currentStackEl.scrollTop = 0;
     } else {
@@ -4386,7 +4391,15 @@ async function init() {
     // so #chat-panel (History) is the last flow element above cy.
     // #action-bar is NO LONGER the correct pin — it's mid-stack now.
     // Fall back through the pre-split candidates for defensive safety.
+    // 2026-08-17 — Nodes mode collapses to a single reading pane: History is
+    // hidden and the action-bar strip is zero-height, so #current-panel is the
+    // bottom-most visible flow element and must anchor #cy. Edit/Player keep
+    // the split, where #chat-panel (History) is the bottom-most.
+    const nodesMode = !document.body.classList.contains('edit-active') &&
+                      !document.body.classList.contains('player-active');
+    const currentPanelEl = document.getElementById('current-panel');
     const refEl =
+      (nodesMode && currentPanelEl && currentPanelEl.getBoundingClientRect().height > 0 ? currentPanelEl : null) ||
       (chatModeActive && chatPanel.getBoundingClientRect().height > 0 ? chatPanel : null) ||
       document.getElementById('default-panel') ||
       document.getElementById('action-bar') ||
@@ -4503,6 +4516,25 @@ async function init() {
     visualIframe.src = url;
   }
 
+  // 2026-08-17 — merge/split the card DOM when the layout mode changes. Nodes
+  // mode is one scrollable pane (all cards in #current-stack); Edit/Player show
+  // the split (newest in #current-stack, the rest in #chat-stack/History). Only
+  // DOM parentage moves — logical card state lives in cards[], untouched. The
+  // single card whose home differs is really just "everything below the newest"
+  // so this is cheap: merge appends History under the current card (newest-first
+  // order preserved); split moves all-but-first back down to History.
+  function reflowCardsForMode() {
+    if (!currentStackEl || !chatStackEl) return;
+    const singlePane = !document.body.classList.contains('edit-active') &&
+                       !document.body.classList.contains('player-active');
+    if (singlePane) {
+      while (chatStackEl.firstChild) currentStackEl.appendChild(chatStackEl.firstChild);
+    } else {
+      const kids = Array.from(currentStackEl.children);
+      for (let i = 1; i < kids.length; i++) chatStackEl.appendChild(kids[i]);
+    }
+  }
+
   function setViewMode(mode) {
     if (mode === 'player') {
       // Refresh the iframe rect from #cy in case anything shifted since the
@@ -4514,6 +4546,7 @@ async function init() {
       // on Player mode. Hidden by default; visible while player-active.
       document.body.classList.add('player-active');
       document.body.classList.remove('edit-active');
+      reflowCardsForMode();   // 2026-08-17 — leave the single-pane merge if coming from Nodes
       // MM1.6 Strategy B — on entering Player mode, load the current node's
       // module so the user sees the visual immediately without having to
       // press Copy Down.
@@ -4543,11 +4576,16 @@ async function init() {
       if (mode === 'edit' && !wasEdit) {
         document.dispatchEvent(new CustomEvent('bd:edit-mode-enter'));
       }
+      // 2026-08-17 — merge/split the card panes for the new mode, then re-anchor
+      // #cy: Nodes hides History + collapses the bar, so #cy's top moves up.
+      reflowCardsForMode();
+      positionCyEl();
       // Cy's internal size may have gone stale while it was hidden (any
       // resize / rAF re-fit was skipped). Re-sync after a frame so the
       // container has real dimensions again, then re-fit to whatever
       // sub-graph is currently visible.
       requestAnimationFrame(() => {
+        positionCyEl();
         cy.resize();
         cy.fit(cy.elements(':visible'), fitPadding(cy, 40));
       });
