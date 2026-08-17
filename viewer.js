@@ -3577,31 +3577,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   document.addEventListener('touchend',    trackTouches, { capture: true, passive: true });
   document.addEventListener('touchcancel', trackTouches, { capture: true, passive: true });
 
-  // 2026-08-17 — opt-in debug HUD (?dbg=1) for the mobile pinch / Nodes-mode
-  // layout glitch. Renders live touch + layout state to a fixed on-screen box
-  // so the exact broken state can be read off the phone. No-op without ?dbg=1.
-  if (new URLSearchParams(location.search).get('dbg') === '1') {
-    const hud = document.createElement('div');
-    hud.style.cssText = 'position:fixed;left:2px;bottom:120px;z-index:99999;background:rgba(0,0,0,0.82);color:#0f0;font:10px/1.35 monospace;padding:4px 6px;white-space:pre;pointer-events:none;border:1px solid #0a0;';
-    document.body.appendChild(hud);
-    let liveTouches = 0, lastTap = '-';
-    const h = id => { const e = document.getElementById(id); return e ? Math.round(e.getBoundingClientRect().height) : '?'; };
-    const paint = () => {
-      const cyEl2 = document.getElementById('cy');
-      hud.textContent =
-        'touches:' + liveTouches + ' guard:' + (multiTouchRecent ? 'ON' : 'off') +
-        '\nbody:' + (document.body.className || '(nodes)') +
-        '\ncy.top:' + (cyEl2 ? getComputedStyle(cyEl2).top : '?') +
-        '\ncur:' + h('current-panel') + ' bar:' + h('action-bar') + ' hist:' + h('chat-panel') +
-        '\nlastTap:' + lastTap;
-    };
-    document.addEventListener('touchstart', e => { liveTouches = e.touches.length; paint(); }, { capture: true, passive: true });
-    document.addEventListener('touchend',   e => { liveTouches = e.touches.length; paint(); }, { capture: true, passive: true });
-    cy.on('tap', 'node', e => { lastTap = String(e.target.data('display_name') || e.target.id()).slice(0, 14); paint(); });
-    cy.on('render', paint);
-    paint();
-  }
-
   cy.on('tap', 'node', evt => {
     const node = evt.target;
     const type = node.data('type');
