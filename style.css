@@ -771,9 +771,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   GREEN (Kolam Extension bar: Jump/Copy Link relabel, shorter buttons, tiny
-   External Website caption, dropped toward the breadcrumbs). Next rotation
-   = red. */
+   RED (Kolam player mobile: History pane grown down to just above the canvas
+   top, layered above the frozen module iframe). Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -783,7 +782,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1073,6 +1072,18 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   margin: 0;
   font-size: 8px;
   line-height: 1.1;
+}
+
+/* 2026-08-17 — Kolam player (mobile): the module iframe is position:fixed
+   z-index 1 and frozen in Player mode, so lift the History pane above it and
+   let it overflow-scroll. Its height is grown to just above the canvas top by
+   positionExtendPanel. Only in Player mode on phones. */
+@media (max-width: 767px) {
+  body.player-active #chat-panel {
+    position: relative;
+    z-index: 2;
+    overflow-y: auto;
+  }
 }
 
 /* 2026-08-09 — Extend label now permanent blue to match the
