@@ -251,7 +251,7 @@ html, body {
   display: none;
   width: 40%;                           /* A51e — matches #default-panel so the panel width
                                            is constant whether chat-mode is on or off */
-  height: 25dvh;                        /* 2026-08-14 — reduced from 33dvh; #current-panel above the bar now takes 118 px of the previously-single-panel budget */
+  height: 20dvh;                        /* 2026-08-17 — history pane cut 25dvh → 20dvh (−20%, matching the card-text shrink) to hand vertical space to #cy; #current-panel depth left unchanged per user. Was 33dvh (2026-08-14). */
   flex-shrink: 0;
   align-self: center;
   /* 2026-07-28 — dropped from solid #3d2e00 to rgba(...,0.55) so the frame
@@ -752,8 +752,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-17:
-   GREEN (reading/partner card text shrunk 20% → 12.8px to reclaim #cy
-   vertical space; local textarea kept 16px for iOS). Next rotation = red. */
+   RED (history pane #chat-panel 25dvh → 20dvh; current pane unchanged —
+   more room for #cy). Next rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -763,7 +763,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
