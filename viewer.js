@@ -1634,7 +1634,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // subtle 2px grey so the small chips don't get heavy.
     const central = instanceCy === cy;
     cytoNode.style(central
-      ? { 'border-width': 5, 'border-color': '#ffffff', 'border-opacity': 1 }
+      ? { 'border-width': 4, 'border-color': '#ffffff', 'border-opacity': 1 }   // 2026-08-17 — 5→4px; the straddling border was nibbling tight labels (e.g. SubFamily)
       : { 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
     lastReadNodeId = cytoNode.id();
     lastReadNodeCy = instanceCy;
