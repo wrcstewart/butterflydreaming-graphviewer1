@@ -4493,6 +4493,22 @@ async function init() {
         iframeEl.style.left   = cyRect.left   + 'px';
         iframeEl.style.width  = stampedWidth  + 'px';
         iframeEl.style.height = cyRect.height + 'px';
+      } else if (iframeEl.classList.contains('active')) {
+        // 2026-08-18 — #cy is hidden (Player mode) but the module iframe is
+        // showing. Compute the rect from the intended #cy geometry (top =
+        // refEl.bottom via topPx, CSS bottom:90px, full width) so the iframe
+        // follows the CURRENT Player pane layout instead of a stale Nodes-mode
+        // rect. Fixes the History pane overlapping the iframe top when Player is
+        // entered straight from Nodes (Edit→Player already had the right rect).
+        const top          = parseInt(topPx, 10) || 0;
+        const isDesktop    = window.innerWidth > 767;
+        const reserveRight = isDesktop ? 100 : 0;
+        const w = Math.max(0, window.innerWidth  - reserveRight);
+        const h = Math.max(0, window.innerHeight - 90 - top);
+        iframeEl.style.top    = top + 'px';
+        iframeEl.style.left   = '0px';
+        iframeEl.style.width  = w + 'px';
+        iframeEl.style.height = h + 'px';
       }
     }
   }
@@ -4613,6 +4629,13 @@ async function init() {
         prependSystemCard('Use the up and down arrows to send information between steppers and the script. Use Copy to create a link to an external website - send your pattern to your friends - uses very little data.', { toHistory: true });
         playerHelperShown = true;
       }
+      // 2026-08-18 — re-anchor the iframe now that player-active is set and the
+      // panes are in Player layout (History pane shown). The positionCyEl() at
+      // the top ran against the PREVIOUS layout (Nodes single pane sits higher),
+      // which left the iframe top overlapped by the History pane. Re-run against
+      // the real Player layout; rAF catches any post-class-swap reflow.
+      positionCyEl();
+      requestAnimationFrame(positionCyEl);
       // MM1.6 Strategy B — on entering Player mode, load the current node's
       // module so the user sees the visual immediately without having to
       // press Copy Down.
