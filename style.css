@@ -771,9 +771,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-18:
-   RED (fix Player iframe overlapped by History pane when entered from Nodes —
-   positionCyEl computes the rect from the live Player layout). Next
-   rotation = green. */
+   GREEN (Extension panel: two stacked white-framed buttons — 'Jump to external
+   player' / 'Copy external url'; dropped the blue-grey). Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -783,7 +782,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #ff4040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -981,9 +980,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
    Was amber solid / amber-outline; user asked for a quieter, more
    uniform panel look. */
 #jump-to-ext-btn {
-  background: #4a4a4a;
-  color: #4080ff;
-  border: none;
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
   border-radius: 3px;
   padding: 5px 4px;
   font-size: 11px;
@@ -997,9 +996,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #jump-to-ext-btn:hover { background: #5c5c5c; }
 
 #copy-link-to-ext-btn {
-  background: #4a4a4a;
-  color: #4080ff;
-  border: none;
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
   border-radius: 3px;
   padding: 5px 4px;
   font-size: 11px;
@@ -1062,31 +1061,31 @@ body.player-active #bd-invite-panel-viewer { display: block; }
    and desktop clears the class. */
 #bd-invite-panel-viewer.under-canvas {
   max-width: none;
-  padding: 5px 8px;                       /* 2026-08-17 — ~20% deeper to seat the caption */
+  padding: 2px;
+  background: transparent;                /* 2026-08-18 — just the two white-framed buttons; no dark box/shadow */
+  border: none;
+  box-shadow: none;
 }
+/* 2026-08-18 — two long buttons stacked one under the other, filling the dock
+   slot. Labels are self-explanatory ("Jump to external player" / "Copy external
+   url") so both the "Extension" header and the caption are dropped. */
 #bd-invite-panel-viewer.under-canvas #bd-invite-actions-viewer {
-  flex-direction: row;                    /* Jump | Copy Link on one row */
-  gap: 6px;
-  margin-bottom: 2px;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
 }
-/* "Extension" header dropped; the two buttons + a tiny caption remain. */
-#bd-invite-panel-viewer.under-canvas #bd-invite-text-viewer {
+#bd-invite-panel-viewer.under-canvas #bd-invite-text-viewer,
+#bd-invite-panel-viewer.under-canvas #bd-invite-target-viewer {
   display: none;
 }
-/* Buttons: single line, auto width to fit "Copy Link", ~70% of prior depth. */
 #bd-invite-panel-viewer.under-canvas #jump-to-ext-btn,
 #bd-invite-panel-viewer.under-canvas #copy-link-to-ext-btn {
-  width: auto;
-  white-space: nowrap;
-  padding: 2px 8px;
-  line-height: 1.1;
-}
-/* Tiny "External Website" caption under the buttons. */
-#bd-invite-panel-viewer.under-canvas #bd-invite-target-viewer {
-  display: block;
-  margin: 0;
+  width: 100%;
+  white-space: normal;
   font-size: 8px;
-  line-height: 1.1;
+  font-weight: normal;
+  line-height: 1.15;
+  padding: 3px 4px;
 }
 
 /* 2026-08-17 — Kolam player (mobile): the module iframe is position:fixed
