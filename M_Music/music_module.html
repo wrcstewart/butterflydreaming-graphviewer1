@@ -413,7 +413,11 @@
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const setStatus = (msg, isErr = false) => {
-      statusEl.textContent = msg;
+      // 2026-08-18 — the floating #status sits top-left over the Copy Script
+      // panel, so only ERRORS surface there. Non-error chatter (Playing /
+      // Stopped / Looping… / Baking…) is redundant now the buttons show state
+      // and the bake button shows its own progress — so it's dropped.
+      statusEl.textContent = isErr ? msg : '';
       statusEl.classList.toggle('err', !!isErr);
     };
     const postToParent = (msg) => window.parent.postMessage(msg, '*');
