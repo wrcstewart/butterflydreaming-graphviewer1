@@ -4465,7 +4465,18 @@ async function init() {
     // so we stamp explicit width/height/top from #cy's bounding rect
     // rather than relying on CSS to derive them.
     const iframeEl = document.getElementById('visual-iframe');
-    if (iframeEl) {
+    if (iframeEl && (iframeEl.src && iframeEl.src.indexOf('/bd_M_ABC/') !== -1)) {
+      // 2026-08-18 — music-player grid module (music_player_layout_spec): the
+      // iframe = the panel-width COLUMN. Match the bottom panel's left/width
+      // (40% centred on desktop, 100% mobile), start 5px below it, fill down to
+      // the breadcrumb clearance. (Add /bd_M_Fractal/ here once ported.)
+      const rr = refEl.getBoundingClientRect();
+      const top = Math.ceil(rr.bottom) + 5;
+      iframeEl.style.top    = top + 'px';
+      iframeEl.style.left   = Math.round(rr.left)  + 'px';
+      iframeEl.style.width  = Math.round(rr.width) + 'px';
+      iframeEl.style.height = Math.max(0, window.innerHeight - 90 - top) + 'px';
+    } else if (iframeEl) {
       const cyRect = cyEl.getBoundingClientRect();
       // Only stamp when #cy has non-zero dimensions. In Player mode #cy has
       // `.hidden` (display: none) so its rect collapses to zeros — if we
@@ -4725,22 +4736,10 @@ async function init() {
       if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; }
     });
     panel.style.width = '';
-    // 2026-08-10 — on desktop (viewport > 1024px) the module doesn't
-    // stack — .lh-actions occupies the LEFT column with the row of
-    // Copy Grammar / Copy ABC / Bake / Save wav / Save midi buttons.
-    // Anchoring the panel at iframe.left + 8 (mobile placement) covers
-    // those buttons. Clear inline overrides and let the CSS defaults win
-    // (right: 8px, vertically centred) — that's the correct desktop
-    // placement and never collides with module content on wide viewports.
-    if (window.innerWidth > 1024) {
-      panel.classList.remove('under-canvas');
-      panel.style.top       = '';
-      panel.style.left      = '';
-      panel.style.right     = '';
-      panel.style.bottom    = '';
-      panel.style.transform = '';
-      return;
-    }
+    // 2026-08-18 — the desktop early-return moved into the LEGACY path below
+    // (after the dock-slot check), so grid modules (ABC) dock their arrows +
+    // Extension panel onto their slots on desktop too. Non-slot modules
+    // (Kolam/Fractal) still fall back to the CSS default on desktop.
     if (!document.body.classList.contains('player-active')) return;
     const outerIframe = document.getElementById('visual-iframe');
     if (!outerIframe) return;
@@ -4805,6 +4804,15 @@ async function init() {
           dock(document.getElementById('copy-up-btn'),   y,             half);
           dock(document.getElementById('copy-down-btn'), y + half + 4,  half);
         }
+        return;
+      }
+
+      // Legacy modules (Kolam/Fractal), no dock-slots: on desktop, clear inline
+      // overrides and let the CSS default (right-side panel) win.
+      if (window.innerWidth > 1024) {
+        panel.classList.remove('under-canvas');
+        panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
+        panel.style.bottom = ''; panel.style.transform = '';
         return;
       }
 
