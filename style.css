@@ -771,8 +771,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-08-18:
-   GREEN (Extension panel: two stacked white-framed buttons — 'Jump to external
-   player' / 'Copy external url'; dropped the blue-grey). Next rotation = red. */
+   RED (ext-website buttons ~50% deeper — easier to press). Next
+   rotation = green. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -782,7 +782,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #ff4040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1085,7 +1085,7 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   font-size: 8px;
   font-weight: normal;
   line-height: 1.15;
-  padding: 3px 4px;
+  padding: 8px 4px;                       /* 2026-08-18 — ~50% deeper; easier to press */
 }
 
 /* 2026-08-17 — Kolam player (mobile): the module iframe is position:fixed

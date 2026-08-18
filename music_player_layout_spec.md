@@ -101,10 +101,41 @@ BD internals; BD needs only the two slot ids. Same for ABC and Fractal.
 | Player | Play / Stop / name | same |
 | Arrows slot, Ext slot | BD-docked | BD-docked |
 
-## 6. Open decisions
+## 6. Decisions (2026-08-18 — all resolved)
 
-- **D1** — Column width: match the panel width exactly (40%), or a fixed value?
-- **D2** — Play/Stop label colour on the light fills: dark (recommended) vs white.
-- **D3** — Desktop side-quarters: literally blank (page background) for now — OK?
-- **D4** — Build order: ABC to completion, then point Fractal at the shared
-  skeleton; or build the skeleton standalone first.
+- **D1** ✅ Column width **matches the panel width exactly** (40% desktop / 100%
+  mobile) — for neatness and simpler onward design.
+- **D2** ✅ Play/Stop labels **dark** on the light-green/light-red fills.
+- **D3** ✅ Desktop side-quarters **blank** (page background) for now.
+- **D4** ✅ **Finish ABC** on the new skeleton first, then point Fractal at it.
+- Grid pairing (Output bottom-right of the ⅔, Ext bottom-left, arrows slot =
+  full stepper-column width directly above the steppers) — ✅ confirmed.
+
+## 7. Implementation status (2026-08-18)
+
+**ABC mobile — DONE** (module `M_Music/music_module.html`; BD `viewer.js` /
+`style.css`; served at `/bd_M_ABC/` via inner `music_module.html`):
+- `.module-layout` is a CSS grid with the areas above; square dropped, piece
+  name is a plain `#piece-title` label under Play/Stop; status floats out of the
+  grid (errors only). Old `max-aspect-ratio` query replaced by `max-width:500px`
+  (the Player iframe is often wider than tall → the aspect query never matched).
+- Two empty dock-slots (`#bd-arrows-slot`, `#bd-ext-slot`). BD's
+  `positionExtendPanel` detects them (via the iframe chain) and **mirrors** the
+  ↓↑ arrows onto the arrows slot and the Extension panel onto the ext slot — the
+  mechanism that ends the pixel-chasing. Kolam/Fractal keep their per-module
+  fallbacks (Fractal still `#abc-pane`).
+- Styling: white-framed panels + stepper column; uniform white-frame/black-bg/
+  white-font buttons; Play/Stop 2× with light-green/light-red + dark label;
+  step-btn +50% (39×33). Extension panel = two stacked white-framed buttons
+  ("Jump to external player" / "Copy external url"), blue-grey dropped.
+- Bug fixed: entering Player straight from Nodes left the iframe top under the
+  History pane — `positionCyEl` now computes the iframe rect from the LIVE
+  Player pane layout when `#cy` is hidden (was reusing a stale Nodes rect), and
+  `setViewMode('player')` re-runs it after `player-active` is set.
+
+**ABC desktop — TODO** (next): constrain the iframe to the panel-width column +
+centre it (leaving the side quarters blank), and let the dock-slot mirroring run
+above 1024px (`positionExtendPanel` currently returns early on desktop).
+
+**Fractal — TODO after ABC desktop:** add the same grid + two dock-slots to
+`M_Fractal/music_module.html`; it inherits the BD side for free.
