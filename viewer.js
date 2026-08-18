@@ -1849,6 +1849,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function panYouCyToLatest() {
     if (youChipCount === 0) return;
+    youCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
     const containerWidth = document.getElementById('cy-you').offsetWidth;
     const rightEdge = youChipX - 7;
     const panX = Math.min(0, containerWidth - rightEdge - 12);
@@ -1917,6 +1918,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function panBuddyCyToLatest() {
     if (buddyChipCount === 0) return;
+    buddyCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
     const containerWidth = document.getElementById('cy-buddy').offsetWidth;
     const rightEdge = buddyChipX - 7;
     const panX = Math.min(0, containerWidth - rightEdge - 12);
