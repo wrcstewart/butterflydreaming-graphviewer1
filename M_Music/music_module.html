@@ -420,7 +420,10 @@
       // where the connection count shows first and this message follows.
       // The local #status is kept empty (:empty → display:none).
       statusEl.textContent = '';
-      postToParent({ type: 'BD_STATUS', text: msg || '', isErr: !!isErr });
+      // Only REAL errors reach BD's status pane; non-error chatter
+      // (Playing / Stopped / Baking…) sends empty text, which clears the
+      // extra slot and leaves just the connection count.
+      postToParent({ type: 'BD_STATUS', text: isErr ? (msg || '') : '', isErr: !!isErr });
     };
 
     function formatDisplay(spec, val) {
