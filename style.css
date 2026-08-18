@@ -308,8 +308,13 @@ html, body {
    or thinner, which never fits BD's layout well. Desktop 16:9/16:10
    monitors have aspect-ratio ≥ 1.6 so aren't caught. Phone landscape
    has aspect-ratio ~2:1 so is caught only by the max-height rule. */
-@media (orientation: landscape) and (max-height: 500px),
-       (orientation: landscape) and (max-aspect-ratio: 4/3) {
+/* v16 (2026-08-18): gate on (pointer: coarse) — a TOUCH primary input.
+   A desktop mouse reports (pointer: fine), so narrowing a desktop browser
+   window (which passes through landscape + aspect ≤ 4/3 en route to a
+   two-window layout) no longer wrongly triggers the rotate overlay.
+   Phones/tablets report (pointer: coarse) and still get it. */
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse),
+       (orientation: landscape) and (max-aspect-ratio: 4/3) and (pointer: coarse) {
   #rotate-to-portrait { display: flex; }
 }
 
@@ -785,7 +790,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c04040;             /* CANARY — red */
+  border: 2px solid #40c040;             /* CANARY — green */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
