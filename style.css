@@ -24,12 +24,11 @@ html, body {
 
 #cy-buddy {
   position: fixed;                       /* A51c — bottom slot (was upper); just above the media-bar */
-  /* 2026-08-18 — constrained to the 40%-wide centred column (was full
-     width) so the breadcrumb strips are a true replica of mobile and the
-     whole reader collapses into the centre when the browser is narrowed
-     for a side-by-side two-window setup. Mobile override → edge-flush. */
-  left: 30%;
-  right: 30%;
+  /* Full width by design — the strip fills the viewport at every width so
+     narrowing the browser leaves NO black side wings (the chips reflow via
+     buddyCy.resize() on the window-resize handler). */
+  left: 0;
+  right: 0;
   bottom: 37px;                          /* clears #media-bar (bottom: 2px, ~26px tall) */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
   background: #001f4d;
@@ -182,8 +181,8 @@ html, body {
 
 #cy-you {
   position: fixed;                       /* A51c — upper slot (was lower); closer to the node graph */
-  left: 30%;                             /* 2026-08-18 — see #cy-buddy: centred 40% column, mobile override → edge-flush */
-  right: 30%;
+  left: 0;                               /* full width — see #cy-buddy (no side wings; chips reflow via youCy.resize()) */
+  right: 0;
   bottom: 63px;                          /* clears #cy-buddy (bottom: 37px, 23px tall) + 3px gap */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
   /* 2026-07-28 — brightened from #5a5000 to #7f6d00 so the strip is
@@ -786,7 +785,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #c04040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1548,7 +1547,6 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 @media (max-width: 767px) {
   #user-count-panel { left: 8px; max-width: 58vw; }
-  #cy-you, #cy-buddy { left: 0; right: 0; }
 }
 
 #user-count-panel.active {
