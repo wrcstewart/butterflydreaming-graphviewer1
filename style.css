@@ -782,7 +782,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green */
+  border: 2px solid #c04040;             /* CANARY — red */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1532,11 +1532,18 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   font-family: sans-serif;
   padding: 3px 8px;
   white-space: nowrap;
+  /* 2026-08-18 — doubles as the general BD status pane. Connection count
+     shows first, then relayed module messages; the strip can overflow, so
+     it scrolls horizontally (swipe on touch) rather than pushing width. */
+  max-width: 42%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   z-index: 20;                          /* above media-bar just in case */
   display: none;
 }
 @media (max-width: 767px) {
-  #user-count-panel { left: 8px; }
+  #user-count-panel { left: 8px; max-width: 58vw; }
 }
 
 #user-count-panel.active {

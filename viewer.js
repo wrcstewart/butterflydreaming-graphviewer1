@@ -6098,6 +6098,29 @@ async function init() {
 
   const userCountPanel = document.getElementById('user-count-panel');
 
+  // 2026-08-18 — general BD status pane. The "N connected" label area is
+  // reused as a horizontally-scrollable status strip: the connection count
+  // always shows FIRST (most important), then the latest relayed message
+  // (module errors / progress). Modules post {type:'BD_STATUS', text} up
+  // through the iframe-chain wrapper — retiring the unreadable in-module
+  // corner text. Empty text clears the extra slot (connection stays).
+  let bdConnStatus  = '';
+  let bdExtraStatus = '';
+  const renderBdStatus = () => {
+    const parts = [];
+    if (bdConnStatus)  parts.push(bdConnStatus);
+    if (bdExtraStatus) parts.push(bdExtraStatus);
+    userCountPanel.textContent = parts.join('    ·    ');
+    userCountPanel.classList.toggle('active', parts.length > 0);
+  };
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (!d || d.type !== 'BD_STATUS') return;
+    bdExtraStatus = (typeof d.text === 'string') ? d.text.trim() : '';
+    renderBdStatus();
+    userCountPanel.scrollLeft = 0;   // keep the connection message in view
+  });
+
   // Attach the 'msg' dispatch BEFORE firing the initial requests. Under
   // ws-based transport this ordering was tolerable because the browser
   // buffered incoming messages during script parsing; under Socket.IO,
@@ -6107,8 +6130,8 @@ async function init() {
   ws.on('msg', msg => {
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'user_count') {
-      userCountPanel.textContent = `${msg.count} connected`;
-      userCountPanel.classList.add('active');
+      bdConnStatus = `${msg.count} connected`;
+      renderBdStatus();
       console.log('[pair-debug] user_count =', msg.count);
       return;
     }
