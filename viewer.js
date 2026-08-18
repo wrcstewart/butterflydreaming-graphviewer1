@@ -4694,10 +4694,14 @@ async function init() {
     // Player/desktop restores CSS defaults.
     const histReset = document.getElementById('chat-panel');
     if (histReset) histReset.style.height = '';
-    const cuReset = document.getElementById('copy-up-btn');
-    const cdReset = document.getElementById('copy-down-btn');
-    if (cuReset) cuReset.style.top = '';
-    if (cdReset) cdReset.style.top = '';
+    // Release any inline geometry we stamp onto BD chrome for module docking
+    // (↓↑ arrow position/size, ext-panel width) so leaving a module/Player
+    // restores the CSS defaults. Re-applied below when applicable.
+    ['copy-up-btn', 'copy-down-btn'].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; }
+    });
+    panel.style.width = '';
     // 2026-08-10 — on desktop (viewport > 1024px) the module doesn't
     // stack — .lh-actions occupies the LEFT column with the row of
     // Copy Grammar / Copy ABC / Bake / Save wav / Save midi buttons.
@@ -4743,6 +4747,44 @@ async function init() {
         innerOffsetLeft = innerRect.left;
         innerDoc        = inner.contentDocument;
       }
+      // 2026-08-18 — dock-slot mechanism (music_player_layout_spec §3). If the
+      // module reserves #bd-ext-slot / #bd-arrows-slot (ABC grid), mirror BD's
+      // Extension panel + ↓↑ arrows onto those slots and we're done. Kolam /
+      // Fractal keep the per-module fallbacks below.
+      const extSlot    = innerDoc && innerDoc.getElementById('bd-ext-slot');
+      const arrowsSlot = innerDoc && innerDoc.getElementById('bd-arrows-slot');
+      if (extSlot || arrowsSlot) {
+        if (extSlot) {
+          const r = extSlot.getBoundingClientRect();
+          panel.classList.add('under-canvas');
+          panel.style.top       = (outerRect.top  + innerOffsetTop  + r.top)  + 'px';
+          panel.style.left      = (outerRect.left + innerOffsetLeft + r.left) + 'px';
+          panel.style.width     = r.width + 'px';
+          panel.style.right     = 'auto';
+          panel.style.bottom    = 'auto';
+          panel.style.transform = 'none';
+        }
+        if (arrowsSlot) {
+          const r = arrowsSlot.getBoundingClientRect();
+          const x = outerRect.left + innerOffsetLeft + r.left;
+          const y = outerRect.top  + innerOffsetTop  + r.top;
+          const half = Math.max(20, Math.round((r.height - 4) / 2));
+          const dock = (btn, ty, h) => {
+            if (!btn) return;
+            btn.style.position = 'fixed';
+            btn.style.left     = x + 'px';
+            btn.style.top      = ty + 'px';
+            btn.style.width    = r.width + 'px';
+            btn.style.height   = h + 'px';
+            btn.style.right    = 'auto';
+            btn.style.zIndex   = '7';
+          };
+          dock(document.getElementById('copy-up-btn'),   y,             half);
+          dock(document.getElementById('copy-down-btn'), y + half + 4,  half);
+        }
+        return;
+      }
+
       const abcPane = (innerDoc && innerDoc.getElementById('abc-pane')) || outerDoc.getElementById('abc-pane');
 
       if (abcPane) {
