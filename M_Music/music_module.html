@@ -27,14 +27,88 @@
       flex-direction: column;
     }
 
+    /* 2026-08-18 — panel grid (music_player_layout_spec.md). Same on mobile +
+       desktop; BD sizes the iframe to the panel-width column. */
     .module-layout {
       flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
+      grid-template-rows: auto 1fr auto;
+      grid-template-areas:
+        "copy   copy    arrows"
+        "player player  steppers"
+        "ext    output  steppers";
+      gap: 5px;
+      padding: 5px;
+      min-height: 0;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    .copy-panel     { grid-area: copy; }
+    .player-panel   { grid-area: player; }
+    #bd-ext-slot    { grid-area: ext; }
+    .output-panel   { grid-area: output; }
+    #bd-arrows-slot { grid-area: arrows; }
+    #control-panel  { grid-area: steppers; }
+
+    /* white-framed panels (spec §4) */
+    .panel {
+      border: 1px solid #fff;
+      border-radius: 4px;
+      padding: 5px;
       display: flex;
-      flex-direction: row;
-      gap: 0;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-content: flex-start;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .player-panel { flex-direction: column; align-items: center; justify-content: center; }
+    .play-row { display: flex; gap: 8px; }
+
+    /* dock-slots — reserved for BD's ↓↑ arrows / Extension panel. Faint frame
+       so the reserved area is visible even before BD stamps into it. */
+    .dock-slot {
+      border: 1px dashed rgba(255,255,255,0.35);
+      border-radius: 4px;
       min-height: 0;
       min-width: 0;
     }
+
+    /* uniform buttons (spec §4): white frame, black bg, white font, one size */
+    .panel button {
+      border: 1px solid #fff;
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.66rem;
+      line-height: 1.1;
+      padding: 4px 6px;
+      border-radius: 3px;
+      min-width: 54px;
+      min-height: 26px;
+      cursor: pointer;
+      text-align: center;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .panel button:hover:not(:disabled)  { background: #1a1a1a; }
+    .panel button:disabled              { opacity: 0.4; cursor: not-allowed; }
+
+    /* Play/Stop exception: 2× size, light-green / light-red, dark label */
+    .big-btn {
+      min-width: 108px;
+      min-height: 52px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #10240f !important;
+    }
+    .big-btn.play { background: #9be29b !important; }
+    .big-btn.stop { background: #e59b9b !important; }
+    .big-btn:hover:not(:disabled) { filter: brightness(1.08); }
 
     /* LH column — 3 action buttons (Copy Script, Deep Link, Create mp3).
        Play/Stop moved out to the middle area 2026-08-05 v3 so BD's invite
@@ -89,53 +163,33 @@
       align-items: center;
     }
 
+    /* 2026-08-18 — status floats out of the grid (top-left); errors/loading
+       only, empty otherwise so it doesn't take layout space. */
     #status {
-      flex: 0 0 auto;
-      align-self: stretch;
-      font-size: 0.78rem;
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      font-size: 0.6rem;
       font-style: italic;
       color: #9e9e90;
-      letter-spacing: 0.03em;
-      text-align: center;
-      background: rgba(15, 15, 24, 0.55);
-      border: 1px solid rgba(74, 155, 142, 0.15);
-      border-radius: 3px;
-      padding: 4px 6px;
-      min-height: 22px;
+      pointer-events: none;
+      max-width: 60%;
     }
-    #status.err {
-      color: #f2a0a0;
-      border-color: rgba(200, 100, 100, 0.4);
-      background: rgba(60, 15, 15, 0.55);
-    }
+    #status:empty { display: none; }
+    #status.err { color: #f2a0a0; }
 
-    /* Piece title — square panel, centred title text inside. 2026-08-05 v4:
-       promoted from a one-line strip to a square area (user request; leaves
-       room for a future waveform / visualisation to live here without
-       relayout). v5: width-only + aspect-ratio derives height so max-width
-       clamping (narrow phones) keeps the square square rather than tall.
-       Height explicitly UNSET so aspect-ratio governs. */
+    /* 2026-08-18 — piece name label (was the square). Sits under Play/Stop in
+       the player panel; just the T: field text, no box. */
     #piece-title {
-      flex: 0 0 auto;
-      width: 220px;
-      height: auto;
-      aspect-ratio: 1 / 1;
-      max-width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(15, 15, 24, 0.55);
-      border: 1px solid rgba(74, 155, 142, 0.15);
-      border-radius: 6px;
-      padding: 12px;
       font-family: 'Georgia', 'Times New Roman', serif;
       font-style: italic;
-      font-size: 1rem;
+      font-size: 0.8rem;
       color: #e8e8e0;
       text-align: center;
+      max-width: 100%;
       overflow: hidden;
       word-wrap: break-word;
-      line-height: 1.3;
+      line-height: 1.2;
     }
 
     /* Play/Stop row — single line, side by side. Widths trimmed ~5% smaller
@@ -165,62 +219,19 @@
     .playback-row button:active:not(:disabled) { background: #243f3b; }
     .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
 
-    /* Right control panel — 8 steppers per media-module convention. */
+    /* 2026-08-18 — stepper column: right-⅓ grid cell, white-framed, scrollable.
+       grid-area:steppers set above; fills the cell height and scrolls. */
     .control-panel {
-      flex: 0 0 200px;
       display: flex;
       flex-direction: column;
       align-items: stretch;
       gap: 3px;
-      background: rgba(15, 15, 24, 0.75);
-      border: 1px solid rgba(74, 155, 142, 0.2);
-      padding: 6px 8px;
-      border-radius: 0.4rem;
+      border: 1px solid #fff;
+      padding: 5px;
+      border-radius: 4px;
       overflow-y: auto;
       min-height: 0;
-      align-self: flex-start;                  /* don't stretch to full column height */
-      max-height: 100%;
-    }
-
-    /* Portrait / narrow — 2026-08-17 Kolam-like ROW (was a vertical stack):
-       lh-actions (left edge) | main-area (square, shifted left to clear the ↓↑
-       arrows) | scrollable stepper COLUMN (right). Prep for moving the ↓↑
-       arrows beside the stepper column. Desktop unchanged. */
-    @media (max-width: 500px) {
-      /* 2026-08-17 — was max-aspect-ratio:1/1, but in Player mode the module
-         iframe is often slightly WIDER than tall (the panes above eat height),
-         so that portrait query never matched and none of these mobile rules
-         applied. Width-based (like Kolam) matches reliably on phones (~390px). */
-      .module-layout { flex-direction: row; }
-      /* lh-actions: keep the left-edge column (Copy Script / Bake). */
-      .lh-actions {
-        flex: 0 0 auto;
-        flex-direction: column;
-        padding: 5px 4px;
-        align-self: flex-start;
-      }
-      /* (1) stepper column: vertical + scrollable, width unchanged (200).
-         align-self: stretch so it fills the row height and actually scrolls. */
-      .control-panel {
-        flex: 0 0 200px;
-        flex-direction: column;
-        flex-wrap: nowrap;
-        overflow-y: auto;
-        align-self: stretch;
-        min-height: 0;
-      }
-      .control-row { flex: 0 0 auto; width: 100%; min-width: 0; max-width: none; }
-      /* (2) central square + play/stop 50% smaller. */
-      #piece-title { width: 70px; font-size: 0.7rem; padding: 5px; }
-      .playback-row button { min-width: 30px; padding: 3px 7px; font-size: 0.7rem; }
-      /* Drop the square + play/stop to the BOTTOM (so the ext bar under them
-         lands just above the breadcrumbs) and shift ~70px left to clear the ↓↑
-         arrows on the right. padding-bottom reserves room for the ext bar. */
-      .main-area {
-        justify-content: flex-end;
-        padding-bottom: 54px;
-        transform: translateX(-70px);
-      }
+      min-width: 0;
     }
 
     .control-row {
@@ -292,31 +303,51 @@
 </head>
 <body>
 
+  <!-- 2026-08-18 — panel grid (music_player_layout_spec.md). Left ⅔: copy
+       (top) / player (centre) / [ext-slot | output] (bottom). Right ⅓: BD
+       arrows-slot (top) over the scrollable stepper column. #bd-arrows-slot and
+       #bd-ext-slot are empty dock-slots BD stamps its ↓↑ arrows / Extension
+       panel onto. Same layout desktop + mobile (BD sizes the iframe to the
+       panel-width column). -->
   <div class="module-layout">
 
-    <!-- LH — sharing/baking buttons. Deep Link retired v15 (duplicated BD's
-         action-bar Copy Link exactly — same URL, same handler); Create mp3
-         moved up into the vacated slot. Remaining space reserved for
-         future fractal-generator controls. -->
-    <aside class="lh-actions">
-      <button id="copy-script-btn"  type="button" title="Copy the current ABC script (with %%bd_ directives) to the clipboard">Copy<br>Script</button>
-      <button id="bake-mp3-btn"     type="button" title="Render offline to WAV and add to the bottom-bar media player">Bake</button>
-    </aside>
+    <!-- top-left: Copy panel -->
+    <div class="panel copy-panel">
+      <button id="copy-script-btn" type="button" title="Copy the current ABC script (with %%bd_ directives) to the clipboard">Copy Script</button>
+      <button id="copy-abc-btn"    type="button" title="Copy the plain .abc score (placeholder)" disabled>Copy .abc</button>
+      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
+    </div>
 
-    <!-- Middle — status strip, piece title, Play/Stop row underneath -->
-    <section class="main-area">
-      <div id="status">Loading samples…</div>
-      <div id="piece-title" title="Piece title (T: field of the ABC score)"></div>
-      <div class="playback-row">
-        <button id="play-pause-btn" type="button" disabled>Play</button>
-        <button id="stop-btn"       type="button" disabled>Stop</button>
+    <!-- centre: player main controls -->
+    <div class="panel player-panel">
+      <div class="play-row">
+        <button id="play-pause-btn" class="big-btn play" type="button" disabled>Play</button>
+        <button id="stop-btn"       class="big-btn stop" type="button" disabled>Stop</button>
       </div>
-    </section>
+      <div id="piece-title" title="Piece title (T: field of the ABC score)"></div>
+    </div>
 
-    <!-- Right — 8 steppers -->
+    <!-- bottom-left: BD Extension panel docks here -->
+    <div id="bd-ext-slot" class="dock-slot"></div>
+
+    <!-- bottom (right of the ⅔): Output panel -->
+    <div class="panel output-panel">
+      <button id="bake-mp3-btn" type="button" title="Render offline to WAV and add to the bottom-bar media player">Bake</button>
+      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
+      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
+      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
+    </div>
+
+    <!-- right ⅓ top: BD ↓↑ arrows dock here -->
+    <div id="bd-arrows-slot" class="dock-slot"></div>
+
+    <!-- right ⅓: scrollable stepper column -->
     <aside id="control-panel" class="control-panel"><!-- injected --></aside>
 
   </div>
+
+  <!-- errors / loading only; floats out of the grid (top-left) -->
+  <div id="status"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js"></script>
