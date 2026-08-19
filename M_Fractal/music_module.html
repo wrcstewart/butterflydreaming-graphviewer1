@@ -31,7 +31,10 @@
     .module-layout {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
+      /* 2026-08-19 — bottom row rebalanced: ext (col 1, where BD's external-
+         website buttons dock) −10%, output (col 2) +10%. The copy and player
+         areas span cols 1-2 so their combined width is unchanged. */
+      grid-template-columns: 0.9fr 1.1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
       grid-template-rows: auto 1fr auto;
       grid-template-areas:
         "copy   copy    arrows"
@@ -81,7 +84,7 @@
       background: #000;
       color: #fff;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.66rem;
+      font-size: 0.76rem;                    /* 2026-08-19 — +15%, the 0.66rem was hard to read */
       line-height: 1.1;
       padding: 4px 6px;
       border-radius: 3px;
@@ -94,6 +97,8 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    /* output panel buttons ~10% wider than the standard 54px */
+    .output-panel button { min-width: 59px; }
     .panel button:hover:not(:disabled)  { background: #1a1a1a; }
     .panel button:disabled              { opacity: 0.4; cursor: not-allowed; }
     .panel button.flash                 { background: #243f3b; color: #a0e0d0; }
@@ -235,8 +240,8 @@
 
     <!-- top-left: Copy panel -->
     <div class="panel copy-panel">
-      <button id="copy-grammar-btn" type="button" title="Copy the current L-system script (grammar + params) to the clipboard">Copy Grammar</button>
-      <button id="copy-abc-btn" type="button" title="Copy a fully-formed bd_M_ABC script (with the derived ABC score wrapped in %%bd_score) — paste into any bd_M_ABC node to play collaboratively">Copy for ABC Player</button>
+      <button id="copy-script-btn" type="button" title="Copy the current script (grammar + all stepper values) to the clipboard">Copy Script</button>
+      <button id="copy-abc-btn" type="button" title="Copy a fully-formed bd_M_ABC script (with the derived ABC score wrapped in %%bd_score) — paste into any bd_M_ABC node to play collaboratively">Copy abc</button>
     </div>
 
     <!-- centre: player main controls -->
@@ -288,7 +293,7 @@
     const pieceTitleEl    = document.getElementById('piece-title');
     const playPauseBtn    = document.getElementById('play-pause-btn');
     const stopBtn         = document.getElementById('stop-btn');
-    const copyGrammarBtn  = document.getElementById('copy-grammar-btn');
+    const copyScriptBtn   = document.getElementById('copy-script-btn');
     const copyAbcBtn      = document.getElementById('copy-abc-btn');
     const bakeMp3Btn      = document.getElementById('bake-mp3-btn');
     const downloadBtn     = document.getElementById('download-mp3-btn');
@@ -407,9 +412,19 @@
       postToParent({ type: 'BD_STATUS', text: isErr ? (msg || '') : '', isErr: !!isErr });
     };
 
+    // Display-only aliases for enum stepper values: the canonical name is what
+    // goes in the script, a shorter label is what fits the narrow stepper cell.
+    // getStepperValue reads the cell back, so it inverts this map.
+    const ENUM_DISPLAY = { min_pentatonic: 'pent' };
+    const ENUM_DISPLAY_INV = Object.fromEntries(
+      Object.entries(ENUM_DISPLAY).map(([canon, shown]) => [shown, canon]));
+
     function formatDisplay(spec, val) {
       if (spec.isToggle) return val >= 0.5 ? 'on' : 'off';
-      if (spec.isEnum)   return spec.values[Math.round(val)] || spec.values[0];
+      if (spec.isEnum) {
+        const v = spec.values[Math.round(val)] || spec.values[0];
+        return ENUM_DISPLAY[v] || v;
+      }
       if (spec.step >= 1) return String(Math.round(val));
       if (val < 1)  return val.toFixed(2);
       if (val < 10) return val.toFixed(1);
@@ -422,7 +437,7 @@
       if (!span) return s.fallback;
       const txt = span.textContent.trim();
       if (s.isToggle) return txt === 'on' ? 1 : 0;
-      if (s.isEnum) return s.values.indexOf(txt);
+      if (s.isEnum) return s.values.indexOf(ENUM_DISPLAY_INV[txt] || txt);
       const v = parseFloat(txt);
       return Number.isFinite(v) ? v : s.fallback;
     }
@@ -1164,7 +1179,7 @@
       playPauseBtn.disabled = !ready;
       stopBtn.disabled      = !ready;
       playPauseBtn.textContent = (playerState === 'playing') ? 'Pause' : 'Play';
-      copyGrammarBtn.disabled = !storedText;
+      copyScriptBtn.disabled = !storedText;
       copyAbcBtn.disabled     = !derivedAbc;
       bakeMp3Btn.disabled     = !ready || baking;
       downloadBtn.disabled    = !lastBakedBlob;
@@ -1255,11 +1270,11 @@
       }
     }
 
-    // Copy Grammar — the full grammar script (with current stepper values
+    // Copy Script — the full script (grammar + current stepper values),
     // baked in so downstream regenerates the same ABC).
-    copyGrammarBtn.addEventListener('click', async () => {
+    copyScriptBtn.addEventListener('click', async () => {
       const grammarText = currentGrammarScript();
-      if (await copyText(grammarText)) flashBtn(copyGrammarBtn, 'Copied<br>✓');
+      if (await copyText(grammarText)) flashBtn(copyScriptBtn, 'Copied<br>✓');
       else setStatus('Copy failed', true);
     });
 

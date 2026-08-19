@@ -32,7 +32,10 @@
     .module-layout {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
+      /* 2026-08-19 — bottom row rebalanced (mirrors M_Fractal): ext (col 1,
+         where BD's external-website buttons dock) −10%, output (col 2) +10%.
+         copy/player span cols 1-2 so their combined width is unchanged. */
+      grid-template-columns: 0.9fr 1.1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
       grid-template-rows: auto 1fr auto;
       grid-template-areas:
         "copy   copy    arrows"
@@ -82,7 +85,7 @@
       background: #000;
       color: #fff;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.66rem;
+      font-size: 0.76rem;                    /* 2026-08-19 — +15%, the 0.66rem was hard to read */
       line-height: 1.1;
       padding: 4px 6px;
       border-radius: 3px;
@@ -95,6 +98,8 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    /* output panel buttons ~10% wider than the standard 54px */
+    .output-panel button { min-width: 59px; }
     .panel button:hover:not(:disabled)  { background: #1a1a1a; }
     .panel button:disabled              { opacity: 0.4; cursor: not-allowed; }
 
