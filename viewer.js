@@ -4725,6 +4725,11 @@ async function init() {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
       document.body.classList.remove('player-active');
+      // 2026-08-19 — leaving Player never calls positionExtendPanel, so release
+      // the Kolam pane growth here or the History pane keeps its grown height.
+      document.body.classList.remove('kolam-player');
+      const histLeave = document.getElementById('chat-panel');
+      if (histLeave) histLeave.style.height = '';
       const wasEdit = document.body.classList.contains('edit-active');
       document.body.classList.toggle('edit-active', mode === 'edit');
       // 2026-08-15 — first entry into Edit mode kicks off Whisper model
@@ -4801,6 +4806,7 @@ async function init() {
     // Player/desktop restores CSS defaults.
     const histReset = document.getElementById('chat-panel');
     if (histReset) histReset.style.height = '';
+    document.body.classList.remove('kolam-player');   // re-added by the Kolam branch
     // Release any inline geometry we stamp onto BD chrome for module docking
     // (↓↑ arrow position/size, ext-panel width) so leaving a module/Player
     // restores the CSS defaults. Re-applied below when applicable.
@@ -4935,9 +4941,15 @@ async function init() {
             // Grow the History pane (#chat-panel) DOWN so its bottom sits just
             // above the canvas top. The module iframe is frozen + z-index 1 in
             // Player mode, so CSS layers #chat-panel above it and here we anchor
-            // its height to the live canvas top. Mobile only.
+            // its height to the live canvas top.
+            // 2026-08-19 — no longer phone-only. Kolam's canvas is bottom-
+            // aligned inside its iframe, so on desktop the tall iframe left a
+            // big empty band between the script panels and the graphic. This is
+            // what fills it, exactly as it already did on iOS. body.kolam-player
+            // gates the CSS that lifts the pane above the iframe.
+            document.body.classList.add('kolam-player');
             const histPane = document.getElementById('chat-panel');
-            if (histPane && histPane.classList.contains('active') && onPhone) {
+            if (histPane && histPane.classList.contains('active')) {
               const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
               if (h > 0) histPane.style.height = h + 'px';
             }
