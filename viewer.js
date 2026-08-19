@@ -4494,28 +4494,9 @@ async function init() {
     // rather than relying on CSS to derive them.
     const iframeEl = document.getElementById('visual-iframe');
     const GRID_MODULES = ['/bd_M_ABC/', '/bd_M_Fractal/'];   // modules on the panel-grid layout
-    const iframeSrc    = (iframeEl && iframeEl.src) || '';
-    const isGridModule = !!(iframeEl && GRID_MODULES.some(u => iframeSrc.indexOf(u) !== -1));
-    // 2026-08-19 v2 — VIRTUAL PHONE WINDOW for Kolam.
-    //
-    // Kolam has two internal layouts on an iframe-width breakpoint, while BD's
-    // chrome keyed off the WINDOW width. Every desktop size produced a slightly
-    // different — and mostly worse — arrangement, and resizing walked through
-    // all of them. The phone layout is the one that is actually right, so
-    // instead of making the desktop responsive we give the module a fixed
-    // phone-width viewport and centre it: one layout, at every window size.
-    //
-    // Width is pinned to KOLAM_VIRTUAL_W (below Kolam's own 500px breakpoint,
-    // so the module renders exactly as it does on a phone) and centred in the
-    // panel column. Height is left as the column height — that is what iOS
-    // gives it too. Mobile is untouched: there the column IS the screen and the
-    // min() below is already the real width.
-    const KOLAM_VIRTUAL_W = 390;    // iPhone-standard CSS width
-    // Real phones keep the legacy path untouched: there the window already IS
-    // the virtual window, and the layout it produces is the one we are copying.
-    const isKolamVirtual = !!(iframeEl && window.innerWidth > 767 &&
-                              iframeSrc.indexOf('/bd_V_Kolam/') !== -1);
-    if (isGridModule || isKolamVirtual) {
+    const isGridModule = !!(iframeEl && iframeEl.src &&
+                            GRID_MODULES.some(u => iframeEl.src.indexOf(u) !== -1));
+    if (isGridModule) {
       // 2026-08-18 — music-player grid module (music_player_layout_spec): the
       // iframe = the panel-width COLUMN. Match the bottom panel's left/width
       // (40% centred on desktop, 100% mobile), start 5px below it, fill down to
@@ -4523,17 +4504,9 @@ async function init() {
       // further grid module to GRID_MODULES above.
       const rr = refEl.getBoundingClientRect();
       const top = Math.ceil(rr.bottom) + 5;
-      // Kolam: clamp to the virtual phone width and centre it in the column.
-      // On a phone rr.width is already ≤ 390, so this is a no-op there.
-      let w    = Math.round(rr.width);
-      let left = Math.round(rr.left);
-      if (isKolamVirtual) {
-        w    = Math.min(w, KOLAM_VIRTUAL_W);
-        left = Math.round(rr.left + (rr.width - w) / 2);
-      }
       iframeEl.style.top    = top + 'px';
-      iframeEl.style.left   = left + 'px';
-      iframeEl.style.width  = w + 'px';
+      iframeEl.style.left   = Math.round(rr.left)  + 'px';
+      iframeEl.style.width  = Math.round(rr.width) + 'px';
       iframeEl.style.height = Math.max(0, window.innerHeight - 90 - top) + 'px';
     } else if (iframeEl) {
       const cyRect = cyEl.getBoundingClientRect();
@@ -4725,11 +4698,6 @@ async function init() {
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
       document.body.classList.remove('player-active');
-      // 2026-08-19 — leaving Player never calls positionExtendPanel, so release
-      // the Kolam pane growth here or the History pane keeps its grown height.
-      document.body.classList.remove('kolam-player');
-      const histLeave = document.getElementById('chat-panel');
-      if (histLeave) histLeave.style.height = '';
       const wasEdit = document.body.classList.contains('edit-active');
       document.body.classList.toggle('edit-active', mode === 'edit');
       // 2026-08-15 — first entry into Edit mode kicks off Whisper model
@@ -4783,20 +4751,6 @@ async function init() {
   // align with abc-pane's top-left corner (offset a few px so the
   // panel sits *beside* it, not on top). Falls back to CSS defaults
   // when the loaded module has no #abc-pane (e.g. V_Kolam).
-  // 2026-08-19 — the ↓↑ arrows get inline geometry from three places (the
-  // dock-slot branch, Kolam mobile, Kolam desktop). Anything that stops docking
-  // them must hand them back to CSS, or they stay pinned where the last module
-  // left them after a switch or a resize across the breakpoint.
-  function clearArrowDock() {
-    ['copy-up-btn', 'copy-down-btn'].forEach(id => {
-      const b = document.getElementById(id);
-      if (!b) return;
-      b.style.position = ''; b.style.left = ''; b.style.top = '';
-      b.style.right = ''; b.style.width = ''; b.style.height = '';
-      b.style.zIndex = '';
-    });
-  }
-
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
@@ -4806,7 +4760,6 @@ async function init() {
     // Player/desktop restores CSS defaults.
     const histReset = document.getElementById('chat-panel');
     if (histReset) histReset.style.height = '';
-    document.body.classList.remove('kolam-player');   // re-added by the Kolam branch
     // Release any inline geometry we stamp onto BD chrome for module docking
     // (↓↑ arrow position/size, ext-panel width) so leaving a module/Player
     // restores the CSS defaults. Re-applied below when applicable.
@@ -4891,15 +4844,9 @@ async function init() {
         return;
       }
 
-      // Legacy modules with no dock-slots: on desktop, clear inline overrides
-      // and let the CSS default (right-side panel) win.
-      // 2026-08-19 — EXCEPT Kolam, which now gets the centred column on desktop
-      // too (see positionCyEl). Returning here is what made its Extension panel
-      // "revert to the old vertical styling at the right screen edge" as soon as
-      // the window got wide; it needs the under-canvas strip at every width.
-      const kolamHere = innerDoc && innerDoc.getElementById('kolam-canvas');
-      if (window.innerWidth > 1024 && !kolamHere) {
-        clearArrowDock();
+      // Legacy modules (Kolam/Fractal), no dock-slots: on desktop, clear inline
+      // overrides and let the CSS default (right-side panel) win.
+      if (window.innerWidth > 1024) {
         panel.classList.remove('under-canvas', 'in-slot');
         panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
         panel.style.bottom = ''; panel.style.transform = '';
@@ -4941,72 +4888,19 @@ async function init() {
             // Grow the History pane (#chat-panel) DOWN so its bottom sits just
             // above the canvas top. The module iframe is frozen + z-index 1 in
             // Player mode, so CSS layers #chat-panel above it and here we anchor
-            // its height to the live canvas top.
-            // 2026-08-19 — no longer phone-only. Kolam's canvas is bottom-
-            // aligned inside its iframe, so on desktop the tall iframe left a
-            // big empty band between the script panels and the graphic. This is
-            // what fills it, exactly as it already did on iOS. body.kolam-player
-            // gates the CSS that lifts the pane above the iframe.
-            document.body.classList.add('kolam-player');
+            // its height to the live canvas top. Mobile only.
             const histPane = document.getElementById('chat-panel');
-            if (histPane && histPane.classList.contains('active')) {
+            if (histPane && histPane.classList.contains('active') && onPhone) {
               const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
               if (h > 0) histPane.style.height = h + 'px';
             }
-            // ↓↑ arrows stacked just left of the stepper column, TOP arrow
-            // aligned with the canvas top (= top stepper).
-            const cUp   = document.getElementById('copy-up-btn');
-            const cDown = document.getElementById('copy-down-btn');
+            // ↓↑ arrows stacked just left of the stepper column (CSS `right`),
+            // TOP arrow aligned with the canvas top (= top stepper).
             if (onPhone) {
-              // Mobile: CSS pins `right`; we only set the vertical. Clear any
-              // left/position left behind by the desktop branch after a resize,
-              // or it fights the CSS `right: 116px`.
-              [cUp, cDown].forEach(b => {
-                if (!b) return;
-                b.style.position = ''; b.style.left = ''; b.style.right = '';
-                b.style.zIndex = '';
-              });
+              const cUp = document.getElementById('copy-up-btn');
+              const cDown = document.getElementById('copy-down-btn');
               if (cUp)   cUp.style.top   = Math.round(canvasTopVp) + 'px';
               if (cDown) cDown.style.top = Math.round(canvasTopVp + 26) + 'px';
-            } else if (cUp && cDown) {
-              // 2026-08-19 desktop: sit them in the band the module reserves
-              // between the canvas and the stepper column. Read the column's
-              // LIVE rect rather than assuming a width — Kolam has two internal
-              // layouts and the column is 220px in one, 108px in the other.
-              const cp = innerDoc.querySelector('.control-panel');
-              if (cp) {
-                const cpRect = cp.getBoundingClientRect();
-                // Reset first, THEN measure: arriving here straight from a
-                // music module leaves the dock-slot branch's inline width on
-                // the button, and measuring that would report the slot's width
-                // rather than the button's own.
-                clearArrowDock();
-                // Measure the button instead of assuming ~34px, and place its
-                // RIGHT edge 6px clear of the column, so the gap it needs is
-                // whatever it actually occupies.
-                const bw  = Math.ceil(cUp.getBoundingClientRect().width) || 30;
-                const gap = cpRect.left - cRect.right;   // canvas → column, module coords
-                if (gap >= bw + 8) {
-                  const x = Math.round(outerRect.left + innerOffsetLeft +
-                                       cpRect.left - bw - 6);
-                  [cUp, cDown].forEach((b, i) => {
-                    b.style.position = 'fixed';
-                    b.style.left     = x + 'px';
-                    b.style.right    = 'auto';
-                    b.style.top      = Math.round(canvasTopVp + i * 28) + 'px';
-                    b.style.zIndex   = '7';
-                  });
-                } else {
-                  // Narrow the window far enough and the module flips to its
-                  // own small-iframe layout, which drops the reserved band —
-                  // the arrows were landing on the right-hand steppers. There
-                  // is nowhere to dock them, so hand them back to CSS (the
-                  // action bar) rather than overlap the column. Keying on the
-                  // measured gap means this self-corrects at every width,
-                  // whichever internal layout the module has chosen.
-                  // (Already reset above — nothing further to undo.)
-                }
-              }
             }
           }
         }
@@ -5017,7 +4911,6 @@ async function init() {
 
     if (topPx === null) {
       // Clear inline overrides so the CSS media-query defaults win.
-      clearArrowDock();
       panel.classList.remove('under-canvas', 'in-slot');
       panel.style.top = '';
       panel.style.left = '';

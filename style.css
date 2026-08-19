@@ -790,7 +790,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #d02020;             /* CANARY — red (revert build; was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1141,18 +1141,6 @@ body.player-active #bd-invite-panel-viewer { display: block; }
     z-index: 2;
     overflow-y: auto;
   }
-}
-/* 2026-08-19 — the same lift on DESKTOP, but only while a Kolam player is
-   showing (body.kolam-player, set by positionExtendPanel). Kolam's canvas is
-   bottom-aligned in its iframe, so a tall iframe leaves dead space between the
-   script panels and the graphic; on phones that space is already filled by
-   growing this pane down to the canvas top, and this lets the same thing
-   happen at desktop widths. Scoped to .kolam-player so the music players,
-   which do not grow the pane, keep their own layout untouched. */
-body.kolam-player.player-active #chat-panel {
-  position: relative;
-  z-index: 2;
-  overflow-y: auto;
 }
 
 /* 2026-08-09 — Extend label now permanent blue to match the
