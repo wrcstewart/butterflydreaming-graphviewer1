@@ -4926,12 +4926,14 @@ async function init() {
             // iframe is above 500 so the column is 220px, and the arrows landed
             // on the steppers. Measuring can't disagree with the module.
             //
-            // Side: below 768 there is no reserved band, so they go to the LEFT
-            // of the column (the iOS placement). At 768+ positionCyEl reserves
-            // 100px to the right of the iframe, so they go to the RIGHT of the
-            // column — the same side the >1024 dock uses, which is what made
-            // the 768–1024 band the odd one out (it positioned them not at all,
-            // leaving them in the action bar).
+            // Side: prefer the band the module leaves BETWEEN the canvas and
+            // the stepper column (the iOS placement) — but only when it is
+            // really there. 2026-08-19: keying that on window width was wrong.
+            // The band comes from the MODULE's layout, so at a ~700px window,
+            // where the module is in its landscape layout, the arrows were
+            // being put to the left of the column and landing on the graphic.
+            // Measure the gap instead; if it can't hold them, use the 100px
+            // band positionCyEl reserves to the RIGHT of the iframe (768+).
             const cUp   = document.getElementById('copy-up-btn');
             const cDown = document.getElementById('copy-down-btn');
             const cpEl  = innerDoc && innerDoc.querySelector('.control-panel');
@@ -4940,8 +4942,10 @@ async function init() {
               const bw = Math.ceil(cUp.getBoundingClientRect().width) || 30;
               const colLeftVp  = outerRect.left + innerOffsetLeft + cpRect.left;
               const colRightVp = outerRect.left + innerOffsetLeft + cpRect.right;
-              const x = onPhone ? Math.round(colLeftVp - bw - 6)
-                                : Math.round(colRightVp + 4);
+              const innerGap   = cpRect.left - cRect.right;   // canvas → column
+              const fitsInside = innerGap >= bw + 8;
+              const x = fitsInside ? Math.round(colLeftVp - bw - 6)
+                                   : Math.round(colRightVp + 4);
               [[cUp, 0], [cDown, 26]].forEach(([b, dy]) => {
                 b.style.position = 'fixed';
                 b.style.left     = x + 'px';

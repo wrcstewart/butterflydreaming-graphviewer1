@@ -100,6 +100,11 @@
          the portrait media query below. */
       justify-content: flex-end;
       align-items: center;
+      /* 2026-08-19 — 44px band between canvas and stepper column, the home for
+         BD's ↓↑ arrows. The small layout gets the same band for free from the
+         canvas's translateX; without this the canvas is flush against the
+         column in landscape and the arrows land on the graphic. */
+      padding-right: 44px;
     }
 
     /* Small iframe (mobile) — 2026-08-05 v13. Kolam-specific gutter for BD's
@@ -117,7 +122,9 @@
          the Extension bar just beneath it — so the bar lands just above the
          breadcrumbs and the canvas sits just above the bar. */
       .module-layout { padding-left: 88px; }
-      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px; }
+      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px;
+                        padding-right: 0; }   /* small layout makes its own band
+                                                 via the canvas translateX */
       /* 2026-08-17 — shift canvas 15% + 20px left to free room between it and
          the stepper column for BD's ↓↑ arrows. The Extension bar follows (BD
          centres it on the live canvas rect). */
@@ -141,12 +148,20 @@
        Portrait media query above overrides to a bottom band.
        The <canvas> keeps itself square via its own aspect-ratio + max-*. */
     .control-panel {
-      flex: 0 0 220px;
+      /* 2026-08-19 — 220 → 130. A control-row is 94px; with the panel's
+         padding, border and a scrollbar it needs ~122. The 220 was defensive
+         (stop the canvas squeezing the panel to zero in the preview harness)
+         and left ~90px dead, which is what made the column look twice the
+         width it needs. */
+      flex: 0 0 130px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;             /* controls hug the left edge, − on the left */
       gap: 2px;                            /* 2026-07-12 -50% from 4 px for MM3 density */
-      background: rgba(15, 15, 24, 0.75);
+      /* 2026-08-19 — amber at EVERY width, not just the small layout, so the
+         stepper block reads as its own thing and the arrows' relationship to
+         it is visible at a glance. */
+      background: rgba(75, 54, 0, 0.9);
       border: 1px solid rgba(74, 155, 142, 0.2);
       padding: 6px 8px;
       border-radius: 0.4rem;
