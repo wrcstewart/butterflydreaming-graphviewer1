@@ -314,7 +314,7 @@
     <!-- top-left: Copy panel (expand later if needed, shrinking the Play/Stop panel) -->
     <div class="panel copy-panel">
       <button id="copy-script-btn" type="button" title="Copy the current ABC script (with %%bd_ directives) to the clipboard">Copy Script</button>
-      <button id="copy-abc-btn"    type="button" title="Copy the plain .abc score (placeholder)" disabled>Copy .abc</button>
+      <button id="copy-abc-btn"    type="button" title="Copy just the .abc score — no %%bd_ directives — ready to paste into any ABC editor" disabled>Copy .abc</button>
     </div>
 
     <!-- centre: player main controls -->
@@ -332,8 +332,8 @@
     <!-- bottom (right of the ⅔): Output panel -->
     <div class="panel output-panel">
       <button id="bake-mp3-btn" type="button" title="Render offline to WAV and add to the bottom-bar media player">Bake</button>
-      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
-      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
+      <button id="download-mp3-btn" type="button" title="Save the most recent bake as a .wav file" disabled>Save wav</button>
+      <button id="save-midi-btn" type="button" title="Save the current ABC score as a .mid file (MIDI, editable in any DAW)" disabled>Save midi</button>
       <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
     </div>
 
@@ -370,6 +370,9 @@
     const stopBtn        = document.getElementById('stop-btn');
     const copyScriptBtn  = document.getElementById('copy-script-btn');
     const bakeMp3Btn     = document.getElementById('bake-mp3-btn');
+    const copyAbcBtn     = document.getElementById('copy-abc-btn');
+    const downloadBtn    = document.getElementById('download-mp3-btn');   // Save wav
+    const saveMidiBtn    = document.getElementById('save-midi-btn');      // Save midi
     const pieceTitleEl   = document.getElementById('piece-title');
     const controlPanel   = document.getElementById('control-panel');
 
@@ -381,6 +384,8 @@
     let noteEvents    = [];
     let endTimeSecs   = 0;
     let storedText    = '';
+    let lastBakedBlob  = null;   // most recent bake, for Save wav
+    let lastBakedLabel = '';     // label of that bake (→ filename)
     let loopEnabled   = true;
     let loopGapSecs   = 6;
     let loopTimer     = null;
@@ -702,6 +707,9 @@
       stopBtn.disabled         = !ready;
       playPauseBtn.textContent = (playerState === 'playing') ? 'Pause' : 'Play';
       copyScriptBtn.disabled   = !storedText;
+      copyAbcBtn.disabled      = !storedText;
+      downloadBtn.disabled     = !lastBakedBlob;                  // Save wav
+      saveMidiBtn.disabled     = !storedText;                     // Save midi (from score)
       bakeMp3Btn.disabled      = !ready || baking;
     }
     playPauseBtn.addEventListener('click', async () => {
@@ -733,21 +741,43 @@
       setTimeout(() => { btn.classList.remove('flash'); btn.innerHTML = orig; }, 1200);
     }
 
-    copyScriptBtn.addEventListener('click', async () => {
-      const text = currentScriptWithParams();
+    // Shared by Copy Script and Copy .abc: async clipboard first, hidden
+    // <textarea> + execCommand as the fallback (Safari/iOS refuse the async
+    // API outside a trusted gesture in some contexts). Flashes the button on
+    // success, reports on the status line on failure.
+    async function copyViaClipboard(text, btn) {
+      if (!text) { setStatus('Nothing to copy', true); return; }
       try {
         await navigator.clipboard.writeText(text);
-        flashBtn(copyScriptBtn, 'Copied<br>✓');
-      } catch (_) {
-        const ta = document.createElement('textarea');
-        ta.value = text; ta.setAttribute('readonly', '');
-        Object.assign(ta.style, { position:'fixed', left:'-9999px', opacity:'0' });
-        document.body.appendChild(ta);
-        ta.focus(); ta.select();
-        try { document.execCommand('copy'); flashBtn(copyScriptBtn, 'Copied<br>✓'); }
-        catch (_) { setStatus('Copy failed', true); }
-        document.body.removeChild(ta);
-      }
+        flashBtn(btn, 'Copied<br>✓');
+        return;
+      } catch (_) { /* fall through to the legacy path */ }
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      Object.assign(ta.style, { position:'fixed', left:'-9999px', opacity:'0' });
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try { document.execCommand('copy'); flashBtn(btn, 'Copied<br>✓'); }
+      catch (_) { setStatus('Copy failed', true); }
+      document.body.removeChild(ta);
+    }
+
+    copyScriptBtn.addEventListener('click', () => {
+      copyViaClipboard(currentScriptWithParams(), copyScriptBtn);
+    });
+
+    // Copy .abc — the plain score only: strip the %%bd_score wrapper and every
+    // %%bd_ directive line, so what lands on the clipboard is valid ABC that
+    // any external editor (abcjs, EasyABC, abcnotation.com) will open. Same
+    // source of truth as Save midi, which also renders from extractScore().
+    copyAbcBtn.addEventListener('click', () => {
+      const abcText = extractScore(storedText || '')
+        .split('\n')
+        .filter(line => !/^%%bd_/.test(line.trim()))
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      copyViaClipboard(abcText ? abcText + '\n' : '', copyAbcBtn);
     });
 
     // Snapshot the button's initial HTML ONCE at load. Reused as the restore
@@ -772,6 +802,12 @@
         const mm = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
         const label = `abc @ ${hh}:${mm}:${ss}`;
+        // Cache blob + label BEFORE posting, so Save wav can hand out a fresh
+        // URL any time without re-rendering (and so it stays correct if
+        // postToParent ever gains a transfer list, which would detach the
+        // underlying ArrayBuffer).
+        lastBakedBlob  = new Blob([wavBytes], { type: 'audio/wav' });
+        lastBakedLabel = label;
         console.log('[bd_M_ABC] bake: posting BD_MEDIA_BLOB', {
           label, sizeBytes: wavBytes.byteLength
         });
@@ -792,6 +828,59 @@
         baking = false;
         bakeMp3Btn.innerHTML = BAKE_BTN_INITIAL;
         updateControls();
+      }
+    });
+
+    // ── Save wav / Save midi (local downloads) ─────────────────────────
+    // Present in BOTH copies since 2026-08-19 (was standalone-only). Inside
+    // BD this works because #visual-iframe carries `allow-downloads` in its
+    // sandbox and the M_Music/index.html wrapper sets no sandbox of its own,
+    // so it inherits the grant — drop `allow-downloads` and these go silent.
+    // Small helper: trigger a browser download for a Blob via a hidden
+    // <a download>. Used by both the Save wav and Save midi paths.
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // Save wav — download the most recent bake. Reuses the cached Blob so
+    // repeat clicks don't re-render. (Bake still feeds BD's #media-bar; this
+    // is the local-file copy of the same render.)
+    downloadBtn.addEventListener('click', () => {
+      if (!lastBakedBlob) return;
+      const safeName = lastBakedLabel.replace(/[^A-Za-z0-9._-]+/g, '_') || 'bake';
+      downloadBlob(lastBakedBlob, `${safeName}.wav`);
+      flashBtn(downloadBtn, 'Saved<br>✓');
+    });
+
+    // Save midi — abcjs generates the MIDI directly from the current score
+    // (independent of any prior bake; ABC is the source of truth). getMidiFile
+    // with 'binary' routes through renderEngine, which returns an ARRAY (one
+    // Uint8Array per tune) — take [0] (our ABC has a single tune).
+    saveMidiBtn.addEventListener('click', () => {
+      if (!storedText || typeof ABCJS === 'undefined' || !ABCJS.synth) return;
+      try {
+        const abcText = extractScore(storedText);
+        const result = ABCJS.synth.getMidiFile(abcText, { midiOutputType: 'binary' });
+        const bytes  = Array.isArray(result) ? result[0] : result;
+        if (!bytes || !bytes.byteLength) throw new Error('empty MIDI output');
+        const blob = new Blob([bytes], { type: 'audio/midi' });
+        const title = extractTitle(abcText).replace(/[^A-Za-z0-9._-]+/g, '_') || 'score';
+        downloadBlob(blob, `${title}.mid`);
+        // Flash the button as well as reporting: inside BD, setStatus only
+        // relays real ERRORS to the status pane, so a success line there
+        // would be swallowed and the save would look like it did nothing.
+        flashBtn(saveMidiBtn, 'Saved<br>✓');
+        setStatus(`Saved ${title}.mid (${bytes.byteLength} bytes)`);
+      } catch (err) {
+        console.error('[Save midi] failed', err);
+        setStatus('Save midi failed: ' + err.message, true);
       }
     });
 
