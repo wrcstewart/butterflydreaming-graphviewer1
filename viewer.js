@@ -4496,14 +4496,26 @@ async function init() {
     const GRID_MODULES = ['/bd_M_ABC/', '/bd_M_Fractal/'];   // modules on the panel-grid layout
     const iframeSrc    = (iframeEl && iframeEl.src) || '';
     const isGridModule = !!(iframeEl && GRID_MODULES.some(u => iframeSrc.indexOf(u) !== -1));
-    // 2026-08-19 — Kolam takes the same centred column, but ONLY above 1024px.
-    // Desktop was leaving it full-width with the Extension panel stranded at
-    // the right screen edge; the column gives it the black side wings the music
-    // players have. Mobile is deliberately untouched — it is already right, and
-    // its layout depends on the full-width iframe rect.
-    const isKolamDesktop = !!(iframeEl && window.innerWidth > 1024 &&
+    // 2026-08-19 v2 — VIRTUAL PHONE WINDOW for Kolam.
+    //
+    // Kolam has two internal layouts on an iframe-width breakpoint, while BD's
+    // chrome keyed off the WINDOW width. Every desktop size produced a slightly
+    // different — and mostly worse — arrangement, and resizing walked through
+    // all of them. The phone layout is the one that is actually right, so
+    // instead of making the desktop responsive we give the module a fixed
+    // phone-width viewport and centre it: one layout, at every window size.
+    //
+    // Width is pinned to KOLAM_VIRTUAL_W (below Kolam's own 500px breakpoint,
+    // so the module renders exactly as it does on a phone) and centred in the
+    // panel column. Height is left as the column height — that is what iOS
+    // gives it too. Mobile is untouched: there the column IS the screen and the
+    // min() below is already the real width.
+    const KOLAM_VIRTUAL_W = 390;    // iPhone-standard CSS width
+    // Real phones keep the legacy path untouched: there the window already IS
+    // the virtual window, and the layout it produces is the one we are copying.
+    const isKolamVirtual = !!(iframeEl && window.innerWidth > 767 &&
                               iframeSrc.indexOf('/bd_V_Kolam/') !== -1);
-    if (isGridModule || isKolamDesktop) {
+    if (isGridModule || isKolamVirtual) {
       // 2026-08-18 — music-player grid module (music_player_layout_spec): the
       // iframe = the panel-width COLUMN. Match the bottom panel's left/width
       // (40% centred on desktop, 100% mobile), start 5px below it, fill down to
@@ -4511,9 +4523,17 @@ async function init() {
       // further grid module to GRID_MODULES above.
       const rr = refEl.getBoundingClientRect();
       const top = Math.ceil(rr.bottom) + 5;
+      // Kolam: clamp to the virtual phone width and centre it in the column.
+      // On a phone rr.width is already ≤ 390, so this is a no-op there.
+      let w    = Math.round(rr.width);
+      let left = Math.round(rr.left);
+      if (isKolamVirtual) {
+        w    = Math.min(w, KOLAM_VIRTUAL_W);
+        left = Math.round(rr.left + (rr.width - w) / 2);
+      }
       iframeEl.style.top    = top + 'px';
-      iframeEl.style.left   = Math.round(rr.left)  + 'px';
-      iframeEl.style.width  = Math.round(rr.width) + 'px';
+      iframeEl.style.left   = left + 'px';
+      iframeEl.style.width  = w + 'px';
       iframeEl.style.height = Math.max(0, window.innerHeight - 90 - top) + 'px';
     } else if (iframeEl) {
       const cyRect = cyEl.getBoundingClientRect();
