@@ -4810,7 +4810,12 @@ async function init() {
       if (extSlot || arrowsSlot) {
         if (extSlot) {
           const r = extSlot.getBoundingClientRect();
-          panel.classList.add('under-canvas');
+          // 2026-08-19 — `in-slot` distinguishes THIS placement (a tall grid
+          // cell, buttons stacked and full-width) from Kolam's under-canvas
+          // strip, which shares `under-canvas` only for the bare-buttons look.
+          // Both used to ride on `under-canvas` alone, which is how 322ed49's
+          // stacking silently made Kolam's horizontal bar vertical.
+          panel.classList.add('under-canvas', 'in-slot');
           panel.style.top       = (outerRect.top  + innerOffsetTop  + r.top)  + 'px';
           panel.style.left      = (outerRect.left + innerOffsetLeft + r.left) + 'px';
           panel.style.width     = r.width + 'px';
@@ -4842,7 +4847,7 @@ async function init() {
       // Legacy modules (Kolam/Fractal), no dock-slots: on desktop, clear inline
       // overrides and let the CSS default (right-side panel) win.
       if (window.innerWidth > 1024) {
-        panel.classList.remove('under-canvas');
+        panel.classList.remove('under-canvas', 'in-slot');
         panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
         panel.style.bottom = ''; panel.style.transform = '';
         return;
@@ -4906,7 +4911,7 @@ async function init() {
 
     if (topPx === null) {
       // Clear inline overrides so the CSS media-query defaults win.
-      panel.classList.remove('under-canvas');
+      panel.classList.remove('under-canvas', 'in-slot');
       panel.style.top = '';
       panel.style.left = '';
       panel.style.right = '';
@@ -4919,6 +4924,7 @@ async function init() {
     // hidden) for the Kolam under-canvas placement; music modules keep the
     // vertical left-gutter panel.
     panel.classList.toggle('under-canvas', centerUnderCanvas);
+    panel.classList.remove('in-slot');   // this path is never a dock slot
     panel.style.top       = topPx + 'px';
     panel.style.left      = leftPx + 'px';
     panel.style.right     = 'auto';

@@ -790,7 +790,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #d02020;             /* CANARY — red (was blue) */
+  border: 2px solid #40c040;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1065,8 +1065,10 @@ body.player-active #bd-invite-panel-viewer { display: block; }
    the canvas. positionExtendPanel adds .under-canvas and sets top/left/
    transform (translateX(-50%)) from the live canvas rect; here we lay the two
    buttons side by side and drop the verbose stacked labels for a compact strip.
-   Only Kolam gets .under-canvas — music modules keep the vertical left panel,
-   and desktop clears the class. */
+   2026-08-19 — .under-canvas is now shared: Kolam gets it for this strip, and
+   the ABC/Fractal dock-slot placement gets it PLUS .in-slot for the stacked
+   variant (see below). Both want the same bare-buttons look, which is what
+   this rule provides. Desktop clears both classes. */
 #bd-invite-panel-viewer.under-canvas {
   max-width: none;
   padding: 2px;
@@ -1074,20 +1076,34 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   border: none;
   box-shadow: none;
 }
-/* 2026-08-18 — two long buttons stacked one under the other, filling the dock
-   slot. Labels are self-explanatory ("Jump to external player" / "Copy external
-   url") so both the "Extension" header and the caption are dropped. */
-#bd-invite-panel-viewer.under-canvas #bd-invite-actions-viewer {
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-}
+/* Header and caption are dropped in BOTH placements — the button labels
+   ("Jump to external player" / "Copy external url") say it themselves. */
 #bd-invite-panel-viewer.under-canvas #bd-invite-text-viewer,
 #bd-invite-panel-viewer.under-canvas #bd-invite-target-viewer {
   display: none;
 }
-#bd-invite-panel-viewer.under-canvas #jump-to-ext-btn,
-#bd-invite-panel-viewer.under-canvas #copy-link-to-ext-btn {
+
+/* Kolam, under the canvas: a HORIZONTAL strip, as fa062b4 built it on
+   2026-08-17. 322ed49 then made this rule `column` for the ABC dock slot —
+   both placements were riding on `.under-canvas` alone, so Kolam's bar
+   silently became a tall stack that hung down over the breadcrumbs, and
+   d2492e7's ~50%-deeper buttons made it taller still. The stacked variant now
+   lives under `.in-slot` below; this is the strip again. */
+#bd-invite-panel-viewer.under-canvas #bd-invite-actions-viewer {
+  flex-direction: row;
+  gap: 6px;
+  margin: 0;
+}
+
+/* ABC / Fractal, docked into the module's #bd-ext-slot: two long buttons
+   stacked one under the other, filling the cell. `.in-slot` is added only by
+   positionExtendPanel's dock-slot branch. */
+#bd-invite-panel-viewer.under-canvas.in-slot #bd-invite-actions-viewer {
+  flex-direction: column;
+  gap: 4px;
+}
+#bd-invite-panel-viewer.under-canvas.in-slot #jump-to-ext-btn,
+#bd-invite-panel-viewer.under-canvas.in-slot #copy-link-to-ext-btn {
   width: 100%;
   white-space: normal;
   font-size: 8px;
