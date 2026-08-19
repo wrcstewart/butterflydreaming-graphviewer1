@@ -4,6 +4,50 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
+  <!-- ─── Desktop device frame (2026-08-19) ──────────────────────────────────
+       BD's layout is designed for a phone. Every attempt to make the desktop
+       responsive produced a different arrangement at each window size, because
+       the CSS media queries key on the viewport while the JS geometry keys on
+       window.innerWidth/Height and on module iframe rects — they disagree at
+       every size but a phone's.
+
+       So on desktop we do not lay BD out at all: we render the WHOLE app inside
+       a phone-sized iframe, centred on a black page. Inside that frame
+       window.innerWidth is 390, so every media query matches the mobile branch
+       and every JS measurement is the one iOS gives — identical code path, not
+       an imitation of it. The black area either side is the "wings".
+
+       This must run BEFORE anything else loads: document.write() after
+       document.open() aborts the current parse, so viewer.js, the sockets and
+       the module iframes never start in the outer page.
+
+       Escape hatches: ?device=0 forces the old desktop layout; a real phone
+       (≤767) and the framed copy itself both fall straight through. -->
+  <script>
+    (function () {
+      try {
+        if (window.self !== window.top) return;              // already framed
+        if (window.innerWidth <= 767) return;                // real phone
+        if (/[?&]device=0\b/.test(location.search)) return;  // opt out
+        var src = location.href;
+        document.open();
+        document.write(
+          '<!doctype html><html><head><meta charset="utf-8">' +
+          '<title>ButterflyDreaming</title><style>' +
+          'html,body{margin:0;height:100%;background:#000;}' +
+          'body{display:flex;align-items:center;justify-content:center;}' +
+          '#bd-device{width:390px;height:min(844px,100dvh);border:0;' +
+          'display:block;background:#0a0a0f;}' +
+          '</style></head><body>' +
+          '<iframe id="bd-device" src="' + src.replace(/"/g, '&quot;') + '" ' +
+          'title="ButterflyDreaming" ' +
+          'allow="clipboard-read; clipboard-write; microphone; autoplay"' +
+          '></iframe></body></html>'
+        );
+        document.close();
+      } catch (e) { /* any failure → fall through to the normal desktop page */ }
+    })();
+  </script>
   <link rel="stylesheet" href="style.css?v=231">
 </head>
 <body>
