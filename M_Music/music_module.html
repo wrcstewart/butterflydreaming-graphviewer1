@@ -98,9 +98,6 @@
     .panel button:hover:not(:disabled)  { background: #1a1a1a; }
     .panel button:disabled              { opacity: 0.4; cursor: not-allowed; }
 
-    /* hidden-but-present (2026-08-19): see SHOW_LOCAL_SAVES in the script */
-    .bd-hidden { display: none !important; }
-
     /* Play/Stop exception: 2× size, light-green / light-red, dark label */
     .big-btn {
       min-width: 108px;
@@ -376,18 +373,6 @@
     const copyAbcBtn     = document.getElementById('copy-abc-btn');
     const downloadBtn    = document.getElementById('download-mp3-btn');   // Save wav
     const saveMidiBtn    = document.getElementById('save-midi-btn');      // Save midi
-
-    // ── BD-embedded only (2026-08-19) ────────────────────────────────────
-    // Bake feeds BD's #media-bar, which is where a BD user gets their audio,
-    // so the local-file download buttons are hidden HERE. The standalone
-    // (bd_M_ABC / bd_M_Fractal repos) keeps them — that is its only way out.
-    // Buttons stay in the DOM and the panel keeps its shape, so flipping this
-    // to true brings them straight back.
-    const SHOW_LOCAL_SAVES = false;
-    if (!SHOW_LOCAL_SAVES) {
-      downloadBtn.classList.add('bd-hidden');
-      saveMidiBtn.classList.add('bd-hidden');
-    }
     const pieceTitleEl   = document.getElementById('piece-title');
     const controlPanel   = document.getElementById('control-panel');
 
@@ -723,8 +708,8 @@
       playPauseBtn.textContent = (playerState === 'playing') ? 'Pause' : 'Play';
       copyScriptBtn.disabled   = !storedText;
       copyAbcBtn.disabled      = !storedText;
-      downloadBtn.disabled     = !SHOW_LOCAL_SAVES || !lastBakedBlob;   // Save wav
-      saveMidiBtn.disabled     = !SHOW_LOCAL_SAVES || !storedText;      // Save midi (from score)
+      downloadBtn.disabled     = !lastBakedBlob;                  // Save wav
+      saveMidiBtn.disabled     = !storedText;                     // Save midi (from score)
       bakeMp3Btn.disabled      = !ready || baking;
     }
     playPauseBtn.addEventListener('click', async () => {
