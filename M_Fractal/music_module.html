@@ -344,6 +344,14 @@
     // stepper cell + fits comfortably in 2-column mobile layout.
     const SCALE_ALIASES = { pentatonic: 'min_pentatonic', minor_pentatonic: 'min_pentatonic' };
     const SCALE_NAMES = Object.keys(SCALES);
+
+    // Display-only aliases for enum stepper values: the canonical name is what
+    // goes in the script, a shorter label is what fits the narrow stepper cell.
+    // getStepperValue reads the cell back, so it inverts this map.
+    const ENUM_DISPLAY = { min_pentatonic: 'pent' };
+    const ENUM_DISPLAY_INV = Object.fromEntries(
+      Object.entries(ENUM_DISPLAY).map(([canon, shown]) => [shown, canon]));
+
     const NOTE_NAMES  = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     // ABC key-signature strings for each scale (used in the K: header).
     // Minor pentatonic uses K:min so its chromatic notes (Eb, Bb) land
@@ -424,13 +432,6 @@
       statusEl.textContent = '';
       postToParent({ type: 'BD_STATUS', text: isErr ? (msg || '') : '', isErr: !!isErr });
     };
-
-    // Display-only aliases for enum stepper values: the canonical name is what
-    // goes in the script, a shorter label is what fits the narrow stepper cell.
-    // getStepperValue reads the cell back, so it inverts this map.
-    const ENUM_DISPLAY = { min_pentatonic: 'pent' };
-    const ENUM_DISPLAY_INV = Object.fromEntries(
-      Object.entries(ENUM_DISPLAY).map(([canon, shown]) => [shown, canon]));
 
     function formatDisplay(spec, val) {
       if (spec.isToggle) return val >= 0.5 ? 'on' : 'off';
