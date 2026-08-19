@@ -98,19 +98,28 @@ BD internals; BD needs only the two slot ids. Same for ABC and Fractal.
 
 ## 4a. Styling revision (standalone, 2026-08-18 evening)
 
-The standalone player went **black-and-white**: the green/red Play/Stop pair was
-the only hue-carrying element, and hue was never what distinguished it. The rule
-it was standing in for survives intact — **distinguish by LUMINANCE, not hue**
-([[user-colour-vision]]):
+The standalone player went **black-and-white in the panel area**: the green/red
+Play/Stop pair was the only hue-carrying element there, and hue was never what
+distinguished it. The rule it was standing in for survives intact —
+**distinguish by LUMINANCE, not hue** ([[user-colour-vision]]).
+
+Scope note: this was **not** a whole-module desaturation. The stepper column
+keeps its teal `#4a9b8e` borders/labels in *both* copies (7 occurrences each) —
+only the typeface and Play/Stop actually changed.
 
 - **Play = light fill `#f0f0f0` / black label. Stop = black fill / white label.**
-  Still 2×-width, white frame kept; `min-height` 52 → 40px.
+  Still 2×-width, white frame kept; `min-height` 52 → **56px** (dropped to 40 in
+  `dc18a56`, restored to 56 once the depth moved into the panels instead —
+  the button is a standard 2× button, the *panel* carries the black space).
 - **Typeface: Arial/Helvetica sans throughout** (was Georgia serif; the stepper
   labels' Courier also went). The **one** serif element left is the standalone's
   `#bd-invite-target` title line, in dark gold `#d4a017` — deliberately the sole
   exception.
 - **Depth, not size.** Where a panel looked cramped the fix is to grow the
   *panel* (adding black space) and leave the buttons at their normal size.
+  Mechanically: `.copy-panel { min-height: 80px }`, `.player-panel
+  { min-height: 160px; justify-content: flex-start }` — content top-aligned so
+  the surplus reads as black space *under* the buttons, not as centring.
   Standalone grid rows are pinned explicitly for this:
   `minmax(80px, auto) minmax(136px, auto) 1fr` — the player row was cut 160 →
   136 so the freed depth goes to the bottom row (ext invite + Bake output),
@@ -190,9 +199,13 @@ after 13:51 happened in the `bd_M_ABC` repo (see below).**
   `downloadBlob`/`lastBakedBlob` re-added. `preview.html` lifted the ↓↑ arrows
   out of the side-panel into `#arrow-dock`, overlaid onto `#bd-arrows-slot` by a
   local `positionSlots()` (single same-origin iframe → slot rect + iframe page
-  offset; edit-mode only, top-right fallback if unreadable). `#bd-ext-slot` left
-  as free space; `.dock-slot` borders transparent so empty slots read as clean
-  space. Module `setStatus` relays `BD_STATUS` straight to preview's side-panel
+  offset; top-right fallback if unreadable). `.dock-slot` borders made
+  transparent so an un-docked slot reads as clean free space, not an empty box.
+  **`#bd-ext-slot` started as free space here and was then used** (`dc18a56`,
+  "docked invite"): `positionSlots()` now docks the **Collaborate invite panel**
+  into it in **both** modes with `growable = true`, while `#arrow-dock` docks
+  into `#bd-arrows-slot` in **edit mode only** (`growable = false`) and has its
+  geometry cleared in basic mode so it doesn't linger. Module `setStatus` relays `BD_STATUS` straight to preview's side-panel
   status (no wrapper hop — `module.parent` IS preview).
 - `dc18a56`…`9598b94` — the §4a B&W restyle, the row-depth tuning, docked
   invite, `#script-input` min-height 160 → 320 → 368px, gold serif title,
@@ -214,7 +227,13 @@ deliberately, don't diff-and-merge blind:
 | Play / Stop | light-green / light-red, dark label, `min-height:52px` | `#f0f0f0`+black / black+white, `min-height:40px` |
 | `grid-template-rows` | `auto 1fr auto` | `minmax(80px,auto) minmax(136px,auto) 1fr` |
 | Output-panel slots | Bake + 3 spares | Bake + **Save wav** + **Save midi** + spare |
+| `.big-btn` min-height | 52px | 56px (panels carry the depth: copy 80 / player 160) |
+| `.dock-slot` border | `1px dashed rgba(255,255,255,.35)` — visible reserved box | `1px solid transparent` — empty slot reads as free space |
 | Dock mechanism | BD `positionExtendPanel` through the iframe chain | preview's local `positionSlots()` / `dockOnto` |
+
+Verified by direct diff on 2026-08-19: 935 lines embedded vs 1003 standalone,
+~122 changed lines, and **both repos are level with `origin/main`** — GitHub
+holds nothing newer than what is described here.
 
 The Save-wav/Save-midi and dock-mechanism rows are **intended** divergence. The
 typeface / Play-Stop / grid-rows rows are the standalone running ahead —
