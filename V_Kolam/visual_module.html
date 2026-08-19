@@ -100,6 +100,14 @@
          the portrait media query below. */
       justify-content: flex-end;
       align-items: center;
+      /* 2026-08-19 — reserve two bands so BD's chrome never lands on the
+         square: 44px on the RIGHT for the ↓↑ arrows, which dock between the
+         canvas and the stepper column, and 52px BELOW for the Extension strip.
+         The canvas is max-width/height 100% of this box, so it simply comes out
+         a little smaller — which is the point. Overridden in the small-iframe
+         query below, where mobile has its own (already correct) arrangement. */
+      padding-right: 44px;
+      padding-bottom: 52px;
     }
 
     /* Small iframe (mobile) — 2026-08-05 v13. Kolam-specific gutter for BD's
@@ -117,7 +125,10 @@
          the Extension bar just beneath it — so the bar lands just above the
          breadcrumbs and the canvas sits just above the bar. */
       .module-layout { padding-left: 88px; }
-      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px; }
+      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px;
+                        padding-right: 0; }   /* 2026-08-19 — cancel the landscape
+                                                 right band; mobile puts the arrows
+                                                 elsewhere (CSS `right: 116px`) */
       /* 2026-08-17 — shift canvas 15% + 20px left to free room between it and
          the stepper column for BD's ↓↑ arrows. The Extension bar follows (BD
          centres it on the live canvas rect). */

@@ -4494,9 +4494,16 @@ async function init() {
     // rather than relying on CSS to derive them.
     const iframeEl = document.getElementById('visual-iframe');
     const GRID_MODULES = ['/bd_M_ABC/', '/bd_M_Fractal/'];   // modules on the panel-grid layout
-    const isGridModule = !!(iframeEl && iframeEl.src &&
-                            GRID_MODULES.some(u => iframeEl.src.indexOf(u) !== -1));
-    if (isGridModule) {
+    const iframeSrc    = (iframeEl && iframeEl.src) || '';
+    const isGridModule = !!(iframeEl && GRID_MODULES.some(u => iframeSrc.indexOf(u) !== -1));
+    // 2026-08-19 — Kolam takes the same centred column, but ONLY above 1024px.
+    // Desktop was leaving it full-width with the Extension panel stranded at
+    // the right screen edge; the column gives it the black side wings the music
+    // players have. Mobile is deliberately untouched — it is already right, and
+    // its layout depends on the full-width iframe rect.
+    const isKolamDesktop = !!(iframeEl && window.innerWidth > 1024 &&
+                              iframeSrc.indexOf('/bd_V_Kolam/') !== -1);
+    if (isGridModule || isKolamDesktop) {
       // 2026-08-18 — music-player grid module (music_player_layout_spec): the
       // iframe = the panel-width COLUMN. Match the bottom panel's left/width
       // (40% centred on desktop, 100% mobile), start 5px below it, fill down to
@@ -4751,6 +4758,20 @@ async function init() {
   // align with abc-pane's top-left corner (offset a few px so the
   // panel sits *beside* it, not on top). Falls back to CSS defaults
   // when the loaded module has no #abc-pane (e.g. V_Kolam).
+  // 2026-08-19 — the ↓↑ arrows get inline geometry from three places (the
+  // dock-slot branch, Kolam mobile, Kolam desktop). Anything that stops docking
+  // them must hand them back to CSS, or they stay pinned where the last module
+  // left them after a switch or a resize across the breakpoint.
+  function clearArrowDock() {
+    ['copy-up-btn', 'copy-down-btn'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.style.position = ''; b.style.left = ''; b.style.top = '';
+      b.style.right = ''; b.style.width = ''; b.style.height = '';
+      b.style.zIndex = '';
+    });
+  }
+
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
@@ -4844,9 +4865,15 @@ async function init() {
         return;
       }
 
-      // Legacy modules (Kolam/Fractal), no dock-slots: on desktop, clear inline
-      // overrides and let the CSS default (right-side panel) win.
-      if (window.innerWidth > 1024) {
+      // Legacy modules with no dock-slots: on desktop, clear inline overrides
+      // and let the CSS default (right-side panel) win.
+      // 2026-08-19 — EXCEPT Kolam, which now gets the centred column on desktop
+      // too (see positionCyEl). Returning here is what made its Extension panel
+      // "revert to the old vertical styling at the right screen edge" as soon as
+      // the window got wide; it needs the under-canvas strip at every width.
+      const kolamHere = innerDoc && innerDoc.getElementById('kolam-canvas');
+      if (window.innerWidth > 1024 && !kolamHere) {
+        clearArrowDock();
         panel.classList.remove('under-canvas', 'in-slot');
         panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
         panel.style.bottom = ''; panel.style.transform = '';
@@ -4894,13 +4921,38 @@ async function init() {
               const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
               if (h > 0) histPane.style.height = h + 'px';
             }
-            // ↓↑ arrows stacked just left of the stepper column (CSS `right`),
-            // TOP arrow aligned with the canvas top (= top stepper).
+            // ↓↑ arrows stacked just left of the stepper column, TOP arrow
+            // aligned with the canvas top (= top stepper).
+            const cUp   = document.getElementById('copy-up-btn');
+            const cDown = document.getElementById('copy-down-btn');
             if (onPhone) {
-              const cUp = document.getElementById('copy-up-btn');
-              const cDown = document.getElementById('copy-down-btn');
+              // Mobile: CSS pins `right`; we only set the vertical. Clear any
+              // left/position left behind by the desktop branch after a resize,
+              // or it fights the CSS `right: 116px`.
+              [cUp, cDown].forEach(b => {
+                if (!b) return;
+                b.style.position = ''; b.style.left = ''; b.style.right = '';
+                b.style.zIndex = '';
+              });
               if (cUp)   cUp.style.top   = Math.round(canvasTopVp) + 'px';
               if (cDown) cDown.style.top = Math.round(canvasTopVp + 26) + 'px';
+            } else if (cUp && cDown) {
+              // 2026-08-19 desktop: sit them in the band the module reserves
+              // between the canvas and the stepper column. Read the column's
+              // LIVE rect rather than assuming a width — Kolam has two internal
+              // layouts and the column is 220px in one, 108px in the other.
+              const cp = innerDoc.querySelector('.control-panel');
+              if (cp) {
+                const cpRect = cp.getBoundingClientRect();
+                const x = Math.round(outerRect.left + innerOffsetLeft + cpRect.left - 34);
+                [cUp, cDown].forEach((b, i) => {
+                  b.style.position = 'fixed';
+                  b.style.left     = x + 'px';
+                  b.style.right    = 'auto';
+                  b.style.top      = Math.round(canvasTopVp + i * 28) + 'px';
+                  b.style.zIndex   = '7';
+                });
+              }
             }
           }
         }
@@ -4911,6 +4963,7 @@ async function init() {
 
     if (topPx === null) {
       // Clear inline overrides so the CSS media-query defaults win.
+      clearArrowDock();
       panel.classList.remove('under-canvas', 'in-slot');
       panel.style.top = '';
       panel.style.left = '';
