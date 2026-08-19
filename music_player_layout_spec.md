@@ -314,9 +314,33 @@ stepper displays `min_pentatonic` as `pent`. ABC was deliberately left at its
    `/tmp/bd_server.log`** (BD relays only its own window), so reproduce the
    top-level order under node instead. Fixed in `6ec2385`.
 
-## 10. Fractal standalone — TODO
+## 10. Fractal standalone — DONE, 2026-08-19 (`bd_M_Fractal` `921e6b8`)
 
-`bd_M_Fractal` still has the pre-grid layout and its own `#abc-pane`. Porting it
-is the same job the ABC standalone had on 2026-08-18: take the embedded grid,
-keep the standalone-only bits (its Save wav / Save midi already exist there),
-and dock via a local `positionSlots()` rather than BD's `positionExtendPanel`.
+All four players are now on the grid. The port was cheaper than ABC's because
+the two Fractal module copies had **no functional divergence at all** — same
+function set, Bake info dialog in both — so `music_module.html` was replaced
+wholesale with the BD-embedded copy. Only `.dock-slot`'s transparent border is
+standalone-specific (§8's rule: an un-docked slot should read as free space).
+
+`preview.html` follows `bd_M_ABC`'s harness: `#arrow-dock` lifted out of the
+side panel and overlaid on `#bd-arrows-slot`; the Collaborate invite docked into
+`#bd-ext-slot` (growable) and restyled B&W with the gold serif title first; Copy
+Link moved to the bottom bar; Copy retired (the module's own Copy Script does
+it), taking the action bar and its CSS with it; module status relayed via
+`BD_STATUS` into the side-panel line, errors only.
+
+**The simplified non-edit ("basic") mode is retired here** at the user's
+request — `body` no longer boots `.ev-basic`, the rule that hid the side panel
+is gone, and so is the Edit button that toggled it. This harness is edit-only;
+the side panel and invite are always present. **`bd_M_ABC` still has both
+modes**, so its `positionSlots()` keeps the `ev-basic` branch that gates the
+arrow dock. Do not "tidy" that branch away when diffing the two harnesses —
+it is a real difference, not drift.
+
+## 11. What is left
+
+- The four styling rows in §8 (typeface, grid rows, panel depths, button
+  height): ABC-embedded vs its standalone. Deliberate, still undecided.
+- Fractal-only settings from §9 (0.95rem buttons, `0.9fr 1.1fr` columns, `pent`)
+  are now in BOTH Fractal copies but in NEITHER ABC copy — that is the current
+  intended state, at the user's explicit instruction ("don't alter the abc").
