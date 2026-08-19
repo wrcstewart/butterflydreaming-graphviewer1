@@ -4916,13 +4916,39 @@ async function init() {
               const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
               if (h > 0) histPane.style.height = h + 'px';
             }
-            // ↓↑ arrows stacked just left of the stepper column (CSS `right`),
-            // TOP arrow aligned with the canvas top (= top stepper).
-            if (onPhone) {
-              const cUp = document.getElementById('copy-up-btn');
-              const cDown = document.getElementById('copy-down-btn');
-              if (cUp)   cUp.style.top   = Math.round(canvasTopVp) + 'px';
-              if (cDown) cDown.style.top = Math.round(canvasTopVp + 26) + 'px';
+            // ↓↑ arrows stacked beside the stepper column, TOP arrow aligned
+            // with the canvas top (= top stepper).
+            //
+            // 2026-08-19 — read the column's LIVE rect instead of trusting the
+            // CSS `right: 116px`. That constant assumed the module's SMALL
+            // layout (108px column), but the module switches layout on its own
+            // iframe width (500px), not on the window: at a ~700px window the
+            // iframe is above 500 so the column is 220px, and the arrows landed
+            // on the steppers. Measuring can't disagree with the module.
+            //
+            // Side: below 768 there is no reserved band, so they go to the LEFT
+            // of the column (the iOS placement). At 768+ positionCyEl reserves
+            // 100px to the right of the iframe, so they go to the RIGHT of the
+            // column — the same side the >1024 dock uses, which is what made
+            // the 768–1024 band the odd one out (it positioned them not at all,
+            // leaving them in the action bar).
+            const cUp   = document.getElementById('copy-up-btn');
+            const cDown = document.getElementById('copy-down-btn');
+            const cpEl  = innerDoc && innerDoc.querySelector('.control-panel');
+            if (cUp && cDown && cpEl) {
+              const cpRect = cpEl.getBoundingClientRect();
+              const bw = Math.ceil(cUp.getBoundingClientRect().width) || 30;
+              const colLeftVp  = outerRect.left + innerOffsetLeft + cpRect.left;
+              const colRightVp = outerRect.left + innerOffsetLeft + cpRect.right;
+              const x = onPhone ? Math.round(colLeftVp - bw - 6)
+                                : Math.round(colRightVp + 4);
+              [[cUp, 0], [cDown, 26]].forEach(([b, dy]) => {
+                b.style.position = 'fixed';
+                b.style.left     = x + 'px';
+                b.style.right    = 'auto';
+                b.style.top      = Math.round(canvasTopVp + dy) + 'px';
+                b.style.zIndex   = '7';
+              });
             }
           }
         }

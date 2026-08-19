@@ -790,7 +790,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #d02020;             /* CANARY — red (revert build; was blue) */
+  border: 2px solid #40c040;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -854,7 +854,12 @@ body:not(.player-active) #copy-up-btn {
   body.player-active #copy-up-btn,
   body.player-active #copy-down-btn {
     position: fixed;
-    right: 116px;
+    /* 2026-08-19 — `right: 116px` removed. It assumed the module's SMALL
+       layout (108px stepper column), but the module switches layout on its own
+       IFRAME width, not the window, so at ~700px the column is 220px and the
+       arrows sat on the steppers. positionExtendPanel now stamps `left` from
+       the column's live rect; these two properties are all that is left to do
+       here. */
     z-index: 7;
   }
 }
