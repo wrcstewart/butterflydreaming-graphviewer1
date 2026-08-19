@@ -1,8 +1,12 @@
-# Music-player layout — spec (v0.1, 2026-08-18)
+# Music-player layout — spec (v0.2, 2026-08-19)
 
-Status: **reference / pre-implementation.** A single, principled layout for the
-media-module players (ABC first, then Fractal — same layout). Supersedes the
-ad-hoc per-module mobile patching. Red-line this before build.
+Status: **built for ABC (mobile + desktop, embedded + standalone); Fractal not
+yet ported.** A single, principled layout for the media-module players.
+Supersedes the ad-hoc per-module mobile patching.
+
+§§0–3 (principles, column, grid, dock-slots) are as built and unchanged. **§4
+styling was revised on the standalone during the 2026-08-18 evening pass — read
+§4a and §8 before copying colours from §4.**
 
 ## 0. Principles
 
@@ -90,6 +94,30 @@ BD internals; BD needs only the two slot ids. Same for ABC and Fractal.
   light-green** background, **Stop = light-red** background; white frame kept.
   Label colour: **dark** on the light fills for legibility (luminance contrast —
   see [[user-colour-vision]]); confirm if you'd rather keep white.
+  → **Revised on the standalone, see §4a.**
+
+## 4a. Styling revision (standalone, 2026-08-18 evening)
+
+The standalone player went **black-and-white**: the green/red Play/Stop pair was
+the only hue-carrying element, and hue was never what distinguished it. The rule
+it was standing in for survives intact — **distinguish by LUMINANCE, not hue**
+([[user-colour-vision]]):
+
+- **Play = light fill `#f0f0f0` / black label. Stop = black fill / white label.**
+  Still 2×-width, white frame kept; `min-height` 52 → 40px.
+- **Typeface: Arial/Helvetica sans throughout** (was Georgia serif; the stepper
+  labels' Courier also went). The **one** serif element left is the standalone's
+  `#bd-invite-target` title line, in dark gold `#d4a017` — deliberately the sole
+  exception.
+- **Depth, not size.** Where a panel looked cramped the fix is to grow the
+  *panel* (adding black space) and leave the buttons at their normal size.
+  Standalone grid rows are pinned explicitly for this:
+  `minmax(80px, auto) minmax(136px, auto) 1fr` — the player row was cut 160 →
+  136 so the freed depth goes to the bottom row (ext invite + Bake output),
+  which needed it. `minmax(…, auto)` lets a row grow if content ever exceeds
+  the floor.
+
+**This revision has NOT been applied to the embedded copy** — see §8.
 
 ## 5. Per-module specifics (same skeleton, different fills)
 
@@ -106,12 +134,13 @@ BD internals; BD needs only the two slot ids. Same for ABC and Fractal.
 - **D1** ✅ Column width **matches the panel width exactly** (40% desktop / 100%
   mobile) — for neatness and simpler onward design.
 - **D2** ✅ Play/Stop labels **dark** on the light-green/light-red fills.
+  **→ superseded 2026-08-18 for the standalone: B&W, see §4a.**
 - **D3** ✅ Desktop side-quarters **blank** (page background) for now.
 - **D4** ✅ **Finish ABC** on the new skeleton first, then point Fractal at it.
 - Grid pairing (Output bottom-right of the ⅔, Ext bottom-left, arrows slot =
   full stepper-column width directly above the steppers) — ✅ confirmed.
 
-## 7. Implementation status (2026-08-18)
+## 7. Implementation status (2026-08-19)
 
 **ABC mobile — DONE** (module `M_Music/music_module.html`; BD `viewer.js` /
 `style.css`; served at `/bd_M_ABC/` via inner `music_module.html`):
@@ -133,9 +162,68 @@ BD internals; BD needs only the two slot ids. Same for ABC and Fractal.
   Player pane layout when `#cy` is hidden (was reusing a stale Nodes rect), and
   `setViewMode('player')` re-runs it after `player-active` is set.
 
-**ABC desktop — TODO** (next): constrain the iframe to the panel-width column +
-centre it (leaving the side quarters blank), and let the dock-slot mirroring run
-above 1024px (`positionExtendPanel` currently returns early on desktop).
+**ABC desktop — DONE** (BD commit `370b02d`, 2026-08-18 13:01):
+- `positionCyEl` branches on `iframeEl.src.indexOf('/bd_M_ABC/')`: for a
+  grid module the iframe **is** the column — left/width copied from the bottom
+  panel's rect (40% centred desktop / 100% mobile), `top = panel.bottom + 5`,
+  height down to the 90px breadcrumb clearance. Every other module keeps the old
+  `#cy`-rect path. **Add `/bd_M_Fractal/` to that test when Fractal is ported.**
+- `positionExtendPanel`'s `innerWidth > 1024` early-return **moved below the
+  dock-slot check**, so slot-bearing modules dock on desktop too; legacy
+  (Kolam/Fractal) modules still hit it and fall back to the CSS default
+  right-side panel.
 
-**Fractal — TODO after ABC desktop:** add the same grid + two dock-slots to
-`M_Fractal/music_module.html`; it inherits the BD side for free.
+**Other BD work the same afternoon** (13:09–13:51): module `#status` shows
+errors only; BD reuses the "N connected" label as a scrollable status strip and
+relays only real errors, not playback chatter; breadcrumb strips tried
+column-constrained (`2b25b03`) then reverted to full width (`019d043`); the
+phone rotate overlay gated on `(pointer: coarse)` so it never fires on desktop
+(`9f8bb73`). **`9f8bb73` is the last BD-repo commit of the day — everything
+after 13:51 happened in the `bd_M_ABC` repo (see below).**
+
+**Standalone (`bd_M_ABC` repo) — DONE, 15:00→20:56, commits `1828135`,
+`dc18a56`, `66349e0`, `f38b39d`, `0c51dfb`, `9598b94`:**
+- `1828135` — standalone `music_module.html` replaced wholesale with the
+  embedded grid copy. No stepper duplication: the standalone side-panel already
+  had `STEPPERS=[]`, the module always owned them. Divergence preserved: **Save
+  wav + Save midi** occupy two output-panel slots (spares in the embedded copy);
+  `downloadBlob`/`lastBakedBlob` re-added. `preview.html` lifted the ↓↑ arrows
+  out of the side-panel into `#arrow-dock`, overlaid onto `#bd-arrows-slot` by a
+  local `positionSlots()` (single same-origin iframe → slot rect + iframe page
+  offset; edit-mode only, top-right fallback if unreadable). `#bd-ext-slot` left
+  as free space; `.dock-slot` borders transparent so empty slots read as clean
+  space. Module `setStatus` relays `BD_STATUS` straight to preview's side-panel
+  status (no wrapper hop — `module.parent` IS preview).
+- `dc18a56`…`9598b94` — the §4a B&W restyle, the row-depth tuning, docked
+  invite, `#script-input` min-height 160 → 320 → 368px, gold serif title,
+  module iframe cache-bust `?v=2` → `?v=3`, no ready-noise on load.
+- **`dockOnto(el, slotId, growable)`** — third argument added: `growable` sets
+  `min-height` rather than `height`, so a docked element fills its slot but can
+  grow past it when its content needs the room instead of clipping. Use it for
+  any slot with variable-height content.
+
+## 8. Two-copy divergence (as of 2026-08-19)
+
+`M_Music/music_module.html` (embedded, this repo) and `bd_M_ABC/music_module.html`
+(standalone) share the grid but **no longer share the styling**. Reconcile
+deliberately, don't diff-and-merge blind:
+
+| | Embedded (BD) | Standalone (`bd_M_ABC`) |
+|---|---|---|
+| Typeface | Georgia serif | Arial sans (serif only on the gold title) |
+| Play / Stop | light-green / light-red, dark label, `min-height:52px` | `#f0f0f0`+black / black+white, `min-height:40px` |
+| `grid-template-rows` | `auto 1fr auto` | `minmax(80px,auto) minmax(136px,auto) 1fr` |
+| Output-panel slots | Bake + 3 spares | Bake + **Save wav** + **Save midi** + spare |
+| Dock mechanism | BD `positionExtendPanel` through the iframe chain | preview's local `positionSlots()` / `dockOnto` |
+
+The Save-wav/Save-midi and dock-mechanism rows are **intended** divergence. The
+typeface / Play-Stop / grid-rows rows are the standalone running ahead —
+**decide whether to port §4a back to the embedded copy** (and whether the BD
+Player should read B&W too) before touching Fractal.
+
+## 9. Fractal — TODO
+
+Add the same grid + two dock-slots to `M_Fractal/music_module.html`; the BD side
+is free once `/bd_M_Fractal/` is added to the `positionCyEl` src test (§7). Pick
+the styling from §4 or §4a per the §8 decision first, so Fractal doesn't become
+a third variant.
