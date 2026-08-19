@@ -4765,7 +4765,7 @@ async function init() {
     // restores the CSS defaults. Re-applied below when applicable.
     ['copy-up-btn', 'copy-down-btn'].forEach((id) => {
       const b = document.getElementById(id);
-      if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; }
+      if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; b.style.zIndex = ''; }
     });
     panel.style.width = '';
     // 2026-08-18 — the desktop early-return moved into the LEGACY path below
@@ -4850,6 +4850,28 @@ async function init() {
         panel.classList.remove('under-canvas', 'in-slot');
         panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
         panel.style.bottom = ''; panel.style.transform = '';
+        // 2026-08-19 — desktop ↓↑ arrows. The stepper column is the module's
+        // last flex child, so the module iframe's right edge IS the column's
+        // right edge; positionCyEl already reserves a 100px band beyond it for
+        // the Extension panel. Stack the arrows just inside that band, hugging
+        // the column, anchored to the column's TOP — the Extension panel is
+        // vertically centred there, so they don't meet. Modules without a
+        // stepper column keep the arrows in the action bar.
+        const cpDesk = innerDoc && innerDoc.querySelector('.control-panel');
+        if (cpDesk) {
+          const cpRect = cpDesk.getBoundingClientRect();
+          const x = Math.round(outerRect.right + 4);
+          const y = Math.round(outerRect.top + innerOffsetTop + cpRect.top + 2);
+          [['copy-up-btn', 0], ['copy-down-btn', 30]].forEach(([id, dy]) => {
+            const b = document.getElementById(id);
+            if (!b) return;
+            b.style.position = 'fixed';
+            b.style.left     = x + 'px';
+            b.style.right    = 'auto';
+            b.style.top      = (y + dy) + 'px';
+            b.style.zIndex   = '7';
+          });
+        }
         return;
       }
 
