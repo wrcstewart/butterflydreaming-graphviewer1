@@ -4493,11 +4493,15 @@ async function init() {
     // so we stamp explicit width/height/top from #cy's bounding rect
     // rather than relying on CSS to derive them.
     const iframeEl = document.getElementById('visual-iframe');
-    if (iframeEl && (iframeEl.src && iframeEl.src.indexOf('/bd_M_ABC/') !== -1)) {
+    const GRID_MODULES = ['/bd_M_ABC/', '/bd_M_Fractal/'];   // modules on the panel-grid layout
+    const isGridModule = !!(iframeEl && iframeEl.src &&
+                            GRID_MODULES.some(u => iframeEl.src.indexOf(u) !== -1));
+    if (isGridModule) {
       // 2026-08-18 — music-player grid module (music_player_layout_spec): the
       // iframe = the panel-width COLUMN. Match the bottom panel's left/width
       // (40% centred on desktop, 100% mobile), start 5px below it, fill down to
-      // the breadcrumb clearance. (Add /bd_M_Fractal/ here once ported.)
+      // the breadcrumb clearance. Fractal joined the grid 2026-08-19; add any
+      // further grid module to GRID_MODULES above.
       const rr = refEl.getBoundingClientRect();
       const top = Math.ceil(rr.bottom) + 5;
       iframeEl.style.top    = top + 'px';

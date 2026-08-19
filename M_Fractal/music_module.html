@@ -24,218 +24,135 @@
       flex-direction: column;
     }
 
+    /* 2026-08-19 — panel grid, ported from bd_M_ABC (music_player_layout_spec).
+       Same on mobile + desktop; BD sizes the iframe to the panel-width column,
+       so there is no breakpoint here. Replaces the old flex row + 1024px
+       stacked variant, and the derived-ABC pane it was built around. */
     .module-layout {
       flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
+      grid-template-rows: auto 1fr auto;
+      grid-template-areas:
+        "copy   copy    arrows"
+        "player player  steppers"
+        "ext    output  steppers";
+      gap: 5px;
+      padding: 5px;
+      min-height: 0;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    .copy-panel     { grid-area: copy; }
+    .player-panel   { grid-area: player; }
+    #bd-ext-slot    { grid-area: ext; }
+    .output-panel   { grid-area: output; }
+    #bd-arrows-slot { grid-area: arrows; }
+    #control-panel  { grid-area: steppers; }
+
+    /* white-framed panels (spec §4) */
+    .panel {
+      border: 1px solid #fff;
+      border-radius: 4px;
+      padding: 5px;
       display: flex;
-      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-content: flex-start;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .player-panel { flex-direction: column; align-items: center; justify-content: center; }
+    .play-row { display: flex; gap: 8px; }
+
+    /* dock-slots — reserved for BD's ↓↑ arrows / Extension panel. Faint frame
+       so the reserved area is visible even before BD stamps into it. */
+    .dock-slot {
+      border: 1px dashed rgba(255,255,255,0.35);
+      border-radius: 4px;
       min-height: 0;
       min-width: 0;
     }
 
-    .lh-actions {
-      flex: 0 0 96px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      padding: 6px 5px;
-      background: rgba(15, 15, 24, 0.75);
-      border: 1px solid rgba(74, 155, 142, 0.2);
-      border-radius: 0.4rem;
-      overflow-y: auto;
-      align-self: flex-start;
-      max-height: 100%;
-    }
-
-    .lh-actions button {
-      background: #0f0f18;
-      border: 1px solid #4a9b8e;
-      color: #4a9b8e;
-      cursor: pointer;
-      font-family: Georgia, 'Times New Roman', serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.03em;
-      padding: 6px 3px;
+    /* uniform buttons (spec §4): white frame, black bg, white font, one size */
+    .panel button {
+      border: 1px solid #fff;
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.66rem;
+      line-height: 1.1;
+      padding: 4px 6px;
       border-radius: 3px;
-      line-height: 1.15;
+      min-width: 54px;
+      min-height: 26px;
+      cursor: pointer;
       text-align: center;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       user-select: none;
       -webkit-user-select: none;
-      -webkit-touch-callout: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-      flex: 0 0 auto;
     }
-    .lh-actions button:hover:not(:disabled)  { background: #1a2a28; }
-    .lh-actions button:active:not(:disabled) { background: #243f3b; }
-    .lh-actions button:disabled              { opacity: 0.4; cursor: not-allowed; }
-    .lh-actions button.flash                 { background: #243f3b; color: #a0e0d0; }
+    .panel button:hover:not(:disabled)  { background: #1a1a1a; }
+    .panel button:disabled              { opacity: 0.4; cursor: not-allowed; }
+    .panel button.flash                 { background: #243f3b; color: #a0e0d0; }
 
-    .main-area {
-      flex: 1 1 auto;
-      min-height: 0;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      padding: 6px 8px;
-      gap: 6px;
-      align-items: center;
-    }
-
-    /* BD-embedded 2026-08-08: status hidden per user request — the
-       "N notes, X.Xs" info line + load/error prose all suppressed here.
-       The standalone copy still shows it. Any error surfacing that
-       previously reached the user via setStatus() is now silent inside
-       BD; errors still log to console.error via the module's error
-       handler. Kept the element in the DOM (rather than removing) so
-       the JS setStatus() call sites don't need branching. */
-    #status {
-      display: none;
-    }
-    #status.err {
-      color: #f2a0a0;
-      border-color: rgba(200, 100, 100, 0.4);
-      background: rgba(60, 15, 15, 0.55);
-    }
-
-    /* Read-only ABC pane — replaces the title-square from bd_M_ABC. Same
-       ~square footprint but scrollable text content. User selects + Cmd-C
-       to lift the ABC (or uses "Copy for ABC Player" for a fully-wrapped
-       bd_M_ABC-ready script). */
-    #abc-pane {
-      /* 2026-08-09 — dropped aspect-ratio: 1/1 (was cramping ABC lines
-         into awkward wraps). Now 80% wider than before, height fixed
-         at the pre-change value so the vertical footprint stays the
-         same and text has room to breathe horizontally. */
-      flex: 0 0 auto;
-      width: 396px;
-      height: 220px;
-      max-width: 100%;
-      background: rgba(15, 15, 24, 0.55);
-      border: 1px solid rgba(74, 155, 142, 0.15);
-      border-radius: 6px;
-      padding: 8px 10px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 1.08rem;                /* +20 % from 0.9 (was 0.75 originally) */
-      color: #cfcfc4;
-      line-height: 1.4;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      user-select: text;
-      -webkit-user-select: text;
-    }
-    #abc-pane:empty::before {
-      content: '(no ABC yet)';
-      font-style: italic;
-      color: #6a6a60;
-    }
-
-    /* 2026-08-08 — Play/Stop moved to the right of #abc-pane via
-       .abc-and-play row. .playback-row itself is now a vertical stack
-       inside that row (buttons above/below each other in the gutter). */
-    .abc-and-play {
-      /* 2026-08-09 v2 — abc-pane on the left, Play/Stop on the right,
-         both clearing the fixed-overlay extend-panel (mobile) on the
-         left edge (via padding-left in the mobile media query, since
-         only mobile positions the extend panel on the left; desktop
-         places it right-side). */
-      flex: 0 0 auto;
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-      align-self: stretch;
-      padding: 0 12px;
-      gap: 8px;
-    }
-    .playback-row {
-      flex: 0 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      justify-content: center;
-      align-items: stretch;
-    }
-    .playback-row button {
-      background: #0f0f18;
-      border: 1px solid #4a9b8e;
-      color: #4a9b8e;
-      cursor: pointer;
-      font-family: Georgia, 'Times New Roman', serif;
-      /* 2026-08-08 — Play/Stop scaled up 20 %: font 0.85 → 1.02rem,
-         padding 5/13 → 6/16, min-width 59 → 71. */
-      font-size: 1.02rem;
-      letter-spacing: 0.05em;
-      padding: 6px 16px;
-      border-radius: 3px;
-      text-transform: uppercase;
-      min-width: 71px;
-      touch-action: manipulation;
-    }
-    .playback-row button:hover:not(:disabled)  { background: #1a2a28; }
-    .playback-row button:active:not(:disabled) { background: #243f3b; }
-    .playback-row button:disabled              { opacity: 0.4; cursor: not-allowed; }
-    /* v-check canary — RGB rotation (feedback_canary_rotation).
-       Currently BLUE (iPad landscape → rotate-to-portrait overlay,
-       2026-08-10); next = red. */
-    #play-pause-btn {
-      background: #2A6DFF !important;
-      color: #ffffff !important;
-      border-color: #2A6DFF !important;
+    /* Play/Stop exception: 2× size, light-green / light-red, dark label.
+       Keep these three values identical to M_Music/music_module.html. */
+    .big-btn {
+      min-width: 108px;
+      min-height: 52px;
+      font-size: 0.95rem;
       font-weight: bold;
+      color: #10240f !important;
+    }
+    .big-btn.play { background: #9be29b !important; }
+    .big-btn.stop { background: #e59b9b !important; }
+    .big-btn:hover:not(:disabled) { filter: brightness(1.08); }
+
+    /* status floats out of the grid (top-left); errors/loading only, empty
+       otherwise so it doesn't take layout space. Everything else relays up
+       to BD's status strip. */
+    #status {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      font-size: 0.6rem;
+      font-style: italic;
+      color: #9e9e90;
+      pointer-events: none;
+      max-width: 60%;
+    }
+    #status:empty { display: none; }
+    #status.err { color: #f2a0a0; }
+
+    /* piece name — the derived score's T: header (scale, root, iteration
+       count). Sits under Play/Stop; parity with the ABC player's label. */
+    #piece-title {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-style: italic;
+      font-size: 0.8rem;
+      color: #e8e8e0;
+      text-align: center;
+      max-width: 100%;
+      overflow: hidden;
+      word-wrap: break-word;
+      line-height: 1.2;
     }
 
+    /* stepper column: right-⅓ grid cell, white-framed, scrollable. */
     .control-panel {
-      flex: 0 0 200px;
       display: flex;
       flex-direction: column;
       align-items: stretch;
       gap: 3px;
-      background: rgba(15, 15, 24, 0.75);
-      border: 1px solid rgba(74, 155, 142, 0.2);
-      padding: 6px 8px;
-      border-radius: 0.4rem;
+      border: 1px solid #fff;
+      padding: 5px;
+      border-radius: 4px;
       overflow-y: auto;
       min-height: 0;
-      align-self: flex-start;
-      max-height: 100%;
-    }
-
-    /* 2026-08-09 — breakpoint raised 500 → 1024 so iPad (portrait 768–
-       1024, iPad Mini landscape 1024) gets the stacked/wrapped layout
-       instead of the 3-column desktop one that was hiding Play/Stop
-       behind the right stepper column. */
-    @media (max-width: 1024px) {
-      .module-layout { flex-direction: column; }
-      .lh-actions {
-        flex: 0 0 auto;
-        flex-direction: row;
-        flex-wrap: wrap;
-        padding: 5px 6px;
-        align-self: stretch;
-      }
-      .lh-actions button { flex: 1 1 auto; min-width: 70px; }
-      .control-panel {
-        flex: 0 0 auto;
-        max-height: 40vh;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-self: stretch;
-      }
-      .control-row { flex: 1 1 45%; min-width: 140px; max-width: 100%; }
-      /* Mobile: abc-pane can grow, but max-width caps it so it plus the
-         cleared left gutter and the Play/Stop stack all fit within the
-         viewport without horizontal overflow. */
-      #abc-pane {
-        width: 252px;
-        height: 140px;
-        max-width: calc(100vw - 200px);   /* 90 padding-left + 8 gap + ~80 play + 12 padding-right + safety */
-        font-size: 1.01rem;
-        padding: 6px 8px;
-      }
-      /* Push abc-pane past the fixed extend-panel overlay on the left
-         (panel is at left:8, width up to 76 → right edge ~84 px). */
-      .abc-and-play { padding-left: 90px; }
+      min-width: 0;
     }
 
     .control-row {
@@ -244,6 +161,7 @@
       gap: 2px;
       width: 100%;
     }
+
     .control-row label {
       font-size: 0.64rem;
       letter-spacing: 0.02em;
@@ -254,21 +172,23 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
+
     .stepper {
       display: flex;
       align-items: stretch;
       justify-content: space-between;
       gap: 3px;
     }
+
     .step-btn {
       background: #0f0f18;
       border: 1px solid #4a9b8e;
       color: #4a9b8e;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.9rem;
+      font-size: 1.3rem;                       /* 2026-08-19 — +50%, matching ABC */
       padding: 0;
-      width: 26px;
-      height: 22px;
+      width: 39px;                             /* 2026-08-19 — +50% (was 26) for easier taps */
+      height: 33px;                            /* 2026-08-19 — +50% (was 22) */
       line-height: 1;
       cursor: pointer;
       border-radius: 3px;
@@ -282,6 +202,7 @@
     .step-btn:hover:not(:disabled)  { background: #1a2a28; }
     .step-btn:active:not(:disabled) { background: #243f3b; }
     .step-btn:disabled              { opacity: 0.4; cursor: not-allowed; }
+
     .stepper-value {
       flex: 1;
       display: flex;
@@ -303,30 +224,51 @@
 </head>
 <body>
 
+  <!-- 2026-08-19 — panel grid ported from bd_M_ABC (music_player_layout_spec).
+       Left ⅔: copy (top) / player (centre) / [ext-slot | output] (bottom).
+       Right ⅓: BD arrows-slot (top) over the scrollable stepper column.
+       #bd-arrows-slot and #bd-ext-slot are empty dock-slots BD stamps its ↓↑
+       arrows / Extension panel onto — BD needs no per-module code for either.
+       The read-only derived-ABC pane is gone; "Copy for ABC Player" still
+       hands out the same score. -->
   <div class="module-layout">
 
-    <aside class="lh-actions">
-      <button id="copy-grammar-btn" type="button" title="Copy the current L-system script (grammar + params) to the clipboard">Copy<br>Grammar</button>
-      <button id="copy-abc-btn"     type="button" title="Copy a fully-formed bd_M_ABC script (with the derived ABC score wrapped in %%bd_score) — paste into any bd_M_ABC node to play collaboratively">Copy for<br>ABC Player</button>
-      <button id="bake-mp3-btn"     type="button" title="Render offline to WAV and add to the bottom-bar media player" disabled>Bake</button>
-      <button id="download-mp3-btn" type="button" title="Save the most recent bake as a .wav file" disabled>Save<br>wav</button>
-      <button id="save-midi-btn"    type="button" title="Save the derived ABC score as a .mid file (MIDI, editable in any DAW)" disabled>Save<br>midi</button>
-    </aside>
+    <!-- top-left: Copy panel -->
+    <div class="panel copy-panel">
+      <button id="copy-grammar-btn" type="button" title="Copy the current L-system script (grammar + params) to the clipboard">Copy Grammar</button>
+      <button id="copy-abc-btn" type="button" title="Copy a fully-formed bd_M_ABC script (with the derived ABC score wrapped in %%bd_score) — paste into any bd_M_ABC node to play collaboratively">Copy for ABC Player</button>
+    </div>
 
-    <section class="main-area">
-      <div id="status">Loading samples…</div>
-      <div class="abc-and-play">
-        <div id="abc-pane" title="Derived ABC (read-only; select + Cmd-C to copy, or use 'Copy for ABC Player')"></div>
-        <div class="playback-row">
-          <button id="play-pause-btn" type="button" disabled>Play</button>
-          <button id="stop-btn"       type="button" disabled>Stop</button>
-        </div>
+    <!-- centre: player main controls -->
+    <div class="panel player-panel">
+      <div class="play-row">
+        <button id="play-pause-btn" class="big-btn play" type="button" disabled>Play</button>
+        <button id="stop-btn"       class="big-btn stop" type="button" disabled>Stop</button>
       </div>
-    </section>
+      <div id="piece-title" title="Derived score (T: header — scale, root, iterations)"></div>
+    </div>
 
+    <!-- bottom-left: BD Extension panel docks here -->
+    <div id="bd-ext-slot" class="dock-slot"></div>
+
+    <!-- bottom (right of the ⅔): Output panel -->
+    <div class="panel output-panel">
+      <button id="bake-mp3-btn" type="button" title="Render offline to WAV and add to the bottom-bar media player" disabled>Bake</button>
+      <button id="download-mp3-btn" type="button" title="Save the most recent bake as a .wav file" disabled>Save wav</button>
+      <button id="save-midi-btn" type="button" title="Save the derived ABC score as a .mid file (MIDI, editable in any DAW)" disabled>Save midi</button>
+      <button class="ph" type="button" disabled title="(spare)">&nbsp;</button>
+    </div>
+
+    <!-- right ⅓ top: BD ↓↑ arrows dock here -->
+    <div id="bd-arrows-slot" class="dock-slot"></div>
+
+    <!-- right ⅓: scrollable stepper column -->
     <aside id="control-panel" class="control-panel"><!-- injected --></aside>
 
   </div>
+
+  <!-- errors / loading only; floats out of the grid (top-left) -->
+  <div id="status">Loading samples…</div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js"></script>
@@ -343,7 +285,7 @@
 
     // ── Refs ─────────────────────────────────────────────────────────────────
     const statusEl        = document.getElementById('status');
-    const abcPaneEl       = document.getElementById('abc-pane');
+    const pieceTitleEl    = document.getElementById('piece-title');
     const playPauseBtn    = document.getElementById('play-pause-btn');
     const stopBtn         = document.getElementById('stop-btn');
     const copyGrammarBtn  = document.getElementById('copy-grammar-btn');
@@ -454,11 +396,16 @@
     });
 
     // ── Helpers ─────────────────────────────────────────────────────────────
-    const setStatus = (msg, isErr = false) => {
-      statusEl.textContent = msg;
-      statusEl.classList.toggle('err', !!isErr);
-    };
     const postToParent = (msg) => window.parent.postMessage(msg, '*');
+    const setStatus = (msg, isErr = false) => {
+      // 2026-08-19 — parity with bd_M_ABC: the in-module corner text sits
+      // behind the copy panel and is unreadable, so status relays UP to BD's
+      // status strip and the local #status is kept empty (:empty → hidden).
+      // Only REAL errors are forwarded; playback chatter sends empty text so
+      // the strip falls back to the connection count.
+      statusEl.textContent = '';
+      postToParent({ type: 'BD_STATUS', text: isErr ? (msg || '') : '', isErr: !!isErr });
+    };
 
     function formatDisplay(spec, val) {
       if (spec.isToggle) return val >= 0.5 ? 'on' : 'off';
@@ -1011,7 +958,11 @@
         effectiveIter:   effIter,
         iterReduced
       };
-      abcPaneEl.textContent = derivedAbc;
+      // 2026-08-19 — the read-only ABC pane is gone (grid layout). Surface the
+      // derived score's T: header instead; "Copy for ABC Player" still hands
+      // out the full script, so nothing is lost but the wall of text.
+      const tMatch = derivedAbc.match(/^T:\s*(.+?)\s*$/m);
+      pieceTitleEl.textContent = tMatch ? tMatch[1] : '';
       loadDerivedAbcIntoPlayer();
     }
     let lastGenerationInfo = {
