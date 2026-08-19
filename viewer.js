@@ -4944,14 +4944,36 @@ async function init() {
               const cp = innerDoc.querySelector('.control-panel');
               if (cp) {
                 const cpRect = cp.getBoundingClientRect();
-                const x = Math.round(outerRect.left + innerOffsetLeft + cpRect.left - 34);
-                [cUp, cDown].forEach((b, i) => {
-                  b.style.position = 'fixed';
-                  b.style.left     = x + 'px';
-                  b.style.right    = 'auto';
-                  b.style.top      = Math.round(canvasTopVp + i * 28) + 'px';
-                  b.style.zIndex   = '7';
-                });
+                // Reset first, THEN measure: arriving here straight from a
+                // music module leaves the dock-slot branch's inline width on
+                // the button, and measuring that would report the slot's width
+                // rather than the button's own.
+                clearArrowDock();
+                // Measure the button instead of assuming ~34px, and place its
+                // RIGHT edge 6px clear of the column, so the gap it needs is
+                // whatever it actually occupies.
+                const bw  = Math.ceil(cUp.getBoundingClientRect().width) || 30;
+                const gap = cpRect.left - cRect.right;   // canvas → column, module coords
+                if (gap >= bw + 8) {
+                  const x = Math.round(outerRect.left + innerOffsetLeft +
+                                       cpRect.left - bw - 6);
+                  [cUp, cDown].forEach((b, i) => {
+                    b.style.position = 'fixed';
+                    b.style.left     = x + 'px';
+                    b.style.right    = 'auto';
+                    b.style.top      = Math.round(canvasTopVp + i * 28) + 'px';
+                    b.style.zIndex   = '7';
+                  });
+                } else {
+                  // Narrow the window far enough and the module flips to its
+                  // own small-iframe layout, which drops the reserved band —
+                  // the arrows were landing on the right-hand steppers. There
+                  // is nowhere to dock them, so hand them back to CSS (the
+                  // action bar) rather than overlap the column. Keying on the
+                  // measured gap means this self-corrects at every width,
+                  // whichever internal layout the module has chosen.
+                  // (Already reset above — nothing further to undo.)
+                }
               }
             }
           }
