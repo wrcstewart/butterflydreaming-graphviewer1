@@ -4844,34 +4844,18 @@ async function init() {
         return;
       }
 
-      // Legacy modules (Kolam/Fractal), no dock-slots: on desktop, clear inline
-      // overrides and let the CSS default (right-side panel) win.
-      if (window.innerWidth > 1024) {
+      // Legacy modules with no dock-slots: on desktop, clear inline overrides
+      // and let the CSS default (right-side panel) win.
+      // 2026-08-19 — EXCEPT Kolam. Its Extension panel belongs UNDER the canvas
+      // at every size, and its arrows beside the stepper column at every size,
+      // so it must reach the under-canvas branch below rather than returning
+      // here. Returning was what flipped the panel to the vertical right-edge
+      // default as soon as the window passed 1024.
+      const kolamHere = innerDoc && innerDoc.getElementById('kolam-canvas');
+      if (window.innerWidth > 1024 && !kolamHere) {
         panel.classList.remove('under-canvas', 'in-slot');
         panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
         panel.style.bottom = ''; panel.style.transform = '';
-        // 2026-08-19 — desktop ↓↑ arrows. The stepper column is the module's
-        // last flex child, so the module iframe's right edge IS the column's
-        // right edge; positionCyEl already reserves a 100px band beyond it for
-        // the Extension panel. Stack the arrows just inside that band, hugging
-        // the column, anchored to the column's TOP — the Extension panel is
-        // vertically centred there, so they don't meet. Modules without a
-        // stepper column keep the arrows in the action bar.
-        const cpDesk = innerDoc && innerDoc.querySelector('.control-panel');
-        if (cpDesk) {
-          const cpRect = cpDesk.getBoundingClientRect();
-          const x = Math.round(outerRect.right + 4);
-          const y = Math.round(outerRect.top + innerOffsetTop + cpRect.top + 2);
-          [['copy-up-btn', 0], ['copy-down-btn', 30]].forEach(([id, dy]) => {
-            const b = document.getElementById(id);
-            if (!b) return;
-            b.style.position = 'fixed';
-            b.style.left     = x + 'px';
-            b.style.right    = 'auto';
-            b.style.top      = (y + dy) + 'px';
-            b.style.zIndex   = '7';
-          });
-        }
         return;
       }
 
@@ -4944,7 +4928,8 @@ async function init() {
               const colRightVp = outerRect.left + innerOffsetLeft + cpRect.right;
               const innerGap   = cpRect.left - cRect.right;   // canvas → column
               const fitsInside = innerGap >= bw + 8;
-              const x = fitsInside ? Math.round(colLeftVp - bw - 6)
+              // 3px, not 6 — the arrows read as belonging to the column.
+              const x = fitsInside ? Math.round(colLeftVp - bw - 3)
                                    : Math.round(colRightVp + 4);
               [[cUp, 0], [cDown, 26]].forEach(([b, dy]) => {
                 b.style.position = 'fixed';
