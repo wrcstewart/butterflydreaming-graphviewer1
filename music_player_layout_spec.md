@@ -221,19 +221,44 @@ after 13:51 happened in the `bd_M_ABC` repo (see below).**
 (standalone) share the grid but **no longer share the styling**. Reconcile
 deliberately, don't diff-and-merge blind:
 
+**Converged 2026-08-19** (BD `54ae973`, standalone `02b8cae`): Play/Stop is the
+light-green/light-red pair in both again, and **Copy .abc, Save wav and Save
+midi now exist in both**. The two files' JS is identical bar declaration order;
+what is left is styling only.
+
 | | Embedded (BD) | Standalone (`bd_M_ABC`) |
 |---|---|---|
-| Typeface | Georgia serif | Arial sans (serif only on the gold title) |
-| Play / Stop | light-green / light-red, dark label, `min-height:52px` | `#f0f0f0`+black / black+white, `min-height:40px` |
+| Typeface | Georgia serif + Courier steppers | Arial sans throughout (serif only on preview's gold title) |
 | `grid-template-rows` | `auto 1fr auto` | `minmax(80px,auto) minmax(136px,auto) 1fr` |
-| Output-panel slots | Bake + 3 spares | Bake + **Save wav** + **Save midi** + spare |
-| `.big-btn` min-height | 52px | 56px (panels carry the depth: copy 80 / player 160) |
+| Panel depths | none pinned | `.copy-panel` 80px, `.player-panel` 160px + `flex-start` |
+| `.big-btn` min-height | 52px | 56px (the panel, not the button, carries the black space) |
 | `.dock-slot` border | `1px dashed rgba(255,255,255,.35)` — visible reserved box | `1px solid transparent` — empty slot reads as free space |
 | Dock mechanism | BD `positionExtendPanel` through the iframe chain | preview's local `positionSlots()` / `dockOnto` |
 
-Verified by direct diff on 2026-08-19: 935 lines embedded vs 1003 standalone,
-~122 changed lines, and **both repos are level with `origin/main`** — GitHub
-holds nothing newer than what is described here.
+The dock-mechanism row is **intended** divergence (different harnesses). The
+other four are the standalone's depth/typeface work not yet ported back — that
+is the remaining §4a decision.
+
+**Copy .abc / Save wav / Save midi (both copies, 2026-08-19).**
+- `copyViaClipboard(text, btn)` — one helper, both copy buttons: async
+  clipboard, then hidden-`<textarea>` + `execCommand`, flash on success.
+- **Copy .abc** = `extractScore()` with any surviving `%%bd_` lines filtered
+  out, so the clipboard holds ABC an external editor will open. Genuine ABC
+  `%%` directives (`%%score`, `%%MIDI`) are deliberately kept.
+- **Save wav** hands out the cached bake Blob; **Save midi** renders from the
+  score via `ABCJS.synth.getMidiFile(..., 'binary')`, which returns an ARRAY —
+  take `[0]`.
+- The bake Blob is cached **before** the `BD_MEDIA_BLOB` post. Structured clone
+  makes that moot today, but a transfer list would detach the buffer.
+- **Downloads inside BD depend on `allow-downloads`** in `#visual-iframe`'s
+  sandbox (`index.html:105`); `M_Music/index.html` sets no sandbox of its own,
+  so it inherits the grant. Remove that token and both saves go silent.
+- Both saves **flash the button**: inside BD `setStatus` relays only real
+  errors, so a success line alone is swallowed and the save looks inert.
+
+Verified by direct diff on 2026-08-19 (935/1003 lines and ~122 changed before
+the port; 71 changed after), and **all four repos are level with `origin/main`**
+— GitHub holds nothing newer than what is described here.
 
 The Save-wav/Save-midi and dock-mechanism rows are **intended** divergence. The
 typeface / Play-Stop / grid-rows rows are the standalone running ahead —
