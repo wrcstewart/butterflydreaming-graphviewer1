@@ -105,6 +105,15 @@
          canvas's translateX; without this the canvas is flush against the
          column in landscape and the arrows land on the graphic. */
       padding-right: 44px;
+      /* 2026-08-19 — and 52px below it for BD's Extension strip, matching the
+         reserve the small layout has always had. Without it the canvas fills
+         the wrapper down to the iframe's bottom edge, the strip has nowhere to
+         sit, and positionExtendPanel's breadcrumb clamp pulls it up ONTO the
+         graphic (it needs 44: 34 strip + 6 gap + 4 clearance).
+         The canvas is height-limited on desktop, so this costs ~52px of square
+         in both dimensions — deliberate, and the same trade the small layout
+         makes for free (it is width-limited there). */
+      padding-bottom: 52px;
     }
 
     /* Small iframe (mobile) — 2026-08-05 v13. Kolam-specific gutter for BD's
