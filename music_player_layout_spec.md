@@ -329,13 +329,22 @@ Link moved to the bottom bar; Copy retired (the module's own Copy Script does
 it), taking the action bar and its CSS with it; module status relayed via
 `BD_STATUS` into the side-panel line, errors only.
 
-**The simplified non-edit ("basic") mode is retired here** at the user's
-request — `body` no longer boots `.ev-basic`, the rule that hid the side panel
-is gone, and so is the Edit button that toggled it. This harness is edit-only;
-the side panel and invite are always present. **`bd_M_ABC` still has both
-modes**, so its `positionSlots()` keeps the `ev-basic` branch that gates the
-arrow dock. Do not "tidy" that branch away when diffing the two harnesses —
-it is a real difference, not drift.
+**The simplified non-edit ("basic") mode is retired**, in `bd_M_Fractal`
+(`921e6b8`) and then in `bd_M_ABC` too (`e3c4851`) — `body` no longer boots
+`.ev-basic`, the rule that hid the side panel is gone, and so is the Edit button
+that toggled it. **Both standalone harnesses are edit-only**; the side panel and
+the invite are always present. `positionSlots()` therefore docks the arrows
+unconditionally: the old branch that skipped docking in basic mode and cleared
+their inline geometry is dead code once the mode is.
+
+Also in `bd_M_Fractal` (`2f02aa8`), bringing it fully into line with `bd_M_ABC`:
+the invite buttons drop the amber solid/outlined pair for the white-frame,
+black-bg B&W pair, and `#script-input` opens at **full panel depth**
+(`flex: 1 1 auto`, 120px floor) rather than a fixed height waiting to be
+dragged — which also behaves better in portrait than `bd_M_ABC`'s fixed 368px,
+that overflows a 45vh side panel on a phone. Its textarea stays **editable**
+(the grammar has an axiom and rules, not just numerics), so ABC's read-only
+colour/cursor cues were corrected rather than copied.
 
 ## 11. What is left
 
