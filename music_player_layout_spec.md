@@ -1,7 +1,7 @@
 # Music-player layout — spec (v0.2, 2026-08-19)
 
-Status: **built for ABC (mobile + desktop, embedded + standalone); Fractal not
-yet ported.** A single, principled layout for the media-module players.
+Status: **built for ABC (mobile + desktop, embedded + standalone) and for
+Fractal (BD-embedded; its standalone is not ported).** A single, principled layout for the media-module players.
 Supersedes the ad-hoc per-module mobile patching.
 
 §§0–3 (principles, column, grid, dock-slots) are as built and unchanged. **§4
@@ -265,9 +265,58 @@ typeface / Play-Stop / grid-rows rows are the standalone running ahead —
 **decide whether to port §4a back to the embedded copy** (and whether the BD
 Player should read B&W too) before touching Fractal.
 
-## 9. Fractal — TODO
+## 9. Fractal — DONE (BD-embedded), 2026-08-19
 
-Add the same grid + two dock-slots to `M_Fractal/music_module.html`; the BD side
-is free once `/bd_M_Fractal/` is added to the `positionCyEl` src test (§7). Pick
-the styling from §4 or §4a per the §8 decision first, so Fractal doesn't become
-a third variant.
+`M_Fractal/music_module.html` is on the grid (`0c3bd2a`). It took §4 styling,
+not §4a — so BD's two players match each other and the standalone is the odd
+one out (§8).
+
+- Same six areas, same white-framed panels, same green/red 2× Play/Stop. The old
+  flex row and its 1024px stacked variant are gone, along with the
+  `padding-left: 90px` gutter that pushed content clear of the floating extend
+  panel — the dock-slot makes it unnecessary.
+- **`#abc-pane` removed** (user: not needed). Nothing is lost: *Copy abc* still
+  emits the full `bd_M_ABC` script, and the derived score's `T:` header now
+  fills `#piece-title` under Play/Stop, exactly as ABC uses its own `T:`.
+- BD side was nearly free, as designed: `positionCyEl`'s single-module test
+  became `GRID_MODULES` (add future grid modules there), and the dock-slots meant
+  `positionExtendPanel` needed no Fractal code at all. Its `#abc-pane` fallback
+  is now dead for Fractal but is left in place.
+- **The wrapper's `RELAY_UP` set needed `BD_STATUS` adding** or status messages
+  were dropped silently at `M_Fractal/index.html`. Check that list when porting
+  any module.
+
+**Fractal-only divergences from ABC, at the user's request (`15d377e`,
+`fb35b06`):** bottom-row columns `0.9fr 1.1fr 1fr` (output +10%, ext slot −10%,
+which also narrows BD's docked external-website buttons since
+`positionExtendPanel` stamps the slot's width onto them); panel buttons 0.95rem
+with a 34px floor; Play/Stop 1.1rem; output buttons `min-width: 59px`; the scale
+stepper displays `min_pentatonic` as `pent`. ABC was deliberately left at its
+0.66rem / `1fr 1fr 1fr` settings.
+
+### 9a. Two traps this port hit — read before porting the next module
+
+1. **A grid item's automatic minimum size is its CONTENT.** Fractal's 12-row
+   stepper column grew past the grid and was clipped by `html, body {
+   overflow: hidden }`; `overflow-y: auto` never engaged because the element was
+   never shorter than its own content. Fix: `minmax(80px, 1fr)` on the row track
+   (a *fixed* floor is safe — only a content-based minimum breaks the scroll),
+   `overflow: hidden` on the grid, and `flex: 0 0 auto` on the rows so they keep
+   their height instead of squashing. ABC's 8 rows had been getting away with it.
+2. **A top-level throw in a module reads as four unrelated faults.** Adding
+   `const ENUM_DISPLAY` *after* the `STEPPERS.forEach` loop that calls
+   `formatDisplay` threw on the first enum stepper (TDZ), which aborted the
+   script and produced: a control column with exactly 3 rows, every button inert,
+   and BD's extend panel stranded at the right-hand screen edge — because
+   `BD_READY` is posted at the END of the module script and never went out. CSS
+   in the same commit still applied, which made it look like the file had loaded
+   fine. **Module iframes do not forward console errors to
+   `/tmp/bd_server.log`** (BD relays only its own window), so reproduce the
+   top-level order under node instead. Fixed in `6ec2385`.
+
+## 10. Fractal standalone — TODO
+
+`bd_M_Fractal` still has the pre-grid layout and its own `#abc-pane`. Porting it
+is the same job the ABC standalone had on 2026-08-18: take the embedded grid,
+keep the standalone-only bits (its Save wav / Save midi already exist there),
+and dock via a local `positionSlots()` rather than BD's `positionExtendPanel`.
