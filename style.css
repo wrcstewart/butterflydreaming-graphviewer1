@@ -1094,6 +1094,22 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   gap: 6px;
   margin: 0;
 }
+/* The button LABELS grew long in 322ed49 ("Jump to external player" /
+   "Copy external url") while the base width stayed 50px, so side-by-side they
+   would be two narrow 5-line columns. Widen them for the strip: two ~2-line
+   buttons, ~34px tall, which is what has to fit between the canvas bottom and
+   the breadcrumbs. */
+#bd-invite-panel-viewer.under-canvas #jump-to-ext-btn,
+#bd-invite-panel-viewer.under-canvas #copy-link-to-ext-btn {
+  width: auto;
+  min-width: 96px;
+  max-width: 132px;
+  white-space: normal;
+  font-size: 9px;
+  font-weight: normal;
+  line-height: 1.15;
+  padding: 5px 6px;
+}
 
 /* ABC / Fractal, docked into the module's #bd-ext-slot: two long buttons
    stacked one under the other, filling the cell. `.in-slot` is added only by
@@ -1105,6 +1121,9 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #bd-invite-panel-viewer.under-canvas.in-slot #jump-to-ext-btn,
 #bd-invite-panel-viewer.under-canvas.in-slot #copy-link-to-ext-btn {
   width: 100%;
+  min-width: 0;                           /* reset the strip's min/max — the slot
+                                             sets the width, not the button */
+  max-width: none;
   white-space: normal;
   font-size: 8px;
   font-weight: normal;

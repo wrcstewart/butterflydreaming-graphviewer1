@@ -4925,11 +4925,22 @@ async function init() {
     // vertical left-gutter panel.
     panel.classList.toggle('under-canvas', centerUnderCanvas);
     panel.classList.remove('in-slot');   // this path is never a dock slot
-    panel.style.top       = topPx + 'px';
     panel.style.left      = leftPx + 'px';
     panel.style.right     = 'auto';
     panel.style.bottom    = 'auto';
     panel.style.transform = centerUnderCanvas ? 'translateX(-50%)' : 'none';
+    if (centerUnderCanvas) {
+      // 2026-08-19 — the strip must live in the gap BETWEEN the canvas bottom
+      // and the breadcrumbs, never over them. Classes and width are set above,
+      // so the panel's real height can be measured now; clamp the top so its
+      // bottom edge clears #cy-you (the upper breadcrumb strip) by 4px.
+      const youEl = document.getElementById('cy-you');
+      const limit = (youEl ? youEl.getBoundingClientRect().top
+                           : window.innerHeight - 63) - 4;
+      const ph = panel.getBoundingClientRect().height || 36;
+      topPx = Math.min(topPx, limit - ph);
+    }
+    panel.style.top       = topPx + 'px';
   }
 
   // 2026-07-15 — Chat is now always active from boot (no toggle). The
