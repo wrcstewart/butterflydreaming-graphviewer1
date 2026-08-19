@@ -2560,7 +2560,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function setSendBtn(el) { sendBtnEl = el; updateSendBtn(); }
 
-  let prevHasModule = false;
+  // Auto-Player bookkeeping (2026-08-09, reworked 2026-08-19). The original
+  // `prevHasModule` was a single sticky boolean, and that was the bug: once a
+  // module script reached the top Current card — exactly what the ↓ arrow does
+  // — hasModule stayed true for the rest of the session, the false→true edge
+  // never came round again, and no later module node ever auto-engaged Player.
+  // Key off the module NODE instead, and track the top-card path separately.
+  let lastAutoPlayerNodeId = null;   // node we last auto-switched for
+  let prevCardHasModule    = false;  // top-card path only (pasted script)
   function updateSendBtn() {
     const top = topLocalCard();
     const text = top && top.body ? top.body.value : '';
@@ -2579,11 +2586,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const playerLabel = playerRadio ? playerRadio.closest('label') : null;
     if (playerRadio && playerLabel) {
       const MODULE_RE = /^%%bd_module\s+\S+/m;
-      let hasModule = MODULE_RE.test(text);
-      if (!hasModule && readingState && readingState.nodeId) {
+      // Two independent sources, kept apart so the auto-switch can key off the
+      // node while the enable/disable state still honours a pasted script.
+      const cardHasModule = MODULE_RE.test(text);
+      let nodeHasModule = false;
+      let moduleNodeId  = null;
+      if (readingState && readingState.nodeId) {
         const rn = cy.getElementById(readingState.nodeId);
-        if (rn && rn.length) hasModule = MODULE_RE.test(rn.data('text') || '');
+        if (rn && rn.length && MODULE_RE.test(rn.data('text') || '')) {
+          nodeHasModule = true;
+          moduleNodeId  = readingState.nodeId;
+        }
       }
+      const hasModule = cardHasModule || nodeHasModule;
       playerRadio.disabled = !hasModule;
       // 2026-08-14 — Player label always visible now (part of the yellow
       // top-row radio group alongside Nodes + Edit). Only the disabled
@@ -2595,16 +2610,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         playerRadio.checked = false;
         document.dispatchEvent(new CustomEvent('bd:force-nodes-mode'));
       }
-      // 2026-08-09 — auto-switch to Player mode on false→true transition
-      // (a module script has just "landed"). Manual Nodes selection on a
-      // module node is respected: subsequent updateSendBtn calls see
-      // prevHasModule=true and don't re-auto-switch. Navigating away
-      // (hasModule→false) resets prevHasModule; coming back re-fires.
-      if (hasModule && !prevHasModule && !playerRadio.checked) {
+      // Auto-switch to Player when a module script "lands". Two ways:
+      //   · the user read-taps a module NODE we haven't auto-switched for yet
+      //     (keyed by node id, so a second module node fires again, and so
+      //     does returning to the first one after reading something else);
+      //   · a script is pasted into the top card while no module node is in
+      //     play — the original false→true edge, kept for that path only.
+      // Manual Nodes selection is still respected: while the reading node is
+      // unchanged its id already equals lastAutoPlayerNodeId, so the repeated
+      // updateSendBtn calls can't drag the user back into Player.
+      const landedOnModuleNode = nodeHasModule && moduleNodeId !== lastAutoPlayerNodeId;
+      const pastedIntoTopCard  = !nodeHasModule && cardHasModule && !prevCardHasModule;
+      if ((landedOnModuleNode || pastedIntoTopCard) && !playerRadio.checked) {
+        console.log('[auto-player] engaging Player for',
+                    moduleNodeId ? ('node ' + moduleNodeId) : 'pasted script');
         playerRadio.checked = true;
         playerRadio.dispatchEvent(new Event('change'));
       }
-      prevHasModule = hasModule;
+      // Remember what we acted on. Reading a NON-module node clears the key, so
+      // coming back to a module node counts as a fresh landing.
+      lastAutoPlayerNodeId = nodeHasModule ? moduleNodeId : null;
+      prevCardHasModule    = cardHasModule;
     }
   }
 
