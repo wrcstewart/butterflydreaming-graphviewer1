@@ -35,7 +35,10 @@
          website buttons dock) −10%, output (col 2) +10%. The copy and player
          areas span cols 1-2 so their combined width is unchanged. */
       grid-template-columns: 0.9fr 1.1fr 1fr;   /* left ⅔ = cols 1-2, right ⅓ = col 3 */
-      grid-template-rows: auto 1fr auto;
+      /* 2026-08-19 — minmax(0,1fr), NOT 1fr: a grid item's auto minimum size
+         is its content, so the 12-row stepper column grew past the grid and
+         was clipped (only the top few rows visible) instead of scrolling. */
+      grid-template-rows: auto minmax(80px, 1fr) auto;
       grid-template-areas:
         "copy   copy    arrows"
         "player player  steppers"
@@ -44,6 +47,7 @@
       padding: 5px;
       min-height: 0;
       min-width: 0;
+      overflow: hidden;
       box-sizing: border-box;
     }
     .copy-panel     { grid-area: copy; }
@@ -84,12 +88,15 @@
       background: #000;
       color: #fff;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.76rem;                    /* 2026-08-19 — +15%, the 0.66rem was hard to read */
-      line-height: 1.1;
-      padding: 4px 6px;
+      /* 2026-08-19 — text sized to FILL the button: 0.66 → 0.95rem, trimmed
+         side padding and a taller floor so the label isn't a stripe in the
+         middle of a black box. ABC deliberately keeps the smaller 0.66rem. */
+      font-size: 0.95rem;
+      line-height: 1.15;
+      padding: 3px 5px;
       border-radius: 3px;
       min-width: 54px;
-      min-height: 26px;
+      min-height: 34px;
       cursor: pointer;
       text-align: center;
       touch-action: manipulation;
@@ -108,7 +115,7 @@
     .big-btn {
       min-width: 108px;
       min-height: 52px;
-      font-size: 0.95rem;
+      font-size: 1.1rem;                     /* 2026-08-19 — stays above the 0.95rem panel buttons */
       font-weight: bold;
       color: #10240f !important;
     }
@@ -152,6 +159,11 @@
       flex-direction: column;
       align-items: stretch;
       gap: 3px;
+      /* 12 steppers never fit — the column scrolls. `flex: 0 0 auto` on the
+         rows stops them squashing to fit instead of overflowing, and a thin
+         always-visible scrollbar makes the scroll discoverable. */
+      scrollbar-width: thin;
+      overscroll-behavior: contain;
       border: 1px solid #fff;
       padding: 5px;
       border-radius: 4px;
@@ -165,6 +177,7 @@
       flex-direction: column;
       gap: 2px;
       width: 100%;
+      flex: 0 0 auto;
     }
 
     .control-row label {
