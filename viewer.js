@@ -1330,6 +1330,14 @@ function buildStyle() {
                                                   clip inside the chip. */
         'text-max-width': '59px',              /* proportional to width bump
                                                   (was 56/60 = 0.93; now 59/63). */
+        /* 2026-08-20 — TRUNCATE, don't wrap. The base `node` selector sets
+           text-wrap:'wrap' (b61364e, for in-node labels on the main canvas),
+           which inside an 18px chip pushed long names onto a second and third
+           line that overlapped each other — the squashed look. 'ellipsis' cuts
+           at text-max-width and adds "…" on one line instead. Long-standing;
+           only became conspicuous once the trail was right-aligned and the
+           newest chip stopped drifting. */
+        'text-wrap': 'ellipsis',
         'text-margin-y': 0,
         'border-width': 0,
       }
