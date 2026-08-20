@@ -76,6 +76,19 @@ body.player-active #buddy-latest { display: none; }
 /* Partner left: dim to match the .buddy-gone chips in the strip below, but stay
    tappable — where they got to is still worth revisiting. */
 #buddy-latest.gone { opacity: 0.45; }
+/* 2026-08-20 — transparent tap target laid over the cytoscape canvases.
+   iOS was not firing the panel's click at all: cytoscape binds its own touch
+   handlers to the container and preventDefaults them, so no synthesized click
+   ever reached us. This sits above the canvases and takes the tap itself —
+   safe because the instance has interaction disabled, so nothing inside it
+   wanted the event. */
+#buddy-latest .tap-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 /* Phones take a further cut. The panel is a fixed pixel size, so it occupies a
    far bigger share of a 390px phone than of a desktop — that is the mismatch.
    145x49 is ~67% linear / ~45% of the original area, and still renders a ~10px
@@ -85,8 +98,13 @@ body.player-active #buddy-latest { display: none; }
    (50% of the AREA is 70% linear, which is roughly what this is.) */
 @media (max-width: 767px) {
   #buddy-latest {
-    width: min(46vw, 145px);
-    height: 49px;
+    /* 2026-08-20 — 50% of the original 216x73. Viable only because the fit
+       padding dropped 7 → 3: at pad 7 this size renders a 6.8px label, BELOW
+       the chip's 8px; at pad 3 it is 8.5px with the node at 102x29 against the
+       chip's 63x18. So on a phone the enlargement is mostly in node SIZE
+       (~1.6x each way) rather than text size. */
+    width: min(30vw, 108px);
+    height: 37px;
   }
 }
 
@@ -865,7 +883,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #d02020;             /* CANARY — red (was blue) */
+  border: 2px solid #40c040;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

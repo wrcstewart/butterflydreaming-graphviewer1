@@ -2022,7 +2022,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     if (!buddyLatestCy || !buddyLatestEl || buddyLatestEl.hidden) return;
     if (buddyLatestCy.nodes().length === 0) return;
     buddyLatestCy.resize();
-    buddyLatestCy.fit(buddyLatestCy.nodes(), 7);   // 8 − the 1px border that is now gone
+    // 2026-08-20 — padding 7 → 3: "maximum use of the space". At the reduced
+    // panel sizes the padding was the difference between a label above and
+    // below the 8px the chip uses.
+    buddyLatestCy.fit(buddyLatestCy.nodes(), 3);
     if (buddyLatestCy.zoom() > BUDDY_LATEST_MAX_ZOOM) {
       buddyLatestCy.zoom(BUDDY_LATEST_MAX_ZOOM);
       buddyLatestCy.center();
@@ -2039,16 +2042,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
   }
 
   if (buddyLatestEl) {
-    // Tap handled on the CONTAINER, not the node: the whole panel is the
-    // target, and the instance has interaction disabled anyway. Same
-    // one-gesture behaviour as a chip tap — re-enter that node's view.
-    buddyLatestEl.addEventListener('click', () => {
+    // 2026-08-20 — the tap is taken by a transparent shield laid OVER the
+    // cytoscape canvases, not by the container. A container listener never
+    // fired on iOS: cytoscape binds its own touch handlers and preventDefaults
+    // them, so no synthesized click ever arrived. The shield is above the
+    // canvases, so it gets the event first — safe, because this instance has
+    // interaction disabled and nothing inside it wanted the touch.
+    const shield = document.createElement('div');
+    shield.className = 'tap-shield';
+    buddyLatestEl.appendChild(shield);
+
+    // Same one-gesture behaviour as a chip tap — re-enter that node's view.
+    const openBuddyLatest = () => {
       if (!buddyLatestMainId) return;
       const main = cy.getElementById(buddyLatestMainId);
       if (!main.length) return;
       hideTooltip();
       handleNodeTap(main);
-    });
+    };
+    // touchend AND click: touchend for iOS (and preventDefault so the click it
+    // would synthesize cannot fire the handler a second time), click for mouse
+    // and for any browser that does not emit touch events here.
+    shield.addEventListener('touchend', (e) => { e.preventDefault(); openBuddyLatest(); });
+    shield.addEventListener('click', openBuddyLatest);
   }
 
   function panBuddyCyToLatest() {
