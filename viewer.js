@@ -4734,12 +4734,25 @@ async function init() {
     if (nodeId) loadModuleForNode(nodeId);
   });
   // Window resize while Player is active — restamp the iframe rect from #cy.
-  window.addEventListener('resize', () => {
-    if (visualIframe && visualIframe.classList.contains('active')) {
-      positionCyEl();
-      positionExtendPanel();
-    }
-  });
+  // 2026-08-20 — repositioning ONCE is not enough on an orientation change.
+  // iOS fires resize while it is still reporting the old viewport, so the
+  // single synchronous pass measured a half-rotated layout and nothing ran
+  // afterwards to correct it. Re-run on the next frame and again after the
+  // rotation animation, which is why leaving for the external player and
+  // coming back "fixed" it — that path repositions from a settled layout.
+  function repositionPlayer() {
+    if (!visualIframe || !visualIframe.classList.contains('active')) return;
+    positionCyEl();
+    positionExtendPanel();
+  }
+  function repositionPlayerSettled() {
+    repositionPlayer();
+    requestAnimationFrame(repositionPlayer);
+    setTimeout(repositionPlayer, 250);
+    setTimeout(repositionPlayer, 600);   // iOS rotation animation is ~400ms
+  }
+  window.addEventListener('resize', repositionPlayerSettled);
+  window.addEventListener('orientationchange', repositionPlayerSettled);
 
   // 2026-08-09 — JS-anchored extend-panel positioning. CSS-only rules
   // (media queries with vh offsets) couldn't reliably align the panel
@@ -4895,8 +4908,20 @@ async function init() {
             // above the canvas top. The module iframe is frozen + z-index 1 in
             // Player mode, so CSS layers #chat-panel above it and here we anchor
             // its height to the live canvas top. Mobile only.
+            // 2026-08-20 — skip entirely while the rotate-to-portrait overlay
+            // is up. In landscape the canvas rect is meaningless, and the
+            // oversized height computed from it was being stamped and kept:
+            // rotating back fired one resize, which recomputed from a viewport
+            // iOS had not finished updating, so the bad value stuck and the
+            // History pane covered the graphic. Reading the overlay's computed
+            // display uses the same media query the CSS does, so the two can
+            // never disagree. The reset at the top of this function has already
+            // cleared the height, so skipping leaves the CSS default.
+            const rotOverlay = document.getElementById('rotate-to-portrait');
+            const rotated = rotOverlay &&
+                            getComputedStyle(rotOverlay).display !== 'none';
             const histPane = document.getElementById('chat-panel');
-            if (histPane && histPane.classList.contains('active') && onPhone) {
+            if (histPane && histPane.classList.contains('active') && onPhone && !rotated) {
               const h = Math.max(0, Math.round((canvasTopVp - 6) - histPane.getBoundingClientRect().top));
               if (h > 0) histPane.style.height = h + 'px';
             }
