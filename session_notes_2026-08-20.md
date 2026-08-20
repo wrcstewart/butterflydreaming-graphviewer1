@@ -80,7 +80,123 @@ the layout you must not disturb, and my 85px was arithmetic, not a measurement.
 Full rule in `music_player_layout_spec.md` §3a and the [[music-player-layout]]
 memory.
 
-## 5. Desktop — working, confirmed 2026-08-20
+## 6. Enlarged remote breadcrumb (evening)
+
+The remote trail is the one thing a user cannot zoom, and where the partner is
+sits at the centre of the conversation — but the chips are 23px and often
+abbreviated to a bare sequence number. `#buddy-latest` restates the newest one.
+
+**It is a third cytoscape instance**, `buddyLatestCy`, not a styled div. It
+shares `buildStyle()` with the two strips, so the node is drawn by the same
+code and cannot drift when node styling changes. The node is added WITHOUT the
+`.breadcrumb-chip` class — that class is what shrinks chips to 63×18/8px, so
+omitting it renders the node at its natural per-type size, and the instance's
+fit does the enlarging. It shows the **unabbreviated** name; the chip may be
+just a seq number, and an enlarged "7" is still a 7.
+
+Behaviour mirrors the chip it copies: taps through via `handleNodeTap`,
+persists until the next arrives, dims (not vanishes) with the trail on
+`buddy_disconnected`, clears on a new pair, hidden in Player mode.
+
+Sizing settled at **162×55 desktop / 108×37 phone** with fit padding 3. The
+padding mattered more than it sounds: at pad 7 the phone size renders a 6.8px
+label, BELOW the 8px the chip uses — the panel would have been a shrunken chip
+in a box. At pad 3 it is 8.5px with the node at 102×29 against 63×18, so on a
+phone the enlargement is mostly in node SIZE, not text size.
+
+**Gotchas banked:**
+- The container starts `hidden` and cytoscape measures a `display:none` element
+  as 0×0 — unhide BEFORE the first resize/fit or the node lands off-canvas.
+- **iOS never fired the tap.** Cytoscape binds its own touch handlers to the
+  container and preventDefaults them, so no synthesized click reached a
+  container listener — it worked with a mouse and not on a phone. A transparent
+  `.tap-shield` over the canvases takes the tap instead.
+- Fit, don't fix the zoom. Node sizes vary by type (TextNode 120×34, root
+  100×100); a flat 1.8× clipped root to 180×180 in a 300×66 box.
+
+## 7. Two layout truths found along the way
+
+**Breadcrumb trails now fill from the RIGHT.** `panYouCyToLatest` /
+`panBuddyCyToLatest` had `Math.min(0, …)`, which pinned a short trail to the
+left and only scrolled once it overflowed — so the newest chip crept rightwards
+and only settled when the bar filled. Dropping the clamp right-aligns at every
+length. That is also what makes the enlarged copy sit over the chip it
+enlarges, which had not actually been true when the panel moved bottom-right.
+
+**The two strips are swapped**: `#cy-buddy` (navy, remote) took the upper slot
+at bottom 63, `#cy-you` (mustard, local) the lower at 37, so the navy panel,
+navy strip and the gradient's navy foot form one block. That broke a named
+lookup — `positionExtendPanel` clamped the Kolam Extension strip against
+"#cy-you (the upper breadcrumb strip)", true until it wasn't; it now takes the
+higher of the two by measurement. Second time this week a named lookup encoded
+a layout assumption that later went stale (the arrows' `right: 116px` was the
+other). **Measure, don't name.**
+
+## 8. Chip labels truncate in JS now
+
+Chips were showing the MIDDLE of long names — "arden Wi" for "Garden Wild",
+losing a character at the start as well as the end. A trailing ellipsis only
+cuts the end, so both ends missing means the label was simply wider than its
+63px chip: centred, it spilled each side and the neighbouring chips, drawn
+afterwards, painted over the spill. `text-max-width` and
+`text-wrap: 'ellipsis'` were not constraining these labels at all.
+
+`truncateChipLabel()` cuts to 13 chars + ellipsis BEFORE the label reaches
+cytoscape — deterministic, immune to style precedence or a `text-wrap` value
+the renderer ignores. The enlarged copy still receives the full name, which is
+now the better justification for that panel than the one it started with.
+
+**Not a regression:** verified the `.breadcrumb-chip` style block was
+byte-identical to before this work and the label logic unchanged since
+`214f20a`. The wrapping came from `text-wrap:'wrap'` on the base `node`
+selector (`b61364e`, for in-node labels on the main canvas) — right there,
+wrong in an 18px chip. It only became conspicuous once the trail was
+right-aligned and the newest chip stopped drifting.
+
+## 9. OPEN — circular nodes in the enlarged panel
+
+**Undecided, to look at next.** Family (60×60) and Entry (68×68) are circles;
+flat nodes are 34 tall. Fitted into a 108×37 phone panel the circles land at
+zoom ~0.5 — 31×31, a 5px label, using 29% of the width, and genuinely LESS
+readable than the chip they enlarge. TextNode uses 94% and reads at 8.5px.
+
+Proposal on the table: an override class in the panel instance — the mirror of
+`.breadcrumb-chip` — forcing every type to one box (~102×30) at one font size,
+keeping shape and colour per-type. Cost: Family and Entry render as wide
+ellipses rather than circles. Not implemented; the user is thinking it over.
+
+## 10. Also today
+
+- **Cluster-assign behind `CLUSTER_ASSIGN`, default OFF** (`?ca=1` re-enables —
+  note the sense is INVERTED from `?uf=0`). Curation work is moving to the
+  curator tool. Guarding the two tap handlers was not enough: the tableau
+  layout branches on `editModeActive` in six more places, so everything
+  assign-related now goes through `clusterEditActive()`.
+- **Cluster count badge** clears the node frame at any zoom. It sat a flat 4px
+  above the bounding box while the border scales with zoom, so a clicked
+  Cluster (4px white border) had zero clearance at 1× and −8 at 3×.
+- **Pairing review** for the multi-window tests — see §11.
+
+## 11. Pairing: what governs it (reviewed, not changed)
+
+- The wait queue is a **single slot** (`let waitingUser = null`), so
+  "exactly two" is structural: first Join occupies it, second empties it by
+  pairing. Four windows give two independent dyads.
+- **Same-device pairing is refused** (`server.js:1080`) — two sockets sharing a
+  `bd_device_id` cookie get `pair_denied: same_device`. So several windows of
+  ONE browser cannot pair with each other. Four different browsers is the
+  setup; four URLs are unnecessary.
+- **My memory was wrong** and is corrected: there is no connect-time kick any
+  more. `server.js:741` records that it broke dyad continuity on return from
+  the external player, so it became a pair-time refusal.
+- Curation code is **active** (`config.js`, 4 chars) and gates the ARRIVER
+  only — whoever completes the pair, not whoever waits.
+- Disconnects have a **65s grace period** before the buddy is told.
+- **Worth probing:** `ready_to_pair` does not check whether the sender is
+  already paired. The UI hides it, but nothing server-side stops a paired user
+  re-entering the queue.
+
+## 12. Desktop — working, confirmed 2026-08-20
 
 **Not an open bug.** The user checked the arrows, the Extension strip, the invite
 panel and the output panel at small, medium and large windows and confirmed each.
