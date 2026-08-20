@@ -1584,7 +1584,7 @@ function showSessionExpired(message) {
   overlay.classList.add('active');
 }
 
-function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
+function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, buddyLatestCy) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || !wsRef.current.connected) {
@@ -1918,41 +1918,89 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // UNABBREVIATED name: the chip may have collapsed to a bare sequence number
     // (successive chunks of one text), and an enlarged "7" is still a 7. Full
     // name, with the seq alongside when there is one.
-    showBuddyLatest({
-      title: data.display_name || data.name || '',
-      seq:   abbreviated ? seq : null,
-      mainId: data.mainId || null,
-    });
+    showBuddyLatest(data, data.display_name || data.name || '', seq, abbreviated);
   }
 
   // The enlarged copy of the newest remote breadcrumb. Persists until the next
   // one arrives (where the partner IS is a standing question, not an event) and
   // taps through to the same node the chip would.
+  //
+  // Mirrors the chip as a real cytoscape node in buddyLatestCy, deliberately
+  // WITHOUT the .breadcrumb-chip class — that class is what shrinks chips to
+  // 63x18/8px, so omitting it renders the node at its natural per-type size,
+  // shape and colour. The instance's 1.8 zoom does the enlarging.
   const buddyLatestEl = document.getElementById('buddy-latest');
   let   buddyLatestMainId = null;
-  function showBuddyLatest({ title, seq, mainId }) {
-    if (!buddyLatestEl) return;
+
+  function showBuddyLatest(data, displayName, seq, abbreviated) {
+    if (!buddyLatestEl || !buddyLatestCy) return;
+    const title = displayName || '';
     if (!title) { hideBuddyLatest(); return; }
-    buddyLatestEl.textContent = title;
-    if (seq !== null && seq !== undefined) {
-      const s = document.createElement('span');
-      s.className = 'seq';
-      s.textContent = String(seq);
-      buddyLatestEl.appendChild(s);
-    }
-    buddyLatestMainId = mainId;
+    buddyLatestCy.elements().remove();
+    buddyLatestCy.add({
+      group: 'nodes',
+      data: {
+        id: 'buddy_latest',
+        type:          data.type,
+        // The UNABBREVIATED name. A chip collapses to a bare sequence number
+        // when the partner reads successive chunks of one text, and an enlarged
+        // "7" is still a 7 — the full name is the readability win. The seq is
+        // appended so the position within the text is not lost.
+        display_name:  (abbreviated && seq !== null && seq !== undefined)
+                         ? `${title}  ${seq}` : title,
+        colour:        data.colour || '#444444',
+        name:          data.name || '',
+        seq,
+        gateway:       data.gateway || false,
+        section_title: data.section_title || false,
+        subfamily:     data.subfamily || false,
+      },
+      position: { x: 0, y: 0 },
+    });
+    if (data.subfamily) buddyLatestCy.getElementById('buddy_latest').addClass('subfamily');
+    buddyLatestMainId = data.mainId || null;
     buddyLatestEl.classList.remove('gone');
+    // UNHIDE FIRST. The container starts `hidden`, and cytoscape measures a
+    // display:none element as 0x0 — resize/center against that would centre
+    // the node against nothing and leave it off-canvas on the first arrival.
     buddyLatestEl.hidden = false;
+    fitBuddyLatest();
+    // One more pass after layout settles, same reason the player chrome does it.
+    requestAnimationFrame(fitBuddyLatest);
   }
+
+  // FIT rather than a fixed zoom. Node sizes vary by type — TextNode 120x34,
+  // Cluster 70x34, root 100x100 — so a flat 1.8x would overflow the panel for
+  // some and under-fill it for others; root at 1.8 would be 180x180 in a 300x66
+  // box and simply get clipped. Fitting adapts to whatever arrives, and the cap
+  // stops a small node being blown up to something absurd.
+  // (Absolute padding is fine here, unlike the main canvas rule about
+  // fitPadding: this panel is a fixed size, not a share of the viewport.)
+  const BUDDY_LATEST_MAX_ZOOM = 1.8;
+  function fitBuddyLatest() {
+    if (!buddyLatestCy || !buddyLatestEl || buddyLatestEl.hidden) return;
+    if (buddyLatestCy.nodes().length === 0) return;
+    buddyLatestCy.resize();
+    buddyLatestCy.fit(buddyLatestCy.nodes(), 8);
+    if (buddyLatestCy.zoom() > BUDDY_LATEST_MAX_ZOOM) {
+      buddyLatestCy.zoom(BUDDY_LATEST_MAX_ZOOM);
+      buddyLatestCy.center();
+    }
+  }
+  window.addEventListener('resize', fitBuddyLatest);
+
   function hideBuddyLatest() {
     if (!buddyLatestEl) return;
+    if (buddyLatestCy) buddyLatestCy.elements().remove();
     buddyLatestEl.classList.remove('gone');
     buddyLatestEl.hidden = true;
-    buddyLatestEl.textContent = '';
     buddyLatestMainId = null;
   }
+
   if (buddyLatestEl) {
-    // Same one-gesture behaviour as a chip tap: re-enter that node's view.
+    // Tap handled on the CONTAINER, not the node: the whole panel is the
+    // target, and the instance has interaction disabled anyway. Same
+    // one-gesture behaviour as a chip tap — re-enter that node's view.
     buddyLatestEl.addEventListener('click', () => {
       if (!buddyLatestMainId) return;
       const main = cy.getElementById(buddyLatestMainId);
@@ -1960,15 +2008,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       hideTooltip();
       handleNodeTap(main);
     });
-  }
-
-  function panBuddyCyToLatest() {
-    if (buddyChipCount === 0) return;
-    buddyCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
-    const containerWidth = document.getElementById('cy-buddy').offsetWidth;
-    const rightEdge = buddyChipX - 7;
-    const panX = Math.min(0, containerWidth - rightEdge - 12);
-    buddyCy.pan({ x: panX, y: 0 });
   }
 
   function resetBuddyBar() {
@@ -4525,6 +4564,25 @@ async function init() {
     boxSelectionEnabled: false,
   });
 
+  // 2026-08-20 — third instance: the enlarged copy of the newest REMOTE
+  // breadcrumb. Same buildStyle() as the strips, so the node is drawn by the
+  // same code and cannot drift when node styling changes. Interaction is off —
+  // this is a read-out, not a canvas to explore; the tap is handled on the
+  // container so the whole panel is the target, not just the node.
+  const buddyLatestCy = cytoscape({
+    container: document.getElementById('buddy-latest'),
+    elements: [],
+    style: buildStyle(),
+    layout: { name: 'preset' },
+    zoom: 1,                             // seed only — fitBuddyLatest() owns the
+                                         // zoom, fitting each node to the panel
+                                         // with a 1.8 cap
+    userZoomingEnabled: false,
+    userPanningEnabled: false,
+    boxSelectionEnabled: false,
+    autoungrabify: true,
+  });
+
   // After CSS sets the new 23px bar heights, sync cytoscape's internal size
   // and fit any existing chips. Empty on first load — these are no-ops then —
   // but harmless and gives a clean reset point if the bars are ever rebuilt.
@@ -5747,7 +5805,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, buddyLatestCy);
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
