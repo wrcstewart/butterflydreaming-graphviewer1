@@ -4478,6 +4478,20 @@ async function init() {
     // the split, where #chat-panel (History) is the bottom-most.
     const nodesMode = !document.body.classList.contains('edit-active') &&
                       !document.body.classList.contains('player-active');
+    // 2026-08-20 — FEEDBACK LOOP FIX. In Player mode the anchor below is
+    // #chat-panel (History), and the Kolam branch of positionExtendPanel grows
+    // that pane down to the canvas top. So: grown pane → anchor lower → iframe
+    // top pushed down → iframe shorter → canvas smaller and LOWER → pane grown
+    // deeper still. One pass per event hid it; adding settle re-runs for the
+    // rotation bug turned it into a runaway, which is why the pane kept the
+    // screen and the square collapsed.
+    //
+    // Clearing the inline height here means the anchor is always measured
+    // against the pane's NATURAL height, so every pass computes the same
+    // geometry and positionExtendPanel re-grows from a stable canvas rect.
+    // Idempotent, and the collapse-and-regrow happens within one frame.
+    const histNatural = document.getElementById('chat-panel');
+    if (histNatural) histNatural.style.height = '';
     const currentPanelEl = document.getElementById('current-panel');
     const refEl =
       (nodesMode && currentPanelEl && currentPanelEl.getBoundingClientRect().height > 0 ? currentPanelEl : null) ||
