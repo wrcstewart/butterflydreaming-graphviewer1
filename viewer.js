@@ -1712,7 +1712,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     const seq         = node.data('seq') ?? null;
     const abbreviated = type === 'TextNode' && !node.data('gateway') && !node.data('section_title') && sourceText !== null && sourceText === lastYouSourceText;
     const isSubfamily = node.hasClass('subfamily');
-    const displayName = abbreviated ? String(seq ?? '?') : (node.data('display_name') || node.data('name') || '');
+    const displayName = abbreviated ? String(seq ?? '?')
+                       : truncateChipLabel(node.data('display_name') || node.data('name') || '');
 
     const id = 'you_' + (youChipCount++);
     if (lastYouChipId) {
@@ -1899,6 +1900,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
 
   window.addEventListener('resize', panYouCyToLatest);
 
+  // 2026-08-20 — chip labels are truncated HERE, not left to the renderer.
+  // text-max-width + text-wrap:'ellipsis' was not constraining them: labels ran
+  // wider than the 63px chip, spilled both sides, and the neighbouring chips —
+  // drawn afterwards — painted over the spill, so only the middle survived
+  // ("arden Wi" for "Garden Wild"). Cutting the string is deterministic and
+  // cannot be defeated by style precedence or an unsupported text-wrap value.
+  // 13 chars ≈ 55px at the chip's 8px font, inside the 63px node with margin.
+  // The ENLARGED copy is unaffected: appendBuddyChip passes it the untruncated
+  // data.display_name separately, which is that panel's whole purpose.
+  const CHIP_LABEL_MAX = 13;
+  function truncateChipLabel(s) {
+    const str = String(s == null ? '' : s);
+    return str.length <= CHIP_LABEL_MAX ? str
+         : str.slice(0, CHIP_LABEL_MAX - 1).trimEnd() + '\u2026';
+  }
+
   // --- buddyCy chip trail ---
 
   let buddyChipCount = 0;
@@ -1912,7 +1929,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     const seq         = data.seq ?? null;
     const abbreviated = type === 'TextNode' && !data.gateway && !data.section_title && sourceText !== null && sourceText === lastBuddySourceText;
     const isSubfamily = data.subfamily || false;
-    const displayName = abbreviated ? String(seq ?? '?') : (data.display_name || data.name || '');
+    const displayName = abbreviated ? String(seq ?? '?')
+                       : truncateChipLabel(data.display_name || data.name || '');
 
     const id = 'buddy_' + (buddyChipCount++);
     if (lastBuddyChipId) {
