@@ -23,7 +23,7 @@ html, body {
 }
 
 /* 2026-08-20 v2 — enlarged copy of the newest remote breadcrumb, hosted by its
-   own cytoscape instance (buddyLatestCy). Sits in the band above #cy-you,
+   own cytoscape instance (buddyLatestCy). Sits in the band above #cy-buddy,
    centred, overlaying only the base of the graph — a strip that took real
    layout space would cost graph height, and there is none spare.
    Container opacity dims canvas and node together, which is the "background
@@ -41,7 +41,8 @@ html, body {
   width: min(64vw, 216px);               /* −20%, then −10% again */
   height: 73px;                          /* +10% — Family labels were too small */
   /* Navy at the FOOT, black at the crown. The remote breadcrumb strip
-     (#cy-buddy, #001f4d) sits directly below this panel, so the navy belongs
+     (#cy-buddy, #001f4d) sits directly below this panel — since 2026-08-20
+     literally so, the two being contiguous — so the navy belongs
      at the bottom — the enlarged copy reads as rising out of the trail it came
      from, dissolving into the graph above. (Built the other way round first:
      designed in isolation as "emerges from the dark" without regard to where
@@ -73,13 +74,17 @@ body.player-active #buddy-latest { display: none; }
 #buddy-latest.gone { opacity: 0.45; }
 
 #cy-buddy {
-  position: fixed;                       /* A51c — bottom slot (was upper); just above the media-bar */
+  position: fixed;                       /* 2026-08-20 — UPPER slot, swapped with
+                                            #cy-you so the remote strip is
+                                            contiguous with the navy enlarged
+                                            copy above it (A51c had put it in the
+                                            bottom slot). */
   /* Full width by design — the strip fills the viewport at every width so
      narrowing the browser leaves NO black side wings (the chips reflow via
      buddyCy.resize() on the window-resize handler). */
   left: 0;
   right: 0;
-  bottom: 37px;                          /* clears #media-bar (bottom: 2px, ~26px tall) */
+  bottom: 63px;                          /* clears #cy-you (bottom: 37px, 23px tall) + 3px gap */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
   background: #001f4d;
   cursor: url('cursor-wings.svg') 16 16, auto;
@@ -230,10 +235,11 @@ body.player-active #buddy-latest { display: none; }
 
 
 #cy-you {
-  position: fixed;                       /* A51c — upper slot (was lower); closer to the node graph */
+  position: fixed;                       /* 2026-08-20 — BOTTOM slot, swapped with
+                                            #cy-buddy (see there). */
   left: 0;                               /* full width — see #cy-buddy (no side wings; chips reflow via youCy.resize()) */
   right: 0;
-  bottom: 63px;                          /* clears #cy-buddy (bottom: 37px, 23px tall) + 3px gap */
+  bottom: 37px;                          /* clears #media-bar (bottom: 2px, ~26px tall) */
   height: 23px;                          /* -35% from 36px (2026-06-29) */
   /* 2026-07-28 — brightened from #5a5000 to #7f6d00 so the strip is
      visibly present AND so `.hi-bread` highlight text can match it
@@ -248,7 +254,9 @@ body.player-active #buddy-latest { display: none; }
   left: 0;
   right: 0;
   top: 158px;   /* set precisely by JS; fallback matches BARS_BOTTOM */
-  bottom: 90px;                         /* clears bottom-stack: cy-buddy(63+23=86) + 4px gap (A51) */
+  bottom: 90px;                         /* clears the bottom stack: whichever strip
+                                           holds the upper slot ends at 63+23=86,
+                                           + 4px gap (A51) */
   z-index: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
@@ -840,7 +848,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #d02020;             /* CANARY — red (was blue) */
+  border: 2px solid #40c040;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

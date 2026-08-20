@@ -5191,10 +5191,19 @@ async function init() {
       // 2026-08-19 — the strip must live in the gap BETWEEN the canvas bottom
       // and the breadcrumbs, never over them. Classes and width are set above,
       // so the panel's real height can be measured now; clamp the top so its
-      // bottom edge clears #cy-you (the upper breadcrumb strip) by 4px.
-      const youEl = document.getElementById('cy-you');
-      const limit = (youEl ? youEl.getBoundingClientRect().top
-                           : window.innerHeight - 63) - 4;
+      // bottom edge clears the breadcrumbs by 4px.
+      // 2026-08-20 — take the HIGHER of the two strips rather than naming one.
+      // This read #cy-you as "the upper breadcrumb strip", which stopped being
+      // true when the two were swapped so the remote strip could sit under its
+      // enlarged copy; the ext strip would then have been allowed 26px lower,
+      // straight over the bar that had moved up.
+      const barTop = ['cy-buddy', 'cy-you'].reduce((top, id) => {
+        const el = document.getElementById(id);
+        if (!el) return top;
+        const r = el.getBoundingClientRect();
+        return (r.height > 0 && r.top < top) ? r.top : top;
+      }, window.innerHeight - 63);
+      const limit = barTop - 4;
       const ph = panel.getBoundingClientRect().height || 36;
       topPx = Math.min(topPx, limit - ph);
     }
