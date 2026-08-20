@@ -22,6 +22,50 @@ html, body {
   flex-shrink: 0;
 }
 
+/* 2026-08-20 — enlarged copy of the newest remote breadcrumb. Sits in the 4px
+   gap between #cy's bottom edge (90px) and #cy-you's top (86px), centred, so it
+   overlays only the very bottom of the graph. Navy matches #cy-buddy so it
+   reads as "theirs" without relying on hue alone; the panel is 0.85 opaque so
+   the graph shows through faintly, while the TEXT stays fully opaque — the
+   whole point is legibility, and dimming the words would defeat it. */
+#buddy-latest {
+  position: fixed;
+  bottom: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(80vw, 420px);
+  padding: 5px 12px;
+  background: rgba(0, 31, 77, 0.85);
+  border: 1px solid #4a6fa5;
+  border-radius: 5px;
+  color: #ffffff;
+  font-family: sans-serif;
+  font-size: 15px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  z-index: 6;                            /* above #cy (canvas), below the panels */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+#buddy-latest[hidden] { display: none; }
+/* Player mode hides #cy, and this panel belongs to the graph area — with the
+   module iframe showing there is nothing for it to sit above. */
+body.player-active #buddy-latest { display: none; }
+#buddy-latest:active { background: rgba(0, 45, 110, 0.95); }
+/* Partner left: dim to match the .buddy-gone chips in the strip below, but
+   stay tappable — where they got to is still worth revisiting. */
+#buddy-latest.gone { opacity: 0.45; }
+/* The sequence number, when the chip it copies was abbreviated to just that. */
+#buddy-latest .seq {
+  opacity: 0.75;
+  font-size: 13px;
+  margin-left: 6px;
+}
+
 #cy-buddy {
   position: fixed;                       /* A51c — bottom slot (was upper); just above the media-bar */
   /* Full width by design — the strip fills the viewport at every width so
@@ -790,7 +834,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #d02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

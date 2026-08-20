@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=240">
+  <link rel="stylesheet" href="style.css?v=241">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -26,6 +26,13 @@
        Frees ~22 px of vertical space for a taller split panel in the edit
        mode being prepared. -->
   <div id="bc-spacer"></div>
+  <!-- 2026-08-20 — enlarged copy of the newest REMOTE breadcrumb. The chips in
+       #cy-buddy are 23px tall and often abbreviated to a bare sequence number,
+       which makes the partner's position hard to read at a glance — and that
+       position is central to the conversation. This panel restates the latest
+       one legibly just above the breadcrumb strips, and taps through to the
+       same node the chip would. Populated by appendBuddyChip. -->
+  <div id="buddy-latest" hidden></div>
   <div id="cy-buddy"></div>
   <div id="cy-you"></div>
   <!-- 2026-08-14 — panel split. Newest card (or freshly-arrived remote /
@@ -217,6 +224,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=562"></script>
+  <script type="module" src="viewer.js?v=563"></script>
 </body>
 </html>

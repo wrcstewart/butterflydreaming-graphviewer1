@@ -1914,6 +1914,52 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     buddyChipX    += w + 7;
     lastBuddyChipId = id;
     panBuddyCyToLatest();
+    // 2026-08-20 — restate it legibly above the strips. Deliberately uses the
+    // UNABBREVIATED name: the chip may have collapsed to a bare sequence number
+    // (successive chunks of one text), and an enlarged "7" is still a 7. Full
+    // name, with the seq alongside when there is one.
+    showBuddyLatest({
+      title: data.display_name || data.name || '',
+      seq:   abbreviated ? seq : null,
+      mainId: data.mainId || null,
+    });
+  }
+
+  // The enlarged copy of the newest remote breadcrumb. Persists until the next
+  // one arrives (where the partner IS is a standing question, not an event) and
+  // taps through to the same node the chip would.
+  const buddyLatestEl = document.getElementById('buddy-latest');
+  let   buddyLatestMainId = null;
+  function showBuddyLatest({ title, seq, mainId }) {
+    if (!buddyLatestEl) return;
+    if (!title) { hideBuddyLatest(); return; }
+    buddyLatestEl.textContent = title;
+    if (seq !== null && seq !== undefined) {
+      const s = document.createElement('span');
+      s.className = 'seq';
+      s.textContent = String(seq);
+      buddyLatestEl.appendChild(s);
+    }
+    buddyLatestMainId = mainId;
+    buddyLatestEl.classList.remove('gone');
+    buddyLatestEl.hidden = false;
+  }
+  function hideBuddyLatest() {
+    if (!buddyLatestEl) return;
+    buddyLatestEl.classList.remove('gone');
+    buddyLatestEl.hidden = true;
+    buddyLatestEl.textContent = '';
+    buddyLatestMainId = null;
+  }
+  if (buddyLatestEl) {
+    // Same one-gesture behaviour as a chip tap: re-enter that node's view.
+    buddyLatestEl.addEventListener('click', () => {
+      if (!buddyLatestMainId) return;
+      const main = cy.getElementById(buddyLatestMainId);
+      if (!main.length) return;
+      hideTooltip();
+      handleNodeTap(main);
+    });
   }
 
   function panBuddyCyToLatest() {
@@ -1926,6 +1972,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function resetBuddyBar() {
+    hideBuddyLatest();
     buddyCy.elements().remove();
     buddyChipCount      = 0;
     buddyChipX          = 0;
@@ -6330,6 +6377,9 @@ async function init() {
       pairingState.active = false;
       pairingState.waiting = false;
       buddyCy.nodes().addClass('buddy-gone');
+      // 2026-08-20 — the enlarged copy dims with the trail it mirrors rather
+      // than vanishing; where they got to still matters after they leave.
+      document.getElementById('buddy-latest')?.classList.add('gone');
       pairStatus.textContent = '';
       updateJoinButtonLabel();
       updateSendBtn();
