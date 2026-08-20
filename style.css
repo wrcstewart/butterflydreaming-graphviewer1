@@ -40,17 +40,19 @@ html, body {
   transform: none;
   width: min(64vw, 216px);               /* −20%, then −10% again */
   height: 73px;                          /* +10% — Family labels were too small */
-  /* ══ TEMPORARY DIAGNOSTIC (2026-08-20) — REVERT ME ══════════════════════
-     Blue→yellow at full strength purely to make the DIRECTION unmistakable.
-     As written: BLUE at the TOP (0%), YELLOW at the BOTTOM (100%) — the same
-     direction the real navy→black gradient runs, so whatever you see here is
-     where the navy currently is.
-     Restore the real one once confirmed:
-       background: linear-gradient(180deg,
-                                   rgba(0, 31, 77, 0.78) 0%,
-                                   rgba(0, 8, 22, 0.55) 100%);
-     ═══════════════════════════════════════════════════════════════════════ */
-  background: linear-gradient(180deg, #0033aa 0%, #ffcc00 100%);
+  /* Navy at the FOOT, black at the crown. The remote breadcrumb strip
+     (#cy-buddy, #001f4d) sits directly below this panel, so the navy belongs
+     at the bottom — the enlarged copy reads as rising out of the trail it came
+     from, dissolving into the graph above. (Built the other way round first:
+     designed in isolation as "emerges from the dark" without regard to where
+     the navy actually lives.)
+     Contrast pushed up from the first attempt — at 0.78/0.55 over a black
+     canvas the two ends were barely distinguishable.
+     The NODE is unaffected: this is a background, not container opacity, so
+     the chip inside keeps its own solid fill and full contrast. */
+  background: linear-gradient(180deg,
+                              rgba(0, 6, 18, 0.30) 0%,
+                              rgba(0, 40, 100, 0.92) 100%);
   border: 1px solid #4a6fa5;
   border-radius: 5px;
   overflow: hidden;
@@ -834,7 +836,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
