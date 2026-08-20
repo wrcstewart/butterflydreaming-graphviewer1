@@ -132,6 +132,20 @@ const UNIFIED_FOCUS = (() => {
   catch (_) { return true; }
 })();
 
+// 2026-08-20 — Cluster-assign (the grey snake-section tap → cluster chips →
+// editor bar flow) behind an internal flag, because this kind of curation work
+// is moving out of BD into the curator tool. Default ON so nothing changes for
+// anyone relying on it today; `?ca=0` turns it off per window, which is what
+// makes multi-window pairing tests bearable — with the curation code entered in
+// every window, tapping a grey node otherwise opens the assign layout.
+// To retire it for good, flip this default to false; to delete it, remove the
+// two `CLUSTER_ASSIGN` guards in handleNodeTap/the tap handler and the
+// ClusterEditChip branches beside them.
+const CLUSTER_ASSIGN = (() => {
+  try { return new URLSearchParams(location.search).get('ca') !== '0'; }
+  catch (_) { return true; }
+})();
+
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';
 const CHUNK_HINT_NAVIGATE = 'Tap once more to see connected nodes.';
 const CHUNK_HINT_NO_MORE  = 'There are not yet further descendants.';
@@ -3633,12 +3647,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
 
-    if (type === 'ClusterEditChip') {
+    if (CLUSTER_ASSIGN && type === 'ClusterEditChip') {
       applyEditChipSelection(node.data('mainClusterId'));
       return;
     }
 
-    if (editModeActive && node.hasClass('snake-section')) {
+    if (CLUSTER_ASSIGN && editModeActive && node.hasClass('snake-section')) {
       applyEditTextSelection(node);
       return;
     }
@@ -3749,11 +3763,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     if (multiTouchRecent) return;
 
     // Special cases with their own semantics, unchanged by the chunk UX.
-    if (type === 'ClusterEditChip') {
+    if (CLUSTER_ASSIGN && type === 'ClusterEditChip') {
       applyEditChipSelection(node.data('mainClusterId'));
       return;
     }
-    if (editModeActive && node.hasClass('snake-section')) {
+    if (CLUSTER_ASSIGN && editModeActive && node.hasClass('snake-section')) {
       applyEditTextSelection(node);
       return;
     }
