@@ -151,6 +151,14 @@ const CLUSTER_ASSIGN = (() => {
   catch (_) { return false; }
 })();
 
+// The cluster-assign FLAVOUR of edit mode. Guarding the two tap handlers was
+// not enough: handleTitlePageTap also branches on editModeActive to lay the
+// snake tableau out dense-and-tiny with CLUSTER_REL highlighting — the "cluster
+// tableau" that kept appearing on a grey title-node tap with the flag off.
+// Everything else the Edit radio does (compose posture, Send/New, the mic) is
+// untouched and still keys off editModeActive directly.
+function clusterEditActive() { return CLUSTER_ASSIGN && editModeActive; }
+
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';
 const CHUNK_HINT_NAVIGATE = 'Tap once more to see connected nodes.';
 const CHUNK_HINT_NO_MORE  = 'There are not yet further descendants.';
@@ -2293,7 +2301,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
   function navigateInto(node) {
     const type = node.data('type');
     if (type === 'Cluster') {
-      const target = (editModeActive && editSelectedClusterId && editSelectedClusterId !== node.id())
+      const target = (clusterEditActive() && editSelectedClusterId && editSelectedClusterId !== node.id())
         ? cy.getElementById(editSelectedClusterId)
         : node;
       expandToCluster(target);
@@ -3331,10 +3339,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     const headerY  = 30;
 
     // Edit mode: text nodes 50% of base size, doubled columns, grid at bottom
-    const dispCols  = editModeActive ? Math.min(30, Math.max(10, cols * 2)) : cols;
-    const dispNodeW = editModeActive ? Math.round(nodeW * 0.5) : nodeW;
-    const dispNodeH = editModeActive ? Math.round(dispNodeW * 0.57) : nodeH;
-    const dispFont  = editModeActive ? 7 : fontSize;
+    const dispCols  = clusterEditActive() ? Math.min(30, Math.max(10, cols * 2)) : cols;
+    const dispNodeW = clusterEditActive() ? Math.round(nodeW * 0.5) : nodeW;
+    const dispNodeH = clusterEditActive() ? Math.round(dispNodeW * 0.57) : nodeH;
+    const dispFont  = clusterEditActive() ? 7 : fontSize;
     const stepX     = dispNodeW + gapX;
     const stepY     = dispNodeH + gapY;
 
@@ -3351,13 +3359,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
         'background-color':   linked && clusterColour ? clusterColour : '#1a1a1a',
         'background-opacity': 0.7,
         'text-valign':        'center',
-        'text-margin-y':      editModeActive ? -Math.round(dispNodeH / 4) : 0,
+        'text-margin-y':      clusterEditActive() ? -Math.round(dispNodeH / 4) : 0,
       });
     });
 
     const positions = {};
 
-    if (!editModeActive) {
+    if (!clusterEditActive()) {
       // Non-edit reading-mode layout (rev 2026-08-16):
       //   [Cluster]   [Gateway]   [Title]      ← ONE row, spanning grid width
       //        ↓ 5 px gap                       ← gap between header row and grid
@@ -3657,7 +3665,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
       return;
     }
 
-    if (CLUSTER_ASSIGN && editModeActive && node.hasClass('snake-section')) {
+    if (clusterEditActive() && node.hasClass('snake-section')) {
       applyEditTextSelection(node);
       return;
     }
@@ -3685,7 +3693,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
       if (type === 'Cluster') {
         // In snake edit mode the displayed cluster node is visually repurposed to
         // show the selected chip. Navigate to the chip's actual cluster instead.
-        const target = (editModeActive && editSelectedClusterId && editSelectedClusterId !== node.id())
+        const target = (clusterEditActive() && editSelectedClusterId && editSelectedClusterId !== node.id())
           ? cy.getElementById(editSelectedClusterId)
           : node;
         expandToCluster(target);
@@ -3772,7 +3780,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
       applyEditChipSelection(node.data('mainClusterId'));
       return;
     }
-    if (CLUSTER_ASSIGN && editModeActive && node.hasClass('snake-section')) {
+    if (clusterEditActive() && node.hasClass('snake-section')) {
       applyEditTextSelection(node);
       return;
     }
