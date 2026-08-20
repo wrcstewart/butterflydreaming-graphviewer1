@@ -31,19 +31,22 @@ html, body {
 #buddy-latest {
   position: fixed;
   bottom: 92px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(70vw, 240px);               /* 2026-08-20 — −20% from 300 */
-  height: 66px;                          /* 2026-08-20 — depth RESTORED. Height
-                                            was the binding constraint on the
-                                            fit, so shrinking it was what made
-                                            the node small; width alone is what
-                                            needed reducing. */
-  /* Opacity down 0.85 → 0.6: the node inside carries its own solid background
-     and border, so the contrast that matters is node-against-panel, not
-     panel-against-graph. A fainter panel lets more of the graph through
-     without costing legibility. */
-  background: rgba(0, 31, 77, 0.6);      /* navy of #cy-buddy — reads as theirs */
+  /* 2026-08-20 — bottom-RIGHT, not centred. The buddy strip pans to keep the
+     newest chip at its right-hand end, so the enlarged copy sits directly over
+     the chip it enlarges: as the trail fills, expanded and unexpanded converge
+     on the same spot instead of drifting apart. */
+  right: 8px;
+  left: auto;
+  transform: none;
+  width: min(64vw, 216px);               /* −20%, then −10% again */
+  height: 73px;                          /* +10% — Family labels were too small */
+  /* Navy fading to near-black downward: the panel emerges from the dark rather
+     than sitting on it, and the darker foot blends toward the breadcrumb strips
+     below. The NODE is unaffected — this is a background, not container
+     opacity, so the chip inside keeps its own solid fill and full contrast. */
+  background: linear-gradient(180deg,
+                              rgba(0, 31, 77, 0.78) 0%,
+                              rgba(0, 8, 22, 0.55) 100%);
   border: 1px solid #4a6fa5;
   border-radius: 5px;
   overflow: hidden;
@@ -827,7 +830,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #d02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
