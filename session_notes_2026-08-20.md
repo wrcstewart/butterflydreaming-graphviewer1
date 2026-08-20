@@ -80,13 +80,22 @@ the layout you must not disturb, and my 85px was arithmetic, not a measurement.
 Full rule in `music_player_layout_spec.md` §3a and the [[music-player-layout]]
 memory.
 
-## 5. Open: desktop
+## 5. Desktop — working, confirmed 2026-08-20
 
-BD's desktop Kolam player is usable but not designed — the module renders in its
-landscape layout at whatever width the window gives it. Everything in §1 makes
-the CHROME behave at every width; it does not make the desktop layout good.
+**Not an open bug.** The user checked the arrows, the Extension strip, the invite
+panel and the output panel at small, medium and large windows and confirmed each.
+An earlier draft of this section called desktop "open"; that was my unease at
+never having seen it, not a defect, and it is corrected here so nobody goes
+hunting for a problem that is not there.
 
-If picking this up: the honest options are a device frame done properly (the
-idea was sound, the execution was not — it broke several things and was
-reverted), or accepting BD as phone-first and leaving desktop as a functional
-fallback. Do not attempt a third round of per-element responsive tuning.
+What is true is narrower: the desktop layout was never deliberately DESIGNED.
+The module renders in its landscape layout at whatever width the window gives
+it, and §1's work made the chrome behave at every width rather than making the
+layout considered. That is a "someday, if it starts to grate" item, not a fault.
+
+If it ever is revisited, the record matters more than the ambition: a centred
+panel-width column, a virtual phone iframe for the module, and a device frame
+around the whole app were all tried on 2026-08-19/20 and all reverted
+(`d8f0781`). The device-frame idea was sound and the execution was not. What
+actually worked was deleting width thresholds and measuring the live layout
+instead — do that before reaching for a fourth structural rewrite.
