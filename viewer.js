@@ -3380,6 +3380,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   const mediaBar = document.getElementById('media-bar');
 
+  // 2026-08-20 — stop BD's own track. Jump-to-external uses window.open, so
+  // this tab stays alive and its audio carried on playing into the standalone;
+  // with the ↻ loop on it never even ended. Worse, arriving back via the
+  // standalone's "Jump to BD" navigates THAT tab, creating a second BD page —
+  // so the still-playing one was a tab behind, with no visible transport, and
+  // quitting Safari was the only way to silence it.
+  // pagehide covers same-tab exits; the jump handler calls this directly,
+  // because window.open does not fire pagehide here.
+  function stopMediaPlayback() {
+    const a = mediaBar && mediaBar.querySelector('audio');
+    if (!a) return;
+    if (!a.paused) a.pause();
+    try { a.currentTime = 0; } catch (_) { /* not seekable yet */ }
+    const b = mediaBar.querySelector('.mp-btn');
+    if (b) b.textContent = '▶';
+  }
+  window.addEventListener('pagehide', stopMediaPlayback);
+
   function fmtTime(s) {
     if (!isFinite(s)) return '–:––';
     const m = Math.floor(s / 60);
@@ -6154,6 +6172,9 @@ async function init() {
         withUpdatePrompt(() => {
           const { url } = buildExternalWebsiteUrl();
           console.log('Jump to External Website URL:', url);
+          // Silence our own player before handing over — the standalone has
+          // its own, and two tracks over each other is nobody's intention.
+          stopMediaPlayback();
           window.open(url, '_blank');
         });
       });
