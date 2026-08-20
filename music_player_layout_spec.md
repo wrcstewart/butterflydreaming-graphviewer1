@@ -84,6 +84,27 @@ and stamps its fixed `#copy-up`/`#copy-down` and `#bd-invite-panel-viewer` onto
 them. Module moves the slot → BD chrome follows. No module needs to know about
 BD internals; BD needs only the two slot ids. Same for ABC and Fractal.
 
+### 3a. An empty dock slot inherits its height (2026-08-20)
+
+`#bd-ext-slot` is an empty `<div>`: it adds nothing to its grid row and, with
+the default `align-self: stretch`, just fills whatever the row turns out to be.
+Row 3 is `"ext output steppers"`, so **the slot's height is the output panel's
+height**, and anything the harness pins to the slot inherits it at one remove.
+
+`bd_M_Fractal` hit this (`6ab4695`): past ~740px of module width all four output
+buttons fitted on one line, the row halved 85 → 46px, and the invite panel —
+pinned to the slot since `f7eabec` — lost its Copy Link button off the bottom.
+The two panels "collapsing" together was one cause, not two symptoms.
+
+Fix: hold the output buttons at two per row (`flex: 1 1 calc(50% - 2.5px)`) so
+wide reproduces the wrapping narrow already had. Chosen over a `min-height` on
+the slot because it changes nothing at the widths that were already correct —
+a floor would have to be measured against the layout you must not disturb.
+
+**Before pinning anything to a slot, ask what sets that slot's height.** For an
+empty slot it is always a sibling. `growable:true` masks the problem but
+overhangs short cells (the iPad bug §10 fixed); stabilise the ROW instead.
+
 ## 4. Styling
 
 - **Panels** (each control-containing group: Copy, Player, Output, arrows,

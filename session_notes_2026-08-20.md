@@ -61,6 +61,25 @@ enclosing promise swallowed it, and the button silently did nothing. Found in
   the state is carried by a word rather than an amber tint (`056dce7`). Media bar
   nudged 20px left.
 
+## 4a. The FSA invite panel — an empty slot inherits its height
+
+Reported as two panels collapsing on medium/large desktop windows; it was one
+cause. `#bd-ext-slot` is an EMPTY div sharing grid row 3 with the output panel,
+so the row's height is the output panel's height, the empty slot stretches to
+it, and the invite panel (pinned to the slot since `f7eabec`) inherits it at one
+remove. Past ~740px of module width all four output buttons fitted on one line,
+the row halved 85 → 46px, and Copy Link was clipped off the bottom.
+
+Fixed by holding the output buttons at two per row (`6ab4695`), so wide
+reproduces the wrapping narrow already had. Modelled 500–1600px first to prove
+the row height is **unchanged at every width that was already right** — the
+user's explicit constraint. A `min-height` on the slot was the ranked fallback
+and is still available; it was second because a floor has to be measured against
+the layout you must not disturb, and my 85px was arithmetic, not a measurement.
+
+Full rule in `music_player_layout_spec.md` §3a and the [[music-player-layout]]
+memory.
+
 ## 5. Open: desktop
 
 BD's desktop Kolam player is usable but not designed — the module renders in its
