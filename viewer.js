@@ -134,16 +134,21 @@ const UNIFIED_FOCUS = (() => {
 
 // 2026-08-20 — Cluster-assign (the grey snake-section tap → cluster chips →
 // editor bar flow) behind an internal flag, because this kind of curation work
-// is moving out of BD into the curator tool. Default ON so nothing changes for
-// anyone relying on it today; `?ca=0` turns it off per window, which is what
-// makes multi-window pairing tests bearable — with the curation code entered in
-// every window, tapping a grey node otherwise opens the assign layout.
-// To retire it for good, flip this default to false; to delete it, remove the
-// two `CLUSTER_ASSIGN` guards in handleNodeTap/the tap handler and the
-// ClusterEditChip branches beside them.
+// is moving out of BD into the curator tool.
+//
+// Default OFF. Only the author knows the curation code, so nobody else can
+// reach the flow anyway, and with the code entered in several windows for
+// pairing tests a grey-node tap would otherwise keep opening the assign
+// layout. `?ca=1` turns it back on per window when the flow IS wanted —
+// inverted from the `?uf=0` precedent because the default is inverted too.
+//
+// The machinery below it (applyEditTextSelection, the chip grid, the editor
+// bar, the clone panel) is untouched and inert — this hides the entry, which
+// keeps the flag cheap to reverse. Deleting it properly is a bigger job than
+// removing the two `CLUSTER_ASSIGN` guards.
 const CLUSTER_ASSIGN = (() => {
-  try { return new URLSearchParams(location.search).get('ca') !== '0'; }
-  catch (_) { return true; }
+  try { return new URLSearchParams(location.search).get('ca') === '1'; }
+  catch (_) { return false; }
 })();
 
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';
