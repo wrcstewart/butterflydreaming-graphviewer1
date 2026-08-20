@@ -53,7 +53,11 @@ html, body {
   background: linear-gradient(180deg,
                               rgba(0, 6, 18, 0.30) 0%,
                               rgba(0, 40, 100, 0.92) 100%);
-  border: 1px solid #4a6fa5;
+  /* 2026-08-20 — borderless. The gradient's navy foot already separates the
+     panel from the graph, and the frame was competing with the node's own
+     border inside it. Restore `border: 1px solid #4a6fa5` if it reads as
+     floating. Padding compensates for the 1px the border used to occupy. */
+  border: 0;
   border-radius: 5px;
   overflow: hidden;
   cursor: pointer;
@@ -836,7 +840,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #d02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

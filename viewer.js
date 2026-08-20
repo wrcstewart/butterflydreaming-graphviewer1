@@ -1879,7 +1879,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     youCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
     const containerWidth = document.getElementById('cy-you').offsetWidth;
     const rightEdge = youChipX - 7;
-    const panX = Math.min(0, containerWidth - rightEdge - 12);
+    // 2026-08-20 — right-ALIGNED at every length. The old Math.min(0, …) clamp
+    // pinned a short trail to the left edge and only started scrolling once it
+    // overflowed, so the newest chip moved rightwards as you went and only
+    // settled at the right end when the bar filled. Without the clamp the trail
+    // hangs from the right: newest always in the same place, older ones running
+    // off to the left — which is also where the enlarged copy now sits.
+    const panX = containerWidth - rightEdge - 12;
     youCy.pan({ x: panX, y: 0 });
   }
 
@@ -2008,7 +2014,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     if (!buddyLatestCy || !buddyLatestEl || buddyLatestEl.hidden) return;
     if (buddyLatestCy.nodes().length === 0) return;
     buddyLatestCy.resize();
-    buddyLatestCy.fit(buddyLatestCy.nodes(), 8);
+    buddyLatestCy.fit(buddyLatestCy.nodes(), 7);   // 8 − the 1px border that is now gone
     if (buddyLatestCy.zoom() > BUDDY_LATEST_MAX_ZOOM) {
       buddyLatestCy.zoom(BUDDY_LATEST_MAX_ZOOM);
       buddyLatestCy.center();
@@ -2042,7 +2048,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     buddyCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
     const containerWidth = document.getElementById('cy-buddy').offsetWidth;
     const rightEdge = buddyChipX - 7;
-    const panX = Math.min(0, containerWidth - rightEdge - 12);
+    // 2026-08-20 — right-ALIGNED at every length. The old Math.min(0, …) clamp
+    // pinned a short trail to the left edge and only started scrolling once it
+    // overflowed, so the newest chip moved rightwards as you went and only
+    // settled at the right end when the bar filled. Without the clamp the trail
+    // hangs from the right: newest always in the same place, older ones running
+    // off to the left — which is also where the enlarged copy now sits.
+    const panX = containerWidth - rightEdge - 12;
     buddyCy.pan({ x: panX, y: 0 });
   }
 
