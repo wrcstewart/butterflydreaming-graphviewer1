@@ -3397,6 +3397,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (b) b.textContent = '▶';
   }
   window.addEventListener('pagehide', stopMediaPlayback);
+  // Published for init(): the media bar lives in setupInteractions()'s scope,
+  // init() cannot see it. Mirrors window.bdStopMedia in the standalone.
+  window.bdStopMedia = stopMediaPlayback;
 
   function fmtTime(s) {
     if (!isFinite(s)) return '–:––';
@@ -6174,7 +6177,10 @@ async function init() {
           console.log('Jump to External Website URL:', url);
           // Silence our own player before handing over — the standalone has
           // its own, and two tracks over each other is nobody's intention.
-          stopMediaPlayback();
+          // Guarded: a bare call here threw ReferenceError (the function is in
+          // setupInteractions()'s scope, this is init()'s), and the enclosing
+          // promise swallowed it, so the jump silently never happened.
+          if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
           window.open(url, '_blank');
         });
       });
