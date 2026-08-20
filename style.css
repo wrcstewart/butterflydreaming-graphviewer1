@@ -38,8 +38,12 @@ html, body {
   right: 8px;
   left: auto;
   transform: none;
-  width: min(64vw, 216px);               /* −20%, then −10% again */
-  height: 73px;                          /* +10% — Family labels were too small */
+  /* 2026-08-20 — down to 75% linear (216x73 → 162x55), which is ~56% of the
+     area it was taking. The node is FITTED to the panel, so panel size is what
+     governs label size: at 162x55 a TextNode label renders ~12px, comfortably
+     above the 8px the chip it enlarges uses. */
+  width: min(52vw, 162px);
+  height: 55px;
   /* Navy at the FOOT, black at the crown. The remote breadcrumb strip
      (#cy-buddy, #001f4d) sits directly below this panel — since 2026-08-20
      literally so, the two being contiguous — so the navy belongs
@@ -72,6 +76,19 @@ body.player-active #buddy-latest { display: none; }
 /* Partner left: dim to match the .buddy-gone chips in the strip below, but stay
    tappable — where they got to is still worth revisiting. */
 #buddy-latest.gone { opacity: 0.45; }
+/* Phones take a further cut. The panel is a fixed pixel size, so it occupies a
+   far bigger share of a 390px phone than of a desktop — that is the mismatch.
+   145x49 is ~67% linear / ~45% of the original area, and still renders a ~10px
+   label against the chip's 8px.
+   NOT 50% linear: at 108x37 the fit yields a 6.8px label — SMALLER than the
+   chip this panel exists to enlarge, which would defeat the whole feature.
+   (50% of the AREA is 70% linear, which is roughly what this is.) */
+@media (max-width: 767px) {
+  #buddy-latest {
+    width: min(46vw, 145px);
+    height: 49px;
+  }
+}
 
 #cy-buddy {
   position: fixed;                       /* 2026-08-20 — UPPER slot, swapped with
@@ -848,7 +865,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #40c040;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
