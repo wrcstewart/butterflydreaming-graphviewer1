@@ -4127,8 +4127,16 @@ function setupNrBadges(cy) {
       div.style.display = 'block';
       div.style.fontSize = fontSize;
       const cx = (bb.x1 + bb.x2) / 2;
+      // 2026-08-20 — clear the node's frame. The lift used to be a flat 4px
+      // while the BORDER scales with zoom, so the badge slid under it: a
+      // clicked Cluster carries the 4px white "you are here" border, which at
+      // zoom 1 leaves exactly 0 clearance and goes negative as you zoom in.
+      // Cytoscape borders straddle the outline, so the bounding box's y2 is the
+      // border's OUTER edge and its inner edge is bb.y2 − borderWidth × zoom;
+      // sit 3px above that, whatever the border and zoom happen to be.
+      const bw = (parseFloat(node.style('border-width')) || 0) * cy.zoom();
       div.style.left = cx + 'px';
-      div.style.top  = (bb.y2 - 4) + 'px';
+      div.style.top  = (bb.y2 - bw - 3) + 'px';
     });
   }
 
