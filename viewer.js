@@ -2010,6 +2010,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     });
   }
 
+  function panBuddyCyToLatest() {
+    if (buddyChipCount === 0) return;
+    buddyCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
+    const containerWidth = document.getElementById('cy-buddy').offsetWidth;
+    const rightEdge = buddyChipX - 7;
+    const panX = Math.min(0, containerWidth - rightEdge - 12);
+    buddyCy.pan({ x: panX, y: 0 });
+  }
+
   function resetBuddyBar() {
     hideBuddyLatest();
     buddyCy.elements().remove();
