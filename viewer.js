@@ -1731,6 +1731,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let bnNodeId  = null;   // node carrying the partner's mark
   let bnOuter   = null;   // 'blue' | 'white' — which ring is OUTER when both coincide
   let bnGone    = false;  // partner left: dim, do not remove (§2)
+  // Did WE reveal this node, or was it already part of the user's view? Only a
+  // node we revealed may be hidden again when the BN moves on — hiding one the
+  // user had navigated to would delete part of their own view.
+  let bnWasRevealed = false;
 
   const MARK_WHITE = '#ffffff';
   const MARK_BLUE  = '#4a9bff';
@@ -1813,14 +1817,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    // Retire the previous BN's mark before adopting the new one.
-    if (bnNodeId && bnNodeId !== node.id()) {
-      const prev = cy.getElementById(bnNodeId);
-      if (prev.length) {
-        clearMarksFrom(prev);
-        prev.connectedEdges('.bn-edge').removeClass('bn-edge');
-      }
-    }
+    // Retire the previous BN before adopting the new one. Clearing its STYLE
+    // is not enough: a node we revealed stays on the canvas, so successive
+    // arrivals pile up on top of one another. Put it back out of sight —
+    // unless the user has since made it their own central node, in which case
+    // it is part of their view now and not ours to remove.
+    if (bnNodeId && bnNodeId !== node.id()) retireBlueNode();
 
     bnNodeId = node.id();
     bnGone   = false;
@@ -1833,17 +1835,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     markBlueEdges(node);
   }
 
+  // Undo everything showBlueNode did to the previous node.
+  function retireBlueNode() {
+    if (!bnNodeId) return;
+    const prev = cy.getElementById(bnNodeId);
+    if (prev.length) {
+      clearMarksFrom(prev);
+      prev.connectedEdges('.bn-edge').removeClass('bn-edge');
+      const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+      if (bnWasRevealed && !isLocalCentral) prev.hide();
+    }
+    bnNodeId = null; bnOuter = null; bnWasRevealed = false;
+  }
+
   // §3 — bottom-right of the current view. If the node is already on screen it
   // is left exactly where it is: moving a node the user is looking at would be
   // worse than not hinting at all.
   function placeBlueNode(node) {
-    if (node.visible()) return;
+    if (node.visible()) { bnWasRevealed = false; return; }
     const ext = cy.extent();
     node.position({
       x: ext.x1 + (ext.x2 - ext.x1) * 0.78,
       y: ext.y1 + (ext.y2 - ext.y1) * 0.80,
     });
     node.show();
+    bnWasRevealed = true;
   }
 
   // §4 — thin blue edges to nodes ALREADY on screen. The edges already exist in
@@ -2243,11 +2259,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function resetBuddyBar() {
     // §2 — a new pair clears the partner's mark along with their trail.
-    if (bnNodeId) {
-      const prev = cy.getElementById(bnNodeId);
-      if (prev.length) { clearMarksFrom(prev); prev.connectedEdges('.bn-edge').removeClass('bn-edge'); }
-    }
-    bnNodeId = null; bnOuter = null; bnGone = false;
+    retireBlueNode();
+    bnGone = false;
     try { renderMarks(); } catch (_) {}
     buddyCy.elements().remove();
     buddyChipCount      = 0;
