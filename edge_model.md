@@ -183,6 +183,31 @@ regardless of what any view has chosen to show. That is why the Blue Node's
 edge marking has to filter by endpoint visibility itself (§5) — the graph will
 happily hand it edges no view ever intended to draw.
 
+### A documented NEGATIVE: the parallelogram gateway nodes
+
+Also remembered, 2026-08-21: gateway-ish nodes drawn as **parallelograms**,
+seen both in the graph and on the breadcrumb chips, and recalled as **DOM
+creations** rather than cytoscape nodes. **They have never existed in this
+project.** Recorded here so the search is not repeated — it was exhaustive:
+
+- No `parallelogram`, `rhomboid`, `skewX`/`skewY`, `clip-path` or `polygon(`
+  in the current tree of any of the five repos.
+- **No blob in BD's entire git history contains any of them** (checked by
+  walking every object, not just greping HEAD), and no diff contains `skew`.
+- The only node shapes EVER assigned in viewer.js, across all history, are
+  `hexagon`, `round-rectangle`, `round-triangle`, `square` — six assignments
+  in total, plus the cytoscape default ellipse.
+- `node.breadcrumb-chip` sets **no shape at all**; chips inherit their node
+  type's, and they are cytoscape nodes, not DOM.
+- Not in `curator.html` or `sr_editor.html` (no SVG or angled shapes), and not
+  in the one published artifact (the landing page — no diagram).
+- Not in any surviving session transcript; only four remain locally.
+
+Most likely an HTML mockup or prototype from a session whose transcript is
+gone — a parallelogram is the flowchart convention for input/output, which is
+a natural way to sketch a "gateway". **The practical point: it is not a
+mechanism in BD, so it changes nothing about the edge model above.**
+
 ### The three fossils that reinforce the memory
 
 1. **`handleGatewayClick` (viewer.js:3309) really does run a live query during
