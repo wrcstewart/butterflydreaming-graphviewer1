@@ -9,6 +9,35 @@ Everything below was verified against the running Memgraph instance and the
 cytoscape 3.34.1 source, not inferred from comments. Where something is a
 hypothesis it says so.
 
+## 0. How this was established — and how to disprove it
+
+Worth stating, because "there is no simulation" is a claim about CODE and could
+not be settled by looking at the database. The layers were checked separately:
+
+| Claim | Evidence | Layer |
+|---|---|---|
+| All edges resident at boot | the boot query string has no label/type/LIMIT | viewer.js |
+| Navigation never creates edges | every nav function is `hide()`/`show()`; 4 runtime `cy.add` edge sites, all mirroring a committed DB write | viewer.js |
+| Nothing is synthesised client-side | grep for edge construction (`target:`) → 7 hits, every one accounted for | viewer.js |
+| Nothing is synthesised server-side | `server.js` never constructs a `source`/`target` pair — **zero** hits; the query channel runs the client's Cypher verbatim and `serializeRecord` is a pure key-by-key mapping | server.js |
+| Gateway→Cluster edges are stored, not derived | 227 rows of the real relationship | Memgraph |
+
+Only the last row is a database fact. **The database could never have shown the
+absence of simulation** — that had to come from the client and the server.
+
+**The falsifiable cross-check.** The DB holds **2,706** relationships
+(2026-08-21). If every edge is resident and nothing is invented, then in the
+browser console:
+
+```js
+cy.edges().length        // expect ≈ 2706
+```
+
+Materially **lower** ⇒ the boot load is selective after all and this document is
+wrong. **Higher** ⇒ something is synthesising edges. Re-run the count with
+`node bd_tool.js cypher "MATCH ()-[r]->() RETURN count(r) AS total"` first, since
+curation writes move it. *Not yet run in a browser — stated so it can be.*
+
 ---
 
 ## 1. The headline: every edge is resident from boot
