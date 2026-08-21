@@ -124,3 +124,60 @@ reloading", and "ring order cannot encode arrival" — and both times the user's
 follow-up question was better than my answer. Also nearly added a duplicate
 `url` field before checking `git show HEAD` and finding the chips already
 carried it. **Check the file, not the memory.**
+
+---
+
+## Afternoon/evening — Blue Node built, then debugged from user reports
+
+Commits `19e4611` → `fb19717`. Canary rotated each time; ended **blue**
+(`viewer.js?v=583`, `style.css?v=262`).
+
+| commit | what |
+|---|---|
+| `19e4611` | §9.5 Blue Node itself; `#buddy-latest` retired |
+| `40728a9` | retiring a BN must HIDE it too — they were piling up |
+| `edc706b` | rings contiguous; BN sized to the view it lands in |
+| `f80f189` | `border-position` leak — white frame drew across the badge |
+| `5b440aa` | `n_r` badge measured from the body, not the bounding box |
+| `768e12a` | Snap rings overlap rather than abut (hairline) |
+| `fb19717` | blue edges were a NO-OP; now shown, invisible types skipped |
+
+**Reference doc written: `edge_model.md`** — prompted by the question of whether
+some relationships are simulated by live query. They are not; see the doc. It
+also carries the cytoscape 3.34.1 rendering facts established today, which cost
+several wrong guesses and should not be re-derived.
+
+### The pattern worth carrying forward
+
+Three separate bugs were the same shape: **revealing something and marking it
+are separate effects, so undoing one is not undoing the other.**
+
+1. Retiring a BN cleared its style but left the node shown → pile-up.
+2. The same, one layer down, for edges.
+3. `border-position` set in one branch persisted into another → the white frame
+   drew inward across the badge, and only on nodes that had been through a Snap,
+   so it read as intermittent.
+
+The rule that kills all three: **every branch sets every property it depends
+on**, and **remember what WE revealed so we put back exactly that**.
+
+### Diagnostic notes
+
+- The desktop-vs-iOS size split was the clue that cracked the oversized BN: the
+  snake view writes width/height INLINE, computed from the live canvas and
+  clamped [46,120]. A phone's narrow column lands near the top of that clamp so
+  the type default looks right; a desktop's wider grid sizes nodes below it.
+  Not a desktop bug — a "never went through the layout" bug.
+- Blue edges failing SILENTLY (a class cannot undo `display:none`) is the worst
+  failure mode available: looks built, does nothing, no error. Worth a
+  deliberate check on any future feature that decorates hidden elements.
+
+### Open at end of day
+
+- Thin black line between white and blue rings in the Snap. Overlap did not
+  clear it. **Next suspect: the blue's 0.4 outline-opacity darkening toward its
+  edge — a colour problem. Do NOT tweak the offset again.**
+- Blue edges untested in a browser (fixed after the day's last test round).
+- iOS untested for everything today.
+- `GATEWAY_LINK` (9 in DB) has no `buildStyle` selector — drawn in fallback
+  grey. Flagged, untouched.
