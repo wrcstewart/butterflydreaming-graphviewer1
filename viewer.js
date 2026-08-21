@@ -1741,7 +1741,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function clearMarksFrom(node) {
     if (!node || !node.length) return;
-    node.removeStyle('border-width border-color border-opacity ' +
+    node.removeStyle('border-width border-color border-opacity border-position ' +
                      'outline-width outline-color outline-opacity outline-offset');
   }
 
@@ -1759,7 +1759,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                         centralNode.id() === bn.id());
 
     if (centralNode && centralNode.length && !together) {
-      centralNode.style({ 'border-width': 4, 'border-color': MARK_WHITE, 'border-opacity': 1,
+      // border-position MUST be set here, not left to the default. .style() is
+      // inline and persists, so a node that has been through the Snap below
+      // carries that branch's value until something overwrites it — which is
+      // how the white frame started drawing inward across the number badge.
+      // Every branch sets every property it depends on.
+      // 'outside' puts the whole 4px beyond the node body (outerWidth = w +
+      // 2*border-width), so the frame never covers the label at all.
+      centralNode.style({ 'border-width': 4, 'border-position': 'outside',
+                          'border-color': MARK_WHITE, 'border-opacity': 1,
                           'outline-width': 0 });
     }
     if (bn && bn.length && !together) {
@@ -1772,19 +1780,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (together) {
       // Both marks on one node — the "Snap". The two rings must touch: a gap
       // puts canvas black between them, so the eye reads three bands rather
-      // than two marks. border-position 'inside' keeps the whole border within
-      // the node body, so outline-offset 0 lands the outer ring exactly on the
-      // inner ring's edge.
+      // than two marks. The border band runs [0,4] beyond the body when
+      // border-position is 'outside', and the outline band runs
+      // [offset, offset+width] from that same body edge — so offset 4 lands
+      // the outer ring exactly on the inner ring's edge, and neither touches
+      // the interior.
       const blueInside = (bnOuter === 'white');
       bn.style({
         'border-width': 4,
-        'border-position': 'inside',
+        'border-position': 'outside',
         'border-color':   blueInside ? MARK_BLUE  : MARK_WHITE,
         'border-opacity': blueInside ? (bnGone ? 0.35 : 0.75) : 1,
         'outline-width': 6,
         'outline-color':  blueInside ? MARK_WHITE : MARK_BLUE,
         'outline-opacity': blueInside ? 1 : (bnGone ? 0.18 : 0.4),
-        'outline-offset': 0,
+        'outline-offset': 4,
       });
     }
   }
