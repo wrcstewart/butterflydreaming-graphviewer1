@@ -1771,6 +1771,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
             colour:        node.data('colour') || '#444444',
             name:          node.data('name') || '',
             mainId:        node.id(),
+            url:           node.data('url') || null,   // the stable id (2026-08-21)
             source_text:   node.data('source_text') || null,
             seq:           node.data('seq') ?? null,
             gateway:        node.data('gateway') || false,
@@ -1900,6 +1901,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
 
   window.addEventListener('resize', panYouCyToLatest);
 
+  // 2026-08-21 — resolve a node by its DURABLE url, not by cytoscape's id.
+  //
+  // cy ids are Memgraph elementIds, and viewer.js:4460 documents that the same
+  // Cluster or Family comes back with DIFFERENT elementIds in different query
+  // contexts — the client works around it by deduplicating on name and keeping
+  // whichever it saw first. "First seen" depends on result ordering, which is
+  // not guaranteed to match between two browsers. So a crumb saying "I am at
+  // node 89" can mean different nodes on the two machines.
+  //
+  // `url` is a stored property (a UUID, written once at creation), identical
+  // everywhere and forever. It is the platform's stable id and the only safe
+  // thing to send across the wire.
+  function nodeByUrl(url) {
+    if (!url) return null;
+    const hit = cy.nodes().filter(n => n.data('url') === url);
+    return hit.length ? hit.first() : null;
+  }
+
+  // Resolve a chip to its main-graph node: durable url first, cy id as the
+  // legacy fallback for chips that predate the url being sent.
+  function resolveChipNode(chip) {
+    return nodeByUrl(chip.data('url')) || cy.getElementById(chip.data('mainId'));
+  }
+
   // 2026-08-20 — chip labels are truncated HERE, not left to the renderer.
   // text-max-width + text-wrap:'ellipsis' was not constraining them: labels ran
   // wider than the 63px chip, spilled both sides, and the neighbouring chips —
@@ -1946,6 +1971,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
         colour:        data.colour || '#444444',
         name:          data.name || '',
         mainId:        data.mainId || null,
+        url:           data.url || null,
         source_text:   sourceText,
         seq,
         gateway:        data.gateway || false,
@@ -2124,8 +2150,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
 
   buddyCy.on('tap', 'node', evt => {
     const chip = evt.target;
-    const main = cy.getElementById(chip.data('mainId'));
-    if (!main.length) return;
+    // url first — the partner's cy id may not mean the same node here (see
+    // nodeByUrl). This is why tapping a remote Cluster or Family chip could
+    // already do nothing at all: the lookup missed and this guard returned
+    // silently, with no error and no explanation.
+    const main = resolveChipNode(chip);
+    if (!main || !main.length) return;
     if (isTouchEvent(evt)) markRecentTouch();
     hideTooltip();
     markReadNode(chip, buddyCy);
@@ -2138,8 +2168,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
 
   youCy.on('tap', 'node', evt => {
     const chip = evt.target;
-    const main = cy.getElementById(chip.data('mainId'));
-    if (!main.length) return;
+    // url first — the partner's cy id may not mean the same node here (see
+    // nodeByUrl). This is why tapping a remote Cluster or Family chip could
+    // already do nothing at all: the lookup missed and this guard returned
+    // silently, with no error and no explanation.
+    const main = resolveChipNode(chip);
+    if (!main || !main.length) return;
     if (isTouchEvent(evt)) markRecentTouch();
     hideTooltip();
     markReadNode(chip, youCy);
