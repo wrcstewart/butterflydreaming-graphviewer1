@@ -1763,21 +1763,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                           'outline-width': 0 });
     }
     if (bn && bn.length && !together) {
+      // outline-offset 0: the ring sits flush against the node body. Any gap
+      // shows canvas black between node and ring, which reads as a third
+      // colour rather than as one mark.
       bn.style({ 'outline-width': 6, 'outline-color': MARK_BLUE,
-                 'outline-opacity': bnGone ? 0.18 : 0.4, 'outline-offset': 2 });
+                 'outline-opacity': bnGone ? 0.18 : 0.4, 'outline-offset': 0 });
     }
     if (together) {
-      // Both marks on one node — the "Snap". Offset stepped out so the inner
-      // ring reads clearly instead of the two crowding.
+      // Both marks on one node — the "Snap". The two rings must touch: a gap
+      // puts canvas black between them, so the eye reads three bands rather
+      // than two marks. border-position 'inside' keeps the whole border within
+      // the node body, so outline-offset 0 lands the outer ring exactly on the
+      // inner ring's edge.
       const blueInside = (bnOuter === 'white');
       bn.style({
         'border-width': 4,
+        'border-position': 'inside',
         'border-color':   blueInside ? MARK_BLUE  : MARK_WHITE,
         'border-opacity': blueInside ? (bnGone ? 0.35 : 0.75) : 1,
         'outline-width': 6,
         'outline-color':  blueInside ? MARK_WHITE : MARK_BLUE,
         'outline-opacity': blueInside ? 1 : (bnGone ? 0.18 : 0.4),
-        'outline-offset': 5,
+        'outline-offset': 0,
       });
     }
   }
@@ -1843,9 +1850,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearMarksFrom(prev);
       prev.connectedEdges('.bn-edge').removeClass('bn-edge');
       const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
-      if (bnWasRevealed && !isLocalCentral) prev.hide();
+      if (bnWasRevealed && !isLocalCentral) { prev.removeStyle(BN_SIZE_KEYS); prev.hide(); }
     }
     bnNodeId = null; bnOuter = null; bnWasRevealed = false;
+  }
+
+  // Some views lay out their own grid and set width/height/font-size INLINE,
+  // computed from the live canvas — the snake view does, clamped [46,120]. A
+  // node WE revealed never went through that layout, so it keeps its type
+  // default (a TextNode is 120 wide) and towers over neighbours the layout has
+  // shrunk to fit. How badly depends on the canvas: a phone's narrow column
+  // lands near the top of the clamp and the mismatch does not show, while a
+  // desktop's wider grid sizes nodes down and the default looks twice too big.
+  // Copy the size the view is actually using rather than re-deriving it.
+  const BN_SIZE_KEYS = 'width height font-size';
+  function sizeBlueNodeToView(node) {
+    node.removeStyle(BN_SIZE_KEYS);          // back to the type default first
+    const peer = cy.nodes('.snake-section').filter(n => n.visible() && n.id() !== node.id()).first();
+    if (!peer.length) return;                // ordinary view: the default IS right
+    node.style({
+      'width':     peer.numericStyle('width'),
+      'height':    peer.numericStyle('height'),
+      'font-size': peer.style('font-size'),
+    });
   }
 
   // §3 — bottom-right of the current view. If the node is already on screen it
@@ -1859,6 +1886,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       y: ext.y1 + (ext.y2 - ext.y1) * 0.80,
     });
     node.show();
+    sizeBlueNodeToView(node);
     bnWasRevealed = true;
   }
 
@@ -1885,7 +1913,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!bnNodeId) return;
     const node = cy.getElementById(bnNodeId);
     if (!node.length) { bnNodeId = null; return; }
-    if (!node.visible()) placeBlueNode(node);
+    if (node.visible()) { bnWasRevealed = false; }
+    else placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
   }
