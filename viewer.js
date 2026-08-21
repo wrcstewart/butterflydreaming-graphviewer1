@@ -1336,6 +1336,18 @@ function buildStyle() {
     // aren't truncated too aggressively — pinch-zoom is enabled if more
     // reading room is needed.
     {
+      // §4 — an edge from the Blue Node to something already on screen. Thin
+      // and blue so it reads as the partner's connection rather than part of
+      // the local structure.
+      selector: 'edge.bn-edge',
+      style: {
+        'line-color': '#4a9bff',
+        'width': 1,
+        'opacity': 0.75,
+        'line-style': 'solid',
+      }
+    },
+    {
       selector: 'node.breadcrumb-chip',
       style: {
         'width': 63,                           /* 2026-07-15 — +5% from 60 so
@@ -1638,7 +1650,7 @@ function showSessionExpired(message) {
   overlay.classList.add('active');
 }
 
-function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, buddyLatestCy) {
+function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   async function safeQuery(type, query, params = {}) {
     if (!wsRef.current || !wsRef.current.connected) {
@@ -1679,7 +1691,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
 
   function markReadNode(cytoNode, instanceCy) {
     if (lastReadNodeId && lastReadNodeCy) {
-      try { lastReadNodeCy.getElementById(lastReadNodeId).removeStyle('border-width border-color border-opacity'); } catch (_) {}
+      // Clear BOTH ring properties from the node we are leaving — a stale
+      // outline would otherwise persist there — then let renderMarks() below
+      // put the partner's mark back if it still belongs to that node.
+      try { clearMarksFrom(lastReadNodeCy.getElementById(lastReadNodeId)); } catch (_) {}
     }
     // 2026-08-16 — the central (just-tapped) node on the MAIN canvas gets a
     // thick WHITE border ("you are here"); only the successor is amber, so the
@@ -1687,18 +1702,195 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     // distinction. Breadcrumb trail chips (youCy/buddyCy) keep the original
     // subtle 2px grey so the small chips don't get heavy.
     const central = instanceCy === cy;
-    cytoNode.style(central
-      ? { 'border-width': 4, 'border-color': '#ffffff', 'border-opacity': 1 }   // 2026-08-17 — 5→4px; the straddling border was nibbling tight labels (e.g. SubFamily)
-      : { 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
     lastReadNodeId = cytoNode.id();
     lastReadNodeCy = instanceCy;
+    if (central) {
+      // 2026-08-21 — the white mark is now stamped by renderMarks(), which also
+      // knows about the partner's blue one. Arriving on a node the partner is
+      // already on means WHITE arrived last, so white takes the outer ring
+      // (§1.2 case B, "I went to them").
+      if (bnNodeId && bnNodeId === cytoNode.id()) bnOuter = 'white';
+      renderMarks();
+    } else {
+      cytoNode.style({ 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
+    }
+  }
+
+  // ══ Blue Node (blue_node_spec.md) ═══════════════════════════════════════
+  //
+  // TWO INDEPENDENT MARKS, never a combined "agreed" state (§1.2.1). The local
+  // user's white mark and the partner's blue mark are tracked separately and
+  // rendered by ONE function that reads both. Agreement is emergent: when the
+  // two land on the same node it wears two rings, and when either party moves
+  // its own mark moves with it — nothing to assemble, nothing to tear down.
+  //
+  // renderMarks() is a pure function of that state, so it is safe to call after
+  // every navigation (§5) — the same inputs always give the same result. The
+  // 2026-08-20 pane/anchor runaway is what happens when a re-asserted thing is
+  // not idempotent.
+  let bnNodeId  = null;   // node carrying the partner's mark
+  let bnOuter   = null;   // 'blue' | 'white' — which ring is OUTER when both coincide
+  let bnGone    = false;  // partner left: dim, do not remove (§2)
+
+  const MARK_WHITE = '#ffffff';
+  const MARK_BLUE  = '#4a9bff';
+
+  function clearMarksFrom(node) {
+    if (!node || !node.length) return;
+    node.removeStyle('border-width border-color border-opacity ' +
+                     'outline-width outline-color outline-opacity outline-offset');
+  }
+
+  // THE RULE (§1.2): the OUTER ring is whoever arrived last. Rings accrete
+  // outward, like tree rings. Whichever mark belongs inside is drawn as the
+  // BORDER, whichever outside as the OUTLINE — the pairing is not fixed.
+  // An outline draws entirely outside the shape, so it never eats the node's
+  // interior the way a border does (which is what nibbles tight labels).
+  function renderMarks() {
+    // Central node: white, unless the BN shares it (handled below).
+    const centralNode = (lastReadNodeId && lastReadNodeCy === cy)
+      ? cy.getElementById(lastReadNodeId) : null;
+    const bn = bnNodeId ? cy.getElementById(bnNodeId) : null;
+    const together = !!(centralNode && bn && centralNode.length && bn.length &&
+                        centralNode.id() === bn.id());
+
+    if (centralNode && centralNode.length && !together) {
+      centralNode.style({ 'border-width': 4, 'border-color': MARK_WHITE, 'border-opacity': 1,
+                          'outline-width': 0 });
+    }
+    if (bn && bn.length && !together) {
+      bn.style({ 'outline-width': 6, 'outline-color': MARK_BLUE,
+                 'outline-opacity': bnGone ? 0.18 : 0.4, 'outline-offset': 2 });
+    }
+    if (together) {
+      // Both marks on one node — the "Snap". Offset stepped out so the inner
+      // ring reads clearly instead of the two crowding.
+      const blueInside = (bnOuter === 'white');
+      bn.style({
+        'border-width': 4,
+        'border-color':   blueInside ? MARK_BLUE  : MARK_WHITE,
+        'border-opacity': blueInside ? (bnGone ? 0.35 : 0.75) : 1,
+        'outline-width': 6,
+        'outline-color':  blueInside ? MARK_WHITE : MARK_BLUE,
+        'outline-opacity': blueInside ? 1 : (bnGone ? 0.18 : 0.4),
+        'outline-offset': 5,
+      });
+    }
+  }
+
+  // Show the partner's arrival as a node on OUR graph (§1, §2, §3, §4).
+  // LATEST WINS (§2): a fast-moving partner would otherwise back up a queue of
+  // stale positions; the question this answers is "where are they NOW".
+  async function showBlueNode(data) {
+    const url = data && data.url;
+    let node = url ? nodeByUrl(url) : null;
+    if (!node && data && data.mainId) {
+      const byId = cy.getElementById(data.mainId);       // pre-url crumbs
+      if (byId.length) node = byId;
+    }
+
+    // §7.3 — the node may post-date our graph load. Fetch it, with its edges.
+    if (!node && url) {
+      try {
+        const ws = wsRef.current;
+        if (ws && ws.connected) {
+          const rows = await fetchNodeByUrl(ws, url);
+          if (rows && rows.length) {
+            addFetchedRows(cy, rows);
+            node = nodeByUrl(url);
+          }
+        }
+      } catch (err) {
+        console.warn('[BN] fetch failed for', url, err && err.message);
+      }
+    }
+
+    if (!node || !node.length) {
+      // §8.3 — show NOTHING rather than a provisional node that could not
+      // honestly become your central node when tapped. But SAY so: silence is
+      // the failure mode this replaces.
+      prependSystemCard('Your partner has moved to somewhere this graph does not have yet. Reload to catch up.');
+      return;
+    }
+
+    // Retire the previous BN's mark before adopting the new one.
+    if (bnNodeId && bnNodeId !== node.id()) {
+      const prev = cy.getElementById(bnNodeId);
+      if (prev.length) {
+        clearMarksFrom(prev);
+        prev.connectedEdges('.bn-edge').removeClass('bn-edge');
+      }
+    }
+
+    bnNodeId = node.id();
+    bnGone   = false;
+    // Blue arrived last. If we are already standing here, that is §1.2 case A
+    // ("they came to me") — white stays inside, blue takes the outer ring.
+    bnOuter  = 'blue';
+
+    placeBlueNode(node);
+    renderMarks();
+    markBlueEdges(node);
+  }
+
+  // §3 — bottom-right of the current view. If the node is already on screen it
+  // is left exactly where it is: moving a node the user is looking at would be
+  // worse than not hinting at all.
+  function placeBlueNode(node) {
+    if (node.visible()) return;
+    const ext = cy.extent();
+    node.position({
+      x: ext.x1 + (ext.x2 - ext.x1) * 0.78,
+      y: ext.y1 + (ext.y2 - ext.y1) * 0.80,
+    });
+    node.show();
+  }
+
+  // §4 — thin blue edges to nodes ALREADY on screen. The edges already exist in
+  // cy, so this is a class change, not a graph change. Edges to nodes that are
+  // not visible are simply not drawn.
+  // §5 — every local navigation does cy.elements().hide() and shows a computed
+  // set, which would take the BN with it. Re-assert after each. renderMarks()
+  // is a pure function of state, and this shows the node again rather than
+  // toggling anything, so calling it repeatedly is safe — the property that
+  // the 2026-08-20 pane/anchor runaway lacked.
+  // Scheduled, not immediate: each navigation calls hide() FIRST and then shows
+  // its computed set, so re-asserting inline would be undone a few lines later.
+  // A single rAF puts it after that synchronous work. The pending flag makes
+  // repeated calls in one frame collapse to one.
+  let blueReassertPending = false;
+  function scheduleBlueReassert() {
+    if (!bnNodeId || blueReassertPending) return;
+    blueReassertPending = true;
+    requestAnimationFrame(() => { blueReassertPending = false; reassertBlueNode(); });
+  }
+
+  function reassertBlueNode() {
+    if (!bnNodeId) return;
+    const node = cy.getElementById(bnNodeId);
+    if (!node.length) { bnNodeId = null; return; }
+    if (!node.visible()) placeBlueNode(node);
+    renderMarks();
+    markBlueEdges(node);
+  }
+
+  function markBlueEdges(node) {
+    cy.edges('.bn-edge').removeClass('bn-edge');
+    node.connectedEdges().forEach(e => {
+      if (e.source().visible() && e.target().visible()) e.addClass('bn-edge');
+    });
   }
 
   function clearReadMark() {
     if (lastReadNodeId && lastReadNodeCy) {
-      try { lastReadNodeCy.getElementById(lastReadNodeId).removeStyle('border-width border-color border-opacity'); } catch (_) {}
+      try {
+        clearMarksFrom(lastReadNodeCy.getElementById(lastReadNodeId));
+      } catch (_) {}
       lastReadNodeId = null;
       lastReadNodeCy = null;
+      // The node may still carry the partner's blue mark — clearing OUR mark
+      // must not take theirs with it. Re-render from the remaining state.
+      try { renderMarks(); } catch (_) {}
     }
   }
 
@@ -2018,117 +2210,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     buddyChipX    += w + 7;
     lastBuddyChipId = id;
     panBuddyCyToLatest();
-    // 2026-08-20 — restate it legibly above the strips. Deliberately uses the
-    // UNABBREVIATED name: the chip may have collapsed to a bare sequence number
-    // (successive chunks of one text), and an enlarged "7" is still a 7. Full
-    // name, with the seq alongside when there is one.
-    showBuddyLatest(data, data.display_name || data.name || '', seq, abbreviated);
+    // 2026-08-21 — the partner's arrival is now shown as a NODE on our own
+    // graph (blue_node_spec.md), not as a panel beside it. Async: the node may
+    // have to be fetched if it post-dates our graph load (§7.3).
+    // Fire and forget deliberately — appendBuddyChip must not block on a
+    // possible network fetch. But an unawaited async call rejects into
+    // NOTHING, which is exactly how yesterday's jump-to-external breakage hid
+    // itself, so the rejection is caught and reported rather than swallowed.
+    showBlueNode(data).catch(err => console.warn('[BN] showBlueNode failed', err));
   }
 
-  // The enlarged copy of the newest remote breadcrumb. Persists until the next
-  // one arrives (where the partner IS is a standing question, not an event) and
-  // taps through to the same node the chip would.
-  //
-  // Mirrors the chip as a real cytoscape node in buddyLatestCy, deliberately
-  // WITHOUT the .breadcrumb-chip class — that class is what shrinks chips to
-  // 63x18/8px, so omitting it renders the node at its natural per-type size,
-  // shape and colour. The instance's 1.8 zoom does the enlarging.
-  const buddyLatestEl = document.getElementById('buddy-latest');
-  let   buddyLatestMainId = null;
-
-  function showBuddyLatest(data, displayName, seq, abbreviated) {
-    if (!buddyLatestEl || !buddyLatestCy) return;
-    const title = displayName || '';
-    if (!title) { hideBuddyLatest(); return; }
-    buddyLatestCy.elements().remove();
-    buddyLatestCy.add({
-      group: 'nodes',
-      data: {
-        id: 'buddy_latest',
-        type:          data.type,
-        // The UNABBREVIATED name. A chip collapses to a bare sequence number
-        // when the partner reads successive chunks of one text, and an enlarged
-        // "7" is still a 7 — the full name is the readability win. The seq is
-        // appended so the position within the text is not lost.
-        display_name:  (abbreviated && seq !== null && seq !== undefined)
-                         ? `${title}  ${seq}` : title,
-        colour:        data.colour || '#444444',
-        name:          data.name || '',
-        seq,
-        gateway:       data.gateway || false,
-        section_title: data.section_title || false,
-        subfamily:     data.subfamily || false,
-      },
-      position: { x: 0, y: 0 },
-    });
-    if (data.subfamily) buddyLatestCy.getElementById('buddy_latest').addClass('subfamily');
-    buddyLatestMainId = data.mainId || null;
-    buddyLatestEl.classList.remove('gone');
-    // UNHIDE FIRST. The container starts `hidden`, and cytoscape measures a
-    // display:none element as 0x0 — resize/center against that would centre
-    // the node against nothing and leave it off-canvas on the first arrival.
-    buddyLatestEl.hidden = false;
-    fitBuddyLatest();
-    // One more pass after layout settles, same reason the player chrome does it.
-    requestAnimationFrame(fitBuddyLatest);
-  }
-
-  // FIT rather than a fixed zoom. Node sizes vary by type — TextNode 120x34,
-  // Cluster 70x34, root 100x100 — so a flat 1.8x would overflow the panel for
-  // some and under-fill it for others; root at 1.8 would be 180x180 in a 300x66
-  // box and simply get clipped. Fitting adapts to whatever arrives, and the cap
-  // stops a small node being blown up to something absurd.
-  // (Absolute padding is fine here, unlike the main canvas rule about
-  // fitPadding: this panel is a fixed size, not a share of the viewport.)
-  const BUDDY_LATEST_MAX_ZOOM = 1.8;
-  function fitBuddyLatest() {
-    if (!buddyLatestCy || !buddyLatestEl || buddyLatestEl.hidden) return;
-    if (buddyLatestCy.nodes().length === 0) return;
-    buddyLatestCy.resize();
-    // 2026-08-20 — padding 7 → 3: "maximum use of the space". At the reduced
-    // panel sizes the padding was the difference between a label above and
-    // below the 8px the chip uses.
-    buddyLatestCy.fit(buddyLatestCy.nodes(), 3);
-    if (buddyLatestCy.zoom() > BUDDY_LATEST_MAX_ZOOM) {
-      buddyLatestCy.zoom(BUDDY_LATEST_MAX_ZOOM);
-      buddyLatestCy.center();
-    }
-  }
-  window.addEventListener('resize', fitBuddyLatest);
-
-  function hideBuddyLatest() {
-    if (!buddyLatestEl) return;
-    if (buddyLatestCy) buddyLatestCy.elements().remove();
-    buddyLatestEl.classList.remove('gone');
-    buddyLatestEl.hidden = true;
-    buddyLatestMainId = null;
-  }
-
-  if (buddyLatestEl) {
-    // 2026-08-20 — the tap is taken by a transparent shield laid OVER the
-    // cytoscape canvases, not by the container. A container listener never
-    // fired on iOS: cytoscape binds its own touch handlers and preventDefaults
-    // them, so no synthesized click ever arrived. The shield is above the
-    // canvases, so it gets the event first — safe, because this instance has
-    // interaction disabled and nothing inside it wanted the touch.
-    const shield = document.createElement('div');
-    shield.className = 'tap-shield';
-    buddyLatestEl.appendChild(shield);
-
-    // Same one-gesture behaviour as a chip tap — re-enter that node's view.
-    const openBuddyLatest = () => {
-      if (!buddyLatestMainId) return;
-      const main = cy.getElementById(buddyLatestMainId);
-      if (!main.length) return;
-      hideTooltip();
-      handleNodeTap(main);
-    };
-    // touchend AND click: touchend for iOS (and preventDefault so the click it
-    // would synthesize cannot fire the handler a second time), click for mouse
-    // and for any browser that does not emit touch events here.
-    shield.addEventListener('touchend', (e) => { e.preventDefault(); openBuddyLatest(); });
-    shield.addEventListener('click', openBuddyLatest);
-  }
+  // 2026-08-21 — the enlarged-copy panel (#buddy-latest / buddyLatestCy, built
+  // 2026-08-20) is RETIRED. The partner's position is now a node on the user's
+  // own graph — see showBlueNode above and blue_node_spec.md §6. Its unresolved
+  // problem went with it: circular types fitted badly into a fixed panel, and a
+  // real graph node has none.
 
   function panBuddyCyToLatest() {
     if (buddyChipCount === 0) return;
@@ -2146,7 +2242,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
   }
 
   function resetBuddyBar() {
-    hideBuddyLatest();
+    // §2 — a new pair clears the partner's mark along with their trail.
+    if (bnNodeId) {
+      const prev = cy.getElementById(bnNodeId);
+      if (prev.length) { clearMarksFrom(prev); prev.connectedEdges('.bn-edge').removeClass('bn-edge'); }
+    }
+    bnNodeId = null; bnOuter = null; bnGone = false;
+    try { renderMarks(); } catch (_) {}
     buddyCy.elements().remove();
     buddyChipCount      = 0;
     buddyChipX          = 0;
@@ -2991,6 +3093,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     lastParentNode = state.parent;
     activeNodeId = null;
     cy.elements().hide();
+    scheduleBlueReassert();   // §5 — survive this view change
     cy.elements().filter(el => ids.has(el.id())).show();
     runLayout(cy, lastParentNode);
     updateBackBtn();
@@ -3025,6 +3128,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     // reload for these tiers, symmetric with the Cluster-expand fix.
     lastParentNode = node;
     cy.elements().hide();
+    scheduleBlueReassert();   // §5 — survive this view change
 
     if (node.data('type') === 'root') {
       // Root click: show root + its real Neo4j neighbours (Family nodes + invisible edges)
@@ -3046,6 +3150,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     lastParentNode = familyNode;
     activeNodeId = familyNode.id();
     cy.elements().hide();
+    scheduleBlueReassert();   // §5 — survive this view change
     familyNode.show();
 
     // Show all DESCENDS_FROM edges connected to this family (both directions)
@@ -3084,6 +3189,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     saveState();
     activeNodeId = clusterNode.id();
     cy.elements().hide();
+    scheduleBlueReassert();   // §5 — survive this view change
 
     clusterNode.show();
     clusterNode.connectedEdges().forEach(edge => {
@@ -3175,6 +3281,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     saveState();
     activeNodeId = node.id();
     cy.elements().hide();
+    scheduleBlueReassert();   // §5 — survive this view change
     showIds.forEach(id => { const el = cy.getElementById(id); if (el.length) el.show(); });
     // Show every edge whose both endpoints are visible. Previously excluded
     // CHILD explicitly — that created the "click gateway shows no arrow to
@@ -3409,6 +3516,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     saveState();
     activeNodeId = titlePage.id();
     cy.elements().hide();
+    scheduleBlueReassert();   // §5 — survive this view change
 
     if (clusterNode && clusterNode.length) clusterNode.show();
     titlePage.show();
@@ -4764,25 +4872,6 @@ async function init() {
     boxSelectionEnabled: false,
   });
 
-  // 2026-08-20 — third instance: the enlarged copy of the newest REMOTE
-  // breadcrumb. Same buildStyle() as the strips, so the node is drawn by the
-  // same code and cannot drift when node styling changes. Interaction is off —
-  // this is a read-out, not a canvas to explore; the tap is handled on the
-  // container so the whole panel is the target, not just the node.
-  const buddyLatestCy = cytoscape({
-    container: document.getElementById('buddy-latest'),
-    elements: [],
-    style: buildStyle(),
-    layout: { name: 'preset' },
-    zoom: 1,                             // seed only — fitBuddyLatest() owns the
-                                         // zoom, fitting each node to the panel
-                                         // with a 1.8 cap
-    userZoomingEnabled: false,
-    userPanningEnabled: false,
-    boxSelectionEnabled: false,
-    autoungrabify: true,
-  });
-
   // After CSS sets the new 23px bar heights, sync cytoscape's internal size
   // and fit any existing chips. Empty on first load — these are no-ops then —
   // but harmless and gives a clean reset point if the bars are ever rebuilt.
@@ -6014,7 +6103,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, buddyLatestCy);
+  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
@@ -6646,7 +6735,10 @@ async function init() {
       buddyCy.nodes().addClass('buddy-gone');
       // 2026-08-20 — the enlarged copy dims with the trail it mirrors rather
       // than vanishing; where they got to still matters after they leave.
-      document.getElementById('buddy-latest')?.classList.add('gone');
+      // §2 — the Blue Node dims with the trail rather than vanishing: where
+      // they got to is still worth seeing, and still tappable.
+      bnGone = true;
+      try { renderMarks(); } catch (_) {}
       pairStatus.textContent = '';
       updateJoinButtonLabel();
       updateSendBtn();
