@@ -1774,7 +1774,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // outline-offset 0: the ring sits flush against the node body. Any gap
       // shows canvas black between node and ring, which reads as a third
       // colour rather than as one mark.
-      bn.style({ 'outline-width': 6, 'outline-color': MARK_BLUE,
+      //
+      // border-width 0 is doing the same job from the other side. A Cluster
+      // carries its own 2px border in a darkened version of its fill, drawn
+      // ON TOP of the ring's innermost pixels — which is the thin black line
+      // that appeared between the colour and the blue. The halo replaces that
+      // frame for as long as it is shown; clearMarksFrom puts it back.
+      bn.style({ 'border-width': 0,
+                 'outline-width': 6, 'outline-color': MARK_BLUE,
                  'outline-opacity': bnGone ? 0.18 : 0.4, 'outline-offset': 0 });
     }
     if (together) {
@@ -4516,20 +4523,28 @@ function setupNrBadges(cy) {
     badges.forEach((div, id) => {
       const node = cy.getElementById(id);
       if (!node.length || !node.visible()) { div.style.display = 'none'; return; }
-      const bb = node.renderedBoundingBox({ includeLabels: false, includeOverlays: false });
       div.style.display = 'block';
       div.style.fontSize = fontSize;
-      const cx = (bb.x1 + bb.x2) / 2;
-      // 2026-08-20 — clear the node's frame. The lift used to be a flat 4px
-      // while the BORDER scales with zoom, so the badge slid under it: a
-      // clicked Cluster carries the 4px white "you are here" border, which at
-      // zoom 1 leaves exactly 0 clearance and goes negative as you zoom in.
-      // Cytoscape borders straddle the outline, so the bounding box's y2 is the
-      // border's OUTER edge and its inner edge is bb.y2 − borderWidth × zoom;
-      // sit 3px above that, whatever the border and zoom happen to be.
-      const bw = (parseFloat(node.style('border-width')) || 0) * cy.zoom();
-      div.style.left = cx + 'px';
-      div.style.top  = (bb.y2 - bw - 3) + 'px';
+      // 2026-08-21 — measure from the node BODY, never from the bounding box.
+      // The box grows to enclose the OUTLINE as well as the border, and the
+      // old formula subtracted only border-width — so every pixel of halo
+      // pushed the badge outward. A Blue Node's 6px ring put it half outside
+      // the fill; the Snap's two rings swallowed it whole. The body is the
+      // thing the badge belongs to, and no outline can move it.
+      //
+      // Then step in past whatever border is drawn, which depends on
+      // border-position: 'center' straddles (half inside), 'inside' is wholly
+      // within, 'outside' takes nothing from the interior at all. Read it
+      // rather than assume it — renderMarks writes 'outside' on marked nodes,
+      // and the plain Cluster border is 'center'.
+      const zoom  = cy.zoom();
+      const rp    = node.renderedPosition();
+      const bodyBottom = rp.y + node.renderedHeight() / 2;
+      const bw    = (parseFloat(node.style('border-width')) || 0) * zoom;
+      const bpos  = node.style('border-position') || 'center';
+      const inset = bpos === 'inside' ? bw : bpos === 'outside' ? 0 : bw / 2;
+      div.style.left = rp.x + 'px';
+      div.style.top  = (bodyBottom - inset - 3) + 'px';
     });
   }
 
