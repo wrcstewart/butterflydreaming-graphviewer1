@@ -59,3 +59,68 @@ with `updated_at`/`created_at` on new writes — small, no behaviour change.
 Facts measured today and worth not re-measuring: 477 nodes, 2,706 edges,
 Memgraph 3.2.1, cytoscape 3.34.1 from the CDN, seven `cy.elements().hide()`
 sites, 69 nodes carrying the legacy ISO-string `tagged_at`.
+
+---
+
+# Afternoon — building began
+
+## WHERE WE ARE (read this first after a compaction)
+
+**Doing:** a dedicated **stable-node-ID** pass — `stable_id_spec.md`, specced
+and pushed (`b0d6719`), **NOT yet implemented**. Agreed to finish this before
+any further BD feature work.
+
+**Next action:** implement `stable_id_spec.md` §4 — six changes, client-only,
+one commit. Then its §7 test plan, with the **gateway click** as the item that
+matters (it is what broke the July attempt).
+
+**Then:** back to `blue_node_spec.md` §9.4, the fetch endpoint.
+
+## Done this afternoon
+
+**§9.1 timestamps on writes** (`5e71c5f`, `b816954`). `created_at`/`updated_at`
+on the four node write paths, and edge writes bump BOTH endpoints — the trick
+that lets edges need no timestamps, index or scan. Verified with EXPLAIN against
+the live DB before committing, then end-to-end after the restart.
+
+**Server restarted** on the new code (the user has since said no need to ask
+before restarting).
+
+**§9.2 backfill** — all 477 nodes stamped, flagged `created_at_estimated: true`,
+1 ms apart in `id(n)` order. Backup first:
+`backups/memgraph_2026-08-21_140105.cypher`.
+
+**§9.3 indexes** on `updated_at` for all eight labels. **Memgraph 3.2.1 has no
+global property index** — `CREATE GLOBAL INDEX` is a syntax error — so the delta
+MUST query per label. EXPLAIN proves it: label-scoped gives
+`ScanAllByLabelProperties`, unlabelled gives `ScanAll + Filter`. The naive
+`MATCH (n)` would silently scan everything and look fine at 477.
+
+**`d83935b`** — crumbs now carry `url` and taps resolve by it. This was a PATCH
+for the id problem; `stable_id_spec.md` supersedes it by making the cy id BE the
+url. The patch stays for older cached crumbs.
+
+## Two things found along the way
+
+**The id problem.** cy ids are Memgraph elementIds, and the same Cluster or
+Family returns different elementIds in different query contexts — the client
+deduplicates by name, first-seen-wins, and first-seen order need not match
+between browsers. So a crumb saying "node 89" can mean different nodes on the
+two machines. **Tapping a partner's Cluster chip could already fail silently**
+via `if (!main.length) return;`. This is why the stable-id pass jumped the
+queue: the Blue Node is the first feature whose correctness DEPENDS on identity
+matching.
+
+**84 orphan nodes** — unlabelled, no properties before the backfill. Proven
+pre-existing from the pre-backfill backup (`__mg_vertex__` with no label), not
+created by me. They never enter the graph load and the label-scoped delta
+excludes them. Cleanup candidate, not urgent, and deletion is irreversible so
+not without a decision.
+
+## A working note on method
+
+Twice today I stated a limit that was not real — "you cannot add a node without
+reloading", and "ring order cannot encode arrival" — and both times the user's
+follow-up question was better than my answer. Also nearly added a duplicate
+`url` field before checking `git show HEAD` and finding the chips already
+carried it. **Check the file, not the memory.**
