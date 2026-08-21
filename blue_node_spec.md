@@ -27,14 +27,58 @@ its natural size with its full label.
 
 ## 1. What a BN is
 
-A node **already in `cy`**, shown with a blue border (`.bn` class). Not a new
+A node **already in `cy`**, shown with a blue halo (`.bn` class). Not a new
 element, not a copy — the same graph node the partner is on. That is what makes
 "tap it and it becomes your central node" honest rather than a simulation.
 
 - One BN at a time.
-- Colour is a border, never a fill: the node keeps its own type colour, so the
-  blue reads as "theirs" without hue carrying the whole message
-  ([[user-colour-vision]]).
+- Never a fill: the node keeps its own type colour, so the blue is an
+  annotation on top rather than a recolouring.
+
+### 1.1 An OUTLINE, not a border — and a low-opacity halo
+
+Use cytoscape's `outline-*`, not `border-*`. Verified 2026-08-21: the CDN's
+`cytoscape@3` resolves to **3.34.1**, whose build implements `outline-width`,
+`outline-color`, `outline-offset`, `outline-opacity` and `outline-style`.
+
+```
+outline-width:   6
+outline-color:   <blue>
+outline-opacity: ~0.4          /* halo, not a ring */
+outline-offset:  2             /* stands off the node */
+```
+
+Why an outline rather than a border:
+
+- **Borders straddle the shape's edge**, half inside. That interior half is
+  already a known nuisance here: the central-node border comment (2026-08-17)
+  records 5px "nibbling tight labels (e.g. SubFamily)", and it is what pushed
+  the Cluster count badge under the frame on 2026-08-19. An outline takes none
+  of the node's interior, so the label — the whole point of showing the
+  partner's position — is untouched.
+- **It does not compete with the node's own border.** Clusters carry a 2px
+  darkened-colour border already; an outline sits clear of it, so the node keeps
+  its identity and the blue is unambiguously an annotation.
+- **It composes with the white "you are here" border.** On tap the outline drops
+  and the white border applies; they occupy different space, so there is no
+  conflict to resolve.
+
+On the low opacity and [[user-colour-vision]]: a faint halo would normally be
+the wrong call, but here the cue is **geometric, not chromatic** — a ring exists
+where other nodes have none. Presence carries the meaning; blue only says whose.
+That is why low opacity is safe here in a way a low-opacity fill would not be.
+
+**Caveat to remember:** an outline is NOT counted in `renderedBoundingBox` the
+way a border is. Anything positioned from a node's box — the count badge, the
+arrow docks, the extend panel — will not account for the halo. Given the badge
+fix of 2026-08-19 was precisely about a border eating into that box, this is a
+difference to remember rather than rediscover.
+
+**Related, not urgent:** the same `outline-*` swap would retire the straddling
+border everywhere and cure the label nibbling at source. That was worked around
+on 2026-08-19 (the badge now measures the live border width), so it is a
+cleanup, not a fix — but it changes the apparent size of every bordered node, so
+it wants its own pass rather than being slipped in with the BN.
 
 ## 2. Lifecycle
 
@@ -104,6 +148,9 @@ fade? See §8.
   live position.
 - Chip labels stay truncated at 13 characters (`truncateChipLabel`); the BN
   carries the full name, which is now the reason the truncation is acceptable.
+- The panel's gradient, tap-shield and sizing work (2026-08-20) goes with it.
+  Nothing there transfers: a graph node needs no shield (the main `cy` already
+  handles taps) and no fitting (it renders at its own size).
 
 ## 7. Graph sync — the UBN problem
 
