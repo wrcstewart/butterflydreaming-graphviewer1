@@ -102,7 +102,23 @@ no reliance on hue.
 | **B.** they were here, you arrive | blue — theirs | **white** — yours | I went to them |
 
 **How to remember it: rings accrete outward, like tree rings. Later is further
-out.** The newcomer arrives and wraps around what was already there. Nothing to
+out.**
+
+**Worked example — the "Snap" (observed live, 2026-08-21).** The round trip
+produces agreement naturally, and each side shows it differently:
+
+1. You navigate to Cluster A. You have white on A. Your partner sees A arrive.
+2. Your partner taps A. Now they are on A too, and their crumb reaches you.
+3. **Your screen:** white was there first, blue arrived → white inside, blue
+   outside (case A, "they came to me").
+   **Their screen:** blue was there first, their own white arrived last → blue
+   inside, white outside (case B, "I went to them").
+
+**The two browsers show MIRRORED ring orders, and both are correct** — each
+reads who arrived last from its own point of view. Nothing coordinates this;
+it falls out of §1.2.1's two-independent-marks rule. It is also the sharpest
+test of that rule: a shared "agreed" state would have had to pick ONE order and
+would therefore be wrong on one of the two screens. The newcomer arrives and wraps around what was already there. Nothing to
 memorise beyond that.
 
 Note the pairing is NOT fixed — whichever mark belongs inside is drawn as the

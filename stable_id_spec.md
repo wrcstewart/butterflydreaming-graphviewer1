@@ -1,7 +1,7 @@
 # Stable node IDs — spec v0.1, 2026-08-21
 
-Status: **pre-implementation.** Dedicated pass, agreed to run before further BD
-feature work.
+Status: **DONE 2026-08-21** (`467c2f7`), test plan §7 passed in full. Kept as
+the record of why the change was made and what it removed.
 
 Make the cytoscape node id **the node's durable `url`** (a UUID property written
 once at creation) instead of Memgraph's `elementId`.
@@ -134,10 +134,10 @@ Items 1, 2, 3 and 6 pass. Gateway and title clicks behave exactly as before,
 navigation is normal, and the forwarded client console shows no errors since the
 new build (31 hint-scan lines, so layout hints are running — item 6).
 
-**Item 5 outstanding**: a partner's Cluster chip tapped across two browsers.
-That is the one that exercises what this pass actually fixed, since it needs the
-two clients to agree on an identity. Everything else was already working; it
-would have been the regression test.
+**Item 5 PASSES (2026-08-21).** Two browsers: clicking Cluster A in one raises
+Cluster A in the other's remote panel; clicking THAT opens it and raises Cluster
+A back in the first. The round trip completes, which it could not reliably do
+before — a Cluster's cy id was per-client. **This pass is complete.**
 
 ## 8. Rollback
 
