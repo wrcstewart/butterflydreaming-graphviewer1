@@ -80,13 +80,64 @@ on 2026-08-19 (the badge now measures the live border width), so it is a
 cleanup, not a fix — but it changes the apparent size of every bordered node, so
 it wants its own pass rather than being slipped in with the BN.
 
+### 1.2 Agreement — when you are both on the same node
+
+The round-trip case (§8.2, closed): the partner is on the node you are centred
+on, either because they followed you there or because you went to them. This is
+not an awkward collision to suppress — it is a state worth showing, and the pair
+will want to know it.
+
+**Both marks co-exist.** A border straddles the node's edge; an outline sits
+outside it. They occupy different space by construction, so the node simply
+wears two rings. That reads as "both of us are here" with no new vocabulary and
+no reliance on hue.
+
+**THE RULE: the OUTER ring is whoever arrived last.**
+
+| | inner (border, 4px) | outer (outline, 6px, offset 3) | reads as |
+|---|---|---|---|
+| **A.** you were here, they arrive | white — yours | **blue** — theirs | they came to me |
+| **B.** they were here, you arrive | blue — theirs | **white** — yours | I went to them |
+
+**How to remember it: rings accrete outward, like tree rings. Later is further
+out.** The newcomer arrives and wraps around what was already there. Nothing to
+memorise beyond that.
+
+Note the pairing is NOT fixed — whichever mark belongs inside is drawn as the
+`border`, whichever belongs outside as the `outline`. An early draft of this
+spec assumed white was always the border and blue always the outline, which
+would have made the order un-encodable; it is not so.
+
+**Two consequences, accepted knowingly:**
+
+- **In case B the node loses its own type border.** Clusters carry a 2px
+  darkened-colour border; blue-as-border replaces it. The fill still identifies
+  the type, so little is lost — but it is a real change, not an oversight.
+- **White renders differently in case B** — as an outline standing off the node,
+  not the straddling border it is everywhere else in BD. That difference is part
+  of the signal, but it will look odd to someone who does not know why, hence
+  this paragraph.
+
+**Rejected: two shades of blue** to encode who joined whom. Considered and
+dropped on 2026-08-21. Two close blues is the hardest possible discrimination
+and the weakest available channel ([[user-colour-vision]]) — carrying meaning
+there, for a secondary fact, when a geometric channel was available, would have
+been the wrong trade. Ring order does the same job on the stronger channel.
+
+Also worth knowing, and an argument against over-engineering this: **in the
+moment you already know who moved.** If you tapped, you joined them; if you did
+not move and a ring appeared, they came to you. The encoding earns its keep
+only AFTER the moment — you look away, come back, and the node still carries
+the answer.
+
 ## 2. Lifecycle
 
 | event | behaviour |
 |---|---|
 | remote crumb arrives | that node gets `.bn`, is shown, positioned (§3) |
 | another arrives while one is pending | **latest wins** — the old BN clears, the new one shows |
-| user taps the BN | it becomes the central node (`handleNodeTap`), `.bn` drops, white "you are here" border applies as normal |
+| user taps the BN | it becomes the central node (`handleNodeTap`); the rings re-order per §1.2 case B — blue moves inside, white outside |
+| remote arrives on your central node | §1.2 case A — white stays inside, blue outline outside. Never suppress the halo here |
 | user navigates elsewhere | **the BN persists** (§5) |
 | partner leaves | BN stays, dimmed, matching how the strip dims on `buddy_disconnected` |
 | new pair | cleared, as `resetBuddyBar` does |
@@ -223,16 +274,20 @@ irrelevant at 477 nodes, not irrelevant later.
 
 ## 8. Open questions
 
-1. **A BN with no visible neighbours** after the user navigates away — leave it
-   floating, or fade it?
-2. **Round trips.** A node that goes R→L→R: the partner is on a node you sent
-   them to. Set aside for now (user, 2026-08-21) but it needs an answer before
-   this ships — at minimum, do not blue-edge the node the local user is
-   currently centred on.
+1. ~~A BN with no visible neighbours.~~ **CLOSED 2026-08-21: leave it floating,
+   fully visible.** It is also the legible copy of the last remote crumb — the
+   job `#buddy-latest` used to do — so fading it would quietly remove the thing
+   it replaced. The edge structure signals relevance on its own; the halo does
+   not need to.
+2. ~~Round trips.~~ **CLOSED 2026-08-21 — see §1.2.**
 3. **Provisional BN.** If the fetch in §7.3 fails, draw the crumb's own data
    (`display_name`, `colour`, `type`) as a node with no edges, or show nothing?
    A provisional node cannot honestly "become your central node".
-4. **Does the BN survive a mode switch** to Player and back?
+4. ~~Mode switch.~~ **CLOSED 2026-08-21: yes, it survives and shows on return.**
+   Cheap if `.bn` is a class on the node rather than state rebuilt on entry —
+   the node keeps the class while `#cy` is hidden. Latest-wins applies
+   throughout, so crumbs arriving during Player mode are not queued: the last
+   one is what shows on return.
 
 ## 9. Build order
 
