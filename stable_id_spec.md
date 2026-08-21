@@ -113,12 +113,31 @@ remaining call is either an edge (fine) or a bug.
 1. Graph loads; node count matches (393 labelled nodes, no duplicates, no
    orphan edges).
 2. Tap through Root → Family → Cluster → TextNode.
-3. **Gateway click** — the July failure. Confirm the snake view populates.
+3. **Gateway click** — the July failure point. NOT the snake view: that comes
+   from tapping the grey TITLE node (`handleTitlePageTap`). The gateway runs a
+   FOLLOW-UP Cypher query after load and matches its results against nodes
+   already in cytoscape, revealing the work's content nodes connected to that
+   cluster. If load-time and follow-up ids disagree, `showIds` matches nothing
+   and the reveal is silently empty — no error, just nothing. Test both, since
+   the title path also resolves ids.
+   **PASSED 2026-08-21** — user confirms gateway and title both behave as
+   before.
 4. Cluster clone and node-text save still resolve their targets.
 5. Breadcrumbs: tap a chip in your own trail; tap a partner's Cluster chip
    (the bug this fixes) across two browsers.
 6. Layout hints still apply — they are keyed per edge and viewing parent, and
    the parent uuid is already a url, so this should be unaffected. Verify.
+
+### 7.1 Result — 2026-08-21
+
+Items 1, 2, 3 and 6 pass. Gateway and title clicks behave exactly as before,
+navigation is normal, and the forwarded client console shows no errors since the
+new build (31 hint-scan lines, so layout hints are running — item 6).
+
+**Item 5 outstanding**: a partner's Cluster chip tapped across two browsers.
+That is the one that exercises what this pass actually fixed, since it needs the
+two clients to agree on an identity. Everything else was already working; it
+would have been the regression test.
 
 ## 8. Rollback
 
