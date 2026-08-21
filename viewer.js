@@ -4433,6 +4433,74 @@ function queryWS(ws, type, query, params = {}) {
   });
 }
 
+// ── Fetching nodes the client does not have (blue_node_spec.md §7.3) ──────
+//
+// A client that loaded before a node was created has no way to show it — today
+// that fails silently (`if (!main.length) return;`). These two functions repair
+// it on demand, over the SAME query channel the graph load already uses.
+//
+// LABEL-SCOPED BY NECESSITY. Memgraph 3.2.1 has no global property index, so
+// `MATCH (n) WHERE n.updated_at > $t` is a full scan (verified by EXPLAIN:
+// ScanAll + Filter, versus ScanAllByLabelProperties when a label is given).
+// Eight indexed lookups cost nothing; the tempting one-liner silently does not
+// scale — see spec §7.5.
+const SYNC_LABELS = ['TextNode', 'Cluster', 'Family', 'SubFamily', 'Entry', 'Root'];
+
+// queryWS resolves on the FIRST reply whose `type` matches, so two fetches in
+// flight with the same type would resolve each other's promise — the second
+// crumb's node landing in the first's caller. A counter makes every request
+// its own conversation.
+let syncReqSeq = 0;
+
+// One node plus its immediate edges. The edges come back whole; the CALLER
+// decides which to keep, because cytoscape cannot hold an edge whose other end
+// is missing (spec §7.3).
+function fetchNodeByUrl(ws, url) {
+  return queryWS(ws, 'fetch_node_' + (++syncReqSeq),
+    'MATCH (n {url: $url}) ' +
+    'OPTIONAL MATCH (n)-[r]-(m) ' +
+    'RETURN n, r, m',
+    { url });
+}
+
+// Everything changed since `since` (ms UTC), one indexed query per label.
+async function fetchNodesSince(ws, since) {
+  const out = [];
+  for (const label of SYNC_LABELS) {
+    const rows = await queryWS(ws, 'fetch_since_' + label + '_' + (++syncReqSeq),
+      'MATCH (n:' + label + ') WHERE n.updated_at > $since ' +
+      'OPTIONAL MATCH (n)-[r]-(m) ' +
+      'RETURN n, r, m',
+      { since });
+    out.push(...rows);
+  }
+  return out;
+}
+
+// Add fetched rows to the live graph. Returns the node ids actually added.
+//
+// Edges are added only where BOTH ends are present — deliberately, per spec §4:
+// unknown neighbours are NOT imported, so the graph stays a record of where the
+// pair has actually been rather than quietly growing.
+function addFetchedRows(cy, rows) {
+  const added = [];
+  // Nodes first: an edge cannot be added before its endpoints exist.
+  for (const rec of rows) {
+    if (!rec || !rec.n) continue;
+    const nd = buildNodeData(rec.n);
+    if (!cy.getElementById(nd.id).length) { cy.add({ group: 'nodes', data: nd }); added.push(nd.id); }
+  }
+  for (const rec of rows) {
+    if (!rec || !rec.r || !rec.m) continue;      // OPTIONAL MATCH gives null for an edgeless node
+    const ed = buildEdgeData(rec.r, rec.n, rec.m);
+    ed.id = 'r_' + ed.id;                        // same prefix rule as the graph load
+    if (cy.getElementById(ed.id).length) continue;
+    if (!cy.getElementById(ed.source).length || !cy.getElementById(ed.target).length) continue;
+    cy.add({ group: 'edges', data: ed });
+  }
+  return added;
+}
+
 // --- Boot ---
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
