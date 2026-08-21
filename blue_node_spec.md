@@ -290,10 +290,27 @@ Users cannot delete. Deletion requires a reload. **No tombstones, no
 because the situation is rare and a reload is bearable. Revisit if curator-side
 deletion ever reaches live clients.
 
-### 7.5 Index
+### 7.5 Index — and why the delta MUST be label-scoped
 
-Label-property index on `updated_at`. Without it the delta is a full scan —
-irrelevant at 477 nodes, not irrelevant later.
+**Done 2026-08-21.** `CREATE INDEX ON :<Label>(updated_at)` for all eight
+labels: TextNode (211), Cluster (126), Family (46), SubFamily (40),
+HelperMessage (5), Entry (3), HelperHub (1), Root (1).
+
+**Memgraph 3.2.1 has no global property index** — `CREATE GLOBAL INDEX ON
+:(updated_at)` is a syntax error. Indexes are per-label, and that dictates the
+delta's shape. Verified by EXPLAIN against the live database:
+
+```
+MATCH (n:Cluster) WHERE n.updated_at > $t   →  ScanAllByLabelProperties  ✓ indexed
+MATCH (n)         WHERE n.updated_at > $t   →  ScanAll + Filter          ✗ full scan
+```
+
+**So §7.3 must issue one query per label and merge, never the unlabelled
+`MATCH (n)`.** Eight indexed lookups is trivial; the naive single query silently
+scans every node and would look fine at 477.
+
+Note an index on `TextNode(created_at)` already existed before this work —
+presumably from the earlier timestamp experiments. Harmless, and now populated.
 
 ## 8. Questions raised and settled
 
@@ -323,11 +340,14 @@ scratch.
 
 ## 9. Build order
 
-1. `updated_at` / `created_at` on new writes (§7.1) — small, no risk, no
-   behaviour change.
-2. Backfill 477 nodes via `bd_tool.js`, so it inherits the pre-flight backup
-   ([[backup-safety]]).
-3. Index (§7.5).
+1. ~~`updated_at` / `created_at` on new writes (§7.1).~~ **DONE** — `5e71c5f`
+   (node writes) and `b816954` (edge writes bumping endpoints).
+2. ~~Backfill 477 nodes.~~ **DONE 2026-08-21.** All 477 stamped and flagged
+   `created_at_estimated: true`, spaced 1 ms apart in `id(n)` order so the
+   values are distinct and sort stably — ordering only, never identity (§7.1).
+   Backup taken first: `backups/memgraph_2026-08-21_140105.cypher`, 3,192
+   statements.
+3. ~~Index.~~ **DONE** — see §7.5, including the label-scoping it forces.
 4. The endpoint (§7.3).
 5. The BN itself (§1–§6), retiring `#buddy-latest`.
 
