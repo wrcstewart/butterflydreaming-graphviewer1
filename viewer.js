@@ -1735,6 +1735,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // node we revealed may be hidden again when the BN moves on — hiding one the
   // user had navigated to would delete part of their own view.
   let bnWasRevealed = false;
+  // Edges WE revealed, so retiring can put exactly those back. Same rule as
+  // the node: never hide an edge the view itself had shown.
+  let bnShownEdges = null;
+  // Types the design draws at opacity 0 on purpose — structural links that
+  // exist for derivation and layout, not for reading. edge.bn-edge sits LATER
+  // in the stylesheet than their rules, so for equal specificity it wins and
+  // marking one would override that zero, drawing a line the graph is meant
+  // never to show.
+  const BN_EDGE_SKIP = new Set(['CONTAINS_CLUSTER', '__root_edge__']);
 
   const MARK_WHITE = '#ffffff';
   const MARK_BLUE  = '#4a9bff';
@@ -1873,7 +1882,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const prev = cy.getElementById(bnNodeId);
     if (prev.length) {
       clearMarksFrom(prev);
-      prev.connectedEdges('.bn-edge').removeClass('bn-edge');
+      clearBlueEdges();
       const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
       if (bnWasRevealed && !isLocalCentral) { prev.removeStyle(BN_SIZE_KEYS); prev.hide(); }
     }
@@ -1944,11 +1953,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     markBlueEdges(node);
   }
 
-  function markBlueEdges(node) {
+  function clearBlueEdges() {
+    if (bnShownEdges) { bnShownEdges.hide(); bnShownEdges = null; }
     cy.edges('.bn-edge').removeClass('bn-edge');
-    node.connectedEdges().forEach(e => {
-      if (e.source().visible() && e.target().visible()) e.addClass('bn-edge');
-    });
+  }
+
+  function markBlueEdges(node) {
+    clearBlueEdges();
+    if (!node || !node.length) return;
+    const eligible = node.connectedEdges().filter(e =>
+      !BN_EDGE_SKIP.has(e.data('type')) &&
+      e.source().visible() && e.target().visible());
+
+    // The edges are resident but hidden. Every navigation does
+    // cy.elements().hide() and shows only what the view computed, and the BN
+    // was not in that set — placeBlueNode shows the NODE alone. A class sets
+    // line-color and opacity; it cannot undo display:none. So marking without
+    // showing drew nothing whatsoever, which is what made this look built.
+    //
+    // Split before showing, so we hide back exactly what we revealed and
+    // leave the view's own edges alone.
+    const hidden = eligible.filter(e => !e.visible());
+    hidden.show();
+    bnShownEdges = hidden.length ? hidden : null;
+    eligible.addClass('bn-edge');
   }
 
   function clearReadMark() {
