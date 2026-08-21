@@ -1798,10 +1798,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'border-position': 'outside',
         'border-color':   blueInside ? MARK_BLUE  : MARK_WHITE,
         'border-opacity': blueInside ? (bnGone ? 0.35 : 0.75) : 1,
-        'outline-width': 6,
+        // The two bands are separately-stroked paths, and where they merely
+        // ABUT, antialiasing leaves a hairline of canvas black between them.
+        // So overlap instead of abutting: the border paints OVER the outline
+        // (proof: the white ring is visible at all — a 10px blue band drawn
+        // on top would hide it), so running the outline 2px further in puts
+        // blue underneath the border's inner edge with no seam to show
+        // through. Offset + width still total 10, so the VISIBLE blue is the
+        // same [4,10] band it was before.
+        'outline-width': 8,
         'outline-color':  blueInside ? MARK_WHITE : MARK_BLUE,
         'outline-opacity': blueInside ? 1 : (bnGone ? 0.18 : 0.4),
-        'outline-offset': 4,
+        'outline-offset': 2,
       });
     }
   }
