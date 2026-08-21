@@ -2,8 +2,9 @@
 
 **Written 2026-08-21.** Prompted by a suspicion that some relationships were
 "presented by carrying out a live query and simulating the edges … to avoid too
-many edges". **That system does not exist.** This document records what is
-actually there, so the question does not have to be asked again.
+many edges". **No edge is ever synthesised — but the recollection is otherwise
+sound, and §4 explains what it is really remembering.** This document records
+what is actually there, so the question does not have to be asked again.
 
 Everything below was verified against the running Memgraph instance and the
 cytoscape 3.34.1 source, not inferred from comments. Where something is a
@@ -139,9 +140,50 @@ toggle classes, styles and visibility.
 Synthetic elements that DO exist are all **nodes**: `ClusterEditChip` and the
 breadcrumb chips in `youCy`/`buddyCy`. They carry no edges in the main graph.
 
-## 4. Three fossils that explain the false memory
+## 4. Why the "query simulates edges" memory is substantially RIGHT
 
-The suspicion was well-founded — these are what it attaches to:
+Recorded 2026-08-21 after tracing the actual visual ("gateway nodes with
+slanting edges"). The first draft of this document called it a false memory.
+That was too dismissive: **four of the five things remembered are true.**
+
+There IS a live query, it IS at the gateway, it DOES produce a fan of slanting
+edges, and its purpose IS to avoid drawing too many. Only the fifth is wrong —
+the query does not CREATE the edges, it selects which already-loaded ones
+become visible. Functionally identical, which is why it encoded as
+"simulating".
+
+**The slanting fan, in code.** `expandToCluster` (viewer.js ~3329) lays gateway
+nodes out in a horizontal ROW 150px below the cluster, 130px apart, centred on
+it:
+
+```js
+const rowX = clusterNode.position().x - ((gws.length - 1) * spacing) / 2;
+const rowY = clusterNode.position().y + 150;
+```
+
+One cluster above, a row below — every connecting line slants inward except the
+middle one. Then `handleGatewayClick` runs the `gwClick` query narrowed by
+*work × cluster*, shows those TextNodes, and shows every edge whose endpoints
+are both visible.
+
+**The numbers that justify it** (2026-08-21):
+
+| scope | CLUSTER_REL edges converging on the cluster |
+|---|---|
+| Tao Te Ching × Paradox — ONE gateway click | **70** |
+| Paradox, all works | 134 |
+| Questioning/Doubt, all works | 162 |
+| all CLUSTER_REL in the corpus | **1,640** |
+
+So the query is a genuine edge-count control. Without the work filter a single
+cluster view roughly doubles; without any filter it is a 1,640-edge hairball.
+
+**Why the distinction still matters:** `connectedEdges()` sees all 1,640
+regardless of what any view has chosen to show. That is why the Blue Node's
+edge marking has to filter by endpoint visibility itself (§5) — the graph will
+happily hand it edges no view ever intended to draw.
+
+### The three fossils that reinforce the memory
 
 1. **`handleGatewayClick` (viewer.js:3309) really does run a live query during
    navigation.** It binds `r` and then *never uses it*. The rows only build a
