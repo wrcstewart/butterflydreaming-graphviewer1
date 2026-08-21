@@ -21,6 +21,15 @@ try {
   CURATION_CODE = cfg.CURATION_CODE || null;
 } catch { /* no config or no CURATION_CODE — curation disabled */ }
 
+// ── Node timestamps (blue_node_spec.md §7.1) ──────────────────────────────
+// Integer ms UTC, from the SERVER's clock — every write goes through here, so
+// clients never contribute a time. `updated_at` is the one the delta keys on:
+// an EDITED node is stale for an early-loading client just as much as a missing
+// one. `created_at` is set once and is informational.
+// NOT an identifier: nodes already have a durable UUID (`url`). Nothing may
+// depend on these being unique.
+const nowMs = () => Date.now();
+
 const app = express();
 app.use(express.json());
 
@@ -441,8 +450,9 @@ app.post('/api/create-cluster', async (req, res) => {
     }
     const url = 'butterflydreaming.org/n/' + crypto.randomUUID();
     await session.run(
-      `CREATE (n:Cluster { name: $name, url: $url, text: '' })`,
-      { name: trimmed, url }
+      `CREATE (n:Cluster { name: $name, url: $url, text: '',
+                           created_at: $now, updated_at: $now })`,
+      { name: trimmed, url, now: nowMs() }
     );
     res.set('Cache-Control', 'no-store');
     res.json({ url, name: trimmed });
@@ -482,8 +492,9 @@ app.post('/api/create-subfamily', async (req, res) => {
     }
     const url = 'butterflydreaming.org/n/' + crypto.randomUUID();
     await session.run(
-      `CREATE (n:Family:SubFamily { name: $name, url: $url, text: '' })`,
-      { name: trimmed, url }
+      `CREATE (n:Family:SubFamily { name: $name, url: $url, text: '',
+                                   created_at: $now, updated_at: $now })`,
+      { name: trimmed, url, now: nowMs() }
     );
     res.set('Cache-Control', 'no-store');
     res.json({ url, name: trimmed });
@@ -1359,8 +1370,9 @@ io.on('connection', async (socket) => {
           }
           await s.run(
             'MATCH (src:Cluster {name: $sourceName}) ' +
-            'CREATE (c:Cluster { name: $newName, display_name: $newName, label: $newName, n_r: 0 })',
-            { sourceName, newName }
+            'CREATE (c:Cluster { name: $newName, display_name: $newName, label: $newName, n_r: 0, ' +
+            'created_at: $now, updated_at: $now })',
+            { sourceName, newName, now: nowMs() }
           );
           // Copy all DESCENDS_FROM edges from the source cluster. No label constraint
           // on the parent so sub-families (also :Family in Memgraph) are included.
@@ -1430,8 +1442,8 @@ io.on('connection', async (socket) => {
         try {
           const result = await s.run(
             'MATCH (n) WHERE $label IN labels(n) AND n.name = $name ' +
-            'SET n.text = $text RETURN count(n) AS c',
-            { label: msg.label, name: msg.name, text: msg.text }
+            'SET n.text = $text, n.updated_at = $now RETURN count(n) AS c',
+            { label: msg.label, name: msg.name, text: msg.text, now: nowMs() }
           );
           const rec   = result.records[0];
           const count = rec ? (rec.get('c').toNumber ? rec.get('c').toNumber() : rec.get('c')) : 0;
