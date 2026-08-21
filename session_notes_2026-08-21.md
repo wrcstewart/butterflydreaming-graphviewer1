@@ -66,15 +66,15 @@ sites, 69 nodes carrying the legacy ISO-string `tagged_at`.
 
 ## WHERE WE ARE (read this first after a compaction)
 
-**Doing:** a dedicated **stable-node-ID** pass — `stable_id_spec.md`, specced
-and pushed (`b0d6719`), **NOT yet implemented**. Agreed to finish this before
-any further BD feature work.
+**Stable-node-ID pass: DONE** (`467c2f7`), full §7 test plan passed including
+the two-browser round trip. `stable_id_spec.md` marked DONE.
 
-**Next action:** implement `stable_id_spec.md` §4 — six changes, client-only,
-one commit. Then its §7 test plan, with the **gateway click** as the item that
-matters (it is what broke the July attempt).
+**Doing now:** `blue_node_spec.md` §9.4 — the fetch endpoint (`nodes-since(T)`
+and `node-by-url(u)`). Keyed on `url`, which the client now speaks natively.
 
-**Then:** back to `blue_node_spec.md` §9.4, the fetch endpoint.
+**Reminder from §7.5:** the delta MUST query per label — Memgraph 3.2.1 has no
+global property index, so `MATCH (n) WHERE n.updated_at > $t` silently scans
+everything.
 
 ## Done this afternoon
 
