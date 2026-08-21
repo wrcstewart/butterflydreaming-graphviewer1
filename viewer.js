@@ -696,6 +696,23 @@ function getElementId(entity) {
   return (entity.elementId !== undefined) ? entity.elementId : entity.identity.toString();
 }
 
+// stable_id_spec.md — the cytoscape id for a NODE is its durable `url`, a UUID
+// property written once at creation and identical in every client, forever.
+//
+// getElementId() is Memgraph's own handle: not stored, and documented in this
+// file as returning DIFFERENT values for the same Cluster or Family in
+// different query contexts. That instability is what forced the name-based
+// dedup (now deleted) and what let a partner's crumb point at nothing.
+//
+// The rule for this pass: no site may mint a NODE id from getElementId. It
+// remains correct for EDGES, whose ids never cross clients.
+// The fallback is defensive only — every labelled node has a url (verified:
+// 393 of 393, all distinct).
+function nodeId(entity) {
+  const url = entity && entity.properties && entity.properties.url;
+  return (typeof url === 'string' && url) ? url : getElementId(entity);
+}
+
 function flattenProps(props) {
   const out = {};
   for (const k in props) out[k] = toPlain(props[k]);
@@ -817,7 +834,7 @@ function getTextNodeLabel(props) {
 function buildNodeData(n) {
   const labels = n.labels || [];
   const props = flattenProps(n.properties || {});
-  const id = getElementId(n);
+  const id = nodeId(n);
 
   if (labels.includes('Family')) {
     const familyColour = FAMILY_COLOURS[props.name] || '#aaaaaa';
@@ -868,8 +885,10 @@ function buildEdgeData(r, n, m) {
   return Object.assign({}, props, {
     id: getElementId(r),
     raw_rel_id: getElementId(r),  // preserved after ed.id is overwritten with cf_/sf_/r_ prefix
-    source: getElementId(n),
-    target: getElementId(m),
+    // Endpoints are NODE references, so they take node ids. The edge's own id
+    // stays elementId-based — edge ids never cross clients.
+    source: nodeId(n),
+    target: nodeId(m),
     // 2026-08-16 — endpoint names carried on the edge so stylesheet selectors
     // can single out specific hops (e.g. the faint Gateways nav-aid edge)
     // without a post-load tagging pass. Cytoscape selectors can't reach into
@@ -3138,7 +3157,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState, bu
     const showIds = new Set([lastClusterNode.id(), node.id()]);
     for (const rec of records) {
       if (!rec.n) continue;
-      const id = getElementId(rec.n);
+      // stable_id_spec.md §6 — THE site the July 2026 attempt got wrong. It
+      // canonicalised at load time only, leaving this follow-up query speaking
+      // elementIds, so the two sources stopped agreeing. Using nodeId() here
+      // means load and follow-up mint the same identifier by construction.
+      const id = nodeId(rec.n);
       showIds.add(id);
       // Also include the title page (section_title node) connected via PART_OF
       // so the user can tap it to enter snake view
@@ -4472,8 +4495,8 @@ async function init() {
     const n = rec.n;
     const r = rec.r;
     const m = rec.m;
-    const nId = getElementId(n);
-    const mId = getElementId(m);
+    const nId = nodeId(n);
+    const mId = nodeId(m);
     // Prefix all relationship IDs with 'r_' to avoid Cytoscape silently dropping edges
     // whose integer ID happens to equal a node's integer ID (Memgraph shares the
     // integer namespace between nodes and relationships).
@@ -4487,46 +4510,31 @@ async function init() {
     }
   }
 
-  // Memgraph elementId inconsistency: the same Cluster or Family node can return
-  // different elementIds in different query contexts. Deduplicate by name (first-seen
-  // wins), fix all edge source/target references to the canonical ID, and remove the
-  // phantom duplicate nodes. Without this, TextNode→Cluster edges that landed on a
-  // duplicate Cluster ID produce disconnected components in fCoSE, which grids them
-  // into a "neat table" alongside the gateway.
+  // 2026-08-21 (stable_id_spec.md §4.5) — the name-based deduplication that
+  // used to sit here is GONE, along with clusterIdByName / familyIdByName /
+  // canonicalNodeId and the edge-rewrite loop.
   //
-  // 2026-07-04: TextNode dedup was tried and reverted — it broke handleGatewayClick's
-  // path, which uses raw DB elementIds from a follow-up Cypher query. Any future
-  // TextNode dedup must also canonicalise IDs at every DB-query result site, not
-  // just at graph-load time. Leaving as-is until we have concrete diagnostic data
-  // showing duplicate TextNodes are the actual cause of the CHILD asymmetry.
-  const clusterIdByName = new Map();
-  const familyIdByName  = new Map();
-  const canonicalNodeId = new Map(); // duplicateId → canonicalId
-  nodesById.forEach(nd => {
-    if (nd.type === 'Cluster') {
-      if (clusterIdByName.has(nd.name)) canonicalNodeId.set(nd.id, clusterIdByName.get(nd.name));
-      else clusterIdByName.set(nd.name, nd.id);
-    }
-    if (nd.type === 'Family') {
-      if (familyIdByName.has(nd.name)) canonicalNodeId.set(nd.id, familyIdByName.get(nd.name));
-      else familyIdByName.set(nd.name, nd.id);
-    }
-  });
-  if (canonicalNodeId.size > 0) {
-    edgesById.forEach(ed => {
-      if (canonicalNodeId.has(ed.source)) ed.source = canonicalNodeId.get(ed.source);
-      if (canonicalNodeId.has(ed.target)) ed.target = canonicalNodeId.get(ed.target);
-    });
-    canonicalNodeId.forEach((_, dupId) => nodesById.delete(dupId));
-  }
+  // It existed because the same Cluster or Family returned different Memgraph
+  // elementIds in different query contexts, so one node could enter the graph
+  // twice and TextNode→Cluster edges could land on the phantom — producing
+  // disconnected components that fCoSE gridded into a "neat table".
+  //
+  // Node ids are now the durable `url`, so the two query contexts yield the
+  // SAME id and `nodesById` (a Map keyed by that id) collapses them by itself.
+  // Removing the cause removed the need for the treatment.
+  //
+  // The 2026-07-04 warning that lived here — that TextNode dedup was reverted
+  // because handleGatewayClick's follow-up query still spoke elementIds — is
+  // answered by construction now: every site mints ids the same way. It is
+  // preserved in stable_id_spec.md §6 rather than deleted.
 
   for (const rec of cfRecords) {
     const c = rec.c, r = rec.r, f = rec.f;
     const cProps = flattenProps(c.properties || {});
     const fProps = flattenProps(f.properties || {});
     const rId = getElementId(r);
-    const cId = clusterIdByName.get(cProps.name) || getElementId(c);
-    const fId = familyIdByName.get(fProps.name)  || getElementId(f);
+    const cId = nodeId(c);
+    const fId = nodeId(f);
     if (!nodesById.has(cId)) nodesById.set(cId, buildNodeData(c));
     if (!nodesById.has(fId)) nodesById.set(fId, buildNodeData(f));
     // Prefix with 'cf_' to avoid ID collision: Memgraph shares the integer namespace
@@ -4549,8 +4557,8 @@ async function init() {
     const sfProps = flattenProps(sf.properties || {});
     const fProps  = flattenProps(f.properties  || {});
     const rId  = getElementId(r);
-    const sfId = familyIdByName.get(sfProps.name) || getElementId(sf);
-    const fId  = familyIdByName.get(fProps.name)  || getElementId(f);
+    const sfId = nodeId(sf);
+    const fId  = nodeId(f);
     if (!nodesById.has(sfId)) nodesById.set(sfId, buildNodeData(sf));
     if (!nodesById.has(fId))  nodesById.set(fId,  buildNodeData(f));
     const sfEdgeId = 'sf_' + rId;

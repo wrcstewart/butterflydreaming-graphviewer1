@@ -92,6 +92,22 @@ with nothing to translate.
 **The rule for this pass: no site may mint a node id from `getElementId`.** Any
 remaining call is either an edge (fine) or a bug.
 
+## 6a. Measured before implementing (2026-08-21)
+
+- **Node count unchanged.** 477 nodes enter the graph under both schemes — the
+  new ids partition exactly as the old ones did.
+- **The elementId conflict is not currently reproducing.** Across all three load
+  queries, 388 urls each map to exactly ONE elementId. So the dedup block was
+  defending against a condition this dataset does not presently exhibit. It was
+  still right to keep until now — the comment says it HAS occurred — and url
+  makes it impossible rather than merely absent.
+- **42 edge rows have a url-less endpoint.** These are the 84 unlabelled orphan
+  nodes; they are connected, and they DO enter the graph today via the
+  unlabelled `MATCH (n)-[r]->(m)`. `nodeId()`'s fallback to `getElementId` keeps
+  them distinct and behaving exactly as before — without it they would all
+  collapse to a single id and take the graph with them. **The defensive fallback
+  is load-bearing, not decoration; do not remove it.**
+
 ## 7. Test plan
 
 1. Graph loads; node count matches (393 labelled nodes, no duplicates, no
