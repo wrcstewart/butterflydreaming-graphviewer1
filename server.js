@@ -399,9 +399,10 @@ app.post('/api/save-cluster-parents', async (req, res) => {
         `MATCH (sf:SubFamily {url: $sf_url})
          MATCH (c:Cluster {url: $cluster_url})
          MERGE (sf)-[e:DESCENDS_FROM]->(c)
-         SET e.weight = $weight
+         SET e.weight = $weight,
+             sf.updated_at = $now, c.updated_at = $now
          RETURN count(e) AS n`,
-        { sf_url: sfUrl, cluster_url, weight }
+        { sf_url: sfUrl, cluster_url, weight, now: nowMs() }
       );
       mergedEdges += toNum(r.records[0].get('n'));
     }
@@ -619,8 +620,9 @@ app.post('/api/save-subfamily-parents', async (req, res) => {
             `MATCH (f:Family {url: $f_url})
              MATCH (c:Cluster {url: $c_url})
              MERGE (f)-[e:DESCENDS_FROM]->(c)
-             SET e.weight = 1.0`,
-            { f_url: bestFamilyUrl, c_url: c.url }
+             SET e.weight = 1.0,
+                 f.updated_at = $now, c.updated_at = $now`,
+            { f_url: bestFamilyUrl, c_url: c.url, now: nowMs() }
           );
           reassignedToFamily++;
         }
@@ -660,9 +662,10 @@ app.post('/api/save-subfamily-parents', async (req, res) => {
         `MATCH (f:Family {url: $f_url})
          MATCH (sf:SubFamily {url: $sf_url})
          MERGE (f)-[e:DESCENDS_FROM]->(sf)
-         SET e.weight = $weight
+         SET e.weight = $weight,
+             f.updated_at = $now, sf.updated_at = $now
          RETURN count(e) AS n`,
-        { f_url: famUrl, sf_url: subfamily_url, weight }
+        { f_url: famUrl, sf_url: subfamily_url, weight, now: nowMs() }
       );
       merged += toNum(r.records[0].get('n'));
     }
@@ -1331,6 +1334,27 @@ io.on('connection', async (socket) => {
               { name: clusterName, work }
             );
             const cc_count = ccResult.records[0]?.get('cc_count').toNumber() ?? 0;
+            // blue_node_spec.md §7.2 — bump the ENDPOINTS of every edge this
+            // transaction touched. That is what lets the delta be a NODE query
+            // only: an edge added or removed between two nodes a client already
+            // has still surfaces, because both ends were marked. Without this a
+            // CLUSTER_REL change would be invisible to an early-loading client
+            // unless edges carried their own timestamps and index — the part
+            // that would not have scaled.
+            const stamp = nowMs();
+            await tx.run(
+              'MATCH (n:TextNode {url: $url}), (c:Cluster {name: $clusterName}) ' +
+              'SET n.updated_at = $now, c.updated_at = $now',
+              { url: textNodeUrl, clusterName, now: stamp }
+            );
+            // The gateway is the other end of the CONTAINS_CLUSTER edge whose
+            // count was just refreshed. Separate statement so a missing gateway
+            // is a no-op rather than a null SET.
+            await tx.run(
+              'MATCH (gw:TextNode {gateway: true, source_text: $work}) ' +
+              'SET gw.updated_at = $now',
+              { work, now: stamp }
+            );
             await tx.commit();
             const eventType = msg.type === 'edit_save' ? 'cluster_rel_saved' : 'cluster_rel_deleted';
             socket.emit('msg', { type: msg.type, ok: true });
@@ -1382,6 +1406,15 @@ io.on('connection', async (socket) => {
             'MATCH (c:Cluster {name: $newName}) ' +
             'CREATE (parent)-[:DESCENDS_FROM {weight: r.weight}]->(c)',
             { sourceName, newName }
+          );
+          // §7.2 endpoint bump. The new cluster already carries updated_at from
+          // its CREATE; the PARENTS gained an edge and would otherwise look
+          // unchanged to a delta, so the clone would be invisible to an
+          // early-loading client until it happened to reload.
+          await s.run(
+            'MATCH (parent)-[:DESCENDS_FROM]->(c:Cluster {name: $newName}) ' +
+            'SET parent.updated_at = $now',
+            { newName, now: nowMs() }
           );
           const result = await s.run(
             'MATCH (c:Cluster {name: $newName}) RETURN c',
