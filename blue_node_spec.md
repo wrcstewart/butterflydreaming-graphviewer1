@@ -1,6 +1,8 @@
 # Blue Node (BN) + graph sync — spec v0.1, 2026-08-21
 
-Status: **pre-implementation. Red-line this before any code is written.**
+Status: **pre-implementation, but all four open questions are now CLOSED
+(2026-08-21). Ready to build against §9's order.** Red-line anything that still
+looks wrong before code is written.
 
 The arriving remote breadcrumb becomes a node on the local user's own graph,
 edged in blue, instead of a panel beside it. Two parts, deliberately separable:
@@ -117,6 +119,27 @@ would have made the order un-encodable; it is not so.
   not the straddling border it is everywhere else in BD. That difference is part
   of the signal, but it will look odd to someone who does not know why, hence
   this paragraph.
+
+### 1.2.1 There is no "agreement state" — do not build one
+
+Agreement decomposes by itself, which is the strongest argument for this design
+(user, 2026-08-21). Model **two independent marks**, not a third combined state:
+
+- **You navigate away** → your white moves with you; their blue stays behind.
+  The old node reverts to a plain BN, the new one gets your white border.
+- **They navigate away** → their blue moves to the new BN (latest-wins); the old
+  node keeps your white border and reverts to a plain central node.
+
+Nothing has to be torn down, because nothing was ever assembled. Two marks
+happened to coincide; when one moves, its mark moves with it. **Build it as a
+state machine with an "agreed" state and you will have to handle every exit from
+it by hand — and get one wrong.**
+
+The one piece of state genuinely needed is **per-node arrival order**, so the
+rings know which is inner and which is outer. Set it when the SECOND mark lands
+on a node; it is meaningless while only one mark is present. Coming back to a
+node you left is handled by the same rule with no special case: you are the
+newcomer, so your white goes outside.
 
 **Rejected: two shades of blue** to encode who joined whom. Considered and
 dropped on 2026-08-21. Two close blues is the hardest possible discrimination
@@ -272,7 +295,11 @@ deletion ever reaches live clients.
 Label-property index on `updated_at`. Without it the delta is a full scan —
 irrelevant at 477 nodes, not irrelevant later.
 
-## 8. Open questions
+## 8. Questions raised and settled
+
+All four closed on 2026-08-21. Kept with their answers rather than deleted: the
+reasoning is the useful part, and it stops each one being re-opened from
+scratch.
 
 1. ~~A BN with no visible neighbours.~~ **CLOSED 2026-08-21: leave it floating,
    fully visible.** It is also the legible copy of the last remote crumb — the
@@ -280,9 +307,14 @@ irrelevant at 477 nodes, not irrelevant later.
    it replaced. The edge structure signals relevance on its own; the halo does
    not need to.
 2. ~~Round trips.~~ **CLOSED 2026-08-21 — see §1.2.**
-3. **Provisional BN.** If the fetch in §7.3 fails, draw the crumb's own data
-   (`display_name`, `colour`, `type`) as a node with no edges, or show nothing?
-   A provisional node cannot honestly "become your central node".
+3. ~~Provisional BN.~~ **CLOSED 2026-08-21: show NOTHING, and say so.** No
+   provisional node — one that cannot honestly become your central node when
+   tapped would be a lie the moment it is pressed. Instead
+   `prependSystemCard(...)` in the main panel (`viewer.js:2664`, BD's existing
+   way of speaking to the user) explaining that the partner is somewhere this
+   graph does not have yet. Silence is the one thing to avoid: today the chip
+   tap already fails silently via `if (!main.length) return;`, which is the
+   behaviour this replaces.
 4. ~~Mode switch.~~ **CLOSED 2026-08-21: yes, it survives and shows on return.**
    Cheap if `.bn` is a class on the node rather than state rebuilt on entry —
    the node keeps the class while `#cy` is hidden. Latest-wins applies
