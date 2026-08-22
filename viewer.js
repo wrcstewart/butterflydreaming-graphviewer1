@@ -1651,9 +1651,36 @@ function runLayout(cy, parentNode = null) {
       };
     });
 
+    // 2026-08-22 — place the cluster's Family parents in a row ABOVE it,
+    // instead of leaving them wherever they last happened to be.
+    //
+    // They are the cluster's parents, so above reads correctly. And stale
+    // positions were drifting them off towards the bottom-right, where they
+    // looked isolated and competed for the corner the Blue Node now owns.
+    //
+    // Sorted by name so the row is stable: collection order is not something
+    // to rely on for a position the user will re-visit.
+    const unmanaged = visible.nodes()
+      .filter(n => !positions[n.id()])
+      .sort((a, b) => String(a.data('name') || a.data('title') || '')
+        .localeCompare(String(b.data('name') || b.data('title') || '')));
+    if (unmanaged.length) {
+      // Above the titles when there are any — the title row is already at
+      // clusterY - 150, and stacking these on top of it would trade one
+      // overlap for another.
+      const famY  = titleNodes.length ? titleY - 150 : clusterY - 150;
+      const fSep  = Math.min(200, Math.max(120, gridW / Math.max(1, unmanaged.length - 1)));
+      unmanaged.forEach((n, i) => {
+        positions[n.id()] = { x: ox + (i - (unmanaged.length - 1) / 2) * fSep, y: famY };
+      });
+    }
+
     visible.layout({ name: 'preset', positions, fit: false }).run();
 
-    // 2026-08-22 — everything NOT in `positions` keeps whatever coordinates it
+    // Kept as a backstop. With the row above, everything in this view is now
+    // managed, so this is normally a no-op — but it costs nothing and catches
+    // anything a future change leaves unpositioned.
+    // Everything NOT in `positions` keeps whatever coordinates it
     // last had, because a preset layout only moves what it is given and runs
     // no simulation to push anything apart. In a cluster view that is the
     // Family parents: Garden/Wild has six, none of them in the grid, so any
