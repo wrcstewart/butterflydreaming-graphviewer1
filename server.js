@@ -706,6 +706,7 @@ pingMemgraph()
   .then(() => loadHelpers());
 setInterval(pingMemgraph, 5 * 60 * 1000);
 
+
 // Socket.IO server (2026-07-13) — replaces raw `ws` WebSocketServer.
 // connectionStateRecovery gives us the mobile-friendly resilience that the
 // bare ws was missing: on a client reconnect within the disconnection
@@ -724,6 +725,36 @@ const io = new SocketIOServer(server, {
 // --- Pairing state ---
 
 const sessions    = new Map();  // userId → socket (Socket.IO Socket)
+
+// --- Idle session reaper (2026-08-22) ---
+//
+// The client ends its own session after 60 min without a tap, and now
+// disconnects when it does. This is the backstop for when that never runs:
+// a laptop asleep, a background tab whose timers the browser throttled, a
+// client on a cached older build. Those sockets stay open and healthy —
+// Socket.IO's ping/pong only reaps genuinely DEAD connections, not live ones
+// nobody is using — so without this they sit in `sessions` indefinitely and
+// inflate the connected count.
+//
+// 65 min, deliberately past the client's 60: the client should normally end
+// its own session, and this should only ever catch the cases where it could
+// not. Both use the same notion of idle (no user interaction), so the two
+// policies agree rather than compete.
+const IDLE_REAP_MS   = 65 * 60 * 1000;
+const IDLE_REAP_EVERY =  5 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  // Snapshot: disconnect() fires the 'disconnect' handler, which deletes from
+  // `sessions` — do not mutate the map while iterating it.
+  for (const [userId, s] of [...sessions]) {
+    const last = (s.data && s.data.lastActiveAt) || 0;
+    if (!last || now - last < IDLE_REAP_MS) continue;
+    console.log(`[BD] Idle reap: ${userId} — ${Math.round((now - last) / 60000)} min without activity`);
+    try { s.disconnect(true); } catch (err) {
+      console.error('[BD] idle reap failed for', userId, err.message);
+    }
+  }
+}, IDLE_REAP_EVERY);
 let   waitingUser = null;        // { userId, socket } | null
 const pairedWith  = new Map();  // userId → buddyUserId
 const inChat      = new Map();  // userId → boolean (true ⇒ chat panel open)
@@ -984,6 +1015,7 @@ function serializeRecord(rec) {
 // --- Socket.IO connection handler (2026-07-13 migration from raw ws) ---
 
 io.on('connection', async (socket) => {
+  socket.data.lastActiveAt = Date.now();   // activity clock for the idle reaper
   // Parse the bd_device_id cookie into socket.data.deviceId. Used by the
   // ready_to_pair handler to refuse same-device self-pair (MM3). Cookie
   // survives across recovery on socket.data — no need to re-parse.
@@ -1046,6 +1078,11 @@ io.on('connection', async (socket) => {
     let type;
     try {
       type = msg && msg.type;
+      // Activity clock for the idle reaper. client_log is deliberately
+      // excluded: a tab forwarding console noise is not a user doing
+      // anything, and counting it would keep an abandoned tab alive forever
+      // — the exact failure being fixed.
+      if (type !== 'client_log') socket.data.lastActiveAt = Date.now();
       // Client → server log forwarding. Every client's console.log /
       // .info / .warn / .error, plus its uncaught errors and unhandled
       // promise rejections, arrive as these records. Print them here so

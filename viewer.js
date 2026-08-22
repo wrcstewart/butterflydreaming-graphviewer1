@@ -1653,6 +1653,9 @@ function showSessionExpired(message) {
 function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   async function safeQuery(type, query, params = {}) {
+    // Once expired, stay expired. Without this the reconnect below would
+    // silently re-establish the session the idle timer just ended.
+    if (wsRef.expired) throw new Error('session_expired');
     if (!wsRef.current || !wsRef.current.connected) {
       if (Date.now() - wsRef.lastActivity > wsRef.maxIdleMs) {
         // Truly idle for > 60 min — session ended
@@ -5021,6 +5024,20 @@ async function init() {
   const idleTimer = setInterval(() => {
     if (Date.now() - wsRef.lastActivity > MAX_IDLE_MS) {
       clearInterval(idleTimer);
+      // 2026-08-22 — expiry must actually LEAVE. This used to show the overlay
+      // and nothing else, so the socket stayed open and the server went on
+      // counting the tab in sessions.size: that is how "7 connected" happened
+      // with two people actually present. Every abandoned tab held a slot for
+      // as long as the browser stayed open.
+      //
+      // disconnect() rather than close(): it also stops Socket.IO's automatic
+      // reconnection, which would otherwise walk straight back in.
+      //
+      // Guarded so a failure here cannot cost the user the overlay — the
+      // message is the part they must not miss.
+      wsRef.expired = true;
+      try { if (wsRef.current) wsRef.current.disconnect(); }
+      catch (err) { console.warn('[BD] expiry disconnect failed', err); }
       showSessionExpired();
     }
   }, 60000);
