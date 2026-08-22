@@ -1744,6 +1744,36 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // marking one would override that zero, drawing a line the graph is meant
   // never to show.
   const BN_EDGE_SKIP = new Set(['CONTAINS_CLUSTER', '__root_edge__']);
+  // 2026-08-22 — the high-level navigation views. There the graph is a few
+  // large hub nodes spread wide, and a BN sized to whatever peer happens to be
+  // on screen, dropped at a fraction of the extent, lands at a scale that
+  // makes no sense. Suppress it on the main canvas entirely; the breadcrumb
+  // trail still carries the partner's position, so nothing is lost.
+  //
+  // Tested by what is ON SCREEN rather than by a stored view id: activeNodeId
+  // is nulled by Back, so it does not survive the one navigation most likely
+  // to land you back at the top.
+  const BN_SUPPRESS_HUBS = new Set(['Settling', 'Gateways', 'Conversations']);
+  function bnViewSuppressed() {
+    return cy.nodes(':visible').some(n =>
+      n.data('type') === 'root' ||
+      (n.data('type') === 'Entry' && BN_SUPPRESS_HUBS.has(n.data('name'))));
+  }
+
+  // Put the BN out of sight WITHOUT forgetting it — bnNodeId and bnOuter
+  // survive, so navigating down to an ordinary view brings it straight back
+  // via the re-assert. Distinct from retireBlueNode, which forgets.
+  function hideBlueVisualsForView() {
+    clearBlueEdges();
+    if (!bnNodeId) return;
+    const n = cy.getElementById(bnNodeId);
+    if (!n.length) return;
+    clearMarksFrom(n);
+    const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+    if (bnWasRevealed && !isLocalCentral) { n.removeStyle(BN_SIZE_KEYS); n.hide(); }
+    bnWasRevealed = false;
+    renderMarks();          // restore the local white mark clearMarksFrom stripped
+  }
 
   const MARK_WHITE = '#ffffff';
   const MARK_BLUE  = '#4a9bff';
@@ -1763,7 +1793,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // Central node: white, unless the BN shares it (handled below).
     const centralNode = (lastReadNodeId && lastReadNodeCy === cy)
       ? cy.getElementById(lastReadNodeId) : null;
-    const bn = bnNodeId ? cy.getElementById(bnNodeId) : null;
+    const bn = (bnNodeId && !bnViewSuppressed()) ? cy.getElementById(bnNodeId) : null;
     const together = !!(centralNode && bn && centralNode.length && bn.length &&
                         centralNode.id() === bn.id());
 
@@ -1871,6 +1901,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // ("they came to me") — white stays inside, blue takes the outer ring.
     bnOuter  = 'blue';
 
+    if (bnViewSuppressed()) { hideBlueVisualsForView(); return; }
     placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
@@ -1947,6 +1978,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!bnNodeId) return;
     const node = cy.getElementById(bnNodeId);
     if (!node.length) { bnNodeId = null; return; }
+    if (bnViewSuppressed()) { hideBlueVisualsForView(); return; }
     if (node.visible()) { bnWasRevealed = false; }
     else placeBlueNode(node);
     renderMarks();
