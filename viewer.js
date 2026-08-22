@@ -1778,6 +1778,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!n.length) return;
     clearMarksFrom(n);
     const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+    n.removeStyle('opacity');        // unconditional: it may survive on screen
     if (bnWasRevealed && !isLocalCentral) { n.removeStyle(BN_SIZE_KEYS); n.hide(); }
     bnWasRevealed = false;
     renderMarks();          // restore the local white mark clearMarksFrom stripped
@@ -1923,6 +1924,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       clearMarksFrom(prev);
       clearBlueEdges();
       const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+      prev.removeStyle('opacity');   // unconditional: it may survive on screen
       if (bnWasRevealed && !isLocalCentral) { prev.removeStyle(BN_SIZE_KEYS); prev.hide(); }
     }
     bnNodeId = null; bnOuter = null; bnWasRevealed = false;
@@ -1937,6 +1939,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // desktop's wider grid sizes nodes down and the default looks twice too big.
   // Copy the size the view is actually using rather than re-deriving it.
   const BN_SIZE_KEYS = 'width height font-size';
+  // 2026-08-22 — a BN we REVEALED is drawn translucent: it is not part of the
+  // view the user built, it is news from elsewhere, and the whole node says so
+  // — body, halo and label together. Cytoscape's element-level `opacity`
+  // multiplies the lot, which is why it is one property rather than
+  // background-/outline-/text-opacity set separately.
+  //
+  // A BN that was ALREADY on screen stays fully opaque: it is a node of the
+  // user's own view and dimming it would degrade what they are reading.
+  const BN_REVEAL_OPACITY = 0.75;
   function sizeBlueNodeToView(node) {
     node.removeStyle(BN_SIZE_KEYS);          // back to the type default first
     const peer = cy.nodes('.snake-section').filter(n => n.visible() && n.id() !== node.id()).first();
@@ -1955,6 +1966,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (node.visible()) { bnWasRevealed = false; return; }
     sizeBlueNodeToView(node);          // size FIRST — the corner inset depends on it
     node.position(blueNodeCorner(node));
+    node.style('opacity', BN_REVEAL_OPACITY);
     node.show();
     bnWasRevealed = true;
   }
@@ -2007,7 +2019,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const node = cy.getElementById(bnNodeId);
     if (!node.length) { bnNodeId = null; return; }
     if (bnViewSuppressed()) { hideBlueVisualsForView(); return; }
-    if (node.visible()) { bnWasRevealed = false; }
+    if (node.visible()) { bnWasRevealed = false; node.removeStyle('opacity'); }
     else placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
