@@ -1468,10 +1468,28 @@ function runLayout(cy, parentNode = null) {
       const kx = `hint_x_${parentUuid}`;
       const ky = `hint_y_${parentUuid}`;
       const ks = `hint_scale_${parentUuid}`;
-      // Prefer view-scoped values; fall back to bare keys for pre-scoping edges.
-      getHintX     = e => e.data(kx) != null ? e.data(kx) : e.data('hint_x');
-      getHintY     = e => e.data(ky) != null ? e.data(ky) : e.data('hint_y');
-      getHintScale = e => e.data(ks) != null ? e.data(ks) : e.data('hint_scale');
+      // Prefer view-scoped values; fall back to bare keys for pre-scoping edges
+      // — EXCEPT under a Cluster parent.
+      //
+      // 2026-08-22. A bare hint is a pre-2026-07-23 single-slot value, written
+      // by whichever view happened to save last. For a Cluster that is never
+      // the cluster's own arrangement: measured across all 126 clusters, not
+      // one has hints scoped to itself, while 59 were being dragged out of the
+      // clean grid path into hybrid mode by a stale bare value left behind by
+      // a Family view. The effect was one node pinned at a meaningless
+      // coordinate and the rest scattered around it — the clusters that
+      // "don't work", against Garden/Wild which has no bare hints and does.
+      //
+      // Using one view's coordinates in another is precisely the clobbering
+      // view-scoping was introduced to stop; the fallback just predates it.
+      // Restricted rather than removed, because Family views legitimately
+      // still rely on it. Once a curator runs Write in a cluster view the
+      // hints are stored scoped, and that view moves to the preset path with
+      // real curation behind it.
+      const allowBare = parentNode.data('type') !== 'Cluster';
+      getHintX     = e => e.data(kx) != null ? e.data(kx) : (allowBare ? e.data('hint_x')     : null);
+      getHintY     = e => e.data(ky) != null ? e.data(ky) : (allowBare ? e.data('hint_y')     : null);
+      getHintScale = e => e.data(ks) != null ? e.data(ks) : (allowBare ? e.data('hint_scale') : null);
     }
     childEdges  = visible.edges().filter(
       e => e.source().id() === pid || e.target().id() === pid
