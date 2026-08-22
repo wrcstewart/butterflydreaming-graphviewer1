@@ -1821,12 +1821,37 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // a circular gradient on a rectangle, and acceptable: it reads as the node
   // being lit from its edges.
   function applyBlueFill(node) {
-    const base = node.data('colour') || '#666666';
+    const base = bnBaseColour(node);
     node.style({
       'background-fill': 'radial-gradient',
       'background-gradient-stop-colors': base + ' ' + base + ' ' + MARK_BLUE,
       'background-gradient-stop-positions': '0% 30% 50%',
     });
+  }
+
+  // The gradient must start from what the node ACTUALLY renders as, which is
+  // not data('colour'). Several types set background-color literally in the
+  // stylesheet and never touch that data field: gateway TextNodes are white
+  // with black text and carry colour:null in the DB, so reading the data field
+  // gave the grey fallback and painted a dark core under black text —
+  // unreadable, and the opposite of the node's real appearance. The root node,
+  // the Gateways square and the snake view's inline fills are all the same.
+  //
+  // The result is then normalised to a SPACE-FREE hex string. Cytoscape splits
+  // multi-value properties on whitespace, so an "rgb(255, 255, 255)" returned
+  // by the style getter would be torn into three broken tokens.
+  function bnBaseColour(node) {
+    const raw = node.style('background-color') || node.data('colour');
+    const hex = v => '#' + v.map(n =>
+      Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('');
+    if (Array.isArray(raw)) return hex(raw.slice(0, 3));
+    if (typeof raw === 'string') {
+      const m = raw.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+      if (m) return hex([+m[1], +m[2], +m[3]]);
+      const s = raw.replace(/\s+/g, '');
+      if (s) return s;
+    }
+    return '#666666';
   }
 
   // Arrival pulse. The static marks say WHERE the partner is; nothing said
