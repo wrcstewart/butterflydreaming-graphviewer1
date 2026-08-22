@@ -1639,10 +1639,30 @@ function runLayout(cy, parentNode = null) {
     // Pure preset layout: all positions computed, no simulation needed.
     const sorted  = gridNodes.toArray().sort((a, b) => (a.data('seq') || 0) - (b.data('seq') || 0));
     const n       = sorted.length;
-    const cols    = Math.ceil(Math.sqrt(n));
-    const spacing = 120;
-    const gridW   = (cols - 1) * spacing;
-    const rows    = Math.ceil(n / cols);
+
+    // 2026-08-22 — the grid used ONE spacing of 120 for both axes while the
+    // node is 120 x 34. That was wrong in both directions at once: a 0px gap
+    // horizontally (the nodes touched) and 86px wasted vertically on every
+    // row. Give each axis a cell matched to the node.
+    const cellW = 148, cellH = 62;          // 120 + 28, 34 + 28
+
+    // And choose the column count that minimises how far cy.fit must zoom OUT
+    // — the larger of the two ratios against the canvas. ceil(sqrt(n)) aims at
+    // a square grid, which is the wrong target when each cell is four times
+    // wider than it is tall, and the grid is what was setting the scale for
+    // the whole view.
+    const gArea  = cy.container().getBoundingClientRect();
+    const availW = Math.max(200, gArea.width);
+    const availH = Math.max(200, gArea.height);
+    let cols = 1, bestScale = Infinity;
+    for (let c = 1; c <= Math.max(1, n); c++) {
+      const r = Math.ceil(n / c);
+      const s = Math.max(((c - 1) * cellW + 120) / availW,
+                         ((r - 1) * cellH + 34)  / availH);
+      if (s < bestScale - 1e-9) { bestScale = s; cols = c; }
+    }
+    const gridW = (cols - 1) * cellW;
+    const rows  = Math.ceil(n / cols);
 
     // Work from a fixed origin — cy.fit() normalises to the viewport afterwards.
     const ox = 0, oy = 0;
@@ -1655,8 +1675,8 @@ function runLayout(cy, parentNode = null) {
 
     sorted.forEach((node, rank) => {
       positions[node.id()] = {
-        x: ox - gridW / 2 + (rank % cols) * spacing,
-        y: gridTopY + Math.floor(rank / cols) * spacing,
+        x: ox - gridW / 2 + (rank % cols) * cellW,
+        y: gridTopY + Math.floor(rank / cols) * cellH,
       };
     });
 
