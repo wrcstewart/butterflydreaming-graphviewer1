@@ -1750,14 +1750,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // makes no sense. Suppress it on the main canvas entirely; the breadcrumb
   // trail still carries the partner's position, so nothing is lost.
   //
-  // Tested by what is ON SCREEN rather than by a stored view id: activeNodeId
-  // is nulled by Back, so it does not survive the one navigation most likely
-  // to land you back at the top.
+  // The test is which node is CENTRED, not which are on screen. Those are
+  // very different: selecting a Family leaves Conversations sitting in the
+  // view, and an on-screen test wrongly suppressed the whole Family level.
+  //
+  // lastParentNode is the right signal of the three available. activeNodeId is
+  // nulled by restoreState, and lastReadNodeId is never re-set by it — both go
+  // wrong on Back, the navigation most likely to return you to the top, which
+  // is exactly when this must be right. lastParentNode is set by every expand
+  // AND restored from the saved state on Back.
   const BN_SUPPRESS_HUBS = new Set(['Settling', 'Gateways', 'Conversations']);
   function bnViewSuppressed() {
-    return cy.nodes(':visible').some(n =>
-      n.data('type') === 'root' ||
-      (n.data('type') === 'Entry' && BN_SUPPRESS_HUBS.has(n.data('name'))));
+    const centre = lastParentNode;
+    if (!centre || !centre.length) return true;     // boot, and the root view
+    const type = centre.data('type');
+    if (type === 'root') return true;
+    return type === 'Entry' && BN_SUPPRESS_HUBS.has(centre.data('name'));
   }
 
   // Put the BN out of sight WITHOUT forgetting it — bnNodeId and bnOuter
