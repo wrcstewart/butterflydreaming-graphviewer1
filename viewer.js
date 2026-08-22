@@ -2644,7 +2644,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const nodeName = (node && node.data)
       ? (node.data('name') || node.data('title') || node.data('source_text') || 'TextNode')
       : '(node)';
-    const label = (chunkIndex != null) ? `${nodeName} (${chunkIndex})` : nodeName;
+    // Show a chunk position ONLY when there is more than one chunk. Today
+    // every node is a single chunk — nothing in the corpus carries
+    // %%bd_chunk — and Unified Focus retires chunk-advance for non-root nodes
+    // anyway, so this suffix read "(0)" on every card everywhere and told the
+    // reader nothing. Worse, a bare "0" invites reading it as a count.
+    //
+    // If multi-chunk text returns, it shows "(2/5)": 1-based, with the total,
+    // so the number says where you are AND how much is left.
+    const chunkTotal = (readingState && readingState.chunks)
+      ? readingState.chunks.length : 1;
+    const label = (chunkIndex != null && chunkTotal > 1)
+      ? `${nodeName} (${chunkIndex + 1}/${chunkTotal})`
+      : nodeName;
 
     const card = createCard({ kind: 'system', label });
     if (!card || !card.body) return;
