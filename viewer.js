@@ -1543,10 +1543,27 @@ function runLayout(cy, parentNode = null) {
       sumY += pos.y;
     });
     if (hintMode === 'hybrid') {
+      // 2026-08-22 — seed un-hinted children on a RING around the centroid,
+      // not all at the centroid itself.
+      //
+      // They used to be given identical coordinates, and fCoSE runs with
+      // randomize:false so it starts from exactly those. Repulsion between two
+      // nodes at ZERO distance has no direction — the separation force is
+      // degenerate — so coincident nodes can stay welded together for the
+      // whole simulation. That is what hid subfamilies behind one another:
+      // the lower one was there, exactly underneath, with no way to know.
+      //
+      // A ring is a non-degenerate start, and deterministic — the same view
+      // always seeds the same way, so positions do not jitter between visits
+      // the way a random scatter would. fCoSE then settles them properly.
       const centroid = { x: sumX / hintedEdges.length, y: sumY / hintedEdges.length };
-      childEdges.filter(e => getHintX(e) == null || getHintY(e) == null).forEach(e => {
+      const unhinted = childEdges.filter(e => getHintX(e) == null || getHintY(e) == null);
+      const ringR    = Math.max(60, renderScale * 0.35);
+      unhinted.forEach((e, i) => {
         const c = e.source().id() === pid ? e.target() : e.source();
-        c.position({ ...centroid });
+        const a = (2 * Math.PI * i) / Math.max(1, unhinted.length) - Math.PI / 2;
+        c.position({ x: centroid.x + ringR * Math.cos(a),
+                     y: centroid.y + ringR * Math.sin(a) });
       });
     }
     visible.layout({
