@@ -1792,8 +1792,59 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function clearMarksFrom(node) {
     if (!node || !node.length) return;
+    try { node.stop(true); } catch (_) {}   // cancel a pulse still in flight
     node.removeStyle('border-width border-color border-opacity border-position ' +
-                     'outline-width outline-color outline-opacity outline-offset');
+                     'outline-width outline-color outline-opacity outline-offset ' +
+                     'background-fill background-gradient-stop-colors ' +
+                     'background-gradient-stop-positions');
+  }
+
+  // The RIM glows, not the core. A radial gradient is the obvious way to make
+  // a node conspicuous, but the LABEL sits in the middle — a bright centre
+  // fights it for contrast, on nodes whose labels are already tight. Holding
+  // the node's own colour across the middle and running it out to a blue rim
+  // keeps the text on its normal background and reinforces the halo instead
+  // of competing with it.
+  function applyBlueFill(node) {
+    const base = node.data('colour') || '#666666';
+    node.style({
+      'background-fill': 'radial-gradient',
+      'background-gradient-stop-colors': base + ' ' + base + ' ' + MARK_BLUE,
+      'background-gradient-stop-positions': '0% 45% 100%',
+    });
+  }
+
+  // Arrival pulse. The static marks say WHERE the partner is; nothing said
+  // WHEN they moved — which is why an arrival on a node already on screen was
+  // so easy to miss: it simply gained a thin ring, with no perceptible moment
+  // of change. Motion is detected pre-attentively and does not depend on
+  // telling two blues apart, so it carries where a colour cue would not.
+  //
+  // The RING pulses, never the body: an outline draws entirely outside the
+  // shape, so the label is untouched throughout.
+  //
+  // Rest values are READ, not assumed — solo and Snap use different widths,
+  // and hardcoding either would leave the other wrong when it settles.
+  function pulseBlueNode(node, cycles = 3) {
+    if (!node || !node.length) return;
+    try { node.stop(true); } catch (_) {}
+    const restW = node.numericStyle('outline-width');
+    const restO = node.numericStyle('outline-opacity');
+    if (!restW) return;                        // nothing drawn to pulse
+    let done = 0;
+    const settle  = () => node.style({ 'outline-width': restW, 'outline-opacity': restO });
+    const outward = () => {
+      if (done++ >= cycles) { settle(); return; }
+      node.animate({
+        style: { 'outline-width': restW * 3, 'outline-opacity': Math.max(0.05, restO * 0.2) },
+        duration: 300, complete: inward,
+      });
+    };
+    const inward = () => node.animate({
+      style: { 'outline-width': restW, 'outline-opacity': restO },
+      duration: 260, complete: outward,
+    });
+    outward();
   }
 
   // THE RULE (§1.2): the OUTER ring is whoever arrived last. Rings accrete
@@ -1863,6 +1914,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'outline-offset': 2,
       });
     }
+    if (bn && bn.length) applyBlueFill(bn);
   }
 
   // Show the partner's arrival as a node on OUR graph (§1, §2, §3, §4).
@@ -1917,6 +1969,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
+    pulseBlueNode(node);
   }
 
   // Undo everything showBlueNode did to the previous node.
