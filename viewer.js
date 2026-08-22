@@ -4703,7 +4703,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     expandToNode(node);
   }
 
-  return { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  // §2 — the partner left: dim their marks, do not remove them. Exposed
+  // because bnGone and renderMarks are setupInteractions' own state and init()
+  // cannot reach them; assigning across that boundary threw a ReferenceError
+  // under module strict mode and killed the rest of the handler.
+  function markBuddyGone() {
+    bnGone = true;
+    renderMarks();
+  }
+
+  return { markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -5818,6 +5827,13 @@ async function init() {
       wsNow.emit('msg', { type: 'unpair' });
       pairingState.active = false;
       pairingState.waiting = false;
+      // Leaving must dim the partner's marks exactly as buddy_disconnected
+      // does on the other side. This used to reset only the pair flags, so
+      // the person who LEFT went on showing their ex-partner's trail and Blue
+      // Node at full strength, as though the pair were still live — the two
+      // screens disagreed about whether it existed.
+      buddyCy.nodes().addClass('buddy-gone');
+      try { markBuddyGone(); } catch (err) { console.warn('[BN] markBuddyGone failed', err); }
       const pairStatusEl = document.getElementById('pair-status');
       if (pairStatusEl) pairStatusEl.textContent = '';
       updateJoinButtonLabel();
@@ -6439,7 +6455,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
@@ -7073,8 +7089,12 @@ async function init() {
       // than vanishing; where they got to still matters after they leave.
       // §2 — the Blue Node dims with the trail rather than vanishing: where
       // they got to is still worth seeing, and still tappable.
-      bnGone = true;
-      try { renderMarks(); } catch (_) {}
+      // bnGone and renderMarks belong to setupInteractions, NOT to init().
+      // Assigning to them here threw a ReferenceError under module strict
+      // mode, so everything below this line silently never ran — the Join
+      // button stayed on "Leave" and the pair only half-dissolved on the
+      // side that did not initiate it.
+      try { markBuddyGone(); } catch (err) { console.warn('[BN] markBuddyGone failed', err); }
       pairStatus.textContent = '';
       updateJoinButtonLabel();
       updateSendBtn();
