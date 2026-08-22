@@ -1805,12 +1805,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // the node's own colour across the middle and running it out to a blue rim
   // keeps the text on its normal background and reinforces the halo instead
   // of competing with it.
+  //
+  // THE STOP POSITIONS ARE NOT INTUITIVE. Cytoscape builds a node's radial
+  // gradient as createRadialGradient(cx, cy, 0, cx, cy, max(paddedWidth,
+  // paddedHeight)) — the radius is the node's FULL long dimension, not half
+  // of it. So the node's own edge sits at 50% along the gradient, and
+  // everything from 50% to 100% is painted outside the shape where it can
+  // never be seen. A stop at 100% therefore does nothing at all, which is
+  // exactly how the first attempt failed: it looked like the property was
+  // unsupported when in fact the blue was landing off the node.
+  //
+  // Hence blue by 50%. On a wide node the short axis reaches only
+  // (height/2)/width along the radius, so the glow lands on the long-axis
+  // ends and the corners rather than evenly all round — inherent to putting
+  // a circular gradient on a rectangle, and acceptable: it reads as the node
+  // being lit from its edges.
   function applyBlueFill(node) {
     const base = node.data('colour') || '#666666';
     node.style({
       'background-fill': 'radial-gradient',
       'background-gradient-stop-colors': base + ' ' + base + ' ' + MARK_BLUE,
-      'background-gradient-stop-positions': '0% 45% 100%',
+      'background-gradient-stop-positions': '0% 30% 50%',
     });
   }
 
