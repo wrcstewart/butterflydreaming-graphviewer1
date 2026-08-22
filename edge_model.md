@@ -183,12 +183,34 @@ regardless of what any view has chosen to show. That is why the Blue Node's
 edge marking has to filter by endpoint visibility itself (§5) — the graph will
 happily hand it edges no view ever intended to draw.
 
-### A documented NEGATIVE: the parallelogram gateway nodes
+### RESOLVED 2026-08-22: the technique was real, and was RETIRED
+
+**The user located a reference: the simulated-edge technique existed and was
+deliberately retired in favour of explicit edges in Memgraph.** So both
+accounts are true, of different eras — the memory is of the predecessor, and
+everything measured in this document describes the system that replaced it.
+The migration is the reason no trace survives in the searches below: it
+predates this repo's history.
+
+This also explains the one piece of physical evidence that had no owner:
+**`__root_edge__`** (viewer.js:1185, filter at 3207) is styled *"Synthetic
+root→family edges: invisible but present for fCoSE layout"* and is constructed
+nowhere. It is not a fossil of an idea that was never built — it is a leftover
+of a technique that WAS built and then removed.
+
+**The lesson for reading this document:** its conclusions are about the current
+system and are well-evidenced (§0), but "BD does not work that way" never
+meant "BD never worked that way". A recollection that contradicts the code is
+as likely to be older as it is to be wrong. TODO: cite the reference here once
+its location is to hand.
+
+### The search that found no trace (kept — it dated the migration)
 
 Also remembered, 2026-08-21: gateway-ish nodes drawn as **parallelograms**,
 seen both in the graph and on the breadcrumb chips, and recalled as **DOM
-creations** rather than cytoscape nodes. **They have never existed in this
-project.** Recorded here so the search is not repeated — it was exhaustive:
+creations** rather than cytoscape nodes. **No trace survives anywhere in this
+repository**, which is what places the retirement BEFORE this git history
+begins. Recorded so the search is not repeated — it was exhaustive:
 
 - No `parallelogram`, `rhomboid`, `skewX`/`skewY`, `clip-path` or `polygon(`
   in the current tree of any of the five repos.
@@ -203,10 +225,10 @@ project.** Recorded here so the search is not repeated — it was exhaustive:
   in the one published artifact (the landing page — no diagram).
 - Not in any surviving session transcript; only four remain locally.
 
-Most likely an HTML mockup or prototype from a session whose transcript is
-gone — a parallelogram is the flowchart convention for input/output, which is
-a natural way to sketch a "gateway". **The practical point: it is not a
-mechanism in BD, so it changes nothing about the edge model above.**
+At the time this was written the conclusion drawn was "most likely an HTML
+mockup". That was wrong: it was a real technique, since retired (above). The
+searches remain useful as evidence for WHEN — nothing survived the migration
+into this repository, not even a commit that removed it.
 
 ### The three fossils that reinforce the memory
 
