@@ -2627,6 +2627,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // TextNode chunks get an extra `.text-reading` class on the card element
   // so CSS can dim the head + hint to 0.5 opacity — the actual verse/text
   // content is the star; the metadata is distraction when reading.
+  // Which part of its section a content TextNode is. Returns null for
+  // anything that should not carry one — non-TextNodes, the section titles
+  // themselves, gateways, and nodes with no seq or no reachable title.
+  //
+  // PART_OF is matched direction-agnostically: edge direction in this DB is
+  // not reliable, and the title is simply whichever endpoint is the
+  // section_title one.
+  function textNodePartNumber(node) {
+    if (!node || !node.data) return null;
+    if (node.data('type') !== 'TextNode') return null;
+    if (node.data('section_title') || node.data('gateway')) return null;
+    const seq = node.data('seq');
+    if (seq == null) return null;
+    const title = node.connectedEdges('[type="PART_OF"]')
+      .connectedNodes()
+      .filter(n => !!n.data('section_title'))
+      .first();
+    if (!title || !title.length) return null;
+    const titleSeq = title.data('seq');
+    if (titleSeq == null) return null;
+    const part = seq - titleSeq;
+    return part >= 1 ? part : null;
+  }
+
   function insertNodeChunkAsCard(chunkBody, hint, node, chunkIndex) {
     let text = chunkBody;
     // Bot-context handling — paragraph-normalise, then strip/unnormalise
@@ -2644,6 +2668,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const nodeName = (node && node.data)
       ? (node.data('name') || node.data('title') || node.data('source_text') || 'TextNode')
       : '(node)';
+    // Part number for content TextNodes: THIS node's seq minus its SECTION
+    // TITLE's seq. Verified against all 10 sections in the corpus — every one
+    // is contiguous and starts at part 1.
+    //
+    // Subtracting the TITLE's seq, rather than using seq raw, is what makes
+    // the Hardy poems right: they share one seq space across the work, so His
+    // Visitor's first part is seq 6 and The Walk's is seq 11. Raw seq would
+    // label them "(part 6)" and "(part 11)".
+    //
+    // Skipped when the name already carries one — Snow White's parts have
+    // "(part N)" hand-authored into their title property, and this must not
+    // produce "Snow White (part 1) (part 1)".
+    const partNo = textNodePartNumber(node);
+    const hasAuthoredPart = /\(\s*part\b/i.test(nodeName);
+    const namePlusPart = (partNo != null && !hasAuthoredPart)
+      ? `${nodeName} (part ${partNo})`
+      : nodeName;
+
     // Show a chunk position ONLY when there is more than one chunk. Today
     // every node is a single chunk — nothing in the corpus carries
     // %%bd_chunk — and Unified Focus retires chunk-advance for non-root nodes
@@ -2655,8 +2697,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const chunkTotal = (readingState && readingState.chunks)
       ? readingState.chunks.length : 1;
     const label = (chunkIndex != null && chunkTotal > 1)
-      ? `${nodeName} (${chunkIndex + 1}/${chunkTotal})`
-      : nodeName;
+      ? `${namePlusPart} (${chunkIndex + 1}/${chunkTotal})`
+      : namePlusPart;
 
     const card = createCard({ kind: 'system', label });
     if (!card || !card.body) return;
