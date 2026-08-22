@@ -1882,7 +1882,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //
   // Rest values are READ, not assumed — solo and Snap use different widths,
   // and hardcoding either would leave the other wrong when it settles.
-  function pulseBlueNode(node, cycles = 3) {
+  // 6 cycles at 560ms each ~= 3.4s. Doubled from 3 on 2026-08-22: the rhythm
+  // was right, only the duration was short. Extended by adding CYCLES rather
+  // than slowing each one, so the beat the user approved is unchanged.
+  function pulseBlueNode(node, cycles = 6) {
     if (!node || !node.length) return;
     try { node.stop(true); } catch (_) {}
     const restW = node.numericStyle('outline-width');
