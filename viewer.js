@@ -1402,6 +1402,39 @@ function applySeqSignals(cy, centralNode) {
   fwd.targets().addClass('seq-successor');
 }
 
+// fCoSE cannot separate nodes that begin at EXACTLY the same point: the
+// repulsion between two bodies at zero distance has no direction, so a
+// coincident pair stays welded together for the whole simulation. Seeding the
+// un-hinted children on a ring (below) fixed the case where WE stacked them,
+// but any node can arrive coincident — nodes revealed by a view are not all
+// children of its parent (expandToFamily shows the grandparent and siblings
+// too), so they are neither pinned nor seeded and keep stale positions from
+// wherever they last were.
+//
+// So nudge duplicates apart just before the simulation, whatever put them
+// there. Golden-angle spiral: deterministic, so a view resolves the same way
+// every visit, and successive duplicates spread instead of forming a line.
+// `skipIds` protects pinned nodes, whose positions are curated.
+function separateCoincidentNodes(nodes, skipIds) {
+  const seen = new Map();
+  nodes.forEach(n => {
+    if (skipIds && skipIds.has(n.id())) return;
+    const p = n.position();
+    const key = Math.round(p.x * 100) + ',' + Math.round(p.y * 100);
+    const prior = seen.get(key) || 0;
+    if (prior > 0) {
+      // 70 is node-scale (a SubFamily is 56x22, a Family 60 across). Breaking
+      // the degeneracy needs only a hair, but if fCoSE then barely moves them
+      // — and with most nodes pinned it often does not — a hair still reads as
+      // overlapping. Separate them properly here and let the simulation refine.
+      const a = 2.399963229 * prior;        // golden angle in radians
+      const r = 70 * Math.sqrt(prior);
+      n.position({ x: p.x + r * Math.cos(a), y: p.y + r * Math.sin(a) });
+    }
+    seen.set(key, prior + 1);
+  });
+}
+
 function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
   applySeqSignals(cy, parentNode);
@@ -1566,6 +1599,8 @@ function runLayout(cy, parentNode = null) {
                      y: centroid.y + ringR * Math.sin(a) });
       });
     }
+    separateCoincidentNodes(visible.nodes(), new Set(pins.map(p => p.nodeId)));
+
     visible.layout({
       name: 'fcose',
       animate: true,
@@ -1617,6 +1652,17 @@ function runLayout(cy, parentNode = null) {
     });
 
     visible.layout({ name: 'preset', positions, fit: false }).run();
+
+    // 2026-08-22 — everything NOT in `positions` keeps whatever coordinates it
+    // last had, because a preset layout only moves what it is given and runs
+    // no simulation to push anything apart. In a cluster view that is the
+    // Family parents: Garden/Wild has six, none of them in the grid, so any
+    // two that arrive coincident stay welded together permanently — the
+    // reported "one exactly on top of another, and only the top one moves".
+    //
+    // Gateways carry seq = -1 rather than null, so this branch fires for
+    // every un-hinted cluster view, not the rare case it looks like.
+    separateCoincidentNodes(visible.nodes(), new Set(Object.keys(positions)));
     cy.fit(visible, fitPadding(cy, 80));
 
   } else {
