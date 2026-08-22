@@ -1953,14 +1953,64 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // worse than not hinting at all.
   function placeBlueNode(node) {
     if (node.visible()) { bnWasRevealed = false; return; }
-    const ext = cy.extent();
-    node.position({
-      x: ext.x1 + (ext.x2 - ext.x1) * 0.78,
-      y: ext.y1 + (ext.y2 - ext.y1) * 0.80,
-    });
+    sizeBlueNodeToView(node);          // size FIRST — the spot search needs the size
+    node.position(findBlueNodeSpot(node));
     node.show();
-    sizeBlueNodeToView(node);
     bnWasRevealed = true;
+  }
+
+  // A fixed fraction of the viewport was landing the BN on top of whatever
+  // happened to be there. Search instead: take the corner-most candidate that
+  // clears everything already on screen, and if nothing clears, the one that
+  // obstructs least. Model coordinates throughout — cy.extent(), boundingBox()
+  // and width()/height() are all model space, unlike renderedBoundingBox().
+  function findBlueNodeSpot(node) {
+    const ext = cy.extent();
+    const spanX = ext.x2 - ext.x1, spanY = ext.y2 - ext.y1;
+    // Half-extents include the halo (outline reaches 10 beyond the body) and a
+    // little air, so "clear" means visibly clear rather than merely not
+    // overlapping.
+    const halfW = (node.width()  || 40) / 2 + 14;
+    const halfH = (node.height() || 30) / 2 + 14;
+
+    // Labels included: covering a neighbour's label obstructs the view just as
+    // much as covering the node.
+    const boxes = cy.nodes(':visible')
+      .filter(n => n.id() !== node.id())
+      .map(n => n.boundingBox({ includeLabels: true, includeOverlays: false }));
+
+    const cands = [];
+    for (const fx of [0.92, 0.80, 0.68, 0.56]) {
+      for (const fy of [0.90, 0.78, 0.66, 0.54]) {
+        cands.push({
+          x: Math.min(ext.x1 + spanX * fx, ext.x2 - halfW),
+          y: Math.min(ext.y1 + spanY * fy, ext.y2 - halfH),
+          rank: (1 - fx) + (1 - fy),      // smaller = nearer the bottom-right
+        });
+      }
+    }
+    cands.sort((a, b) => a.rank - b.rank);
+
+    // Gap to the nearest neighbour. Two boxes are clear if they are separated
+    // on EITHER axis, so the per-box gap is the larger of the two axis gaps;
+    // negative means overlap.
+    const clearance = c => {
+      let worst = Infinity;
+      for (const b of boxes) {
+        const dx = Math.max(b.x1 - (c.x + halfW), (c.x - halfW) - b.x2);
+        const dy = Math.max(b.y1 - (c.y + halfH), (c.y - halfH) - b.y2);
+        worst = Math.min(worst, Math.max(dx, dy));
+      }
+      return worst;                        // Infinity when the canvas is empty
+    };
+
+    let best = cands[0], bestGap = -Infinity;
+    for (const c of cands) {
+      const gap = clearance(c);
+      if (gap >= 0) return { x: c.x, y: c.y };   // corner-most clear spot wins
+      if (gap > bestGap) { bestGap = gap; best = c; }
+    }
+    return { x: best.x, y: best.y };
   }
 
   // §4 — thin blue edges to nodes ALREADY on screen. The edges already exist in
