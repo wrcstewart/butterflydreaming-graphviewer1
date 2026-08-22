@@ -1669,46 +1669,74 @@ function runLayout(cy, parentNode = null) {
       };
     });
 
-    // 2026-08-22 — place the cluster's Family parents in a row ABOVE it,
-    // instead of leaving them wherever they last happened to be.
+    // 2026-08-22 — the cluster's Family parents go ABOVE it, but are NUDGED
+    // there rather than pinned into a line.
     //
-    // They are the cluster's parents, so above reads correctly. And stale
-    // positions were drifting them off towards the bottom-right, where they
-    // looked isolated and competed for the corner the Blue Node now owns.
+    // A single row was the wrong answer. Eight subfamilies at row spacing is
+    // ~840px wide, so cy.fit zooms the whole view down until nothing is
+    // legible — worst on iOS, bad enough on desktop. It also throws away the
+    // vertical dimension, which is most of the point of a graph layout.
     //
-    // Sorted by name so the row is stable: collection order is not something
-    // to rely on for a position the user will re-visit.
-    const unmanaged = visible.nodes()
+    // So: seed them in a compact staggered block above the cluster and let
+    // fCoSE arrange them, with the deterministic part of the view PINNED
+    // (cluster, gateway grid, section titles) so the grid survives exactly as
+    // before. relativePlacementConstraint then guarantees "above" as a
+    // property of the layout rather than something the seeding merely hopes
+    // for. Sorted by name so the seed is stable between visits.
+    const famNodes = visible.nodes()
       .filter(n => !positions[n.id()])
       .sort((a, b) => String(a.data('name') || a.data('title') || '')
         .localeCompare(String(b.data('name') || b.data('title') || '')));
-    if (unmanaged.length) {
-      // Above the titles when there are any — the title row is already at
-      // clusterY - 150, and stacking these on top of it would trade one
-      // overlap for another.
-      const famY  = titleNodes.length ? titleY - 150 : clusterY - 150;
-      const fSep  = Math.min(200, Math.max(120, gridW / Math.max(1, unmanaged.length - 1)));
-      unmanaged.forEach((n, i) => {
-        positions[n.id()] = { x: ox + (i - (unmanaged.length - 1) / 2) * fSep, y: famY };
+
+    // Anchor the pinned part first — fCoSE runs with randomize:false, so it
+    // starts from whatever is on the nodes now, not from `positions`.
+    Object.keys(positions).forEach(id => {
+      const n = cy.getElementById(id);
+      if (n.length) n.position(positions[id]);
+    });
+
+    if (famNodes.length) {
+      // Wider than tall: ~1.6 aspect keeps the block from becoming a column,
+      // which would fight the vertical space the gateway grid needs below.
+      const fCols  = Math.max(2, Math.ceil(Math.sqrt(famNodes.length * 1.6)));
+      const fSepX  = 130, fSepY = 80;
+      const fBaseY = (titleNodes.length ? titleY : clusterY) - 170;
+      famNodes.forEach((n, i) => {
+        const row  = Math.floor(i / fCols);
+        const col  = i % fCols;
+        const rowN = Math.min(fCols, famNodes.length - row * fCols);
+        n.position({
+          x: ox + (col - (rowN - 1) / 2) * fSepX,
+          y: fBaseY - row * fSepY,          // rows stack UPWARD, away from the cluster
+        });
       });
     }
 
-    visible.layout({ name: 'preset', positions, fit: false }).run();
+    visible.layout({
+      name: 'fcose',
+      animate: true,
+      animationDuration: 450,
+      randomize: false,
+      fit: true,
+      padding: 60,
+      nodeSeparation: 75,
+      idealEdgeLength: 100,
+      nodeRepulsion: 4500,
+      gravity: 0.25,
+      fixedNodeConstraint: Object.keys(positions).map(id => ({
+        nodeId: id, position: positions[id],
+      })),
+      ...(famNodes.length ? {
+        relativePlacementConstraint: famNodes.map(n => ({
+          top: n.id(), bottom: parentNode.id(), gap: 140,
+        })),
+      } : {}),
+    }).run();
 
-    // Kept as a backstop. With the row above, everything in this view is now
-    // managed, so this is normally a no-op — but it costs nothing and catches
-    // anything a future change leaves unpositioned.
-    // Everything NOT in `positions` keeps whatever coordinates it
-    // last had, because a preset layout only moves what it is given and runs
-    // no simulation to push anything apart. In a cluster view that is the
-    // Family parents: Garden/Wild has six, none of them in the grid, so any
-    // two that arrive coincident stay welded together permanently — the
-    // reported "one exactly on top of another, and only the top one moves".
-    //
-    // Gateways carry seq = -1 rather than null, so this branch fires for
-    // every un-hinted cluster view, not the rare case it looks like.
-    separateCoincidentNodes(visible.nodes(), new Set(Object.keys(positions)));
-    cy.fit(visible, fitPadding(cy, 80));
+    // No separateCoincidentNodes and no cy.fit here any more. Every node in
+    // this view is now either pinned or seeded, so nothing arrives coincident;
+    // and fCoSE animates with fit:true, so an immediate cy.fit would frame the
+    // pre-animation positions and fight it.
 
   } else {
     // force mode — fCoSE from scratch.  If title nodes are present, pin them at
