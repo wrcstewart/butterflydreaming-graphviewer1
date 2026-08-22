@@ -1953,64 +1953,34 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // worse than not hinting at all.
   function placeBlueNode(node) {
     if (node.visible()) { bnWasRevealed = false; return; }
-    sizeBlueNodeToView(node);          // size FIRST — the spot search needs the size
-    node.position(findBlueNodeSpot(node));
+    sizeBlueNodeToView(node);          // size FIRST — the corner inset depends on it
+    node.position(blueNodeCorner(node));
     node.show();
     bnWasRevealed = true;
   }
 
-  // A fixed fraction of the viewport was landing the BN on top of whatever
-  // happened to be there. Search instead: take the corner-most candidate that
-  // clears everything already on screen, and if nothing clears, the one that
-  // obstructs least. Model coordinates throughout — cy.extent(), boundingBox()
-  // and width()/height() are all model space, unlike renderedBoundingBox().
-  function findBlueNodeSpot(node) {
+  // ALWAYS the bottom-right corner, never a searched-for gap. A node that
+  // moves about to dodge obstacles makes the user hunt for it on every
+  // arrival; one that is always in the same place can be found without
+  // looking. Predictability beats optimality here, so collisions are accepted.
+  //
+  // In practice it collides LESS than the old 78%/80% did: the layout fits
+  // with padding, so the true corner is usually the emptiest part of the
+  // canvas, while 78%/80% sat just inside where the content actually is.
+  //
+  // Inset by the node's own half-size plus air for the halo (the outline
+  // reaches 10 beyond the body), so it sits hard in the corner without any
+  // part of it running off the canvas.
+  //
+  // Model coordinates — cy.extent(), width() and height() are all model space,
+  // unlike renderedBoundingBox(). Mixing those is a silent zoom-dependent bug;
+  // it is the trap that displaced the n_r badge.
+  function blueNodeCorner(node) {
     const ext = cy.extent();
-    const spanX = ext.x2 - ext.x1, spanY = ext.y2 - ext.y1;
-    // Half-extents include the halo (outline reaches 10 beyond the body) and a
-    // little air, so "clear" means visibly clear rather than merely not
-    // overlapping.
-    const halfW = (node.width()  || 40) / 2 + 14;
-    const halfH = (node.height() || 30) / 2 + 14;
-
-    // Labels included: covering a neighbour's label obstructs the view just as
-    // much as covering the node.
-    const boxes = cy.nodes(':visible')
-      .filter(n => n.id() !== node.id())
-      .map(n => n.boundingBox({ includeLabels: true, includeOverlays: false }));
-
-    const cands = [];
-    for (const fx of [0.92, 0.80, 0.68, 0.56]) {
-      for (const fy of [0.90, 0.78, 0.66, 0.54]) {
-        cands.push({
-          x: Math.min(ext.x1 + spanX * fx, ext.x2 - halfW),
-          y: Math.min(ext.y1 + spanY * fy, ext.y2 - halfH),
-          rank: (1 - fx) + (1 - fy),      // smaller = nearer the bottom-right
-        });
-      }
-    }
-    cands.sort((a, b) => a.rank - b.rank);
-
-    // Gap to the nearest neighbour. Two boxes are clear if they are separated
-    // on EITHER axis, so the per-box gap is the larger of the two axis gaps;
-    // negative means overlap.
-    const clearance = c => {
-      let worst = Infinity;
-      for (const b of boxes) {
-        const dx = Math.max(b.x1 - (c.x + halfW), (c.x - halfW) - b.x2);
-        const dy = Math.max(b.y1 - (c.y + halfH), (c.y - halfH) - b.y2);
-        worst = Math.min(worst, Math.max(dx, dy));
-      }
-      return worst;                        // Infinity when the canvas is empty
+    return {
+      x: ext.x2 - ((node.width()  || 40) / 2 + 14),
+      y: ext.y2 - ((node.height() || 30) / 2 + 14),
     };
-
-    let best = cands[0], bestGap = -Infinity;
-    for (const c of cands) {
-      const gap = clearance(c);
-      if (gap >= 0) return { x: c.x, y: c.y };   // corner-most clear spot wins
-      if (gap > bestGap) { bestGap = gap; best = c; }
-    }
-    return { x: best.x, y: best.y };
   }
 
   // §4 — thin blue edges to nodes ALREADY on screen. The edges already exist in
