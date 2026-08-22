@@ -4304,6 +4304,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // --- Dev panel (position curation) ---
   const devCodeEl   = document.getElementById('dev-code');
   const devStatusEl = document.getElementById('dev-status');
+  devCodeEl.addEventListener('input', () => rememberCurationCode(devCodeEl.value.trim()));
 
   function devStatus(msg) {
     devStatusEl.textContent = msg;
@@ -4364,7 +4365,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     wsNow.on('msg', function handler(msg) {
       if (!msg || msg.type !== 'write_hints') return;
       wsNow.off('msg', handler);
-      if (msg.error) { devStatus(msg.error); return; }
+      if (msg.error) {
+        if (msg.error === 'bad_code') forgetCurationCode();
+        devStatus(msg.error); return;
+      }
       // Reflect the same keys into Cytoscape edge data so Reset / re-entry
       // uses preset mode immediately (no reload required).
       const hintByRelId = new Map(hints.map(h => [h.relId, h]));
@@ -4438,7 +4442,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     wsNow.on('msg', function handler(m) {
       if (!m || m.type !== 'edit_node_text') return;
       wsNow.off('msg', handler);
-      if (m.error) { devStatus(m.error); return; }
+      if (m.error) {
+        if (m.error === 'bad_code') forgetCurationCode();
+        devStatus(m.error); return;
+      }
       devStatus(`saved ${name}`);
       // Update in-memory node text so next tap re-parses the fresh chunks.
       node.data('text', text);
@@ -4884,11 +4891,55 @@ function addFetchedRows(cy, rows) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// --- Curation code persistence (2026-08-22) ---
+//
+// Retyping the code into every browser on every debug cycle was the actual
+// cost of pair testing. This remembers it PER BROWSER so it is typed once.
+//
+// It weakens nothing: the code is enforced server-side with timingSafeEqual
+// against a gitignored config, and this stores it only where it was already
+// typed. Deliberately NOT an IP-based grant — cloudflared runs on this host,
+// so every public visitor reaches the server from 127.0.0.1 and a loopback
+// check would have handed the code to the internet.
+const CURATION_STORE_KEY = 'bd_curation_code';
+
+// Storage throws in Safari Private mode and when cookies are blocked. Every
+// path here degrades to "type it in", which is exactly the status quo, so
+// failures are swallowed rather than surfaced.
+function restoreCurationCode() {
+  try {
+    const el = document.getElementById('dev-code');
+    if (!el || el.value.trim()) return;          // never overwrite live typing
+    const saved = localStorage.getItem(CURATION_STORE_KEY);
+    if (saved) el.value = saved;
+  } catch (_) {}
+}
+
+function rememberCurationCode(code) {
+  try {
+    // Only a COMPLETE code is worth keeping. Persisting a half-typed one would
+    // restore a value that puts the UI in curator view but can never validate.
+    const el = document.getElementById('dev-code');
+    const full = el && el.maxLength > 0 ? el.maxLength : 4;
+    if (code && code.length >= full) localStorage.setItem(CURATION_STORE_KEY, code);
+    else if (!code) localStorage.removeItem(CURATION_STORE_KEY);
+  } catch (_) {}
+}
+
+// Called when the SERVER rejects the code. Clears the store but leaves the
+// field as typed — the user may be mid-correction, and blanking it under them
+// would drop them out of curator view mid-action.
+function forgetCurationCode() {
+  try { localStorage.removeItem(CURATION_STORE_KEY); } catch (_) {}
+}
+
 
 async function init() {
   // #help-text was removed in A50 — guard the legacy assignment so init() doesn't abort.
   const helpTextEl = document.getElementById('help-text');
   if (helpTextEl) helpTextEl.textContent = helpText;
+
+  restoreCurationCode();   // before the first render reads #dev-code
 
   const overlay = document.getElementById('loading-overlay');
   const msgEl   = document.getElementById('loading-msg');
@@ -7040,6 +7091,7 @@ async function init() {
       // Under the always-on chat model (2026-07-15) neither reason closes
       // chat — the panel stays active for solo composition / bot dialogue
       // / system status; only the pair state resets.
+      if (msg.reason === 'code_required') forgetCurationCode();
       const reasonMessage =
           msg.reason === 'code_required' ? 'Code required to chat'
         : msg.reason === 'same_device'   ? 'Another BD tab on this device is already waiting to chat — close that tab or use it instead'
