@@ -372,5 +372,24 @@ Makes it easy to trace what a given utterance was classified as and what the ext
 - **Persistent tricky-vocabulary side panel.** A small always-visible pane where the user maintains a hand-curated list of tricky words (Prologue, Epilogue, proper nouns, technical terms, etc.). Words get **always** prepended to the bias prompt regardless of what's in History/Current. Would solve the Prologue/Epilogue class of misrecognition permanently for a given corpus without requiring the user to plant the words in a card before every recording. Idea only — not implemented 2026-08-15.
 - **Compressor toggle** in the action-bar (default ON; toggle for A/B testing hot vs. dry mic).
 - **Quality-report banner** on release (peak/mean dBFS, silence %, clip %, verdict OK / WEAK / HOT / BAD) — currently just logged to console.
+### Manual `{?…}` marking — ADDED 2026-08-23
+
+`Mark {?…}` in the destination toolbar, beside `Accept {?…}`.
+
+Until this, `{?…}` markers could only be produced by mode 4's aligner, so a
+substitution the reviewer spotted themselves could not be marked at all — only
+accepted, or the braces typed by hand. The two buttons are now a pair: one
+marks, the other clears.
+
+- **With a selection** — wraps it: `{?selection}`.
+- **With no selection** — marks the word at the caret, so it is usable without
+  a drag on a phone. A caret in whitespace is a no-op with a status message
+  rather than an empty `{?}`.
+- **Toggles.** Pressing it on an already-marked stretch unmarks it, whether the
+  selection IS the marked span or merely sits inside one. So it cannot nest.
+- Uses `setRangeText(..., 'select')` like every other insertion path, to
+  preserve the browser's native undo stack (constraint D5), and leaves the
+  result selected so the action can be repeated or reversed immediately.
+
 - **Manual bound/free override** — user can hint the mode via a small "🎤 Reading" toggle. User's 2026-08-15 call: not yet.
 - **Non-1:1 boundary extension** — handle Whisper's word-condensation cases ("of late to" → "o") where positional 1:1 pairing marks the wrong source-word. Would need fuzzy source-alignment with variable spans. Complex — defer until it hurts.
