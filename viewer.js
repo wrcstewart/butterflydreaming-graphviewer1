@@ -1934,9 +1934,6 @@ function runLayout(cy, parentNode = null) {
     // deliberately: a post-layout fit races the animation, which is exactly
     // what framed the cluster view mid-flight.
     const forcePad = fitPadding(cy, 60);
-    console.log('[fit-debug] force branch — canvas '
-      + Math.round(cy.width()) + 'x' + Math.round(cy.height())
-      + ' | nodes ' + visible.nodes().length + ' | pad ' + Math.round(forcePad));
     visible.layout({
       name: 'fcose',
       animate: true,
