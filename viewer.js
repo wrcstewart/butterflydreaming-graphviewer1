@@ -6305,16 +6305,41 @@ async function init() {
     }
     refreshWrapBtnEnabled();
   }
-  // 2026-08-16 — Wrap-{?} button is enabled only when the tracked
-  // Current textarea has a non-collapsed selection. Fires on every
-  // caret-tracking event via captureCaretIfInCurrent above.
+  // 2026-08-23 — {?} works across the whole editor, not just Current textareas.
+  //
+  // It was limited to <textarea> inside #current-stack, which is only the top
+  // LOCAL card. Every other card body is a contenteditable div, and History is
+  // editable too, so most of the editor could not be marked at all. {?} is
+  // general editor vocabulary — "this bit is tentative" — so it should work
+  // wherever the user can type.
+  function inEditorStack(el) {
+    return !!(el && ((currentStackEl && currentStackEl.contains(el)) ||
+                     (chatStackEl    && chatStackEl.contains(el))));
+  }
+
+  // The live selection, whichever kind of editable it is in. Read at click
+  // time rather than from a snapshot: the button suppresses its own
+  // pointerdown, so focus and selection are still intact when it fires.
+  function editorSelection() {
+    const ae = document.activeElement;
+    if (ae && ae.tagName === 'TEXTAREA' && inEditorStack(ae) &&
+        ae.selectionStart !== ae.selectionEnd) {
+      return { kind: 'ta', el: ae, start: ae.selectionStart, end: ae.selectionEnd };
+    }
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.isCollapsed) {
+      const n = sel.anchorNode;
+      const host = n && (n.nodeType === 1 ? n : n.parentElement);
+      const ce = host && host.closest && host.closest('[contenteditable="true"]');
+      if (ce && inEditorStack(ce)) return { kind: 'ce', el: ce, sel };
+    }
+    return null;
+  }
+
   function refreshWrapBtnEnabled() {
     const btn = document.getElementById('sr-wrap-btn');
     if (!btn) return;
-    const s = srCaretSnapshot;
-    const hasSel = !!(s && s.textarea && s.selectionStart !== s.selectionEnd &&
-                      currentStackEl && currentStackEl.contains(s.textarea));
-    btn.disabled = !hasSel;
+    btn.disabled = !editorSelection();
   }
   if (currentStackEl) {
     currentStackEl.addEventListener('focusin',  () => captureCaretIfInCurrent());
@@ -6328,6 +6353,13 @@ async function init() {
     // does not even emit click. That is why it appeared dead on iOS.
     currentStackEl.addEventListener('touchend', () => captureCaretIfInCurrent());
   }
+  // History is editable too, and {?} now works there. It does not feed the SR
+  // insertion snapshot — that deliberately tracks Current only — so these just
+  // refresh the button.
+  if (chatStackEl) {
+    ['mouseup', 'touchend', 'keyup', 'focusin', 'input']
+      .forEach(ev => chatStackEl.addEventListener(ev, () => refreshWrapBtnEnabled()));
+  }
   // selectionchange is the only event that reliably fires for EVERY way a
   // selection can be made — drag, long-press, double-tap, keyboard, and the
   // iOS selection handles being dragged after the initial press. It lives on
@@ -6336,7 +6368,9 @@ async function init() {
   document.addEventListener('selectionchange', () => {
     const el = document.activeElement;
     if (el && el.tagName === 'TEXTAREA' && currentStackEl && currentStackEl.contains(el)) {
-      captureCaretIfInCurrent(el);
+      captureCaretIfInCurrent(el);   // Current textarea: also feeds SR insertion
+    } else {
+      refreshWrapBtnEnabled();       // anywhere else in the editor: {?} only
     }
   });
   // selectionchange fires globally on the document — catches keyboard/
@@ -6778,27 +6812,39 @@ async function init() {
     srWrapBtn.addEventListener('pointerdown', (e) => e.preventDefault());
     srWrapBtn.addEventListener('mousedown',   (e) => e.preventDefault());
     srWrapBtn.addEventListener('click', () => {
-      const s = srCaretSnapshot;
-      if (!s || !s.textarea || !currentStackEl || !currentStackEl.contains(s.textarea)) return;
-      const ta = s.textarea;
-      const start = Math.min(s.selectionStart, ta.value.length);
-      const end   = Math.min(s.selectionEnd,   ta.value.length);
-      if (start >= end) return;
-      const selected = ta.value.slice(start, end);
-      const wrapped  = '{?' + selected + '}';
+      const s = editorSelection();
+      if (!s) return;
       try {
-        ta.focus({ preventScroll: true });
-        ta.setRangeText(wrapped, start, end, 'select');
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
-        srCaretSnapshot = {
-          textarea:       ta,
-          selectionStart: ta.selectionStart,
-          selectionEnd:   ta.selectionEnd,
-        };
+        if (s.kind === 'ta') {
+          const ta = s.el;
+          const selected = ta.value.slice(s.start, s.end);
+          ta.focus({ preventScroll: true });
+          ta.setRangeText('{?' + selected + '}', s.start, s.end, 'select');
+          ta.dispatchEvent(new Event('input', { bubbles: true }));
+          srCaretSnapshot = {
+            textarea:       ta,
+            selectionStart: ta.selectionStart,
+            selectionEnd:   ta.selectionEnd,
+          };
+          console.log(`[BD] wrapped ${selected.length}-char selection in {?…}`);
+        } else {
+          // contenteditable. execCommand is deprecated but is the only way to
+          // edit a contenteditable AND keep the browser's native undo stack, and
+          // a Range splice would break Ctrl-Z on the card. Falls back to the
+          // splice if it is ever refused.
+          const text = s.sel.toString();
+          const ok = document.execCommand('insertText', false, '{?' + text + '}');
+          if (!ok) {
+            const r = s.sel.getRangeAt(0);
+            r.deleteContents();
+            r.insertNode(document.createTextNode('{?' + text + '}'));
+          }
+          s.el.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log(`[BD] wrapped ${text.length}-char selection in {?…} (contenteditable)`);
+        }
         refreshWrapBtnEnabled();
-        console.log(`[SR] wrapped ${selected.length}-char selection in {?…}`);
       } catch (err) {
-        console.warn('[SR] wrap failed', err);
+        console.warn('[BD] {?} wrap failed', err);
       }
     });
   }
