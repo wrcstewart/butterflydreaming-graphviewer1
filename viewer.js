@@ -1895,7 +1895,20 @@ function runLayout(cy, parentNode = null) {
         // The gateways are pinned below the cluster by construction — only
         // the families are free to drift across it.
         shift(famNodes, false);
-        cy.fit(visible, fitPadding(cy, 60));
+        const padUsed = fitPadding(cy, 60);
+        cy.fit(visible, padUsed);
+        // TEMPORARY DIAGNOSTIC (2026-08-23) — remove once the iOS fit is
+        // understood. Client console is forwarded to the server log, so this
+        // reports the REAL canvas rather than a modelled one.
+        const bb = visible.boundingBox();
+        const z  = cy.zoom();
+        console.log('[fit-debug] canvas ' + Math.round(cy.width()) + 'x' + Math.round(cy.height())
+          + ' | content ' + Math.round(bb.w) + 'x' + Math.round(bb.h)
+          + ' | pad ' + Math.round(padUsed)
+          + ' | zoom ' + z.toFixed(3)
+          + ' | drawn ' + Math.round(bb.w * z) + 'x' + Math.round(bb.h * z)
+          + ' | fills ' + Math.round(100 * bb.w * z / cy.width()) + '%x'
+          + Math.round(100 * bb.h * z / cy.height()) + '%');
       } catch (err) { console.warn('[BD] side-shift failed', err); }
     });
     layout.run();
