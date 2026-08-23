@@ -1744,7 +1744,8 @@ function runLayout(cy, parentNode = null) {
       });
     }
 
-    visible.layout({
+    const gwColl = cy.collection(sorted);
+    const layout = visible.layout({
       name: 'fcose',
       animate: true,
       animationDuration: 450,
@@ -1758,13 +1759,49 @@ function runLayout(cy, parentNode = null) {
       fixedNodeConstraint: Object.keys(positions).map(id => ({
         nodeId: id, position: positions[id],
       })),
-      relativePlacementConstraint: [
-        // families above the cluster, gateways below it — the two halves of
-        // the view stay on their own sides however the simulation settles.
-        ...famNodes.map(nd => ({ top: nd.id(), bottom: parentNode.id(), gap: 140 })),
-        ...sorted.map(nd => ({ top: parentNode.id(), bottom: nd.id(), gap: 110 })),
-      ],
-    }).run();
+      // NO relativePlacementConstraint. It enforces an EXACT offset, so every
+      // node sharing an anchor collapses onto one line — measured headlessly
+      // against this exact case: all 5 gateways at the same y, and all 8
+      // families too. That was the reported row, and it was this.
+      //
+      // Staggering the gaps per row was tried and is worse: it holds the sides
+      // but pins y while leaving x free to compress, giving 5 overlapping
+      // pairs at 12 gateways and 44 at 40. Unconstrained gives a real cloud
+      // with none. The sides are kept below instead, by moving each group
+      // whole.
+    });
+
+    // Keep the two halves on their own sides WITHOUT distorting either.
+    // Unconstrained, a gateway can drift past the cluster once there are
+    // enough of them (measured: fine at 5, crosses at 12+). Shifting the whole
+    // group rigidly preserves the arrangement fCoSE found — every relative
+    // position within the cloud is untouched — where a per-node constraint
+    // flattens or overlaps it.
+    layout.one('layoutstop', () => {
+      try {
+        const anchorY = parentNode.position().y;
+        const shift = (coll, below) => {
+          if (!coll || !coll.length) return;
+          let worst = 0;
+          coll.forEach(nd => {
+            const dy = nd.position().y - anchorY;
+            const need = below ? (90 - dy) : (dy + 90);
+            if (need > worst) worst = need;
+          });
+          if (worst > 0) {
+            const d = below ? worst : -worst;
+            coll.forEach(nd => {
+              const q = nd.position();
+              nd.position({ x: q.x, y: q.y + d });
+            });
+          }
+        };
+        shift(gwColl, true);
+        shift(famNodes, false);
+        cy.fit(visible, fitPadding(cy, 60));
+      } catch (err) { console.warn('[BD] side-shift failed', err); }
+    });
+    layout.run();
 
     // No separateCoincidentNodes and no cy.fit here any more. Every node in
     // this view is now either pinned or seeded, so nothing arrives coincident;
