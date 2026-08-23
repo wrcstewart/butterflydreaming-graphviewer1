@@ -1696,12 +1696,19 @@ function runLayout(cy, parentNode = null) {
       const row  = Math.floor(rank / cols);
       const col  = rank % cols;
       const rowN = Math.min(cols, n - row * cols);
-      node.position({
+      const seat = {
         x: ox + (col - (rowN - 1) / 2) * cellW,
         y: gridTopY + row * cellH,
-      });
+      };
+      node.position(seat);
       gwSeedIds.add(node.id());
-      gwPins.push({ nodeId: node.id(), position: node.position() });
+      // Pin from the COMPUTED values, never from node.position(): that getter
+      // returns cytoscape's live internal position object, not a copy — so the
+      // pin would be the very object the layout mutates, and would follow the
+      // node instead of holding it. Verified: read a position, move the node,
+      // and the captured "value" has changed. That silent no-op is why the
+      // block kept floating back into a line despite being pinned.
+      gwPins.push({ nodeId: node.id(), position: { x: seat.x, y: seat.y } });
     });
 
     const tCount = titleNodes.length;
