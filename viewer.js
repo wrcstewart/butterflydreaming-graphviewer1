@@ -6322,7 +6322,23 @@ async function init() {
     currentStackEl.addEventListener('keyup',    () => captureCaretIfInCurrent());
     currentStackEl.addEventListener('mouseup',  () => captureCaretIfInCurrent());
     currentStackEl.addEventListener('focusout', (e) => captureCaretIfInCurrent(e.target));
+    // 2026-08-23 — touchend, because iOS does not fire mouseup. Selecting text
+    // by long-press produced NONE of the five events above, so the snapshot
+    // never updated, the {?} button stayed disabled, and a disabled button
+    // does not even emit click. That is why it appeared dead on iOS.
+    currentStackEl.addEventListener('touchend', () => captureCaretIfInCurrent());
   }
+  // selectionchange is the only event that reliably fires for EVERY way a
+  // selection can be made — drag, long-press, double-tap, keyboard, and the
+  // iOS selection handles being dragged after the initial press. It lives on
+  // document rather than on the element, so it is guarded to textareas inside
+  // Current.
+  document.addEventListener('selectionchange', () => {
+    const el = document.activeElement;
+    if (el && el.tagName === 'TEXTAREA' && currentStackEl && currentStackEl.contains(el)) {
+      captureCaretIfInCurrent(el);
+    }
+  });
   // selectionchange fires globally on the document — catches keyboard/
   // touch selection expansion inside textareas even between the events
   // above. Lightweight guard: only refresh Wrap-btn state (don't re-
@@ -6755,6 +6771,12 @@ async function init() {
   // Enabled state managed by refreshWrapBtnEnabled above.
   const srWrapBtn = document.getElementById('sr-wrap-btn');
   if (srWrapBtn) {
+    // Keep the selection alive while the button is pressed. Without this the
+    // textarea blurs on pointer-down, and on some browsers that collapses the
+    // selection before the click handler ever reads it — the button then acts
+    // on nothing. preventDefault on pointerdown stops focus moving at all.
+    srWrapBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+    srWrapBtn.addEventListener('mousedown',   (e) => e.preventDefault());
     srWrapBtn.addEventListener('click', () => {
       const s = srCaretSnapshot;
       if (!s || !s.textarea || !currentStackEl || !currentStackEl.contains(s.textarea)) return;
