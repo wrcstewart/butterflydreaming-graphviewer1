@@ -1646,18 +1646,28 @@ function runLayout(cy, parentNode = null) {
     // row. Give each axis a cell matched to the node.
     const cellW = 148, cellH = 62;          // 120 + 28, 34 + 28
 
-    // Seed shape: aspect-driven, and capped by what the canvas can actually
-    // hold. An earlier version minimised the fitted zoom across all column
-    // counts, and on a wide canvas that resolved to a SINGLE ROW — which then
-    // set the width of the entire view and would only get worse as works are
-    // added. The floor of 2 columns removes that failure mode outright.
+    // Seed shape: aim for a SQUARE block, and cap by what the canvas can hold.
     //
-    // 1.6 keeps the block wider than tall without letting it run away, and the
-    // cap stops a narrow phone being handed a block it cannot show.
+    // 2026-08-23 — this rule was `sqrt(n * 1.6)`, which deliberately aims WIDER
+    // than tall. That is right for the small Family nodes and exactly wrong
+    // here: a gateway is 120 x 34, so a cell is 148 x 62 and any column-heavy
+    // arrangement is nearly a line before the simulation even runs. Measured:
+    // the seed for 5 gateways was 416 x 96 — aspect 4.3 — which is what was
+    // being seen briefly and then reported as "floating down into a row".
+    //
+    // fCoSE was NOT the culprit; it only widened 4.8 to 5.1. No parameter
+    // tuning helped (every variant landed between 4.0 and 5.7) because the
+    // seed it starts from was already flat. Fix the seed, not the simulation.
+    //
+    // 0.7*sqrt(n) balances the 148x62 cell into a square-ish block: 5 gateways
+    // become 268 x 158 instead of 416 x 96, and 12 become 268 x 344 instead of
+    // 712 x 158 — which is the width that was setting the scale for the whole
+    // view. Floor of 2 columns so it can never become a single stack; the cap
+    // stops a narrow phone being handed a block it cannot show.
     const gArea  = cy.container().getBoundingClientRect();
     const availW = Math.max(200, gArea.width);
     const maxCols = Math.max(1, Math.floor(availW / cellW));
-    const cols  = Math.min(maxCols, Math.max(2, Math.ceil(Math.sqrt(n * 1.6))));
+    const cols  = Math.min(maxCols, Math.max(2, Math.round(0.7 * Math.sqrt(n))));
     const gridW = (cols - 1) * cellW;
     const rows  = Math.ceil(n / cols);
 
@@ -1681,6 +1691,7 @@ function runLayout(cy, parentNode = null) {
     // seq = -1, so the sort above is a no-op on them. It still applies if this
     // branch ever sees TextNodes with real seq values.
     const gwSeedIds = new Set();
+    const gwPins = [];
     sorted.forEach((node, rank) => {
       const row  = Math.floor(rank / cols);
       const col  = rank % cols;
@@ -1690,6 +1701,7 @@ function runLayout(cy, parentNode = null) {
         y: gridTopY + row * cellH,
       });
       gwSeedIds.add(node.id());
+      gwPins.push({ nodeId: node.id(), position: node.position() });
     });
 
     const tCount = titleNodes.length;
@@ -1744,7 +1756,6 @@ function runLayout(cy, parentNode = null) {
       });
     }
 
-    const gwColl = cy.collection(sorted);
     const layout = visible.layout({
       name: 'fcose',
       animate: true,
@@ -1756,9 +1767,22 @@ function runLayout(cy, parentNode = null) {
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
       gravity: 0.25,
+      // Gateways are PINNED at their seed, not arranged by the simulation.
+      //
+      // 2026-08-23 — a force layout cannot give a compact cloud from this
+      // topology, and the reason is structural rather than a tuning problem.
+      // Every gateway attaches to the ONE cluster node, which sits above them,
+      // so attraction to a single fixed point plus mutual repulsion settles
+      // them on an arc at roughly constant distance — and an arc below a point
+      // is inherently wide and shallow. Measured: a compact 148x124 seed came
+      // out of fCoSE at 405x101. That is the "floats down into a line".
+      //
+      // The seed is already the shape wanted, so keep it. It is also
+      // deterministic, which means a cluster looks the same every visit —
+      // the spatial-memory argument in the scaling brief §3.5.
       fixedNodeConstraint: Object.keys(positions).map(id => ({
         nodeId: id, position: positions[id],
-      })),
+      })).concat(gwPins),
       // NO relativePlacementConstraint. It enforces an EXACT offset, so every
       // node sharing an anchor collapses onto one line — measured headlessly
       // against this exact case: all 5 gateways at the same y, and all 8
@@ -1796,7 +1820,8 @@ function runLayout(cy, parentNode = null) {
             });
           }
         };
-        shift(gwColl, true);
+        // The gateways are pinned below the cluster by construction — only
+        // the families are free to drift across it.
         shift(famNodes, false);
         cy.fit(visible, fitPadding(cy, 60));
       } catch (err) { console.warn('[BD] side-shift failed', err); }
