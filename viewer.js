@@ -318,8 +318,23 @@ function createSystemCardEl(label) {
 // a cap (so desktop doesn't waste space). Caller passes the original "ideal"
 // padding as the cap.
 function fitPadding(cy, maxPad) {
+  // 2026-08-23 — fraction cut 0.08 -> 0.03, floor 20 -> 10.
+  //
+  // At 0.08 the padding was 14% of the width and 16% of the height on a phone,
+  // which is the "about 15% of the area unused, horizontally AND vertically"
+  // that was reported. Symmetric unused margin can only be padding: a correct
+  // fit pegs one dimension at 100%, so slack on BOTH means the fit was never
+  // given the room. Tightening the content cannot touch it.
+  //
+  // Now ~5% of width and ~6% of height on a phone, ~4/6% on desktop.
+  //
+  // Note `maxPad` is effectively dead and has been for some time — the
+  // computed value is always smaller than the 40-120 callers pass, so it never
+  // binds. Left in place rather than removed, because it is the only record of
+  // what each caller INTENDED, and a future change to the fraction could make
+  // it live again.
   const dim = Math.min(cy.width(), cy.height());
-  return Math.max(20, Math.min(maxPad, dim * 0.08));
+  return Math.max(10, Math.min(maxPad, dim * 0.03));
 }
 
 // ── Bot-context (bd_ai_read) helpers ─────────────────────────────────────────
