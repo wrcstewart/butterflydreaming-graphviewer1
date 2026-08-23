@@ -1654,6 +1654,8 @@ function runLayout(cy, parentNode = null) {
     // Pure preset layout: all positions computed, no simulation needed.
     const sorted  = gridNodes.toArray().sort((a, b) => (a.data('seq') || 0) - (b.data('seq') || 0));
     const n       = sorted.length;
+    console.log('[fit-debug] seq-grid ENTERED — gateways=' + n
+      + ' visibleNodes=' + visible.nodes().length);   // TEMPORARY, see layoutstop
 
     // 2026-08-22 — the grid used ONE spacing of 120 for both axes while the
     // node is 120 x 34. That was wrong in both directions at once: a 0px gap
