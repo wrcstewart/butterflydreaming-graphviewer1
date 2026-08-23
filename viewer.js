@@ -1645,6 +1645,7 @@ function runLayout(cy, parentNode = null) {
     // horizontally (the nodes touched) and 86px wasted vertically on every
     // row. Give each axis a cell matched to the node.
     const cellW = 148, cellH = 62;          // 120 + 28, 34 + 28
+    const GAP_BELOW = 80, GAP_ABOVE = 80;   // cluster -> gateway / family blocks
 
     // Seed shape: aim for a SQUARE block, and cap by what the canvas can hold.
     //
@@ -1664,18 +1665,62 @@ function runLayout(cy, parentNode = null) {
     // 712 x 158 — which is the width that was setting the scale for the whole
     // view. Floor of 2 columns so it can never become a single stack; the cap
     // stops a narrow phone being handed a block it cannot show.
+    // 2026-08-23 — choose the gateway columns by minimising how far cy.fit must
+    // zoom OUT for the WHOLE VIEW, not for the gateway block alone.
+    //
+    // Measured before this: the view filled 100% of the canvas height and only
+    // 50-70% of its width, so height bound the fit and all the slack was
+    // horizontal — "the views only occupy the central half". Optimising the
+    // gateway block in isolation cannot see that, because the binding
+    // dimension is the total stack: families + cluster + gateways.
     const gArea  = cy.container().getBoundingClientRect();
     const availW = Math.max(200, gArea.width);
-    const maxCols = Math.max(1, Math.floor(availW / cellW));
-    const cols  = Math.min(maxCols, Math.max(2, Math.round(0.7 * Math.sqrt(n))));
+    const availH = Math.max(200, gArea.height);
+    // Everything that is neither the cluster, a gateway, nor a section title is
+    // a Family parent. Both blocks are shaped together below, because they
+    // share one bounding box and cy.fit sees only that.
+    const gridIds  = new Set(sorted.map(nd => nd.id()));
+    const titleIds = new Set(titleNodes.map(nd => nd.id()));
+    const famCount = visible.nodes().filter(nd =>
+      nd.id() !== parentNode.id() && !gridIds.has(nd.id()) && !titleIds.has(nd.id())
+    ).length;
+
+    // Choose BOTH column counts together, minimising how far cy.fit must zoom
+    // out. Shaping either block alone cannot see the binding dimension, which
+    // is the total stack: families + cluster + gateways.
+    //
+    // No cap on columns by canvas width — that cap blocked options the
+    // optimiser would have rejected anyway on their own merits, while
+    // forbidding ones that cost nothing because the OTHER block was already
+    // that wide.
+    let cols = 2, famCols = 2, bestFit = Infinity;
+    for (let gc = 1; gc <= Math.max(1, n); gc++) {
+      const gr = Math.ceil(n / gc);
+      const gW = (gc - 1) * cellW + 120, gH = (gr - 1) * cellH + 34;
+      for (let fc = 1; fc <= Math.max(1, famCount); fc++) {
+        const fr = Math.ceil(famCount / fc) || 0;
+        const fW = famCount ? (fc - 1) * 130 + 56 : 0;
+        const fH = famCount ? (fr - 1) * 80 + 22 : 0;
+        const totalW = Math.max(gW, fW, 70);
+        const totalH = GAP_ABOVE + fH + 34 + GAP_BELOW + gH;
+        const s = Math.max(totalW / availW, totalH / availH);
+        if (s < bestFit - 1e-9) { bestFit = s; cols = gc; famCols = fc; }
+      }
+    }
     const gridW = (cols - 1) * cellW;
     const rows  = Math.ceil(n / cols);
 
     // Work from a fixed origin — cy.fit() normalises to the viewport afterwards.
     const ox = 0, oy = 0;
     const clusterY  = oy - 100;
-    const gridTopY  = oy + 80;
-    const titleY    = clusterY - 150;
+    // 2026-08-23 — gaps cut from 180/170 to 110. They were pure empty edge:
+    // 180 between the cluster's centre and the first gateway row is ~146px of
+    // nothing once both node heights are taken off. That extra height was what
+    // bound the fit and shrank everything, which is the "edges are quite long,
+    // the diagram is bigger than it needs to be" observation. Compacting and
+    // scaling up were the same fix, as suspected.
+    const gridTopY  = clusterY + GAP_BELOW;
+    const titleY    = clusterY - GAP_ABOVE;
 
     const positions = {};
     positions[parentNode.id()] = { x: ox, y: clusterY };
@@ -1749,9 +1794,9 @@ function runLayout(cy, parentNode = null) {
     if (famNodes.length) {
       // Wider than tall: ~1.6 aspect keeps the block from becoming a column,
       // which would fight the vertical space the gateway grid needs below.
-      const fCols  = Math.max(2, Math.ceil(Math.sqrt(famNodes.length * 1.6)));
+      const fCols  = Math.max(1, Math.min(famCols, famNodes.length));
       const fSepX  = 130, fSepY = 80;
-      const fBaseY = (titleNodes.length ? titleY : clusterY) - 170;
+      const fBaseY = (titleNodes.length ? titleY : clusterY) - GAP_ABOVE;
       famNodes.forEach((n, i) => {
         const row  = Math.floor(i / fCols);
         const col  = i % fCols;
