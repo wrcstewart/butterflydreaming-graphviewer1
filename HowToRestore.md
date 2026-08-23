@@ -107,6 +107,9 @@ memories changed.
 
 For a new session that wants the project's reasoning rather than its code:
 
+0. **`DOCS_INDEX.md`** — what every .md in this repo is for, which are current,
+   and which are superseded. There are 38 of them and several are duplicates or
+   old handovers; start there rather than guessing from filenames.
 1. `MEMORY.md` (loaded automatically) — the index; every line is a pointer.
 2. `session_notes_2026-08-19.md` and `session_notes_2026-08-16_17.md` — recent
    narrative, including the traps that cost real time.
