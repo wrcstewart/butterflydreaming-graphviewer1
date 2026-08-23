@@ -3780,21 +3780,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // the border lands on the very first cluster tap.
     markReadNode(clusterNode, cy);
 
-    // Fallback row layout for gateways when NO hints exist for them. If any
-    // gateway edge already carries hint_x/y, runLayout above has already
-    // placed them at the user's chosen positions — the row override would
-    // wipe that, so skip it in that case.
-    setTimeout(() => {
-      const gws = gwEdges.sources().filter(':visible');
-      if (!gws.length) return;
-      const anyGwHint = gwEdges.some(e => e.data('hint_x') != null && e.data('hint_y') != null);
-      if (anyGwHint) return;
-      const spacing = 130;
-      const rowX = clusterNode.position().x - ((gws.length - 1) * spacing) / 2;
-      const rowY = clusterNode.position().y + 150;
-      gws.forEach((n, i) => n.position({ x: rowX + i * spacing, y: rowY }));
-      cy.fit(cy.elements(':visible'), fitPadding(cy, 60));
-    }, 500);
+    // 2026-08-23 — REMOVED: a deferred fallback that put every gateway in a
+    // single row at clusterY + 150, 500ms after this function returned.
+    //
+    // It dated from before runLayout placed gateways at all, and it was the
+    // real cause of "the block floats down into a line": the seq-grid branch
+    // laid out a compact block, and half a second later this silently
+    // overwrote it. Every attempt to fix the block — reshaping the seed,
+    // retuning fCoSE, pinning the nodes — was being undone by a second writer
+    // nobody was looking at.
+    //
+    // Its own guard could never fire: it skipped only when a gateway edge
+    // carried a bare hint_x/hint_y, and CONTAINS_CLUSTER edges carry no hints
+    // at all. So the row was applied on EVERY cluster expand, unconditionally.
+    //
+    // runLayout's seq-grid branch now seeds the gateways in a square-ish block
+    // and pins them, so there is nothing left for a fallback to fall back to.
+    // The cy.fit it also did is covered by the layout's own fit:true and the
+    // layoutstop handler.
   }
 
   async function handleGatewayClick(node) {
