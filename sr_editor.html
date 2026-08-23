@@ -360,7 +360,6 @@
       <button id="clear-dest-btn" type="button">Clear destination</button>
       <button id="copy-src-to-dest-btn" type="button" title="Copy source pane text into destination">Copy →</button>
       <button id="undo-btn" type="button" title="Undo last insertion (browser undo)">Undo</button>
-      <button id="mark-sub-btn" type="button" title="Wrap the selected text in {?…} as a tentative substitution. With no selection, marks the word at the caret. Press again on a marked stretch to unmark it.">Mark {?…}</button>
       <button id="accept-subs-btn" type="button" title="Strip {?…} tentative-substitution markers throughout the destination pane">Accept {?…}</button>
       <div id="status">initialising…</div>
       <!-- 2026-08-15 — mic primer (mirror of bd_SR_Editor). Shown on Use
@@ -1916,59 +1915,6 @@
     // Accept — strip all tentative-substitution markers ({?…}) throughout
     // the destination. Uses setRangeText to preserve the browser undo stack
     // so the user can Undo → Accept → Undo to review what changed.
-    // 2026-08-23 — manual counterpart to mode 4. Until now {?…} markers could
-    // only be produced by the aligner, so a substitution the reviewer spotted
-    // themselves could not be marked at all — only accepted or hand-typed.
-    //
-    // setRangeText is used rather than assigning .value, to preserve the
-    // browser's native undo stack (rules doc constraint D5), and the result is
-    // left selected so the action can be repeated or reversed immediately.
-    $('mark-sub-btn').addEventListener('click', () => {
-      const ta = $('dest-pane');
-      ta.focus();
-      let start = ta.selectionStart, end = ta.selectionEnd;
-      const v = ta.value;
-
-      // No selection: take the word under the caret, so the button is useful
-      // without a drag on a phone.
-      if (start === end) {
-        const isWord = c => c && /\S/.test(c) && c !== '{' && c !== '}';
-        while (start > 0 && isWord(v[start - 1])) start--;
-        while (end < v.length && isWord(v[end])) end++;
-        if (start === end) { setStatus('Nothing to mark — select some text first.', 'warn'); return; }
-      }
-
-      const sel = v.slice(start, end);
-
-      // Already marked? Unmark, so the button toggles rather than nesting.
-      // Handles both the selection ITSELF being {?…} and it sitting inside one.
-      const inner = sel.match(/^\{\?([^{}]*)\}$/);
-      if (inner) {
-        ta.setRangeText(inner[1], start, end, 'select');
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
-        setStatus('Unmarked.', 'ok');
-        logEntry(`unmarked {?${inner[1]}}`, 'info');
-        return;
-      }
-      const open = v.lastIndexOf('{?', start);
-      if (open !== -1) {
-        const close = v.indexOf('}', open);
-        if (close >= end && v.slice(open + 2, close).indexOf('{') === -1) {
-          const body = v.slice(open + 2, close);
-          ta.setRangeText(body, open, close + 1, 'select');
-          ta.dispatchEvent(new Event('input', { bubbles: true }));
-          setStatus('Unmarked.', 'ok');
-          logEntry(`unmarked {?${body}}`, 'info');
-          return;
-        }
-      }
-
-      ta.setRangeText('{?' + sel + '}', start, end, 'select');
-      ta.dispatchEvent(new Event('input', { bubbles: true }));
-      setStatus('Marked as tentative.', 'ok');
-      logEntry(`marked {?${sel}}`, 'info');
-    });
-
     $('accept-subs-btn').addEventListener('click', () => {
       const ta = $('dest-pane');
       const before = ta.value;
