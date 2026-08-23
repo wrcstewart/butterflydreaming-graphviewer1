@@ -1646,21 +1646,18 @@ function runLayout(cy, parentNode = null) {
     // row. Give each axis a cell matched to the node.
     const cellW = 148, cellH = 62;          // 120 + 28, 34 + 28
 
-    // And choose the column count that minimises how far cy.fit must zoom OUT
-    // — the larger of the two ratios against the canvas. ceil(sqrt(n)) aims at
-    // a square grid, which is the wrong target when each cell is four times
-    // wider than it is tall, and the grid is what was setting the scale for
-    // the whole view.
+    // Seed shape: aspect-driven, and capped by what the canvas can actually
+    // hold. An earlier version minimised the fitted zoom across all column
+    // counts, and on a wide canvas that resolved to a SINGLE ROW — which then
+    // set the width of the entire view and would only get worse as works are
+    // added. The floor of 2 columns removes that failure mode outright.
+    //
+    // 1.6 keeps the block wider than tall without letting it run away, and the
+    // cap stops a narrow phone being handed a block it cannot show.
     const gArea  = cy.container().getBoundingClientRect();
     const availW = Math.max(200, gArea.width);
-    const availH = Math.max(200, gArea.height);
-    let cols = 1, bestScale = Infinity;
-    for (let c = 1; c <= Math.max(1, n); c++) {
-      const r = Math.ceil(n / c);
-      const s = Math.max(((c - 1) * cellW + 120) / availW,
-                         ((r - 1) * cellH + 34)  / availH);
-      if (s < bestScale - 1e-9) { bestScale = s; cols = c; }
-    }
+    const maxCols = Math.max(1, Math.floor(availW / cellW));
+    const cols  = Math.min(maxCols, Math.max(2, Math.ceil(Math.sqrt(n * 1.6))));
     const gridW = (cols - 1) * cellW;
     const rows  = Math.ceil(n / cols);
 
@@ -1673,11 +1670,26 @@ function runLayout(cy, parentNode = null) {
     const positions = {};
     positions[parentNode.id()] = { x: ox, y: clusterY };
 
+    // 2026-08-23 — the gateways are SEEDED below the cluster, not pinned into a
+    // grid. Any fixed shape is chosen for today's counts and stops being right
+    // as works are added: the row was setting the width of the whole view, and
+    // that only gets worse. Seeding a compact block and letting fCoSE arrange
+    // it — a cloud constrained to stay below the cluster — degrades gracefully
+    // instead, because the simulation re-solves for whatever n happens to be.
+    //
+    // Nothing is lost by dropping the grid order: every gateway carries
+    // seq = -1, so the sort above is a no-op on them. It still applies if this
+    // branch ever sees TextNodes with real seq values.
+    const gwSeedIds = new Set();
     sorted.forEach((node, rank) => {
-      positions[node.id()] = {
-        x: ox - gridW / 2 + (rank % cols) * cellW,
-        y: gridTopY + Math.floor(rank / cols) * cellH,
-      };
+      const row  = Math.floor(rank / cols);
+      const col  = rank % cols;
+      const rowN = Math.min(cols, n - row * cols);
+      node.position({
+        x: ox + (col - (rowN - 1) / 2) * cellW,
+        y: gridTopY + row * cellH,
+      });
+      gwSeedIds.add(node.id());
     });
 
     const tCount = titleNodes.length;
@@ -1704,7 +1716,7 @@ function runLayout(cy, parentNode = null) {
     // property of the layout rather than something the seeding merely hopes
     // for. Sorted by name so the seed is stable between visits.
     const famNodes = visible.nodes()
-      .filter(n => !positions[n.id()])
+      .filter(n2 => !positions[n2.id()] && !gwSeedIds.has(n2.id()))
       .sort((a, b) => String(a.data('name') || a.data('title') || '')
         .localeCompare(String(b.data('name') || b.data('title') || '')));
 
@@ -1746,11 +1758,12 @@ function runLayout(cy, parentNode = null) {
       fixedNodeConstraint: Object.keys(positions).map(id => ({
         nodeId: id, position: positions[id],
       })),
-      ...(famNodes.length ? {
-        relativePlacementConstraint: famNodes.map(n => ({
-          top: n.id(), bottom: parentNode.id(), gap: 140,
-        })),
-      } : {}),
+      relativePlacementConstraint: [
+        // families above the cluster, gateways below it — the two halves of
+        // the view stay on their own sides however the simulation settles.
+        ...famNodes.map(nd => ({ top: nd.id(), bottom: parentNode.id(), gap: 140 })),
+        ...sorted.map(nd => ({ top: parentNode.id(), bottom: nd.id(), gap: 110 })),
+      ],
     }).run();
 
     // No separateCoincidentNodes and no cy.fit here any more. Every node in
