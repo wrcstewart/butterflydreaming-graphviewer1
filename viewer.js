@@ -1924,13 +1924,26 @@ function runLayout(cy, parentNode = null) {
                            return { x: (a.width/2 - cy.pan().x)/z, y: (a.height/2 - cy.pan().y)/z };
                          })() }]
       : [];
+    // 2026-08-23 — padding was a hardcoded 60, and fcose's own fit:true is the
+    // only fit this branch performs. On a 430x381 phone canvas that gave away
+    // 28% of the width and 31% of the height as margin — worse than the
+    // cluster view, and this is the branch a TextNode view uses.
+    //
+    // fitPadding scales with the canvas, so the same call is ~11 on a phone and
+    // ~19 on a desktop. Passed INTO fcose rather than followed by a cy.fit,
+    // deliberately: a post-layout fit races the animation, which is exactly
+    // what framed the cluster view mid-flight.
+    const forcePad = fitPadding(cy, 60);
+    console.log('[fit-debug] force branch — canvas '
+      + Math.round(cy.width()) + 'x' + Math.round(cy.height())
+      + ' | nodes ' + visible.nodes().length + ' | pad ' + Math.round(forcePad));
     visible.layout({
       name: 'fcose',
       animate: true,
       animationDuration: 450,
       randomize: true,
       fit: true,
-      padding: 60,
+      padding: forcePad,
       nodeSeparation: 75,
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
