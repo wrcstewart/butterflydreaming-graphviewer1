@@ -1644,8 +1644,13 @@ function runLayout(cy, parentNode = null) {
     // node is 120 x 34. That was wrong in both directions at once: a 0px gap
     // horizontally (the nodes touched) and 86px wasted vertically on every
     // row. Give each axis a cell matched to the node.
-    const cellW = 148, cellH = 62;          // 120 + 28, 34 + 28
-    const GAP_BELOW = 80, GAP_ABOVE = 80;   // cluster -> gateway / family blocks
+    // 2026-08-23 — cells and gaps tightened ~15%. These are shared by the
+    // optimiser below AND by the seeding code further down: if they ever
+    // disagree, the optimiser is choosing a shape for a layout that is not the
+    // one drawn, so keep them in one place.
+    const cellW = 136, cellH = 56;          // gateway 120 x 34, so 16 / 22 clear
+    const FAM_W = 112, FAM_H = 70;          // family   56 x 22, so 56 / 48 clear
+    const GAP_BELOW = 60, GAP_ABOVE = 60;   // cluster -> gateway / family blocks
 
     // Seed shape: aim for a SQUARE block, and cap by what the canvas can hold.
     //
@@ -1699,8 +1704,8 @@ function runLayout(cy, parentNode = null) {
       const gW = (gc - 1) * cellW + 120, gH = (gr - 1) * cellH + 34;
       for (let fc = 1; fc <= Math.max(1, famCount); fc++) {
         const fr = Math.ceil(famCount / fc) || 0;
-        const fW = famCount ? (fc - 1) * 130 + 56 : 0;
-        const fH = famCount ? (fr - 1) * 80 + 22 : 0;
+        const fW = famCount ? (fc - 1) * FAM_W + 56 : 0;
+        const fH = famCount ? (fr - 1) * FAM_H + 22 : 0;
         const totalW = Math.max(gW, fW, 70);
         const totalH = GAP_ABOVE + fH + 34 + GAP_BELOW + gH;
         const s = Math.max(totalW / availW, totalH / availH);
@@ -1795,7 +1800,7 @@ function runLayout(cy, parentNode = null) {
       // Wider than tall: ~1.6 aspect keeps the block from becoming a column,
       // which would fight the vertical space the gateway grid needs below.
       const fCols  = Math.max(1, Math.min(famCols, famNodes.length));
-      const fSepX  = 130, fSepY = 80;
+      const fSepX  = FAM_W, fSepY = FAM_H;
       const fBaseY = (titleNodes.length ? titleY : clusterY) - GAP_ABOVE;
       famNodes.forEach((n, i) => {
         const row  = Math.floor(i / fCols);
