@@ -19,7 +19,8 @@ Keep this current when adding a doc. One line is enough.
 |---|---|
 | ✔ **HowToRestore.md** | **Read first if memory is missing.** Explains the out-of-git memory directory, how it is mirrored here, and what else to read. |
 | **MEMORY_SNAPSHOT.md** | Mirror of the live memory directory, written by `sync_memory_snapshot.sh` via a Stop hook. **Auto-generated — never hand-edit;** edit the memory files and re-run the script. |
-| **DOCS_INDEX.md** | This file. |
+| **DOCS_INDEX.md** | This file — what every document *is*. |
+| **PLANNING_REGISTER.md** | What every *design* document proposes and **how far it is built**, evidence-based. Read this when deciding what to work on. |
 
 ---
 
@@ -85,10 +86,10 @@ architecture.
 | **chat_panel_handover_2026-06-28.md** | 06-28 | Superseded by `cards_spec.md` + `communications.md`. |
 | **websocketdevels.md** | 07-12 | The ws → Socket.IO migration. Historical, but still the reference for connection-state recovery and the grace-period purge. |
 | **bd_graph_schema_corrected.md** | 06-28 | Schema reference; self-declared verified and current. Predates several 2026-07/08 changes — cross-check against the live DB. |
-| **bot_context.md** | 06-24 | Self-declared "design, not yet built". |
+| **bot_context.md** | 06-24 | Bot-context authoring. Self-declares "not yet built", but the **rendering** side exists (`stripBotBlocks` and the curator-view fork). See `PLANNING_REGISTER.md`. |
 | **ButterflyDreamingColourDesignNotes.md** | 05-30 | Colour design. See also the `user-colour-vision` memory, which is the operative constraint. |
-| **summary.md** | 07-02 | Controls / panels / iframe relations. **Untracked** — see housekeeping. |
-| **convergence_node (3).md** | 06-28 | Paired-discussion convergence node, "design / exploration". **Untracked** — see housekeeping. |
+| **controls_panels_iframe_map.md** | 07-02 | Controls / panels / iframe relations. *Was `summary.md`, untracked, renamed and tracked 08-23.* |
+| **convergence_node.md** | 06-28 | Paired-discussion convergence node. **Design only — nothing built.** Nearest prior thinking to the imminent pair-agreed-edit work. *Was `convergence_node (3).md`, untracked until 08-23.* |
 
 ---
 
@@ -101,26 +102,26 @@ current behaviour.
 
 ---
 
-## Housekeeping — found 2026-08-23, not acted on
+## Housekeeping
 
-1. **`bd_graph_schema (2).md` is byte-identical to `bd_graph_schema_corrected.md`**
-   (verified with `diff`). A re-download. Untracked; safe to delete, but not
-   deleted without asking.
+**Done 2026-08-23:**
 
-2. **Three files are untracked and therefore unpushed:**
-   `bd_graph_schema (2).md`, `convergence_node (3).md`, `summary.md`.
-   The latter two have **no tracked counterpart**, so they exist only on this
-   machine. `convergence_node` in particular is design thinking that would be
-   lost with the disk.
+- `bd_graph_schema (2).md` deleted — byte-identical duplicate of
+  `bd_graph_schema_corrected.md`, verified with `diff`.
+- `convergence_node (3).md` → `convergence_node.md`, now tracked.
+- `summary.md` → `controls_panels_iframe_map.md`, now tracked. Renamed because
+  "summary" told a future reader nothing about its contents.
 
-3. **`backups/` is gitignored.** Anything written there is untracked — the
+**Still open:**
+
+1. **`backups/` is gitignored.** Anything written there is untracked — the
    scaling brief was, until it was moved to the root on 2026-08-23. Do not
    leave documents there.
 
-4. **The scaling brief's reference [5] cites "Handover v7"**, which does not
+2. **The scaling brief's reference [5] cites "Handover v7"**, which does not
    exist in this repo — v6 is the latest present. Either it lives elsewhere or
    the citation is wrong.
 
-5. **The `(2)` / `(3)` suffixes** are browser re-download artefacts. Where a
+3. **The `(2)` / `(3)` suffixes** are browser re-download artefacts. Where a
    tracked original exists, prefer it; where it does not, the file needs
    adding to git under a clean name.
