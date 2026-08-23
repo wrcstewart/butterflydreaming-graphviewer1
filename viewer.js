@@ -1875,7 +1875,14 @@ function runLayout(cy, parentNode = null) {
     // group rigidly preserves the arrangement fCoSE found — every relative
     // position within the cloud is untouched — where a per-node constraint
     // flattens or overlaps it.
-    layout.one('layoutstop', () => {
+    // TEMPORARY (2026-08-23): the fit below was never running — no layoutstop
+    // reached us in the browser, though it fires normally in isolation. Listen
+    // on BOTH the layout and cy, run at most once, and report which fired.
+    let fitDone = false;
+    const finish = (src) => {
+      if (fitDone) return;
+      fitDone = true;
+      console.log('[fit-debug] layoutstop via ' + src);
       try {
         const anchorY = parentNode.position().y;
         const shift = (coll, below) => {
@@ -1912,8 +1919,16 @@ function runLayout(cy, parentNode = null) {
           + ' | fills ' + Math.round(100 * bb.w * z / cy.width()) + '%x'
           + Math.round(100 * bb.h * z / cy.height()) + '%');
       } catch (err) { console.warn('[BD] side-shift failed', err); }
-    });
+    };
+    layout.one('layoutstop', () => finish('layout'));
+    cy.one('layoutstop',     () => finish('cy'));
+    console.log('[fit-debug] calling layout.run()');
     layout.run();
+    console.log('[fit-debug] layout.run() returned');
+    // Backstop: if neither event arrives, do the fit on a timer anyway. Without
+    // it the view is framed by fCoSE's own fit:true at padding 60, which is the
+    // padding the fitPadding change was meant to replace.
+    setTimeout(() => finish('timer'), 700);
 
     // No separateCoincidentNodes and no cy.fit here any more. Every node in
     // this view is now either pinned or seeded, so nothing arrives coincident;
