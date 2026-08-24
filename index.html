@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=298">
+  <link rel="stylesheet" href="style.css?v=299">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -56,6 +56,12 @@
          accept. Also usable as a self-marker for "still reviewing this". -->
     <button id="sr-wrap-btn"   type="button" disabled title="Wrap the selected text in {?…} to mark it tentative — works in any editable card, Current or History">{?}</button>
     <button id="sr-accept-btn" type="button" title="Strip {?…} tentative markers from the top card (em-dashes inside insertions survive as asides)">{?✓}</button>
+    <!-- 2026-08-24 — Explore sessions (editing_spec.md). Enabled only in the
+         Snap: both users on the same node. Label states are Explore ->
+         Cancel (offer out) -> Leave (session live); the label always says
+         what a press DOES, never the state, matching the pairing button's
+         Join/Leave. Colour is a second channel, never the only one. -->
+    <button id="explore-btn" type="button" disabled title="Both of you are on this node — offer to work on it together">Explore</button>
     <button id="chat-send-btn" type="button" disabled>Send</button>
     <!-- 2026-07-25: sole entry point to create a Local card (no auto-Local
          at boot). Label reads "New / Edit" — press creates a Local at top
@@ -217,6 +223,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=619"></script>
+  <script type="module" src="viewer.js?v=620"></script>
 </body>
 </html>

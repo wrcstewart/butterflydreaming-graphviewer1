@@ -2055,6 +2055,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let bnNodeId  = null;   // node carrying the partner's mark
   let bnOuter   = null;   // 'blue' | 'white' — which ring is OUTER when both coincide
   let bnGone    = false;  // partner left: dim, do not remove (§2)
+  // --- Explore sessions (editing_spec.md) --------------------------------
+  // 'none' | 'offered' (we asked) | 'invited' (they asked) | 'active'
+  let exploreState  = 'none';
+  let exploreNodeId = null;   // the node the session is anchored to
+  let explorePartnerGone = false;   // partner left the session: dim, do not remove (§6)
+  let snapNodeId    = null;   // node currently carrying BOTH marks, or null
   // Did WE reveal this node, or was it already part of the user's view? Only a
   // node we revealed may be hidden again when the BN moves on — hiding one the
   // user had navigated to would delete part of their own view.
@@ -2224,6 +2230,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const together = !!(centralNode && bn && centralNode.length && bn.length &&
                         centralNode.id() === bn.id());
 
+    // §2 — the Snap IS the trigger for Explore, and it is already computed
+    // here as an emergent property of two independent marks. Publishing it
+    // rather than recomputing keeps one definition of "we are both here", and
+    // it decomposes by itself the moment either user navigates away.
+    const prevSnap = snapNodeId;
+    snapNodeId = together ? bn.id() : null;
+    if (prevSnap !== snapNodeId) refreshExploreBtn();
+
     if (centralNode && centralNode.length && !together) {
       // border-position MUST be set here, not left to the default. .style() is
       // inline and persists, so a node that has been through the Snap below
@@ -2279,6 +2293,37 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       });
     }
     if (bn && bn.length) applyBlueFill(bn);
+  }
+
+  // §3 — the button says what a press DOES, never the state. Disabled unless
+  // there is something a press could achieve.
+  function refreshExploreBtn() {
+    const btn = document.getElementById('explore-btn');
+    if (!btn) return;
+    const paired = !!(pairingState && pairingState.active);
+    let label = 'Explore', title = 'Both of you are on this node — offer to work on it together';
+    let enabled = false;
+
+    if (!paired) {
+      title = 'Pair with someone first';
+    } else if (exploreState === 'active') {
+      label = 'Leave'; enabled = true;
+      title = 'Leave this shared exploration — your partner keeps theirs';
+    } else if (exploreState === 'offered') {
+      label = 'Cancel'; enabled = true;
+      title = 'Withdraw your offer to explore this node together';
+    } else if (exploreState === 'invited') {
+      label = 'Accept'; enabled = true;
+      title = 'Your partner has offered to work on this node together';
+    } else {
+      enabled = !!snapNodeId;
+      if (!enabled) title = 'Available when you are both on the same node';
+    }
+
+    btn.textContent = label;
+    btn.disabled    = !enabled;
+    btn.title       = title;
+    btn.dataset.state = exploreState;   // CSS hook for colour + flashing
   }
 
   // Show the partner's arrival as a node on OUR graph (§1, §2, §3, §4).
@@ -5093,7 +5138,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { refreshExploreBtn, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -6215,6 +6260,7 @@ async function init() {
       // screens disagreed about whether it existed.
       buddyCy.nodes().addClass('buddy-gone');
       try { markBuddyGone(); } catch (err) { console.warn('[BN] markBuddyGone failed', err); }
+      try { refreshExploreBtn(); } catch (_) {}
       const pairStatusEl = document.getElementById('pair-status');
       if (pairStatusEl) pairStatusEl.textContent = '';
       updateJoinButtonLabel();
@@ -6904,7 +6950,8 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { refreshExploreBtn, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  try { refreshExploreBtn(); } catch (_) {}   // set the Explore button's resting state
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
@@ -7522,6 +7569,7 @@ async function init() {
       resetBuddyBar();
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
+      try { refreshExploreBtn(); } catch (_) {}
       pairingState.waiting = false;
       updateJoinButtonLabel();
       updateSendBtn();
@@ -7533,6 +7581,7 @@ async function init() {
       // a new partner.
       pairingState.active = false;
       pairingState.waiting = false;
+      try { refreshExploreBtn(); } catch (_) {}
       buddyCy.nodes().addClass('buddy-gone');
       // 2026-08-20 — the enlarged copy dims with the trail it mirrors rather
       // than vanishing; where they got to still matters after they leave.
