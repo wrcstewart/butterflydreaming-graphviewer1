@@ -2675,6 +2675,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
   }
 
+  // 2026-08-24 — re-park after EVERY layout completes.
+  //
+  // scheduleBlueReassert parks on the next animation frame, but a navigation
+  // then runs a layout, and the fCoSE branches animate for ~450ms afterwards
+  // and reposition whatever they are given. So the layout won the race and the
+  // mark landed wherever the simulation put it — reported as the green node
+  // drawing north-east instead of top-left whenever its node happened to be
+  // part of the view.
+  //
+  // layoutstop is the honest moment: positions are final and nothing else is
+  // going to move them. Parking a node emits no layout, so this cannot recurse.
+  cy.on('layoutstop', () => {
+    try {
+      reassertBlueNode();
+      reassertGreenNode();
+      renderMarks();
+    } catch (err) { console.warn('[marks] re-park after layout failed', err); }
+  });
+
   // One place that makes the screen agree with exploreState.
   function applyExploreVisuals() {
     if (exploreState === 'active') reassertGreenNode();
