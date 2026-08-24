@@ -1251,6 +1251,35 @@ io.on('connection', async (socket) => {
         }
         return;
       }
+      // ── Explore sessions (2026-08-24, editing_spec.md) ─────────────────
+      // Pure relay between paired users; the clients hold the state. The
+      // server's job here is the two things only it can know: that the pair
+      // exists, and that the partner is actually THERE. iOS discards
+      // backgrounded tabs routinely, so an offer must be refusable up front
+      // rather than flashed at nobody (spec §10).
+      //
+      // Only the node url is forwarded — never the sender's payload — so this
+      // cannot become an arbitrary message channel.
+      if (msg.type === 'explore_offer'  || msg.type === 'explore_accept' ||
+          msg.type === 'explore_cancel' || msg.type === 'explore_leave') {
+        if (!socket.data.userId) return;
+        const buddyId = pairedWith.get(socket.data.userId);
+        if (!buddyId) {
+          socket.emit('msg', { type: 'explore_denied', reason: 'not_paired' });
+          return;
+        }
+        const buddy = sessions.get(buddyId);
+        if (!buddy || !buddy.connected) {
+          socket.emit('msg', { type: 'explore_denied', reason: 'partner_offline' });
+          return;
+        }
+        buddy.emit('msg', {
+          type: msg.type,
+          url: typeof msg.url === 'string' ? msg.url : null,
+        });
+        console.log(`[BD] ${msg.type}: ${socket.data.userId} -> ${buddyId}`);
+        return;
+      }
       if (msg.type === 'buddy_card') {
         // Outbound from client (Send button). communications.md §6.2/§6.4.
         // No persistence — pure pass-through with a delivery ack on success.

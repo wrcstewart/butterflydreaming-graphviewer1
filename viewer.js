@@ -2236,7 +2236,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // it decomposes by itself the moment either user navigates away.
     const prevSnap = snapNodeId;
     snapNodeId = together ? bn.id() : null;
-    if (prevSnap !== snapNodeId) refreshExploreBtn();
+    if (prevSnap !== snapNodeId) {
+      // §10 — an OFFER's whole premise is "we are both here", so it lapses the
+      // moment that stops being true, and says so rather than going quiet. An
+      // ACTIVE session must survive this: wandering apart is the point of it.
+      if (!snapNodeId && (exploreState === 'offered' || exploreState === 'invited')) {
+        sendExplore('explore_cancel');
+        exploreState = 'none';
+        exploreNodeId = null;
+        prependSystemCard('The invitation lapsed — you are no longer on the same node.');
+      }
+      refreshExploreBtn();
+    }
 
     if (centralNode && centralNode.length && !together) {
       // border-position MUST be set here, not left to the default. .style() is
@@ -2295,6 +2306,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (bn && bn.length) applyBlueFill(bn);
   }
 
+  // One control, four meanings — see refreshExploreBtn for the labels.
+  {
+    const eb = document.getElementById('explore-btn');
+    if (eb) eb.addEventListener('click', () => {
+      if (exploreState === 'none') {
+        if (!snapNodeId) return;
+        exploreNodeId = snapNodeId;
+        if (sendExplore('explore_offer', snapNodeId)) exploreState = 'offered';
+      } else if (exploreState === 'offered') {
+        sendExplore('explore_cancel');
+        exploreState = 'none'; exploreNodeId = null;
+      } else if (exploreState === 'invited') {
+        sendExplore('explore_accept');
+        exploreState = 'active';
+      } else if (exploreState === 'active') {
+        // §6 — unilateral, and it drops OUR participation only.
+        sendExplore('explore_leave');
+        exploreState = 'none'; exploreNodeId = null; explorePartnerGone = false;
+      }
+      refreshExploreBtn();
+    });
+  }
+
   // §3 — the button says what a press DOES, never the state. Disabled unless
   // there is something a press could achieve.
   function refreshExploreBtn() {
@@ -2324,6 +2358,50 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     btn.disabled    = !enabled;
     btn.title       = title;
     btn.dataset.state = exploreState;   // CSS hook for colour + flashing
+  }
+
+  function sendExplore(type, url) {
+    const ws = wsRef.current;
+    if (!ws || !ws.connected) return false;
+    ws.emit('msg', { type, url: url || null });
+    return true;
+  }
+
+  // Incoming explore traffic. Exposed to init(), which owns the message
+  // dispatch — the state it mutates lives in THIS scope, so it must be called
+  // rather than assigned across the boundary.
+  function handleExploreMsg(msg) {
+    switch (msg.type) {
+      case 'explore_offer':
+        // Only meaningful while we are still together on the node they named.
+        exploreState  = 'invited';
+        exploreNodeId = msg.url || snapNodeId;
+        explorePartnerGone = false;
+        break;
+      case 'explore_accept':
+        exploreState = 'active';
+        explorePartnerGone = false;
+        break;
+      case 'explore_cancel':
+        exploreState = 'none';
+        exploreNodeId = null;
+        break;
+      case 'explore_leave':
+        // §6 — they left, we did not. Our anchor stays; it dims, exactly as
+        // the Blue Node dims rather than vanishing. Nothing is taken from us.
+        explorePartnerGone = true;
+        prependSystemCard('Your partner has left the shared exploration. Your green mark stays until you leave too.');
+        break;
+      case 'explore_denied':
+        exploreState  = 'none';
+        exploreNodeId = null;
+        prependSystemCard(msg.reason === 'partner_offline'
+          ? 'Your partner is not connected just now, so the invitation was not sent.'
+          : 'That invitation could not be sent.');
+        break;
+      default: return;
+    }
+    refreshExploreBtn();
   }
 
   // Show the partner's arrival as a node on OUR graph (§1, §2, §3, §4).
@@ -5138,7 +5216,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { refreshExploreBtn, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -6950,7 +7028,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { refreshExploreBtn, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
   try { refreshExploreBtn(); } catch (_) {}   // set the Explore button's resting state
 
   // 2026-08-16 — Breadcrumb persistence triggers.
@@ -7573,6 +7651,10 @@ async function init() {
       pairingState.waiting = false;
       updateJoinButtonLabel();
       updateSendBtn();
+    } else if (msg.type === 'explore_offer'  || msg.type === 'explore_accept' ||
+               msg.type === 'explore_cancel' || msg.type === 'explore_leave'  ||
+               msg.type === 'explore_denied') {
+      try { handleExploreMsg(msg); } catch (err) { console.warn('[explore] handler failed', err); }
     } else if (msg.type === 'buddy_disconnected') {
       console.log('[pair-debug] ← buddy_disconnected received');
       // Partner left (either their WS closed or they pressed Leave). Under
