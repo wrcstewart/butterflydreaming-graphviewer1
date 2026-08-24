@@ -2565,12 +2565,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Same treatment as the Blue Node: reveal it rather than lose the anchor,
   // and remember that WE revealed it so it can be put back.
   function placeGreenNode(node) {
-    if (node.visible()) { gnWasRevealed = false; return; }
-    sizeBlueNodeToView(node);
-    node.position(markCorner(node, 'green'));
-    node.style('opacity', BN_REVEAL_OPACITY);
-    node.show();
-    gnWasRevealed = true;
+    gnWasRevealed = parkMark(node, 'green') || gnWasRevealed;
   }
 
   function greenNodeEl() {
@@ -2586,8 +2581,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function reassertGreenNode() {
     const node = greenNodeEl();
     if (!node) return;
-    if (node.visible()) { gnWasRevealed = false; node.removeStyle('opacity'); }
-    else placeGreenNode(node);
+    if (lastReadNodeId === exploreNodeId && lastReadNodeCy === cy) {
+      gnWasRevealed = false; node.removeStyle('opacity');   // you are on it
+    } else placeGreenNode(node);
   }
 
   function clearGreenVisuals() {
@@ -2602,13 +2598,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // §3 — bottom-right of the current view. If the node is already on screen it
   // is left exactly where it is: moving a node the user is looking at would be
   // worse than not hinting at all.
-  function placeBlueNode(node) {
-    if (node.visible()) { bnWasRevealed = false; return; }
+  // 2026-08-24 — ALWAYS park a mark at its own corner: blue bottom-right, green
+  // top-left. Previously a marked node was only moved when it was NOT part of
+  // the current view; when it happened to be a visible neighbour it sat
+  // wherever the layout put it, so the marks wandered and the user had to hunt
+  // for them. A fixed seat means you always know where to look.
+  //
+  // Returns true if the node had to be REVEALED (it was hidden), which is what
+  // decides whether teardown should hide it again. Moving a node that was
+  // already on screen is not something to undo.
+  function parkMark(node, which) {
+    const wasHidden = !node.visible();
     sizeBlueNodeToView(node);          // size FIRST — the corner inset depends on it
-    node.position(blueNodeCorner(node));
+    node.position(markCorner(node, which));
     node.style('opacity', BN_REVEAL_OPACITY);
-    node.show();
-    bnWasRevealed = true;
+    if (wasHidden) node.show();
+    return wasHidden;
+  }
+
+  function placeBlueNode(node) {
+    bnWasRevealed = parkMark(node, 'blue') || bnWasRevealed;
   }
 
   // ALWAYS the bottom-right corner, never a searched-for gap. A node that
@@ -2677,8 +2686,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const node = cy.getElementById(bnNodeId);
     if (!node.length) { bnNodeId = null; return; }
     if (bnViewSuppressed()) { hideBlueVisualsForView(); return; }
-    if (node.visible()) { bnWasRevealed = false; node.removeStyle('opacity'); }
-    else placeBlueNode(node);
+    // The exception to parking: if this is the node you are standing on, it
+    // belongs in the middle. You do not need a corner to find what is already
+    // in front of you.
+    if (lastReadNodeId === bnNodeId && lastReadNodeCy === cy) {
+      bnWasRevealed = false; node.removeStyle('opacity');
+    } else placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
   }
