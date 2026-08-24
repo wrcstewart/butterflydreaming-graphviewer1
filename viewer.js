@@ -2106,10 +2106,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!bnNodeId) return;
     const n = cy.getElementById(bnNodeId);
     if (!n.length) return;
-    clearMarksFrom(n);
-    const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
-    n.removeStyle('opacity');        // unconditional: it may survive on screen
-    if (bnWasRevealed && !isLocalCentral) { n.removeStyle(BN_SIZE_KEYS); n.hide(); }
+    if (isExploreAnchor(bnNodeId)) {
+      // Green is NOT suppressed at the top-level views (§10) — it is the way
+      // back. So leave the node alone and let renderMarks repaint it green.
+      gnWasRevealed = gnWasRevealed || bnWasRevealed;
+    } else {
+      clearMarksFrom(n);
+      const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+      n.removeStyle('opacity');      // unconditional: it may survive on screen
+      if (bnWasRevealed && !isLocalCentral) { n.removeStyle(BN_SIZE_KEYS); n.hide(); }
+    }
     bnWasRevealed = false;
     renderMarks();          // restore the local white mark clearMarksFrom stripped
   }
@@ -2494,15 +2500,34 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   // Undo everything showBlueNode did to the previous node.
+  // True when the node the Blue Node is leaving is ALSO the agreed node. Then
+  // it is not ours to strip or hide — the green anchor owns it now.
+  function isExploreAnchor(id) {
+    return exploreState === 'active' && !!exploreNodeId && exploreNodeId === id;
+  }
+
   function retireBlueNode() {
     if (!bnNodeId) return;
     const prev = cy.getElementById(bnNodeId);
     if (prev.length) {
-      clearMarksFrom(prev);
       clearBlueEdges();
-      const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
-      prev.removeStyle('opacity');   // unconditional: it may survive on screen
-      if (bnWasRevealed && !isLocalCentral) { prev.removeStyle(BN_SIZE_KEYS); prev.hide(); }
+      if (isExploreAnchor(bnNodeId)) {
+        // 2026-08-24 — the partner has moved off the node you both agreed on.
+        // Retiring the Blue Node used to clear that node's marks and hide it,
+        // which took the GREEN anchor with it: A navigating away made B's green
+        // mark disappear. The reveal transfers to green rather than being undone,
+        // so whoever revealed it, green is now responsible for putting it back.
+        gnWasRevealed = gnWasRevealed || bnWasRevealed;
+        // If it was PARKED, it is sitting in the Blue Node's bottom-right
+        // corner — where the partner's new position is about to be drawn.
+        // Move it to green's own corner so the two never overlap.
+        if (gnWasRevealed) prev.position(markCorner(prev, 'green'));
+      } else {
+        clearMarksFrom(prev);
+        const isLocalCentral = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+        prev.removeStyle('opacity');   // unconditional: it may survive on screen
+        if (bnWasRevealed && !isLocalCentral) { prev.removeStyle(BN_SIZE_KEYS); prev.hide(); }
+      }
     }
     bnNodeId = null; bnOuter = null; bnWasRevealed = false;
   }
