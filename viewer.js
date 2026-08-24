@@ -2116,6 +2116,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   const MARK_WHITE = '#ffffff';
   const MARK_BLUE  = '#4a9bff';
+  // §5 — the agreed node's ring. Chosen for luminance separation from both
+  // white and blue, not just hue ([[user-colour-vision]]).
+  const MARK_GREEN = '#3ddc84';
+  let   gnWasRevealed = false;
 
   function clearMarksFrom(node) {
     if (!node || !node.length) return;
@@ -2249,7 +2253,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       refreshExploreBtn();
     }
 
-    if (centralNode && centralNode.length && !together) {
+    // §5 — the agreed node wears ONE green ring, and it replaces whatever else
+    // would have been drawn there. Two rings mean "two independent marks that
+    // happen to coincide"; one means "a shared commitment", and the difference
+    // reads without a legend.
+    const green   = greenNodeEl();
+    const greenId = green ? green.id() : null;
+    const isGreen = n => !!(n && n.length && greenId && n.id() === greenId);
+
+    if (green) {
+      // border-width 0 for the same reason as the solo blue ring: a Cluster's
+      // own darkened border would otherwise draw over the ring's inner pixels.
+      green.style({
+        'border-width': 0,
+        'outline-width': 6,
+        'outline-color': MARK_GREEN,
+        // §6 — partner left, we did not. Dim, never remove: the anchor is
+        // still ours and still tappable.
+        'outline-opacity': explorePartnerGone ? 0.3 : 0.85,
+        'outline-offset': 0,
+      });
+    }
+
+    if (centralNode && centralNode.length && !together && !isGreen(centralNode)) {
       // border-position MUST be set here, not left to the default. .style() is
       // inline and persists, so a node that has been through the Snap below
       // carries that branch's value until something overwrites it — which is
@@ -2261,7 +2287,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                           'border-color': MARK_WHITE, 'border-opacity': 1,
                           'outline-width': 0 });
     }
-    if (bn && bn.length && !together) {
+    if (bn && bn.length && !together && !isGreen(bn)) {
       // outline-offset 0: the ring sits flush against the node body. Any gap
       // shows canvas black between node and ring, which reads as a third
       // colour rather than as one mark.
@@ -2275,7 +2301,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                  'outline-width': 6, 'outline-color': MARK_BLUE,
                  'outline-opacity': bnGone ? 0.18 : 0.4, 'outline-offset': 0 });
     }
-    if (together) {
+    if (together && !isGreen(bn)) {
       // Both marks on one node — the "Snap". The two rings must touch: a gap
       // puts canvas black between them, so the eye reads three bands rather
       // than two marks. The border band runs [0,4] beyond the body when
@@ -2320,10 +2346,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       } else if (exploreState === 'invited') {
         sendExplore('explore_accept');
         exploreState = 'active';
+        applyExploreVisuals();
       } else if (exploreState === 'active') {
         // §6 — unilateral, and it drops OUR participation only.
         sendExplore('explore_leave');
+        clearGreenVisuals();
         exploreState = 'none'; exploreNodeId = null; explorePartnerGone = false;
+        renderMarks();
       }
       refreshExploreBtn();
     });
@@ -2381,18 +2410,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       case 'explore_accept':
         exploreState = 'active';
         explorePartnerGone = false;
+        applyExploreVisuals();
         break;
       case 'explore_cancel':
+        clearGreenVisuals();          // BEFORE the id is dropped — it needs it
         exploreState = 'none';
         exploreNodeId = null;
+        renderMarks();
         break;
       case 'explore_leave':
         // §6 — they left, we did not. Our anchor stays; it dims, exactly as
         // the Blue Node dims rather than vanishing. Nothing is taken from us.
         explorePartnerGone = true;
+        renderMarks();                // §6 — dims, never removes
         prependSystemCard('Your partner has left the shared exploration. Your green mark stays until you leave too.');
         break;
       case 'explore_denied':
+        clearGreenVisuals();
         exploreState  = 'none';
         exploreNodeId = null;
         prependSystemCard(msg.reason === 'partner_offline'
@@ -2502,6 +2536,44 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
   }
 
+  // The agreed node, parked top-left when it is not part of the current view.
+  // Same treatment as the Blue Node: reveal it rather than lose the anchor,
+  // and remember that WE revealed it so it can be put back.
+  function placeGreenNode(node) {
+    if (node.visible()) { gnWasRevealed = false; return; }
+    sizeBlueNodeToView(node);
+    node.position(markCorner(node, 'green'));
+    node.style('opacity', BN_REVEAL_OPACITY);
+    node.show();
+    gnWasRevealed = true;
+  }
+
+  function greenNodeEl() {
+    if (exploreState !== 'active' || !exploreNodeId) return null;
+    const n = cy.getElementById(exploreNodeId);
+    return n && n.length ? n : null;
+  }
+
+  // §10 — the green mark is an ANCHOR, not information: it is how the user
+  // gets back. Unlike the Blue Node it is NOT suppressed at the top-level
+  // views, because that would remove the way home exactly when someone is
+  // deepest in the graph.
+  function reassertGreenNode() {
+    const node = greenNodeEl();
+    if (!node) return;
+    if (node.visible()) { gnWasRevealed = false; node.removeStyle('opacity'); }
+    else placeGreenNode(node);
+  }
+
+  function clearGreenVisuals() {
+    if (!exploreNodeId) return;
+    const n = cy.getElementById(exploreNodeId);
+    if (!n || !n.length) return;
+    clearMarksFrom(n);
+    if (gnWasRevealed) { n.removeStyle(BN_SIZE_KEYS + ' opacity'); n.hide(); }
+    gnWasRevealed = false;
+  }
+
   // §3 — bottom-right of the current view. If the node is already on screen it
   // is left exactly where it is: moving a node the user is looking at would be
   // worse than not hinting at all.
@@ -2530,13 +2602,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Model coordinates — cy.extent(), width() and height() are all model space,
   // unlike renderedBoundingBox(). Mixing those is a silent zoom-dependent bug;
   // it is the trap that displaced the n_r badge.
-  function blueNodeCorner(node) {
+  function markCorner(node, which) {
     const ext = cy.extent();
-    return {
-      x: ext.x2 - ((node.width()  || 40) / 2 + 14),
-      y: ext.y2 - ((node.height() || 30) / 2 + 14),
-    };
+    const halfW = (node.width()  || 40) / 2 + 14;
+    const halfH = (node.height() || 30) / 2 + 14;
+    return which === 'green'
+      ? { x: ext.x1 + halfW, y: ext.y1 + halfH }    // top-left
+      : { x: ext.x2 - halfW, y: ext.y2 - halfH };   // bottom-right
   }
+  function blueNodeCorner(node) { return markCorner(node, 'blue'); }
 
   // §4 — thin blue edges to nodes ALREADY on screen. The edges already exist in
   // cy, so this is a class change, not a graph change. Edges to nodes that are
@@ -2551,10 +2625,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // A single rAF puts it after that synchronous work. The pending flag makes
   // repeated calls in one frame collapse to one.
   let blueReassertPending = false;
+  // Re-asserts BOTH marks after a view change. It used to bail when there was
+  // no Blue Node, which would have left the green anchor behind on every
+  // navigation — the one thing it must survive.
   function scheduleBlueReassert() {
-    if (!bnNodeId || blueReassertPending) return;
+    if (blueReassertPending) return;
+    const wantGreen = (exploreState === 'active' && exploreNodeId);
+    if (!bnNodeId && !wantGreen) return;
     blueReassertPending = true;
-    requestAnimationFrame(() => { blueReassertPending = false; reassertBlueNode(); });
+    requestAnimationFrame(() => {
+      blueReassertPending = false;
+      reassertBlueNode();
+      reassertGreenNode();
+      renderMarks();
+    });
+  }
+
+  // One place that makes the screen agree with exploreState.
+  function applyExploreVisuals() {
+    if (exploreState === 'active') reassertGreenNode();
+    renderMarks();
   }
 
   function reassertBlueNode() {
