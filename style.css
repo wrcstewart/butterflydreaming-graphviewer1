@@ -199,7 +199,7 @@ html, body {
   /* 2026-07-28 — brightened from #5a5000 to #7f6d00 so the strip is
      visibly present AND so `.hi-bread` highlight text can match it
      exactly whilst staying readable on the recessed panel bg. */
-  background: #7f6d00;                  /* mustard — matches local card head + .hi-bread text */
+  background: #FFD700;                  /* 2026-08-25 brightened from #7f6d00 — matches local card head, .hi-bread and the selected-node mark */
   cursor: url('cursor-wings.svg') 16 16, auto;
   z-index: 5;
 }
@@ -485,7 +485,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
    throughout — body backgrounds are very dark so the head reads as a
    distinct stripe. Local takes the brighter yellow (user's compose
    area should stand out); system fades back to the dimmer green. */
-.card.local    .card-head { background: #7f6d00; }   /* mustard, matches #cy-you breadcrumb + .hi-bread */
+.card.local    .card-head { background: #FFD700; color: #1a1a20; }   /* 2026-08-25 brightened from #7f6d00; dark text because white is unreadable on gold */
 .card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
 /* 2026-07-16 — system card head now uses the Root-node fill colour
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
@@ -574,10 +574,10 @@ body:not(.edit-active):not(.player-active) #action-bar {
   font-weight: 600;
 }
 .hi-bread {
-  /* Exact match with #cy-you and .card.local .card-head (all #7f6d00)
+  /* Exact match with #cy-you and .card.local .card-head (all #FFD700)
      so the reader sees the same colour on the sentence and on the
      local breadcrumb strip / local card headers. */
-  color: #7f6d00;
+  color: #FFD700;
   font-weight: 700;
 }
 
@@ -861,7 +861,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
