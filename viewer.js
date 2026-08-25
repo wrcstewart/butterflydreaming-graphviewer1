@@ -83,6 +83,15 @@ const FAMILY_COLOURS = {
   Arts:     '#C47A5A',
 };
 
+// 2026-08-25 — the local mark colour lives at MODULE scope because buildStyle
+// needs it too: the reading-spine arrow and the successor's outline are the
+// same signal as the selection ring and must not drift from it.
+const MARK_LOCAL     = '#8d7900';   // the node you have selected
+// 25% dimmer, by uniform RGB scaling — which preserves hue exactly, so the
+// successor reads as the same signal one step quieter rather than as a
+// different colour.
+const MARK_SUCCESSOR = '#6a5b00';
+
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
   CONTAINS:      '#444444',
@@ -1175,8 +1184,8 @@ function buildStyle() {
       // the CHILD rule so it wins.
       selector: 'edge.seq-edge',
       style: {
-        'line-color': '#e0a020',
-        'target-arrow-color': '#e0a020',
+        'line-color': MARK_LOCAL,
+        'target-arrow-color': MARK_LOCAL,
         'target-arrow-shape': 'triangle',
         'arrow-scale': 1.2,          // ~2x the softened 0.6 TextNode-CHILD arrow
         'width': 2.5,                // thicker than the ~0.6 default hop
@@ -1191,7 +1200,7 @@ function buildStyle() {
       selector: 'node.seq-successor',
       style: {
         'border-width': 4,
-        'border-color': '#e0a020',
+        'border-color': MARK_SUCCESSOR,
         'border-opacity': 1,
       }
     },
@@ -2142,26 +2151,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Named for its ROLE rather than its colour, because "MARK_WHITE = amber"
   // is exactly the sort of stale name that misleads a future reader.
   //
-  // 2026-08-25 — #8d7900, the midpoint between the breadcrumb strip (#5a5000)
-  // and the previous ring (#bfa100). 4.0:1 against the canvas, still enough for
-  // a thin ring.
-  //
-  // The STRIP was deliberately NOT moved to meet it. Measured across the chip
-  // palette, this midpoint is the worst place a backdrop can sit: 7 of 10 chips
-  // fall under 1.5:1 against it, and Reason lands at 1.00:1 — exactly the
-  // unreadable-breadcrumbs problem #5a5000 was chosen to fix. The strip and the
-  // ring want opposite things and cannot meet in the middle while the chips
-  // have no outline of their own.
-  //
-  // Note it sits at only 1.4:1 luminance from the agreed-node green. That is
-  // tolerable ONLY because the two never share a node — green replaces the
-  // local mark outright, so they are always compared across the screen, where
-  // position disambiguates them. If that ever changes, this needs revisiting.
-  //
-  // Never the root's outer RING (#90EE90) — it is green, and sits at 1.3:1
-  // against the agreed-node green, so local and agreed would separate by hue
-  // alone.
-  const MARK_LOCAL = '#8d7900';
+// MARK_LOCAL / MARK_SUCCESSOR are declared at module scope — see there.
   const MARK_BLUE  = '#4a9bff';
   // §5 — the agreed node's ring. Chosen for luminance separation from both
   // white and blue, not just hue ([[user-colour-vision]]).
