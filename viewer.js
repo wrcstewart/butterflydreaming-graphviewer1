@@ -2128,16 +2128,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Named for its ROLE rather than its colour, because "MARK_WHITE = amber"
   // is exactly the sort of stale name that misleads a future reader.
   //
-  // 2026-08-25 — #FFD700. The whole local family moved UP to this brightness
-  // rather than the mark moving down to the strip's: #cy-you, .card.local
-  // .card-head and .hi-bread all changed with it, so the mark still matches
-  // the breadcrumbs exactly — which was the point — but at a luminance a thin
-  // ring can carry (12.3:1 against the canvas, where the old #7f6d00 gave 3.4).
+  // 2026-08-25 — #bfa100, a 25% cut from #FFD700. Still 6.9:1 against the
+  // canvas, so it carries as a thin ring, but a step down toward the dark-gold
+  // breadcrumb strip it belongs with.
+  //
+  // Note it sits at only 1.4:1 luminance from the agreed-node green. That is
+  // tolerable ONLY because the two never share a node — green replaces the
+  // local mark outright, so they are always compared across the screen, where
+  // position disambiguates them. If that ever changes, this needs revisiting.
   //
   // Never the root's outer RING (#90EE90) — it is green, and sits at 1.3:1
   // against the agreed-node green, so local and agreed would separate by hue
   // alone.
-  const MARK_LOCAL = '#FFD700';
+  const MARK_LOCAL = '#bfa100';
   const MARK_BLUE  = '#4a9bff';
   // §5 — the agreed node's ring. Chosen for luminance separation from both
   // white and blue, not just hue ([[user-colour-vision]]).
