@@ -2996,6 +2996,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
   }
 
+  // 2026-08-25 — every chip sits at model y = 11, which is the centre of the
+  // 23px bar ONLY at zoom 1. Screen y is model_y * zoom + pan_y, so at zoom 2
+  // the chips render at 22px and at zoom 3 at 33px — off the bottom of the bar
+  // entirely. The bars are zoomable, which is the whole point of them being
+  // cytoscape instances, so the pan has to carry the correction.
+  const BAR_CHIP_Y = 11;
+  function barPanY(barCy, containerId) {
+    const el = document.getElementById(containerId);
+    const h  = (el && el.offsetHeight) || 23;
+    return h / 2 - BAR_CHIP_Y * barCy.zoom();
+  }
+  // Re-centre on every zoom, leaving the horizontal pan as the user left it.
+  // pan() emits no zoom event, so this cannot recurse.
+  youCy.on('zoom',   () => youCy.pan({   x: youCy.pan().x,   y: barPanY(youCy,   'cy-you')   }));
+  buddyCy.on('zoom', () => buddyCy.pan({ x: buddyCy.pan().x, y: barPanY(buddyCy, 'cy-buddy') }));
+
   function panYouCyToLatest() {
     if (youChipCount === 0) return;
     youCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
@@ -3008,7 +3024,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // hangs from the right: newest always in the same place, older ones running
     // off to the left — which is also where the enlarged copy now sits.
     const panX = containerWidth - rightEdge - 12;
-    youCy.pan({ x: panX, y: 0 });
+    youCy.pan({ x: panX, y: barPanY(youCy, 'cy-you') });
   }
 
   window.addEventListener('resize', panYouCyToLatest);
@@ -3139,7 +3155,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // hangs from the right: newest always in the same place, older ones running
     // off to the left — which is also where the enlarged copy now sits.
     const panX = containerWidth - rightEdge - 12;
-    buddyCy.pan({ x: panX, y: 0 });
+    buddyCy.pan({ x: panX, y: barPanY(buddyCy, 'cy-buddy') });
   }
 
   function resetBuddyBar() {
@@ -3152,7 +3168,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     buddyChipX          = 0;
     lastBuddyChipId     = null;
     lastBuddySourceText = null;
-    buddyCy.pan({ x: 0, y: 0 });
+    buddyCy.pan({ x: 0, y: barPanY(buddyCy, 'cy-buddy') });
   }
 
   window.addEventListener('resize', panBuddyCyToLatest);
