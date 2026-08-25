@@ -2128,9 +2128,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Named for its ROLE rather than its colour, because "MARK_WHITE = amber"
   // is exactly the sort of stale name that misleads a future reader.
   //
-  // 2026-08-25 — #bfa100, a 25% cut from #FFD700. Still 6.9:1 against the
-  // canvas, so it carries as a thin ring, but a step down toward the dark-gold
-  // breadcrumb strip it belongs with.
+  // 2026-08-25 — #8d7900, the midpoint between the breadcrumb strip (#5a5000)
+  // and the previous ring (#bfa100). 4.0:1 against the canvas, still enough for
+  // a thin ring.
+  //
+  // The STRIP was deliberately NOT moved to meet it. Measured across the chip
+  // palette, this midpoint is the worst place a backdrop can sit: 7 of 10 chips
+  // fall under 1.5:1 against it, and Reason lands at 1.00:1 — exactly the
+  // unreadable-breadcrumbs problem #5a5000 was chosen to fix. The strip and the
+  // ring want opposite things and cannot meet in the middle while the chips
+  // have no outline of their own.
   //
   // Note it sits at only 1.4:1 luminance from the agreed-node green. That is
   // tolerable ONLY because the two never share a node — green replaces the
@@ -2140,7 +2147,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Never the root's outer RING (#90EE90) — it is green, and sits at 1.3:1
   // against the agreed-node green, so local and agreed would separate by hue
   // alone.
-  const MARK_LOCAL = '#bfa100';
+  const MARK_LOCAL = '#8d7900';
   const MARK_BLUE  = '#4a9bff';
   // §5 — the agreed node's ring. Chosen for luminance separation from both
   // white and blue, not just hue ([[user-colour-vision]]).
