@@ -3,7 +3,7 @@
 Explore sessions designed and built to slice C; the `{?}` button found and
 fixed; gateway text stripped of appraisal; the mark colour scheme settled.
 
-Canary ended **green** at `viewer.js?v=640`, `style.css?v=321`.
+Canary ended **green** at `viewer.js?v=643`, `style.css?v=324`.
 
 ---
 
@@ -213,6 +213,42 @@ everything that moves things — the third time that shape appeared today.
 canvas, so after a big resize the shape is stale rather than wrong. Re-running
 it would rearrange the graph under the user's hands mid-drag; it belongs on
 resize-END if it proves annoying.
+
+---
+
+## 7. Parked marks — three faults, found by pulling one thread
+
+`b88a643` · `4ca285f` · `d59bc98`
+
+Reported after the resize work: the marks hold their corners but grow long
+edges out to the graph, and end up roughly twice the whole graph's width away.
+
+**Long edges.** A parked node has been moved out of its structural position, so
+its edges no longer describe the graph — they are the "long diagonals to a
+fixed corner, mistaken for real topology" the scaling brief warns about in §4.
+Hidden while parked. This was the *symptom*, not the cause.
+
+**Then the real fault: `cy.fit` was framing the parked marks.** A mark parks at
+the corner of the current extent, so fitting to include it widens the extent,
+which pushes the next park further out, which widens the next fit. **A feedback
+loop, one turn per navigation or resize** — which is why they walked away.
+Parked marks now carry `.parked-mark` and every fit excludes them. The class is
+cleared when a mark stops being parked; leaving it set would silently drop a
+real node from every future fit.
+
+**And the piece that made it bad in the first place — the user's diagnosis.** A
+cluster view lays its content to roughly the panel width and centres it, while
+`markCorner` used `cy.extent()`, the whole window. So the mark sat hard against
+the glass with the graph in a narrow column in the middle. The corner is now
+taken from the **bounding box of what the layout occupies** (minus parked
+marks, so it cannot feed back), plus a 26px gap, **clamped into the viewport**.
+
+The clamp keeps both cases right: a narrow diagram puts the mark just outside
+it; a diagram already filling the window gives the old edge-of-screen result,
+which is correct there because the edge *is* just outside the content.
+
+*"Top-left" and "bottom-right" now mean relative to the diagram, not to the
+glass* — which is what they should have meant all along.
 
 ---
 
