@@ -2297,6 +2297,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         prependSystemCard('The invitation lapsed — you are no longer on the same node.');
       }
       refreshExploreBtn();
+      // Only on ARRIVING at a shared node, and only when there is something to
+      // explain — mid-session the buttons already mean something to the user.
+      if (snapNodeId && exploreState === 'none' && pairingState && pairingState.active) {
+        try { showSnapDialog(); } catch (err) { console.warn('[explore] snap dialog failed', err); }
+      }
     }
 
     // §5 — the agreed node wears ONE green ring, and it replaces whatever else
@@ -2763,6 +2768,40 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       renderMarks();
     } catch (err) { console.warn('[marks] re-park after layout failed', err); }
   });
+
+  // 2026-08-25 — the Snap dialog. Shown when you and your partner first land on
+  // the same node, BEFORE any green state exists, to explain what the buttons
+  // are for. Session-only suppression: a plain variable, so it resets on reload
+  // and never becomes a setting nobody remembers turning on.
+  let snapDialogSuppressed = false;
+  let snapDialogOpen       = false;
+  function showSnapDialog() {
+    if (snapDialogSuppressed || snapDialogOpen) return;
+    snapDialogOpen = true;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#1a1a2e;color:#eee;border:1px solid #555;border-radius:6px;padding:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;font-family:sans-serif;font-size:14px;line-height:1.5;box-sizing:border-box;';
+    card.innerHTML =
+      '<p style="margin:0 0 12px;">You are now viewing the same node as your partner.</p>' +
+      '<p style="margin:0 0 12px;">Agree, if you wish, to explore this node further \u2014 perhaps with a view to saving your thoughts. To do this press the red <b>Explore</b> button, or the amber <b>Accept</b> button if your partner has already asked.</p>' +
+      '<p style="margin:0 0 14px;">The node will then show a <b style="color:#1bbb40;">green halo</b> to bookmark itself. You can safely go off and gather text from other nodes, and find your way back.</p>' +
+      '<label style="display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:13px;color:#bbb;cursor:pointer;">' +
+        '<input type="checkbox" id="snap-noshow" style="width:18px;height:18px;"> Don\u2019t show this again this session</label>' +
+      '<div style="display:flex;justify-content:flex-end;">' +
+        '<button id="snap-ok" type="button" style="padding:10px 18px;background:#4080ff;color:#fff;border:none;border-radius:4px;font-size:14px;font-family:sans-serif;font-weight:bold;cursor:pointer;">Got it</button>' +
+      '</div>';
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    const close = () => {
+      const box = document.getElementById('snap-noshow');
+      if (box && box.checked) snapDialogSuppressed = true;
+      snapDialogOpen = false;
+      overlay.remove();
+    };
+    document.getElementById('snap-ok').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  }
 
   // The partner is gone — by Leave, by disconnect, or by their tab being
   // discarded. All three mean the same thing to us, so they share one path.
