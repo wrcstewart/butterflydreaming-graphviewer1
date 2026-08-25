@@ -2764,6 +2764,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } catch (err) { console.warn('[marks] re-park after layout failed', err); }
   });
 
+  // The partner is gone — by Leave, by disconnect, or by their tab being
+  // discarded. All three mean the same thing to us, so they share one path.
+  function markExplorePartnerGone() {
+    if (exploreState !== 'active') return;
+    explorePartnerGone = true;
+    renderMarks();
+  }
+
   // Both breadcrumb bars, re-synced and re-anchored. Exposed for the same
   // reason as reassertMarks: init() owns the resize handler, these live here.
   function refitBars() {
@@ -5495,7 +5503,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { markExplorePartnerGone, refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -7307,7 +7315,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { markExplorePartnerGone, refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
   try { refreshExploreBtn(); } catch (_) {}   // set the Explore button's resting state
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
@@ -7975,6 +7983,17 @@ async function init() {
       // a new partner.
       pairingState.active = false;
       pairingState.waiting = false;
+      // 2026-08-25 — a live Explore session cannot outlast the pair. This
+      // cleared the pairing but left exploreState 'active', so the button went
+      // on reading "Leave" and the green mark stayed at full strength with
+      // nobody on the other end.
+      //
+      // Treated exactly as if they had pressed Leave (spec §6): their
+      // participation ends, OURS does not. The anchor dims rather than
+      // vanishing, so the node being worked on is not lost just because the
+      // connection was — which matters most when the cause is an iOS tab being
+      // discarded mid-session.
+      try { markExplorePartnerGone(); } catch (_) {}
       try { refreshExploreBtn(); } catch (_) {}
       buddyCy.nodes().addClass('buddy-gone');
       // 2026-08-20 — the enlarged copy dims with the trail it mirrors rather
