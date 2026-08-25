@@ -2734,6 +2734,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } catch (err) { console.warn('[marks] re-park after layout failed', err); }
   });
 
+  // Both marks, re-parked. Exposed because init() owns the resize handler and
+  // the marks live here — the same boundary that silently half-broke unpair.
+  function reassertMarks() {
+    try {
+      reassertBlueNode();
+      reassertGreenNode();
+      renderMarks();
+    } catch (err) { console.warn('[marks] re-assert failed', err); }
+  }
+
   // One place that makes the screen agree with exploreState.
   function applyExploreVisuals() {
     if (exploreState === 'active') reassertGreenNode();
@@ -5444,7 +5454,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -7256,8 +7266,36 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
   try { refreshExploreBtn(); } catch (_) {}   // set the Explore button's resting state
+
+  // 2026-08-25 — live resize. #cy had NO resize handler: only the two
+  // breadcrumb bars and the media player listened, so the graph kept its old
+  // dimensions and framing until the next navigation.
+  //
+  // Order matters. positionCyEl re-places the element, cy.resize() makes
+  // cytoscape re-read it, cy.fit re-frames — and the marks are re-parked LAST,
+  // because their corners are derived from cy.extent() and the fit is what
+  // changes it. Skipping that step is worse than doing nothing: the canvas
+  // would look correctly re-framed while the two corner marks sat at
+  // coordinates from the old extent, which reads as a fresh bug rather than a
+  // stale view. A plain cy.fit emits no layoutstop, so the re-park that
+  // normally follows a layout never fires here.
+  //
+  // Debounced: resize fires continuously during a drag, and re-fitting on
+  // every event is wasted work. 120ms is short enough to feel live.
+  let cyResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(cyResizeTimer);
+    cyResizeTimer = setTimeout(() => {
+      try {
+        positionCyEl();
+        cy.resize();
+        cy.fit(cy.elements(':visible'), fitPadding(cy, 60));
+        reassertMarks();
+      } catch (err) { console.warn('[BD] resize re-fit failed', err); }
+    }, 120);
+  });
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
