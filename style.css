@@ -199,13 +199,14 @@ html, body {
   /* 2026-07-28 — brightened from #5a5000 to #7f6d00 so the strip is
      visibly present AND so `.hi-bread` highlight text can match it
      exactly whilst staying readable on the recessed panel bg. */
-  /* 2026-08-25 — DARK gold. The strip is a BACKDROP: chips sit on it and must
-     stand out, so it has to be darker than every chip colour. Measured across
-     the whole chip palette (six families, white gateways, grey clusters, teal
-     Settling, orange Conversations), no MID gold works — anything in the middle
-     collides with something, and half-luminance #ba9d00 is the worst point of
-     all at 1.00:1 against Symbolic. Dark is the only region that clears them. */
-  background: #5a5000;
+  /* 2026-08-25 — the same #8d7900 as the selection ring and the local card
+     head, so the local family is ONE colour rather than a gradient of roles.
+     User's call, made with the numbers in view: at this value 7 of 10 chip
+     colours sit under 1.5:1 against the strip, worst 1.00:1 (Reason). Judged
+     acceptable — chip separation was not the problem it was measured to be.
+     If some chips do disappear, a hairline border on .breadcrumb-chip frees
+     the strip colour entirely rather than forcing it dark again. */
+  background: #8d7900;
   cursor: url('cursor-wings.svg') 16 16, auto;
   z-index: 5;
 }
@@ -491,7 +492,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
    throughout — body backgrounds are very dark so the head reads as a
    distinct stripe. Local takes the brighter yellow (user's compose
    area should stand out); system fades back to the dimmer green. */
-.card.local    .card-head { background: #5a5000; }   /* 2026-08-25 dark gold — a backdrop, like #cy-you; inherits white text, which reads on it */
+.card.local    .card-head { background: #8d7900; }   /* 2026-08-25 — same gold as #cy-you and the selection ring; inherits white text at 4.3:1 */
 .card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
 /* 2026-07-16 — system card head now uses the Root-node fill colour
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
@@ -869,7 +870,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c02020;             /* CANARY — red (was blue) */
+  border: 2px solid #20a020;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
