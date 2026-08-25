@@ -2784,7 +2784,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     card.style.cssText = 'background:#1a1a2e;color:#eee;border:1px solid #555;border-radius:6px;padding:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;font-family:sans-serif;font-size:14px;line-height:1.5;box-sizing:border-box;';
     card.innerHTML =
       '<p style="margin:0 0 12px;">You are now viewing the same node as your partner.</p>' +
-      '<p style="margin:0 0 12px;">Agree, if you wish, to explore this node further \u2014 perhaps with a view to saving your thoughts. To do this press the red <b>Explore</b> button, or the amber <b>Accept</b> button if your partner has already asked.</p>' +
+      '<p style="margin:0 0 12px;">You can agree, if you wish, to explore this node further \u2014 perhaps with a view to saving your thoughts. To do this press the red <b>Explore</b> button, or the amber <b>Accept</b> button if your partner has already asked.</p>' +
       '<p style="margin:0 0 14px;">The node will then show a <b style="color:#1bbb40;">green halo</b> to bookmark itself. You can safely go off and gather text from other nodes, and find your way back.</p>' +
       '<label style="display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:13px;color:#bbb;cursor:pointer;">' +
         '<input type="checkbox" id="snap-noshow" style="width:18px;height:18px;"> Don\u2019t show this again this session</label>' +
