@@ -2653,6 +2653,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     node.position(markCorner(node, which));
     node.style('opacity', BN_REVEAL_OPACITY);
     if (wasHidden) node.show();
+    // 2026-08-25 — a PARKED node has been moved out of its structural position,
+    // so its edges no longer describe the graph: they run from a viewport
+    // corner to whatever is in the middle, and the larger the window the longer
+    // they get. That is the "long diagonals mistaken for real topology" the
+    // scaling brief warns about in §4. Hide them; the next navigation
+    // recomputes the view and shows whatever genuinely belongs.
+    node.connectedEdges().hide();
     return wasHidden;
   }
 
@@ -2780,6 +2787,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function markBlueEdges(node) {
     clearBlueEdges();
     if (!node || !node.length) return;
+    // Only when the Blue Node sits where it actually belongs. Parked in a
+    // corner, these would be the long diagonals parkMark just suppressed —
+    // drawing them again here would undo that in the same frame.
+    if (bnWasRevealed) return;
     const eligible = node.connectedEdges().filter(e =>
       !BN_EDGE_SKIP.has(e.data('type')) &&
       e.source().visible() && e.target().visible());
