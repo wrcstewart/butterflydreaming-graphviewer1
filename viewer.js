@@ -2688,13 +2688,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Model coordinates — cy.extent(), width() and height() are all model space,
   // unlike renderedBoundingBox(). Mixing those is a silent zoom-dependent bug;
   // it is the trap that displaced the n_r badge.
+  // 2026-08-25 — park against the CONTENT, not the canvas.
+  //
+  // A cluster view lays its content to roughly the panel width and centres it,
+  // while the canvas is the full window. Parking at cy.extent() therefore put
+  // the mark hard against the screen edge with the graph in a narrow column in
+  // the middle — a long way from anything, which is what made the marks look
+  // detached and their edges enormous.
+  //
+  // So: the corner of what the layout actually occupies, a short gap beyond
+  // it, then CLAMPED into the viewport so it can never be pushed off-screen
+  // when the content already fills the window. Small diagram -> the mark sits
+  // just outside it; full-width diagram -> the old behaviour, at the edge.
   function markCorner(node, which) {
-    const ext = cy.extent();
     const halfW = (node.width()  || 40) / 2 + 14;
     const halfH = (node.height() || 30) / 2 + 14;
+    const ext   = cy.extent();
+    const body  = cy.elements(':visible').not('.parked-mark');
+    const bb    = body.length ? body.boundingBox() : ext;
+    const gap   = 26;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     return which === 'green'
-      ? { x: ext.x1 + halfW, y: ext.y1 + halfH }    // top-left
-      : { x: ext.x2 - halfW, y: ext.y2 - halfH };   // bottom-right
+      ? { x: clamp(bb.x1 - gap - halfW, ext.x1 + halfW, ext.x2 - halfW),
+          y: clamp(bb.y1 - gap - halfH, ext.y1 + halfH, ext.y2 - halfH) }
+      : { x: clamp(bb.x2 + gap + halfW, ext.x1 + halfW, ext.x2 - halfW),
+          y: clamp(bb.y2 + gap + halfH, ext.y1 + halfH, ext.y2 - halfH) };
   }
   function blueNodeCorner(node) { return markCorner(node, 'blue'); }
 
