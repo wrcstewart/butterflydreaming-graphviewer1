@@ -2300,7 +2300,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Only on ARRIVING at a shared node, and only when there is something to
       // explain — mid-session the buttons already mean something to the user.
       if (snapNodeId && exploreState === 'none' && pairingState && pairingState.active) {
-        try { showSnapDialog(); } catch (err) { console.warn('[explore] snap dialog failed', err); }
+        // 2026-08-25 — let the view PAINT first. This fires from inside
+        // renderMarks, and the fCoSE branches animate for ~450ms afterwards, so
+        // the dialog could arrive before the node it is describing. "You are now
+        // viewing the same node" has to be true when it is read.
+        //
+        // Re-checked when the timer fires: the user may have moved off in the
+        // meantime, and an explanation of a state you have already left is
+        // worse than none.
+        const snapAt = snapNodeId;
+        setTimeout(() => {
+          if (snapNodeId !== snapAt || exploreState !== 'none') return;
+          if (!pairingState || !pairingState.active) return;
+          try { showSnapDialog(); } catch (err) { console.warn('[explore] snap dialog failed', err); }
+        }, 600);
       }
     }
 
