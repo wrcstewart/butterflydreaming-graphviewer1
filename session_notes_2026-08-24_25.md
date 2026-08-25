@@ -3,7 +3,7 @@
 Explore sessions designed and built to slice C; the `{?}` button found and
 fixed; gateway text stripped of appraisal; the mark colour scheme settled.
 
-Canary ended **red** at `viewer.js?v=636`, `style.css?v=317`.
+Canary ended **blue** at `viewer.js?v=638`, `style.css?v=319`.
 
 ---
 
@@ -112,6 +112,20 @@ contrast ratios describe a risk, not a verdict.
 **If chips do disappear, do not darken the strip again.** A hairline border on
 `.breadcrumb-chip` frees the strip colour entirely instead of trading against
 it.
+
+**Then finished on the 25th** (`fdfe7de`, `bead3c9`). The reading-spine arrow
+and successor were an unrelated `#e0a020`; they are part of the same signal as
+the selection ring, so the arrow now IS `MARK_LOCAL` and the successor is 25%
+dimmer with hue preserved exactly. `MARK_LOCAL` moved to module scope —
+`buildStyle` could not see it, which is how a second literal came to exist.
+
+And the agreed green is now **derived** rather than picked: `#1bbb40`, hue 134°,
+midway between local gold (51°) and remote navy (216°). **Mixing the two
+literally does not work** — averaging or adding lands on olive at 68-69°, barely
+17° from the gold; additive yellow + blue gives grey-olive on a screen. Only the
+hue midpoint is green. Candidates live at `colour_options.html` as rings on a
+node against the real canvas, because a flat swatch says nothing about how a
+thin ring reads.
 
 **Method note:** computing contrast took seconds and twice reversed the
 intuitive answer. Uniform RGB scaling preserves hue exactly, so "same colour,
