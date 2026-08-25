@@ -3,7 +3,7 @@
 Explore sessions designed and built to slice C; the `{?}` button found and
 fixed; gateway text stripped of appraisal; the mark colour scheme settled.
 
-Canary ended **green** at `viewer.js?v=631`, `style.css?v=312`.
+Canary ended **red** at `viewer.js?v=636`, `style.css?v=317`.
 
 ---
 
@@ -120,19 +120,6 @@ so the eye disagreeing with the arithmetic is not a mistake.
 
 ---
 
-## Open at end of session
-
-| item | note |
-|---|---|
-| Explore: acceptance dialog | Spec §8, wording to settle at build time. |
-| Explore: reconnect behaviour | Spec §10 — does a session survive the 65s grace period? |
-| Draft persistence | Brief `CC.7`. Now more pressing: a ceremony promises shared work, and a backgrounded iOS tab loses it. |
-| The write gate | Generic query channel still runs arbitrary Cypher — agreement is witnessed, not enforced. |
-| Card-head text | White on `#8d7900` is 4.3:1, marginally under the 4.5 for body text. |
-| Blue Node ring seam | Colour problem, not geometry. |
-
----
-
 ## 5. Breadcrumb bar — five fixes, all late on the 25th
 
 `393c047` · `2ad387e` · `005707a` · `cd0b5a7` · `5c5698d`
@@ -174,3 +161,18 @@ A left-edge fade was added to `#cy-you` while chasing the wrong cause (a
 right-aligned trail clipping its leftmost chip). It is defensible on its own —
 a faded word reads as "continues" — but it was aimed at a symptom that turned
 out to have a different explanation, and could be removed.
+
+---
+
+## Open at end of session
+
+| item | note |
+|---|---|
+| Explore: acceptance dialog | Spec §8, wording to settle at build time. |
+| Explore: reconnect behaviour | Spec §10 — does a session survive the 65s grace period? |
+| Draft persistence | Brief `CC.7`. Now more pressing: a ceremony promises shared work, and a backgrounded iOS tab loses it. |
+| The write gate | Generic query channel still runs arbitrary Cypher — agreement is witnessed, not enforced. |
+| Card-head text | White on `#8d7900` is 4.3:1, marginally under the 4.5 for body text. |
+| Blue Node ring seam | Colour problem, not geometry. |
+| Strip colour now unconstrained | The chip hairline freed it — the contrast table no longer applies. |
+| `#cy-you` left-edge fade | Added while chasing the wrong cause; defensible alone, but removable. |
