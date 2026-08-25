@@ -2153,9 +2153,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //
 // MARK_LOCAL / MARK_SUCCESSOR are declared at module scope — see there.
   const MARK_BLUE  = '#4a9bff';
-  // §5 — the agreed node's ring. Chosen for luminance separation from both
-  // white and blue, not just hue ([[user-colour-vision]]).
-  const MARK_GREEN = '#3ddc84';
+  // §5 — the agreed node's ring, DERIVED from the two breadcrumb colours rather
+  // than picked: hue 134° sits midway between local gold (51°) and remote navy
+  // (216°). Agreed is made from local and remote, and now says so.
+  //
+  // Mixing the two literally does NOT work — averaging or adding them lands on
+  // olive at hue 68-69°, barely 17° from the gold and 1.4:1 from it in
+  // luminance. Additive yellow + blue gives grey-olive on a screen; the pigment
+  // intuition does not transfer. Only the hue midpoint gives an actual green.
+  //
+  // 6.8:1 against the canvas, 1.7:1 from the gold ([[user-colour-vision]] —
+  // never hue alone, so the luminance gap matters).
+  const MARK_GREEN = '#1bbb40';
   let   gnWasRevealed = false;
 
   function clearMarksFrom(node) {
