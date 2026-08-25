@@ -3,7 +3,7 @@
 Explore sessions designed and built to slice C; the `{?}` button found and
 fixed; gateway text stripped of appraisal; the mark colour scheme settled.
 
-Canary ended **blue** at `viewer.js?v=638`, `style.css?v=319`.
+Canary ended **green** at `viewer.js?v=640`, `style.css?v=321`.
 
 ---
 
@@ -175,6 +175,44 @@ A left-edge fade was added to `#cy-you` while chasing the wrong cause (a
 right-aligned trail clipping its leftmost chip). It is defensible on its own —
 a faded word reads as "continues" — but it was aimed at a symptom that turned
 out to have a different explanation, and could be removed.
+
+---
+
+## 6. Live resize on desktop
+
+`d76575e` · `242fbc6`
+
+**`#cy` had no resize handler at all.** Only the two breadcrumb bars and the
+media player listened, so dragging a desktop window left the graph at its old
+dimensions and framing until the next navigation.
+
+Four steps, and the order is the whole thing:
+
+    positionCyEl()   re-place the element
+    cy.resize()      cytoscape re-reads its container
+    cy.fit(...)      re-frame to what is visible
+    reassertMarks()  re-park the Blue and Green marks
+    refitBars()      re-sync both breadcrumb bars
+
+**The last two are not optional.** The marks park at corners derived from
+`cy.extent()`, and the fit is precisely what changes it — omitting the re-park
+is *worse* than doing nothing, because a correctly-framed canvas with two marks
+adrift reads as a fresh bug where a wholly stale view reads as stale. A plain
+`cy.fit` emits no `layoutstop`, so the re-park that normally follows a layout
+never fires.
+
+The bars then went blank, and **they were not the fault**: both already had
+resize listeners and both already called `resize()`. Their listeners fire
+immediately while this one is debounced 120ms, so they corrected against the
+OLD pane geometry and were invalidated by `positionCyEl` afterwards.
+
+*Whatever runs last decides.* Anything position-dependent has to run after
+everything that moves things — the third time that shape appeared today.
+
+**Not done, deliberately:** the cluster layout picks column counts from the
+canvas, so after a big resize the shape is stale rather than wrong. Re-running
+it would rearrange the graph under the user's hands mid-drag; it belongs on
+resize-END if it proves annoying.
 
 ---
 
