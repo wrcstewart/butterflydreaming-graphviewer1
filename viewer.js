@@ -3014,10 +3014,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const h  = (el && el.offsetHeight) || 23;
     return h / 2 - BAR_CHIP_Y * barCy.zoom();
   }
-  // Re-centre on every zoom, leaving the horizontal pan as the user left it.
-  // pan() emits no zoom event, so this cannot recurse.
-  youCy.on('zoom',   () => youCy.pan({   x: youCy.pan().x,   y: barPanY(youCy,   'cy-you')   }));
-  buddyCy.on('zoom', () => buddyCy.pan({ x: buddyCy.pan().x, y: barPanY(buddyCy, 'cy-buddy') }));
+  // 2026-08-25 — on zoom, RE-ANCHOR the whole trail rather than only fixing the
+  // vertical. Correcting y alone left the horizontal pan wherever the pinch had
+  // put it, so the chips could slide out of the bar sideways with no way to get
+  // them back — the strip went blank and stayed blank. Re-anchoring keeps the
+  // newest chip in its usual place at every zoom, which is the invariant the
+  // bar is built around.
+  youCy.on('zoom',   () => { try { panYouCyToLatest();   } catch (_) {} });
+  buddyCy.on('zoom', () => { try { panBuddyCyToLatest(); } catch (_) {} });
 
   function panYouCyToLatest() {
     if (youChipCount === 0) return;

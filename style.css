@@ -207,6 +207,13 @@ html, body {
      If some chips do disappear, a hairline border on .breadcrumb-chip frees
      the strip colour entirely rather than forcing it dark again. */
   background: #8d7900;
+  /* 2026-08-25 — fade the left edge. The trail is RIGHT-aligned, so older chips
+     run off to the left and the leftmost is usually cut mid-word: "Loss" reads
+     as "oss", which looks like a broken label rather than a scrolled one. An
+     18px fade says "this continues". Changes how the edge READS, not what is
+     drawn. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px);
+          mask-image: linear-gradient(to right, transparent 0, #000 18px);
   cursor: url('cursor-wings.svg') 16 16, auto;
   z-index: 5;
 }
@@ -870,7 +877,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #20a020;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
