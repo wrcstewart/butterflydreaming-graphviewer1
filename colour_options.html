@@ -1,0 +1,84 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Agreed-node green — candidates</title>
+<style>
+  body { background:#1a1a20; color:#ddd; font:14px/1.5 system-ui,sans-serif; margin:0; padding:28px 22px 48px; }
+  h1 { font-size:17px; font-weight:600; margin:0 0 4px; }
+  p.sub { color:#999; margin:0 0 26px; font-size:13px; }
+  h2 { font-size:13px; font-weight:600; color:#aaa; margin:30px 0 12px; letter-spacing:.04em; text-transform:uppercase; }
+  .row { display:flex; align-items:center; gap:18px; padding:11px 0; border-bottom:1px solid #2a2a32; }
+  .chip { width:78px; height:34px; border-radius:4px; flex:0 0 auto; }
+  /* a Cluster-sized node wearing the candidate as its ring, on the real canvas */
+  .node { width:70px; height:34px; border-radius:5px; background:#666; flex:0 0 auto;
+          display:flex; align-items:center; justify-content:center;
+          font-size:9px; color:#fff; }
+  .meta { font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; color:#bbb; }
+  .meta b { color:#fff; font-weight:600; }
+  .note { color:#8a8a95; font-size:12px; }
+  .rec { color:#7fe08f; }
+</style>
+
+<h1>Agreed-node green — candidates</h1>
+<p class="sub">Left: the colour itself. Middle: a Cluster-sized node wearing it as a 6px ring, on the real canvas background.</p>
+
+<h2>Your two breadcrumb colours</h2>
+<div class="row">
+  <div class="chip" style="background:#8d7900"></div>
+  <div class="node" style="outline:6px solid #8d7900; outline-offset:0">local</div>
+  <div class="meta"><b>#8d7900</b> local gold · hue 51°</div>
+</div>
+<div class="row">
+  <div class="chip" style="background:#001f4d"></div>
+  <div class="node" style="outline:6px solid #4a9bff; outline-offset:0">remote</div>
+  <div class="meta"><b>#001f4d</b> remote navy · hue 216° <span class="note">(ring shown as the actual remote blue #4a9bff)</span></div>
+</div>
+
+<h2>Made literally from the two — all land on olive</h2>
+<div class="row">
+  <div class="chip" style="background:#474c27"></div>
+  <div class="node" style="outline:6px solid #474c27; outline-offset:0">A</div>
+  <div class="meta"><b>#474c27</b> average · hue 68° · canvas 1.9:1 <span class="note">— too dark to read</span></div>
+</div>
+<div class="row">
+  <div class="chip" style="background:#8d984d"></div>
+  <div class="node" style="outline:6px solid #8d984d; outline-offset:0">B</div>
+  <div class="meta"><b>#8d984d</b> additive · hue 69° · vs gold 1.4:1 <span class="note">— too near the gold</span></div>
+</div>
+<div class="row">
+  <div class="chip" style="background:#becd68"></div>
+  <div class="node" style="outline:6px solid #becd68; outline-offset:0">E</div>
+  <div class="meta"><b>#becd68</b> additive, lifted · hue 69° <span class="note">— bright, but still olive not green</span></div>
+</div>
+
+<h2>Hue midway between the two — a true green</h2>
+<div class="row">
+  <div class="chip" style="background:#009924"></div>
+  <div class="node" style="outline:6px solid #009924; outline-offset:0">C</div>
+  <div class="meta"><b>#009924</b> hue 134° · canvas 4.6:1 · vs gold 1.1:1 <span class="note">— same luminance as gold</span></div>
+</div>
+<div class="row">
+  <div class="chip" style="background:#1bbb40"></div>
+  <div class="node" style="outline:6px solid #1bbb40; outline-offset:0">D</div>
+  <div class="meta"><b>#1bbb40</b> hue 134° · canvas 6.8:1 · vs gold 1.7:1 <span class="rec">— recommended</span></div>
+</div>
+
+<h2>What is there now</h2>
+<div class="row">
+  <div class="chip" style="background:#3ddc84"></div>
+  <div class="node" style="outline:6px solid #3ddc84; outline-offset:0">now</div>
+  <div class="meta"><b>#3ddc84</b> hue 147° · canvas 9.7:1 · vs gold 2.4:1 <span class="note">— best separation, but not derived from your two</span></div>
+</div>
+
+<h2>All three marks together, as they would appear</h2>
+<div class="row">
+  <div class="node" style="outline:6px solid #8d7900; outline-offset:0">you</div>
+  <div class="node" style="outline:6px solid #4a9bff; outline-offset:0">them</div>
+  <div class="node" style="outline:6px solid #1bbb40; outline-offset:0">agreed</div>
+  <div class="meta">with <b>D</b></div>
+</div>
+<div class="row">
+  <div class="node" style="outline:6px solid #8d7900; outline-offset:0">you</div>
+  <div class="node" style="outline:6px solid #4a9bff; outline-offset:0">them</div>
+  <div class="node" style="outline:6px solid #3ddc84; outline-offset:0">agreed</div>
+  <div class="meta">with the <b>current</b> green</div>
+</div>
