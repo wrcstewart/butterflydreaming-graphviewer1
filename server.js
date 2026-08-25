@@ -913,13 +913,28 @@ function broadcastCorpusUpdate(msg) {
 }
 
 // Grace-period purge helpers (Socket.IO migration 2026-07-13).
+//
+// 2026-08-25 — SHORTENED TO 5s FOR DEVELOPMENT. Waiting 65 seconds to see a
+// teardown makes pair and Explore behaviour painful to test.
+//
+// **RESTORE TO 65 BEFORE ANY REAL USE.** The production value is not arbitrary:
+// Socket.IO's connectionStateRecovery window is 60s, and the extra 5 is the
+// margin that lets a reconnect land inside it. At 5s a phone locking its screen
+// or a tab backgrounding for a moment tears the pair down — which is exactly
+// the behaviour the 65 was chosen to prevent.
+//
+// Override without editing code: BD_GRACE_MS=65000 node server.js
+const GRACE_MS = Number(process.env.BD_GRACE_MS) || 5 * 1000;
+if (GRACE_MS < 60 * 1000) {
+  console.log(`[BD] *** GRACE PERIOD ${GRACE_MS / 1000}s — DEVELOPMENT VALUE, restore to 65000 for real use ***`);
+}
 function schedulePurge(userId) {
   if (!userId) return;
   cancelPurge(userId);
   const timer = setTimeout(() => {
     pendingPurges.delete(userId);
     executePurge(userId);
-  }, 65 * 1000);
+  }, GRACE_MS);
   pendingPurges.set(userId, timer);
 }
 
@@ -1071,7 +1086,7 @@ io.on('connection', async (socket) => {
     if (sessions.get(userId) === socket) sessions.delete(userId);
     broadcastUserCount();
     schedulePurge(userId);
-    console.log(`[BD] Disconnected: ${userId} (reason: ${reason}) — grace period 65 s`);
+    console.log(`[BD] Disconnected: ${userId} (reason: ${reason}) — grace period ${GRACE_MS / 1000} s`);
   });
 
   socket.on('msg', async (msg) => {
