@@ -30,6 +30,7 @@ Keep this current when adding a doc. One line is enough.
 |---|---|---|
 | ✔ **edge_model.md** | 08-22 | How relationships actually reach the graph. Establishes there is **no simulated-edge system** (the whole corpus is resident from boot), that gateway→cluster edges are explicit, and carries the measured cytoscape 3.34.1 rendering facts. Read before touching anything edge- or layout-related. |
 | ✔ **BD_Viewer_Scaling_Brief.md** | 08-23 | Whether the viewer scales. **Planning only, nothing scheduled.** The `CC analysis` section at the foot corrects the brief's central premise and holds the draft-loss design. |
+| ✔ **editing_spec.md** | 08-24 | Collaborative **Explore sessions** — two users agree on a node, then wander while anchored to it. Slices A–C built; §10 lists what is still open. |
 | ✔ **blue_node_spec.md** | 08-21 | The Blue Node — partner's position shown on your own graph. **Built**; see the memory entry for what is verified vs untested. |
 | **stable_id_spec.md** | 08-21 | `url` as the durable node id, replacing Memgraph elementId. **Done.** |
 | **unified_focus_spec.md** | 08-16 | One-tap focus model (text + neighbourhood together). Default ON; `?uf=0` restores legacy. |
@@ -98,7 +99,7 @@ architecture.
 Chronological working record. Useful for "why is it like this", not for
 current behaviour.
 
-`session_notes_2026-08-16_17.md` · `…08-19.md` · `…08-20.md` · `…08-21.md` · `…08-22_23.md`
+`session_notes_2026-08-16_17.md` · `…08-19.md` · `…08-20.md` · `…08-21.md` · `…08-22_23.md` · `…08-24_25.md`
 
 ---
 

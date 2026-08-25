@@ -31,6 +31,7 @@ Keep this updated when a design moves. A stale register is worse than none.
 
 | doc | date | status | evidence |
 |---|---|---|---|
+| `editing_spec.md` | 08-24 | **Partly built** (A–C of 4) | `exploreState`, `explore_offer` relay, `MARK_GREEN` |
 | `stable_id_spec.md` | 08-21 | **Built** | `nodeId()`, url-keyed ids throughout |
 | `blue_node_spec.md` | 08-21 | **Built** (partly untested) | `showBlueNode`, `renderMarks`, `markBlueEdges` |
 | `edge_model.md` | 08-22 | **Reference** (not a plan) | describes as-built |
@@ -218,7 +219,8 @@ Not a schedule — a list of what has been designed and not built.
 | item | where | note |
 |---|---|---|
 | Draft/panel persistence across reload | brief `CC.7` | Present-tense risk. Design complete, including the `pagehide` trap. |
-| Pair-agreed edit → new node | — | Imminent. `convergence_node.md` is the nearest prior thinking. |
+| Explore: acceptance dialog + reconnect | `editing_spec.md` §8, §10 | Slices A–C built; these are what remain. |
+| Pair-agreed edit → SAVE a new node | — | The Explore ceremony is its front door. Consent vocabularies deliberately kept apart. |
 | Boot-payload dedupe + drop `raw_text` | brief `CC.4` | Two easy wins, no behaviour change. |
 | Fetch text on open | brief `CC.4` | Moderate; needs a small endpoint. |
 | Desktop docking for media modules | layout spec | `positionExtendPanel` early-returns above 1024px. |
