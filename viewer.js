@@ -2120,7 +2120,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();          // restore the local white mark clearMarksFrom stripped
   }
 
-  const MARK_WHITE = '#ffffff';
+  // 2026-08-25 — the local mark is AMBER, not white: the same #7f6d00 as
+  // #cy-you, .card.local .card-head and .hi-bread. That makes the three marks
+  // read as one scheme — local amber, remote blue, agreed green — and green
+  // then sits between the two it is made of.
+  //
+  // Named for its ROLE rather than its colour, because "MARK_WHITE = amber"
+  // is exactly the sort of stale name that misleads a future reader.
+  //
+  // Contrast against the canvas drops from 17.3:1 (white) to 3.4:1. #FFD700
+  // gold is the same family at 12.3:1 if this reads too dim as a thin ring.
+  const MARK_LOCAL = '#7f6d00';
   const MARK_BLUE  = '#4a9bff';
   // §5 — the agreed node's ring. Chosen for luminance separation from both
   // white and blue, not just hue ([[user-colour-vision]]).
@@ -2290,7 +2300,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // 'outside' puts the whole 4px beyond the node body (outerWidth = w +
       // 2*border-width), so the frame never covers the label at all.
       centralNode.style({ 'border-width': 4, 'border-position': 'outside',
-                          'border-color': MARK_WHITE, 'border-opacity': 1,
+                          'border-color': MARK_LOCAL, 'border-opacity': 1,
                           'outline-width': 0 });
     }
     if (bn && bn.length && !together && !isGreen(bn)) {
@@ -2319,7 +2329,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       bn.style({
         'border-width': 4,
         'border-position': 'outside',
-        'border-color':   blueInside ? MARK_BLUE  : MARK_WHITE,
+        'border-color':   blueInside ? MARK_BLUE  : MARK_LOCAL,
         'border-opacity': blueInside ? (bnGone ? 0.35 : 0.75) : 1,
         // The two bands are separately-stroked paths, and where they merely
         // ABUT, antialiasing leaves a hairline of canvas black between them.
@@ -2330,7 +2340,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // through. Offset + width still total 10, so the VISIBLE blue is the
         // same [4,10] band it was before.
         'outline-width': 8,
-        'outline-color':  blueInside ? MARK_WHITE : MARK_BLUE,
+        'outline-color':  blueInside ? MARK_LOCAL : MARK_BLUE,
         'outline-opacity': blueInside ? 1 : (bnGone ? 0.18 : 0.4),
         'outline-offset': 2,
       });
