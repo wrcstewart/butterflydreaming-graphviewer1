@@ -2939,7 +2939,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       group: 'nodes',
       data: {
         id, type,
-        display_name:   abbreviated ? String(d.seq ?? '?') : (d.display_name || ''),
+        // 2026-08-25 — truncateChipLabel here too. This is the RESTORE-from-cache
+        // builder, and it was rendering the stored name in full while the live
+        // builder truncated to 13 — so long cluster titles came back mangled
+        // after a reload and were fine before one. Idempotent: truncating an
+        // already-short label is a no-op, so it does not matter whether the
+        // cache holds the full name or the trimmed one.
+        display_name:   abbreviated ? String(d.seq ?? '?')
+                                    : truncateChipLabel(d.display_name || d.name || ''),
         colour:         d.colour || '#444444',
         name:           d.name || '',
         url:            d.url || null,
