@@ -2128,15 +2128,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Named for its ROLE rather than its colour, because "MARK_WHITE = amber"
   // is exactly the sort of stale name that misleads a future reader.
   //
-  // 2026-08-25 — #FFD700, the root node's BODY gold, already in the palette
-  // (root, system card heads). 12.3:1 against the canvas, against 3.4:1 for the
-  // #7f6d00 breadcrumb mustard it replaces: a thin ring needs the luminance
-  // that a filled strip does not.
+  // 2026-08-25 — #7f6d00, the local breadcrumb strip's own mustard (#cy-you,
+  // .card.local .card-head, .hi-bread). Chosen over the brighter #FFD700 gold
+  // after seeing both: the gold read as too loud for a mark that is present
+  // constantly rather than occasionally.
   //
-  // NOT the root's outer RING, which is #90EE90 and green — it sits at 1.3:1
-  // against the agreed-node green, so local and agreed would have separated by
-  // hue alone, which is the one channel not to depend on here.
-  const MARK_LOCAL = '#FFD700';
+  // The trade is known and accepted: 3.4:1 against the canvas where gold gives
+  // 12.3:1. If it ever proves hard to pick out at small sizes, #FFD700 is the
+  // same family and a one-word change back.
+  //
+  // Never the root's outer RING (#90EE90) — it is green, and sits at 1.3:1
+  // against the agreed-node green, so local and agreed would separate by hue
+  // alone.
+  const MARK_LOCAL = '#7f6d00';
   const MARK_BLUE  = '#4a9bff';
   // §5 — the agreed node's ring. Chosen for luminance separation from both
   // white and blue, not just hue ([[user-colour-vision]]).
