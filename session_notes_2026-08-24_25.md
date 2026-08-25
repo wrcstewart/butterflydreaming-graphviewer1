@@ -130,3 +130,47 @@ so the eye disagreeing with the arithmetic is not a mistake.
 | The write gate | Generic query channel still runs arbitrary Cypher — agreement is witnessed, not enforced. |
 | Card-head text | White on `#8d7900` is 4.3:1, marginally under the 4.5 for body text. |
 | Blue Node ring seam | Colour problem, not geometry. |
+
+---
+
+## 5. Breadcrumb bar — five fixes, all late on the 25th
+
+`393c047` · `2ad387e` · `005707a` · `cd0b5a7` · `5c5698d`
+
+**Chips now carry a 1px black hairline** (`border-position: outside`, so it does
+not eat a 63×18 interior whose labels already clip). That dissolves the
+constraint behind the whole colour argument: chip colours span the luminance
+range, so the STRIP was having to carry all the separation, which forced it
+darker than every chip and stopped it matching the selection ring. **The strip
+colour is now free.** `.breadcrumb-chip.latest` restates white, since it sits
+after the general rule and would otherwise have lost its marker.
+
+**Chips fell off the bar when zoomed.** They sit at model `y = 11`, commented
+"centre of 23px bar" — true at zoom 1 and only at zoom 1, since screen y is
+`model_y × zoom + pan_y` and `pan_y` was hardcoded to 0. At zoom 3 they render
+at 33px, off a 23px bar. `pan_y` is now `h/2 − 11 × zoom`, with `h` read from
+the container rather than assumed.
+
+**Then they vanished entirely after a zoom — my own fix, half-done.** The zoom
+handler corrected only the vertical and left the horizontal wherever the pinch
+had put it, so the trail slid out sideways with nothing to bring it back. It now
+re-anchors the whole trail. *Fixing half a pan was worse than fixing none.*
+
+**Long labels mangled — two builders, one truncating.** The live builder
+truncates to 13 chars; `addYouChipFromData`, which rebuilds the trail from cache
+at boot, rendered the stored name in full. So a fresh crumb was fine and the same
+crumb after a reload was not — which is why the report came with "not sure if it
+happened before".
+
+**And the real cause of the missing letters: an embedded NEWLINE.** Cluster
+`display_name` is genuinely two-line — `"Loss\nLonging"`, `"Garden\nWild"` —
+which suits the main graph and cannot render in an 18px chip. It also **defeated
+the length check**: `"Loss\nLonging"` is 12 characters, under the 13 limit, so
+truncation returned it untouched. *The truncation looked like it was working
+precisely because it did nothing.* Whitespace is now collapsed BEFORE measuring —
+order is the whole fix.
+
+A left-edge fade was added to `#cy-you` while chasing the wrong cause (a
+right-aligned trail clipping its leftmost chip). It is defensible on its own —
+a faded word reads as "continues" — but it was aimed at a symptom that turned
+out to have a different explanation, and could be removed.
