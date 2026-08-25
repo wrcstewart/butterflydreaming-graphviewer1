@@ -3074,8 +3074,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // The ENLARGED copy is unaffected: appendBuddyChip passes it the untruncated
   // data.display_name separately, which is that panel's whole purpose.
   const CHIP_LABEL_MAX = 13;
+  // 2026-08-25 — FLATTEN first, then truncate.
+  //
+  // Cluster display_name carries an embedded NEWLINE by design — "Loss\nLonging",
+  // "Garden\nWild", "Naming\nBecoming" — which is right for the main graph,
+  // where the node is tall enough for two lines. A breadcrumb chip is 18px and
+  // cannot take it: the label rendered wrong and dropped characters, so "Loss"
+  // appeared as "oss" and "Garden Wild" as "arden Wi".
+  //
+  // It also defeated the length check: "Loss\nLonging" is 12 characters, under
+  // the 13 limit, so it was passed through untouched — the truncation looked
+  // like it was working precisely because it did nothing.
   function truncateChipLabel(s) {
-    const str = String(s == null ? '' : s);
+    // Collapse every run of whitespace — newlines included — to one space,
+    // BEFORE measuring. Measuring first would let a two-line name slip under
+    // the limit and reach the chip with its newline intact.
+    const str = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
     return str.length <= CHIP_LABEL_MAX ? str
          : str.slice(0, CHIP_LABEL_MAX - 1).trimEnd() + '\u2026';
   }
