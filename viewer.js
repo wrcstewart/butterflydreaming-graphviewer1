@@ -1477,7 +1477,7 @@ function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
   applySeqSignals(cy, parentNode);
   if (visible.nodes().length <= 1) {
-    cy.fit(visible, fitPadding(cy, 120));
+    cy.fit(visible.not('.parked-mark'), fitPadding(cy, 120));
     return;
   }
 
@@ -1593,7 +1593,7 @@ function runLayout(cy, parentNode = null) {
       };
     });
     visible.layout({ name: 'preset', positions, fit: false }).run();
-    cy.fit(visible, fitPadding(cy, 80));
+    cy.fit(visible.not('.parked-mark'), fitPadding(cy, 80));
 
   } else if (hintMode === 'preset' || hintMode === 'hybrid') {
     // Recover hinted children from stored offsets, pin them, and run fCoSE so any
@@ -1925,7 +1925,7 @@ function runLayout(cy, parentNode = null) {
         // The gateways are pinned below the cluster by construction — only
         // the families are free to drift across it.
         shift(famNodes, false);
-        cy.fit(visible, fitPadding(cy, 60));
+        cy.fit(visible.not('.parked-mark'), fitPadding(cy, 60));
       } catch (err) { console.warn('[BD] side-shift failed', err); }
     };
     layout.run();
@@ -2622,7 +2622,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const node = greenNodeEl();
     if (!node) return;
     if (lastReadNodeId === exploreNodeId && lastReadNodeCy === cy) {
-      gnWasRevealed = false; node.removeStyle('opacity');   // you are on it
+      gnWasRevealed = false; node.removeStyle('opacity'); node.removeClass('parked-mark');
     } else placeGreenNode(node);
   }
 
@@ -2660,6 +2660,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // scaling brief warns about in §4. Hide them; the next navigation
     // recomputes the view and shows whatever genuinely belongs.
     node.connectedEdges().hide();
+    // 2026-08-25 — tag it so fits can EXCLUDE it. Including a parked mark in
+    // cy.fit is a feedback loop: the fit zooms out to reach the corner, which
+    // widens the extent, which pushes the next park further out, which widens
+    // the next fit. Left alone the marks end up several graph-widths away.
+    node.addClass('parked-mark');
     return wasHidden;
   }
 
@@ -2773,7 +2778,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // belongs in the middle. You do not need a corner to find what is already
     // in front of you.
     if (lastReadNodeId === bnNodeId && lastReadNodeCy === cy) {
-      bnWasRevealed = false; node.removeStyle('opacity');
+      bnWasRevealed = false; node.removeStyle('opacity'); node.removeClass('parked-mark');
     } else placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
@@ -6261,7 +6266,7 @@ async function init() {
       requestAnimationFrame(() => {
         positionCyEl();
         cy.resize();
-        cy.fit(cy.elements(':visible'), fitPadding(cy, 40));
+        cy.fit(cy.elements(':visible').not('.parked-mark'), fitPadding(cy, 40));
       });
     }
   }
@@ -7309,7 +7314,7 @@ async function init() {
       try {
         positionCyEl();
         cy.resize();
-        cy.fit(cy.elements(':visible'), fitPadding(cy, 60));
+        cy.fit(cy.elements(':visible').not('.parked-mark'), fitPadding(cy, 60));
         reassertMarks();
         // The bars have their OWN resize listeners, but those fire immediately
         // while this one is debounced — so positionCyEl re-lays the panes
