@@ -1385,12 +1385,26 @@ function buildStyle() {
            newest chip stopped drifting. */
         'text-wrap': 'ellipsis',
         'text-margin-y': 0,
-        'border-width': 0,
+        /* 2026-08-25 — a 1px black hairline round every chip.
+           The chips take their colour from the node palette, which spans the
+           whole luminance range, so the STRIP behind them was having to carry
+           all the separation — and that forced it darker than every chip,
+           which is what kept it from matching the selection ring. With each
+           chip carrying its own edge, the strip colour is free.
+           border-position OUTSIDE so the hairline does not eat the interior:
+           these are 63x18 and their labels already clip. */
+        'border-width': 1,
+        'border-color': '#000000',
+        'border-opacity': 1,
+        'border-position': 'outside',
       }
     },
     {
+      /* The newest chip keeps its WHITE edge. This rule sits after the one
+         above, so the colour must be restated — inheriting would leave the
+         latest chip black and lose the marker entirely. */
       selector: 'node.breadcrumb-chip.latest',
-      style: { 'border-width': 1.5 }
+      style: { 'border-width': 1.5, 'border-color': '#ffffff', 'border-opacity': 1 }
     },
   ];
 }
