@@ -2734,6 +2734,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } catch (err) { console.warn('[marks] re-park after layout failed', err); }
   });
 
+  // Both breadcrumb bars, re-synced and re-anchored. Exposed for the same
+  // reason as reassertMarks: init() owns the resize handler, these live here.
+  function refitBars() {
+    try { panYouCyToLatest();   } catch (_) {}
+    try { panBuddyCyToLatest(); } catch (_) {}
+  }
+
   // Both marks, re-parked. Exposed because init() owns the resize handler and
   // the marks live here — the same boundary that silently half-broke unpair.
   function reassertMarks() {
@@ -5454,7 +5461,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -7266,7 +7273,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
   try { refreshExploreBtn(); } catch (_) {}   // set the Explore button's resting state
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
@@ -7293,6 +7300,11 @@ async function init() {
         cy.resize();
         cy.fit(cy.elements(':visible'), fitPadding(cy, 60));
         reassertMarks();
+        // The bars have their OWN resize listeners, but those fire immediately
+        // while this one is debounced — so positionCyEl re-lays the panes
+        // AFTER the bars have already corrected themselves, leaving them stale
+        // again. Re-sync them last, once everything else has settled.
+        refitBars();
       } catch (err) { console.warn('[BD] resize re-fit failed', err); }
     }, 120);
   });
