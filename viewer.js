@@ -2211,6 +2211,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (i !== -1) gnStack.splice(i, 1);      // revisiting moves it to the top
     gnStack.unshift(id);
     while (gnStack.length > GN_CAP) gnStack.pop();
+    console.log('[gn-debug] pushGn ->', gnStack.length, 'entries; top =', gnStack[0]);
     updateGnBtn();
   }
   let explorePartnerGone = false;   // partner left the session: dim, do not remove (§6)
@@ -2643,6 +2644,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // Your partner followed you here. Record it on this side too — by URL,
         // never by their cy id, which does not mean the same node in this graph.
         const n = msg.url ? nodeByUrl(msg.url) : null;
+        console.log('[gn-debug] gn_mark RECEIVED url=', msg.url, 'resolved=', !!(n && n.length));
         if (n && n.length) { pushGn(n.id()); renderMarks(); }
         break;
       }
@@ -2962,6 +2964,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // gn_mark would land on their screen for a node neither of you occupies.
     if (!atHead) { jumpToNode(n); return; }
 
+    console.log('[gn-debug] BN click at head — minting GN for', targetId);
     pushGn(targetId);          // following your partner IS the record
     // 2026-08-27 — and TELL them, so the record lands on both sides.
     //
@@ -2993,6 +2996,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!btn) return;
     const n = gnStack.length ? cy.getElementById(gnStack[0]) : null;
     const show = !!(n && n.length);
+    if (gnStack.length) console.log('[gn-debug] updateGnBtn: stack=', gnStack.length, 'btn found=', !!btn, 'show=', show);
     btn.classList.toggle('visible', show);
     if (!show) return;
     paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '', 'Common:');
