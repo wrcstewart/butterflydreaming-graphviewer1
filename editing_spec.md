@@ -29,7 +29,14 @@
 > |---|---|---|
 > | top-left | GN, green | nodes reached by FOLLOWING your partner |
 > | top-right | PN, faint amber | every local predecessor |
-> | bottom-right | BN, blue | the partner's positions |
+> | bottom-right | BN, blue | the partner's position NOW — **not a stack** |
+>
+> **Amended 2026-08-27.** The bottom-right corner is a live pointer, not a
+> history: you are deliberately given no way to scan back through your partner's
+> browsing, because that would realign local too far into remote. The GN stack
+> is where following is recorded — and it holds the BNs local actually CLICKED,
+> which is a record of your own choices rather than of their wanderings. That is
+> also why the GN cycles rather than pops.
 >
 > **The in-graph halo stays** where the node is structurally present. The corner
 > control is additional, not instead — which is only possible because it is no

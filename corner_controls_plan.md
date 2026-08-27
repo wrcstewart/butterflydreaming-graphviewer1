@@ -155,6 +155,29 @@ top-right, partner bottom-right.
   partner, your marker lands on their screen on the node they are already on.
   Both sides can record the same moment with no protocol.
 
+### 4b. WHICH corners are stacks — decided 2026-08-27 by the user
+
+**The BN corner is NOT a stack.** It shows the partner's CURRENT position and
+nothing else. You are deliberately not offered a way to scan back through their
+browsing, because — the user's reason, and it is the right one — *that would
+realign local too far into remote*. Following someone should be a choice you
+make at a moment, not a second trail you can wander independently of your own.
+Your thread stays primary; theirs is a live pointer, not a history.
+
+**The GN corner is the stack, and it records the BNs local actually CLICKED.**
+That is the recovery path: not "everywhere they went", but "the places I chose
+to follow them to". It is a record of your own decisions, which is why it cycles
+rather than pops.
+
+This is what makes "the GN is created ONLY by a BN click" more than a
+simplification — the click is the only event that carries local's intent, so it
+is the only one worth recording. Everything else is the partner moving about.
+
+Corrects the table in the summary above and in `editing_spec.md` §v0.2, both of
+which had the bottom-right corner holding "the partner's positions", plural.
+
+---
+
 ### 5. Stack semantics
 
 **Observed 2026-08-27, and it is not theoretical.** Testing the graph-node PN
