@@ -86,13 +86,17 @@ const FAMILY_COLOURS = {
 // 2026-08-25 — the local mark colour lives at MODULE scope because buildStyle
 // needs it too: the reading-spine arrow and the successor's outline are the
 // same signal as the selection ring and must not drift from it.
-const MARK_LOCAL     = '#8d7900';   // the node you have selected
-// 2026-08-27 — currently UNUSED. It was the successor's outline, removed when
-// the arrow became the sole successor signal. Kept because the incoming scheme
-// needs a faint amber for the PRECEDING node, and this is already the dimmed
-// partner of MARK_LOCAL: 25% down by uniform RGB scaling, which preserves hue
-// exactly (both 51.5°).
-const MARK_SUCCESSOR = '#6a5b00';
+// 2026-08-27 — brightened from #8d7900 so the CURRENT node separates clearly
+// from the PREVIOUS one, now that both are amber. Hue preserved exactly (51.5°)
+// — the pair differ in luminance alone, which is the channel to rely on.
+const MARK_LOCAL     = '#b79d00';   // the node you have selected NOW
+// The node you were on BEFORE this one. Same hue, well below MARK_LOCAL, so the
+// pair reads as one signal at two depths rather than as two colours.
+//
+// Colour carries HISTORY and identity here (local / previous / remote / agreed);
+// arrows and edges carry constructed relationships. Keeping those two channels
+// apart is why the successor's amber border was removed.
+const MARK_PREV      = '#6a5b00';
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
@@ -2058,6 +2062,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // distinction. Breadcrumb trail chips (youCy/buddyCy) keep the original
     // subtle 2px grey so the small chips don't get heavy.
     const central = instanceCy === cy;
+    // 2026-08-27 — remember where we came FROM. Only on the main canvas, and
+    // only on a real change: re-marking the same node must not push it into its
+    // own history.
+    if (central && lastReadNodeCy === cy && lastReadNodeId &&
+        lastReadNodeId !== cytoNode.id()) {
+      clearPrevVisuals();              // BEFORE the id moves on — it needs it
+      prevReadNodeId = lastReadNodeId;
+    }
     lastReadNodeId = cytoNode.id();
     lastReadNodeCy = instanceCy;
     if (central) {
@@ -2087,6 +2099,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let bnNodeId  = null;   // node carrying the partner's mark
   let bnOuter   = null;   // 'blue' | 'white' — which ring is OUTER when both coincide
   let bnGone    = false;  // partner left: dim, do not remove (§2)
+  let prevReadNodeId = null;   // the node selected before the current one
+  let pnWasRevealed  = false;
   // --- Explore sessions (editing_spec.md) --------------------------------
   // 'none' | 'offered' (we asked) | 'invited' (they asked) | 'active'
   let exploreState  = 'none';
@@ -2332,7 +2346,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // reads without a legend.
     const green   = greenNodeEl();
     const greenId = green ? green.id() : null;
+    const greenIdOf = g => (g && g.length ? g.id() : null);
     const isGreen = n => !!(n && n.length && greenId && n.id() === greenId);
+
+    // The previous node, dimmed. Skipped when the node already means something
+    // stronger — the agreed node, the partner's position, or where you are now.
+    const prevN  = prevNodeEl();
+    const prevId = prevN ? prevN.id() : null;
+    if (prevN && prevId !== greenIdOf(green) &&
+        !(bn && bn.length && bn.id() === prevId) &&
+        !(centralNode && centralNode.length && centralNode.id() === prevId)) {
+      prevN.style({
+        'border-width': 0,
+        'outline-width': 5,
+        'outline-color': MARK_PREV,
+        'outline-opacity': 0.85,
+        'outline-offset': 0,
+      });
+    }
 
     if (green) {
       // border-width 0 for the same reason as the solo blue ring: a Cluster's
@@ -2635,6 +2666,43 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     gnWasRevealed = parkMark(node, 'green') || gnWasRevealed;
   }
 
+  // Undo everything the previous-node mark did, before the id moves on. Same
+  // asymmetry as the Blue Node: revealing and marking are separate effects, so
+  // clearing the style without un-revealing leaves a node on the canvas that
+  // nothing owns.
+  function clearPrevVisuals() {
+    if (!prevReadNodeId) return;
+    const n = cy.getElementById(prevReadNodeId);
+    if (!n || !n.length) return;
+    clearMarksFrom(n);
+    if (pnWasRevealed) {
+      n.removeStyle(BN_SIZE_KEYS + ' opacity');
+      n.removeClass('parked-mark');
+      n.hide();
+    }
+    pnWasRevealed = false;
+  }
+
+  function prevNodeEl() {
+    if (!prevReadNodeId || prevReadNodeId === lastReadNodeId) return null;
+    const n = cy.getElementById(prevReadNodeId);
+    return n && n.length ? n : null;
+  }
+
+  function placePrevNode(node) {
+    pnWasRevealed = parkMark(node, 'prev') || pnWasRevealed;
+  }
+
+  // Like the green anchor, the previous node is a way BACK, so it is not
+  // suppressed at the top-level views.
+  function reassertPrevNode() {
+    const node = prevNodeEl();
+    if (!node) return;
+    if (lastReadNodeId === prevReadNodeId && lastReadNodeCy === cy) {
+      pnWasRevealed = false; node.removeStyle('opacity'); node.removeClass('parked-mark');
+    } else placePrevNode(node);
+  }
+
   function greenNodeEl() {
     if (exploreState !== 'active' || !exploreNodeId) return null;
     const n = cy.getElementById(exploreNodeId);
@@ -2735,11 +2803,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const bb    = body.length ? body.boundingBox() : ext;
     const gap   = 26;
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    return which === 'green'
-      ? { x: clamp(bb.x1 - gap - halfW, ext.x1 + halfW, ext.x2 - halfW),
-          y: clamp(bb.y1 - gap - halfH, ext.y1 + halfH, ext.y2 - halfH) }
-      : { x: clamp(bb.x2 + gap + halfW, ext.x1 + halfW, ext.x2 - halfW),
-          y: clamp(bb.y2 + gap + halfH, ext.y1 + halfH, ext.y2 - halfH) };
+    const left  = clamp(bb.x1 - gap - halfW, ext.x1 + halfW, ext.x2 - halfW);
+    const right = clamp(bb.x2 + gap + halfW, ext.x1 + halfW, ext.x2 - halfW);
+    const top   = clamp(bb.y1 - gap - halfH, ext.y1 + halfH, ext.y2 - halfH);
+    const bot   = clamp(bb.y2 + gap + halfH, ext.y1 + halfH, ext.y2 - halfH);
+    // Three corners, three meanings: agreed top-left, previous top-right,
+    // partner bottom-right. All can be parked at once, so none may share.
+    if (which === 'green') return { x: left,  y: top };
+    if (which === 'prev')  return { x: right, y: top };
+    return { x: right, y: bot };
   }
   function blueNodeCorner(node) { return markCorner(node, 'blue'); }
 
@@ -2762,12 +2834,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function scheduleBlueReassert() {
     if (blueReassertPending) return;
     const wantGreen = (exploreState === 'active' && exploreNodeId);
-    if (!bnNodeId && !wantGreen) return;
+    if (!bnNodeId && !wantGreen && !prevReadNodeId) return;
     blueReassertPending = true;
     requestAnimationFrame(() => {
       blueReassertPending = false;
       reassertBlueNode();
       reassertGreenNode();
+      reassertPrevNode();
       renderMarks();
     });
   }
@@ -2787,6 +2860,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     try {
       reassertBlueNode();
       reassertGreenNode();
+      reassertPrevNode();
       renderMarks();
     } catch (err) { console.warn('[marks] re-park after layout failed', err); }
   });
@@ -2846,6 +2920,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     try {
       reassertBlueNode();
       reassertGreenNode();
+      reassertPrevNode();
       renderMarks();
     } catch (err) { console.warn('[marks] re-assert failed', err); }
   }
@@ -5108,6 +5183,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // Pinch guard: drop taps that fired during (or within 250 ms of) a
     // multi-touch pinch so brushing a node while zooming doesn't navigate.
     if (multiTouchRecent) return;
+
+    // 2026-08-27 — the PARKED previous-node mark is a Back button, not a node.
+    // It has been lifted out of its structural position and put in a corner to
+    // mean "where you came from", so a tap on it should retrace rather than
+    // navigate forward into it. Only when PARKED: sitting in its real place in
+    // the graph it is an ordinary node again and must behave like one.
+    if (pnWasRevealed && prevReadNodeId && node.id() === prevReadNodeId) {
+      try { clearMarksFrom(node); } catch (_) {}
+      if (pnWasRevealed) { node.removeStyle(BN_SIZE_KEYS + ' opacity'); node.removeClass('parked-mark'); node.hide(); }
+      pnWasRevealed = false;
+      prevReadNodeId = null;
+      restoreState();
+      return;
+    }
 
     // Special cases with their own semantics, unchanged by the chunk UX.
     if (CLUSTER_ASSIGN && type === 'ClusterEditChip') {
