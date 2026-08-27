@@ -164,6 +164,12 @@ realign local too far into remote*. Following someone should be a choice you
 make at a moment, not a second trail you can wander independently of your own.
 Your thread stays primary; theirs is a live pointer, not a history.
 
+**A third argument FOR a BN stack, from the user 2026-08-27 — deferred, not
+rejected:** it would make BN and PN behave SYMMETRICALLY, which helps
+understanding and may simplify both design and implementation, and it is
+quasi-symmetrical with GN too. Weigh this against the "realigns local into
+remote" objection when the question is reopened. Left as a live pointer for now.
+
 **The GN corner is the stack, and it records the BNs local actually CLICKED.**
 That is the recovery path: not "everywhere they went", but "the places I chose
 to follow them to". It is a record of your own decisions, which is why it cycles

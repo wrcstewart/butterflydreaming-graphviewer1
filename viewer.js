@@ -247,6 +247,33 @@ function extractChunkHint(chunk) {
 // shows the cluster's FAMILY PARENTS (and any gateways), so a childless cluster
 // gets a view of what contains it. Upward instead of downward, which is the only
 // direction left.
+// 2026-08-27 — BREADCRUMB BARS RETIRED (corner_controls_plan.md §6).
+//
+// The user chose to sacrifice the bars' PARALLEL view of the trail — "Nature →
+// Emotion → Loss" at a glance — for simplicity, and to reclaim the ~53px the two
+// strips cost at the bottom of every screen. The three corner controls carry the
+// same information one entry at a time, and they carry LABELS, which the chips
+// could not fit.
+//
+// The code is KEPT WHOLE and merely not called, so the parallel view can come
+// back by flipping this one constant if it turns out to be missed. Every entry
+// point is gated at its top rather than at its call sites, because the call
+// sites are many and scattered and a missed one would half-build a bar nobody
+// can see.
+//
+// KNOWN LOSS, recorded in the plan: the remote strip's chips NAVIGATE, so it was
+// the only route to a position your partner has already left. With it gone the
+// BN is a live pointer with no history behind it anywhere. If that bites, the
+// honest fix is to reconsider the BN stack, not to restore the strip.
+const BREADCRUMB_BARS = false;
+
+// The control panel's depth, and the canvas's distance from the bottom of the
+// window. 46 is what the two retired strips occupied (23 + 23); 37 is where the
+// local strip's bottom edge was, which is as far down as the canvas can go
+// without touching #media-bar. Both are mirrored in style.css as fallbacks.
+const TOP_PANEL_H = 46;
+const CY_BOTTOM   = 37;
+
 function navigatesOnTap(node, hasDesc) {
   return hasDesc || node.data('type') === 'Cluster';
 }
@@ -3081,6 +3108,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Both breadcrumb bars, re-synced and re-anchored. Exposed for the same
   // reason as reassertMarks: init() owns the resize handler, these live here.
   function refitBars() {
+    if (!BREADCRUMB_BARS) return;
     try { panYouCyToLatest();   } catch (_) {}
     try { panBuddyCyToLatest(); } catch (_) {}
   }
@@ -3184,6 +3212,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let lastYouSourceText = null;
 
   function addYouChip(node) {
+    if (!BREADCRUMB_BARS) return;
     const type        = node.data('type');
     const sourceText  = type === 'TextNode' ? (node.data('source_text') || null) : null;
     const seq         = node.data('seq') ?? null;
@@ -3275,6 +3304,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let   restoringYouCrumbs  = false;            // guard: don't re-save while restore is in flight
 
   function saveYouBreadcrumbs() {
+    if (!BREADCRUMB_BARS) return;
     if (restoringYouCrumbs) return;
     try {
       const chips = youCy.nodes().map(n => n.data());
@@ -3288,6 +3318,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function addYouChipFromData(d) {
+    if (!BREADCRUMB_BARS) return;
     // Chip-render logic mirrors addYouChip's, but works off a saved
     // data dict (from localStorage) instead of a live main-graph node.
     // Skips the pair-broadcast (restore fires pre-pair).
@@ -3348,6 +3379,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function restoreYouBreadcrumbs() {
+    if (!BREADCRUMB_BARS) return;
     let raw;
     try { raw = localStorage.getItem(BD_YOU_CRUMBS_KEY); } catch (_) { return; }
     if (!raw) return;
@@ -3389,6 +3421,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   buddyCy.on('zoom', () => { try { panBuddyCyToLatest(); } catch (_) {} });
 
   function panYouCyToLatest() {
+    if (!BREADCRUMB_BARS) return;
     if (youChipCount === 0) return;
     youCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
     const containerWidth = document.getElementById('cy-you').offsetWidth;
@@ -3467,6 +3500,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let lastBuddySourceText = null;
 
   function appendBuddyChip(data) {
+    if (!BREADCRUMB_BARS) return;
     const type        = data.type;
     const sourceText  = type === 'TextNode' ? (data.source_text || null) : null;
     const seq         = data.seq ?? null;
@@ -3534,6 +3568,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // real graph node has none.
 
   function panBuddyCyToLatest() {
+    if (!BREADCRUMB_BARS) return;
     if (buddyChipCount === 0) return;
     buddyCy.resize();   // 2026-08-18 — sync canvas to the (possibly narrowed) container before panning
     const containerWidth = document.getElementById('cy-buddy').offsetWidth;
@@ -3549,6 +3584,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function resetBuddyBar() {
+    if (!BREADCRUMB_BARS) return;
     // §2 — a new pair clears the partner's mark along with their trail.
     retireBlueNode();
     bnGone = false;
@@ -4471,9 +4507,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const dest = history[history.length - 1].chipNode;
     if (!dest || !dest.length) {           // parentless view — plain arrow, as before
-      // Clear only what the DESTINATION set. removeAttribute('style') would
-      // also wipe the placement positionPnBtn wrote, dropping the button back
-      // to the CSS top row.
+      // Clear only what the DESTINATION set, not the whole style attribute.
+      // (This guarded a placement written by JS; the buttons are flex children
+      // of #bd-toppanel now, so nothing else lives in their inline style — but
+      // targeted clearing is still the correct habit.)
       backBtn.textContent = '\u2190';
       backBtn.style.background = backBtn.style.color = backBtn.style.borderColor = '';
       backBtn.style.borderRadius = '';
@@ -6498,7 +6535,14 @@ async function init() {
       document.getElementById('default-panel') ||
       document.getElementById('action-bar') ||
       document.getElementById('cy-you');
-    const topPx = Math.ceil(refEl.getBoundingClientRect().bottom) + 'px';
+    // 2026-08-27 — the CONTROL PANEL takes the anchor, and the canvas starts
+    // below it. Both are driven from the same measurement so they cannot
+    // separate; giving the panel its own would be a second writer, and this
+    // file has been bitten by that three times.
+    const anchorBottom = Math.ceil(refEl.getBoundingClientRect().bottom);
+    const topPanel = document.getElementById('bd-toppanel');
+    if (topPanel) topPanel.style.top = anchorBottom + 'px';
+    const topPx = (anchorBottom + TOP_PANEL_H) + 'px';
     cyEl.style.top = topPx;
     // A42 §42.3 — #visual-iframe must share #cy's rect exactly. iframe
     // elements have an HTML intrinsic default height of 150 px that the
@@ -6560,61 +6604,23 @@ async function init() {
         const isDesktop    = window.innerWidth > 767;
         const reserveRight = isDesktop ? 100 : 0;
         const w = Math.max(0, window.innerWidth  - reserveRight);
-        const h = Math.max(0, window.innerHeight - 90 - top);
+        // 90 was the old #cy bottom, clearing the two breadcrumb strips. They are
+        // retired and the canvas now ends at CY_BOTTOM; the iframe shares #cy's
+        // rect exactly (A42 §42.3), so it has to move with it or Player mode
+        // keeps a 53px band of dead space the canvas no longer has.
+        const h = Math.max(0, window.innerHeight - CY_BOTTOM - top);
         iframeEl.style.top    = top + 'px';
         iframeEl.style.left   = '0px';
         iframeEl.style.width  = w + 'px';
         iframeEl.style.height = h + 'px';
       }
     }
-    positionPnBtn();
   }
 
-  // 2026-08-27 — the PN control sits at the TOP-RIGHT OF THE CANVAS, not in the
-  // top button row it has occupied until now.
-  //
-  // corner_controls_plan.md gives the three marks three corners — GN top-left,
-  // PN top-right, BN bottom-right. Leaving Back up in the row would put a hole
-  // in that scheme and keep the control far from the graph it refers to. It is
-  // a DOM button over the canvas, so there was never anything stopping it; the
-  // reason this reuses #back-btn is that its stack already pops, not placement.
-  //
-  // Anchored to #cy's LIVE rect, never to a constant. The canvas top moves with
-  // the panel stack, the Nodes/Edit/Player toggle and every resize — the same
-  // rule the Kolam arrows follow: measure the column, do not assume it.
-  function positionPnBtn() {
-    if (!cyEl) return;
-    const r = cyEl.getBoundingClientRect();
-    if (!r.height) return;                       // hidden pane measures 0x0
-    const inset = 8;
-    const right = Math.round(window.innerWidth - r.right + inset) + 'px';
-
-    const pn = document.getElementById('back-btn');
-    if (pn) {
-      pn.style.top   = Math.round(r.top + inset) + 'px';
-      pn.style.left  = 'auto';                   // overrides the CSS left AND its mobile override
-      pn.style.right = right;
-    }
-    // GN top-left: the agreed/followed record. Opposite corner to the BN because
-    // both can be wanted at once, which is why they never shared one as marks.
-    const gn = document.getElementById('gn-btn');
-    if (gn) {
-      gn.style.top    = Math.round(r.top + inset) + 'px';
-      gn.style.right  = 'auto';
-      gn.style.left   = Math.round(r.left + inset) + 'px';
-      gn.style.bottom = 'auto';
-    }
-    // BN bottom-right, the corner it has always parked in — so the habit built
-    // over the last week survives the change of representation.
-    const bn = document.getElementById('bn-btn');
-    if (bn) {
-      bn.style.top    = 'auto';
-      bn.style.left   = 'auto';
-      bn.style.right  = right;
-      bn.style.bottom = Math.round(window.innerHeight - r.bottom + inset) + 'px';
-    }
-  }
-
+  // Kept as named constants because THREE places have to agree about them: this
+  // file's canvas placement, the iframe rect that mirrors it, and the CSS
+  // fallbacks. They were literals (158 / 90) and drifted out of step with the
+  // comments describing them.
   // A42 §42.3 — Nodes/Player view switch. Called by the radio change handler
   // and by toggleChatMode when chat closes (forces back to Nodes).
   const visualIframe = document.getElementById('visual-iframe');

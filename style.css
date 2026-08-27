@@ -61,9 +61,9 @@ html, body {
 
 #pair-control {
   position: fixed;
-  /* 2026-08-27 — top/left/right are now written by positionPnBtn from #cy's
-     live rect, placing this at the CANVAS top-right (the PN corner of
-     corner_controls_plan.md). What is left here is the pre-JS fallback. */
+  /* 2026-08-27 — now a flex child of #bd-toppanel above the canvas. The
+     position/top/left below are overridden by the #back-btn,#bn-btn,#gn-btn
+     rule further down; they survive only as the pre-panel fallback. */
   top: 6px;                              /* 2026-08-14 — raised from 34px into vacated title-bar row */
   /* 2026-08-14 v2 — panel-aligned on desktop: 30% from right edge lines
      up with the 40%-wide centred panel's right edge. Mobile override
@@ -215,7 +215,7 @@ html, body {
 }
 #bn-btn.visible { display: block; }
 
-/* The GN control — canvas top-left, written by positionPnBtn. Same shape
+/* The GN control — laid out by #bd-toppanel's flex row. Same shape
    language as #back-btn and #bn-btn; only the border separates the three, which
    is the whole mark vocabulary: dark for your own trail, blue for the partner,
    green for a convergence you chose to record. */
@@ -304,14 +304,60 @@ html, body {
   z-index: 5;
 }
 
+
+/* 2026-08-27 — THE CONTROL PANEL. Sits directly above the canvas, is written by
+   positionCyEl from the same anchor #cy uses, and is PERMANENT: it survives the
+   Nodes/Edit/Player toggle, unlike every other panel in the stack.
+
+   Depth 46px, which is what the two retired breadcrumb strips occupied
+   (23 + 23). Deliberately kept rather than trimmed: a description line goes
+   ABOVE each button, so the space is spoken for.
+
+   align-items: flex-end so the buttons sit on the panel's baseline and the room
+   above them is where the descriptions will go. */
+#bd-toppanel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 158px;                            /* set precisely by JS; fallback only */
+  height: 46px;
+  z-index: 6;                            /* above the canvas, below the top button row */
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 8px 4px;
+  box-sizing: border-box;
+  background: #14141a;
+  border-bottom: 1px solid #2a2a32;
+  overflow: hidden;
+}
+
+/* Inside the panel the three controls are laid out by flex, so every trace of
+   the corner positioning goes — including #back-btn's `left: 30%` and its mobile
+   override, which would otherwise still apply. */
+#back-btn, #bn-btn, #gn-btn {
+  position: static;
+  top: auto; left: auto; right: auto; bottom: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* 2026-08-27 — the two breadcrumb strips are RETIRED (see BREADCRUMB_BARS in
+   viewer.js). Hidden rather than removed: the markup and all the chip code stay
+   whole so flipping that one constant brings the parallel view back. */
+#cy-you, #cy-buddy { display: none !important; }
+
 #cy {
   position: fixed;
   left: 0;
   right: 0;
-  top: 158px;   /* set precisely by JS; fallback matches BARS_BOTTOM */
-  bottom: 90px;                         /* clears the bottom stack: whichever strip
-                                           holds the upper slot ends at 63+23=86,
-                                           + 4px gap (A51) */
+  top: 204px;   /* set precisely by JS = panel bottom; fallback only */
+  /* 2026-08-27 — was 90px, clearing the two breadcrumb strips (the upper ended
+     at 63+23=86, +4 gap). Both are retired, so the canvas now runs down to the
+     bottom of where the LOCAL strip was: #media-bar ends at ~28, and 37 was
+     #cy-you's own bottom edge, so this reclaims 53px without touching the
+     media bar. */
+  bottom: 37px;
   z-index: 1;
   cursor: url('cursor-wings.svg') 16 16, auto;
   touch-action: none;
@@ -963,7 +1009,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
