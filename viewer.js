@@ -4489,7 +4489,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // points AT the word, reading "go to this", where leading it points away
   // from the name and reads as a description of where you already are.
   function paintNodeButton(btn, node, suffix) {
-    const colour = node.data('colour') || MARK_LOCAL;
+    // bnBaseColour, NOT data('colour') — the same distinction the blue radial
+    // fill already had to make. Several node types set background-color
+    // literally in the stylesheet and never touch the data field: gateway
+    // TextNodes render WHITE with black text but carry colour:null, so reading
+    // the data field painted the button the dark fallback instead. The root
+    // node, the Gateways square and the snake view's inline fills are all the
+    // same, and a control that stands for a node must wear what that node
+    // actually looks like or it stops being recognisable — which is the whole
+    // job it has.
+    const colour = bnBaseColour(node);
     const full   = String(node.data('display_name') || node.data('name') || '');
     // truncateChipLabel FLATTENS whitespace before measuring — load-bearing,
     // since Cluster display_name carries real newlines ("Loss\nLonging") and a
