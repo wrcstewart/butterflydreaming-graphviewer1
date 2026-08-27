@@ -1,3 +1,16 @@
+:root {
+  /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
+     50. Designer feedback singled out the top-row buttons and the helper
+     card header as the loudest thing on screen.
+
+     Hue and lightness are unchanged, so it is the same gold at half the
+     intensity — 7.6:1 against the dark text it carries, where the bright
+     version gave 12.5:1, so nothing becomes hard to read.
+
+     Now a variable because this colour appeared in 12 places and the
+     next adjustment should be one line, not 12. */
+  --bd-gold: #BFAC40;
+}
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -70,7 +83,7 @@ html, body {
    controls now share the same visual language. Canary role moved OFF
    this button and onto #copy-link-btn (below). */
 #chat-btn {
-  background: #FFD700;
+  background: var(--bd-gold);
   border: 1px solid #a07820;
   border-radius: 4px;
   color: #1a1a20;
@@ -125,7 +138,7 @@ html, body {
    communicates the state (Pair ↔ Unpair). Kept as a no-op selector
    in case other code toggles .active for state tracking. */
 #chat-btn.active {
-  background: #FFD700;
+  background: var(--bd-gold);
   border-color: #a07820;
   color: #1a1a20;
 }
@@ -141,7 +154,7 @@ html, body {
   /* 2026-07-28 — filled signal yellow (same as #copy-link-btn) since Back
      is a primary navigation control and users were missing it in its dim
      amber-on-amber form. Same colour language reads as "important". */
-  background: #FFD700;
+  background: var(--bd-gold);
   border: 1px solid #a07820;
   border-radius: 4px;
   color: #1a1a20;
@@ -316,7 +329,7 @@ html, body {
   inset: 0;
   z-index: 10000;
   background: rgba(10, 8, 4, 0.96);
-  color: #FFD700;
+  color: var(--bd-gold);
   align-items: center;
   justify-content: center;
   font-family: Georgia, 'Times New Roman', serif;
@@ -506,7 +519,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
    on bright yellow fails luminance contrast (see [[user-colour-vision]]).
    2026-08-14 — extended to #current-stack. */
 #chat-stack .card.system .card-head,
-#current-stack .card.system .card-head { background: #FFD700; color: #1a1a20; }
+#current-stack .card.system .card-head { background: var(--bd-gold); color: #1a1a20; }
 
 .card-body {
   width: 100%;
@@ -584,7 +597,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
    Back button (yellow), local breadcrumb strip (bread). Font weight
    nudged up so the highlight reads clearly against the panel bg. */
 .hi-yellow {
-  color: #FFD700;
+  color: var(--bd-gold);
   font-weight: 600;
 }
 .hi-bread {
@@ -593,7 +606,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
      (was an exact match with #cy-you and .card.local .card-head)
      so the reader sees the same colour on the sentence and on the
      local breadcrumb strip / local card headers. */
-  color: #FFD700;
+  color: var(--bd-gold);
   font-weight: 700;
 }
 
@@ -744,7 +757,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    - .listening:      "🎤 Recording…" — red, holding to capture
    - .processing:     "🎤 Transcribing…" — dim, waiting on Whisper */
 #sr-mic-btn {
-  background: #FFD700;
+  background: var(--bd-gold);
   border: 1px solid #a07820;
   border-radius: 4px;
   color: #1a1a20;
@@ -794,7 +807,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   background: #4caf50;
   transition: width 60ms linear;
 }
-#sr-level-meter .bar.mid { background: #FFD700; }
+#sr-level-meter .bar.mid { background: var(--bd-gold); }
 #sr-level-meter .bar.hot { background: #ff5555; }
 
 /* SR mic primer — appears in Edit mode over the panel area while the
@@ -877,7 +890,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -972,7 +985,7 @@ body:not(.player-active) #copy-up-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #FFD700;
+  background: var(--bd-gold);
   border: 1px solid #a07820;
   border-radius: 4px;
   padding: 2px 8px;
@@ -1424,8 +1437,8 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 .mp-loop:hover     { border-color: #fff; }
 .mp-loop.on        {
   background: rgba(255, 215, 0, 0.2);
-  border-color: #FFD700;
-  color: #FFD700;
+  border-color: var(--bd-gold);
+  color: var(--bd-gold);
 }
 
 
