@@ -87,9 +87,11 @@ const FAMILY_COLOURS = {
 // needs it too: the reading-spine arrow and the successor's outline are the
 // same signal as the selection ring and must not drift from it.
 const MARK_LOCAL     = '#8d7900';   // the node you have selected
-// 25% dimmer, by uniform RGB scaling — which preserves hue exactly, so the
-// successor reads as the same signal one step quieter rather than as a
-// different colour.
+// 2026-08-27 — currently UNUSED. It was the successor's outline, removed when
+// the arrow became the sole successor signal. Kept because the incoming scheme
+// needs a faint amber for the PRECEDING node, and this is already the dimmed
+// partner of MARK_LOCAL: 25% down by uniform RGB scaling, which preserves hue
+// exactly (both 51.5°).
 const MARK_SUCCESSOR = '#6a5b00';
 
 const EDGE_COLOURS = {
@@ -1187,7 +1189,11 @@ function buildStyle() {
         'line-color': MARK_LOCAL,
         'target-arrow-color': MARK_LOCAL,
         'target-arrow-shape': 'triangle',
-        'arrow-scale': 1.2,          // ~2x the softened 0.6 TextNode-CHILD arrow
+        'arrow-scale': 1.44,         // 2026-08-27 — +20%. The arrow is now the
+                                     // ONLY successor signal, so it carries
+                                     // alone what it used to share with a
+                                     // border.  (~2x the softened 0.6
+                                     // TextNode-CHILD arrow before the bump.)
         'width': 2.5,                // thicker than the ~0.6 default hop
         'opacity': 0.95,
         'z-index': 15,
@@ -1199,9 +1205,12 @@ function buildStyle() {
       // gets its own thicker amber border via markReadNode (inline → wins).
       selector: 'node.seq-successor',
       style: {
-        'border-width': 4,
-        'border-color': MARK_SUCCESSOR,
-        'border-opacity': 1,
+        // 2026-08-27 — border REMOVED. The successor is signalled by the arrow
+        // alone now; a second mark on the node competed with the local ring
+        // for the same meaning. The class is kept so applySeqSignals still has
+        // something to target, and so the successor can be styled again
+        // without re-deriving which node it is.
+        'border-width': 0,
       }
     },
     {
