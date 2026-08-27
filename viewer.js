@@ -4266,8 +4266,66 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   const backBtn = document.getElementById('back-btn');
 
+  // 2026-08-27 — the Back button now WEARS the node it will return you to.
+  //
+  // This is the PN control of corner_controls_plan.md step 2. The plan had it
+  // as a NEW DOM control with its own stack, until the user asked whether the
+  // PN is simply this button carrying the previous node's style. It is — and
+  // this button's stack already POPS (saveState/restoreState), which the
+  // parallel `prevReadNodeId` history built beside it did not, and that missing
+  // pop was the whole of the A->B->A->B oscillation.
+  //
+  // So step 2 is APPEARANCE ONLY. No new stack, no new click handler, no
+  // recording. The button already went to the right place; it just never said
+  // where that was.
+
+  // Black or white ink, chosen by measured luminance rather than by eye. The
+  // family palette spans a wide lightness range, so no single ink works for all
+  // of it — and the user relies on luminance contrast rather than hue, which
+  // makes guessing this the wrong move specifically here.
+  const INK_DARK = '#1a1a20', INK_DARK_L = 0.0106;   // relative luminance of INK_DARK
+  function readableInk(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return INK_DARK;
+    const v = parseInt(m[1], 16);
+    const lin = c => (c /= 255) <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    const L = 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
+    const vsWhite = 1.05 / (L + 0.05);
+    const vsDark  = (L + 0.05) / (INK_DARK_L + 0.05);
+    return vsWhite > vsDark ? '#ffffff' : INK_DARK;
+  }
+
   function updateBackBtn() {
-    backBtn.classList.toggle('visible', history.length > 0);
+    const has = history.length > 0;
+    backBtn.classList.toggle('visible', has);
+    if (!has) return;
+
+    const dest = history[history.length - 1].chipNode;
+    if (!dest || !dest.length) {           // parentless view — plain arrow, as before
+      backBtn.textContent = '\u2190';
+      backBtn.removeAttribute('style');
+      backBtn.removeAttribute('title');
+      return;
+    }
+
+    const colour = dest.data('colour') || MARK_LOCAL;
+    const full   = String(dest.data('display_name') || dest.data('name') || '');
+    // truncateChipLabel FLATTENS whitespace before measuring — load-bearing,
+    // since Cluster display_name carries real newlines ("Loss\nLonging") and a
+    // length test on the raw string passes while the render is wrong.
+    const label  = truncateChipLabel(full);
+
+    backBtn.textContent = label ? '\u2190 ' + label : '\u2190';
+    backBtn.style.background  = colour;
+    backBtn.style.color       = readableInk(colour);
+    backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
+    // Gateways is the corpus's one square node. Everything else that can be a
+    // Back destination is round-rectangle, hexagon or round-triangle, and none
+    // of those survive being drawn 20px high — rounding is the honest half of
+    // the shape signal, and the colour carries the rest.
+    backBtn.style.borderRadius =
+      (dest.data('type') === 'Entry' && dest.data('name') === 'Gateways') ? '2px' : '6px';
+    backBtn.title = full.replace(/\s+/g, ' ');   // the untruncated name, on hover
   }
 
   function saveState() {

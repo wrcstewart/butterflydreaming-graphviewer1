@@ -154,15 +154,26 @@ html, body {
   /* 2026-07-28 — filled signal yellow (same as #copy-link-btn) since Back
      is a primary navigation control and users were missing it in its dim
      amber-on-amber form. Same colour language reads as "important". */
+  /* 2026-08-27 — background, colour and border-radius are now set INLINE by
+     updateBackBtn from the node it will return you to, so the button says where
+     it goes rather than only that going back is possible. These are the
+     fallback for the parentless case, where the arrow stands alone. */
   background: var(--bd-gold);
   border: 1px solid #a07820;
   border-radius: 4px;
   color: #1a1a20;
-  font-size: 18px;
-  font-weight: 700;
+  /* Was 18px/700 for a lone arrow. A label needs to be readable without the
+     button growing into #pair-control, so: smaller, still bold, clipped at a
+     width that suits the 13-char cap truncateChipLabel applies. */
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 40vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
-  padding: 4px 12px;
-  line-height: 1;
+  padding: 5px 10px;
+  line-height: 1.15;
   font-family: sans-serif;
 }
 
@@ -173,9 +184,11 @@ html, body {
   #back-btn { left: 8px; }
 }
 
+/* Hover must not name a colour any more — the button wears its destination's,
+   which changes on every navigation, and a fixed hover yellow would contradict
+   it. Brightening whatever is there works for all of them. */
 #back-btn:hover {
-  background: #ffe555;
-  border-color: #d4a52e;
+  filter: brightness(1.18);
 }
 
 #chat-btn:disabled {
@@ -890,7 +903,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
