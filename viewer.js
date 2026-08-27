@@ -2875,11 +2875,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // functions call. That is what lets Back return you across a jump whose
   // destination has no structural path back.
   function jumpToNode(n) {
-    const type = n.data('type');
     markReadNode(n, cy);
-    if (type === 'Cluster')     expandToCluster(n);
-    else if (type === 'Family') expandToFamily(n);
-    else                        expandToNode(n);
+    // navigateInto, NOT a second hand-rolled dispatch. It already routes
+    // gateways and section-title pages to their own handlers, and duplicating
+    // the branch list here sent a jump to a partner's GATEWAY through
+    // expandToNode — the whole-neighbourhood path, i.e. exactly the 70-cluster
+    // tableau, every single time.
+    navigateInto(n);
     addYouChip(n);
     renderMarks();
   }
@@ -4690,8 +4692,46 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   async function handleGatewayClick(node) {
-    if (!lastClusterNode) {
-      expandToNode(node);
+    // 2026-08-27 — this used to read `if (!lastClusterNode)`, and that one
+    // condition carried two faults the user found as "sometimes clicking a
+    // gateway shows a tableau of 70+ clusters".
+    //
+    // lastClusterNode is written ONLY by expandToCluster and never cleared, so:
+    //
+    //  1. Cold — before any cluster has been visited it is null, and the click
+    //     fell through to expandToNode, whose one-hop rule shows the gateway's
+    //     ENTIRE neighbourhood: up to 48 clusters plus every chunk TextNode.
+    //     Hence "sometimes", and hence "not usually" — normally you have been
+    //     through a cluster first.
+    //  2. Stale — it is whatever cluster you saw LAST, which may belong to a
+    //     different work. The query then finds no chunk of THIS work in THAT
+    //     cluster, and the focused view collapses to two nodes with no
+    //     explanation. Quieter than fault 1 and probably read as "did nothing".
+    //
+    // So the context is now VALIDATED rather than assumed: use it only when
+    // this gateway actually contains it.
+    const ctxValid = !!(lastClusterNode && lastClusterNode.length &&
+      node.outgoers('edge[type="CONTAINS_CLUSTER"]').targets()
+          .some(c => c.id() === lastClusterNode.id()));
+
+    if (!ctxValid) {
+      // No cluster context: show the work's THEMES — the gateway and the
+      // clusters it contains — rather than its whole neighbourhood. Still a
+      // large view for a big work, but a deliberate and meaningful one, and
+      // without the chunk TextNodes that made it a wall.
+      exitSnakeView();
+      saveState();
+      activeNodeId = node.id();
+      lastParentNode = node;
+      cy.elements().hide();
+      scheduleBlueReassert();
+      node.show();
+      const themes = node.outgoers('edge[type="CONTAINS_CLUSTER"]');
+      themes.show();
+      themes.targets().show();
+      cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
+      runLayout(cy, node);
+      markReadNode(node, cy);
       return;
     }
 
