@@ -2174,6 +2174,32 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   const GN_CAP  = 3;
   const gnStack = [];
 
+  // 2026-08-27 — the BN STACK. Reopened at the user's request after being
+  // deferred: their argument is that it makes BN and PN behave SYMMETRICALLY,
+  // which helps understanding and may simplify both, and is quasi-symmetrical
+  // with GN too. The symptom that reopened it is the argument making itself —
+  // once you have jumped, the button names the node you are standing on and
+  // there is nowhere further to go.
+  //
+  // A CURSOR, not a rotation. The stack is newest-first and the halo always
+  // tracks bnStack[0] — where your partner IS — while the cursor is where your
+  // browsing has got to. Rotating the array would make "their current position"
+  // wander, and that is the one thing the BN must never lie about.
+  //
+  // Any move by your partner resets the cursor to 0. They moved; that is news,
+  // and it outranks a tour of where they have been.
+  const BN_CAP  = 3;
+  const bnStack = [];
+  let   bnCursor = 0;
+
+  function pushBn(id) {
+    const i = bnStack.indexOf(id);
+    if (i !== -1) bnStack.splice(i, 1);        // revisiting moves it to the top
+    bnStack.unshift(id);
+    while (bnStack.length > BN_CAP) bnStack.pop();
+    bnCursor = 0;                              // their move resets your browsing
+  }
+
   // The ONE place a GN is minted: a click on the LIVE BN. That is what makes
   // this cheap — your marker lands on their screen on the node they are
   // standing on, so both sides record the same moment with no protocol at all.
@@ -2676,6 +2702,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (bnNodeId && bnNodeId !== node.id()) retireBlueNode();
 
     bnNodeId = node.id();
+    pushBn(bnNodeId);
     bnGone   = false;
     // Blue arrived last. If we are already standing here, that is §1.2 case A
     // ("they came to me") — white stays inside, blue takes the outer ring.
@@ -2872,17 +2899,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // renderMarks and take the halos with it. Same trap as the init() destructure.
     const bnBtn = document.getElementById('bn-btn');
     if (!bnBtn) return;
-    const n = bnNodeId ? cy.getElementById(bnNodeId) : null;
+    const targetId = bnStack.length ? bnStack[Math.min(bnCursor, bnStack.length - 1)] : bnNodeId;
+    const n = targetId ? cy.getElementById(targetId) : null;
     const show = !!(n && n.length && pairingState && pairingState.active);
     bnBtn.classList.toggle('visible', show);
     if (!show) return;
-    paintNodeButton(bnBtn, n, '', 'Remote:');
+    // A number when you are browsing BACK through their trail: 1 = one position
+    // ago. Blank at the cursor's home, where the button means "where they are".
+    paintNodeButton(bnBtn, n, bnCursor > 0 ? String(bnCursor) : '', 'Remote:');
     bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
     // §2 — the partner left: dim, do not remove. They are still where they were.
     // And dim when you are ALREADY on their node: clicking then jumps you to
     // where you already stand, which is correctly a no-op but was a silent one,
     // and a silent no-op reads as a broken button.
-    const here = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+    const here = (lastReadNodeId === targetId && lastReadNodeCy === cy);
     bnBtn.style.opacity = (bnGone || here) ? '0.45' : '';
     bnBtn.style.cursor  = here ? 'default' : 'pointer';
   }
@@ -2914,10 +2944,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function jumpToPartner() {
-    if (!bnNodeId) return;
-    const n = cy.getElementById(bnNodeId);
+    const atHead   = (bnCursor === 0);
+    const targetId = bnStack.length ? bnStack[Math.min(bnCursor, bnStack.length - 1)] : bnNodeId;
+    if (!targetId) return;
+    const n = cy.getElementById(targetId);
     if (!n.length) return;
-    pushGn(bnNodeId);          // following your partner IS the record
+
+    // Advance BEFORE navigating, so a second press goes one further back rather
+    // than sticking on the node you have just arrived at — which is the whole
+    // complaint this stack answers. Wraps, so the tour returns to their current
+    // position rather than dead-ending.
+    if (bnStack.length > 1) bnCursor = (bnCursor + 1) % bnStack.length;
+
+    // A GN is minted ONLY from their CURRENT position. Following them to where
+    // they have already been is not a convergence — they are not there, so a
+    // green mark saying "we were both here" would be a fiction, and the
+    // gn_mark would land on their screen for a node neither of you occupies.
+    if (!atHead) { jumpToNode(n); return; }
+
+    pushGn(targetId);          // following your partner IS the record
     // 2026-08-27 — and TELL them, so the record lands on both sides.
     //
     // The plan expected this to be symmetric "for free" — you arrive on the
@@ -3597,6 +3642,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // reached past a rendering concern into a live one: without this, pairing
     // with someone new leaves the previous partner's Blue Node on your graph.
     retireBlueNode();
+    bnStack.length = 0;      // a new partner does not inherit the last one's trail
+    bnCursor = 0;
     bnGone = false;
     try { renderMarks(); } catch (_) {}
     if (!BREADCRUMB_BARS) return;

@@ -164,6 +164,23 @@ realign local too far into remote*. Following someone should be a choice you
 make at a moment, not a second trail you can wander independently of your own.
 Your thread stays primary; theirs is a live pointer, not a history.
 
+**REVERSED, same day, and BUILT.** The user chose to try the stack after all,
+and the symptom that prompted it was the argument making itself: once you have
+jumped, a pointer names the node you are standing on and there is nowhere
+further to go — it "gets stuck".
+
+Built as a CURSOR over a newest-first stack (cap 3), not a rotation: the halo
+always tracks `bnStack[0]`, where your partner IS, while the cursor is where
+your browsing has reached. Rotating would make "their current position" wander,
+which is the one thing the BN must never lie about. Any move by your partner
+resets the cursor to 0 — they moved, that is news, and it outranks a tour.
+
+**A GN is still minted ONLY from the head.** Following them to somewhere they
+have already left is not a convergence, so no green mark and no `gn_mark` — the
+reasoning that made the GN cheap is unchanged by the BN gaining depth.
+
+The original argument, for the record:
+
 **A third argument FOR a BN stack, from the user 2026-08-27 — deferred, not
 rejected:** it would make BN and PN behave SYMMETRICALLY, which helps
 understanding and may simplify both design and implementation, and it is
