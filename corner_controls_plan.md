@@ -202,7 +202,34 @@ indicator behave identically for one click and diverge on the second.
   adding a second.
 - **Cap** each stack (3 is a reasonable start).
 
-### 6. Then, and only then, consider retiring the breadcrumb bars
+### 6. Retire the breadcrumb bars — **DECIDED 2026-08-27, do this next**
+
+The user has chosen to **sacrifice the parallel view for simplicity**. The open
+question below is settled; what follows it is kept as the record of what was
+weighed.
+
+**Order of work:**
+
+1. **Stop CALLING the breadcrumb bar code. Do not delete it.** Kept whole so the
+   parallel view can come back if it turns out to be missed.
+2. **Move the graph area down** so its bottom sits where the bottom of the local
+   breadcrumb strip is now.
+3. **A new permanent panel ABOVE the graph**, present in Player mode too.
+4. **The three corner buttons move into it** — placement inside it is open for
+   now. Keep its depth roughly the current breadcrumb depth: a **description of
+   each button goes above it**.
+
+**Consequence to watch, and it is a real one.** The remote breadcrumb strip is
+today the only way to reach a position your partner has ALREADY LEFT — its chips
+navigate (viewer.js `buddyCy.on('tap','node')`). Retiring it makes the BN
+strictly a live pointer with no history behind it anywhere. That is consistent
+with the decision that BN is not a stack, and it was half the argument against
+giving it one — so if the loss bites, the honest fix is to reconsider the BN
+stack rather than to bring the strip back.
+
+---
+
+### 6 (original). Then, and only then, consider retiring the breadcrumb bars
 The two strips cost ~46px of permanent vertical space; three buttons in one
 strip cost less and carry labels the chips cannot fit.
 
