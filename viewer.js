@@ -4319,7 +4319,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // length test on the raw string passes while the render is wrong.
     const label  = truncateChipLabel(full);
 
-    backBtn.textContent = label ? '\u2190 ' + label : '\u2190';
+    // 2026-08-27 — arrow AFTER the label, per the user: a left-pointing arrow
+    // placed after the word points AT the word, so it reads "back to this".
+    // Leading it ("← Loss") points away from the name and reads as the label
+    // describing where you are rather than where you are going.
+    backBtn.textContent = label ? label + ' \u2190' : '\u2190';
     backBtn.style.background  = colour;
     backBtn.style.color       = readableInk(colour);
     backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
