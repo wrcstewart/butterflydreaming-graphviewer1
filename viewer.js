@@ -2136,6 +2136,30 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // 'none' | 'offered' (we asked) | 'invited' (they asked) | 'active'
   let exploreState  = 'none';
   let exploreNodeId = null;   // the node the session is anchored to
+
+  // 2026-08-27 — the GN STACK (corner_controls_plan.md step 4b/5). The BNs you
+  // actually CLICKED: a record of your own choices, not of your partner's
+  // wanderings. Their trail is already browsable in the remote breadcrumb strip
+  // and does not need a second, worse copy here.
+  //
+  // It CYCLES rather than pops — a record must survive being visited, unlike
+  // the back stack, where consuming the entry is the point.
+  const GN_CAP  = 3;
+  const gnStack = [];
+
+  // The ONE place a GN is minted: a click on the LIVE BN. That is what makes
+  // this cheap — your marker lands on their screen on the node they are
+  // standing on, so both sides record the same moment with no protocol at all.
+  // A click on a stale remote breadcrumb chip navigates but mints NOTHING:
+  // there is no convergence to record, and a green mark for a node your partner
+  // has already left would be a fiction.
+  function pushGn(id) {
+    const i = gnStack.indexOf(id);
+    if (i !== -1) gnStack.splice(i, 1);      // revisiting moves it to the top
+    gnStack.unshift(id);
+    while (gnStack.length > GN_CAP) gnStack.pop();
+    updateGnBtn();
+  }
   let explorePartnerGone = false;   // partner left the session: dim, do not remove (§6)
   let snapNodeId    = null;   // node currently carrying BOTH marks, or null
   // Did WE reveal this node, or was it already part of the user's view? Only a
@@ -2465,7 +2489,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       });
     }
     if (bn && bn.length) applyBlueFill(bn);
-    updateBnBtn();      // the corner control tracks the same state as the halo
+    updateBnBtn();      // the corner controls track the same state as the halos
+    updateGnBtn();
   }
 
   // One control, four meanings — see refreshExploreBtn for the labels.
@@ -2633,6 +2658,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // True when the node the Blue Node is leaving is ALSO the agreed node. Then
   // it is not ours to strip or hide — the green anchor owns it now.
   function isExploreAnchor(id) {
+    if (gnStack.indexOf(id) !== -1) return true;   // a recorded convergence
     return exploreState === 'active' && !!exploreNodeId && exploreNodeId === id;
   }
 
@@ -2694,9 +2720,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // The agreed node, parked top-left when it is not part of the current view.
   // Same treatment as the Blue Node: reveal it rather than lose the anchor,
   // and remember that WE revealed it so it can be put back.
-  function placeGreenNode(node) {
-    gnWasRevealed = parkMark(node, 'green') || gnWasRevealed;
-  }
+  // 2026-08-27 — not parked any more, for the third and last time: a cytoscape
+  // node has ONE position. The corner is #gn-btn. The green halo still paints
+  // wherever a recorded node is genuinely in your view.
+  function placeGreenNode(_node) { /* the corner is a DOM button now */ }
 
   // Undo everything the previous-node mark did, before the id moves on. Same
   // asymmetry as the Blue Node: revealing and marking are separate effects, so
@@ -2818,7 +2845,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     paintNodeButton(bnBtn, n, '');
     bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
     // §2 — the partner left: dim, do not remove. They are still where they were.
-    bnBtn.style.opacity = bnGone ? '0.45' : '';
+    // And dim when you are ALREADY on their node: clicking then jumps you to
+    // where you already stand, which is correctly a no-op but was a silent one,
+    // and a silent no-op reads as a broken button.
+    const here = (lastReadNodeId === bnNodeId && lastReadNodeCy === cy);
+    bnBtn.style.opacity = (bnGone || here) ? '0.45' : '';
+    bnBtn.style.cursor  = here ? 'default' : 'pointer';
   }
 
   // Following your partner. This is the act corner_controls_plan.md step 4
@@ -2831,10 +2863,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // expand functions call. That is what lets Back return you across the jump,
   // and it is the whole reason the corner control was wanted: the destination
   // may have no structural path back to where you were.
-  function jumpToPartner() {
-    if (!bnNodeId) return;
-    const n = cy.getElementById(bnNodeId);
-    if (!n.length) return;
+  // Dispatches by type exactly as the tap handler does, so a jump is an ordinary
+  // navigation in every respect — including saveState, which all three expand
+  // functions call. That is what lets Back return you across a jump whose
+  // destination has no structural path back.
+  function jumpToNode(n) {
     const type = n.data('type');
     markReadNode(n, cy);
     if (type === 'Cluster')     expandToCluster(n);
@@ -2843,6 +2876,40 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     addYouChip(n);
     renderMarks();
   }
+
+  function jumpToPartner() {
+    if (!bnNodeId) return;
+    const n = cy.getElementById(bnNodeId);
+    if (!n.length) return;
+    pushGn(bnNodeId);          // following your partner IS the record
+    jumpToNode(n);
+  }
+
+  // Visiting a snap must not destroy it, so the top rotates to the back rather
+  // than being consumed. Repeated presses walk the record and return to where
+  // they started — the opposite of the Back button, deliberately.
+  function cycleGn() {
+    if (!gnStack.length) return;
+    const id = gnStack[0];
+    const n  = cy.getElementById(id);
+    if (!n.length) { gnStack.shift(); updateGnBtn(); return; }   // node went away
+    gnStack.push(gnStack.shift());
+    jumpToNode(n);
+    updateGnBtn();
+  }
+
+  function updateGnBtn() {
+    const btn = document.getElementById('gn-btn');   // per call — see updateBnBtn
+    if (!btn) return;
+    const n = gnStack.length ? cy.getElementById(gnStack[0]) : null;
+    const show = !!(n && n.length);
+    btn.classList.toggle('visible', show);
+    if (!show) return;
+    paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '');
+    btn.style.borderColor = MARK_GREEN;
+  }
+  const gnBtnEl = document.getElementById('gn-btn');
+  if (gnBtnEl) gnBtnEl.addEventListener('click', cycleGn);
   const bnBtnEl = document.getElementById('bn-btn');
   if (bnBtnEl) bnBtnEl.addEventListener('click', jumpToPartner);
 
@@ -4440,6 +4507,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (dest && dest.length) {
       const ptype = dest.data('type');
       if (ptype === 'Entry' || ptype === 'Family' || ptype === 'Cluster' || ptype === 'TextNode') addYouChip(dest);
+      // 2026-08-27 — restore the SELECTION too, not only the view. Back used to
+      // null activeNodeId, which was tolerable while Back only ever meant
+      // "collapse to the parent": there was no particular node to come back to.
+      // Returning across a BN jump is different — you were reading something
+      // specific — and arriving with nothing selected loses the amber ring and
+      // leaves Unified Focus with nothing to focus. Guarded on visible() so a
+      // node the restored view does not show cannot become the selection.
+      if (dest.visible()) { activeNodeId = dest.id(); markReadNode(dest, cy); }
     }
     return true;
   }
@@ -6446,6 +6521,15 @@ async function init() {
       pn.style.top   = Math.round(r.top + inset) + 'px';
       pn.style.left  = 'auto';                   // overrides the CSS left AND its mobile override
       pn.style.right = right;
+    }
+    // GN top-left: the agreed/followed record. Opposite corner to the BN because
+    // both can be wanted at once, which is why they never shared one as marks.
+    const gn = document.getElementById('gn-btn');
+    if (gn) {
+      gn.style.top    = Math.round(r.top + inset) + 'px';
+      gn.style.right  = 'auto';
+      gn.style.left   = Math.round(r.left + inset) + 'px';
+      gn.style.bottom = 'auto';
     }
     // BN bottom-right, the corner it has always parked in — so the habit built
     // over the last week survives the change of representation.
