@@ -30,7 +30,8 @@ Keep this current when adding a doc. One line is enough.
 |---|---|---|
 | ✔ **edge_model.md** | 08-22 | How relationships actually reach the graph. Establishes there is **no simulated-edge system** (the whole corpus is resident from boot), that gateway→cluster edges are explicit, and carries the measured cytoscape 3.34.1 rendering facts. Read before touching anything edge- or layout-related. |
 | ✔ **BD_Viewer_Scaling_Brief.md** | 08-23 | Whether the viewer scales. **Planning only, nothing scheduled.** The `CC analysis` section at the foot corrects the brief's central premise and holds the draft-loss design. |
-| ✔ **editing_spec.md** | 08-24 | Collaborative **Explore sessions** — two users agree on a node, then wander while anchored to it. Slices A–C built; §10 lists what is still open. |
+| ✔ **corner_controls_plan.md** | 08-27 | **Resumable work plan** for the v0.2 redesign — ordered steps, what gets deleted, traps carried forward. Read with `editing_spec.md` §v0.2. |
+| ✔ **editing_spec.md** | 08-24/27 | Collaborative **Explore sessions** — two users agree on a node, then wander while anchored to it. Slices A–C built; §10 lists what is still open. |
 | ✔ **blue_node_spec.md** | 08-21 | The Blue Node — partner's position shown on your own graph. **Built**; see the memory entry for what is verified vs untested. |
 | **stable_id_spec.md** | 08-21 | `url` as the durable node id, replacing Memgraph elementId. **Done.** |
 | **unified_focus_spec.md** | 08-16 | One-tap focus model (text + neighbourhood together). Default ON; `?uf=0` restores legacy. |

@@ -1,5 +1,85 @@
 # Collaborative editing — Explore sessions
 
+> ## v0.2 — 2026-08-27 — SUPERSEDES §2–§9 BELOW
+>
+> The design changed after building slices A–C and living with them. **§1 and
+> §10–§11 still stand; §2–§9 describe a negotiation that is being removed.**
+> Work plan: `corner_controls_plan.md`.
+>
+> ### What changed, and why
+>
+> **The marks become DOM controls, not graph nodes.** A cytoscape node has ONE
+> position, so a mark cannot be both in the graph and in a corner — and the
+> corner is needed precisely because a Blue Node jump can land you where the
+> predecessor has *no structural path* to you. There is no edge to draw, so the
+> node must be presented some other way.
+>
+> Making them DOM resolves that contradiction and removes, at a stroke, every
+> problem of the two days spent on parked marks: edges stretching across the
+> screen, the `cy.fit` feedback loop that walked the marks several graph-widths
+> away, parking geometry, and layouts re-positioning them. They were UI
+> pretending to be graph elements. A control also gains a **label**, which a
+> halo cannot have — and the label is what you actually need to decide whether
+> to go back.
+>
+> **Each corner is the top of a stack**, not a single mark. Only the top is
+> drawn; clicking navigates and the next one surfaces.
+>
+> | corner | stack | records |
+> |---|---|---|
+> | top-left | GN, green | nodes reached by FOLLOWING your partner |
+> | top-right | PN, faint amber | every local predecessor |
+> | bottom-right | BN, blue | the partner's positions |
+>
+> **The in-graph halo stays** where the node is structurally present. The corner
+> control is additional, not instead — which is only possible because it is no
+> longer the node itself.
+>
+> ### The GN is created by a BN CLICK, not by coincidence
+>
+> This is what deletes the negotiation. A snap alone records nothing; only the
+> deliberate act of following your partner does. No offer, no accept, no lapse,
+> no dwell threshold, and no reconnect question — the machinery in §3–§7 exists
+> to manage a negotiation that no longer happens.
+>
+> It is also symmetric for free: when you jump to your partner, your marker
+> lands on their screen on the node they are already standing on, so both sides
+> can record the same moment with no protocol at all.
+>
+> **`Accept` is therefore released to mean SAVING and nothing else** — which
+> resolves the terminology problem of §7 far better than keeping two consent
+> vocabularies apart.
+>
+> ### Stack semantics
+>
+> - **PN pops** — a back button, and a consumed entry is correct.
+> - **GN cycles** — it is a *record*; visiting a snap must not destroy it.
+> - **Dedup**: revisiting moves the existing entry to the top.
+> - **Cap** each stack; 3 is a reasonable start.
+> - **Click navigates TO the node**, rather than restoring a stored view: a
+>   stored view references state that has moved on.
+>
+> ### Open, deliberately not decided
+>
+> - **Retiring the breadcrumb bars.** The strips cost ~46px permanently and
+>   three buttons carry labels the chips cannot fit. But the bars' irreplaceable
+>   property is the PARALLEL view — "Nature → Emotion → Loss" at a glance, which
+>   a stack of one cannot say. Decide after living with the controls.
+> - **Colour signalling node TYPE rather than content.** Designer feedback is
+>   that the scheme is overbearing. Try DESATURATING `FAMILY_COLOURS` first — it
+>   is one place, everything derives from it, and it is reversible. Re-purposing
+>   the channel costs the sense of territory that makes the graph wanderable,
+>   and shape already carries type.
+>
+> ### Retained from v0.1
+>
+> §1 (what this is), §10 (open items), §11 (dependencies: draft persistence and
+> the write gate). Slice A's Snap detection is kept unchanged — the new model
+> still needs it.
+
+---
+
+
 **Spec v0.1, 2026-08-23/24.** Designed with the user across this session.
 Decided items are marked **DECIDED**; anything else is open and should not be
 built on without asking.
