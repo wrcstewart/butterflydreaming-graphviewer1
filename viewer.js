@@ -233,6 +233,24 @@ function extractChunkHint(chunk) {
 // ALL its DESCENDS_FROM edges come out as incoming (Cluster→SubFamily via
 // CF, top-Family→SubFamily via SF) — `outgoers` would report zero and
 // wrongly fire "no further descendants".
+// 2026-08-27 — whether a tap should NAVIGATE, which is not the same question as
+// whether the node has descendants.
+//
+// A Cluster with no gateways has no descendants, so the tap used to insert its
+// text card and stop. That left it as the one node kind you could read without
+// visiting: no expand, so no saveState, so no history entry, so nothing in the
+// back stack and nothing on the PN control — the panel showed text that Back
+// could not get you back to. The user found it precisely because the new corner
+// control made the gap visible.
+//
+// Navigating is already the right thing and already implemented: expandToCluster
+// shows the cluster's FAMILY PARENTS (and any gateways), so a childless cluster
+// gets a view of what contains it. Upward instead of downward, which is the only
+// direction left.
+function navigatesOnTap(node, hasDesc) {
+  return hasDesc || node.data('type') === 'Cluster';
+}
+
 function hasNavDescendants(node) {
   const type = node.data('type');
   if (type === 'Cluster') {
@@ -3686,6 +3704,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const rawText = node.data('text') || '';
       const chunks = splitNodeChunks(rawText);   // → [{body, hint}, …]
       const desc   = hasNavDescendants(node);
+      // `nav` drives the tap AND the hint together, so a childless cluster
+      // cannot navigate while its card still says there is nowhere to go.
+      const nav    = navigatesOnTap(node, desc);
       if (chunks.length === 0) {
         // No text at all → still show a single placeholder chunk (hint
         // only, empty body) so EVERY node follows the same "tap to read,
@@ -3693,20 +3714,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // navigated on a single tap and inconsistency bit users who had
         // learned to double-tap. The `desc` flag steers getChunkHint to
         // the right message ("Tap once more..." vs "no further descendants").
-        readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: desc, cardsByIdx: {} };
-        const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, desc, node), node, 0);
+        readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: nav, cardsByIdx: {} };
+        const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, nav, node), node, 0);
         if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
         // Unified focus: reveal the neighbourhood on the SAME fresh tap.
-        if (UNIFIED_FOCUS && desc && !isRoot) navigateInto(node);
+        if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
         return;
       }
-      readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: desc, cardsByIdx: {} };
+      readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: nav, cardsByIdx: {} };
       const isLast = chunks.length === 1;
       const c0     = chunks[0];
-      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, desc, node), node, 0);
+      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node), node, 0);
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
-      if (UNIFIED_FOCUS && desc && !isRoot) navigateInto(node);
+      if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
       return;
     }
 
