@@ -74,13 +74,27 @@ const helpText = isTouchDevice
   ? 'Tap to read — double tap to navigate.'
   : 'Click to read — double click to navigate.';
 
+// 2026-08-27 — saturation CAPPED at 32 per cent; hue and lightness untouched.
+//
+// Designer feedback: the scheme reads as overbearing. These six are the root of
+// it — every Cluster and TextNode colour is blended down from them by
+// computeBlendedColours — so calming them calms the whole graph from one place.
+//
+// A CAP rather than a multiplier, because the six were never equally saturated.
+// Symbolic sat at 54 and was doing most of the shouting; Spirit was already 19
+// and a uniform cut would have pushed it toward grey. Capping takes the loud
+// ones down and leaves the quiet ones alone — which also EVENS the palette, and
+// that unevenness was probably part of what read as overbearing.
+//
+// Was: Nature #4A8C4F 31 · Emotion #C0504D 48 · Reason #4A7BC0 48
+//      Spirit #9B6B9B 19 · Symbolic #C09A3A 54 · Arts #C47A5A 47
 const FAMILY_COLOURS = {
-  Nature:   '#4A8C4F',
-  Emotion:  '#C0504D',
-  Reason:   '#4A7BC0',
-  Spirit:   '#9B6B9B',
-  Symbolic: '#C09A3A',
-  Arts:     '#C47A5A',
+  Nature:   '#4A8C4F',   /* 31, unchanged */
+  Emotion:  '#AD6260',   /* was 48 */
+  Reason:   '#5E7EAC',   /* was 48 */
+  Spirit:   '#9B6B9B',   /* 19, unchanged */
+  Symbolic: '#A58E55',   /* was 54 */
+  Arts:     '#B3816B',   /* was 47 */
 };
 
 // 2026-08-25 — the local mark colour lives at MODULE scope because buildStyle
