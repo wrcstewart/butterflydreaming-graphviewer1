@@ -271,7 +271,7 @@ const BREADCRUMB_BARS = false;
 // window. 46 is what the two retired strips occupied (23 + 23); 37 is where the
 // local strip's bottom edge was, which is as far down as the canvas can go
 // without touching #media-bar. Both are mirrored in style.css as fallbacks.
-const TOP_PANEL_H = 46;
+const TOP_PANEL_H = 50;
 const CY_BOTTOM   = 37;
 
 function navigatesOnTap(node, hasDesc) {
@@ -2876,7 +2876,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const show = !!(n && n.length && pairingState && pairingState.active);
     bnBtn.classList.toggle('visible', show);
     if (!show) return;
-    paintNodeButton(bnBtn, n, '');
+    paintNodeButton(bnBtn, n, '', 'Remote:');
     bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
     // §2 — the partner left: dim, do not remove. They are still where they were.
     // And dim when you are ALREADY on their node: clicking then jumps you to
@@ -2950,7 +2950,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const show = !!(n && n.length);
     btn.classList.toggle('visible', show);
     if (!show) return;
-    paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '');
+    paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '', 'Common:');
     btn.style.borderColor = MARK_GREEN;
   }
   const gnBtnEl = document.getElementById('gn-btn');
@@ -4511,14 +4511,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // (This guarded a placement written by JS; the buttons are flex children
       // of #bd-toppanel now, so nothing else lives in their inline style — but
       // targeted clearing is still the correct habit.)
-      backBtn.textContent = '\u2190';
+      backBtn.textContent = '\u2190';   // clears both spans as well
       backBtn.style.background = backBtn.style.color = backBtn.style.borderColor = '';
       backBtn.style.borderRadius = '';
       backBtn.removeAttribute('title');
       return;
     }
 
-    paintNodeButton(backBtn, dest, '\u2190');
+    paintNodeButton(backBtn, dest, '\u2190', 'Local:');
     backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
   }
 
@@ -4527,7 +4527,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // user's rule, and it is a good one: a left-pointing arrow after the word
   // points AT the word, reading "go to this", where leading it points away
   // from the name and reads as a description of where you already are.
-  function paintNodeButton(btn, node, suffix) {
+  function paintNodeButton(btn, node, suffix, role) {
     // bnBaseColour, NOT data('colour') — the same distinction the blue radial
     // fill already had to make. Several node types set background-color
     // literally in the stylesheet and never touch the data field: gateway
@@ -4544,7 +4544,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // length test on the raw string passes while the render is wrong.
     const label  = truncateChipLabel(full);
 
-    btn.textContent = label ? (suffix ? label + ' ' + suffix : label) : (suffix || '');
+    // Two lines: a quiet role prefix over the node's name. Built as DOM nodes,
+    // not innerHTML — display_name comes from the database and is not ours to
+    // trust with markup, and textContent needs no escaping to be safe.
+    btn.textContent = '';
+    const roleEl = document.createElement('span');
+    roleEl.className = 'btn-role';
+    roleEl.textContent = role || '';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'btn-name';
+    nameEl.textContent = label ? (suffix ? label + ' ' + suffix : label) : (suffix || '');
+    btn.append(roleEl, nameEl);
     btn.style.background = colour;
     btn.style.color      = readableInk(colour);
     // Gateways is the corpus's one square node. Everything else that can reach

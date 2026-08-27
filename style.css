@@ -180,9 +180,6 @@ html, body {
   font-family: sans-serif;
 }
 
-#back-btn.visible {
-  display: block;
-}
 @media (max-width: 767px) {
   #back-btn { left: 8px; }
 }
@@ -213,7 +210,6 @@ html, body {
   line-height: 1.15;
   font-family: sans-serif;
 }
-#bn-btn.visible { display: block; }
 
 /* The GN control — laid out by #bd-toppanel's flex row. Same shape
    language as #back-btn and #bn-btn; only the border separates the three, which
@@ -240,7 +236,6 @@ html, body {
   line-height: 1.15;
   font-family: sans-serif;
 }
-#gn-btn.visible { display: block; }
 #gn-btn:hover   { filter: brightness(1.18); }
 #bn-btn:hover   { filter: brightness(1.18); }
 
@@ -309,23 +304,23 @@ html, body {
    positionCyEl from the same anchor #cy uses, and is PERMANENT: it survives the
    Nodes/Edit/Player toggle, unlike every other panel in the stack.
 
-   Depth 46px, which is what the two retired breadcrumb strips occupied
-   (23 + 23). Deliberately kept rather than trimmed: a description line goes
-   ABOVE each button, so the space is spoken for.
+   Depth 50px: a 44px button — the iOS/Android minimum touch target, and the
+   number everything here is sized from — plus 3px above and below. The two
+   retired strips came to 46; the extra 4 buys a usable thumb.
 
-   align-items: flex-end so the buttons sit on the panel's baseline and the room
-   above them is where the descriptions will go. */
+   The role label moved INSIDE the button as a second line ("Local:" over the
+   node name), so no separate description row is needed above it. */
 #bd-toppanel {
   position: fixed;
   left: 0;
   right: 0;
   top: 158px;                            /* set precisely by JS; fallback only */
-  height: 46px;
+  height: 50px;                          /* 44px button + 3px above + 3px below */
   z-index: 6;                            /* above the canvas, below the top button row */
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
-  padding: 0 8px 4px;
+  padding: 0 8px;
   box-sizing: border-box;
   background: #14141a;
   border-bottom: 1px solid #2a2a32;
@@ -335,11 +330,52 @@ html, body {
 /* Inside the panel the three controls are laid out by flex, so every trace of
    the corner positioning goes — including #back-btn's `left: 30%` and its mobile
    override, which would otherwise still apply. */
+/* 2026-08-27 — sized for a THUMB, not a cursor. 44px is the iOS/Android minimum
+   touch target and is set explicitly rather than left to the content, so all
+   three stay identical whatever their labels say. Borders are 2px on all three
+   (the Back button was 1px) or they would not match in height.
+
+   Two lines inside: a 10px role prefix over the 12px node name. The name is the
+   content and keeps the larger size; the role is a label and recedes. Total
+   type height 11 + 14.4 = 25.4, centred in the 40px interior. */
 #back-btn, #bn-btn, #gn-btn {
   position: static;
   top: auto; left: auto; right: auto; bottom: auto;
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 84px;                       /* two thumb-widths, so a short name is still hittable */
+  max-width: 32%;                        /* three across a phone, with the 8px gaps */
+  height: 44px;
+  box-sizing: border-box;
+  border-width: 2px;
+  display: none;                         /* .visible re-shows as flex, below */
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 9px;
+  line-height: 1;
+  text-align: left;
+  overflow: hidden;
+}
+#back-btn.visible, #bn-btn.visible, #gn-btn.visible { display: flex; }
+
+.btn-role {
+  display: block;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 500;
+  opacity: 0.72;                         /* recedes without changing hue — luminance, not colour */
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.btn-name {
+  display: block;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* 2026-08-27 — the two breadcrumb strips are RETIRED (see BREADCRUMB_BARS in
@@ -1009,7 +1045,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c02020;             /* CANARY — red (was blue) */
+  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
