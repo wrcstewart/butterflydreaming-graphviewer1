@@ -49,6 +49,44 @@ round-triangle) and could carry more.
 ### 2. Build one control end-to-end: PN
 Prove the pattern on the simplest case before generalising.
 
+> **REVISED 2026-08-27, after the user asked whether PN is just the existing
+> Back button wearing the previous node's style. It essentially is — and the
+> existing one is already CORRECT.**
+>
+> `#back-btn` is driven by a view stack at viewer.js:4267–4300. `saveState`
+> pushes `{ids, parent, chipNode}` from six navigation sites; `restoreState`
+> **pops**. So it has had the right semantics all along, which is why it has
+> never oscillated.
+>
+> **That reframes the oscillation bug entirely.** It was not graph-node-vs-DOM,
+> and it was not a missing feature — it was a SECOND, parallel history
+> (`prevReadNodeId`) built alongside a working one and lacking its pop. The
+> lesson is not "make it DOM", it is "there was already a back stack".
+>
+> And the depiction comes free: `history[history.length - 1].chipNode` is
+> exactly the node the control should wear — `saveState` sets it to the focused
+> node, falling back to the parent. So step 2 is:
+>
+>     style/label from  history[history.length-1].chipNode
+>     click             restoreState()          // existing, unchanged
+>     hidden when       history.length === 0    // existing updateBackBtn rule
+>
+> Nothing new to record, pop, dedup or cap for PN. Step 5's stack work applies
+> to GN and BN only.
+>
+> **One correction to this plan's own instruction:** "navigate-to, not
+> restore-the-view" is right for GN — you may have no stored view for a snap —
+> but WRONG for PN. Restoring the view returns what you were looking at, which
+> is what Back should do, and it is already built and tested. Node ids are the
+> durable `url` and every node is permanently resident, so a stored id set does
+> not go stale in the way that instruction assumed.
+>
+> **The one thing that must not be forgotten at step 4:** the BN jump has to
+> call `saveState()`. Crossing a BN jump is the entire reason a corner control
+> was wanted — the destination has no structural path back — and Back only
+> covers it if the jump is recorded like any other navigation. There is no BN
+> jump in the code today, so this is a new-code obligation, not a check.
+
 - A DOM element in a fixed corner (top-right), styled from the node it stands
   for: background = `data('colour')`, shape via border-radius/clip-path,
   plus a **truncated label** — reuse `truncateChipLabel`, and remember it must
