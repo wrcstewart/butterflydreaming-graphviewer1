@@ -3211,7 +3211,40 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let lastYouChipId = null;
   let lastYouSourceText = null;
 
+  // 2026-08-27 — TELLING YOUR PARTNER WHERE YOU ARE is not part of drawing the
+  // breadcrumb strip, and must outlive it. It lived inside addYouChip, so
+  // gating that function for the strip's retirement silently stopped our
+  // position reaching the partner — which killed their Blue Node, and ours (no
+  // crumbs coming back), and every green mark, since a GN is minted from a BN
+  // click. One gate, three features, and no error anywhere.
+  //
+  // The lesson is not "check the gates": it is that a transport concern was
+  // sitting inside a rendering function, where nobody would look for it.
+  function publishPosition(node) {
+    if (!pairingState.active) return;
+    const sendWs = wsRef.current;
+    if (!sendWs || !sendWs.connected) return;
+    sendWs.emit('msg', {
+      type: 'breadcrumb',
+      data: {
+        type:          node.data('type'),
+        display_name:  node.data('display_name') || node.data('name') || '',
+        colour:        node.data('colour') || '#444444',
+        name:          node.data('name') || '',
+        mainId:        node.id(),
+        url:           node.data('url') || null,   // the stable id (2026-08-21)
+        source_text:   node.data('source_text') || null,
+        seq:           node.data('seq') ?? null,
+        gateway:        node.data('gateway') || false,
+        section_title:  node.data('section_title') || false,
+        subfamily:      node.hasClass('subfamily'),
+        clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
+      }
+    });
+  }
+
   function addYouChip(node) {
+    publishPosition(node);       // ALWAYS — never gated on the strip
     if (!BREADCRUMB_BARS) return;
     const type        = node.data('type');
     const sourceText  = type === 'TextNode' ? (node.data('source_text') || null) : null;
@@ -3266,28 +3299,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       });
     }
     chip.addClass('latest');
-    if (pairingState.active) {
-      const sendWs = wsRef.current;
-      if (sendWs && sendWs.connected) {
-        sendWs.emit('msg', {
-          type: 'breadcrumb',
-          data: {
-            type,
-            display_name:  node.data('display_name') || node.data('name') || '',
-            colour:        node.data('colour') || '#444444',
-            name:          node.data('name') || '',
-            mainId:        node.id(),
-            url:           node.data('url') || null,   // the stable id (2026-08-21)
-            source_text:   node.data('source_text') || null,
-            seq:           node.data('seq') ?? null,
-            gateway:        node.data('gateway') || false,
-            section_title:  node.data('section_title') || false,
-            subfamily:      isSubfamily,
-            clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
-          }
-        });
-      }
-    }
     youChipX    += w + 7;
     lastYouChipId = id;
     panYouCyToLatest();
@@ -3500,6 +3511,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let lastBuddySourceText = null;
 
   function appendBuddyChip(data) {
+    // The Blue Node is driven from here and must run whether or not the strip
+    // does — same fault as publishPosition above, on the receiving side. Moved
+    // to the TOP so the gate below cannot reach past it; it depends on nothing
+    // the chip builds.
+    showBlueNode(data).catch(err => console.warn('[BN] showBlueNode failed', err));
     if (!BREADCRUMB_BARS) return;
     const type        = data.type;
     const sourceText  = type === 'TextNode' ? (data.source_text || null) : null;
@@ -3551,14 +3567,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     buddyChipX    += w + 7;
     lastBuddyChipId = id;
     panBuddyCyToLatest();
-    // 2026-08-21 — the partner's arrival is now shown as a NODE on our own
-    // graph (blue_node_spec.md), not as a panel beside it. Async: the node may
-    // have to be fetched if it post-dates our graph load (§7.3).
-    // Fire and forget deliberately — appendBuddyChip must not block on a
-    // possible network fetch. But an unawaited async call rejects into
-    // NOTHING, which is exactly how yesterday's jump-to-external breakage hid
-    // itself, so the rejection is caught and reported rather than swallowed.
-    showBlueNode(data).catch(err => console.warn('[BN] showBlueNode failed', err));
   }
 
   // 2026-08-21 — the enlarged-copy panel (#buddy-latest / buddyLatestCy, built
@@ -3584,11 +3592,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function resetBuddyBar() {
-    if (!BREADCRUMB_BARS) return;
-    // §2 — a new pair clears the partner's mark along with their trail.
+    // §2 — a new pair clears the partner's MARK as well as their trail, and the
+    // mark outlives the strip. Third function today whose gate would have
+    // reached past a rendering concern into a live one: without this, pairing
+    // with someone new leaves the previous partner's Blue Node on your graph.
     retireBlueNode();
     bnGone = false;
     try { renderMarks(); } catch (_) {}
+    if (!BREADCRUMB_BARS) return;
     buddyCy.elements().remove();
     buddyChipCount      = 0;
     buddyChipX          = 0;
