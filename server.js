@@ -1275,8 +1275,13 @@ io.on('connection', async (socket) => {
       //
       // Only the node url is forwarded — never the sender's payload — so this
       // cannot become an arbitrary message channel.
+      // gn_mark (2026-08-27): one side clicked the other's Blue Node and
+      // followed them. Both sides record the convergence, so the choice has to
+      // cross — the arrival alone is invisible to the partner, who was already
+      // receiving that position as an ordinary crumb.
       if (msg.type === 'explore_offer'  || msg.type === 'explore_accept' ||
-          msg.type === 'explore_cancel' || msg.type === 'explore_leave') {
+          msg.type === 'explore_cancel' || msg.type === 'explore_leave' ||
+          msg.type === 'gn_mark') {
         if (!socket.data.userId) return;
         const buddyId = pairedWith.get(socket.data.userId);
         if (!buddyId) {

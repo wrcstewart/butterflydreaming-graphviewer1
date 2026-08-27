@@ -2586,6 +2586,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         renderMarks();                // §6 — dims, never removes
         prependSystemCard('Your partner has left the shared exploration. Your green mark stays until you leave too.');
         break;
+      case 'gn_mark': {
+        // Your partner followed you here. Record it on this side too — by URL,
+        // never by their cy id, which does not mean the same node in this graph.
+        const n = msg.url ? nodeByUrl(msg.url) : null;
+        if (n && n.length) { pushGn(n.id()); renderMarks(); }
+        break;
+      }
       case 'explore_denied':
         clearGreenVisuals();
         exploreState  = 'none';
@@ -2882,6 +2889,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const n = cy.getElementById(bnNodeId);
     if (!n.length) return;
     pushGn(bnNodeId);          // following your partner IS the record
+    // 2026-08-27 — and TELL them, so the record lands on both sides.
+    //
+    // The plan expected this to be symmetric "for free" — you arrive on the
+    // node they are standing on, so they could notice the convergence
+    // themselves. They cannot: nothing about your arrival changes their state,
+    // because your position reaches them as an ordinary crumb they were already
+    // receiving. The convergence is only an event for the side that CHOSE it,
+    // so the choice is what has to be sent. One message, no negotiation.
+    sendExplore('gn_mark', n.data('url') || null);
     jumpToNode(n);
   }
 
@@ -3014,9 +3030,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // the same node, BEFORE any green state exists, to explain what the buttons
   // are for. Session-only suppression: a plain variable, so it resets on reload
   // and never becomes a setting nobody remembers turning on.
+  // 2026-08-27 — DISABLED for now, at the user's request: it explains more than
+  // is wanted, and it describes the offer/accept flow that the corner-controls
+  // redesign is in the middle of retiring (the GN is minted by a BN click now,
+  // not by agreeing to anything). Kept whole rather than deleted, because some
+  // one-time explanation of the green mark will probably still be wanted once
+  // the new model has settled — and it will need rewriting, not restoring.
+  const SNAP_DIALOG_ENABLED = false;
   let snapDialogSuppressed = false;
   let snapDialogOpen       = false;
   function showSnapDialog() {
+    if (!SNAP_DIALOG_ENABLED) return;
     if (snapDialogSuppressed || snapDialogOpen) return;
     snapDialogOpen = true;
     const overlay = document.createElement('div');
