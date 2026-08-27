@@ -86,6 +86,28 @@ Prove the pattern on the simplest case before generalising.
 > was wanted — the destination has no structural path back — and Back only
 > covers it if the jump is recorded like any other navigation. There is no BN
 > jump in the code today, so this is a new-code obligation, not a check.
+>
+> **Does Back cope with a jump to an unrelated subgraph? Yes — checked.**
+> `restoreState` traverses nothing. It hides everything and re-shows a stored id
+> set, and every node is permanently resident with a durable `url` id, so the
+> set stays valid however far the jump went. Returning across a BN jump is no
+> harder for it than collapsing to a parent. Reading material survives too —
+> nothing clears the card stack on navigation.
+>
+> Three gaps to close when the jump lands:
+>
+> 1. **The selection is lost.** `restoreState` sets `activeNodeId = null`, so no
+>    node is selected on return — no amber ring, and Unified Focus does not
+>    re-focus what you were reading. Fine when Back means "collapse to parent"
+>    (all six current callers); wrong when it means "return from a jump", where
+>    you WERE on a specific node. Restore `activeNodeId` from `chipNode` when it
+>    is a TextNode.
+> 2. **The you-trail extends rather than unwinds** — `addYouChip` always
+>    appends, so jump-and-back reads `Loss → DuFu → Loss`. Defensible as a
+>    record of where you have been; note it is a choice, not an oversight.
+> 3. **`history` has no cap** and each entry stores every visible id. Cluster
+>    views are small; a Gateways view is not, and a partner moving about drives
+>    jumps. Cap it before the jump ships.
 
 - A DOM element in a fixed corner (top-right), styled from the node it stands
   for: background = `data('colour')`, shape via border-radius/clip-path,
