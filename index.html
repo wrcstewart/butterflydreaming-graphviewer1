@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=336">
+  <link rel="stylesheet" href="style.css?v=337">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -156,6 +156,12 @@
   <div id="label-tooltip"></div>
   <div id="user-count-panel"></div>
   <button id="back-btn">←</button>
+  <!-- 2026-08-27 — the partner's position as a CORNER CONTROL (corner_controls_plan.md
+       step 4), replacing the blue-haloed graph node parked bottom-right. A cytoscape
+       node has one position and so could never be both in the graph and in a corner;
+       a DOM button can, which also lets it carry a LABEL — the thing that actually
+       tells you whether following your partner is worth it. Click jumps to them. -->
+  <button id="bn-btn"></button>
   <div id="pair-control">
     <button id="chat-btn">Pair</button>
     <span id="pair-status"></span>
@@ -223,6 +229,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=654"></script>
+  <script type="module" src="viewer.js?v=655"></script>
 </body>
 </html>

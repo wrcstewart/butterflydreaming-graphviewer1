@@ -187,6 +187,35 @@ html, body {
   #back-btn { left: 8px; }
 }
 
+/* 2026-08-27 — the BN corner control. Same shape language as #back-btn, which
+   it deliberately mirrors: both stand for a node, both wear that node's colour,
+   and only the border tells them apart — dark for your own trail, MARK_BLUE for
+   the partner. Placement (bottom-right of the canvas) is written by
+   positionPnBtn from #cy's live rect, as for #back-btn. */
+#bn-btn {
+  display: none;
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  z-index: 10;
+  background: var(--bd-gold);
+  border: 2px solid #4a9bff;
+  border-radius: 6px;
+  color: #1a1a20;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 40vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  padding: 5px 10px;
+  line-height: 1.15;
+  font-family: sans-serif;
+}
+#bn-btn.visible { display: block; }
+#bn-btn:hover   { filter: brightness(1.18); }
+
 /* Hover must not name a colour any more — the button wears its destination's,
    which changes on every navigation, and a fixed hover yellow would contradict
    it. Brightening whatever is there works for all of them. */
@@ -906,7 +935,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

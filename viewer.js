@@ -2447,6 +2447,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       });
     }
     if (bn && bn.length) applyBlueFill(bn);
+    updateBnBtn();      // the corner control tracks the same state as the halo
   }
 
   // One control, four meanings — see refreshExploreBtn for the labels.
@@ -2769,9 +2770,63 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return wasHidden;
   }
 
-  function placeBlueNode(node) {
-    bnWasRevealed = parkMark(node, 'blue') || bnWasRevealed;
+  // 2026-08-27 — the BN is NO LONGER PARKED, for the reason PN stopped being
+  // parked: a cytoscape node has one position, so it cannot be both in the
+  // graph and in a corner. The corner is now #bn-btn, a DOM control.
+  //
+  // The in-graph blue halo stays wherever the partner's node is genuinely in
+  // your view — that is the honest signal, and the control is additional. What
+  // goes is the pretence, and with it the edge-hiding, the size-to-view and the
+  // .parked-mark exclusion this used to need.
+  function placeBlueNode(_node) { /* the corner is a DOM button now */ }
+
+  // The partner's node as a corner control. Unlike the halo it is NEVER
+  // suppressed at the top-level views: bnViewSuppressed exists because a graph
+  // node drawn at Root or Gateways scale looked absurd, and a fixed-size button
+  // has no such problem. Suppressing the way to your partner exactly when you
+  // are furthest from them was always the wrong behaviour; it was a workaround
+  // for the representation, not a decision.
+  function updateBnBtn() {
+    // Looked up per call, NOT held in a closure const. renderMarks calls this
+    // and runs earlier in setupInteractions' body than any const declared here
+    // would initialise — a temporal-dead-zone throw that would kill the rest of
+    // renderMarks and take the halos with it. Same trap as the init() destructure.
+    const bnBtn = document.getElementById('bn-btn');
+    if (!bnBtn) return;
+    const n = bnNodeId ? cy.getElementById(bnNodeId) : null;
+    const show = !!(n && n.length && pairingState && pairingState.active);
+    bnBtn.classList.toggle('visible', show);
+    if (!show) return;
+    paintNodeButton(bnBtn, n, '');
+    bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
+    // §2 — the partner left: dim, do not remove. They are still where they were.
+    bnBtn.style.opacity = bnGone ? '0.45' : '';
   }
+
+  // Following your partner. This is the act corner_controls_plan.md step 4
+  // makes the ONLY way a GN is created — a deliberate choice rather than the
+  // coincidence of a Snap, which is what deletes the offer/accept/lapse
+  // machinery. The GN itself lands in the next slice; the jump comes first.
+  //
+  // Dispatches by type exactly as the tap handler does, so a jump is an
+  // ordinary navigation in every respect — including saveState, which all three
+  // expand functions call. That is what lets Back return you across the jump,
+  // and it is the whole reason the corner control was wanted: the destination
+  // may have no structural path back to where you were.
+  function jumpToPartner() {
+    if (!bnNodeId) return;
+    const n = cy.getElementById(bnNodeId);
+    if (!n.length) return;
+    const type = n.data('type');
+    markReadNode(n, cy);
+    if (type === 'Cluster')     expandToCluster(n);
+    else if (type === 'Family') expandToFamily(n);
+    else                        expandToNode(n);
+    addYouChip(n);
+    renderMarks();
+  }
+  const bnBtnEl = document.getElementById('bn-btn');
+  if (bnBtnEl) bnBtnEl.addEventListener('click', jumpToPartner);
 
   // ALWAYS the bottom-right corner, never a searched-for gap. A node that
   // moves about to dodge obstacles makes the user hunt for it on every
@@ -4312,28 +4367,33 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
-    const colour = dest.data('colour') || MARK_LOCAL;
-    const full   = String(dest.data('display_name') || dest.data('name') || '');
+    paintNodeButton(backBtn, dest, '\u2190');
+    backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
+  }
+
+  // Shared by every corner control, so PN, BN and GN cannot drift apart in
+  // appearance. `suffix` is an optional glyph placed AFTER the label — the
+  // user's rule, and it is a good one: a left-pointing arrow after the word
+  // points AT the word, reading "go to this", where leading it points away
+  // from the name and reads as a description of where you already are.
+  function paintNodeButton(btn, node, suffix) {
+    const colour = node.data('colour') || MARK_LOCAL;
+    const full   = String(node.data('display_name') || node.data('name') || '');
     // truncateChipLabel FLATTENS whitespace before measuring — load-bearing,
     // since Cluster display_name carries real newlines ("Loss\nLonging") and a
     // length test on the raw string passes while the render is wrong.
     const label  = truncateChipLabel(full);
 
-    // 2026-08-27 — arrow AFTER the label, per the user: a left-pointing arrow
-    // placed after the word points AT the word, so it reads "back to this".
-    // Leading it ("← Loss") points away from the name and reads as the label
-    // describing where you are rather than where you are going.
-    backBtn.textContent = label ? label + ' \u2190' : '\u2190';
-    backBtn.style.background  = colour;
-    backBtn.style.color       = readableInk(colour);
-    backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
-    // Gateways is the corpus's one square node. Everything else that can be a
-    // Back destination is round-rectangle, hexagon or round-triangle, and none
-    // of those survive being drawn 20px high — rounding is the honest half of
-    // the shape signal, and the colour carries the rest.
-    backBtn.style.borderRadius =
-      (dest.data('type') === 'Entry' && dest.data('name') === 'Gateways') ? '2px' : '6px';
-    backBtn.title = full.replace(/\s+/g, ' ');   // the untruncated name, on hover
+    btn.textContent = label ? (suffix ? label + ' ' + suffix : label) : (suffix || '');
+    btn.style.background = colour;
+    btn.style.color      = readableInk(colour);
+    // Gateways is the corpus's one square node. Everything else that can reach
+    // a corner is round-rectangle, hexagon or round-triangle, none of which
+    // survive being drawn 20px high — rounding is the honest half of the shape
+    // signal, and the colour carries the rest.
+    btn.style.borderRadius =
+      (node.data('type') === 'Entry' && node.data('name') === 'Gateways') ? '2px' : '6px';
+    btn.title = full.replace(/\s+/g, ' ');   // the untruncated name, on hover
   }
 
   function saveState() {
@@ -6354,13 +6414,27 @@ async function init() {
   // the panel stack, the Nodes/Edit/Player toggle and every resize — the same
   // rule the Kolam arrows follow: measure the column, do not assume it.
   function positionPnBtn() {
-    const btn = document.getElementById('back-btn');
-    if (!btn || !cyEl) return;
+    if (!cyEl) return;
     const r = cyEl.getBoundingClientRect();
     if (!r.height) return;                       // hidden pane measures 0x0
-    btn.style.top   = Math.round(r.top + 8) + 'px';
-    btn.style.left  = 'auto';                    // overrides the CSS left AND its mobile override
-    btn.style.right = Math.round(window.innerWidth - r.right + 8) + 'px';
+    const inset = 8;
+    const right = Math.round(window.innerWidth - r.right + inset) + 'px';
+
+    const pn = document.getElementById('back-btn');
+    if (pn) {
+      pn.style.top   = Math.round(r.top + inset) + 'px';
+      pn.style.left  = 'auto';                   // overrides the CSS left AND its mobile override
+      pn.style.right = right;
+    }
+    // BN bottom-right, the corner it has always parked in — so the habit built
+    // over the last week survives the change of representation.
+    const bn = document.getElementById('bn-btn');
+    if (bn) {
+      bn.style.top    = 'auto';
+      bn.style.left   = 'auto';
+      bn.style.right  = right;
+      bn.style.bottom = Math.round(window.innerHeight - r.bottom + inset) + 'px';
+    }
   }
 
   // A42 §42.3 — Nodes/Player view switch. Called by the radio change handler
