@@ -8410,7 +8410,11 @@ async function init() {
       updateSendBtn();
     } else if (msg.type === 'explore_offer'  || msg.type === 'explore_accept' ||
                msg.type === 'explore_cancel' || msg.type === 'explore_leave'  ||
-               msg.type === 'explore_denied') {
+               msg.type === 'explore_denied' || msg.type === 'gn_mark') {
+      // gn_mark had to be added in THREE places to work: the sender, the server
+      // relay whitelist, and this receive whitelist. Missing this one dropped
+      // the message silently on arrival — the wire was fine and the handler was
+      // fine, so the only symptom was the mark appearing on one side.
       try { handleExploreMsg(msg); } catch (err) { console.warn('[explore] handler failed', err); }
     } else if (msg.type === 'buddy_disconnected') {
       console.log('[pair-debug] ← buddy_disconnected received');
