@@ -57,8 +57,20 @@ Prove the pattern on the simplest case before generalising.
   view references state that has moved on.
 - Hidden when the stack is empty.
 
-### 3. Retire the PN graph-node machinery
-Only once step 2 works. Delete, for the previous mark: `parkMark` use,
+### 3. Retire the PN graph-node machinery — **PARKING DONE EARLY, 2026-08-27**
+Was to be done only once step 2 works. The **parking** was pulled forward
+anyway, because a corner graph node from the superseded design was on screen
+confusing the user ("why are there nodes appearing top right — have you
+partially started this?"). A half-built thing from a design we have abandoned
+costs more sitting there than it saves.
+
+Removed: `placePrevNode`, the `markCorner` 'prev' branch, `reassertPrevNode`'s
+body, the un-park in `clearPrevVisuals`, `pnWasRevealed`, and the Back-tap
+special case. **The faint amber halo stays**, as below.
+
+Still to delete, once step 2 lands: nothing for PN — this step is complete.
+
+Original wording, for the other two marks. Delete, for each: `parkMark` use,
 `markCorner` 'prev' branch, `reassertPrevNode`, `clearPrevVisuals`, the
 `.parked-mark` handling, and the Back-tap special case in the node tap handler.
 

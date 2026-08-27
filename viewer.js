@@ -2114,7 +2114,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let bnOuter   = null;   // 'blue' | 'white' — which ring is OUTER when both coincide
   let bnGone    = false;  // partner left: dim, do not remove (§2)
   let prevReadNodeId = null;   // the node selected before the current one
-  let pnWasRevealed  = false;
   // --- Explore sessions (editing_spec.md) --------------------------------
   // 'none' | 'offered' (we asked) | 'invited' (they asked) | 'active'
   let exploreState  = 'none';
@@ -2689,12 +2688,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const n = cy.getElementById(prevReadNodeId);
     if (!n || !n.length) return;
     clearMarksFrom(n);
-    if (pnWasRevealed) {
-      n.removeStyle(BN_SIZE_KEYS + ' opacity');
-      n.removeClass('parked-mark');
-      n.hide();
-    }
-    pnWasRevealed = false;
   }
 
   function prevNodeEl() {
@@ -2703,19 +2696,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return n && n.length ? n : null;
   }
 
-  function placePrevNode(node) {
-    pnWasRevealed = parkMark(node, 'prev') || pnWasRevealed;
-  }
-
-  // Like the green anchor, the previous node is a way BACK, so it is not
-  // suppressed at the top-level views.
-  function reassertPrevNode() {
-    const node = prevNodeEl();
-    if (!node) return;
-    if (lastReadNodeId === prevReadNodeId && lastReadNodeCy === cy) {
-      pnWasRevealed = false; node.removeStyle('opacity'); node.removeClass('parked-mark');
-    } else placePrevNode(node);
-  }
+  // 2026-08-27 — the previous node is marked IN PLACE and never parked.
+  //
+  // It was briefly parked top-right as a graph node (d8141fc), before the
+  // corner marks were redesigned as DOM controls — see editing_spec.md §v0.2
+  // and corner_controls_plan.md. A parked graph node in the corner is the thing
+  // being retired, so it goes now rather than sitting on screen as a leftover
+  // of a superseded design.
+  //
+  // The faint amber halo stays: where the node IS structurally present, that is
+  // the honest signal, and the corner control will be additional rather than a
+  // replacement for it.
+  function reassertPrevNode() { /* nothing to re-park */ }
 
   function greenNodeEl() {
     if (exploreState !== 'active' || !exploreNodeId) return null;
@@ -2821,10 +2813,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const right = clamp(bb.x2 + gap + halfW, ext.x1 + halfW, ext.x2 - halfW);
     const top   = clamp(bb.y1 - gap - halfH, ext.y1 + halfH, ext.y2 - halfH);
     const bot   = clamp(bb.y2 + gap + halfH, ext.y1 + halfH, ext.y2 - halfH);
-    // Three corners, three meanings: agreed top-left, previous top-right,
-    // partner bottom-right. All can be parked at once, so none may share.
-    if (which === 'green') return { x: left,  y: top };
-    if (which === 'prev')  return { x: right, y: top };
+    // Agreed top-left, partner bottom-right. ('prev' was here too until
+    // 2026-08-27 — it is marked in place now, pending its DOM control.)
+    if (which === 'green') return { x: left, y: top };
     return { x: right, y: bot };
   }
   function blueNodeCorner(node) { return markCorner(node, 'blue'); }
@@ -5198,19 +5189,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // multi-touch pinch so brushing a node while zooming doesn't navigate.
     if (multiTouchRecent) return;
 
-    // 2026-08-27 — the PARKED previous-node mark is a Back button, not a node.
-    // It has been lifted out of its structural position and put in a corner to
-    // mean "where you came from", so a tap on it should retrace rather than
-    // navigate forward into it. Only when PARKED: sitting in its real place in
-    // the graph it is an ordinary node again and must behave like one.
-    if (pnWasRevealed && prevReadNodeId && node.id() === prevReadNodeId) {
-      try { clearMarksFrom(node); } catch (_) {}
-      if (pnWasRevealed) { node.removeStyle(BN_SIZE_KEYS + ' opacity'); node.removeClass('parked-mark'); node.hide(); }
-      pnWasRevealed = false;
-      prevReadNodeId = null;
-      restoreState();
-      return;
-    }
+    // (The parked previous-node mark used to act as a Back button here. It is
+    // marked in place now and is an ordinary node again, so an ordinary tap is
+    // correct. The Back behaviour returns with its DOM control.)
 
     // Special cases with their own semantics, unchanged by the chunk UX.
     if (CLUSTER_ASSIGN && type === 'ClusterEditChip') {
