@@ -89,7 +89,24 @@ top-right, partner bottom-right.
   Both sides can record the same moment with no protocol.
 
 ### 5. Stack semantics
-- **PN pops** — it is a back button, and a consumed entry is correct.
+
+**Observed 2026-08-27, and it is not theoretical.** Testing the graph-node PN
+before it was removed: sequential Back clicks **oscillate A→B→A→B**. Clicking
+Back navigates you, and the same recorder that logs every navigation then writes
+the node you just LEFT as the new PN. So Back's own target becomes the next
+Back's target.
+
+**The DOM control does NOT fix this by itself.** Nothing in the oscillation
+depends on the mark being a cytoscape node — if step 4's click handler routes
+through the ordinary navigation path, it reproduces the bug exactly. The fix is
+the pop below, and it must be built WITH the control, not after it.
+
+The distinction the bug exposes: a back button and a "most recent other node"
+indicator behave identically for one click and diverge on the second.
+
+- **PN pops** — it is a back button, and a consumed entry is correct. Concretely:
+  a Back click must **not** push the departed node. Test with THREE clicks, not
+  two — A→B→C then Back Back should reach A, and the broken version reaches C.
 - **GN cycles** — it is a *record*; visiting a snap must not destroy it.
 - **Dedup**: revisiting a node moves its existing entry to the top rather than
   adding a second.
