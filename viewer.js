@@ -4302,8 +4302,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const dest = history[history.length - 1].chipNode;
     if (!dest || !dest.length) {           // parentless view — plain arrow, as before
+      // Clear only what the DESTINATION set. removeAttribute('style') would
+      // also wipe the placement positionPnBtn wrote, dropping the button back
+      // to the CSS top row.
       backBtn.textContent = '\u2190';
-      backBtn.removeAttribute('style');
+      backBtn.style.background = backBtn.style.color = backBtn.style.borderColor = '';
+      backBtn.style.borderRadius = '';
       backBtn.removeAttribute('title');
       return;
     }
@@ -6330,6 +6334,29 @@ async function init() {
         iframeEl.style.height = h + 'px';
       }
     }
+    positionPnBtn();
+  }
+
+  // 2026-08-27 — the PN control sits at the TOP-RIGHT OF THE CANVAS, not in the
+  // top button row it has occupied until now.
+  //
+  // corner_controls_plan.md gives the three marks three corners — GN top-left,
+  // PN top-right, BN bottom-right. Leaving Back up in the row would put a hole
+  // in that scheme and keep the control far from the graph it refers to. It is
+  // a DOM button over the canvas, so there was never anything stopping it; the
+  // reason this reuses #back-btn is that its stack already pops, not placement.
+  //
+  // Anchored to #cy's LIVE rect, never to a constant. The canvas top moves with
+  // the panel stack, the Nodes/Edit/Player toggle and every resize — the same
+  // rule the Kolam arrows follow: measure the column, do not assume it.
+  function positionPnBtn() {
+    const btn = document.getElementById('back-btn');
+    if (!btn || !cyEl) return;
+    const r = cyEl.getBoundingClientRect();
+    if (!r.height) return;                       // hidden pane measures 0x0
+    btn.style.top   = Math.round(r.top + 8) + 'px';
+    btn.style.left  = 'auto';                    // overrides the CSS left AND its mobile override
+    btn.style.right = Math.round(window.innerWidth - r.right + 8) + 'px';
   }
 
   // A42 §42.3 — Nodes/Player view switch. Called by the radio change handler

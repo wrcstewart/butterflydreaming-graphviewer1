@@ -61,6 +61,9 @@ html, body {
 
 #pair-control {
   position: fixed;
+  /* 2026-08-27 — top/left/right are now written by positionPnBtn from #cy's
+     live rect, placing this at the CANVAS top-right (the PN corner of
+     corner_controls_plan.md). What is left here is the pre-JS fallback. */
   top: 6px;                              /* 2026-08-14 — raised from 34px into vacated title-bar row */
   /* 2026-08-14 v2 — panel-aligned on desktop: 30% from right edge lines
      up with the 40%-wide centred panel's right edge. Mobile override
@@ -903,7 +906,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

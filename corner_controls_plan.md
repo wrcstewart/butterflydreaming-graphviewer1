@@ -74,6 +74,13 @@ Prove the pattern on the simplest case before generalising.
 > Nothing new to record, pop, dedup or cap for PN. Step 5's stack work applies
 > to GN and BN only.
 >
+> **Placement — done 2026-08-27.** The user asked whether the old Back button
+> was reused because a DOM control could not be put on the canvas. It can, and
+> it now is: `positionPnBtn` writes top/right from `#cy`'s LIVE rect, so the
+> button sits at the canvas top-right and follows the panel stack, the
+> Nodes/Edit/Player toggle and every resize. Never a constant — the canvas top
+> is not one. The reuse of `#back-btn` was only ever about its stack.
+>
 > **One correction to this plan's own instruction:** "navigate-to, not
 > restore-the-view" is right for GN — you may have no stored view for a snap —
 > but WRONG for PN. Restoring the view returns what you were looking at, which
