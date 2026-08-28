@@ -42,6 +42,27 @@
 > control is additional, not instead — which is only possible because it is no
 > longer the node itself.
 >
+> ### AMENDED 2026-08-28 — TWO routes, one rule
+>
+> A GN is minted by **tapping your partner's haloed node** as well as by pressing
+> the Remote control. The rule is therefore not "you pressed a particular
+> control" but **"you deliberately arrived at where your partner is"** — the halo
+> means they are here, so tapping it IS following them, and the distinction
+> between doing that on the graph and on the chrome was arbitrary.
+>
+> Both routes are guarded identically: their CURRENT position, and only while
+> they are still present. Both send `gn_mark`, so the record lands on both sides.
+>
+> The false positive — tapping a haloed node because it is in your path rather
+> than because you noticed the halo — is accepted: it costs one of three slots
+> and what it recorded was true, whereas a missed convergence costs the record.
+>
+> **Still covered only by the control:** if THEY come to YOU, no tap happens on
+> your side. An argument for keeping the control, not against the change.
+>
+> When their node is NOT in your view there is no halo to tap, so the control is
+> the only route — and it flashes for 5s to say so.
+>
 > ### The GN is created by a BN CLICK, not by coincidence
 >
 > This is what deletes the negotiation. A snap alone records nothing; only the

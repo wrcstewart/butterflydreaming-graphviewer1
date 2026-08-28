@@ -148,6 +148,10 @@ structurally honest signal and the corner control is additional, not instead.
 Same control, three instances, three corners: agreed top-left, previous
 top-right, partner bottom-right.
 
+- **AMENDED 2026-08-28: a GN is minted by tapping the HALOED NODE too**, not
+  only by the control — one rule, "you deliberately arrived at where your
+  partner is", two routes, identically guarded. The control flashes 5s when the
+  node is off-view and it is therefore the only route.
 - **GN is created ONLY by a BN click** — a conscious act of following, not an
   automatic snap. This is the decision that removes the whole
   offer/accept/lapse state machine.

@@ -5502,6 +5502,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   // Tap handler
 
+  // 2026-08-28 — WARNING: this function is currently DEAD. Its only callers were
+  // the youCy and buddyCy chip tap handlers, and both breadcrumb bars are
+  // retired (BREADCRUMB_BARS). It is kept whole with them, and comes back if
+  // that constant is flipped.
+  //
+  // It reads like the obvious home for anything tap-related and IS NOT: the
+  // live path is cy.on('tap','node'), which calls markReadNode and
+  // advanceOrNavigate directly. Adding the haloed-node GN mint here cost a
+  // round of testing before that was noticed.
   function handleNodeTap(node, addChip = true) {
     wsRef.lastActivity = Date.now();
     const type = node.data('type');
