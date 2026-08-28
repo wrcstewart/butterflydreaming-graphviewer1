@@ -5520,27 +5520,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       addYouChip(node);
     }
 
-    // 2026-08-28 — tapping your partner's HALOED node mints a GN, exactly as
-    // pressing the Remote button does. The user's point, and it makes the rule
-    // simpler rather than more complex: it is no longer "you pressed a
-    // particular control" but "you deliberately arrived at where your partner
-    // is". The halo means they are here; tapping it IS following them, and the
-    // distinction between doing that on the graph and doing it on the chrome
-    // was arbitrary.
-    //
-    // Guarded to their CURRENT position and to their still being present, which
-    // is the same rule the button follows: arriving where they have already
-    // been is not a convergence, and the gn_mark would land on their screen for
-    // a node neither of you occupies.
-    //
-    // Accepting the false positive deliberately — you might tap a haloed node
-    // because it is in your path rather than because you noticed the halo. It
-    // costs one of three slots, and what it recorded was TRUE. A missed
-    // convergence costs the record itself, so the asymmetry favours minting.
-    if (bnNodeId && node.id() === bnNodeId && !bnGone && pairingState && pairingState.active) {
-      pushGn(bnNodeId);
-      sendExplore('gn_mark', node.data('url') || null);
-    }
 
     if (node.id() === activeNodeId) {
       if (type === 'TextNode') {
@@ -5670,6 +5649,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // Current stays populated with the last card until the NEXT tap
     // (on a new node) brings a new card that displaces it.
     markReadNode(node, cy);
+
+    // 2026-08-28 (moved here 2026-08-28) — tapping your partner's HALOED node mints a GN, exactly as
+    // pressing the Remote button does. The user's point, and it makes the rule
+    // simpler rather than more complex: it is no longer "you pressed a
+    // particular control" but "you deliberately arrived at where your partner
+    // is". The halo means they are here; tapping it IS following them, and the
+    // distinction between doing that on the graph and doing it on the chrome
+    // was arbitrary.
+    //
+    // Guarded to their CURRENT position and to their still being present, which
+    // is the same rule the button follows: arriving where they have already
+    // been is not a convergence, and the gn_mark would land on their screen for
+    // a node neither of you occupies.
+    //
+    // Accepting the false positive deliberately — you might tap a haloed node
+    // because it is in your path rather than because you noticed the halo. It
+    // costs one of three slots, and what it recorded was TRUE. A missed
+    // convergence costs the record itself, so the asymmetry favours minting.
+    if (bnNodeId && node.id() === bnNodeId && !bnGone && pairingState && pairingState.active) {
+      pushGn(bnNodeId);
+      sendExplore('gn_mark', node.data('url') || null);
+    }
     advanceOrNavigate(node);
   });
 
