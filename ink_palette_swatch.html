@@ -1,0 +1,100 @@
+<!doctype html><meta charset="utf-8"><title>Ink-mode family colours</title>
+<style>
+ body{background:#0b0b0f;color:#ddd;font:14px/1.5 system-ui,sans-serif;margin:0;padding:26px 22px 60px;}
+ h1{font-size:18px;margin:0 0 6px} h2{font-size:14px;color:#9a9aa4;margin:34px 0 4px;text-transform:uppercase;letter-spacing:.05em}
+ p.sub{color:#8a8a95;margin:0 0 8px;max-width:70ch}
+ p.note{color:#8a8a95;margin:0 0 14px;max-width:70ch;font-size:13px}
+ p.gaps{color:#7a7a85;font:12px ui-monospace,Menlo,monospace;margin:10px 0 0}
+ .hdr{display:grid;grid-template-columns:190px 190px 1fr;gap:14px;color:#6a6a75;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid #23232b}
+ .row{display:grid;grid-template-columns:190px 190px 1fr;gap:14px;align-items:center;padding:7px 0;border-bottom:1px solid #17171d}
+ .lab,.grey{font-size:19px;font-weight:700}
+ .meta{font:12px ui-monospace,Menlo,monospace;color:#9a9aa4} .meta b{color:#ddd}
+</style>
+<h1>Ink-mode family colours — the label palette</h1>
+<p class="sub">Left column is the colour as drawn. <b>Middle column is the same colour reduced to its luminance</b> —
+what a reading that does not rely on hue actually separates by. If two rows look the same in the middle column,
+they will be hard to tell apart however different their hues are.</p>
+<h2>A — live now</h2><p class="note">Lightness was normalised so every family reads equally loud. That is exactly the fault: Nature and Symbolic sit 9% apart in luminance, and Reason and Spirit 1% apart. In the middle column they are the same colour.</p>
+<div class="hdr"><span>as drawn</span><span>luminance only</span><span></span></div>
+<div class="row">
+  <div class="lab" style="color:#63E66D">Nature</div>
+  <div class="grey" style="color:#CCCCCC">Nature</div>
+  <div class="meta"><b>#63E66D</b> · contrast 12.2:1 · lum 0.604</div>
+</div><div class="row">
+  <div class="lab" style="color:#E6C063">Symbolic</div>
+  <div class="grey" style="color:#C4C4C4">Symbolic</div>
+  <div class="meta"><b>#E6C063</b> · contrast 11.3:1 · lum 0.554</div>
+</div><div class="row">
+  <div class="lab" style="color:#E68B63">Arts</div>
+  <div class="grey" style="color:#A2A2A2">Arts</div>
+  <div class="meta"><b>#E68B63</b> · contrast 7.7:1 · lum 0.362</div>
+</div><div class="row">
+  <div class="lab" style="color:#E663E6">Spirit</div>
+  <div class="grey" style="color:#989898">Spirit</div>
+  <div class="meta"><b>#E663E6</b> · contrast 6.8:1 · lum 0.315</div>
+</div><div class="row">
+  <div class="lab" style="color:#6399E6">Reason</div>
+  <div class="grey" style="color:#979797">Reason</div>
+  <div class="meta"><b>#6399E6</b> · contrast 6.8:1 · lum 0.311</div>
+</div><div class="row">
+  <div class="lab" style="color:#E66763">Emotion</div>
+  <div class="grey" style="color:#8F8F8F">Emotion</div>
+  <div class="meta"><b>#E66763</b> · contrast 6.1:1 · lum 0.274</div>
+</div>
+<p class="gaps">luminance steps: 1.14× · 1.01× · 1.15× · 1.53× · 1.09×</p>
+<h2>B — luminance spread, hues unchanged</h2><p class="note">Same six hues, luminance assigned deliberately in even steps. The four in the red–green confusable band (red, orange, gold, green) get the widest separation. Cost: the brightest two must desaturate to reach that luminance, so Spirit and Symbolic go pastel.</p>
+<div class="hdr"><span>as drawn</span><span>luminance only</span><span></span></div>
+<div class="row">
+  <div class="lab" style="color:#F1DA9E">Symbolic</div>
+  <div class="grey" style="color:#DCDCDC">Symbolic</div>
+  <div class="meta"><b>#F1DA9E</b> · contrast 14.3:1 · lum 0.713</div>
+</div><div class="row">
+  <div class="lab" style="color:#F4B0F4">Spirit</div>
+  <div class="grey" style="color:#C7C7C7">Spirit</div>
+  <div class="meta"><b>#F4B0F4</b> · contrast 11.6:1 · lum 0.568</div>
+</div><div class="row">
+  <div class="lab" style="color:#EEA484">Arts</div>
+  <div class="grey" style="color:#B5B5B5">Arts</div>
+  <div class="meta"><b>#EEA484</b> · contrast 9.6:1 · lum 0.464</div>
+</div><div class="row">
+  <div class="lab" style="color:#1BBA28">Nature</div>
+  <div class="grey" style="color:#A1A1A1">Nature</div>
+  <div class="meta"><b>#1BBA28</b> · contrast 7.6:1 · lum 0.355</div>
+</div><div class="row">
+  <div class="lab" style="color:#518FE6">Reason</div>
+  <div class="grey" style="color:#8E8E8E">Reason</div>
+  <div class="meta"><b>#518FE6</b> · contrast 6.0:1 · lum 0.271</div>
+</div><div class="row">
+  <div class="lab" style="color:#E23631">Emotion</div>
+  <div class="grey" style="color:#797979">Emotion</div>
+  <div class="meta"><b>#E23631</b> · contrast 4.5:1 · lum 0.190</div>
+</div>
+<p class="gaps">luminance steps: 1.42× · 1.31× · 1.31× · 1.22× · 1.26×</p>
+<h2>C — spread the other way (dark green, bright gold)</h2><p class="note">The same idea with the order reversed: Nature becomes a deep saturated green at the bottom and Symbolic the brightest. Keeps more saturation in the greens and reds, which are the colours that look weakest when made pale.</p>
+<div class="hdr"><span>as drawn</span><span>luminance only</span><span></span></div>
+<div class="row">
+  <div class="lab" style="color:#F0D694">Symbolic</div>
+  <div class="grey" style="color:#D8D8D8">Symbolic</div>
+  <div class="meta"><b>#F0D694</b> · contrast 13.8:1 · lum 0.688</div>
+</div><div class="row">
+  <div class="lab" style="color:#F1B69D">Arts</div>
+  <div class="grey" style="color:#C3C3C3">Arts</div>
+  <div class="meta"><b>#F1B69D</b> · contrast 11.1:1 · lum 0.546</div>
+</div><div class="row">
+  <div class="lab" style="color:#EF8EEF">Spirit</div>
+  <div class="grey" style="color:#B1B1B1">Spirit</div>
+  <div class="meta"><b>#EF8EEF</b> · contrast 9.2:1 · lum 0.439</div>
+</div><div class="row">
+  <div class="lab" style="color:#699EEA">Reason</div>
+  <div class="grey" style="color:#9C9C9C">Reason</div>
+  <div class="meta"><b>#699EEA</b> · contrast 7.2:1 · lum 0.334</div>
+</div><div class="row">
+  <div class="lab" style="color:#E75A55">Emotion</div>
+  <div class="grey" style="color:#898989">Emotion</div>
+  <div class="meta"><b>#E75A55</b> · contrast 5.6:1 · lum 0.250</div>
+</div><div class="row">
+  <div class="lab" style="color:#13871D">Nature</div>
+  <div class="grey" style="color:#747474">Nature</div>
+  <div class="meta"><b>#13871D</b> · contrast 4.2:1 · lum 0.176</div>
+</div>
+<p class="gaps">luminance steps: 1.42× · 1.34× · 1.32× · 1.24× · 1.26×</p>
