@@ -2996,7 +2996,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!btn) return;
     const n = gnStack.length ? cy.getElementById(gnStack[0]) : null;
     const show = !!(n && n.length);
-    if (gnStack.length) console.log('[gn-debug] updateGnBtn: stack=', gnStack.length, 'btn found=', !!btn, 'show=', show);
+    if (gnStack.length) {
+      // MEASURE, do not model. The chain all reports success and the button is
+      // still not on screen, so the question is now purely geometric: is it
+      // display:none, zero-sized, transparent, or clipped out of the panel?
+      const cs = getComputedStyle(btn);
+      const r  = btn.getBoundingClientRect();
+      const pn = document.getElementById('bd-toppanel');
+      const pr = pn ? pn.getBoundingClientRect() : null;
+      console.log('[gn-debug] GN btn:', 'show=', show,
+        'display=', cs.display, 'vis=', cs.visibility, 'opacity=', cs.opacity,
+        'rect=', Math.round(r.x) + ',' + Math.round(r.y) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height),
+        'classes=', btn.className);
+      if (pn) console.log('[gn-debug] panel:',
+        'rect=', Math.round(pr.x) + ',' + Math.round(pr.y) + ' ' + Math.round(pr.width) + 'x' + Math.round(pr.height),
+        'scrollW=', pn.scrollWidth, 'clientW=', pn.clientWidth,
+        'display=', getComputedStyle(pn).display, 'children=', pn.children.length);
+      ['back-btn','bn-btn'].forEach(id => {
+        const e = document.getElementById(id); if (!e) return;
+        const er = e.getBoundingClientRect();
+        console.log('[gn-debug]  sibling', id, getComputedStyle(e).display,
+          Math.round(er.x) + ',' + Math.round(er.y) + ' ' + Math.round(er.width) + 'x' + Math.round(er.height));
+      });
+    }
     btn.classList.toggle('visible', show);
     if (!show) return;
     paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '', 'Common:');
