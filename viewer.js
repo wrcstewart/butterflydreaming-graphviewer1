@@ -1119,6 +1119,41 @@ function inkify(hex) {
   return out;
 }
 
+function inkModeOverrides() {
+  return [
+    {
+      // Body black, identity moved to the label.
+      selector: 'node',
+      style: {
+        'background-color': INK_BG,
+        'background-opacity': 1,
+        'color': function(node) { return inkify(node.data('colour')); },
+      }
+    },
+    {
+      // Family colours are computed, not stored — same source the fill used.
+      selector: 'node[type="Family"]',
+      style: {
+        'background-color': INK_BG,
+        'color': function(node) {
+          return inkify(FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa');
+        },
+      }
+    },
+    // Text nodes read as body text rather than as category: light grey. They are
+    // the great majority of nodes, so this is what decides whether the scheme
+    // reads calm or noisy.
+    { selector: 'node[type="TextNode"]',                 style: { 'color': '#c8c8cc' } },
+    { selector: 'node[type="TextNode"][?section_title]', style: { 'color': '#e6e6ea' } },
+    { selector: 'node[type="TextNode"][?gateway]',       style: { 'color': '#ffffff' } },
+    // These carried literal fills rather than data(colour), so the old fill
+    // becomes the label colour and their identity survives the change.
+    { selector: 'node[type="root"]',                     style: { 'color': '#FFD700' } },
+    { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff' } },
+    { selector: 'node[type="Cluster"]', style: { 'color': function(node) { return inkify(node.data('colour')); } } },
+  ];
+}
+
 // --- Cytoscape stylesheet ---
 
 function buildStyle() {
