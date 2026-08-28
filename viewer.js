@@ -2719,11 +2719,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // ("they came to me") — white stays inside, blue takes the outer ring.
     bnOuter  = 'blue';
 
-    if (bnViewSuppressed()) { hideBlueVisualsForView(); return; }
+    if (bnViewSuppressed()) { hideBlueVisualsForView(); flashBnBtn(); return; }
     placeBlueNode(node);
     renderMarks();
     markBlueEdges(node);
-    pulseBlueNode(node);
+    // No halo to tap means the button is the only route — say so. Checked AFTER
+    // renderMarks, since that is what decides whether the node is on screen.
+    if (!node.visible()) flashBnBtn();
+    else pulseBlueNode(node);
   }
 
   // Undo everything showBlueNode did to the previous node.
@@ -2903,6 +2906,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // has no such problem. Suppressing the way to your partner exactly when you
   // are furthest from them was always the wrong behaviour; it was a workaround
   // for the representation, not a decision.
+  // 2026-08-28 — an ORPHAN BN: your partner's node is not in your view, so there
+  // is no halo to tap and this button is the only way to them. Flash for 5s to
+  // say the route exists — otherwise the extra navigation path is invisible
+  // exactly when it is the only one.
+  //
+  // The cue is a spreading ring, not a colour change: it reads as motion and
+  // luminance rather than hue, which is the channel to rely on here.
+  let bnFlashTimer = null;
+  function flashBnBtn() {
+    const btn = document.getElementById('bn-btn');
+    if (!btn) return;
+    btn.classList.remove('bn-alert');
+    void btn.offsetWidth;                 // reflow, so a repeat arrival restarts it
+    btn.classList.add('bn-alert');
+    clearTimeout(bnFlashTimer);
+    bnFlashTimer = setTimeout(() => btn.classList.remove('bn-alert'), 5000);
+  }
+
   function updateBnBtn() {
     // Looked up per call, NOT held in a closure const. renderMarks calls this
     // and runs earlier in setupInteractions' body than any const declared here
@@ -5497,6 +5518,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     if (addChip && (type === 'Entry' || type === 'Family' || type === 'Cluster' || type === 'TextNode')) {
       addYouChip(node);
+    }
+
+    // 2026-08-28 — tapping your partner's HALOED node mints a GN, exactly as
+    // pressing the Remote button does. The user's point, and it makes the rule
+    // simpler rather than more complex: it is no longer "you pressed a
+    // particular control" but "you deliberately arrived at where your partner
+    // is". The halo means they are here; tapping it IS following them, and the
+    // distinction between doing that on the graph and doing it on the chrome
+    // was arbitrary.
+    //
+    // Guarded to their CURRENT position and to their still being present, which
+    // is the same rule the button follows: arriving where they have already
+    // been is not a convergence, and the gn_mark would land on their screen for
+    // a node neither of you occupies.
+    //
+    // Accepting the false positive deliberately — you might tap a haloed node
+    // because it is in your path rather than because you noticed the halo. It
+    // costs one of three slots, and what it recorded was TRUE. A missed
+    // convergence costs the record itself, so the asymmetry favours minting.
+    if (bnNodeId && node.id() === bnNodeId && !bnGone && pairingState && pairingState.active) {
+      pushGn(bnNodeId);
+      sendExplore('gn_mark', node.data('url') || null);
     }
 
     if (node.id() === activeNodeId) {

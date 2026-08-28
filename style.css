@@ -237,6 +237,25 @@ html, body {
   font-family: sans-serif;
 }
 #gn-btn:hover   { filter: brightness(1.18); }
+
+/* 2026-08-28 — ORPHAN BN alert. Your partner's node is not in your view, so
+   there is no halo to tap and this button is the only route to them. Five
+   pulses at 1s, then it stops and stays put: an alert that keeps moving after
+   it has been read is costing attention and battery for nothing.
+
+   A SPREADING RING, not a colour change — motion and luminance rather than hue,
+   which is the channel to rely on for this user. */
+@keyframes bn-alert-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 155, 255, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(74, 155, 255, 0.9); }
+}
+#bn-btn.bn-alert { animation: bn-alert-flash 1s ease-in-out 5; }
+
+/* Motion is the cue, so when motion is unwanted the ring simply stays on for
+   the same five seconds rather than the alert disappearing altogether. */
+@media (prefers-reduced-motion: reduce) {
+  #bn-btn.bn-alert { animation: none; box-shadow: 0 0 0 4px rgba(74, 155, 255, 0.9); }
+}
 #bn-btn:hover   { filter: brightness(1.18); }
 
 /* Hover must not name a colour any more — the button wears its destination's,
@@ -1045,7 +1064,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
