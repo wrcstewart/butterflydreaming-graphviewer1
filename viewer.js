@@ -1015,87 +1015,108 @@ function getClusterRelWidth(edge) {
 const INK_MODE = new URLSearchParams(location.search).get('ink') === '1';
 const INK_BG   = '#0b0b0f';
 
-// 2026-08-28 — RESATURATE for the label. The user's observation: once a colour
-// is a thin glyph on black rather than a filled body, the desaturated palette
-// all but vanishes, and it can now afford to be loud because it is no longer
-// covering half the screen.
+// 2026-08-28 — the LABEL palette, "swatch B", chosen from ink_palette_swatch.html.
 //
-// The arithmetic agrees. Against INK_BG the fill palette runs 4.4–6.2:1; after
-// this it runs 6.1–12.2:1, with saturation raised from ~31% to ~72%.
+// The first attempt normalised every family to one HSL lightness, reasoning that
+// this made them all equally legible. It did — and equally legible turned out to
+// mean equally INDISTINGUISHABLE. The user could not separate Nature from
+// Symbolic, and the numbers said why: 9% apart in luminance, with Reason and
+// Spirit 1% apart. For a reading that does not lean on hue, that removes the
+// only channel that works.
 //
-// LIGHTNESS IS NORMALISED rather than preserved, so every family is legible by
-// the same amount instead of some reading louder than others purely because
-// their fill happened to be paler. Hue is untouched — this is the same palette
-// turned up, not a different one.
+// So luminance is now ASSIGNED, in even steps of roughly 1.2x-1.4x, with the
+// widest separation given to the four hues in the red-green confusable band
+// (red, orange, gold, green). Hues are untouched: same palette, re-spaced.
 //
-// Applied as a FUNCTION rather than a fixed table because cluster colours are
-// blends computed at load time from FAMILY_COLOURS; a table would have covered
-// the six families and left every cluster muted.
+//   Symbolic  14.2:1      Nature   7.6:1
+//   Spirit    11.5:1      Reason   6.0:1
+//   Arts       9.6:1      Emotion  4.5:1
 //
-// The three constants are the whole tuning surface.
-const INK_SAT_MUL = 2.2, INK_SAT_MIN = 0.72, INK_LIGHT = 0.645;
+// Driven by HUE rather than by family name, which is the part that matters:
+// cluster colours are BLENDS computed at load time from FAMILY_COLOURS, so a
+// six-entry table would have fixed the six families and left all 126 clusters
+// on the old flat lightness — the great majority of what is on screen. A blend
+// lands between its neighbours' targets, so the spread holds across the corpus.
+//
+// The trade, stated rather than hidden: reaching a high luminance forces
+// desaturation, so the top two are pastel. That is why swatch B puts the deep
+// saturated green at 7.6 and not at the top.
+const INK_BG_LUM = 0.0045;                 // relative luminance of INK_BG
 
+// [hue°, target contrast against INK_BG]. Sorted by hue; the curve wraps.
+const INK_ANCHORS = [[2, 4.5], [18, 9.6], [43, 14.2], [125, 7.6], [215, 6.0], [300, 11.5]];
+const INK_SATS    = [0.75, 0.68, 0.60, 0.52, 0.45];   // tried in order; first that reaches the target wins
+const _inkCache   = new Map();
+
+function _srgbToLin(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function _lumOf(r, g, b) { return 0.2126 * _srgbToLin(r * 255) + 0.7152 * _srgbToLin(g * 255) + 0.0722 * _srgbToLin(b * 255); }
+function _hslToRgb(h, l, s) {
+  if (s === 0) return [l, l, l];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const f = tt => {
+    if (tt < 0) tt += 1; if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  };
+  return [f(h + 1 / 3), f(h), f(h - 1 / 3)];
+}
+function _targetContrast(hueDeg) {
+  const a = INK_ANCHORS;
+  if (hueDeg < a[0][0]) {                       // wrap: below the first anchor
+    const span = 360 - a[a.length - 1][0] + a[0][0];
+    const tpos = (hueDeg + 360 - a[a.length - 1][0]) / span;
+    return a[a.length - 1][1] + (a[0][1] - a[a.length - 1][1]) * tpos;
+  }
+  for (let i = 0; i < a.length - 1; i++) {
+    if (hueDeg >= a[i][0] && hueDeg <= a[i + 1][0]) {
+      const tpos = (hueDeg - a[i][0]) / (a[i + 1][0] - a[i][0]);
+      return a[i][1] + (a[i + 1][1] - a[i][1]) * tpos;
+    }
+  }
+  const span = 360 - a[a.length - 1][0] + a[0][0];
+  const tpos = (hueDeg - a[a.length - 1][0]) / span;
+  return a[a.length - 1][1] + (a[0][1] - a[a.length - 1][1]) * tpos;
+}
 function inkify(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
   if (!m) return '#c8c8cc';
-  const v = parseInt(m[1], 16);
+  const key = m[1].toLowerCase();
+  if (_inkCache.has(key)) return _inkCache.get(key);
+
+  const v = parseInt(key, 16);
   const r = ((v >> 16) & 255) / 255, g = ((v >> 8) & 255) / 255, b = (v & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
-  let h = 0, s = 0;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0;
   if (max !== min) {
     const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     if      (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
     else if (max === g) h = ((b - r) / d + 2) / 6;
     else                h = ((r - g) / d + 4) / 6;
   }
-  s = Math.min(1, Math.max(s * INK_SAT_MUL, INK_SAT_MIN));
-  const L2 = INK_LIGHT;
-  const q = L2 < 0.5 ? L2 * (1 + s) : L2 + s - L2 * s, pp = 2 * L2 - q;
-  const hue = tt => {
-    if (tt < 0) tt += 1; if (tt > 1) tt -= 1;
-    if (tt < 1/6) return pp + (q - pp) * 6 * tt;
-    if (tt < 1/2) return q;
-    if (tt < 2/3) return pp + (q - pp) * (2/3 - tt) * 6;
-    return pp;
-  };
-  const to = x => Math.round(x * 255).toString(16).padStart(2, '0');
-  return '#' + to(hue(h + 1/3)) + to(hue(h)) + to(hue(h - 1/3));
-}
+  const targetLum = _targetContrast(h * 360) * (INK_BG_LUM + 0.05) - 0.05;
 
-function inkModeOverrides() {
-  return [
-    {
-      // Body black, label in what used to be the body colour.
-      selector: 'node',
-      style: {
-        'background-color': INK_BG,
-        'background-opacity': 1,
-        'color': function(node) { return inkify(node.data('colour')); },
-      }
-    },
-    {
-      // Family colours are computed, not stored — same function the fill used.
-      selector: 'node[type="Family"]',
-      style: {
-        'background-color': INK_BG,
-        'color': function(node) {
-          return inkify(FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa');
-        },
-      }
-    },
-    // Text nodes read as body text rather than as category: light grey, per the
-    // user's instruction. They are the great majority of nodes, so this is what
-    // decides whether the scheme is calm or noisy.
-    { selector: 'node[type="TextNode"]',                style: { 'color': '#c8c8cc' } },
-    { selector: 'node[type="TextNode"][?section_title]', style: { 'color': '#e6e6ea' } },
-    { selector: 'node[type="TextNode"][?gateway]',       style: { 'color': '#ffffff' } },
-    // These three carried literal fills rather than data(colour), so their old
-    // fill becomes their label colour and their identity survives the change.
-    { selector: 'node[type="root"]',                     style: { 'color': '#FFD700' } },
-    { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff' } },
-    { selector: 'node[type="Cluster"]', style: { 'color': function(node) { return inkify(node.data('colour')); } } },
-  ];
+  // Solve lightness for that luminance, most saturated first. Twenty halvings
+  // is exact to well under one 8-bit step.
+  let best = null;
+  for (const s of INK_SATS) {
+    let lo = 0, hi = 1, mid = 0.5;
+    for (let k = 0; k < 20; k++) {
+      mid = (lo + hi) / 2;
+      const [rr, gg, bb] = _hslToRgb(h, mid, s);
+      if (_lumOf(rr, gg, bb) < targetLum) lo = mid; else hi = mid;
+    }
+    const [rr, gg, bb] = _hslToRgb(h, (lo + hi) / 2, s);
+    const got = (_lumOf(rr, gg, bb) + 0.05) / (INK_BG_LUM + 0.05);
+    const want = _targetContrast(h * 360);
+    if (best === null) best = [rr, gg, bb];
+    if (Math.abs(got - want) / want < 0.06) { best = [rr, gg, bb]; break; }
+  }
+  const to = x => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0');
+  const out = '#' + to(best[0]) + to(best[1]) + to(best[2]);
+  _inkCache.set(key, out);
+  return out;
 }
 
 // --- Cytoscape stylesheet ---
