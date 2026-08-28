@@ -2161,8 +2161,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let prevReadNodeId = null;   // the node selected before the current one
   // --- Explore sessions (editing_spec.md) --------------------------------
   // 'none' | 'offered' (we asked) | 'invited' (they asked) | 'active'
-  let exploreState  = 'none';
-  let exploreNodeId = null;   // the node the session is anchored to
 
   // 2026-08-27 — the GN STACK (corner_controls_plan.md step 4b/5). The BNs you
   // actually CLICKED: a record of your own choices, not of your partner's
@@ -2213,7 +2211,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     while (gnStack.length > GN_CAP) gnStack.pop();
     updateGnBtn();
   }
-  let explorePartnerGone = false;   // partner left the session: dim, do not remove (§6)
   let snapNodeId    = null;   // node currently carrying BOTH marks, or null
   // Did WE reveal this node, or was it already part of the user's view? Only a
   // node we revealed may be hidden again when the BN moves on — hiding one the
@@ -2417,36 +2414,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // it decomposes by itself the moment either user navigates away.
     const prevSnap = snapNodeId;
     snapNodeId = together ? bn.id() : null;
-    if (prevSnap !== snapNodeId) {
-      // §10 — an OFFER's whole premise is "we are both here", so it lapses the
-      // moment that stops being true, and says so rather than going quiet. An
-      // ACTIVE session must survive this: wandering apart is the point of it.
-      if (!snapNodeId && (exploreState === 'offered' || exploreState === 'invited')) {
-        sendExplore('explore_cancel');
-        exploreState = 'none';
-        exploreNodeId = null;
-        prependSystemCard('The invitation lapsed — you are no longer on the same node.');
-      }
-      refreshExploreBtn();
-      // Only on ARRIVING at a shared node, and only when there is something to
-      // explain — mid-session the buttons already mean something to the user.
-      if (snapNodeId && exploreState === 'none' && pairingState && pairingState.active) {
-        // 2026-08-25 — let the view PAINT first. This fires from inside
-        // renderMarks, and the fCoSE branches animate for ~450ms afterwards, so
-        // the dialog could arrive before the node it is describing. "You are now
-        // viewing the same node" has to be true when it is read.
-        //
-        // Re-checked when the timer fires: the user may have moved off in the
-        // meantime, and an explanation of a state you have already left is
-        // worse than none.
-        const snapAt = snapNodeId;
-        setTimeout(() => {
-          if (snapNodeId !== snapAt || exploreState !== 'none') return;
-          if (!pairingState || !pairingState.active) return;
-          try { showSnapDialog(); } catch (err) { console.warn('[explore] snap dialog failed', err); }
-        }, 600);
-      }
-    }
+    // 2026-08-28 — snapNodeId is still PUBLISHED (it is the definition of "we
+    // are both here" and is cheap), but nothing acts on the transition any
+    // more. The offer that used to lapse here no longer exists.
 
     // §5 — the agreed node wears ONE green ring, and it replaces whatever else
     // would have been drawn there. Two rings mean "two independent marks that
@@ -2482,7 +2452,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         'outline-color': MARK_GREEN,
         // §6 — partner left, we did not. Dim, never remove: the anchor is
         // still ours and still tappable.
-        'outline-opacity': explorePartnerGone ? 0.3 : 0.85,
+        'outline-opacity': 0.85,
         'outline-offset': 0,
       });
     }
@@ -2546,63 +2516,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     updateGnBtn();
   }
 
-  // One control, four meanings — see refreshExploreBtn for the labels.
-  {
-    const eb = document.getElementById('explore-btn');
-    if (eb) eb.addEventListener('click', () => {
-      if (exploreState === 'none') {
-        if (!snapNodeId) return;
-        exploreNodeId = snapNodeId;
-        if (sendExplore('explore_offer', snapNodeId)) exploreState = 'offered';
-      } else if (exploreState === 'offered') {
-        sendExplore('explore_cancel');
-        exploreState = 'none'; exploreNodeId = null;
-      } else if (exploreState === 'invited') {
-        sendExplore('explore_accept');
-        exploreState = 'active';
-        applyExploreVisuals();
-      } else if (exploreState === 'active') {
-        // §6 — unilateral, and it drops OUR participation only.
-        sendExplore('explore_leave');
-        clearGreenVisuals();
-        exploreState = 'none'; exploreNodeId = null; explorePartnerGone = false;
-        renderMarks();
-      }
-      refreshExploreBtn();
-    });
-  }
+  // 2026-08-28 — the EXPLORE CONTROL and its four-state label machine are gone,
+  // along with the offer / accept / cancel / leave protocol behind them.
+  //
+  // A GN is minted by a deliberate arrival at your partner's position — the
+  // Remote control or a tap on their haloed node — so there is nothing left for
+  // a negotiation to settle. The button did a job nothing needed.
+  //
+  // KEPT DELIBERATELY, because a consent step IS wanted later for SAVING:
+  //   - editing_spec.md §7, the rule that the exploratory and the write
+  //     vocabularies must never share a control or a word, so nobody presses
+  //     Save from muscle memory built on Explore;
+  //   - showSnapDialog below, disabled but whole, as the nearest thing to a
+  //     template for that dialog;
+  //   - the server relay's shape — paired check, partner-online check, url
+  //     only, never the sender's payload.
+  // The removed code is recoverable from git if the save flow wants it, but it
+  // should be re-derived rather than restored: it was built for a negotiation
+  // over WHERE to work, and the save is a negotiation over WHAT to write.
 
-  // §3 — the button says what a press DOES, never the state. Disabled unless
-  // there is something a press could achieve.
-  function refreshExploreBtn() {
-    const btn = document.getElementById('explore-btn');
-    if (!btn) return;
-    const paired = !!(pairingState && pairingState.active);
-    let label = 'Explore', title = 'Both of you are on this node — offer to work on it together';
-    let enabled = false;
-
-    if (!paired) {
-      title = 'Pair with someone first';
-    } else if (exploreState === 'active') {
-      label = 'Leave'; enabled = true;
-      title = 'Leave this shared exploration — your partner keeps theirs';
-    } else if (exploreState === 'offered') {
-      label = 'Cancel'; enabled = true;
-      title = 'Withdraw your offer to explore this node together';
-    } else if (exploreState === 'invited') {
-      label = 'Accept'; enabled = true;
-      title = 'Your partner has offered to work on this node together';
-    } else {
-      enabled = !!snapNodeId;
-      if (!enabled) title = 'Available when you are both on the same node';
-    }
-
-    btn.textContent = label;
-    btn.disabled    = !enabled;
-    btn.title       = title;
-    btn.dataset.state = exploreState;   // CSS hook for colour + flashing
-  }
-
+  // Retained for gn_mark, which is the only partner-to-partner message this
+  // module still sends. Name kept because the server relay and both whitelists
+  // still speak of "explore" types.
   function sendExplore(type, url) {
     const ws = wsRef.current;
     if (!ws || !ws.connected) return false;
@@ -2613,32 +2548,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Incoming explore traffic. Exposed to init(), which owns the message
   // dispatch — the state it mutates lives in THIS scope, so it must be called
   // rather than assigned across the boundary.
+  // 2026-08-28 — reduced to ONE message. The offer / accept / cancel / leave /
+  // denied cases went with the protocol; gn_mark is all that crosses between
+  // partners now, besides the position crumbs themselves.
   function handleExploreMsg(msg) {
     switch (msg.type) {
-      case 'explore_offer':
-        // Only meaningful while we are still together on the node they named.
-        exploreState  = 'invited';
-        exploreNodeId = msg.url || snapNodeId;
-        explorePartnerGone = false;
-        break;
-      case 'explore_accept':
-        exploreState = 'active';
-        explorePartnerGone = false;
-        applyExploreVisuals();
-        break;
-      case 'explore_cancel':
-        clearGreenVisuals();          // BEFORE the id is dropped — it needs it
-        exploreState = 'none';
-        exploreNodeId = null;
-        renderMarks();
-        break;
-      case 'explore_leave':
-        // §6 — they left, we did not. Our anchor stays; it dims, exactly as
-        // the Blue Node dims rather than vanishing. Nothing is taken from us.
-        explorePartnerGone = true;
-        renderMarks();                // §6 — dims, never removes
-        prependSystemCard('Your partner has left the shared exploration. Your green mark stays until you leave too.');
-        break;
       case 'gn_mark': {
         // Your partner followed you here. Record it on this side too — by URL,
         // never by their cy id, which does not mean the same node in this graph.
@@ -2649,17 +2563,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           .catch(err => console.warn('[gn_mark] resolve failed', err && err.message));
         break;
       }
+      // The server still answers a send with explore_denied when the partner
+      // is offline. Nothing to undo now — a gn_mark that did not arrive simply
+      // means their side has no record of it — but say so rather than going
+      // quiet, which was the failure mode all of this replaced.
       case 'explore_denied':
-        clearGreenVisuals();
-        exploreState  = 'none';
-        exploreNodeId = null;
-        prependSystemCard(msg.reason === 'partner_offline'
-          ? 'Your partner is not connected just now, so the invitation was not sent.'
-          : 'That invitation could not be sent.');
+        if (msg.reason === 'partner_offline') {
+          prependSystemCard('Your partner is not connected just now, so they have no record of that.');
+        }
         break;
       default: return;
     }
-    refreshExploreBtn();
   }
 
   // Show the partner's arrival as a node on OUR graph (§1, §2, §3, §4).
@@ -2733,8 +2647,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // True when the node the Blue Node is leaving is ALSO the agreed node. Then
   // it is not ours to strip or hide — the green anchor owns it now.
   function isExploreAnchor(id) {
-    if (gnStack.indexOf(id) !== -1) return true;   // a recorded convergence
-    return exploreState === 'active' && !!exploreNodeId && exploreNodeId === id;
+    return gnStack.indexOf(id) !== -1;            // a recorded convergence
   }
 
   function retireBlueNode() {
@@ -2830,9 +2743,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // replacement for it.
   function reassertPrevNode() { /* nothing to re-park */ }
 
+  // 2026-08-28 — the green mark is now driven by the GN STACK rather than by an
+  // "active session". The top of the stack is the most recent convergence, and
+  // that is what wears the ring; every other recorded node still counts as an
+  // anchor (isExploreAnchor) so its halo survives a view change.
   function greenNodeEl() {
-    if (exploreState !== 'active' || !exploreNodeId) return null;
-    const n = cy.getElementById(exploreNodeId);
+    if (!gnStack.length) return null;
+    const n = cy.getElementById(gnStack[0]);
     return n && n.length ? n : null;
   }
 
@@ -2843,18 +2760,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function reassertGreenNode() {
     const node = greenNodeEl();
     if (!node) return;
-    if (lastReadNodeId === exploreNodeId && lastReadNodeCy === cy) {
+    if (lastReadNodeId === node.id() && lastReadNodeCy === cy) {
       gnWasRevealed = false; node.removeStyle('opacity'); node.removeClass('parked-mark');
     } else placeGreenNode(node);
-  }
-
-  function clearGreenVisuals() {
-    if (!exploreNodeId) return;
-    const n = cy.getElementById(exploreNodeId);
-    if (!n || !n.length) return;
-    clearMarksFrom(n);
-    if (gnWasRevealed) { n.removeStyle(BN_SIZE_KEYS + ' opacity'); n.hide(); }
-    gnWasRevealed = false;
   }
 
   // §3 — bottom-right of the current view. If the node is already on screen it
@@ -3100,7 +3008,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // navigation — the one thing it must survive.
   function scheduleBlueReassert() {
     if (blueReassertPending) return;
-    const wantGreen = (exploreState === 'active' && exploreNodeId);
+    const wantGreen = gnStack.length > 0;
     if (!bnNodeId && !wantGreen && !prevReadNodeId) return;
     blueReassertPending = true;
     requestAnimationFrame(() => {
@@ -3174,14 +3082,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     overlay.onclick = (e) => { if (e.target === overlay) close(); };
   }
 
-  // The partner is gone — by Leave, by disconnect, or by their tab being
-  // discarded. All three mean the same thing to us, so they share one path.
-  function markExplorePartnerGone() {
-    if (exploreState !== 'active') return;
-    explorePartnerGone = true;
-    renderMarks();
-  }
-
   // Both breadcrumb bars, re-synced and re-anchored. Exposed for the same
   // reason as reassertMarks: init() owns the resize handler, these live here.
   function refitBars() {
@@ -3199,12 +3099,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       reassertPrevNode();
       renderMarks();
     } catch (err) { console.warn('[marks] re-assert failed', err); }
-  }
-
-  // One place that makes the screen agree with exploreState.
-  function applyExploreVisuals() {
-    if (exploreState === 'active') reassertGreenNode();
-    renderMarks();
   }
 
   function reassertBlueNode() {
@@ -6112,7 +6006,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { markExplorePartnerGone, refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -7249,7 +7143,6 @@ async function init() {
       // screens disagreed about whether it existed.
       buddyCy.nodes().addClass('buddy-gone');
       try { markBuddyGone(); } catch (err) { console.warn('[BN] markBuddyGone failed', err); }
-      try { refreshExploreBtn(); } catch (_) {}
       const pairStatusEl = document.getElementById('pair-status');
       if (pairStatusEl) pairStatusEl.textContent = '';
       updateJoinButtonLabel();
@@ -7939,8 +7832,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { markExplorePartnerGone, refitBars, reassertMarks, refreshExploreBtn, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
-  try { refreshExploreBtn(); } catch (_) {}   // set the Explore button's resting state
+  const { refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
   // breadcrumb bars and the media player listened, so the graph kept its old
@@ -8591,17 +8483,15 @@ async function init() {
       resetBuddyBar();
       pairStatus.textContent = 'Paired';
       pairingState.active = true;
-      try { refreshExploreBtn(); } catch (_) {}
       pairingState.waiting = false;
       updateJoinButtonLabel();
       updateSendBtn();
-    } else if (msg.type === 'explore_offer'  || msg.type === 'explore_accept' ||
-               msg.type === 'explore_cancel' || msg.type === 'explore_leave'  ||
-               msg.type === 'explore_denied' || msg.type === 'gn_mark') {
-      // gn_mark had to be added in THREE places to work: the sender, the server
-      // relay whitelist, and this receive whitelist. Missing this one dropped
-      // the message silently on arrival — the wire was fine and the handler was
-      // fine, so the only symptom was the mark appearing on one side.
+    } else if (msg.type === 'gn_mark' || msg.type === 'explore_denied') {
+      // A relayed message type needs THREE sites: the sender, the server relay
+      // whitelist, and THIS receive whitelist. Missing this one dropped gn_mark
+      // silently on arrival — the wire was fine, the relay logged delivery and
+      // the handler was correct, so the only symptom was the mark appearing on
+      // one side. Two of three fails without a word.
       try { handleExploreMsg(msg); } catch (err) { console.warn('[explore] handler failed', err); }
     } else if (msg.type === 'buddy_disconnected') {
       console.log('[pair-debug] ← buddy_disconnected received');
@@ -8611,18 +8501,10 @@ async function init() {
       // a new partner.
       pairingState.active = false;
       pairingState.waiting = false;
-      // 2026-08-25 — a live Explore session cannot outlast the pair. This
-      // cleared the pairing but left exploreState 'active', so the button went
-      // on reading "Leave" and the green mark stayed at full strength with
-      // nobody on the other end.
-      //
-      // Treated exactly as if they had pressed Leave (spec §6): their
-      // participation ends, OURS does not. The anchor dims rather than
-      // vanishing, so the node being worked on is not lost just because the
-      // connection was — which matters most when the cause is an iOS tab being
-      // discarded mid-session.
-      try { markExplorePartnerGone(); } catch (_) {}
-      try { refreshExploreBtn(); } catch (_) {}
+      // 2026-08-28 — nothing to stand down. There is no session to end: the GN
+      // stack is a RECORD of convergences that happened, and those still
+      // happened whether or not the partner is still connected. It survives the
+      // pair ending, which is the point of a record.
       buddyCy.nodes().addClass('buddy-gone');
       // 2026-08-20 — the enlarged copy dims with the trail it mirrors rather
       // than vanishing; where they got to still matters after they leave.

@@ -1279,9 +1279,16 @@ io.on('connection', async (socket) => {
       // followed them. Both sides record the convergence, so the choice has to
       // cross — the arrival alone is invisible to the partner, who was already
       // receiving that position as an ordinary crumb.
-      if (msg.type === 'explore_offer'  || msg.type === 'explore_accept' ||
-          msg.type === 'explore_cancel' || msg.type === 'explore_leave' ||
-          msg.type === 'gn_mark') {
+      // 2026-08-28 — reduced to gn_mark alone. The offer / accept / cancel /
+      // leave types went with the Explore protocol they served: a GN is now
+      // minted by a deliberate arrival at the partner's position, so there is
+      // no negotiation left to relay.
+      //
+      // The GUARDS are the part worth keeping, and are the shape any future
+      // save-consent relay should copy: paired check, partner-online check, and
+      // only the node url forwarded — never the sender's payload, so this
+      // cannot become an arbitrary message channel.
+      if (msg.type === 'gn_mark') {
         if (!socket.data.userId) return;
         const buddyId = pairedWith.get(socket.data.userId);
         if (!buddyId) {

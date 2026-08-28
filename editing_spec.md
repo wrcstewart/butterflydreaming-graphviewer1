@@ -108,6 +108,34 @@
 ---
 
 
+> ## §2–§8 ARE NOW REMOVED FROM THE CODE — 2026-08-28
+>
+> The Explore control and the whole offer / accept / cancel / leave protocol
+> have been deleted from client and server. A GN is minted by a deliberate
+> arrival at your partner's position, so there was no negotiation left to run.
+>
+> **What survives, and matters for the SAVE consent step:**
+>
+> - **§7 stands unchanged and is the reason any of this is worth re-reading.**
+>   The exploratory and the write vocabularies must never share a control or a
+>   word, or someone presses Save from muscle memory. Deleting Explore has
+>   freed `Accept` for saving, which was the point.
+> - **State by LABEL, never by colour alone** (§3). The retired button changed
+>   its word as well as its colour.
+> - **Attention decays** (§4): the heartbeat pulsed for 3.4s in each 20s cycle
+>   for six cycles and then stopped, because an alert nobody has answered in two
+>   minutes is wallpaper. The Remote button's 5s orphan flash follows the same
+>   reasoning at a shorter scale.
+> - **The relay's shape**, in `server.js`: paired check, partner-online check,
+>   and only the node url forwarded — never the sender's payload, so it cannot
+>   become an arbitrary channel. Copy this for a save-consent message.
+> - **`showSnapDialog`** is kept whole in `viewer.js` behind
+>   `SNAP_DIALOG_ENABLED`, as the nearest thing to a template.
+>
+> **Re-derive rather than restore.** The removed protocol negotiated WHERE to
+> work; the save negotiates WHAT to write, which is a heavier and irreversible
+> act with a different shape. The code is in git if it helps.
+
 **Spec v0.1, 2026-08-23/24.** Designed with the user across this session.
 Decided items are marked **DECIDED**; anything else is open and should not be
 built on without asking.

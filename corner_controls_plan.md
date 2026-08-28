@@ -279,7 +279,10 @@ marks are DOM:
   `layoutstop` / rAF re-park paths
 - most of `exploreState` — `offered`, `invited`, the lapse-on-snap-break rule,
   the partner-gone dimming, `explore_offer` / `explore_accept` / `explore_cancel`
-  on both client and server
+  on both client and server — **DONE 2026-08-28.** All of it, plus the
+  button, its CSS and `refreshExploreBtn` / `applyExploreVisuals` /
+  `markExplorePartnerGone` / `clearGreenVisuals`. The green halo is driven by
+  `gnStack` now. `snapNodeId` is still published but nothing acts on it
 
 **Keep**: slice A's Snap detection (`snapNodeId`, published from `renderMarks`).
 The new model still needs it, unchanged.

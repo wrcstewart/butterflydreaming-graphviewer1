@@ -821,8 +821,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
 #sr-mic-btn,
 #sr-level-meter,
 #sr-accept-btn,
-#sr-wrap-btn,
-#explore-btn {
+#sr-wrap-btn {
   display: none;
 }
 #chat-send-btn,
@@ -839,66 +838,24 @@ body:not(.edit-active):not(.player-active) #action-bar {
   text-align: center;
 }
 body.edit-active #chat-send-btn,
-body.edit-active #chat-new-card-btn,
-body.edit-active #explore-btn {
+body.edit-active #chat-new-card-btn {
   display: inline-block;
 }
 
-/* ── Explore sessions (2026-08-24, editing_spec.md) ──────────────────────
-   State is carried by data-state AND by the label text — never by colour
-   alone. The colours are a second channel and are luminance-separated so
-   they read without hue discrimination. */
-#explore-btn {
-  background: #1a1a2e;
-  border: 1px solid #555;
-  border-radius: 3px;
-  color: #cccccc;
-  font-family: sans-serif;
-  font-size: 10px;
-  line-height: 1.1;
-  padding: 3px 6px;
-  cursor: pointer;
-  text-align: center;
-}
-#explore-btn:disabled { opacity: 0.4; cursor: default; }
+/* ── Explore sessions — RETIRED 2026-08-28 ───────────────────────────────
+   The button, its four data-state colours and the heartbeat animation are
+   gone with the offer/accept protocol they served. A GN is minted by a
+   deliberate arrival at the partner's position, so there was nothing left for
+   the control to do.
 
-/* Available — both on the same node, nothing offered yet. */
-#explore-btn[data-state="none"]:not(:disabled) {
-  background: #7a1f1f; border-color: #c04a4a; color: #ffe8e8;
-}
-/* Offer sent — ours now reads Cancel, and rests. */
-#explore-btn[data-state="offered"] {
-  background: #4a3410; border-color: #a07820; color: #ffeccc;
-}
-/* Invited — the partner asked. This is the one that must be noticed. */
-#explore-btn[data-state="invited"] {
-  background: #8a5a10; border-color: #ffb020; color: #fff2d8;
-}
-/* Live session. Steady, never flashing: it is a state, not a summons. */
-#explore-btn[data-state="active"] {
-  background: #17401f; border-color: #4aa860; color: #dfffe4;
-}
+   Two things from it are worth re-reading before building the SAVE consent
+   step, and both are in git rather than here: the states were carried by the
+   LABEL as well as by colour, never by colour alone; and the heartbeat pulsed
+   for 3.4s in each 20s cycle for six cycles, then stopped — because an alert
+   nobody has answered in two minutes has become wallpaper, and the movement is
+   costing attention and battery for nothing. The Remote button's orphan flash
+   follows the same reasoning at a shorter scale. */
 
-/* §4 — 3.4s of pulse, then still for the rest of a 20s cycle: a heartbeat
-   rather than a strobe, because reading and deciding takes longer than
-   noticing. Six iterations = two minutes, after which it stays lit but stops
-   moving — an offer nobody has answered by then has become wallpaper, and the
-   movement is costing attention and battery for nothing. */
-@keyframes explore-heartbeat {
-  0%    { box-shadow: 0 0 0 0 rgba(255,176,32,0.0); }
-  3%    { box-shadow: 0 0 0 3px rgba(255,176,32,0.55); }
-  8%    { box-shadow: 0 0 0 0 rgba(255,176,32,0.0); }
-  11%   { box-shadow: 0 0 0 3px rgba(255,176,32,0.55); }
-  17%   { box-shadow: 0 0 0 0 rgba(255,176,32,0.0); }
-  100%  { box-shadow: 0 0 0 0 rgba(255,176,32,0.0); }
-}
-#explore-btn[data-state="none"]:not(:disabled),
-#explore-btn[data-state="invited"] {
-  animation: explore-heartbeat 20s ease-in-out 6;
-}
-@media (prefers-reduced-motion: reduce) {
-  #explore-btn { animation: none !important; }
-}
 body.edit-active #sr-mic-btn    { display: inline-block; }
 body.edit-active #sr-level-meter { display: block; }
 body.edit-active #sr-accept-btn  { display: inline-block; }
@@ -1064,7 +1021,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c02020;             /* CANARY — red (was blue) */
+  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
