@@ -2211,7 +2211,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (i !== -1) gnStack.splice(i, 1);      // revisiting moves it to the top
     gnStack.unshift(id);
     while (gnStack.length > GN_CAP) gnStack.pop();
-    console.log('[gn-debug] pushGn ->', gnStack.length, 'entries; top =', gnStack[0]);
     updateGnBtn();
   }
   let explorePartnerGone = false;   // partner left the session: dim, do not remove (§6)
@@ -2643,9 +2642,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       case 'gn_mark': {
         // Your partner followed you here. Record it on this side too — by URL,
         // never by their cy id, which does not mean the same node in this graph.
-        const n = msg.url ? nodeByUrl(msg.url) : null;
-        console.log('[gn-debug] gn_mark RECEIVED url=', msg.url, 'resolved=', !!(n && n.length));
-        if (n && n.length) { pushGn(n.id()); renderMarks(); }
+        // Resolved through the shared helper, so a node newer than our graph
+        // load is FETCHED rather than silently dropped.
+        resolvePartnerNode(msg.url, null)
+          .then(n => { if (n) { pushGn(n.id()); renderMarks(); } })
+          .catch(err => console.warn('[gn_mark] resolve failed', err && err.message));
         break;
       }
       case 'explore_denied':
@@ -2664,31 +2665,39 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Show the partner's arrival as a node on OUR graph (§1, §2, §3, §4).
   // LATEST WINS (§2): a fast-moving partner would otherwise back up a queue of
   // stale positions; the question this answers is "where are they NOW".
-  async function showBlueNode(data) {
-    const url = data && data.url;
+  // 2026-08-28 — resolve a url sent by the partner to a node in OUR graph,
+  // fetching it if it post-dates our load (§7.3).
+  //
+  // EXTRACTED because showBlueNode had this fallback and the gn_mark handler did
+  // not: that one did a bare nodeByUrl and gave up in silence. So for any node
+  // newer than the receiver's graph load, the BLUE mark appeared — fetched —
+  // while the GREEN one did not, on that side only and with nothing said. That
+  // is precisely the shape of an intermittent "green on one side" fault, and one
+  // copy of the logic stops the two drifting apart again.
+  async function resolvePartnerNode(url, mainId) {
     let node = url ? nodeByUrl(url) : null;
-    if (!node && data && data.mainId) {
-      const byId = cy.getElementById(data.mainId);       // pre-url crumbs
+    if (!node && mainId) {
+      const byId = cy.getElementById(mainId);            // pre-url crumbs
       if (byId.length) node = byId;
     }
-
-    // §7.3 — the node may post-date our graph load. Fetch it, with its edges.
     if (!node && url) {
       try {
         const ws = wsRef.current;
         if (ws && ws.connected) {
           const rows = await fetchNodeByUrl(ws, url);
-          if (rows && rows.length) {
-            addFetchedRows(cy, rows);
-            node = nodeByUrl(url);
-          }
+          if (rows && rows.length) { addFetchedRows(cy, rows); node = nodeByUrl(url); }
         }
       } catch (err) {
-        console.warn('[BN] fetch failed for', url, err && err.message);
+        console.warn('[partner-node] fetch failed for', url, err && err.message);
       }
     }
+    return (node && node.length) ? node : null;
+  }
 
-    if (!node || !node.length) {
+  async function showBlueNode(data) {
+    const node = await resolvePartnerNode(data && data.url, data && data.mainId);
+
+    if (!node) {
       // §8.3 — show NOTHING rather than a provisional node that could not
       // honestly become your central node when tapped. But SAY so: silence is
       // the failure mode this replaces.
@@ -2964,7 +2973,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // gn_mark would land on their screen for a node neither of you occupies.
     if (!atHead) { jumpToNode(n); return; }
 
-    console.log('[gn-debug] BN click at head — minting GN for', targetId);
     pushGn(targetId);          // following your partner IS the record
     // 2026-08-27 — and TELL them, so the record lands on both sides.
     //
@@ -2996,29 +3004,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!btn) return;
     const n = gnStack.length ? cy.getElementById(gnStack[0]) : null;
     const show = !!(n && n.length);
-    if (gnStack.length) {
-      // MEASURE, do not model. The chain all reports success and the button is
-      // still not on screen, so the question is now purely geometric: is it
-      // display:none, zero-sized, transparent, or clipped out of the panel?
-      const cs = getComputedStyle(btn);
-      const r  = btn.getBoundingClientRect();
-      const pn = document.getElementById('bd-toppanel');
-      const pr = pn ? pn.getBoundingClientRect() : null;
-      console.log('[gn-debug] GN btn:', 'show=', show,
-        'display=', cs.display, 'vis=', cs.visibility, 'opacity=', cs.opacity,
-        'rect=', Math.round(r.x) + ',' + Math.round(r.y) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height),
-        'classes=', btn.className);
-      if (pn) console.log('[gn-debug] panel:',
-        'rect=', Math.round(pr.x) + ',' + Math.round(pr.y) + ' ' + Math.round(pr.width) + 'x' + Math.round(pr.height),
-        'scrollW=', pn.scrollWidth, 'clientW=', pn.clientWidth,
-        'display=', getComputedStyle(pn).display, 'children=', pn.children.length);
-      ['back-btn','bn-btn'].forEach(id => {
-        const e = document.getElementById(id); if (!e) return;
-        const er = e.getBoundingClientRect();
-        console.log('[gn-debug]  sibling', id, getComputedStyle(e).display,
-          Math.round(er.x) + ',' + Math.round(er.y) + ' ' + Math.round(er.width) + 'x' + Math.round(er.height));
-      });
-    }
     btn.classList.toggle('visible', show);
     if (!show) return;
     paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '', 'Common:');

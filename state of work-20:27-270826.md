@@ -1,5 +1,27 @@
 # State of work — 20:27, 27/08/2026
 
+> ## RESOLVED 2026-08-28 — read this first
+>
+> The test was run and **the green button appeared**. The log showed every link
+> succeeding on both sides: the click reached the head branch, `pushGn` built
+> the stack, `gn_mark` was received and resolved, and `updateGnBtn` decided to
+> show. So §2's hypothesis below was **WRONG** — the cursor was at the head both
+> times — and the layout suspects in §4 were never reached.
+>
+> The most likely explanation for the original failure is a **stale cached
+> `viewer.js`**: the successful run followed a hard refresh, which is exactly
+> what the canary is for.
+>
+> **One real fault was found while looking, and is fixed.** `showBlueNode`
+> fetches a node that post-dates the receiver's graph load; the `gn_mark`
+> handler did a bare `nodeByUrl` and gave up silently. So for any node newer
+> than the receiver's load, the BLUE mark appeared and the GREEN one did not, on
+> that side alone. Both now share one `resolvePartnerNode`. That would have
+> shown up as an intermittent "green on one side only" — worth knowing it is
+> gone, since it can no longer be mistaken for a recurrence.
+>
+> Instrumentation removed. The rest of this file stands as the record.
+
 Handover for tomorrow. One open problem, one leading hypothesis, and one test
 that settles it.
 
