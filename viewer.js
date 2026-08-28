@@ -1001,10 +1001,59 @@ function getClusterRelWidth(edge) {
   return Math.max(1.0, w * 2.5);
 }
 
+// 2026-08-28 — INK MODE, an experiment on the `remote-graph-view` branch.
+// Off by default; turn on with ?ink=1.
+//
+// WHY, and it is not a tidy-up. Colour currently encodes CONTENT — which family
+// a node belongs to — and the plan for showing your partner's whole graph needs
+// colour to encode STATE: yours, theirs, shared. One channel cannot carry both,
+// and the halos already compete with the fills on a busy screen.
+//
+// So: every node body goes BLACK and the identity moves to the LABEL. That
+// frees the fill and the outline for state, which is the precondition for the
+// remote-graph idea rather than a separate cosmetic change.
+const INK_MODE = new URLSearchParams(location.search).get('ink') === '1';
+const INK_BG   = '#0b0b0f';
+
+function inkModeOverrides() {
+  return [
+    {
+      // Body black, label in what used to be the body colour.
+      selector: 'node',
+      style: {
+        'background-color': INK_BG,
+        'background-opacity': 1,
+        'color': 'data(colour)',
+      }
+    },
+    {
+      // Family colours are computed, not stored — same function the fill used.
+      selector: 'node[type="Family"]',
+      style: {
+        'background-color': INK_BG,
+        'color': function(node) {
+          return FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa';
+        },
+      }
+    },
+    // Text nodes read as body text rather than as category: light grey, per the
+    // user's instruction. They are the great majority of nodes, so this is what
+    // decides whether the scheme is calm or noisy.
+    { selector: 'node[type="TextNode"]',                style: { 'color': '#c8c8cc' } },
+    { selector: 'node[type="TextNode"][?section_title]', style: { 'color': '#e6e6ea' } },
+    { selector: 'node[type="TextNode"][?gateway]',       style: { 'color': '#ffffff' } },
+    // These three carried literal fills rather than data(colour), so their old
+    // fill becomes their label colour and their identity survives the change.
+    { selector: 'node[type="root"]',                     style: { 'color': '#FFD700' } },
+    { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff' } },
+    { selector: 'node[type="Cluster"]',                  style: { 'color': 'data(colour)' } },
+  ];
+}
+
 // --- Cytoscape stylesheet ---
 
 function buildStyle() {
-  return [
+  const base = [
     {
       selector: 'node',
       style: {
@@ -1488,6 +1537,9 @@ function buildStyle() {
       style: { 'border-width': 1.5, 'border-color': '#ffffff', 'border-opacity': 1 }
     },
   ];
+  // Later rules win in cytoscape, so the experiment is an APPEND and touches
+  // none of the above. Switching it off is switching off one flag.
+  return INK_MODE ? base.concat(inkModeOverrides()) : base;
 }
 
 // --- Layout ---
@@ -2346,7 +2398,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // multi-value properties on whitespace, so an "rgb(255, 255, 255)" returned
   // by the style getter would be torn into three broken tokens.
   function bnBaseColour(node) {
-    const raw = node.style('background-color') || node.data('colour');
+    // In INK MODE every body is black, so the rendered background no longer
+    // identifies anything — the label does. Without this the three corner
+    // controls would all come out black and the blue radial fill would have no
+    // base to grow from. Falls back to the label colour for the types that
+    // carry no stored colour (gateways, the Gateways square, the root).
+    const raw = INK_MODE
+      ? (node.data('colour') || node.style('color'))
+      : (node.style('background-color') || node.data('colour'));
     const hex = v => '#' + v.map(n =>
       Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('');
     if (Array.isArray(raw)) return hex(raw.slice(0, 3));
