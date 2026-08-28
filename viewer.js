@@ -1015,6 +1015,54 @@ function getClusterRelWidth(edge) {
 const INK_MODE = new URLSearchParams(location.search).get('ink') === '1';
 const INK_BG   = '#0b0b0f';
 
+// 2026-08-28 — RESATURATE for the label. The user's observation: once a colour
+// is a thin glyph on black rather than a filled body, the desaturated palette
+// all but vanishes, and it can now afford to be loud because it is no longer
+// covering half the screen.
+//
+// The arithmetic agrees. Against INK_BG the fill palette runs 4.4–6.2:1; after
+// this it runs 6.1–12.2:1, with saturation raised from ~31% to ~72%.
+//
+// LIGHTNESS IS NORMALISED rather than preserved, so every family is legible by
+// the same amount instead of some reading louder than others purely because
+// their fill happened to be paler. Hue is untouched — this is the same palette
+// turned up, not a different one.
+//
+// Applied as a FUNCTION rather than a fixed table because cluster colours are
+// blends computed at load time from FAMILY_COLOURS; a table would have covered
+// the six families and left every cluster muted.
+//
+// The three constants are the whole tuning surface.
+const INK_SAT_MUL = 2.2, INK_SAT_MIN = 0.72, INK_LIGHT = 0.645;
+
+function inkify(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return '#c8c8cc';
+  const v = parseInt(m[1], 16);
+  const r = ((v >> 16) & 255) / 255, g = ((v >> 8) & 255) / 255, b = (v & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if      (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else                h = ((r - g) / d + 4) / 6;
+  }
+  s = Math.min(1, Math.max(s * INK_SAT_MUL, INK_SAT_MIN));
+  const L2 = INK_LIGHT;
+  const q = L2 < 0.5 ? L2 * (1 + s) : L2 + s - L2 * s, pp = 2 * L2 - q;
+  const hue = tt => {
+    if (tt < 0) tt += 1; if (tt > 1) tt -= 1;
+    if (tt < 1/6) return pp + (q - pp) * 6 * tt;
+    if (tt < 1/2) return q;
+    if (tt < 2/3) return pp + (q - pp) * (2/3 - tt) * 6;
+    return pp;
+  };
+  const to = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return '#' + to(hue(h + 1/3)) + to(hue(h)) + to(hue(h - 1/3));
+}
+
 function inkModeOverrides() {
   return [
     {
@@ -1023,7 +1071,7 @@ function inkModeOverrides() {
       style: {
         'background-color': INK_BG,
         'background-opacity': 1,
-        'color': 'data(colour)',
+        'color': function(node) { return inkify(node.data('colour')); },
       }
     },
     {
@@ -1032,7 +1080,7 @@ function inkModeOverrides() {
       style: {
         'background-color': INK_BG,
         'color': function(node) {
-          return FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa';
+          return inkify(FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa');
         },
       }
     },
@@ -1046,7 +1094,7 @@ function inkModeOverrides() {
     // fill becomes their label colour and their identity survives the change.
     { selector: 'node[type="root"]',                     style: { 'color': '#FFD700' } },
     { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff' } },
-    { selector: 'node[type="Cluster"]',                  style: { 'color': 'data(colour)' } },
+    { selector: 'node[type="Cluster"]', style: { 'color': function(node) { return inkify(node.data('colour')); } } },
   ];
 }
 
