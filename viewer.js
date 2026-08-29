@@ -1621,6 +1621,21 @@ function buildStyle() {
       }
     },
     {
+      // 2026-08-29 — a REVEALED path. These are real corpus edges, not drawn
+      // connections; the dotting is a provenance signal, saying "shown to
+      // explain how their node reaches yours" rather than "part of your
+      // neighbourhood". Solid would claim it was already in your view.
+      selector: 'edge.bridge-edge',
+      style: {
+        'line-style': 'dotted',
+        'width': 2,
+        'line-color': '#8b95a6',
+        'opacity': 0.75,
+        'target-arrow-shape': 'none',
+        'source-arrow-shape': 'none',
+      }
+    },
+    {
       selector: 'edge[type="PART_OF"]',
       style: { 'opacity': 0.55, 'target-arrow-shape': 'none' }
     },
@@ -2483,6 +2498,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // read off what is on screen (remote_view_spec.md §4).
   const mergedRemoteIds = new Set();
   let   localViewIds    = new Set();
+  // Nodes on a revealed shortest path. Declared HERE, with the other view sets,
+  // rather than beside findBridge — applyMergedView reads it, and a const
+  // declared further down would be a temporal-dead-zone throw waiting for the
+  // first caller that runs early enough.
+  const bridgeIds       = new Set();
+  const BRIDGE_MAX      = 3;      // intermediate nodes; beyond this, do not bridge
 
   // Snapshot what is yours, THEN reveal what is theirs. The order is the whole
   // correctness of it: a navigation hides everything and shows its own expand
@@ -2492,6 +2513,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     localViewIds = new Set(cy.nodes(':visible').map(n => n.id()));
     if (!mergedRemoteIds.size) return;
     mergedRemoteIds.forEach(id => {
+      const n = cy.getElementById(id);
+      if (n.length) n.show();
+    });
+    // Bridge nodes are LOCAL — they are on your screen, so they wear amber like
+    // everything else and are re-shown with the rest of your view.
+    bridgeIds.forEach(id => {
       const n = cy.getElementById(id);
       if (n.length) n.show();
     });
@@ -2546,6 +2573,51 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
   }
 
+  // 2026-08-29 — reveal the SHORTEST PATH from where you are to where they are,
+  // and show the nodes along it. Entirely local: the whole corpus is resident,
+  // so this is a Dijkstra in memory — no query, and nothing asked of the
+  // partner, which is the principle that these controls never touch remote
+  // structure.
+  //
+  // It also removes the need to park the arriving node in a corner: a connected
+  // component cannot be packed off at the window edge the way an isolated one is.
+  //
+  // FROM YOUR CURRENT NODE, not from whichever of your nodes happens to be
+  // nearest. The nearest gives a shorter path anchored on a node you were not
+  // thinking about; from where you are, the path answers a question you actually
+  // asked — how do I get from here to there.
+  //
+  // HUBS EXCLUDED. Root and the Entry nodes connect broadly, so paths would
+  // route up through the hierarchy and back down, and if everything is four hops
+  // from everything by way of the root then the answer carries no information.
+  // Excluding them forces the path through the meaningful channel — shared
+  // clusters, which is what the corpus's 1,640 CLUSTER_REL edges are.
+  function findBridge(fromNode, toNode) {
+    if (!fromNode || !fromNode.length || !toNode || !toNode.length) return null;
+    const hubs = cy.nodes().filter(n => {
+      const ty = n.data('type');
+      return ty === 'root' || ty === 'Entry';
+    });
+    const searchable = cy.elements()
+      .difference(hubs)
+      .difference(hubs.connectedEdges())
+      .difference(cy.edges('[type="__root_edge__"]'));
+    let path;
+    try {
+      path = searchable.dijkstra({ root: fromNode, directed: false }).pathTo(toNode);
+    } catch (err) {
+      console.warn('[bridge] dijkstra failed', err && err.message);
+      return null;
+    }
+    if (!path || !path.length) return null;                 // unreachable without hubs
+    const hops = path.nodes().length - 2;                   // exclude both endpoints
+    if (hops > BRIDGE_MAX) {
+      console.log('[bridge] nearest path is', hops, 'nodes — beyond the cap, not bridging');
+      return null;
+    }
+    return path;
+  }
+
   function mergeRemoteView() {
     if (!remoteCurrentId) return;
     const n = cy.getElementById(remoteCurrentId);
@@ -2556,16 +2628,36 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
     saveState();                  // a view change — Back undoes it for free
     mergedRemoteIds.add(remoteCurrentId);
-    applyMergedView();
-    cy.one('layoutstop', placeImportedNodes);   // after the layout, or it is overwritten
+
+    const from = (lastReadNodeId && lastReadNodeCy === cy) ? cy.getElementById(lastReadNodeId) : null;
+    const path = findBridge(from, n);
+    if (path) {
+      path.nodes().forEach(pn => { if (pn.id() !== remoteCurrentId) bridgeIds.add(pn.id()); });
+      applyMergedView();
+      path.nodes().show();
+      path.edges().show().addClass('bridge-edge');
+      console.log('[remote-view] bridged in', path.nodes().length - 2, 'step(s)');
+    } else {
+      // No short path, so nothing honest to draw. Park it where the marks used
+      // to go and say so — "there is no near route" is a fact about the corpus,
+      // not a failure.
+      applyMergedView();
+      cy.one('layoutstop', placeImportedNodes);   // after the layout, or it is overwritten
+      console.log('[remote-view] no near path — parked unconnected');
+    }
     runLayout(cy, lastParentNode);
-    console.log('[remote-view] brought in', remoteCurrentId, '| carried', mergedRemoteIds.size);
   }
 
   function clearMergedView() {
     if (!mergedRemoteIds.size) return;
     saveState();
     cy.nodes('.imported-mark').removeClass('imported-mark');
+    cy.edges('.bridge-edge').removeClass('bridge-edge');
+    bridgeIds.forEach(id => {
+      const n = cy.getElementById(id);
+      if (n.length && !localViewIds.has(id)) n.hide();
+    });
+    bridgeIds.clear();
     mergedRemoteIds.forEach(id => {
       const n = cy.getElementById(id);
       // Never hide a node that is ALSO yours — it was merged, but you have since
