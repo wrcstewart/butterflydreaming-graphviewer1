@@ -141,6 +141,15 @@ const LOCAL_HALO_W       = 3;      // px
 const LOCAL_HALO_CURRENT = 0.85;   // the node you are on
 const LOCAL_HALO_REST    = 0.5;    // everything else in your view
 
+// 2026-08-29 — the REMOTE resting tier is separately settable, and quieter.
+// The overlap covers a lot of nodes at once — every node you and your partner
+// both happen to be looking at — so at the local value it reads as a second
+// full-strength scheme competing with your own rather than as an annotation on
+// it. Their CURRENT node keeps the same prominence as yours; it is the one
+// piece of remote information worth as much as a local one.
+const REMOTE_HALO_CURRENT = LOCAL_HALO_CURRENT;
+const REMOTE_HALO_REST    = 0.3;
+
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
   CONTAINS:      '#444444',
@@ -2802,7 +2811,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const haveLocal = localViewIds.size > 0;
     const dim = bnGone ? 0.4 : 1;          // §2 — partner left: dim, never remove
 
-    const tier = (id, cur) => id === cur ? LOCAL_HALO_CURRENT : LOCAL_HALO_REST;
+    const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
+    const remoteTier = (id, cur) => id === cur ? REMOTE_HALO_CURRENT : REMOTE_HALO_REST;
 
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
@@ -2815,7 +2825,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (!isL && !isR) return;
 
         const lOp = tier(id, centralId);
-        const rOp = tier(id, rCur) * dim;
+        const rOp = remoteTier(id, rCur) * dim;
 
         // The Snap: you are both ON this node. ONE green ring, not two — two
         // rings say "two marks that coincide", one says "a shared position".
