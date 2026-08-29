@@ -757,6 +757,12 @@ function computeBlendedColours(cy) {
     const colour = blendColours(blendInputs);
     node.data('colour', colour);
     node.data('blendedColour', colour);
+    // 2026-08-29 — how much single-family identity survives the blend. Recorded
+    // HERE because this is the only place that knows the parentage; a colour on
+    // its own cannot tell a six-way blend from a family that happens to be
+    // muted, which is exactly the mistake that made Spirit dim.
+    // 1/sqrt(n): two parents keep most of their identity, six keep little.
+    node.data('inkPurity', 1 / Math.sqrt(parents.length));
   });
 
   // Bud/Cluster nodes — direction-agnostic lookup for parent Family nodes
@@ -776,6 +782,11 @@ function computeBlendedColours(cy) {
     const colour = blendColours(blendInputs);
     node.data('colour', colour);
     node.data('blendedColour', colour);
+    // Purity CASCADES: a cluster hanging off one sub-family is no purer than
+    // that sub-family. Seasons/Cycles has a single parent, Living World, which
+    // is itself a four-way blend — which is why it read as a strong colour.
+    const pp = parents.map(p => (typeof p.data('inkPurity') === 'number' ? p.data('inkPurity') : 1));
+    node.data('inkPurity', (pp.reduce((s, x) => s + x, 0) / pp.length) / Math.sqrt(parents.length));
   });
 
   // Colour DESCENDS_FROM edges — find the top-level Family endpoint (direction-agnostic)
@@ -1087,6 +1098,29 @@ const INK_BG_LUM = 0.0045;                 // relative luminance of INK_BG
 // [hue°, target contrast against INK_BG]. Sorted by hue; the curve wraps.
 const INK_ANCHORS = [[2, 4.5], [18, 9.6], [43, 14.2], [125, 7.6], [215, 6.0], [300, 11.5]];
 const INK_SATS    = [0.75, 0.68, 0.60, 0.52, 0.45];   // tried in order; first that reaches the target wins
+
+// 2026-08-29 — PURITY. The user noticed that sub-families inheriting from five
+// or six families came out brighter than a pure family — Symbolic Action, a
+// six-way blend, was reaching 9.9:1 against Nature's 7.7:1.
+//
+// The cause was that inkify forced EVERY colour to the same saturation and took
+// its luminance from hue alone. A six-family blend is 9% saturated — very nearly
+// grey — so its hue is residual noise, and pushing it to 75% invented a strong
+// identity that the node does not have.
+//
+// That low saturation is INFORMATION: it means "belongs to many families". So
+// both saturation and target luminance are now scaled by how PURE the source
+// colour is. A single family is unchanged; a heavily blended one recedes toward
+// a quiet neutral instead of shouting on an arbitrary hue.
+//
+// The gradient is the point — a two-family blend keeps most of its identity, a
+// six-family one keeps almost none, which is exactly what those numbers mean.
+// Purity arrives from the node (data('inkPurity')), computed where the blend is,
+// because a colour alone cannot distinguish a six-way blend from a family that
+// happens to be muted — Spirit is only 19% saturated and was wrongly dimmed by a
+// saturation-based guess.
+const INK_NEUTRAL_C   = 4.0;    // contrast a fully-blended colour lands at
+const INK_NEUTRAL_SAT = 0.10;   // and its saturation
 const _inkCache   = new Map();
 
 function _srgbToLin(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
@@ -1120,10 +1154,11 @@ function _targetContrast(hueDeg) {
   const tpos = (hueDeg - a[a.length - 1][0]) / span;
   return a[a.length - 1][1] + (a[0][1] - a[a.length - 1][1]) * tpos;
 }
-function inkify(hex) {
+function inkify(hex, purity) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
   if (!m) return '#c8c8cc';
-  const key = m[1].toLowerCase();
+  const pur = Math.max(0, Math.min(1, typeof purity === 'number' ? purity : 1));
+  const key = m[1].toLowerCase() + '@' + pur.toFixed(3);
   if (_inkCache.has(key)) return _inkCache.get(key);
 
   const v = parseInt(key, 16);
@@ -1136,12 +1171,14 @@ function inkify(hex) {
     else if (max === g) h = ((b - r) / d + 2) / 6;
     else                h = ((r - g) / d + 4) / 6;
   }
-  const targetLum = _targetContrast(h * 360) * (INK_BG_LUM + 0.05) - 0.05;
+  const wantC  = INK_NEUTRAL_C   + (_targetContrast(h * 360) - INK_NEUTRAL_C)   * pur;
+  const satTop = INK_NEUTRAL_SAT + (INK_SATS[0]              - INK_NEUTRAL_SAT) * pur;
+  const targetLum = wantC * (INK_BG_LUM + 0.05) - 0.05;
 
   // Solve lightness for that luminance, most saturated first. Twenty halvings
   // is exact to well under one 8-bit step.
   let best = null;
-  for (const s of INK_SATS) {
+  for (const s of INK_SATS.map(x => Math.min(x, satTop))) {
     let lo = 0, hi = 1, mid = 0.5;
     for (let k = 0; k < 20; k++) {
       mid = (lo + hi) / 2;
@@ -1150,9 +1187,8 @@ function inkify(hex) {
     }
     const [rr, gg, bb] = _hslToRgb(h, (lo + hi) / 2, s);
     const got = (_lumOf(rr, gg, bb) + 0.05) / (INK_BG_LUM + 0.05);
-    const want = _targetContrast(h * 360);
     if (best === null) best = [rr, gg, bb];
-    if (Math.abs(got - want) / want < 0.06) { best = [rr, gg, bb]; break; }
+    if (Math.abs(got - wantC) / wantC < 0.06) { best = [rr, gg, bb]; break; }
   }
   const to = x => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0');
   const out = '#' + to(best[0]) + to(best[1]) + to(best[2]);
@@ -1168,7 +1204,7 @@ function inkModeOverrides() {
       style: {
         'background-color': INK_BG,
         'background-opacity': INK_BODY_OPACITY,
-        'color': function(node) { return inkify(node.data('colour')); },
+        'color': function(node) { return inkify(node.data('colour'), node.data('inkPurity')); },
       }
     },
     {
@@ -1178,7 +1214,10 @@ function inkModeOverrides() {
         'background-color': INK_BG,
         'background-opacity': INK_BODY_OPACITY,
         'color': function(node) {
-          return inkify(FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa');
+          // A top-level family is pure by definition; a sub-family carries the
+          // purity recorded when its colour was blended.
+          const own = FAMILY_COLOURS[node.data('name')];
+          return own ? inkify(own, 1) : inkify(node.data('colour') || '#aaaaaa', node.data('inkPurity'));
         },
       }
     },
@@ -1195,7 +1234,7 @@ function inkModeOverrides() {
     // becomes the label colour and their identity survives the change.
     { selector: 'node[type="root"]',                     style: { 'color': '#FFD700', 'background-opacity': INK_BODY_OPACITY } },
     { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff', 'background-opacity': INK_BODY_OPACITY } },
-    { selector: 'node[type="Cluster"]', style: { 'color': function(node) { return inkify(node.data('colour')); } } },
+    { selector: 'node[type="Cluster"]', style: { 'color': function(node) { return inkify(node.data('colour'), node.data('inkPurity')); } } },
   ];
 }
 
