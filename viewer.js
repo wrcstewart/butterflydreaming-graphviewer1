@@ -3225,9 +3225,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // pressing this is the only way to get it onto your graph. Flash to say there
   // is something new to fetch.
   //
-  // 2026-08-29 — halved to ~2.5s. The overlap now carries most of the signal by
-  // itself, so the flash no longer has to be the news; it only has to point at
-  // the one thing the overlap cannot show — a node of theirs you do not have.
+  // 2026-08-29 — ~2.4s total, half the original, but the pulse RATE is 50%
+  // quicker. The overlap carries most of the signal now, so the flash is
+  // shorter; but what is left is routing the user cannot get any other way, so
+  // while it lasts it should be hard to look past. Shorter and more insistent,
+  // which are not in tension — a slow pulse is exactly what gets missed.
   //
   // The cue is a spreading ring, not a colour change: it reads as motion and
   // luminance rather than hue, which is the channel to rely on here.
@@ -3239,7 +3241,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     void btn.offsetWidth;                 // reflow, so a repeat arrival restarts it
     btn.classList.add('bn-alert');
     clearTimeout(bnFlashTimer);
-    bnFlashTimer = setTimeout(() => btn.classList.remove('bn-alert'), 2600);
+    bnFlashTimer = setTimeout(() => btn.classList.remove('bn-alert'), 2350);
   }
 
   function updateBnBtn() {
