@@ -131,12 +131,15 @@ const MARK_PREV      = '#6a5b00';
 // blue remote channel still has to fit beside it. Cheaper to be thin now than to
 // discover the ceiling once two channels are drawing.
 const LOCAL_HALO_W       = 3;      // px
-// 2026-08-29 — widened: 0.75/0.5/0.3 -> 0.85/0.65/0.2. The two active tiers
-// carry further and the resting tier recedes, which buys back ink for the blue
-// remote channel without giving up the scale.
+// 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
+// all: with amber and blue both carrying a scale, three levels in two colours
+// was six things to tell apart, and the middle one earned the least. What is
+// left answers one question — is this the node you are on, or not.
+//
+// The rest rises 0.2 -> 0.5 as a consequence: it no longer has to leave room
+// beneath a middle tier, so it can simply be visible.
 const LOCAL_HALO_CURRENT = 0.85;   // the node you are on
-const LOCAL_HALO_PREV    = 0.65;   // the node you came from
-const LOCAL_HALO_REST    = 0.2;    // everything else in your view
+const LOCAL_HALO_REST    = 0.5;    // everything else in your view
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
@@ -1797,7 +1800,7 @@ function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
   applySeqSignals(cy, parentNode);
   if (visible.nodes().length <= 1) {
-    cy.fit(visible.not('.parked-mark'), fitPadding(cy, 120));
+    cy.fit(visible.not('.parked-mark, .imported-mark'), fitPadding(cy, 120));
     return;
   }
 
@@ -1913,7 +1916,7 @@ function runLayout(cy, parentNode = null) {
       };
     });
     visible.layout({ name: 'preset', positions, fit: false }).run();
-    cy.fit(visible.not('.parked-mark'), fitPadding(cy, 80));
+    cy.fit(visible.not('.parked-mark, .imported-mark'), fitPadding(cy, 80));
 
   } else if (hintMode === 'preset' || hintMode === 'hybrid') {
     // Recover hinted children from stored offsets, pin them, and run fCoSE so any
@@ -2245,7 +2248,7 @@ function runLayout(cy, parentNode = null) {
         // The gateways are pinned below the cluster by construction — only
         // the families are free to drift across it.
         shift(famNodes, false);
-        cy.fit(visible.not('.parked-mark'), fitPadding(cy, 60));
+        cy.fit(visible.not('.parked-mark, .imported-mark'), fitPadding(cy, 60));
       } catch (err) { console.warn('[BD] side-shift failed', err); }
     };
     layout.run();
@@ -2483,6 +2486,40 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //
   // The button therefore adds at most ONE node. That is also why the layout-churn
   // argument no longer applies to the overlap: recolouring a halo moves nothing.
+  // 2026-08-29 — position the imported node against the CONTENT, not the canvas.
+  //
+  // Left to the layout it landed hard against the left edge of the window: it is
+  // structurally disconnected, so fcose packs it as its own component and puts
+  // it wherever there is room. The user recognised the shape — it is the same
+  // fault the parked marks had, where cy.extent() (the whole window) was used
+  // instead of the bounding box of what the layout actually occupies. A cluster
+  // view fills about the panel width and centres, so the two are far apart.
+  //
+  // So: just outside the top-left of your own nodes, then CLAMPED into the
+  // viewport so it cannot be pushed off-screen when your view already fills it.
+  function placeImportedNodes() {
+    const imported = cy.nodes(':visible').filter(n => !localViewIds.has(n.id()) && mergedRemoteIds.has(n.id()));
+    if (!imported.length) return;
+    const own = cy.nodes(':visible').difference(imported);
+    if (!own.length) return;
+    const bb = own.boundingBox();      // model space, like position() — never renderedBoundingBox
+    const ext = cy.extent();
+    const gap = 34;
+    imported.forEach((n, i) => {
+      const halfW = (n.width()  || 40) / 2 + 14;
+      const halfH = (n.height() || 30) / 2 + 14;
+      const x = bb.x1 - gap - halfW;
+      const y = bb.y1 + i * (halfH * 2 + 12);
+      n.position({
+        x: Math.max(ext.x1 + halfW, Math.min(x, ext.x2 - halfW)),
+        y: Math.max(ext.y1 + halfH, Math.min(y, ext.y2 - halfH)),
+      });
+      // Excluded from every fit. Including it is a feedback loop: the fit zooms
+      // out to reach it, which widens the extent, which moves it further out.
+      n.addClass('imported-mark');
+    });
+  }
+
   function mergeRemoteView() {
     if (!remoteCurrentId) return;
     const n = cy.getElementById(remoteCurrentId);
@@ -2494,6 +2531,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     saveState();                  // a view change — Back undoes it for free
     mergedRemoteIds.add(remoteCurrentId);
     applyMergedView();
+    cy.one('layoutstop', placeImportedNodes);   // after the layout, or it is overwritten
     runLayout(cy, lastParentNode);
     console.log('[remote-view] brought in', remoteCurrentId, '| carried', mergedRemoteIds.size);
   }
@@ -2501,6 +2539,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function clearMergedView() {
     if (!mergedRemoteIds.size) return;
     saveState();
+    cy.nodes('.imported-mark').removeClass('imported-mark');
     mergedRemoteIds.forEach(id => {
       const n = cy.getElementById(id);
       // Never hide a node that is ALSO yours — it was merged, but you have since
@@ -2763,10 +2802,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const haveLocal = localViewIds.size > 0;
     const dim = bnGone ? 0.4 : 1;          // §2 — partner left: dim, never remove
 
-    const tier = (id, cur, prv) =>
-      id === cur ? LOCAL_HALO_CURRENT
-      : (prv && id === prv) ? LOCAL_HALO_PREV
-      : LOCAL_HALO_REST;
+    const tier = (id, cur) => id === cur ? LOCAL_HALO_CURRENT : LOCAL_HALO_REST;
 
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
@@ -2775,11 +2811,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const isL = haveLocal ? localViewIds.has(id) : true;
         // Their whole view is consulted, but only nodes ALREADY VISIBLE are
         // painted — so the overlap lights up without anything being added.
-        const isR = remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur || id === rPrev;
+        const isR = remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur;
         if (!isL && !isR) return;
 
-        const lOp = tier(id, centralId, prevId);
-        const rOp = tier(id, rCur, rPrev) * dim;
+        const lOp = tier(id, centralId);
+        const rOp = tier(id, rCur) * dim;
 
         // The Snap: you are both ON this node. ONE green ring, not two — two
         // rings say "two marks that coincide", one says "a shared position".
@@ -3346,7 +3382,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const halfW = (node.width()  || 40) / 2 + 14;
     const halfH = (node.height() || 30) / 2 + 14;
     const ext   = cy.extent();
-    const body  = cy.elements(':visible').not('.parked-mark');
+    const body  = cy.elements(':visible').not('.parked-mark, .imported-mark');
     const bb    = body.length ? body.boundingBox() : ext;
     const gap   = 26;
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -3387,6 +3423,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     requestAnimationFrame(() => {
       blueReassertPending = false;
       applyMergedView();          // re-show the merge, and re-snapshot what is yours
+      placeImportedNodes();
       reassertBlueNode();
       reassertGreenNode();
       reassertPrevNode();
@@ -7242,7 +7279,7 @@ async function init() {
       requestAnimationFrame(() => {
         positionCyEl();
         cy.resize();
-        cy.fit(cy.elements(':visible').not('.parked-mark'), fitPadding(cy, 40));
+        cy.fit(cy.elements(':visible').not('.parked-mark, .imported-mark'), fitPadding(cy, 40));
       });
     }
   }
@@ -8288,7 +8325,7 @@ async function init() {
       try {
         positionCyEl();
         cy.resize();
-        cy.fit(cy.elements(':visible').not('.parked-mark'), fitPadding(cy, 60));
+        cy.fit(cy.elements(':visible').not('.parked-mark, .imported-mark'), fitPadding(cy, 60));
         reassertMarks();
         // The bars have their OWN resize listeners, but those fire immediately
         // while this one is debounced — so positionCyEl re-lays the panes
