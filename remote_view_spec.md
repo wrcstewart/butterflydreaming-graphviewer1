@@ -1,6 +1,82 @@
 # Remote view sharing — spec
 
-**Branch `remote-graph-view`, designed 2026-08-29 with the user. Not yet built.**
+**Branch `remote-graph-view`. Designed and BUILT 2026-08-29.**
+
+> ## AMENDED IN BUILD — read this before §1–§6
+>
+> Two things changed once it was on screen, and both simplify it. The sections
+> below are the reasoning that got here; where they disagree with this box, this
+> box is what is built.
+>
+> ### 1. The OVERLAP, not the union
+>
+> The full union was more than a reader can hold — the user's judgement on seeing
+> it, and correct. Their whole view is no longer pulled across. What shows:
+>
+> - every node of theirs **already in your view**, painted blue, updated **live**
+> - **their current node**, brought in by the button if it is not already there
+> - nothing else of theirs
+>
+> The picture answers *"which of these are we both seeing?"* rather than *"what
+> is everything either of us can see?"*.
+>
+> **The layout-churn argument no longer applies to the overlap.** It adds no
+> nodes, so it moves nothing, so it can be live. §2's reasoning was sound but was
+> answering a harder question than the one worth answering. The button is left
+> with one job — fetch their current node — and adds at most ONE node.
+>
+> ### 2. TWO halo tiers, not three
+>
+> Predecessors are no longer signalled. With amber and blue each carrying a
+> scale, three levels meant six things to tell apart and the middle earned the
+> least. **0.85** the node you are on, **0.5** everything else, in either colour.
+> The rest rose from 0.2 because it no longer has to leave room beneath a middle
+> tier. `previous` is still sent and stored; nothing paints it.
+>
+> ### Built, in order
+>
+> | | |
+> |---|---|
+> | `29ab8de` | transport on the existing crumb — verified, 15 navigations, every id resolvable |
+> | `762a770` | merge + Clear plumbing, `localViewIds` / `mergedRemoteIds` |
+> | `4da448b` | membership rings — one pass replacing four branches |
+> | `cc1d8a9` | publish deferred one frame (see below) |
+> | `529775f` | overlap not union |
+> | `0309dec` | two tiers; imported node placed against content |
+>
+> ### Three faults worth remembering
+>
+> - **The payload was one navigation stale.** `addYouChip` — and so
+>   `publishPosition` — runs at the TOP of the fresh-tap branch, while
+>   `navigateInto` expands at the BOTTOM. So `current` named the new node while
+>   `ids` held the old view. Now deferred one frame **and coalesced**, since two
+>   navigations in one frame would otherwise have both read the final view and
+>   the first message would have carried the second's ids.
+> - **Merged nodes wore amber.** Nothing painted them: the stylesheet's resting
+>   tier is amber and the only blue was one inline style on their current node.
+>   The merge arrived invisible. Fixed by the single membership pass, which also
+>   fixed blue being `outline-width: 6` against local 3.
+> - **The imported node landed at the window edge.** Structurally disconnected,
+>   so fcose packs it as its own component. Same fault as the parked marks:
+>   `cy.extent()` standing in for the bounding box of what the layout occupies.
+>   Now placed top-left of YOUR nodes, after `layoutstop` (before that the layout
+>   overwrites it), clamped into the viewport, and carrying `.imported-mark` so
+>   every `cy.fit` excludes it — including it is a feedback loop.
+>
+> ### Still open
+>
+> - `renderMembership` takes a `prevId` it no longer uses.
+> - **Edges.** The user asked whether they earn their place now the halos carry
+>   relationship. They do — the user's own principle is that arrows and edges
+>   signal CONSTRUCTED relationships while colour signals history and
+>   local/remote/agreed. Halos say *whose*, edges say *how joined*. If the load
+>   is still too high, hide edges on the ONE imported node, which has no honest
+>   structural relation to your view.
+> - Slice 4 (the 8px green snap ring) is written and live inside the membership
+>   pass but **untested** — it needs both users selecting the same node.
+> - Freezing your own component is now probably unnecessary: at most one node
+>   arrives.
+
 
 Showing your partner's graph on your own screen, so the two of you can see where
 the other is working. Companion to `ink_mode.md`, which frees the colour channel
