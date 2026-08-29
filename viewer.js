@@ -103,7 +103,24 @@ const FAMILY_COLOURS = {
 // 2026-08-27 — brightened from #8d7900 so the CURRENT node separates clearly
 // from the PREVIOUS one, now that both are amber. Hue preserved exactly (51.5°)
 // — the pair differ in luminance alone, which is the channel to rely on.
-const MARK_LOCAL     = '#b79d00';   // the node you have selected NOW
+// 2026-08-29 — PALE amber, not the old dark gold #b79d00.
+//
+// The muddiness was compositing, not the colour. A halo at 0.5 opacity over a
+// near-black canvas averages HALFWAY TO BLACK, so a dark gold arrived as
+// #615408 — a 2.6:1 olive-brown, which is what read as depressing. The same
+// opacity on a pale amber lands at #85724C, 4.2:1: still clearly amber, and
+// bright enough to look deliberate.
+//
+// So the fix is a LIGHTER base, not a higher opacity — the low opacity is doing
+// wanted work, keeping the local channel quiet enough for blue to sit beside it.
+//
+//   composited over the canvas   @0.85     @0.5      @0.3
+//   old  #b79d00                 #9D8702   #615408   #3F370A
+//   new  #FFD98A                 #DABA78   #85724C   #544934
+//
+// Paler still (#FFE7B0, #FFF0CC) lifts luminance further but drains the hue —
+// at 0.3 they arrive as warm greys. This keeps the amber.
+const MARK_LOCAL     = '#FFD98A';   // the node you have selected NOW
 // The node you were on BEFORE this one. Same hue, well below MARK_LOCAL, so the
 // pair reads as one signal at two depths rather than as two colours.
 //
