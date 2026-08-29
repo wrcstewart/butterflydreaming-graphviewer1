@@ -2438,6 +2438,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   const bnStack = [];
   let   bnCursor = 0;
 
+  // 2026-08-29 — REMOTE VIEW, slice 1 of remote_view_spec.md. Received and
+  // stored; nothing is drawn from it yet. Their STRUCTURAL view only — what
+  // arrives is expand(their current node), never anything they merged from us,
+  // or the union would grow every time it crossed the wire.
+  let remoteViewIds   = [];     // their visible node ids (urls)
+  let remoteCurrentId = null;   // the node they are on
+  let remotePrevId    = null;   // the node they came from
+
+  function receiveRemoteView(data) {
+    if (!data) return;
+    remoteViewIds   = Array.isArray(data.ids) ? data.ids : [];
+    remoteCurrentId = data.url || null;
+    remotePrevId    = data.previous || null;
+    // Resolvable HERE, not merely received: an id that names nothing in this
+    // graph is useless later, and counting now is what makes a mismatch visible
+    // while it is still cheap to explain.
+    const known = remoteViewIds.filter(id => cy.getElementById(id).length > 0).length;
+    console.log('[remote-view] received', remoteViewIds.length, 'ids,',
+                known, 'resolvable | current=', remoteCurrentId, '| prev=', remotePrevId);
+  }
+
   function pushBn(id) {
     const i = bnStack.indexOf(id);
     if (i !== -1) bnStack.splice(i, 1);        // revisiting moves it to the top
@@ -3458,6 +3479,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //
   // The lesson is not "check the gates": it is that a transport concern was
   // sitting inside a rendering function, where nobody would look for it.
+  // 2026-08-29 — YOUR STRUCTURAL VIEW: what you are actually exploring, which
+  // is not the same as what is on screen once merging exists. Today they are
+  // identical because nothing merges yet; slice 2 subtracts mergedRemoteIds
+  // here, and this is the ONE place that has to change for it.
+  //
+  // Never send the merged remainder. A merges B's view, sends it all back, B
+  // merges that — and the union grows every round trip until both screens are
+  // the same blob and the remote channel means nothing.
+  function currentLocalViewIds() {
+    return cy.nodes(':visible').map(n => n.id());
+  }
+
   function publishPosition(node) {
     if (!pairingState.active) return;
     const sendWs = wsRef.current;
@@ -3477,6 +3510,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         section_title:  node.data('section_title') || false,
         subfamily:      node.hasClass('subfamily'),
         clusterNodeId:  lastClusterNode ? lastClusterNode.id() : null,
+        // 2026-08-29 — the view rides on the EXISTING crumb. server.js forwards
+        // msg.data wholesale, so these fields need no server change and no
+        // whitelist entries; a new message type would need three sites, and two
+        // of three fails silently.
+        //
+        // One message carries both the label and the set, so the button cannot
+        // name one view while merging another.
+        ids:            currentLocalViewIds(),
+        previous:       prevReadNodeId || null,
       }
     });
   }
@@ -3754,6 +3796,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // to the TOP so the gate below cannot reach past it; it depends on nothing
     // the chip builds.
     showBlueNode(data).catch(err => console.warn('[BN] showBlueNode failed', err));
+    receiveRemoteView(data);   // slice 1 — stored, not drawn
     if (!BREADCRUMB_BARS) return;
     const type        = data.type;
     const sourceText  = type === 'TextNode' ? (data.source_text || null) : null;
