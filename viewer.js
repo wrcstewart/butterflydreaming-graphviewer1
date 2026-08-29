@@ -2442,7 +2442,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // stored; nothing is drawn from it yet. Their STRUCTURAL view only — what
   // arrives is expand(their current node), never anything they merged from us,
   // or the union would grow every time it crossed the wire.
-  let remoteViewIds   = [];     // their visible node ids (urls)
+  // 2026-08-29 — held as a SET and consulted LIVE. Their view is no longer
+  // merged wholesale: a node of theirs lights blue only if it is ALREADY in your
+  // view, so consulting this costs nothing and moves nothing.
+  let remoteViewIds   = new Set();
   let remoteCurrentId = null;   // the node they are on
   let remotePrevId    = null;   // the node they came from
 
@@ -2468,14 +2471,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
   }
 
+  // 2026-08-29 — SIMPLIFIED, at the user's judgement that the full union is more
+  // than a reader can hold. Their whole view is no longer pulled across; only
+  // their CURRENT node is, and only if it is not already yours.
+  //
+  // Everything else they are looking at still shows — but only where it overlaps
+  // what you are already looking at, and that overlap is painted live by
+  // renderMembership without adding a node or moving one. So the picture answers
+  // "which of these are we both seeing?" rather than "what is everything either
+  // of us can see?", which is the question a person can actually hold.
+  //
+  // The button therefore adds at most ONE node. That is also why the layout-churn
+  // argument no longer applies to the overlap: recolouring a halo moves nothing.
   function mergeRemoteView() {
-    if (!remoteViewIds.length) return;
-    saveState();                  // a merge is a view change — Back undoes it free
-    let added = 0;
-    remoteViewIds.forEach(id => { if (!mergedRemoteIds.has(id)) { mergedRemoteIds.add(id); added++; } });
+    if (!remoteCurrentId) return;
+    const n = cy.getElementById(remoteCurrentId);
+    if (!n.length) return;
+    if (mergedRemoteIds.has(remoteCurrentId) || (n.visible() && localViewIds.has(remoteCurrentId))) {
+      console.log('[remote-view] their node is already here — nothing to bring');
+      return;
+    }
+    saveState();                  // a view change — Back undoes it for free
+    mergedRemoteIds.add(remoteCurrentId);
     applyMergedView();
     runLayout(cy, lastParentNode);
-    console.log('[remote-view] merged', added, 'new (', mergedRemoteIds.size, 'total ) | local', localViewIds.size);
+    console.log('[remote-view] brought in', remoteCurrentId, '| carried', mergedRemoteIds.size);
   }
 
   function clearMergedView() {
@@ -2495,15 +2515,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function receiveRemoteView(data) {
     if (!data) return;
-    remoteViewIds   = Array.isArray(data.ids) ? data.ids : [];
+    remoteViewIds   = new Set(Array.isArray(data.ids) ? data.ids : []);
     remoteCurrentId = data.url || null;
     remotePrevId    = data.previous || null;
     // Resolvable HERE, not merely received: an id that names nothing in this
     // graph is useless later, and counting now is what makes a mismatch visible
     // while it is still cheap to explain.
-    const known = remoteViewIds.filter(id => cy.getElementById(id).length > 0).length;
-    console.log('[remote-view] received', remoteViewIds.length, 'ids,',
+    let known = 0;
+    remoteViewIds.forEach(id => { if (cy.getElementById(id).length) known++; });
+    console.log('[remote-view] received', remoteViewIds.size, 'ids,',
                 known, 'resolvable | current=', remoteCurrentId, '| prev=', remotePrevId);
+    renderMarks();     // the overlap re-lights immediately — nothing moves
   }
 
   function pushBn(id) {
@@ -2751,7 +2773,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (isGreen(n)) return;            // a recorded convergence keeps its own ring
         const id  = n.id();
         const isL = haveLocal ? localViewIds.has(id) : true;
-        const isR = mergedRemoteIds.has(id) || id === rCur || id === rPrev;
+        // Their whole view is consulted, but only nodes ALREADY VISIBLE are
+        // painted — so the overlap lights up without anything being added.
+        const isR = remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur || id === rPrev;
         if (!isL && !isR) return;
 
         const lOp = tier(id, centralId, prevId);
