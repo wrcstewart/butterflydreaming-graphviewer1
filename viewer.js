@@ -1621,6 +1621,23 @@ function buildStyle() {
       }
     },
     {
+      // 2026-08-29 — THE NEXT STEP toward your partner. Blue because it points at
+      // them, dotted because it is guidance rather than part of your view, and
+      // arrowed because unlike every other signal here it has a DIRECTION: this
+      // way, not merely "these are related".
+      selector: 'edge.route-step',
+      style: {
+        'line-style': 'dotted',
+        'width': 3,
+        'line-color': '#4a9bff',
+        'opacity': 0.9,
+        'target-arrow-shape': 'triangle',
+        'target-arrow-color': '#4a9bff',
+        'source-arrow-shape': 'none',
+        'z-index': 30,
+      }
+    },
+    {
       // 2026-08-29 — a REVEALED path. These are real corpus edges, not drawn
       // connections; the dotting is a provenance signal, saying "shown to
       // explain how their node reaches yours" rather than "part of your
@@ -2566,9 +2583,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function findBridge(fromNode, toNode) {
     if (!fromNode || !fromNode.length || !toNode || !toNode.length) return null;
     try {
+      // 2026-08-29 — GATEWAYS excluded too. The user found routes "commoning out
+      // on the gateways, which leaves a lot unsaid", and that is exactly right:
+      // a gateway carries up to 48 CONTAINS_CLUSTER edges, so it is as much a hub
+      // as the root. A route through one says only "these are both in the
+      // corpus". Excluded as INTERMEDIATES; still reachable as an endpoint.
       const hubs = cy.nodes().filter(n => {
         const ty = n.data('type');
-        return ty === 'root' || ty === 'Entry';
+        return ty === 'root' || ty === 'Entry' || (ty === 'TextNode' && n.data('gateway'));
       });
       // Never exclude the two ENDS, whatever they are. Dijkstra needs its root
       // in the collection, and the partner may legitimately be standing on an
@@ -2590,6 +2612,56 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       console.warn('[bridge] failed:', err && err.message);
       return null;
     }
+  }
+
+  // 2026-08-29 — THE NEXT STEP. Recomputed whenever either of you moves, and
+  // drawn as a dotted blue arrow from where you are to the first node on the way
+  // to your partner.
+  //
+  // The whole route was too much to read; one step is not. And it costs almost
+  // nothing on screen, because the first hop from your current node is a DIRECT
+  // NEIGHBOUR — usually already visible, so the arrow points at something you can
+  // already tap and no new node appears at all.
+  //
+  // Follow it and it recomputes from where you land. If your partner is doing the
+  // same, the two of you close on each other without either having to know where
+  // the other is going.
+  let stepEdgeId = null, stepNodeId = null, hopDistance = null;
+
+  function clearNextStep() {
+    hopDistance = null;
+    if (stepEdgeId) {
+      const e = cy.getElementById(stepEdgeId);
+      if (e.length) e.removeClass('route-step');
+    }
+    stepEdgeId = null; stepNodeId = null;
+  }
+
+  function updateNextStep() {
+    clearNextStep();
+    if (routeActive) return;                 // the full route is already on screen
+    if (!remoteCurrentId || !pairingState || !pairingState.active) return;
+    const from = (lastReadNodeId && lastReadNodeCy === cy) ? cy.getElementById(lastReadNodeId) : null;
+    const to   = cy.getElementById(remoteCurrentId);
+    if (!from || !from.length || !to.length) return;
+    if (from.id() === to.id()) return;        // you are there — the Snap ring says so
+
+    const path = findBridge(from, to);
+    if (!path) return;
+    const nodes = path.nodes();
+    if (nodes.length < 2) return;
+    const next = nodes[1];
+
+    // Adjacent by construction, so a REAL edge always exists — nothing synthetic
+    // is drawn, and the arrow is the corpus's own relationship, marked.
+    const link = from.edgesWith(next).first();
+    if (!link || !link.length) return;
+
+    if (!next.visible()) next.show();
+    link.show().addClass('route-step');
+    stepEdgeId = link.id();
+    stepNodeId = next.id();
+    hopDistance = nodes.length - 1;
   }
 
   // 2026-08-29 — THE ROUTE VIEW. Pressing Remote replaces your view with just
@@ -2650,6 +2722,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function exitRouteView() {
     if (!routeActive) return;
     routeActive = false;
+    clearNextStep();
     cy.edges('.bridge-edge').removeClass('bridge-edge');
     cy.nodes('.imported-mark').removeClass('imported-mark');
     mergedRemoteIds.clear();
@@ -2678,6 +2751,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     console.log('[remote-view] received', remoteViewIds.size, 'ids,',
                 known, 'resolvable | current=', remoteCurrentId, '| prev=', remotePrevId);
     renderMarks();     // the overlap re-lights immediately — nothing moves
+    updateNextStep();  // they moved: the way to them changed
   }
 
   function pushBn(id) {
@@ -3372,7 +3446,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!show) return;
     // A number when you are browsing BACK through their trail: 1 = one position
     // ago. Blank at the cursor's home, where the button means "where they are".
-    paintNodeButton(bnBtn, n, bnCursor > 0 ? String(bnCursor) : '', 'Remote:');
+    // The hop count, when there is one and you are not already adjacent. It
+    // turns the control into a distance readout — the thing that makes following
+    // the arrow feel like closing on someone rather than just navigating.
+    paintNodeButton(bnBtn, n, (hopDistance && hopDistance > 1) ? String(hopDistance) : '', 'Remote:');
     bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
     // §2 — the partner left: dim, do not remove. They are still where they were.
     // And dim when you are ALREADY on their node: clicking then jumps you to
@@ -3552,6 +3629,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     requestAnimationFrame(() => {
       blueReassertPending = false;
       applyMergedView();          // re-show the route, and re-snapshot what is yours
+      updateNextStep();           // you moved: recompute the way to them
       reassertBlueNode();
       reassertGreenNode();
       reassertPrevNode();
