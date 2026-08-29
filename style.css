@@ -264,9 +264,12 @@ html, body {
 #clear-merge-btn:hover   { filter: brightness(1.3); }
 
 /* 2026-08-28 — ORPHAN BN alert. Your partner's node is not in your view, so
-   there is no halo to tap and this button is the only route to them. Five
-   pulses at 1s, then it stops and stays put: an alert that keeps moving after
-   it has been read is costing attention and battery for nothing.
+   there is no halo to tap and this button is the only route to them. THREE
+   pulses at 0.85s — halved from five at 1s, once the overlap started carrying
+   most of the signal by itself, so the flash only has to say "there is
+   something new to fetch" rather than carry the news alone. Then it stops and
+   stays put: an alert that keeps moving after it has been read is costing
+   attention and battery for nothing.
 
    A SPREADING RING, not a colour change — motion and luminance rather than hue,
    which is the channel to rely on for this user. */
@@ -274,10 +277,10 @@ html, body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(74, 155, 255, 0); }
   50%      { box-shadow: 0 0 0 4px rgba(74, 155, 255, 0.9); }
 }
-#bn-btn.bn-alert { animation: bn-alert-flash 1s ease-in-out 5; }
+#bn-btn.bn-alert { animation: bn-alert-flash 0.85s ease-in-out 3; }
 
 /* Motion is the cue, so when motion is unwanted the ring simply stays on for
-   the same five seconds rather than the alert disappearing altogether. */
+   the same duration rather than the alert disappearing altogether. */
 @media (prefers-reduced-motion: reduce) {
   #bn-btn.bn-alert { animation: none; box-shadow: 0 0 0 4px rgba(74, 155, 255, 0.9); }
 }
@@ -1046,7 +1049,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

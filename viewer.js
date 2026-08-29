@@ -3221,10 +3221,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // has no such problem. Suppressing the way to your partner exactly when you
   // are furthest from them was always the wrong behaviour; it was a workaround
   // for the representation, not a decision.
-  // 2026-08-28 — an ORPHAN BN: your partner's node is not in your view, so there
-  // is no halo to tap and this button is the only way to them. Flash for 5s to
-  // say the route exists — otherwise the extra navigation path is invisible
-  // exactly when it is the only one.
+  // 2026-08-28 — an ORPHAN BN: your partner's node is not in your view, so
+  // pressing this is the only way to get it onto your graph. Flash to say there
+  // is something new to fetch.
+  //
+  // 2026-08-29 — halved to ~2.5s. The overlap now carries most of the signal by
+  // itself, so the flash no longer has to be the news; it only has to point at
+  // the one thing the overlap cannot show — a node of theirs you do not have.
   //
   // The cue is a spreading ring, not a colour change: it reads as motion and
   // luminance rather than hue, which is the channel to rely on here.
@@ -3236,7 +3239,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     void btn.offsetWidth;                 // reflow, so a repeat arrival restarts it
     btn.classList.add('bn-alert');
     clearTimeout(bnFlashTimer);
-    bnFlashTimer = setTimeout(() => btn.classList.remove('bn-alert'), 5000);
+    bnFlashTimer = setTimeout(() => btn.classList.remove('bn-alert'), 2600);
   }
 
   function updateBnBtn() {
