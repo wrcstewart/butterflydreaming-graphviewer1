@@ -1038,6 +1038,21 @@ function getClusterRelWidth(edge) {
 const INK_MODE = new URLSearchParams(location.search).get('ink') === '1';
 const INK_BG   = '#0b0b0f';
 
+// 2026-08-29 — the bodies are TRANSPARENT, not black.
+//
+// Painting them black made every node an occluder: an overlapping neighbour was
+// simply hidden, and dense cluster views lose nodes to each other routinely.
+// With no fill the labels and halos show through one another, so an overlap
+// costs legibility rather than costing a node.
+//
+// background-opacity, not opacity — the latter would take the label and the
+// halo with it, and would stop the node receiving taps. This one only affects
+// the fill, so a transparent node is still fully hittable across its shape.
+//
+// Raise it if the bodies turn out to be wanted as a faint ground; INK_BG is
+// still the colour they would be painted in.
+const INK_BODY_OPACITY = 0;
+
 // 2026-08-28 — the LABEL palette, "swatch B", chosen from ink_palette_swatch.html.
 //
 // The first attempt normalised every family to one HSL lightness, reasoning that
@@ -1149,7 +1164,7 @@ function inkModeOverrides() {
       selector: 'node',
       style: {
         'background-color': INK_BG,
-        'background-opacity': 1,
+        'background-opacity': INK_BODY_OPACITY,
         'color': function(node) { return inkify(node.data('colour')); },
       }
     },
@@ -1158,6 +1173,7 @@ function inkModeOverrides() {
       selector: 'node[type="Family"]',
       style: {
         'background-color': INK_BG,
+        'background-opacity': INK_BODY_OPACITY,
         'color': function(node) {
           return inkify(FAMILY_COLOURS[node.data('name')] || node.data('colour') || '#aaaaaa');
         },
@@ -1167,12 +1183,15 @@ function inkModeOverrides() {
     // the great majority of nodes, so this is what decides whether the scheme
     // reads calm or noisy.
     { selector: 'node[type="TextNode"]',                 style: { 'color': '#c8c8cc' } },
-    { selector: 'node[type="TextNode"][?section_title]', style: { 'color': '#e6e6ea' } },
-    { selector: 'node[type="TextNode"][?gateway]',       style: { 'color': '#ffffff' } },
+    { selector: 'node[type="TextNode"][?section_title]', style: { 'color': '#e6e6ea', 'background-opacity': INK_BODY_OPACITY } },
+    // These three set their own opaque fills in the base sheet (white, gold,
+    // white), which would survive the rule above and go on occluding. Cleared
+    // explicitly rather than relying on the generic node rule.
+    { selector: 'node[type="TextNode"][?gateway]',       style: { 'color': '#ffffff', 'background-opacity': INK_BODY_OPACITY } },
     // These carried literal fills rather than data(colour), so the old fill
     // becomes the label colour and their identity survives the change.
-    { selector: 'node[type="root"]',                     style: { 'color': '#FFD700' } },
-    { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff' } },
+    { selector: 'node[type="root"]',                     style: { 'color': '#FFD700', 'background-opacity': INK_BODY_OPACITY } },
+    { selector: 'node[type="Entry"][name="Gateways"]',   style: { 'color': '#ffffff', 'background-opacity': INK_BODY_OPACITY } },
     { selector: 'node[type="Cluster"]', style: { 'color': function(node) { return inkify(node.data('colour')); } } },
   ];
 }
