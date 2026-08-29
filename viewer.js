@@ -3553,7 +3553,39 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return cy.nodes(':visible').map(n => n.id()).filter(id => !mergedRemoteIds.has(id) || localViewIds.has(id));
   }
 
+  // 2026-08-29 — DEFERRED BY ONE FRAME, and this is not an optimisation.
+  //
+  // addYouChip — and so this — runs at the TOP of the fresh-tap branch, before
+  // navigateInto expands the view at the bottom of it. So reading the visible
+  // set here described the view you were LEAVING: `current` named the node you
+  // had just tapped while `ids` still held the previous view. Pressing the
+  // partner's button merged a graph one navigation out of date, which is
+  // exactly how the user described it.
+  //
+  // A frame later the expand has run. Only the show/hide matters — the id set is
+  // settled synchronously, well before the layout animates positions.
+  //
+  // COALESCED, because deferring alone would have swapped one mismatch for
+  // another: two navigations inside one frame would fire two callbacks that
+  // both read the final view, so the first message would carry the second's
+  // ids. Keeping only the latest pending node sends one message describing the
+  // state actually arrived at — the intermediate one was never occupied.
+  let pendingPublishNode = null, publishScheduled = false;
+
   function publishPosition(node) {
+    if (!pairingState.active) return;
+    pendingPublishNode = node;
+    if (publishScheduled) return;
+    publishScheduled = true;
+    requestAnimationFrame(() => {
+      publishScheduled = false;
+      const n = pendingPublishNode;
+      pendingPublishNode = null;
+      if (n && n.length) emitPosition(n);
+    });
+  }
+
+  function emitPosition(node) {
     if (!pairingState.active) return;
     const sendWs = wsRef.current;
     if (!sendWs || !sendWs.connected) return;
