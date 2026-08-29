@@ -126,7 +126,11 @@ const MARK_PREV      = '#6a5b00';
 // leaves border-* free for the ring vocabulary the marks already use.
 //
 // Extent and the three opacities are the whole tuning surface.
-const LOCAL_HALO_W       = 5;      // px
+// 2026-08-29 — 5 -> 3. Every node in the view carries one of these, so the
+// extent is paid on the whole screen rather than on a handful of marks, and the
+// blue remote channel still has to fit beside it. Cheaper to be thin now than to
+// discover the ceiling once two channels are drawing.
+const LOCAL_HALO_W       = 3;      // px
 const LOCAL_HALO_CURRENT = 0.75;   // the node you are on
 const LOCAL_HALO_PREV    = 0.5;    // the node you came from
 const LOCAL_HALO_REST    = 0.3;    // everything else in your view
