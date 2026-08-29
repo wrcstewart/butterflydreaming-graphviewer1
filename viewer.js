@@ -2551,6 +2551,47 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // connected to the next. Its .imported-mark class is still cleared on exit in
   // case an older session left one behind.
 
+  // 2026-08-29 — the shortest path from where you are to where they are.
+  //
+  // Entirely local: the whole corpus is resident, so this is a Dijkstra in
+  // memory — no query, and nothing asked of the partner, which is the principle
+  // that these controls never touch remote structure.
+  //
+  // HUBS EXCLUDED — root, the Entry nodes, and __root_edge__. They connect
+  // broadly, so paths would route up through the hierarchy and back down, and if
+  // everything is four hops from everything by way of the root then the answer
+  // carries no information. Excluding them forces the path through the
+  // meaningful channel: shared clusters, which is what the corpus's 1,640
+  // CLUSTER_REL edges are.
+  function findBridge(fromNode, toNode) {
+    if (!fromNode || !fromNode.length || !toNode || !toNode.length) return null;
+    try {
+      const hubs = cy.nodes().filter(n => {
+        const ty = n.data('type');
+        return ty === 'root' || ty === 'Entry';
+      });
+      // Never exclude the two ENDS, whatever they are. Dijkstra needs its root
+      // in the collection, and the partner may legitimately be standing on an
+      // Entry node — excluding it would fail every route to them.
+      const drop = hubs.difference(fromNode).difference(toNode);
+      const searchable = cy.elements()
+        .difference(drop)
+        .difference(drop.connectedEdges())
+        .difference(cy.edges('[type="__root_edge__"]'));
+      const path = searchable.dijkstra({ root: fromNode, directed: false }).pathTo(toNode);
+      if (!path || !path.length) return null;              // unreachable without hubs
+      const hops = path.nodes().length - 2;                // exclude both endpoints
+      if (hops > BRIDGE_MAX) {
+        console.log('[bridge] nearest route is', hops, 'nodes — beyond the cap of', BRIDGE_MAX);
+        return null;
+      }
+      return path;
+    } catch (err) {
+      console.warn('[bridge] failed:', err && err.message);
+      return null;
+    }
+  }
+
   // 2026-08-29 — THE ROUTE VIEW. Pressing Remote replaces your view with just
   // the chain of nodes from where you are to where your partner is.
   //
