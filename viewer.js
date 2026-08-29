@@ -112,6 +112,25 @@ const MARK_LOCAL     = '#b79d00';   // the node you have selected NOW
 // apart is why the successor's amber border was removed.
 const MARK_PREV      = '#6a5b00';
 
+// 2026-08-29 — THE LOCAL HALO. Every node in your own view wears a bright-amber
+// outline, and the OPACITY says how it stands to where you are: the node you are
+// on, the one you came from, and the rest of your view.
+//
+// This is the amber third of the amber / blue / green state vocabulary the
+// remote-graph work needs — "mine" as a property of the whole VIEW rather than
+// of one node. It only becomes readable once the bodies are black, which is why
+// the colour scheme had to come first.
+//
+// outline-* rather than border-*: an outline is stroked entirely OUTSIDE the
+// shape, so it never eats into a tight label the way a border does, and it
+// leaves border-* free for the ring vocabulary the marks already use.
+//
+// Extent and the three opacities are the whole tuning surface.
+const LOCAL_HALO_W       = 5;      // px
+const LOCAL_HALO_CURRENT = 0.75;   // the node you are on
+const LOCAL_HALO_PREV    = 0.5;    // the node you came from
+const LOCAL_HALO_REST    = 0.3;    // everything else in your view
+
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
   CONTAINS:      '#444444',
@@ -1170,6 +1189,14 @@ function buildStyle() {
         'font-size': '11px',
         'color': '#ffffff',
         'border-width': 0,
+        // The resting tier of the local halo. Deliberately in the STYLESHEET
+        // rather than painted per node: clearMarksFrom strips inline outline-*,
+        // so a node that stops being marked falls back to this by itself
+        // instead of needing to be repainted.
+        'outline-width': LOCAL_HALO_W,
+        'outline-color': MARK_LOCAL,
+        'outline-opacity': LOCAL_HALO_REST,
+        'outline-offset': 0,
         'overlay-padding': 10,
       }
     },
@@ -2597,11 +2624,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (prevN && prevId !== greenIdOf(green) &&
         !(bn && bn.length && bn.id() === prevId) &&
         !(centralNode && centralNode.length && centralNode.id() === prevId)) {
+      // 2026-08-29 — the same BRIGHT amber as everything else local, separated
+      // by opacity alone. MARK_PREV, a second darker amber, is no longer used
+      // here: two ambers AND two opacities was one channel more than the
+      // distinction needs, and the darker one read as a different colour rather
+      // than a quieter version of the same one.
       prevN.style({
         'border-width': 0,
-        'outline-width': 5,
-        'outline-color': MARK_PREV,
-        'outline-opacity': 0.85,
+        'outline-width': LOCAL_HALO_W,
+        'outline-color': MARK_LOCAL,
+        'outline-opacity': LOCAL_HALO_PREV,
         'outline-offset': 0,
       });
     }
@@ -2628,9 +2660,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Every branch sets every property it depends on.
       // 'outside' puts the whole 4px beyond the node body (outerWidth = w +
       // 2*border-width), so the frame never covers the label at all.
-      centralNode.style({ 'border-width': 4, 'border-position': 'outside',
-                          'border-color': MARK_LOCAL, 'border-opacity': 1,
-                          'outline-width': 0 });
+      // 2026-08-29 — was a 4px outside BORDER. It is now the top tier of the
+      // same halo, so the three local states differ in ONE property and read as
+      // one scale rather than three separate marks. border-width 0 for the usual
+      // reason: a Cluster's own darkened border would otherwise draw over the
+      // halo's innermost pixels.
+      centralNode.style({ 'border-width': 0,
+                          'outline-width': LOCAL_HALO_W,
+                          'outline-color': MARK_LOCAL,
+                          'outline-opacity': LOCAL_HALO_CURRENT,
+                          'outline-offset': 0 });
     }
     if (bn && bn.length && !together && !isGreen(bn)) {
       // outline-offset 0: the ring sits flush against the node body. Any gap
