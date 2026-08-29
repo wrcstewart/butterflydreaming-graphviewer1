@@ -2723,6 +2723,75 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // BORDER, whichever outside as the OUTLINE — the pairing is not fixed.
   // An outline draws entirely outside the shape, so it never eats the node's
   // interior the way a border does (which is what nibbles tight labels).
+  // Amber for yours, blue for theirs; a node in BOTH wears an amber band inside
+  // a blue one. Opacity is the same three-tier scale in either colour — the node
+  // you are on, the one you came from, the rest of the view.
+  //
+  // Painted INLINE in one pass rather than by classes. The class argument was
+  // that clearMarksFrom strips inline styles, which is true but only matters if
+  // membership is painted somewhere other than here. This function owns every
+  // visible node and runs on every change, so a stripped style is restored
+  // immediately — and a class scheme would have needed a rule for every
+  // local-tier x remote-tier combination.
+  function renderMembership(centralNode, prevId, isGreen) {
+    const centralId = (centralNode && centralNode.length) ? centralNode.id() : null;
+    const rCur = remoteCurrentId, rPrev = remotePrevId;
+    // Before any merge there is nothing to distinguish, so everything visible is
+    // yours — which is what the viewer meant all along.
+    const haveLocal = localViewIds.size > 0;
+    const dim = bnGone ? 0.4 : 1;          // §2 — partner left: dim, never remove
+
+    const tier = (id, cur, prv) =>
+      id === cur ? LOCAL_HALO_CURRENT
+      : (prv && id === prv) ? LOCAL_HALO_PREV
+      : LOCAL_HALO_REST;
+
+    cy.batch(() => {
+      cy.nodes(':visible').forEach(n => {
+        if (isGreen(n)) return;            // a recorded convergence keeps its own ring
+        const id  = n.id();
+        const isL = haveLocal ? localViewIds.has(id) : true;
+        const isR = mergedRemoteIds.has(id) || id === rCur || id === rPrev;
+        if (!isL && !isR) return;
+
+        const lOp = tier(id, centralId, prevId);
+        const rOp = tier(id, rCur, rPrev) * dim;
+
+        // The Snap: you are both ON this node. ONE green ring, not two — two
+        // rings say "two marks that coincide", one says "a shared position".
+        if (isL && isR && id === centralId && id === rCur) {
+          n.style({ 'border-width': 0, 'outline-width': 8, 'outline-color': MARK_GREEN,
+                    'outline-opacity': 0.9, 'outline-offset': 0 });
+          return;
+        }
+
+        if (isL && isR) {
+          // Two bands, and they must OVERLAP rather than abut: where two
+          // separately-stroked paths merely touch, antialiasing leaves a
+          // hairline of canvas between them and the eye reads three bands.
+          n.style({
+            'border-width': LOCAL_HALO_W, 'border-position': 'outside',
+            'border-color': MARK_LOCAL, 'border-opacity': lOp,
+            'outline-width': LOCAL_HALO_W, 'outline-color': MARK_BLUE,
+            'outline-opacity': rOp, 'outline-offset': LOCAL_HALO_W - 1,
+          });
+          return;
+        }
+
+        // Every branch sets every property it depends on. .style() is inline and
+        // persists, so a node that has been through the branch above keeps its
+        // border until something explicitly clears it.
+        n.style({
+          'border-width': 0,
+          'outline-width': LOCAL_HALO_W,
+          'outline-color': isR ? MARK_BLUE : MARK_LOCAL,
+          'outline-opacity': isR ? rOp : lOp,
+          'outline-offset': 0,
+        });
+      });
+    });
+  }
+
   function renderMarks() {
     // Central node: white, unless the BN shares it (handled below).
     const centralNode = (lastReadNodeId && lastReadNodeCy === cy)
@@ -2750,26 +2819,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const greenIdOf = g => (g && g.length ? g.id() : null);
     const isGreen = n => !!(n && n.length && greenId && n.id() === greenId);
 
-    // The previous node, dimmed. Skipped when the node already means something
-    // stronger — the agreed node, the partner's position, or where you are now.
     const prevN  = prevNodeEl();
     const prevId = prevN ? prevN.id() : null;
-    if (prevN && prevId !== greenIdOf(green) &&
-        !(bn && bn.length && bn.id() === prevId) &&
-        !(centralNode && centralNode.length && centralNode.id() === prevId)) {
-      // 2026-08-29 — the same BRIGHT amber as everything else local, separated
-      // by opacity alone. MARK_PREV, a second darker amber, is no longer used
-      // here: two ambers AND two opacities was one channel more than the
-      // distinction needs, and the darker one read as a different colour rather
-      // than a quieter version of the same one.
-      prevN.style({
-        'border-width': 0,
-        'outline-width': LOCAL_HALO_W,
-        'outline-color': MARK_LOCAL,
-        'outline-opacity': LOCAL_HALO_PREV,
-        'outline-offset': 0,
-      });
-    }
 
     if (green) {
       // border-width 0 for the same reason as the solo blue ring: a Cluster's
@@ -2785,67 +2836,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       });
     }
 
-    if (centralNode && centralNode.length && !together && !isGreen(centralNode)) {
-      // border-position MUST be set here, not left to the default. .style() is
-      // inline and persists, so a node that has been through the Snap below
-      // carries that branch's value until something overwrites it — which is
-      // how the white frame started drawing inward across the number badge.
-      // Every branch sets every property it depends on.
-      // 'outside' puts the whole 4px beyond the node body (outerWidth = w +
-      // 2*border-width), so the frame never covers the label at all.
-      // 2026-08-29 — was a 4px outside BORDER. It is now the top tier of the
-      // same halo, so the three local states differ in ONE property and read as
-      // one scale rather than three separate marks. border-width 0 for the usual
-      // reason: a Cluster's own darkened border would otherwise draw over the
-      // halo's innermost pixels.
-      centralNode.style({ 'border-width': 0,
-                          'outline-width': LOCAL_HALO_W,
-                          'outline-color': MARK_LOCAL,
-                          'outline-opacity': LOCAL_HALO_CURRENT,
-                          'outline-offset': 0 });
-    }
-    if (bn && bn.length && !together && !isGreen(bn)) {
-      // outline-offset 0: the ring sits flush against the node body. Any gap
-      // shows canvas black between node and ring, which reads as a third
-      // colour rather than as one mark.
-      //
-      // border-width 0 is doing the same job from the other side. A Cluster
-      // carries its own 2px border in a darkened version of its fill, drawn
-      // ON TOP of the ring's innermost pixels — which is the thin black line
-      // that appeared between the colour and the blue. The halo replaces that
-      // frame for as long as it is shown; clearMarksFrom puts it back.
-      bn.style({ 'border-width': 0,
-                 'outline-width': 6, 'outline-color': MARK_BLUE,
-                 'outline-opacity': bnGone ? 0.18 : 0.4, 'outline-offset': 0 });
-    }
-    if (together && !isGreen(bn)) {
-      // Both marks on one node — the "Snap". The two rings must touch: a gap
-      // puts canvas black between them, so the eye reads three bands rather
-      // than two marks. The border band runs [0,4] beyond the body when
-      // border-position is 'outside', and the outline band runs
-      // [offset, offset+width] from that same body edge — so offset 4 lands
-      // the outer ring exactly on the inner ring's edge, and neither touches
-      // the interior.
-      const blueInside = (bnOuter === 'white');
-      bn.style({
-        'border-width': 4,
-        'border-position': 'outside',
-        'border-color':   blueInside ? MARK_BLUE  : MARK_LOCAL,
-        'border-opacity': blueInside ? (bnGone ? 0.35 : 0.75) : 1,
-        // The two bands are separately-stroked paths, and where they merely
-        // ABUT, antialiasing leaves a hairline of canvas black between them.
-        // So overlap instead of abutting: the border paints OVER the outline
-        // (proof: the white ring is visible at all — a 10px blue band drawn
-        // on top would hide it), so running the outline 2px further in puts
-        // blue underneath the border's inner edge with no seam to show
-        // through. Offset + width still total 10, so the VISIBLE blue is the
-        // same [4,10] band it was before.
-        'outline-width': 8,
-        'outline-color':  blueInside ? MARK_LOCAL : MARK_BLUE,
-        'outline-opacity': blueInside ? 1 : (bnGone ? 0.18 : 0.4),
-        'outline-offset': 2,
-      });
-    }
+    // 2026-08-29 — ONE membership pass over every visible node, replacing the
+    // four branches that painted the current node, the predecessor and the
+    // partner's position separately (remote_view_spec.md §1).
+    //
+    // It HAS to be one pass: a node can now be in both views at once, and each
+    // of those branches assumed it owned the node it painted, so your current
+    // node and the partner's position could not both be true of one node
+    // without one silently overwriting the other.
+    renderMembership(centralNode, prevId, isGreen);
+
     if (bn && bn.length) applyBlueFill(bn);
     updateBnBtn();      // the corner controls track the same state as the halos
     updateGnBtn();
