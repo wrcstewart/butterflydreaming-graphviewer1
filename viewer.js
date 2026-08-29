@@ -2810,9 +2810,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // BORDER, whichever outside as the OUTLINE — the pairing is not fixed.
   // An outline draws entirely outside the shape, so it never eats the node's
   // interior the way a border does (which is what nibbles tight labels).
-  // Amber for yours, blue for theirs; a node in BOTH wears an amber band inside
-  // a blue one. Opacity is the same three-tier scale in either colour — the node
-  // you are on, the one you came from, the rest of the view.
+  // 2026-08-29 — AMBER IS NOT A CATEGORY, IT IS THE GROUND. Everything on your
+  // screen is your view, so every visible node wears amber; blue is an
+  // ANNOTATION on top of it, saying "and your partner is looking at this too".
+  //
+  // The user's correction, and it is better than the model it replaces. Their
+  // node, once fetched onto your graph, IS yours — it simply arrived by
+  // computation rather than by navigation. There was never a third kind of node,
+  // only a leftover from the design where whole views were merged: with the
+  // overlap model, nothing on your screen is non-local by definition.
+  //
+  // It also dissolves a problem rather than solving one — bridge nodes on a
+  // computed path need no state of their own, because they are local like
+  // everything else that is here.
+  //
+  // Ring geometry is unchanged and deliberately so: amber occupies [0,W] beyond
+  // the body whether it is drawn as the outline (alone) or the border (with blue
+  // outside it), so gaining a blue ring does not make the amber one move.
   //
   // Painted INLINE in one pass rather than by classes. The class argument was
   // that clearMarksFrom strips inline styles, which is true but only matters if
@@ -2823,9 +2837,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function renderMembership(centralNode, prevId, isGreen) {
     const centralId = (centralNode && centralNode.length) ? centralNode.id() : null;
     const rCur = remoteCurrentId, rPrev = remotePrevId;
-    // Before any merge there is nothing to distinguish, so everything visible is
-    // yours — which is what the viewer meant all along.
-    const haveLocal = localViewIds.size > 0;
     const dim = bnGone ? 0.4 : 1;          // §2 — partner left: dim, never remove
 
     const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
@@ -2835,24 +2846,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       cy.nodes(':visible').forEach(n => {
         if (isGreen(n)) return;            // a recorded convergence keeps its own ring
         const id  = n.id();
-        const isL = haveLocal ? localViewIds.has(id) : true;
-        // Their whole view is consulted, but only nodes ALREADY VISIBLE are
-        // painted — so the overlap lights up without anything being added.
+        // It is visible, so it is yours. Their view is consulted only to decide
+        // whether to ADD the blue ring.
         const isR = remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur;
-        if (!isL && !isR) return;
 
         const lOp = tier(id, centralId);
         const rOp = remoteTier(id, rCur) * dim;
 
         // The Snap: you are both ON this node. ONE green ring, not two — two
         // rings say "two marks that coincide", one says "a shared position".
-        if (isL && isR && id === centralId && id === rCur) {
+        if (isR && id === centralId && id === rCur) {
           n.style({ 'border-width': 0, 'outline-width': 8, 'outline-color': MARK_GREEN,
                     'outline-opacity': 0.9, 'outline-offset': 0 });
           return;
         }
 
-        if (isL && isR) {
+        if (isR) {
           // Two bands, and they must OVERLAP rather than abut: where two
           // separately-stroked paths merely touch, antialiasing leaves a
           // hairline of canvas between them and the eye reads three bands.
@@ -2865,14 +2874,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           return;
         }
 
-        // Every branch sets every property it depends on. .style() is inline and
-        // persists, so a node that has been through the branch above keeps its
-        // border until something explicitly clears it.
+        // Local only: one amber ring, in the same place the border would have
+        // been. Every branch sets every property it depends on — .style() is
+        // inline and persists, so a node that has been through the branch above
+        // keeps its border until something explicitly clears it.
         n.style({
           'border-width': 0,
           'outline-width': LOCAL_HALO_W,
-          'outline-color': isR ? MARK_BLUE : MARK_LOCAL,
-          'outline-opacity': isR ? rOp : lOp,
+          'outline-color': MARK_LOCAL,
+          'outline-opacity': lOp,
           'outline-offset': 0,
         });
       });
