@@ -2446,6 +2446,53 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   let remoteCurrentId = null;   // the node they are on
   let remotePrevId    = null;   // the node they came from
 
+  // 2026-08-29 — slice 2a. The merged snapshot of their view, and YOUR OWN set
+  // recorded separately, because once merging exists the two can no longer be
+  // read off what is on screen (remote_view_spec.md §4).
+  const mergedRemoteIds = new Set();
+  let   localViewIds    = new Set();
+
+  // Snapshot what is yours, THEN reveal what is theirs. The order is the whole
+  // correctness of it: a navigation hides everything and shows its own expand
+  // set, so at this moment "visible" means exactly "mine" — and after the merged
+  // nodes are shown it never does again.
+  function applyMergedView() {
+    localViewIds = new Set(cy.nodes(':visible').map(n => n.id()));
+    if (!mergedRemoteIds.size) return;
+    mergedRemoteIds.forEach(id => {
+      const n = cy.getElementById(id);
+      if (n.length) n.show();
+    });
+    // Same rule the expands use: an edge shows when both its endpoints do. So
+    // the merged nodes bring their own structure without being sent any of it.
+    cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
+  }
+
+  function mergeRemoteView() {
+    if (!remoteViewIds.length) return;
+    saveState();                  // a merge is a view change — Back undoes it free
+    let added = 0;
+    remoteViewIds.forEach(id => { if (!mergedRemoteIds.has(id)) { mergedRemoteIds.add(id); added++; } });
+    applyMergedView();
+    runLayout(cy, lastParentNode);
+    console.log('[remote-view] merged', added, 'new (', mergedRemoteIds.size, 'total ) | local', localViewIds.size);
+  }
+
+  function clearMergedView() {
+    if (!mergedRemoteIds.size) return;
+    saveState();
+    mergedRemoteIds.forEach(id => {
+      const n = cy.getElementById(id);
+      // Never hide a node that is ALSO yours — it was merged, but you have since
+      // navigated to it, so it belongs to your view now and is not ours to take.
+      if (n.length && !localViewIds.has(id)) n.hide();
+    });
+    mergedRemoteIds.clear();
+    applyMergedView();
+    runLayout(cy, lastParentNode);
+    console.log('[remote-view] cleared');
+  }
+
   function receiveRemoteView(data) {
     if (!data) return;
     remoteViewIds   = Array.isArray(data.ids) ? data.ids : [];
@@ -2802,6 +2849,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (bn && bn.length) applyBlueFill(bn);
     updateBnBtn();      // the corner controls track the same state as the halos
     updateGnBtn();
+    const clearBtn = document.getElementById('clear-merge-btn');
+    if (clearBtn) clearBtn.classList.toggle('visible', mergedRemoteIds.size > 0);
   }
 
   // 2026-08-28 — the EXPLORE CONTROL and its four-state label machine are gone,
@@ -3228,8 +3277,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
   const gnBtnEl = document.getElementById('gn-btn');
   if (gnBtnEl) gnBtnEl.addEventListener('click', cycleGn);
+  // 2026-08-29 — the Remote control MERGES rather than jumps
+  // (remote_view_spec.md §5). Jumping destroyed your context, which is why it
+  // needed Back to survive it; merging keeps your context and adds theirs, and
+  // their node is then on screen to tap if you do want to go there.
+  //
+  // jumpToPartner and the BN cursor are left in place but unbound: the retrace
+  // stack is PARKED, not deleted, because it may prove unnecessary once you can
+  // see where they have been.
   const bnBtnEl = document.getElementById('bn-btn');
-  if (bnBtnEl) bnBtnEl.addEventListener('click', jumpToPartner);
+  if (bnBtnEl) bnBtnEl.addEventListener('click', mergeRemoteView);
+  const clearBtnEl = document.getElementById('clear-merge-btn');
+  if (clearBtnEl) clearBtnEl.addEventListener('click', clearMergedView);
 
   // ALWAYS the bottom-right corner, never a searched-for gap. A node that
   // moves about to dodge obstacles makes the user hunt for it on every
@@ -3297,10 +3356,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function scheduleBlueReassert() {
     if (blueReassertPending) return;
     const wantGreen = gnStack.length > 0;
-    if (!bnNodeId && !wantGreen && !prevReadNodeId) return;
+    // Sticky merge: the merged set is re-shown after every navigation, so this
+    // must run even when there is no mark to re-assert.
+    if (!bnNodeId && !wantGreen && !prevReadNodeId && !mergedRemoteIds.size) return;
     blueReassertPending = true;
     requestAnimationFrame(() => {
       blueReassertPending = false;
+      applyMergedView();          // re-show the merge, and re-snapshot what is yours
       reassertBlueNode();
       reassertGreenNode();
       reassertPrevNode();
@@ -3488,7 +3550,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // merges that — and the union grows every round trip until both screens are
   // the same blob and the remote channel means nothing.
   function currentLocalViewIds() {
-    return cy.nodes(':visible').map(n => n.id());
+    return cy.nodes(':visible').map(n => n.id()).filter(id => !mergedRemoteIds.has(id) || localViewIds.has(id));
   }
 
   function publishPosition(node) {
@@ -3518,7 +3580,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // One message carries both the label and the set, so the button cannot
         // name one view while merging another.
         ids:            currentLocalViewIds(),
-        previous:       prevReadNodeId || null,
+        // null when it equals `current` — a re-tap on the same node leaves
+        // prevReadNodeId pointing at it, and "you came from where you are" is
+        // not a previous node. prevNodeEl() already guards this locally; the
+        // payload has to as well, or the 0.65 tier would fight the 0.85 one.
+        previous:       (prevReadNodeId && prevReadNodeId !== lastReadNodeId) ? prevReadNodeId : null,
       }
     });
   }
