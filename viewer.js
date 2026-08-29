@@ -2503,7 +2503,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // declared further down would be a temporal-dead-zone throw waiting for the
   // first caller that runs early enough.
   const bridgeIds       = new Set();
-  const BRIDGE_MAX      = 3;      // intermediate nodes; beyond this, do not bridge
+  // 2026-08-29 — raised 3 -> 5. The route is now shown INSTEAD of your view
+  // rather than added to it, so a longer chain costs nothing: five nodes alone
+  // on the canvas is still a simpler picture than any ordinary cluster view.
+  const BRIDGE_MAX      = 5;      // intermediate nodes; beyond this there is no route to show
+  let   routeActive     = false;
 
   // Snapshot what is yours, THEN reveal what is theirs. The order is the whole
   // correctness of it: a navigation hides everything and shows its own expand
@@ -2539,135 +2543,85 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //
   // The button therefore adds at most ONE node. That is also why the layout-churn
   // argument no longer applies to the overlap: recolouring a halo moves nothing.
-  // 2026-08-29 — position the imported node against the CONTENT, not the canvas.
-  //
-  // Left to the layout it landed hard against the left edge of the window: it is
-  // structurally disconnected, so fcose packs it as its own component and puts
-  // it wherever there is room. The user recognised the shape — it is the same
-  // fault the parked marks had, where cy.extent() (the whole window) was used
-  // instead of the bounding box of what the layout actually occupies. A cluster
-  // view fills about the panel width and centres, so the two are far apart.
-  //
-  // So: just outside the top-left of your own nodes, then CLAMPED into the
-  // viewport so it cannot be pushed off-screen when your view already fills it.
-  function placeImportedNodes() {
-    const imported = cy.nodes(':visible').filter(n => !localViewIds.has(n.id()) && mergedRemoteIds.has(n.id()));
-    if (!imported.length) return;
-    const own = cy.nodes(':visible').difference(imported);
-    if (!own.length) return;
-    const bb = own.boundingBox();      // model space, like position() — never renderedBoundingBox
-    const ext = cy.extent();
-    const gap = 34;
-    imported.forEach((n, i) => {
-      const halfW = (n.width()  || 40) / 2 + 14;
-      const halfH = (n.height() || 30) / 2 + 14;
-      const x = bb.x1 - gap - halfW;
-      const y = bb.y1 + i * (halfH * 2 + 12);
-      n.position({
-        x: Math.max(ext.x1 + halfW, Math.min(x, ext.x2 - halfW)),
-        y: Math.max(ext.y1 + halfH, Math.min(y, ext.y2 - halfH)),
-      });
-      // Excluded from every fit. Including it is a feedback loop: the fit zooms
-      // out to reach it, which widens the extent, which moves it further out.
-      n.addClass('imported-mark');
-    });
-  }
+  // 2026-08-29 — placeImportedNodes is GONE. It existed to park a structurally
+  // disconnected node just outside your content, because dropping it into an
+  // existing view left the layout free to pack it against the window edge. The
+  // route view replaced that case entirely: nothing is ever added to a view any
+  // more, the view is replaced by the route, and every node in a route is
+  // connected to the next. Its .imported-mark class is still cleared on exit in
+  // case an older session left one behind.
 
-  // 2026-08-29 — reveal the SHORTEST PATH from where you are to where they are,
-  // and show the nodes along it. Entirely local: the whole corpus is resident,
-  // so this is a Dijkstra in memory — no query, and nothing asked of the
-  // partner, which is the principle that these controls never touch remote
-  // structure.
+  // 2026-08-29 — THE ROUTE VIEW. Pressing Remote replaces your view with just
+  // the chain of nodes from where you are to where your partner is.
   //
-  // It also removes the need to park the arriving node in a corner: a connected
-  // component cannot be packed off at the window edge the way an isolated one is.
+  // Adding their node to your existing view produced a graph too complicated to
+  // read — the user's judgement twice over, and the second time the bridge made
+  // it worse rather than better, because a path drawn THROUGH a full cluster
+  // view is one more thing on top rather than an explanation.
   //
-  // FROM YOUR CURRENT NODE, not from whichever of your nodes happens to be
-  // nearest. The nearest gives a shorter path anchored on a node you were not
-  // thinking about; from where you are, the path answers a question you actually
-  // asked — how do I get from here to there.
-  //
-  // HUBS EXCLUDED. Root and the Entry nodes connect broadly, so paths would
-  // route up through the hierarchy and back down, and if everything is four hops
-  // from everything by way of the root then the answer carries no information.
-  // Excluding them forces the path through the meaningful channel — shared
-  // clusters, which is what the corpus's 1,640 CLUSTER_REL edges are.
-  function findBridge(fromNode, toNode) {
-    if (!fromNode || !fromNode.length || !toNode || !toNode.length) return null;
-    const hubs = cy.nodes().filter(n => {
-      const ty = n.data('type');
-      return ty === 'root' || ty === 'Entry';
-    });
-    const searchable = cy.elements()
-      .difference(hubs)
-      .difference(hubs.connectedEdges())
-      .difference(cy.edges('[type="__root_edge__"]'));
-    let path;
-    try {
-      path = searchable.dijkstra({ root: fromNode, directed: false }).pathTo(toNode);
-    } catch (err) {
-      console.warn('[bridge] dijkstra failed', err && err.message);
-      return null;
-    }
-    if (!path || !path.length) return null;                 // unreachable without hubs
-    const hops = path.nodes().length - 2;                   // exclude both endpoints
-    if (hops > BRIDGE_MAX) {
-      console.log('[bridge] nearest path is', hops, 'nodes — beyond the cap, not bridging');
-      return null;
-    }
-    return path;
-  }
-
-  function mergeRemoteView() {
+  // Shown ALONE it is an explanation: five nodes and the edges between them,
+  // answering "how do I get from here to there" and nothing else. Your ordinary
+  // view comes back with the Local control, which is the existing Back — the
+  // route is an ordinary view change, so saveState already covers it.
+  function showRouteToPartner() {
     if (!remoteCurrentId) return;
-    const n = cy.getElementById(remoteCurrentId);
-    if (!n.length) return;
-    if (mergedRemoteIds.has(remoteCurrentId) || (n.visible() && localViewIds.has(remoteCurrentId))) {
-      console.log('[remote-view] their node is already here — nothing to bring');
+    const target = cy.getElementById(remoteCurrentId);
+    if (!target.length) return;
+    const from = (lastReadNodeId && lastReadNodeCy === cy) ? cy.getElementById(lastReadNodeId) : null;
+    if (!from || !from.length) {
+      console.log('[route] nowhere to route FROM — select a node first');
       return;
     }
-    saveState();                  // a view change — Back undoes it for free
-    mergedRemoteIds.add(remoteCurrentId);
+    if (from.id() === remoteCurrentId) {
+      console.log('[route] you are already on their node');
+      return;
+    }
 
-    const from = (lastReadNodeId && lastReadNodeCy === cy) ? cy.getElementById(lastReadNodeId) : null;
-    const path = findBridge(from, n);
+    saveState();                      // Local/Back restores your view
+    const path = findBridge(from, target);
+    mergedRemoteIds.clear();
+    bridgeIds.clear();
+    cy.elements().hide();
+
     if (path) {
-      path.nodes().forEach(pn => { if (pn.id() !== remoteCurrentId) bridgeIds.add(pn.id()); });
-      applyMergedView();
       path.nodes().show();
       path.edges().show().addClass('bridge-edge');
-      console.log('[remote-view] bridged in', path.nodes().length - 2, 'step(s)');
+      path.nodes().forEach(pn => { if (pn.id() !== from.id()) bridgeIds.add(pn.id()); });
+      console.log('[route] showing', path.nodes().length, 'nodes,', path.nodes().length - 1, 'hops');
     } else {
-      // No short path, so nothing honest to draw. Park it where the marks used
-      // to go and say so — "there is no near route" is a fact about the corpus,
-      // not a failure.
-      applyMergedView();
-      cy.one('layoutstop', placeImportedNodes);   // after the layout, or it is overwritten
-      console.log('[remote-view] no near path — parked unconnected');
+      // No route within the cap. Show the two ends anyway and let the absence of
+      // a line between them say it — that is a fact about the corpus, and more
+      // useful than refusing to do anything.
+      from.show();
+      target.show();
+      console.log('[route] no near route — showing both ends, unconnected');
     }
-    runLayout(cy, lastParentNode);
+
+    mergedRemoteIds.add(remoteCurrentId);
+    routeActive  = true;
+    localViewIds = new Set(cy.nodes(':visible').map(n => n.id()));
+    runLayout(cy, from);
   }
 
-  function clearMergedView() {
-    if (!mergedRemoteIds.size) return;
-    saveState();
-    cy.nodes('.imported-mark').removeClass('imported-mark');
+  // The route is transient: it must not be re-shown after the view it replaced
+  // comes back, which is what applyMergedView would otherwise do on every
+  // navigation. Emptying the sets is what stops that.
+  function exitRouteView() {
+    if (!routeActive) return;
+    routeActive = false;
     cy.edges('.bridge-edge').removeClass('bridge-edge');
-    bridgeIds.forEach(id => {
-      const n = cy.getElementById(id);
-      if (n.length && !localViewIds.has(id)) n.hide();
-    });
-    bridgeIds.clear();
-    mergedRemoteIds.forEach(id => {
-      const n = cy.getElementById(id);
-      // Never hide a node that is ALSO yours — it was merged, but you have since
-      // navigated to it, so it belongs to your view now and is not ours to take.
-      if (n.length && !localViewIds.has(id)) n.hide();
-    });
+    cy.nodes('.imported-mark').removeClass('imported-mark');
     mergedRemoteIds.clear();
-    applyMergedView();
-    runLayout(cy, lastParentNode);
-    console.log('[remote-view] cleared');
+    bridgeIds.clear();
+  }
+
+  // The ✕ leaves the route, exactly as the Local control does. Kept as a second
+  // way out because Local also unwinds your navigation history, and someone who
+  // only wants their view back should not have to think about which.
+  function clearMergedView() {
+    if (!routeActive) return;
+    if (!restoreState()) exitRouteView();
+    console.log('[route] left');
   }
 
   function receiveRemoteView(data) {
@@ -3039,7 +2993,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     updateBnBtn();      // the corner controls track the same state as the halos
     updateGnBtn();
     const clearBtn = document.getElementById('clear-merge-btn');
-    if (clearBtn) clearBtn.classList.toggle('visible', mergedRemoteIds.size > 0);
+    if (clearBtn) clearBtn.classList.toggle('visible', routeActive);
   }
 
   // 2026-08-28 — the EXPLORE CONTROL and its four-state label machine are gone,
@@ -3480,7 +3434,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // stack is PARKED, not deleted, because it may prove unnecessary once you can
   // see where they have been.
   const bnBtnEl = document.getElementById('bn-btn');
-  if (bnBtnEl) bnBtnEl.addEventListener('click', mergeRemoteView);
+  if (bnBtnEl) bnBtnEl.addEventListener('click', showRouteToPartner);
   const clearBtnEl = document.getElementById('clear-merge-btn');
   if (clearBtnEl) clearBtnEl.addEventListener('click', clearMergedView);
 
@@ -3556,8 +3510,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     blueReassertPending = true;
     requestAnimationFrame(() => {
       blueReassertPending = false;
-      applyMergedView();          // re-show the merge, and re-snapshot what is yours
-      placeImportedNodes();
+      applyMergedView();          // re-show the route, and re-snapshot what is yours
       reassertBlueNode();
       reassertGreenNode();
       reassertPrevNode();
@@ -5163,6 +5116,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function restoreState() {
     if (history.length === 0) return false;
     exitSnakeView();
+    exitRouteView();
     const state = history.pop();
     const ids = new Set(state.ids);
     lastParentNode = state.parent;
