@@ -131,9 +131,12 @@ const MARK_PREV      = '#6a5b00';
 // blue remote channel still has to fit beside it. Cheaper to be thin now than to
 // discover the ceiling once two channels are drawing.
 const LOCAL_HALO_W       = 3;      // px
-const LOCAL_HALO_CURRENT = 0.75;   // the node you are on
-const LOCAL_HALO_PREV    = 0.5;    // the node you came from
-const LOCAL_HALO_REST    = 0.3;    // everything else in your view
+// 2026-08-29 — widened: 0.75/0.5/0.3 -> 0.85/0.65/0.2. The two active tiers
+// carry further and the resting tier recedes, which buys back ink for the blue
+// remote channel without giving up the scale.
+const LOCAL_HALO_CURRENT = 0.85;   // the node you are on
+const LOCAL_HALO_PREV    = 0.65;   // the node you came from
+const LOCAL_HALO_REST    = 0.2;    // everything else in your view
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
