@@ -1648,9 +1648,14 @@ function buildStyle() {
         'arrow-scale': 1.4,
         'line-color': MARK_ROUTE,
         'opacity': 0.9,
-        'target-arrow-shape': 'triangle',
+        // 2026-08-30 — the arrow SHAPES are set inline by updateNextStep, not
+        // here, because which end carries the head depends on the direction of
+        // TRAVEL and the stylesheet only knows the edge's own direction. CHILD
+        // runs seq 2->3, so heading backwards down a work put the head on the
+        // node you were already standing on — pointing at where you are rather
+        // than where to click.
         'target-arrow-color': MARK_ROUTE,
-        'source-arrow-shape': 'none',
+        'source-arrow-color': MARK_ROUTE,
         'z-index': 30,
       }
     },
@@ -1660,7 +1665,6 @@ function buildStyle() {
       // Drawn after .route-step so it wins on the properties it restates.
       selector: 'edge.route-step.route-back',
       style: {
-        'target-arrow-shape': 'triangle-tee',
         'opacity': 0.55,
         'width': 3,
       }
@@ -2674,7 +2678,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     hopDistance = null; remoteSeq = null; remoteAhead = false;
     if (stepEdgeId) {
       const e = cy.getElementById(stepEdgeId);
-      if (e.length) e.removeClass('route-step route-back');
+      if (e.length) {
+        e.removeClass('route-step route-back');
+        e.removeStyle('target-arrow-shape source-arrow-shape');
+      }
     }
     stepEdgeId = null; stepNodeId = null;
   }
@@ -2732,6 +2739,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     if (!next.visible()) next.show();
     link.show().addClass('route-step');
+
+    // THE HEAD GOES ON THE NODE YOU SHOULD CLICK. An edge's source and target
+    // come from the database and are arbitrary with respect to the journey, so
+    // the end to mark is worked out here: whichever end IS the next step.
+    const headAtTarget = link.target().id() === next.id();
+    const head = (remoteSeq !== null && !remoteAhead) ? 'triangle-tee' : 'triangle';
+    link.style({
+      'target-arrow-shape': headAtTarget ? head : 'none',
+      'source-arrow-shape': headAtTarget ? 'none' : head,
+    });
+
     stepEdgeId = link.id();
     stepNodeId = next.id();
 
