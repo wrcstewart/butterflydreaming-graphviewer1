@@ -167,6 +167,17 @@ const LOCAL_HALO_REST    = 0.5;    // everything else in your view
 const REMOTE_HALO_CURRENT = LOCAL_HALO_CURRENT;
 const REMOTE_HALO_REST    = 0.3;
 
+// 2026-08-30 — the route arrow is a LIGHTER blue than the remote halo, and its
+// own constant rather than a shade of MARK_BLUE.
+//
+// They say different things. The halo means "your partner is here"; the arrow
+// means "go this way to reach them". Sharing one colour read as one signal at
+// two weights — and now the arrow is the boldest thing on screen, at the halo's
+// own blue it looked like a halo that had stretched.
+//
+// Only the edge and its head take this. Every node halo keeps MARK_BLUE.
+const MARK_ROUTE = '#9FD0FF';
+
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
   CONTAINS:      '#444444',
@@ -1635,10 +1646,10 @@ function buildStyle() {
         'line-style': 'solid',
         'width': 5,
         'arrow-scale': 1.4,
-        'line-color': '#4a9bff',
+        'line-color': MARK_ROUTE,
         'opacity': 0.9,
         'target-arrow-shape': 'triangle',
-        'target-arrow-color': '#4a9bff',
+        'target-arrow-color': MARK_ROUTE,
         'source-arrow-shape': 'none',
         'z-index': 30,
       }
