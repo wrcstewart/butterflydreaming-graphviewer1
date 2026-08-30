@@ -3149,8 +3149,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
     const remoteTier = (id, cur) => id === cur ? REMOTE_HALO_CURRENT : REMOTE_HALO_REST;
-    // Either centre — yours or theirs — wears the wider ring.
-    const widthOf    = id => (id === centralId || id === rCur) ? HALO_FAT : HALO_THIN;
+    // 2026-08-30 — ONLY THEIR CENTRE IS FAT. Yours is no longer signalled at all.
+    //
+    // The user's reasoning, and it holds: you just clicked it, so you know where
+    // you are — and where you did not click it (Back, leaving a route view, a
+    // resize re-framing the graph) the READING PANEL NAMES IT, in words, more
+    // precisely than a ring could. Its only other use was to say "clicking again
+    // achieves nothing", which is not worth a channel.
+    //
+    // So the rings spend themselves entirely on what you cannot otherwise know:
+    // where your partner is.
+    const widthOf    = id => (id === rCur) ? HALO_FAT : HALO_THIN;
 
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
@@ -3174,14 +3183,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const w = widthOf(id);
 
         if (isR) {
-          // Two bands, and they must OVERLAP rather than abut: where two
-          // separately-stroked paths merely touch, antialiasing leaves a
-          // hairline of canvas between them and the eye reads three bands.
+          // 2026-08-30 — ONE RING, blue. The amber inner band is gone: blue only
+          // ever appears on a node that is already on your screen, so "this is
+          // also yours" was information the node's presence had already given.
+          //
+          // It does shift what amber MEANS — from the ground everything wears, to
+          // "yours alone", with blue meaning "yours and theirs". Coherent, but a
+          // different idea rather than a tidier version of the same one, and
+          // worth knowing it was chosen rather than inherited.
           n.style({
-            'border-width': w, 'border-position': 'outside',
-            'border-color': MARK_LOCAL, 'border-opacity': lOp,
-            'outline-width': w, 'outline-color': MARK_BLUE,
-            'outline-opacity': rOp, 'outline-offset': w - 1,
+            'border-width': 0,
+            'outline-width': w,
+            'outline-color': MARK_BLUE,
+            'outline-opacity': rOp,
+            'outline-offset': 0,
           });
           return;
         }
