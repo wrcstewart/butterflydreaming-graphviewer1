@@ -1625,10 +1625,16 @@ function buildStyle() {
       // them, dotted because it is guidance rather than part of your view, and
       // arrowed because unlike every other signal here it has a DIRECTION: this
       // way, not merely "these are related".
+      // 2026-08-30 — SOLID, THICKER, ARROWED: the viewer's "recommended step"
+      // convention, already carried by the reading-spine successor arrow. Dotted
+      // said "provisional", which was wrong — the next step toward your partner
+      // is a recommendation to act on. Blue rather than the spine's amber,
+      // because it points at THEM rather than onward through the text.
       selector: 'edge.route-step',
       style: {
-        'line-style': 'dotted',
-        'width': 3,
+        'line-style': 'solid',
+        'width': 5,
+        'arrow-scale': 1.4,
         'line-color': '#4a9bff',
         'opacity': 0.9,
         'target-arrow-shape': 'triangle',
@@ -1645,7 +1651,7 @@ function buildStyle() {
       style: {
         'target-arrow-shape': 'triangle-tee',
         'opacity': 0.55,
-        'width': 2,
+        'width': 3,
       }
     },
     {
@@ -2554,9 +2560,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const n = cy.getElementById(id);
       if (n.length) n.show();
     });
-    // Same rule the expands use: an edge shows when both its endpoints do. So
-    // the merged nodes bring their own structure without being sent any of it.
-    cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
+    // 2026-08-30 — NO blanket edge reveal. This showed every edge whose endpoints
+    // both happened to be visible, which is NOT the rule the expands use:
+    // expandToNode shows the closed neighbourhood of the CENTRE, so edges between
+    // two of its neighbours stay hidden. The looser rule here put onward and
+    // backward edges on intermediate nodes — real relationships that say nothing
+    // about the view you are in, and clutter exactly where the route is trying to
+    // be legible.
+    //
+    // Whatever needs an edge now shows its own: the route view reveals its path
+    // edges, updateNextStep reveals the single step it draws.
   }
 
   // 2026-08-29 — SIMPLIFIED, at the user's judgement that the full union is more
@@ -6311,6 +6324,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       pushGn(bnNodeId);
       sendExplore('gn_mark', node.data('url') || null);
     }
+    // 2026-08-30 — a tap is an explicit navigation, so it LEAVES the route view.
+    // Without this, routeActive and its sets survived every exit except the Back
+    // button, so the partner's OLD position kept its blue ring long after they
+    // had moved on — which is what the user noticed.
+    exitRouteView();
     advanceOrNavigate(node);
   });
 
