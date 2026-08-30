@@ -85,6 +85,21 @@
 >
 > ### Still open
 >
+> - **THE CROSSING — noticed 2026-08-30, undecided.** If both users click each
+>   other's node at once they SWAP and no green appears: the snap is emergent
+>   (each side checks `my centre === their last reported centre`), so there is no
+>   arbitration and no first-wins. Staggered clicks give a brief green on BOTH
+>   screens before the second move breaks it; simultaneous ones give none at all.
+>
+>   It is locally detectable with no protocol, because `previous` is already in
+>   the payload: `their current === my previous AND their previous === my
+>   current`. Both sides compute the same answer independently.
+>
+>   What to DO with it is the open question, and the two readings differ in kind:
+>   "you passed each other" is a failure to fix, "you crossed" is an event worth
+>   marking. Only the second makes the near-miss valuable. (This is also what
+>   `previous` was kept in the payload for, after predecessors stopped being
+>   signalled and it had nothing to do.)
 > - Weighted hubs instead of exclusion (not urgent — see the measurement).
 > - Gamifying the chase. The countdown is the hook; no new machinery needed.
 > - `renderMembership` takes a `prevId` it no longer uses.
