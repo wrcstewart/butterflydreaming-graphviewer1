@@ -120,24 +120,26 @@ const FAMILY_COLOURS = {
 //
 // Paler still (#FFE7B0, #FFF0CC) lifts luminance further but drains the hue —
 // at 0.3 they arrive as warm greys. This keeps the amber.
-// 2026-08-30 — YELLOW BACK IN. #FFE6BC read drab, and the cause was that
-// "pastel" had been chased with LIGHTNESS, which drains chroma: at 87% lightness
-// only 46 units of colour survive the composite, against 117 for the amber
-// before it. Pale and desaturated are the same thing here.
+// 2026-08-30 — UNMISTAKABLY YELLOW. #FFD26E was reading as GREEN to the user,
+// which defeats the whole scheme, and two things were causing it:
 //
-// #FFD26E is lightness 72% and composites to a chroma of 100 at the resting
-// tier — more than double — while staying well clear of the olive that every
-// gold below about 65% lightness collapses into.
+//   hue 41   — orange-leaning, so it sat between yellow and the greens
+//   light 72 — and lightness bleeds the colour out: chroma only 145 of 255
 //
-//   base       @1.0 (centre)  chroma    @0.7 (rest)  chroma
-//   #FFE6BC    #FFE6BC            67    #B6A488          46   <- drab
-//   #FFD26E    #FFD26E           145    #B69652         100
+// A washed yellow is exactly what drifts toward green for a reading that does
+// not separate those hues well. So this moves to the Helper header's hue, 51,
+// squarely yellow, and drops the lightness to where the colour is strongest:
 //
-// The lesson, since it has now bitten twice in opposite directions: on a
-// near-black canvas a halo needs ENOUGH LIGHTNESS to survive the composite and
-// ENOUGH SATURATION to arrive as a colour. Too dark goes olive; too light goes
-// grey. The window is narrow and sits around 70-75% lightness.
-const MARK_LOCAL     = '#FFD26E';   // the node you have selected NOW
+//   #FFD26E   hue 41   light 72%   chroma 145   <- read as green
+//   #FFD400   hue 50   light 50%   chroma 255
+//
+// Hue distance is now 84 from the green and 124 from the turquoise.
+//
+// THIS CONTRADICTS the user's own preference for subtler colour, and they said
+// so while asking for it. Legibility is a constraint and subtlety is a taste;
+// where they conflict the constraint wins, and the right place to spend the
+// subtlety is elsewhere — the thin 1.5px width is already doing that work.
+const MARK_LOCAL     = '#FFD400';   // the node you have selected NOW
 // The node you were on BEFORE this one. Same hue, well below MARK_LOCAL, so the
 // pair reads as one signal at two depths rather than as two colours.
 //
