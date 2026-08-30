@@ -1638,6 +1638,17 @@ function buildStyle() {
       }
     },
     {
+      // A step BACKWARDS down the reading spine — they are behind you in the same
+      // work. Hollow head and dimmer: still available, but not urging you on.
+      // Drawn after .route-step so it wins on the properties it restates.
+      selector: 'edge.route-step.route-back',
+      style: {
+        'target-arrow-shape': 'triangle-tee',
+        'opacity': 0.55,
+        'width': 2,
+      }
+    },
+    {
       // 2026-08-29 — a REVEALED path. These are real corpus edges, not drawn
       // connections; the dotting is a provenance signal, saying "shown to
       // explain how their node reaches yours" rather than "part of your
@@ -2627,12 +2638,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // same, the two of you close on each other without either having to know where
   // the other is going.
   let stepEdgeId = null, stepNodeId = null, hopDistance = null;
+  // 2026-08-29 — where they are IN THE WORK, when that is a meaningful thing to
+  // say: same work, and a route that never leaves it. Within a work the route
+  // runs along CHILD, which IS the seq order, so the hop count already equals the
+  // gap — what it cannot say is which SIDE of you they are on, and that is the
+  // whole difference. Four verses forward is an invitation; four verses back is
+  // asking you to un-read something.
+  let remoteSeq = null, remoteAhead = false;
 
   function clearNextStep() {
-    hopDistance = null;
+    hopDistance = null; remoteSeq = null; remoteAhead = false;
     if (stepEdgeId) {
       const e = cy.getElementById(stepEdgeId);
-      if (e.length) e.removeClass('route-step');
+      if (e.length) e.removeClass('route-step route-back');
     }
     stepEdgeId = null; stepNodeId = null;
   }
@@ -2662,6 +2680,25 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     stepEdgeId = link.id();
     stepNodeId = next.id();
     hopDistance = nodes.length - 1;
+
+    // Same work AND a route that stays inside it. Both conditions matter: two
+    // passages of one work can still be joined thematically by way of another
+    // work, and then the seq gap is not what separates you.
+    const work = from.data('source_text');
+    const inWork = !!work && to.data('source_text') === work &&
+                   nodes.every(n => n.data('source_text') === work);
+    if (inWork) {
+      const mySeq = from.data('seq'), theirSeq = to.data('seq');
+      if (typeof mySeq === 'number' && typeof theirSeq === 'number') {
+        remoteSeq   = theirSeq;
+        remoteAhead = theirSeq > mySeq;
+        // A step BACKWARDS down the reading spine is a different act from a step
+        // onward, so it is drawn differently — an invitation to return, not to
+        // continue. It is only ever a probably: they may not be "behind" at all,
+        // just elsewhere in the text. So it flags, and never forbids.
+        if (!remoteAhead) link.addClass('route-back');
+      }
+    }
   }
 
   // 2026-08-29 — THE ROUTE VIEW. Pressing Remote replaces your view with just
@@ -3449,7 +3486,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // The hop count, when there is one and you are not already adjacent. It
     // turns the control into a distance readout — the thing that makes following
     // the arrow feel like closing on someone rather than just navigating.
-    paintNodeButton(bnBtn, n, (hopDistance && hopDistance > 1) ? String(hopDistance) : '', 'Remote:');
+    // Their position in the work when that means something, the hop count
+    // otherwise. The arrow tells you which way; this tells you how far, and the
+    // number COUNTS DOWN as they close on you — which is what waiting for
+    // someone to catch up actually looks like.
+    const suffix = (remoteSeq !== null)
+      ? (remoteAhead ? '\u2191' : '\u2193') + remoteSeq
+      : ((hopDistance && hopDistance > 1) ? String(hopDistance) : '');
+    paintNodeButton(bnBtn, n, suffix, 'Remote:');
     bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
     // §2 — the partner left: dim, do not remove. They are still where they were.
     // And dim when you are ALREADY on their node: clicking then jumps you to
