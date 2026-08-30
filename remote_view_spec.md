@@ -13,13 +13,33 @@
 >
 > | | |
 > |---|---|
-> | **amber ring** | every node in your view. Amber is the GROUND, not a category — everything on your screen is yours |
-> | **blue outer ring** | your partner is looking at this too. An ANNOTATION on top of amber, never instead of it |
-> | **8px green ring** | you are both ON this node |
-> | **light-blue solid arrow** | the recommended next step toward them, head on the node to CLICK |
+> | thin yellow `#FFD400`, 1.5px | a node in YOUR view |
+> | thin blue `#4a9bff`, 1.5px | your partner can see it too |
+> | **fat turquoise `#16CAB8`, 4px** | your partner is ON it |
+> | green `#50E272`, 8px | you are both on it |
+> | solid light-blue arrow `#9FD0FF` | the recommended next step, head on the node to CLICK |
 >
-> Opacity: **0.85** the node you are on, **0.5** the rest of yours; **0.85** their
-> current node, **0.3** the rest of theirs. Predecessors are not signalled.
+> **Your own centre is deliberately NOT marked.** You clicked it, so you know
+> where you are — and where you did not (Back, leaving a route, a resize) the
+> reading panel names it, in words, more precisely than a ring could. The rings
+> spend themselves entirely on what you cannot otherwise know.
+>
+> **The three remote colours are a LADDER in hue AND luminance** — 213/174/134
+> and 6.9/9.5/11.7, each step 1.25-1.43x. Awareness, focus, convergence. Do not
+> move one without the others: blue and green were 1.1x apart before the
+> turquoise needed room, which is nearly indistinguishable for a reading that
+> leans on luminance.
+>
+> **Amber is no longer the ground.** It was, and blue was an annotation on top;
+> since shared nodes dropped their amber inner ring, yellow means "yours alone"
+> and blue "yours and theirs". A deliberate change, not a tidying — "everything
+> on your screen is yours" is now something you know rather than something you
+> see.
+>
+> **The yellow must stay near hue 50-55 at ~50% lightness.** At hue 41 and 72%
+> lightness it read as GREEN to the user: an orange-leaning hue sits between
+> yellow and the greens, and lightness bleeds the colour out. Legibility is a
+> constraint, subtlety is a taste; spend the subtlety on WIDTH.
 >
 > ### The Remote control
 >

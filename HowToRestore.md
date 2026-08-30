@@ -1,5 +1,10 @@
 # HowToRestore.md
 
+> **2026-08-30 17:50 BST — active work is on branch `remote-graph-view`, not
+> `main`. Read [`CONTINUATION.md`](CONTINUATION.md) FIRST**: it says what state
+> the branch is in, which document answers which question, and what is
+> unfinished.
+
 **If you are Claude and this is a fresh session: read this file first, then
 `MEMORY_SNAPSHOT.md`.** It explains what is backed up, why, and how to get
 your project memory back if it has been lost.
