@@ -1279,6 +1279,20 @@ function inkModeOverrides() {
       style: {
         'background-color': INK_BG,
         'background-opacity': INK_BODY_OPACITY,
+        // 2026-08-30 — NO TYPE BORDERS. The user's principle, and it is the right
+        // one: border and outline carry STATE — local, remote, shared, selected —
+        // and nothing else. Type is carried by shape and by label colour.
+        //
+        // The base sheet gives root a 5px green border and Cluster, Family and
+        // Entry their own 2px darkened ones. renderMembership was already
+        // clearing them, but only INCIDENTALLY, as a side effect of every branch
+        // having to set every property it touches — so they appeared on first
+        // paint and vanished once marks were rendered. Zeroing them here makes
+        // the intent explicit and the appearance stable from the first frame.
+        //
+        // renderMembership's inline styles still win over this, so the amber
+        // band of the LR case is unaffected.
+        'border-width': 0,
         'color': function(node) { return inkify(node.data('colour'), node.data('inkPurity')); },
       }
     },
