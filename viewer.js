@@ -2672,6 +2672,37 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     // Adjacent by construction, so a REAL edge always exists — nothing synthetic
     // is drawn, and the arrow is the corpus's own relationship, marked.
+    hopDistance = nodes.length - 1;   // the count stands whether or not an arrow is drawn
+
+    // Their position in the work, computed BEFORE any early return: the readout
+    // is wanted even when the arrow is not, and it is the countdown that makes
+    // waiting for someone legible.
+    const work = from.data('source_text');
+    const inWork = !!work && to.data('source_text') === work &&
+                   nodes.every(nd => nd.data('source_text') === work);
+    if (inWork) {
+      const mySeq = from.data('seq'), theirSeq = to.data('seq');
+      if (typeof mySeq === 'number' && typeof theirSeq === 'number') {
+        remoteSeq = theirSeq; remoteAhead = theirSeq > mySeq;
+      }
+    }
+
+    // 2026-08-29 — DRAW NOTHING WHEN THE OVERLAP ALREADY SAYS IT.
+    //
+    // In a TextNode view your linked Clusters are on screen, so when you share a
+    // cluster with your partner — which is 80% of pairs, at two hops — that
+    // cluster is ALREADY visible on both screens wearing a blue ring. The route
+    // system would be pointing at something the halos have already answered.
+    //
+    // Worse than redundant: at two hops EVERY shared cluster is an equally short
+    // way to them, so an arrow picks one arbitrarily and implies it is the way.
+    // Saying nothing is more honest — tap any blue node.
+    //
+    // The test is on the node itself rather than on the distance, so it adjusts
+    // to the view: a Cluster view does not show one-hop neighbours, and there the
+    // arrow is still needed at the same distance.
+    if (next.visible() && remoteViewIds.has(next.id())) return;
+
     const link = from.edgesWith(next).first();
     if (!link || !link.length) return;
 
@@ -2679,26 +2710,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     link.show().addClass('route-step');
     stepEdgeId = link.id();
     stepNodeId = next.id();
-    hopDistance = nodes.length - 1;
 
-    // Same work AND a route that stays inside it. Both conditions matter: two
-    // passages of one work can still be joined thematically by way of another
-    // work, and then the seq gap is not what separates you.
-    const work = from.data('source_text');
-    const inWork = !!work && to.data('source_text') === work &&
-                   nodes.every(n => n.data('source_text') === work);
-    if (inWork) {
-      const mySeq = from.data('seq'), theirSeq = to.data('seq');
-      if (typeof mySeq === 'number' && typeof theirSeq === 'number') {
-        remoteSeq   = theirSeq;
-        remoteAhead = theirSeq > mySeq;
-        // A step BACKWARDS down the reading spine is a different act from a step
-        // onward, so it is drawn differently — an invitation to return, not to
-        // continue. It is only ever a probably: they may not be "behind" at all,
-        // just elsewhere in the text. So it flags, and never forbids.
-        if (!remoteAhead) link.addClass('route-back');
-      }
-    }
+    // A step BACKWARDS down the reading spine is a different act from a step
+    // onward, so it is drawn differently — an invitation to return, not to
+    // continue. Only ever a probably: they may not be "behind" at all, just
+    // elsewhere in the text. So it flags, and never forbids.
+    if (remoteSeq !== null && !remoteAhead) link.addClass('route-back');
   }
 
   // 2026-08-29 — THE ROUTE VIEW. Pressing Remote replaces your view with just
