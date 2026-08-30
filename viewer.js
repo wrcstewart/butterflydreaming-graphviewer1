@@ -3003,7 +3003,26 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //
   // 6.8:1 against the canvas, 1.7:1 from the gold ([[user-colour-vision]] —
   // never hue alone, so the luminance gap matters).
-  const MARK_GREEN = '#1bbb40';
+  // 2026-08-30 — A THREE-STEP LADDER, hue and luminance progressing together.
+  //
+  //   thin blue      #4a9bff  hue 213  contrast  6.9   they see it
+  //   fat turquoise  #16CAB8  hue 174  contrast  9.5   their centre
+  //   green          #50E272  hue 134  contrast 11.7   you are both here
+  //
+  // The user's turquoise: literally the hue midpoint of the blue and the green,
+  // so the colour moves along the same axis as the meaning — awareness, focus,
+  // convergence.
+  //
+  // Green was RAISED to keep the ladder monotonic. At #1bbb40 it was contrast
+  // 7.7, only 1.1x above the blue: for a reading that leans on luminance rather
+  // than hue those two were nearly the same, and a turquoise between them had
+  // nowhere to sit. Its hue is untouched — 134 is still the midpoint of the
+  // local gold and the remote navy, which is where it came from.
+  //
+  // The culmination should also be the brightest thing, and it now is. Before
+  // this the rare, meaningful state was dimmer than the common one.
+  const MARK_TURQ  = '#16CAB8';
+  const MARK_GREEN = '#50E272';
   let   gnWasRevealed = false;
 
   function clearMarksFrom(node) {
@@ -3208,7 +3227,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           n.style({
             'border-width': 0,
             'outline-width': w,
-            'outline-color': MARK_BLUE,
+            // Their CENTRE takes the turquoise; everything else they can see
+            // stays blue. Colour and width now say the same thing twice, which
+            // is deliberate — width alone was carrying it.
+            'outline-color': (id === rCur) ? MARK_TURQ : MARK_BLUE,
             'outline-opacity': rOp,
             'outline-offset': 0,
           });
