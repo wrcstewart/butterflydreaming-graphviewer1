@@ -2,6 +2,98 @@
 
 **Branch `remote-graph-view`. Designed and BUILT 2026-08-29.**
 
+> ## AS BUILT, 2026-08-30 — read this box and the next one before §1–§6
+>
+> The design moved a long way once it was on screen. **Three simplifications,
+> each made after seeing the previous version, and each smaller than the thing
+> it replaced.** Where the sections below disagree with these boxes, the boxes
+> are what exists.
+>
+> ### What the screen shows now
+>
+> | | |
+> |---|---|
+> | **amber ring** | every node in your view. Amber is the GROUND, not a category — everything on your screen is yours |
+> | **blue outer ring** | your partner is looking at this too. An ANNOTATION on top of amber, never instead of it |
+> | **8px green ring** | you are both ON this node |
+> | **light-blue solid arrow** | the recommended next step toward them, head on the node to CLICK |
+>
+> Opacity: **0.85** the node you are on, **0.5** the rest of yours; **0.85** their
+> current node, **0.3** the rest of theirs. Predecessors are not signalled.
+>
+> ### The Remote control
+>
+> Shows their node's name, plus **their seq with a direction arrow** when you are
+> in the same work and the route never leaves it, or **the hop count** otherwise.
+> That number counts down as they close on you — the waiting affordance was
+> already there and only needed to be legible.
+>
+> Pressing it shows the **ROUTE VIEW**: your view is replaced by the chain from
+> where you are to where they are. Local (Back) or ✕ restores it.
+>
+> ### The route
+>
+> Dijkstra over the resident corpus — no query, nothing asked of the partner.
+> **From your CURRENT node.** Hubs excluded as intermediates: root, the Entry
+> nodes, `__root_edge__`, and **gateways** (up to 48 cluster links each — a route
+> through one says only "both are in the corpus"). Capped at 5 intermediates.
+>
+> **Measured on 400 sampled TextNode pairs**, gateways excluded: **80% are two
+> hops through a single shared Cluster**; 8 adjacent; 44 at three; 18 at four;
+> 6 at five; 4 at six; **zero unreachable**. Intermediates are `Cluster` (318),
+> `Text > Cluster` (44), `Text > Cluster > Text` (6), `Cluster > Sub > Cluster`
+> (6). Top-level Family never appears.
+>
+> **So exclusion is currently costing nothing** — I had argued it would strand
+> pairs and it does not. Switching to WEIGHTED hubs (expensive, not forbidden) is
+> a refinement for when the corpus is much larger, not a fix for anything now.
+>
+> ### The arrow appears only when the halos cannot answer
+>
+> A TextNode view shows that node's linked Clusters, so at two hops — the 80%
+> case — the shared cluster is ALREADY on both screens wearing a blue ring. An
+> arrow there would be worse than redundant: every shared cluster is an equally
+> short way across, so picking one implies it is THE way. **Tap any blue node.**
+>
+> The test is on the NODE (already visible AND already marked shared), not on the
+> distance, so it adjusts to the view by itself — a Cluster view does not show
+> one-hop neighbours, and there the arrow is still needed at the same distance.
+>
+> The hop count and seq readout are computed BEFORE that suppression: they are
+> wanted even when the arrow is not.
+>
+> ### Traps found here, worth carrying
+>
+> - **The payload was one navigation stale.** `addYouChip`/`publishPosition` runs
+>   at the TOP of the fresh-tap branch while `navigateInto` expands at the BOTTOM.
+>   Deferred one frame AND coalesced.
+> - **The arrowhead followed the EDGE's direction**, not the journey's. `CHILD`
+>   runs seq 2->3, so stepping backwards put the head on the node you were
+>   standing on. Which end carries it is now decided per use.
+> - **Stale blue halos.** `routeActive` survived every exit except Back, so
+>   tapping away left the partner's old position marked. A tap now leaves the
+>   route.
+> - **Stray edges.** `applyMergedView` revealed every edge whose endpoints were
+>   both visible — NOT the rule the expands use (`expandToNode` shows the closed
+>   neighbourhood of the CENTRE). Removed.
+> - **A span replacement deleted `findBridge`**, so no route ever appeared. Third
+>   time this week. The check that works: after replacing a span, grep for every
+>   function the new code CALLS — not for the code just written.
+> - **One commit shipped only the version bump** when a stale anchor aborted the
+>   Python and the `&&` chain committed anyway. Put the verification grep BEFORE
+>   the commit, not after.
+>
+> ### Still open
+>
+> - Weighted hubs instead of exclusion (not urgent — see the measurement).
+> - Gamifying the chase. The countdown is the hook; no new machinery needed.
+> - `renderMembership` takes a `prevId` it no longer uses.
+> - At ~40 works the **Cluster view's gateway row** is what breaks first: ~10
+>   gateways average, ~27 for popular themes, against 2.2 today. Texts per
+>   cluster×work stays ~7 however large the corpus gets.
+
+---
+
 > ## AMENDED IN BUILD — read this before §1–§6
 >
 > Two things changed once it was on screen, and both simplify it. The sections
