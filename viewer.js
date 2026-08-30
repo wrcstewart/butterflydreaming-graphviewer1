@@ -173,8 +173,10 @@ const MARK_PREV      = '#6a5b00';
 //
 // So these two are no longer derived from one another: the relationship is a
 // ratio now, not an increment.
-const LOCAL_HALO_W       = 1.5;    // px — everything that is not a centre
-const LOCAL_HALO_W_CUR   = 4;      // px — the node you are on, and the node they are on
+// FAT and THIN, the user's terms. Fat = the node you are on, or the node they
+// are on. Thin = everything else on screen.
+const HALO_THIN = 1.5;   // px
+const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
 // was six things to tell apart, and the middle one earned the least. What is
@@ -1347,7 +1349,7 @@ function buildStyle() {
         // rather than painted per node: clearMarksFrom strips inline outline-*,
         // so a node that stops being marked falls back to this by itself
         // instead of needing to be repainted.
-        'outline-width': LOCAL_HALO_W,
+        'outline-width': HALO_THIN,
         'outline-color': MARK_LOCAL,
         'outline-opacity': LOCAL_HALO_REST,
         'outline-offset': 0,
@@ -3148,7 +3150,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
     const remoteTier = (id, cur) => id === cur ? REMOTE_HALO_CURRENT : REMOTE_HALO_REST;
     // Either centre — yours or theirs — wears the wider ring.
-    const widthOf    = id => (id === centralId || id === rCur) ? LOCAL_HALO_W_CUR : LOCAL_HALO_W;
+    const widthOf    = id => (id === centralId || id === rCur) ? HALO_FAT : HALO_THIN;
 
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
@@ -3772,15 +3774,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // A single rAF puts it after that synchronous work. The pending flag makes
   // repeated calls in one frame collapse to one.
   let blueReassertPending = false;
-  // Re-asserts BOTH marks after a view change. It used to bail when there was
-  // no Blue Node, which would have left the green anchor behind on every
-  // navigation — the one thing it must survive.
+  // Re-asserts the marks AND repaints every halo after a view change.
+  //
+  // 2026-08-30 — THE GUARD IS GONE. It skipped the whole pass when there was no
+  // Blue Node, no green anchor, no predecessor and nothing merged — which was
+  // sound when this only re-parked marks, and wrong once renderMembership became
+  // the thing that paints EVERY halo.
+  //
+  // The symptom: a node that was FAT because it was your centre got hidden by a
+  // navigation, so the repaint skipped it, and when it came back into view it
+  // was still fat although it was no longer selected. It only bit when nothing
+  // else wanted the pass — which is why it looked intermittent.
+  //
+  // Everything inside is a no-op when there is nothing to do, so running it
+  // always costs a batched style pass over the visible nodes.
   function scheduleBlueReassert() {
     if (blueReassertPending) return;
-    const wantGreen = gnStack.length > 0;
-    // Sticky merge: the merged set is re-shown after every navigation, so this
-    // must run even when there is no mark to re-assert.
-    if (!bnNodeId && !wantGreen && !prevReadNodeId && !mergedRemoteIds.size) return;
     blueReassertPending = true;
     requestAnimationFrame(() => {
       blueReassertPending = false;
