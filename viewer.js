@@ -120,7 +120,10 @@ const FAMILY_COLOURS = {
 //
 // Paler still (#FFE7B0, #FFF0CC) lifts luminance further but drains the hue —
 // at 0.3 they arrive as warm greys. This keeps the amber.
-const MARK_LOCAL     = '#FFD98A';   // the node you have selected NOW
+// 2026-08-30 — more pastel again: lightness 77% -> 87%, hue unchanged at 38.
+// At the raised resting opacity it composites to #B6A488, a warm sand rather
+// than the olive the darker golds all collapsed into.
+const MARK_LOCAL     = '#FFE6BC';   // the node you have selected NOW
 // The node you were on BEFORE this one. Same hue, well below MARK_LOCAL, so the
 // pair reads as one signal at two depths rather than as two colours.
 //
@@ -148,6 +151,11 @@ const MARK_PREV      = '#6a5b00';
 // blue remote channel still has to fit beside it. Cheaper to be thin now than to
 // discover the ceiling once two channels are drawing.
 const LOCAL_HALO_W       = 3;      // px
+// 2026-08-30 — the node you are on, and the node they are on, get one pixel
+// more. Opacity alone was carrying the distinction and the resting tiers have
+// just risen, which narrows that gap; width is a second channel and does not
+// compete with colour for the same attention.
+const LOCAL_HALO_W_CUR   = LOCAL_HALO_W + 1;
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
 // was six things to tell apart, and the middle one earned the least. What is
@@ -156,7 +164,7 @@ const LOCAL_HALO_W       = 3;      // px
 // The rest rises 0.2 -> 0.5 as a consequence: it no longer has to leave room
 // beneath a middle tier, so it can simply be visible.
 const LOCAL_HALO_CURRENT = 0.85;   // the node you are on
-const LOCAL_HALO_REST    = 0.5;    // everything else in your view
+const LOCAL_HALO_REST    = 0.7;    // everything else in your view
 
 // 2026-08-29 — the REMOTE resting tier is separately settable, and quieter.
 // The overlap covers a lot of nodes at once — every node you and your partner
@@ -165,7 +173,7 @@ const LOCAL_HALO_REST    = 0.5;    // everything else in your view
 // it. Their CURRENT node keeps the same prominence as yours; it is the one
 // piece of remote information worth as much as a local one.
 const REMOTE_HALO_CURRENT = LOCAL_HALO_CURRENT;
-const REMOTE_HALO_REST    = 0.3;
+const REMOTE_HALO_REST    = 0.5;
 
 // 2026-08-30 — the route arrow is a LIGHTER blue than the remote halo, and its
 // own constant rather than a shade of MARK_BLUE.
@@ -3098,6 +3106,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
     const remoteTier = (id, cur) => id === cur ? REMOTE_HALO_CURRENT : REMOTE_HALO_REST;
+    // Either centre — yours or theirs — wears the wider ring.
+    const widthOf    = id => (id === centralId || id === rCur) ? LOCAL_HALO_W_CUR : LOCAL_HALO_W;
 
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
@@ -3118,15 +3128,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           return;
         }
 
+        const w = widthOf(id);
+
         if (isR) {
           // Two bands, and they must OVERLAP rather than abut: where two
           // separately-stroked paths merely touch, antialiasing leaves a
           // hairline of canvas between them and the eye reads three bands.
           n.style({
-            'border-width': LOCAL_HALO_W, 'border-position': 'outside',
+            'border-width': w, 'border-position': 'outside',
             'border-color': MARK_LOCAL, 'border-opacity': lOp,
-            'outline-width': LOCAL_HALO_W, 'outline-color': MARK_BLUE,
-            'outline-opacity': rOp, 'outline-offset': LOCAL_HALO_W - 1,
+            'outline-width': w, 'outline-color': MARK_BLUE,
+            'outline-opacity': rOp, 'outline-offset': w - 1,
           });
           return;
         }
@@ -3137,7 +3149,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // keeps its border until something explicitly clears it.
         n.style({
           'border-width': 0,
-          'outline-width': LOCAL_HALO_W,
+          'outline-width': w,
           'outline-color': MARK_LOCAL,
           'outline-opacity': lOp,
           'outline-offset': 0,
