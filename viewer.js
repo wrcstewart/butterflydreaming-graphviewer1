@@ -3142,7 +3142,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // visible node and runs on every change, so a stripped style is restored
   // immediately — and a class scheme would have needed a rule for every
   // local-tier x remote-tier combination.
-  function renderMembership(centralNode, prevId, isGreen) {
+  // 2026-08-30 — prevId and isGreen parameters dropped: predecessors stopped
+  // being signalled, and the recorded convergence stopped painting a ring, so
+  // both were ways of skipping work that no longer exists.
+  function renderMembership(centralNode) {
     const centralId = (centralNode && centralNode.length) ? centralNode.id() : null;
     // 2026-08-30 — NO PARTNER, NO BLUE. Every remote signal is derived from
     // whether the connection is live, so a departure cancels the green snap and
@@ -3174,7 +3177,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
-        if (isGreen(n)) return;            // a recorded convergence keeps its own ring
         const id  = n.id();
         // It is visible, so it is yours. Their view is consulted only to decide
         // whether to ADD the blue ring.
@@ -3258,29 +3260,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const prevN  = prevNodeEl();
     const prevId = prevN ? prevN.id() : null;
 
-    if (green) {
-      // border-width 0 for the same reason as the solo blue ring: a Cluster's
-      // own darkened border would otherwise draw over the ring's inner pixels.
-      green.style({
-        'border-width': 0,
-        'outline-width': 6,
-        'outline-color': MARK_GREEN,
-        // §6 — partner left, we did not. Dim, never remove: the anchor is
-        // still ours and still tappable.
-        'outline-opacity': 0.85,
-        'outline-offset': 0,
-      });
-    }
-
-    // 2026-08-29 — ONE membership pass over every visible node, replacing the
-    // four branches that painted the current node, the predecessor and the
-    // partner's position separately (remote_view_spec.md §1).
+    // 2026-08-30 — THE RECORDED CONVERGENCE NO LONGER PAINTS A RING.
     //
-    // It HAS to be one pass: a node can now be in both views at once, and each
-    // of those branches assumed it owned the node it painted, so your current
-    // node and the partner's position could not both be true of one node
-    // without one silently overwriting the other.
-    renderMembership(centralNode, prevId, isGreen);
+    // There were TWO greens and only one of them was live. This one marked
+    // gnStack[0] — a node you once agreed on — and by design it PERSISTED, which
+    // is exactly the "green halo not clearing when you navigate off" that was
+    // reported. It was not failing to clear; it was a record doing its job under
+    // a vocabulary that has since changed out from under it.
+    //
+    // Under the four states, green on the graph means one thing: you are BOTH ON
+    // this node, NOW. That is the 8px ring inside renderMembership, and it clears
+    // by itself the moment either of you moves. The record still exists — it is
+    // the Common control in the corner, which is where a record belongs.
+    //
+    // ONE membership pass over every visible node: a node can be in both views at
+    // once, so no branch may assume it owns the node it paints.
+    renderMembership(centralNode);
 
     if (bn && bn.length) applyBlueFill(bn);
     updateBnBtn();      // the corner controls track the same state as the halos
