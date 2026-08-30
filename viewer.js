@@ -164,12 +164,17 @@ const MARK_PREV      = '#6a5b00';
 // extent is paid on the whole screen rather than on a handful of marks, and the
 // blue remote channel still has to fit beside it. Cheaper to be thin now than to
 // discover the ceiling once two channels are drawing.
-const LOCAL_HALO_W       = 3;      // px
-// 2026-08-30 — the node you are on, and the node they are on, get one pixel
-// more. Opacity alone was carrying the distinction and the resting tiers have
-// just risen, which narrows that gap; width is a second channel and does not
-// compete with colour for the same attention.
-const LOCAL_HALO_W_CUR   = LOCAL_HALO_W + 1;
+// 2026-08-30 — WIDTH now carries the distinction, and colour is near-constant.
+//
+// Previously the resting halos were thick and faint, which is the combination
+// that reads as drab: a wide band of a washed-out colour. Thin and vivid is the
+// better trade — the colour arrives properly, and being 1.5px instead of 4px is
+// what says "not the one you are on".
+//
+// So these two are no longer derived from one another: the relationship is a
+// ratio now, not an increment.
+const LOCAL_HALO_W       = 1.5;    // px — everything that is not a centre
+const LOCAL_HALO_W_CUR   = 4;      // px — the node you are on, and the node they are on
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
 // was six things to tell apart, and the middle one earned the least. What is
@@ -183,7 +188,10 @@ const LOCAL_HALO_W_CUR   = LOCAL_HALO_W + 1;
 // to be brighter THAN. The extra pixel of width carries the rest of the
 // distinction.
 const LOCAL_HALO_CURRENT = 1.0;    // the node you are on
-const LOCAL_HALO_REST    = 0.7;    // everything else in your view
+// Near the centre's own strength. The tiers barely differ in opacity now,
+// deliberately: they differ in WIDTH, which is the channel that does not cost
+// the colour anything.
+const LOCAL_HALO_REST    = 0.9;    // everything else in your view
 
 // 2026-08-29 — the REMOTE resting tier is separately settable, and quieter.
 // The overlap covers a lot of nodes at once — every node you and your partner
@@ -192,7 +200,7 @@ const LOCAL_HALO_REST    = 0.7;    // everything else in your view
 // it. Their CURRENT node keeps the same prominence as yours; it is the one
 // piece of remote information worth as much as a local one.
 const REMOTE_HALO_CURRENT = LOCAL_HALO_CURRENT;
-const REMOTE_HALO_REST    = 0.5;
+const REMOTE_HALO_REST    = 0.9;
 
 // 2026-08-30 — the route arrow is a LIGHTER blue than the remote halo, and its
 // own constant rather than a shade of MARK_BLUE.
