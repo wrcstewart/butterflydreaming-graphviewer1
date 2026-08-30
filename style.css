@@ -784,9 +784,15 @@ body:not(.edit-active):not(.player-active) #action-bar {
   text-align: center;
   margin-top: 4px;
 }
+/* 2026-08-30 — the helper's grey, not amber. These hints ARE the system
+   speaking ("Tap the ButterflyDreaming node below..."), so they belong to the
+   same voice as the header above them. Amber made them read as a local mark
+   living inside a system card — and now that the graph's local ring is a strong
+   yellow, that misreading would only have got worse.
+   10.6:1 on the card body, against the amber's 7.0. */
 .card.system .card-body .chunk-hint {
   text-align: center;
-  color: #c8a050;
+  color: #C9CCD1;
   font-style: italic;
   /* 2026-07-28 — line-space above the tap hint so it reads as a
      separate advisory, not as a caption/continuation of the sentence
@@ -1059,7 +1065,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
