@@ -120,10 +120,24 @@ const FAMILY_COLOURS = {
 //
 // Paler still (#FFE7B0, #FFF0CC) lifts luminance further but drains the hue —
 // at 0.3 they arrive as warm greys. This keeps the amber.
-// 2026-08-30 — more pastel again: lightness 77% -> 87%, hue unchanged at 38.
-// At the raised resting opacity it composites to #B6A488, a warm sand rather
-// than the olive the darker golds all collapsed into.
-const MARK_LOCAL     = '#FFE6BC';   // the node you have selected NOW
+// 2026-08-30 — YELLOW BACK IN. #FFE6BC read drab, and the cause was that
+// "pastel" had been chased with LIGHTNESS, which drains chroma: at 87% lightness
+// only 46 units of colour survive the composite, against 117 for the amber
+// before it. Pale and desaturated are the same thing here.
+//
+// #FFD26E is lightness 72% and composites to a chroma of 100 at the resting
+// tier — more than double — while staying well clear of the olive that every
+// gold below about 65% lightness collapses into.
+//
+//   base       @1.0 (centre)  chroma    @0.7 (rest)  chroma
+//   #FFE6BC    #FFE6BC            67    #B6A488          46   <- drab
+//   #FFD26E    #FFD26E           145    #B69652         100
+//
+// The lesson, since it has now bitten twice in opposite directions: on a
+// near-black canvas a halo needs ENOUGH LIGHTNESS to survive the composite and
+// ENOUGH SATURATION to arrive as a colour. Too dark goes olive; too light goes
+// grey. The window is narrow and sits around 70-75% lightness.
+const MARK_LOCAL     = '#FFD26E';   // the node you have selected NOW
 // The node you were on BEFORE this one. Same hue, well below MARK_LOCAL, so the
 // pair reads as one signal at two depths rather than as two colours.
 //
@@ -163,7 +177,12 @@ const LOCAL_HALO_W_CUR   = LOCAL_HALO_W + 1;
 //
 // The rest rises 0.2 -> 0.5 as a consequence: it no longer has to leave room
 // beneath a middle tier, so it can simply be visible.
-const LOCAL_HALO_CURRENT = 0.85;   // the node you are on
+// 2026-08-30 — FULL opacity on the two centres. At 0.85 they were washed out:
+// the centre is the one thing that should read as its actual colour rather than
+// as a version of it, and the resting tier at 0.7 no longer leaves it much room
+// to be brighter THAN. The extra pixel of width carries the rest of the
+// distinction.
+const LOCAL_HALO_CURRENT = 1.0;    // the node you are on
 const LOCAL_HALO_REST    = 0.7;    // everything else in your view
 
 // 2026-08-29 — the REMOTE resting tier is separately settable, and quieter.
