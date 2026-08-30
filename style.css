@@ -724,8 +724,14 @@ body:not(.edit-active):not(.player-active) #action-bar {
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
    on bright yellow fails luminance contrast (see [[user-colour-vision]]).
    2026-08-14 — extended to #current-stack. */
+/* 2026-08-30 — LIGHT GREY, not gold. The card heads say WHO: gold for you, navy
+   for your partner, and the system was wearing a third gold — so two of the
+   three voices shared a colour, and the graph's local ring has just moved to a
+   strong yellow, which made the clash louder.
+   Grey is the honest answer: the system is neither of you, and a neutral says
+   that without needing a colour of its own. 10.8:1 against the dark text. */
 #chat-stack .card.system .card-head,
-#current-stack .card.system .card-head { background: var(--bd-gold); color: #1a1a20; }
+#current-stack .card.system .card-head { background: #C9CCD1; color: #1a1a20; }
 
 .card-body {
   width: 100%;
@@ -1053,7 +1059,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
