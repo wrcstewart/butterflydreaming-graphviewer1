@@ -3144,8 +3144,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // local-tier x remote-tier combination.
   function renderMembership(centralNode, prevId, isGreen) {
     const centralId = (centralNode && centralNode.length) ? centralNode.id() : null;
-    const rCur = remoteCurrentId, rPrev = remotePrevId;
-    const dim = bnGone ? 0.4 : 1;          // §2 — partner left: dim, never remove
+    // 2026-08-30 — NO PARTNER, NO BLUE. Every remote signal is derived from
+    // whether the connection is live, so a departure cancels the green snap and
+    // the fat centre wherever it came from — three separate sites clear
+    // pairingState.active and only two of them call markBuddyGone, so testing
+    // the state here covers the paths a per-site fix would miss.
+    //
+    // This supersedes the old "dim, never remove" rule (spec §2). That was right
+    // when blue was an ANCHOR you might still want to return to; it is now a LIVE
+    // POSITION, and a live position for someone who has gone is simply false.
+    const remoteLive = !!(pairingState && pairingState.active) && !bnGone;
+    const rCur  = remoteLive ? remoteCurrentId : null;
+    const rPrev = remoteLive ? remotePrevId    : null;
+    const dim = 1;
 
     const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
     const remoteTier = (id, cur) => id === cur ? REMOTE_HALO_CURRENT : REMOTE_HALO_REST;
@@ -3167,7 +3178,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const id  = n.id();
         // It is visible, so it is yours. Their view is consulted only to decide
         // whether to ADD the blue ring.
-        const isR = remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur;
+        const isR = remoteLive &&
+                    (remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur);
 
         const lOp = tier(id, centralId);
         const rOp = remoteTier(id, rCur) * dim;
@@ -6864,6 +6876,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // under module strict mode and killed the rest of the handler.
   function markBuddyGone() {
     bnGone = true;
+    // Forget where they were, so nothing downstream keeps acting on it: no route
+    // arrow, no hop count, and the Remote control has no node to name. The halos
+    // are handled by remoteLive in renderMembership, but the arrow and the button
+    // read this state directly.
+    remoteViewIds.clear();
+    remoteCurrentId = null;
+    remotePrevId    = null;
+    clearNextStep();
     renderMarks();
   }
 
