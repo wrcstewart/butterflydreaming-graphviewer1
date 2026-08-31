@@ -6018,10 +6018,24 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // is cumbersome, and you lose the ability to scan the set for content and
     // for OTHER clusters at a glance. The field is worth the untidiness.
     const HIDE_IN_GATEWAY_VIEW = new Set(['PART_OF', 'CLUSTER_REL']);
-    cy.edges().filter(e =>
-      e.source().visible() && e.target().visible() &&
-      !HIDE_IN_GATEWAY_VIEW.has(e.data('type'))
-    ).show();
+    cy.edges().filter(e => {
+      if (!e.source().visible() || !e.target().visible()) return false;
+      const ty = e.data('type');
+      if (HIDE_IN_GATEWAY_VIEW.has(ty)) return false;
+      // 2026-08-31 — and no CHILD edge that TOUCHES a title.
+      //
+      // A title sits IN the sequence (Hardy's at seq 0, 5, 10, 13), so it has
+      // spine edges to the passages either side of it. Hiding those breaks the
+      // chain at each section boundary — and the BREAK is the signal. A gap
+      // where a title stands says "this section starts here" more plainly than a
+      // line into the title would, and costs nothing on screen.
+      //
+      // The seq arrows BETWEEN passages stay: they are the reading order, and
+      // their discontinuity is what makes the boundary legible.
+      if (ty === 'CHILD' &&
+          (e.source().data('section_title') || e.target().data('section_title'))) return false;
+      return true;
+    }).show();
     lastParentNode = lastClusterNode;
     runLayout(cy, lastClusterNode);
 
