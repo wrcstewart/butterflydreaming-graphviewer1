@@ -267,6 +267,11 @@ const RING_ROUTE_MIN  = 0.2;
 // route state lives inside setupInteractions. Set in exactly two places —
 // showRouteToPartner and exitRouteView — so it cannot drift from routeActive.
 let ROUTE_VIEW_ACTIVE = false;
+
+// The FILTERING CLUSTER's id, mirrored out here because applySeqSignals is module
+// scope while lastClusterNode lives inside setupInteractions. Same arrangement,
+// and the same reason, as ROUTE_VIEW_ACTIVE.
+let FILTER_CLUSTER_ID = null;
 const SEL_WIDTH_MUL   = 2;      // their centre widens the OUTER ring
 // 2026-08-31 — yours widens the INNER ring by FOUR, not two. The two rings are
 // not at the same opacity — 0.5 inside against 0.8 outside — so equal multipliers
@@ -1834,6 +1839,45 @@ function buildStyle() {
       style: { 'opacity': 0.55, 'target-arrow-shape': 'none' }
     },
     {
+      // 2026-08-31 — passage -> its TITLE PAGE. An alternative way to read the
+      // work: the title view shows EVERY passage in order with the filtered ones
+      // marked, which the gateway view cannot show at all.
+      //
+      // Head on the TITLE, since that is where it takes you. Neutral grey, the
+      // title label's own colour, so the edge belongs to the thing it leads to —
+      // and 0.7 so it can be seen through rather than blocking what it crosses.
+      selector: 'edge.title-edge',
+      style: {
+        'line-style': 'solid',
+        'width': 4,
+        'line-color': '#b9bec6',
+        'target-arrow-color': '#b9bec6',
+        'target-arrow-shape': 'triangle',
+        'source-arrow-shape': 'none',
+        'opacity': 0.7,
+        'z-index': 25,
+      }
+    },
+    {
+      // The FILTERING CLUSTER's claim on this passage. Informative, not
+      // navigational — so the head is on the PASSAGE, the opposite way to the
+      // title edge above.
+      //
+      // Wears the cluster's OWN colour, inkified to match the label you can see
+      // on the cluster node; the stored blend is far too dark against black.
+      selector: 'edge.fc-edge',
+      style: {
+        'line-style': 'solid',
+        'width': 4,
+        'line-color':        function(e) { return inkify(e.target().data('colour'), e.target().data('inkPurity')); },
+        'source-arrow-color':function(e) { return inkify(e.target().data('colour'), e.target().data('inkPurity')); },
+        'source-arrow-shape': 'triangle',
+        'target-arrow-shape': 'none',
+        'opacity': 0.7,
+        'z-index': 25,
+      }
+    },
+    {
       selector: 'node[type="TextNode"][?section_title]',
       style: {
         // 2026-08-31 — an OCTAGON. cut-rectangle was too close to the passages:
@@ -2019,6 +2063,8 @@ function buildStyle() {
 function applySeqSignals(cy, centralNode, suppress) {
   cy.edges('.seq-edge').removeClass('seq-edge');
   cy.nodes('.seq-successor').removeClass('seq-successor');
+  cy.edges('.title-edge').removeClass('title-edge');
+  cy.edges('.fc-edge').removeClass('fc-edge');
   // 2026-08-31 — the reading spine is not part of a ROUTE view. A route shows
   // one thing — how to reach your partner — and a second dotted arrow offering
   // the next verse is a different conversation happening over the top of it.
@@ -2032,6 +2078,31 @@ function applySeqSignals(cy, centralNode, suppress) {
   );
   fwd.addClass('seq-edge');
   fwd.targets().addClass('seq-successor');
+
+  // 2026-08-31 — the two edges that say what this passage BELONGS to, marked so
+  // they stand out from the rest of its neighbourhood.
+  //
+  // They point OPPOSITE ways, deliberately, and the direction is the difference:
+  //
+  //   title  <-- passage   the head is on the TITLE, because that is where you
+  //                        would GO. Every other arrow here means "click this"
+  //                        — the route step, the reading spine — and this is a
+  //                        navigation route, not a fact.
+  //   passage <-- cluster  the head is on the PASSAGE, because this is a fact
+  //                        about it: the theme claims this text. Nothing to go to.
+  //
+  // Both are stored as text->X in the database (verified: all 188 PART_OF run
+  // passage to title, all 1640 CLUSTER_REL run passage to cluster), so the
+  // stylesheet can place the heads without inspecting each edge.
+  centralNode.connectedEdges('edge[type="PART_OF"]')
+    .filter(e => e.source().id() === centralNode.id() && e.target().visible())
+    .addClass('title-edge');
+
+  if (FILTER_CLUSTER_ID) {
+    centralNode.connectedEdges('edge[type="CLUSTER_REL"]')
+      .filter(e => e.target().id() === FILTER_CLUSTER_ID && e.target().visible())
+      .addClass('fc-edge');
+  }
 }
 
 // fCoSE cannot separate nodes that begin at EXACTLY the same point: the
@@ -5822,6 +5893,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.$('node[type="Cluster"].active-cluster').removeClass('active-cluster');
     clusterNode.addClass('active-cluster');
     lastClusterNode = clusterNode;
+    FILTER_CLUSTER_ID = clusterNode.id();
     // The dev-write button captures hint_x/hint_y for lastParentNode's child
     // edges. Cluster expand IS a first-class hint context (its gateways and
     // Family parents are the "children" to arrange), so lastParentNode has
