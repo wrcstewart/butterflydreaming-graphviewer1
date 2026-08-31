@@ -5863,10 +5863,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           .some(c => c.id() === lastClusterNode.id()));
 
     if (!ctxValid) {
-      // No cluster context: show the work's THEMES — the gateway and the
-      // clusters it contains — rather than its whole neighbourhood. Still a
-      // large view for a big work, but a deliberate and meaningful one, and
-      // without the chunk TextNodes that made it a wall.
+      // 2026-08-31 — no cluster context, so this is someone ENTERING THE WORK
+      // (from the Gateways hub, typically). Show the way IN: the gateway and its
+      // title page, which is its single CHILD.
+      //
+      // This replaces a "work's themes" view I added a few days ago, which showed
+      // the gateway's CONTAINS_CLUSTER clusters — up to 48 of them for the Tao Te
+      // Ching. That was better than the whole neighbourhood it replaced, but it
+      // was still a wall, and it was a DEAD END: nothing about a list of themes
+      // tells you how to start reading. It also dropped the title node
+      // altogether, which is what the user noticed was missing.
+      //
+      // The title page is the reading entrance — tapping it gathers the work's
+      // passages into the spine (handleTitlePageTap) — so gateway -> title ->
+      // passages is the path, and this shows the first step of it.
       exitSnakeView();
       saveState();
       activeNodeId = node.id();
@@ -5874,10 +5884,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       cy.elements().hide();
       scheduleBlueReassert();
       node.show();
-      const themes = node.outgoers('edge[type="CONTAINS_CLUSTER"]');
-      themes.show();
-      themes.targets().show();
-      cy.edges().filter(e => e.source().visible() && e.target().visible()).show();
+      const titles = node.connectedEdges('[type="CHILD"]')
+        .connectedNodes()
+        .filter(n => n.data('type') === 'TextNode' && n.data('section_title'));
+      titles.show();
+      node.edgesWith(titles).show();
       runLayout(cy, node);
       markReadNode(node, cy);
       return;
