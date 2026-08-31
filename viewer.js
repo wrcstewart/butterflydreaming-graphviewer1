@@ -3263,6 +3263,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                     (remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur);
         const ramp = routeRamp.get(id);   // undefined unless a route is showing
 
+        // 2026-08-31 — YOUR centre thickens the INNER ring, theirs thickens the
+        // OUTER. The vocabulary is symmetric: whichever ring grows tells you
+        // whose focus the node is, and neither needs a colour to say it.
+        //
+        // This puts a marker back on your own centre, which the achromatic move
+        // had removed on the argument that you had just clicked it. That
+        // argument held for a coloured marker, which would have been loud; a
+        // half-pixel of extra width costs nothing and answers the glance the
+        // Local control otherwise has to answer in words.
+        const isSnap = (id === centralId && id === rCur);
+        const wIn = isSnap             ? HALO_THIN * SNAP_WIDTH_MUL
+                  : (id === centralId) ? HALO_THIN * SEL_WIDTH_MUL
+                  : HALO_THIN;
+
         // Local only: ONE ring, opaque white, thin. Drawn as the outline so it
         // occupies the same band the inner ring would, which means a node
         // gaining an outer ring does not make its inner one move.
@@ -3273,7 +3287,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (!isR && ramp === undefined) {
           n.style({
             'border-width': 0,
-            'outline-width': HALO_THIN,
+            'outline-width': wIn,
             'outline-color': MARK_RING,
             'outline-opacity': RING_LOCAL,
             'outline-offset': 0,
@@ -3281,12 +3295,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           return;
         }
 
-        const isSnap = (id === centralId && id === rCur);
         const outerOp = isSnap ? RING_SNAP
                       : (ramp !== undefined) ? ramp
                       : RING_REMOTE;
         // Their centre widens the OUTER ring; a snap widens both.
-        const wIn  = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
         const wOut = isSnap        ? HALO_THIN * SNAP_WIDTH_MUL
                    : (id === rCur) ? HALO_THIN * SEL_WIDTH_MUL
                    : HALO_THIN;
