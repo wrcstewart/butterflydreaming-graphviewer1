@@ -245,6 +245,11 @@ const RING_SNAP       = 1.0;    // outer: you are both on it
 // Distance becomes something you can see rather than count.
 const RING_ROUTE_MIN  = 0.2;
 const SNAP_WIDTH_MUL  = 1.5;    // and wider, to read as a target
+// 2026-08-31 — the OUTER ring is twice the width of the inner one. At 0.5 opacity
+// a 1.5px band was almost invisible without zooming, and the two shortfalls are
+// each other's cure: low opacity is exactly what makes extra width affordable, so
+// the partner's ring can be wide and quiet where yours is narrow and solid.
+const RING_OUTER_MUL  = 2;
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
@@ -3263,17 +3268,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                       : (id === rCur) ? RING_REMOTE_CUR
                       : (ramp !== undefined) ? ramp
                       : RING_REMOTE;
-        const w = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
+        const wIn  = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
+        const wOut = wIn * RING_OUTER_MUL;
 
         // Two bands: yours inside, theirs outside. They OVERLAP by a pixel
         // rather than abutting — where two separately-stroked paths merely
         // touch, antialiasing leaves a hairline of canvas between them and the
         // eye reads three bands instead of two.
+        // The inner band runs [0, wIn] beyond the body; the outer runs
+        // [wIn-1, wIn-1+wOut]. The one-pixel overlap is deliberate — where two
+        // separately stroked paths merely abut, antialiasing leaves a hairline of
+        // canvas between them and the eye reads three bands instead of two.
         n.style({
-          'border-width': w, 'border-position': 'outside',
+          'border-width': wIn, 'border-position': 'outside',
           'border-color': MARK_RING, 'border-opacity': RING_LOCAL,
-          'outline-width': w, 'outline-color': MARK_RING,
-          'outline-opacity': outerOp, 'outline-offset': w - 1,
+          'outline-width': wOut, 'outline-color': MARK_RING,
+          'outline-opacity': outerOp, 'outline-offset': wIn - 1,
         });
       });
     });
