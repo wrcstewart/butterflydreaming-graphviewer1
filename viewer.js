@@ -1636,14 +1636,22 @@ function buildStyle() {
     },
     {
       // 2026-08-16 — reading-spine signalling (see applySeqSignals). ONLY the
-      // central (just-tapped) node's forward hop to its successor gets a bold
-      // amber edge + double-size arrowhead (tap 19 → arrow 19→20), pointing
-      // the way to the next node. Class applied at layout time; placed after
-      // the CHILD rule so it wins.
+      // central (just-tapped) node's forward hop to its successor is marked
+      // (tap 19 → arrow 19→20), pointing the way to the next node. Class applied
+      // at layout time; placed after the CHILD rule so it wins.
+      //
+      // 2026-08-31 — DOTTED GREY, matching the local ring. It was amber, from
+      // when MARK_LOCAL was the selection colour; that tie broke when state went
+      // achromatic, and a lone yellow arrow was then the only coloured thing on
+      // screen that was not content. Dotted because it is a suggestion — where
+      // to read next — rather than a structural fact, which is what separates it
+      // from the route arrow's solid line.
       selector: 'edge.seq-edge',
       style: {
-        'line-color': MARK_LOCAL,
-        'target-arrow-color': MARK_LOCAL,
+        'line-style': 'dotted',
+        'line-color': MARK_RING,
+        'target-arrow-color': MARK_RING,
+        'opacity': RING_LOCAL,
         'target-arrow-shape': 'triangle',
         'arrow-scale': 1.44,         // 2026-08-27 — +20%. The arrow is now the
                                      // ONLY successor signal, so it carries
@@ -1752,8 +1760,12 @@ function buildStyle() {
       selector: 'edge.route-step',
       style: {
         'line-style': 'solid',
-        'width': 5,
-        'arrow-scale': 1.4,
+        // 2026-08-31 — 5 -> 2.5 and the head back to default scale. It had been
+        // sized to carry alone, before the halos and the shadow ramp were doing
+        // as much of the work; at 5px it was the heaviest thing on a canvas of
+        // half-pixel rings.
+        'width': 2.5,
+        'arrow-scale': 1,
         'line-color': MARK_ROUTE,
         'opacity': 0.9,
         // 2026-08-30 — the arrow SHAPES are set inline by updateNextStep, not
