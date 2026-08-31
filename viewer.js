@@ -5920,10 +5920,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       cy.elements().hide();
       scheduleBlueReassert();
       node.show();
-      const titles = node.connectedEdges('[type="CHILD"]')
-        .connectedNodes()
-        .filter(n => n.data('type') === 'TextNode' && n.data('section_title'));
+      // 2026-08-31 — ALL the work's titles, found by SOURCE_TEXT rather than by
+      // following edges.
+      //
+      // CHILD is the linear reading spine — seq n to seq n+1 — and the titles are
+      // simply nodes sitting in that chain (Hardy's are at seq 0, 5, 10, 13). So
+      // the gateway's single CHILD is only the FIRST title; the rest are reachable
+      // one hop at a time along the whole work. Following CHILD from the gateway
+      // therefore showed exactly one section, which is what the user saw.
+      //
+      // A work's sections are a property of the WORK, so that is what to select
+      // on. Sorted by seq, because they are an ordered table of contents rather
+      // than a set.
+      const work = node.data('source_text');
+      const titles = work
+        ? cy.nodes('node[type="TextNode"]').filter(n =>
+            n.data('section_title') && n.data('source_text') === work)
+        : cy.collection();
       titles.show();
+      // Only edges that genuinely exist between what is shown — which is the
+      // gateway's link to the first title. The others connect through passages
+      // that are not in this view, and inventing a line to them would be a claim
+      // the graph does not make.
       node.edgesWith(titles).show();
       runLayout(cy, node);
       markReadNode(node, cy);
