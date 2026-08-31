@@ -181,7 +181,10 @@ const MARK_PREV      = '#6a5b00';
 // 4.5px of band around every node on screen, which was reading as fat. At 1 and 2
 // they still separate — the ratio is what does that, not the absolute size — and
 // the graph gets its air back.
-const HALO_THIN = 1;     // px — the base ring width; selected states double it (SEL_WIDTH_MUL)
+// 2026-08-31 — 1 -> 0.5. Hairline throughout: the whole assembly came to 2px of
+// band around every node, and at these opacities it did not need the weight.
+// Both rings follow this, so the pair stays in proportion.
+const HALO_THIN = 0.5;   // px — the base ring width; selected states double it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
