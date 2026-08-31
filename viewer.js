@@ -177,7 +177,11 @@ const MARK_PREV      = '#6a5b00';
 // ratio now, not an increment.
 // FAT and THIN, the user's terms. Fat = the node you are on, or the node they
 // are on. Thin = everything else on screen.
-const HALO_THIN = 1.5;   // px
+// 2026-08-31 — 1.5 -> 1. With the outer ring at twice this, the pair came to
+// 4.5px of band around every node on screen, which was reading as fat. At 1 and 2
+// they still separate — the ratio is what does that, not the absolute size — and
+// the graph gets its air back.
+const HALO_THIN = 1;     // px — the inner ring; the outer is RING_OUTER_MUL times it
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
