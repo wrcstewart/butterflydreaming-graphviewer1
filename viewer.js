@@ -249,11 +249,18 @@ const RING_SNAP       = 1.0;    // outer: you are both on it
 // Distance becomes something you can see rather than count.
 const RING_ROUTE_MIN  = 0.2;
 const SNAP_WIDTH_MUL  = 1.5;    // and wider, to read as a target
-// 2026-08-31 — the OUTER ring is twice the width of the inner one. At 0.5 opacity
-// a 1.5px band was almost invisible without zooming, and the two shortfalls are
-// each other's cure: low opacity is exactly what makes extra width affordable, so
-// the partner's ring can be wide and quiet where yours is narrow and solid.
-const RING_OUTER_MUL  = 2;
+// 2026-08-31 — the OUTER ring is THREE times the inner one: 3px against 1.
+//
+// Low opacity and extra width are each other's cure. At 0.5 a thin band is
+// almost invisible without zooming in to check it is there, while a wide one at
+// the same opacity stays quiet — so the partner's ring can be wide and soft
+// where yours is narrow and solid. That contrast in WEIGHT does more work than
+// the opacity difference alone ever did.
+//
+// Went 2 -> 3 after thinning the inner ring to 1px took the outer down with it.
+// The ratio is what separates them, so the multiplier had to grow when the base
+// shrank; they are not independent settings.
+const RING_OUTER_MUL  = 3;
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
