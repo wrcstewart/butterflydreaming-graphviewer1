@@ -4068,6 +4068,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // layoutstop is the honest moment: positions are final and nothing else is
   // going to move them. Parking a node emits no layout, so this cannot recurse.
   cy.on('layoutstop', () => {
+    try { placeGatewayTopPair(); } catch (err) { console.warn('[gateway] top placement failed', err); }
     try {
       reassertBlueNode();
       reassertGreenNode();
@@ -5718,6 +5719,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (history.length === 0) return false;
     exitSnakeView();
     exitRouteView();
+    gatewayTopPair = null;
     const state = history.pop();
     const ids = new Set(state.ids);
     lastParentNode = state.parent;
@@ -5752,6 +5754,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function expandToNode(node) {
+    gatewayTopPair = null;
     clearFamilyView();
     exitSnakeView();
     saveState();
@@ -5783,6 +5786,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function expandToFamily(familyNode) {
+    gatewayTopPair = null;
     clearFamilyView();
     saveState();
     lastParentNode = familyNode;
@@ -5812,6 +5816,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function expandToCluster(clusterNode) {
+    gatewayTopPair = null;
     clearFamilyView();
     exitSnakeView();
     cy.$('node[type="Cluster"].active-cluster').removeClass('active-cluster');
@@ -5880,7 +5885,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // layoutstop handler.
   }
 
+  // The gateway and cluster held above the content, or null. Cleared by every
+  // other view builder, so the placement cannot leak into a view it was never
+  // meant for.
+  let gatewayTopPair = null;
+
+  function placeGatewayTopPair() {
+    if (!gatewayTopPair) return;
+    const { gw, cluster } = gatewayTopPair;
+    if (!gw || !gw.length || !cluster || !cluster.length) return;
+    if (!gw.visible() || !cluster.visible()) return;
+    const content = cy.nodes(':visible').difference(gw.union(cluster));
+    if (!content.length) return;
+    const bb   = content.boundingBox();   // the CONTENT, never cy.extent()
+    const y    = bb.y1 - 86;
+    const midX = (bb.x1 + bb.x2) / 2;
+    gw.position({ x: midX - 105, y });        // the work, left
+    cluster.position({ x: midX + 105, y });   // the theme, right
+  }
+
   async function handleGatewayClick(node) {
+    gatewayTopPair = null;
     // 2026-08-27 — this used to read `if (!lastClusterNode)`, and that one
     // condition carried two faults the user found as "sometimes clicking a
     // gateway shows a tableau of 70+ clusters".
@@ -6052,18 +6077,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // Positioned against the CONTENT's bounding box, not the canvas: a view laid
     // out to the panel width sits in the middle of a wide window, and using
     // cy.extent() would strand these two at the top corners.
-    cy.one('layoutstop', () => {
-      try {
-        const pair = clusterNode.union(node);
-        const content = cy.nodes(':visible').difference(pair);
-        if (!content.length) return;
-        const bb = content.boundingBox();
-        const y  = bb.y1 - 86;
-        const midX = (bb.x1 + bb.x2) / 2;
-        node.position({ x: midX - 105, y });          // the work, left
-        clusterNode.position({ x: midX + 105, y });   // the theme, right
-      } catch (err) { console.warn('[gateway] top placement failed', err); }
-    });
+    // 2026-08-31 — remembered, and re-applied on EVERY layoutstop while this
+    // view stands, rather than once.
+    //
+    // cy.one() was racy: a layout already in flight when this view is built
+    // fires its own layoutstop first and consumes the handler, so the placement
+    // ran against the OLD arrangement and the real layout then moved everything
+    // on top of it. That is "whatever runs last decides" again, and registering
+    // once cannot win it. Re-applying is immune to how many layouts run, and in
+    // what order.
+    gatewayTopPair = { gw: node, cluster: clusterNode };
     runLayout(cy, lastClusterNode);
 
     // 2026-07-31 — first-time helper: user just arrived at the title-node
