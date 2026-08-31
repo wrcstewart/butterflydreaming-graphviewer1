@@ -6037,6 +6037,33 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return true;
     }).show();
     lastParentNode = lastClusterNode;
+
+    // 2026-08-31 — put the GATEWAY and the CLUSTER above everything else, so the
+    // view reads downward: the work and the theme at the top, their sections and
+    // passages beneath.
+    //
+    // Done AFTER layoutstop rather than by constraining the layout. fcose's
+    // relativePlacementConstraint pins an exact offset and flattens every node
+    // sharing an anchor into one row — the fault that took two days over the
+    // gateway row — and a preset only moves what it is given, leaving everything
+    // else where it was. Laying out normally and then shifting two nodes is both
+    // simpler and immune to that.
+    //
+    // Positioned against the CONTENT's bounding box, not the canvas: a view laid
+    // out to the panel width sits in the middle of a wide window, and using
+    // cy.extent() would strand these two at the top corners.
+    cy.one('layoutstop', () => {
+      try {
+        const pair = clusterNode.union(node);
+        const content = cy.nodes(':visible').difference(pair);
+        if (!content.length) return;
+        const bb = content.boundingBox();
+        const y  = bb.y1 - 86;
+        const midX = (bb.x1 + bb.x2) / 2;
+        node.position({ x: midX - 105, y });          // the work, left
+        clusterNode.position({ x: midX + 105, y });   // the theme, right
+      } catch (err) { console.warn('[gateway] top placement failed', err); }
+    });
     runLayout(cy, lastClusterNode);
 
     // 2026-07-31 — first-time helper: user just arrived at the title-node
