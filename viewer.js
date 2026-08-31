@@ -4157,6 +4157,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     });
   }
 
+  // 2026-08-31 — publish where you already are, without waiting to move.
+  //
+  // publishPosition fired from ONE place, addYouChip, which only runs on
+  // navigation. So after pairing neither side had told the other anything: the
+  // first person to navigate became visible, and saw nothing back until their
+  // partner also moved. That is the asymmetric remote ring the user reported,
+  // and why it "settled down later" — it resolves once both have navigated.
+  //
+  // The rings are symmetric BY CONSTRUCTION: a node you can see is in your
+  // structural view, which is what you send, so your partner marks it if they
+  // can see it too. The symmetry only fails while one side has never spoken.
+  function publishCurrentPosition() {
+    if (!lastReadNodeId || lastReadNodeCy !== cy) return;
+    const n = cy.getElementById(lastReadNodeId);
+    if (n && n.length) publishPosition(n);
+  }
+
   function addYouChip(node) {
     publishPosition(node);       // ALWAYS — never gated on the strip
     if (!BREADCRUMB_BARS) return;
@@ -4515,6 +4532,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     bnStack.length = 0;      // a new partner does not inherit the last one's trail
     bnCursor = 0;
     bnGone = false;
+    // 2026-08-31 — nor their VIEW. Without this a new pair keeps the previous
+    // partner's remote rings until the new one's first crumb arrives, which is
+    // the same asymmetry as the unpublished-on-pairing case wearing a different
+    // hat: one side showing rings the other has no reason to.
+    remoteViewIds.clear();
+    remoteCurrentId = null;
+    remotePrevId    = null;
     try { renderMarks(); } catch (_) {}
     if (!BREADCRUMB_BARS) return;
     buddyCy.elements().remove();
@@ -6971,7 +6995,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -8797,7 +8821,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
   // breadcrumb bars and the media player listened, so the graph kept its old
@@ -9451,6 +9475,10 @@ async function init() {
       pairingState.waiting = false;
       updateJoinButtonLabel();
       updateSendBtn();
+      // Tell them where we already are. Without this neither side speaks until
+      // it navigates, so the remote rings appear on one screen and not the
+      // other until both have moved.
+      try { publishCurrentPosition(); } catch (err) { console.warn('[pair] publish failed', err); }
     } else if (msg.type === 'gn_mark' || msg.type === 'explore_denied') {
       // A relayed message type needs THREE sites: the sender, the server relay
       // whitelist, and THIS receive whitelist. Missing this one dropped gn_mark
