@@ -1,5 +1,33 @@
 # BD edge & cluster model — how relationships actually reach the graph
 
+> ## NEW EDGE TYPE — `CONTAINS_SECTION`, 2026-08-31
+>
+> **`(gateway:TextNode)-[:CONTAINS_SECTION]->(title:TextNode {section_title:true})`**
+> — a work contains this section. 10 edges; every gateway now reaches every title
+> page in its work.
+>
+> **Why it was added.** `CHILD` meant two things at once. It is the LINEAR
+> READING SPINE (seq *n* → *n+1*), and Grimms was also using it to hang a second
+> title off its gateway — the only way "contains this section" could be said at
+> all. Every other work simply could not say it, so entering Hardy showed one of
+> its four sections.
+>
+> `CHILD` is now strictly the spine. The gateway→first-title edges stay `CHILD`
+> because those genuinely ARE the spine head (seq −1 → 0); the one non-sequential
+> one (Grimms −1 → 7) was deleted. The only remaining non-sequential `CHILD`
+> edges are the module works' −1 → 1, which is a numbering gap rather than a
+> second meaning.
+>
+> Named to match `CONTAINS_CLUSTER`, which is the same shape of relation from the
+> same node kind.
+>
+> The viewer prefers `CONTAINS_SECTION` and falls back to selecting by
+> `source_text`, so it stays correct for any work ingested without the edges.
+>
+> **Ingest note:** new works should create `CONTAINS_SECTION` from the gateway to
+> each of their title pages. Backup before the change:
+> `backups/memgraph_2026-08-31_171432.cypher`.
+
 **Written 2026-08-21.** Prompted by a suspicion that some relationships were
 "presented by carrying out a live query and simulating the edges … to avoid too
 many edges". **No edge is ever synthesised — but the recollection is otherwise
