@@ -1856,24 +1856,29 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"][?gateway]',
       style: {
-        // 2026-08-31 — a RHOMBOID, after a tag proved wrong for a reason worth
-        // recording: a tag is ASYMMETRIC — flat on one side, pointed on the
-        // other — so which face an edge left from depended on where the layout
-        // happened to put the node. The same relationship looked different from
-        // one view to the next.
+        // 2026-08-31 — a DIAMOND, arrived at through two wrong shapes.
         //
-        // A rhomboid is symmetric under 180 degrees, so edges attach
-        // consistently however it is placed. It still reads as set apart from
-        // the upright passages, which is the job.
+        // A TAG was asymmetric — flat one side, pointed the other — so which
+        // face an edge left from depended on where the layout put the node, and
+        // the same relationship looked different from one view to the next.
         //
-        // Dimensions are given explicitly here rather than inherited: a slanted
-        // shape loses usable width to its own lean, so it needs to be longer and
-        // shallower than a passage to hold the same label. Length and depth are
-        // the two numbers to adjust.
-        'shape': 'rhomboid',
-        'width': 150,          // longer than a passage's 120
-        'height': 30,          // and shallower than its 34
-        'text-max-width': '120px',
+        // A RHOMBOID is cytoscape's name for a PARALLELOGRAM, not a rhombus: a
+        // skewed rectangle, which is precisely why it read as a 3D sheet seen in
+        // perspective on an otherwise flat page. The user's objection was exact.
+        //
+        // A diamond is the shape with four equal sides, and its width and height
+        // ARE the horizontal and vertical DIAGONALS — so it sits squarely in a
+        // rectangle you control, stays flat, and is symmetric in both axes, which
+        // means edges attach consistently wherever it lands.
+        //
+        // The label sits at the vertical centre, where a diamond is at its full
+        // width, so a wide shallow one holds a single line comfortably. Its
+        // text-max-width is pulled well inside the span because the shape narrows
+        // fast above and below the middle.
+        'shape': 'diamond',
+        'width': 170,          // the HORIZONTAL diagonal
+        'height': 38,          // the VERTICAL diagonal
+        'text-max-width': '104px',
         'text-transform': 'uppercase',
         'background-color': '#ffffff',
         'background-opacity': 0.85,
