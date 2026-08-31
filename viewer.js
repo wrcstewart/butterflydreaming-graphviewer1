@@ -1381,7 +1381,16 @@ function inkModeOverrides() {
     // the great majority of nodes, so this is what decides whether the scheme
     // reads calm or noisy.
     { selector: 'node[type="TextNode"]',                 style: { 'color': '#c8c8cc' } },
-    { selector: 'node[type="TextNode"][?section_title]', style: { 'color': '#e6e6ea', 'background-opacity': INK_BODY_OPACITY } },
+    // 2026-08-31 — title pages in GREY ITALIC. A title is a different kind of
+    // utterance from the passages under it, and italic says so typographically
+    // without touching anything the rings use — font-style and colour cannot
+    // affect border, outline, opacity or width, so the state signalling is
+    // untouched by construction.
+    //
+    // Slightly dimmer than the body grey rather than brighter: the title is
+    // orientation, and the passages are what you came to read.
+    { selector: 'node[type="TextNode"][?section_title]',
+      style: { 'color': '#b9bec6', 'font-style': 'italic', 'background-opacity': INK_BODY_OPACITY } },
     // These three set their own opaque fills in the base sheet (white, gold,
     // white), which would survive the rule above and go on occluding. Cleared
     // explicitly rather than relying on the generic node rule.
