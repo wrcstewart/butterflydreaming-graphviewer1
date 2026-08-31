@@ -1836,10 +1836,15 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"][?section_title]',
       style: {
-        // A clipped plate — still rectangular, so it reads as kin to the
-        // passages it introduces, but cut corners mark it as the heading rather
-        // than one of them. With the italic label it is now distinct twice over.
-        'shape': 'cut-rectangle',
+        // 2026-08-31 — an OCTAGON. cut-rectangle was too close to the passages:
+        // it clips the corners of a rectangle, which at a 34px node is a couple
+        // of pixels of difference and reads as the same silhouette.
+        //
+        // An octagon breaks the rectangle outline properly while staying a
+        // regular, settled shape — which suits a heading. It is also symmetric
+        // in both axes, so edges attach consistently wherever the layout puts it
+        // (the fault that ruled out the tag for gateways).
+        'shape': 'octagon',
         'background-color': '#cccccc',
         'color': '#1a1a1a',
         // 2026-08-16 — keep the pinned title fully tappable even in a dense
