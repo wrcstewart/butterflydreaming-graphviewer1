@@ -105,7 +105,52 @@ because a layout already in flight consumes a `cy.one` handler.
 
 ---
 
-## 5. Two traps this work produced
+## 5. A passage view (tap a passage)
+
+Shows the passage, its clusters, its title page and its seq neighbours. **Two of
+those edges are marked, and they point OPPOSITE ways — the direction is the
+meaning.**
+
+| | head on | because |
+|---|---|---|
+| `.title-edge` — passage → title | the **title** | that is where you would GO. Every other arrow in the viewer means "click this" (the route step, the reading spine), and this is a navigation route, not a fact. |
+| `.fc-edge` — passage → filtering cluster | the **passage** | this IS a fact about it: the theme claims this text. There is nothing to go to. |
+
+Both width 4 at **opacity 0.7**, so they can be seen through rather than blocking
+what they cross. The title edge takes the title label's grey, so it belongs to
+what it leads to; the FC edge takes the cluster's own colour, **inkified** — the
+stored blend is far too dark against black.
+
+Making both terminate on the passage was the first proposal. It would have given
+two different meanings the same direction, leaving thickness alone to say which
+was navigable. Pointing them opposite ways lets direction carry it: **what points
+IN explains the passage, what points OUT is somewhere you can go.**
+
+Directions are set in the STYLESHEET rather than per edge, which is only safe
+because the database is uniform — verified: all 188 `PART_OF` run passage→title,
+all 1640 `CLUSTER_REL` run passage→cluster. If either were mixed this would need
+the per-edge treatment the route arrows use.
+
+Neither is marked while a route view is showing, and both clear on every layout
+pass, so they cannot linger onto a view whose centre is not a passage.
+
+### Why the title (snake) view still earns its place
+
+A gateway view shows only the passages matching the filtering cluster. **The
+title view shows EVERY passage of the work, in order, with the filtered ones
+marked** — which the gateway view cannot show at all. The two are genuinely
+complementary and the second cannot be reconstructed from the first.
+
+That is what the marked title edge is for: it makes the alternative route
+apparent from inside a passage, rather than something you have to know about.
+
+*(An accidental red lived here until 2026-08-31: `PART_OF` had no colour rule, so
+it fell through to `line-color: data(colour)` with nothing to read and took
+cytoscape's own default. Nobody chose it.)*
+
+---
+
+## 6. Two traps this work produced
 
 **An undefined identifier in an `async` function is silent.** `clusterNode` is
 `expandToCluster`'s parameter; in `handleGatewayClick` the cluster is

@@ -1,4 +1,4 @@
-# Continuation note — 2026-08-31, 18:41 BST
+# Continuation note — 2026-08-31, 22:23 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,11 +10,11 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: ee1538d or later
+    git log --oneline -1          # expect: e396c54 or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=741`, `style.css?v=423`**, canary **green**.
+Current build: **`viewer.js?v=742`, `style.css?v=424`**, canary **blue**.
 Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
 `BD_GRACE_MS=65000` before real use; the server warns at boot).
 
