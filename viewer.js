@@ -6086,7 +6086,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // on top of it. That is "whatever runs last decides" again, and registering
     // once cannot win it. Re-applying is immune to how many layouts run, and in
     // what order.
-    gatewayTopPair = { gw: node, cluster: clusterNode };
+    gatewayTopPair = { gw: node, cluster: lastClusterNode };
     runLayout(cy, lastClusterNode);
 
     // 2026-07-31 — first-time helper: user just arrived at the title-node
