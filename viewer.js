@@ -2784,14 +2784,58 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         .difference(drop)
         .difference(drop.connectedEdges())
         .difference(cy.edges('[type="__root_edge__"]'));
-      const path = searchable.dijkstra({ root: fromNode, directed: false }).pathTo(toNode);
-      if (!path || !path.length) return null;              // unreachable without hubs
-      const hops = path.nodes().length - 2;                // exclude both endpoints
-      if (hops > BRIDGE_MAX) {
-        console.log('[bridge] nearest route is', hops, 'nodes — beyond the cap of', BRIDGE_MAX);
+      // 2026-08-31 — A CANONICAL shortest path, so both of you compute the SAME
+      // one. The user found that Analytical→Dance and Dance→Analytical returned
+      // different node sequences of equal length, which quietly breaks the whole
+      // convergence idea: two people following their own arrows walk different
+      // corridors and never meet.
+      //
+      // The cause is that dijkstra's pathTo reconstructs through a predecessor
+      // tree rooted at the SOURCE, and with ties the tree from A differs from the
+      // one from B. Both answers are correct; they are just not the same answer.
+      //
+      // Two things make it symmetric. Distances are run from the endpoint with
+      // the smaller url — so both clients solve the identical problem regardless
+      // of who is asking — and ties are broken by url, which is order-independent
+      // and therefore immune to the two graphs having been built up differently.
+      const a = fromNode.id() <= toNode.id() ? fromNode : toNode;
+      const b = fromNode.id() <= toNode.id() ? toNode   : fromNode;
+      const dj = searchable.dijkstra({ root: a, directed: false });
+      const total = dj.distanceTo(b);
+      if (!isFinite(total) || total <= 0) return null;      // unreachable without hubs
+      if (total - 1 > BRIDGE_MAX) {
+        console.log('[bridge] nearest route is', total - 1, 'nodes — beyond the cap of', BRIDGE_MAX);
         return null;
       }
-      return path;
+
+      // Walk back from b to a, always stepping to a neighbour one closer to a,
+      // and among those choosing the smallest url. Deterministic, and identical
+      // on both machines.
+      const seq = [b];
+      let cur = b;
+      for (let step = total; step > 0; step--) {
+        const d = dj.distanceTo(cur);
+        let pick = null;
+        cur.openNeighborhood().nodes().forEach(nb => {
+          if (!searchable.contains(nb)) return;
+          if (dj.distanceTo(nb) !== d - 1) return;
+          if (!pick || nb.id() < pick.id()) pick = nb;
+        });
+        if (!pick) return null;                             // should not happen
+        seq.push(pick);
+        cur = pick;
+      }
+      seq.reverse();                                        // now a ... b
+
+      // Hand it back in the direction the CALLER travels.
+      const nodes = (seq[0].id() === fromNode.id()) ? seq : seq.slice().reverse();
+      const edges = [];
+      for (let i = 0; i < nodes.length - 1; i++) {
+        const e = nodes[i].edgesWith(nodes[i + 1]).first();
+        if (!e || !e.length) return null;
+        edges.push(e);
+      }
+      return { nodes, edges };
     } catch (err) {
       console.warn('[bridge] failed:', err && err.message);
       return null;
@@ -2842,7 +2886,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const path = findBridge(from, to);
     if (!path) return;
-    const nodes = path.nodes();
+    const nodes = path.nodes;
     if (nodes.length < 2) return;
     const next = nodes[1];
 
@@ -2879,7 +2923,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // arrow is still needed at the same distance.
     if (next.visible() && remoteViewIds.has(next.id())) return;
 
-    const link = from.edgesWith(next).first();
+    const link = path.edges[0];
     if (!link || !link.length) return;
 
     if (!next.visible()) next.show();
@@ -2939,34 +2983,35 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.elements().hide();
 
     if (path) {
-      path.nodes().show();
-      path.edges().show().addClass('bridge-edge');
-      path.nodes().forEach(pn => { if (pn.id() !== from.id()) bridgeIds.add(pn.id()); });
+      // findBridge now returns { nodes, edges } as plain arrays IN TRAVEL ORDER,
+      // which is what makes the arrow direction and the ramp straightforward —
+      // a cytoscape collection has no inherent order to read them from.
+      path.nodes.forEach(pn => pn.show());
+      path.edges.forEach(e => e.show().addClass('bridge-edge'));
+      path.nodes.forEach(pn => { if (pn.id() !== from.id()) bridgeIds.add(pn.id()); });
 
       // EVERY hop gets an arrowhead, pointing the way to them. A dijkstra path
       // comes back in walk order — node, edge, node, edge, … — so the node
       // FOLLOWING an edge is the direction of travel across it, whatever the
       // edge's own orientation in the database happens to be.
-      const els = path.toArray();
-      for (let i = 1; i < els.length; i += 2) {
-        const e = els[i], onward = els[i + 1];
-        if (!e || !e.isEdge || !e.isEdge() || !onward) continue;
+      path.edges.forEach((e, i) => {
+        const onward = path.nodes[i + 1];
         const headAtTarget = e.target().id() === onward.id();
         e.style({
           'target-arrow-shape': headAtTarget ? 'triangle' : 'none',
           'source-arrow-shape': headAtTarget ? 'none' : 'triangle',
         });
-      }
+      });
       // The shadow brightens toward them: RING_ROUTE_MIN at the node you are
       // leaving, one even step per hop, reaching the ordinary remote strength at
       // the far end. The ENDPOINTS still win — your centre is local, theirs is
       // their centre — so the ramp only really paints what lies between.
-      const ns = path.nodes(), hops = ns.length - 1;
+      const ns = path.nodes, hops = ns.length - 1;
       if (hops > 0) {
         const step = (RING_REMOTE - RING_ROUTE_MIN) / hops;
         ns.forEach((pn, i) => routeRamp.set(pn.id(), RING_ROUTE_MIN + i * step));
       }
-      console.log('[route] showing', path.nodes().length, 'nodes,', path.nodes().length - 1, 'hops');
+      console.log('[route] showing', path.nodes.length, 'nodes,', path.nodes.length - 1, 'hops');
     } else {
       // No route within the cap. Show the two ends anyway and let the absence of
       // a line between them say it — that is a fact about the corpus, and more
