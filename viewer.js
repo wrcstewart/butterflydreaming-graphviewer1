@@ -1810,9 +1810,14 @@ function buildStyle() {
         'line-style': 'dotted',
         'width': 2,
         'line-color': '#8b95a6',
+        'target-arrow-color': '#8b95a6',
+        'source-arrow-color': '#8b95a6',
         'opacity': 0.75,
-        'target-arrow-shape': 'none',
-        'source-arrow-shape': 'none',
+        // 2026-08-31 — the arrow SHAPES are set inline by showRouteToPartner, per
+        // edge, because which end carries the head depends on the direction of
+        // TRAVEL and an edge's own source/target come from the database. The same
+        // reason the next-step arrow sets its own — and the same bug if it does
+        // not: heads landing on the node you came from.
       }
     },
     {
@@ -2937,6 +2942,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       path.nodes().show();
       path.edges().show().addClass('bridge-edge');
       path.nodes().forEach(pn => { if (pn.id() !== from.id()) bridgeIds.add(pn.id()); });
+
+      // EVERY hop gets an arrowhead, pointing the way to them. A dijkstra path
+      // comes back in walk order — node, edge, node, edge, … — so the node
+      // FOLLOWING an edge is the direction of travel across it, whatever the
+      // edge's own orientation in the database happens to be.
+      const els = path.toArray();
+      for (let i = 1; i < els.length; i += 2) {
+        const e = els[i], onward = els[i + 1];
+        if (!e || !e.isEdge || !e.isEdge() || !onward) continue;
+        const headAtTarget = e.target().id() === onward.id();
+        e.style({
+          'target-arrow-shape': headAtTarget ? 'triangle' : 'none',
+          'source-arrow-shape': headAtTarget ? 'none' : 'triangle',
+        });
+      }
       // The shadow brightens toward them: RING_ROUTE_MIN at the node you are
       // leaving, one even step per hop, reaching the ordinary remote strength at
       // the far end. The ENDPOINTS still win — your centre is local, theirs is
@@ -2971,7 +2991,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     routeActive = false;
     ROUTE_VIEW_ACTIVE = false;
     clearNextStep();
-    cy.edges('.bridge-edge').removeClass('bridge-edge');
+    cy.edges('.bridge-edge')
+      .removeStyle('target-arrow-shape source-arrow-shape')
+      .removeClass('bridge-edge');
     cy.nodes('.imported-mark').removeClass('imported-mark');
     mergedRemoteIds.clear();
     bridgeIds.clear();
