@@ -262,6 +262,11 @@ const RING_SNAP       = 1.0;    // outer: you are both on it
 // step at each hop until it reaches the ordinary remote strength at the far end.
 // Distance becomes something you can see rather than count.
 const RING_ROUTE_MIN  = 0.2;
+
+// Module scope because applySeqSignals and runLayout live out here while the
+// route state lives inside setupInteractions. Set in exactly two places —
+// showRouteToPartner and exitRouteView — so it cannot drift from routeActive.
+let ROUTE_VIEW_ACTIVE = false;
 const SEL_WIDTH_MUL   = 2;      // their centre widens the OUTER ring
 // 2026-08-31 — yours widens the INNER ring by FOUR, not two. The two rings are
 // not at the same opacity — 0.5 inside against 0.8 outside — so equal multipliers
@@ -1965,9 +1970,13 @@ function buildStyle() {
 // node's hops. `centralNode` is runLayout's parentNode (what expandToNode
 // passes = the tapped node). Cleared first so a prior view's mark doesn't
 // linger. No-op unless the central node is a content TextNode (not a gateway).
-function applySeqSignals(cy, centralNode) {
+function applySeqSignals(cy, centralNode, suppress) {
   cy.edges('.seq-edge').removeClass('seq-edge');
   cy.nodes('.seq-successor').removeClass('seq-successor');
+  // 2026-08-31 — the reading spine is not part of a ROUTE view. A route shows
+  // one thing — how to reach your partner — and a second dotted arrow offering
+  // the next verse is a different conversation happening over the top of it.
+  if (suppress) return;
   if (!centralNode || !centralNode.length) return;
   if (centralNode.data('type') !== 'TextNode' || centralNode.data('gateway')) return;
   const fwd = centralNode.connectedEdges('edge[type="CHILD"]').filter(e =>
@@ -2014,7 +2023,7 @@ function separateCoincidentNodes(nodes, skipIds) {
 
 function runLayout(cy, parentNode = null) {
   const visible = cy.elements(':visible');
-  applySeqSignals(cy, parentNode);
+  applySeqSignals(cy, parentNode, ROUTE_VIEW_ACTIVE);
   if (visible.nodes().length <= 1) {
     cy.fit(visible.not('.parked-mark, .imported-mark'), fitPadding(cy, 120));
     return;
@@ -2949,6 +2958,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     mergedRemoteIds.add(remoteCurrentId);
     routeActive  = true;
+    ROUTE_VIEW_ACTIVE = true;
     localViewIds = new Set(cy.nodes(':visible').map(n => n.id()));
     runLayout(cy, from);
   }
@@ -2959,6 +2969,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function exitRouteView() {
     if (!routeActive) return;
     routeActive = false;
+    ROUTE_VIEW_ACTIVE = false;
     clearNextStep();
     cy.edges('.bridge-edge').removeClass('bridge-edge');
     cy.nodes('.imported-mark').removeClass('imported-mark');
@@ -4038,7 +4049,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.edges('.bn-edge').removeClass('bn-edge');
   }
 
-  function markBlueEdges(node) {
+  // 2026-08-31 — RETIRED, and this is why the route view had three kinds of edge
+  // on it at once.
+  //
+  // It belongs to blue_node_spec, where the partner's position was a haloed GRAPH
+  // NODE and marking the edges around it said something. Their position is a
+  // RING now, and edges to it are not a signal we use — so this was painting a
+  // third vocabulary nobody was reading.
+  //
+  // Worse, it REVEALED HIDDEN EDGES (`hidden.show()`), which is the same "stray
+  // edges" complaint from two days ago arriving by a route I had not found: the
+  // blanket reveal in applyMergedView was only half of it.
+  //
+  // Kept as an empty function rather than deleted, because two call sites live
+  // in the Blue Node re-assert path that is itself due for retirement.
+  function markBlueEdges(_node) { clearBlueEdges(); }
+
+  function markBlueEdgesRETIRED(node) {
     clearBlueEdges();
     if (!node || !node.length) return;
     // Only when the Blue Node sits where it actually belongs. Parked in a
