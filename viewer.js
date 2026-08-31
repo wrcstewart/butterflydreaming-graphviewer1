@@ -240,6 +240,10 @@ const RING_LOCAL      = 1.0;    // inner: it is in your view
 const RING_REMOTE     = 0.5;    // outer: they can see it
 const RING_REMOTE_CUR = 0.75;   // outer: they are on it
 const RING_SNAP       = 1.0;    // outer: you are both on it
+// The route's shadow: faint at the node you are leaving, brightening by an even
+// step at each hop until it reaches the ordinary remote strength at the far end.
+// Distance becomes something you can see rather than count.
+const RING_ROUTE_MIN  = 0.2;
 const SNAP_WIDTH_MUL  = 1.5;    // and wider, to read as a target
 
 const EDGE_COLOURS = {
@@ -2633,6 +2637,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // declared further down would be a temporal-dead-zone throw waiting for the
   // first caller that runs early enough.
   const bridgeIds       = new Set();
+  // id -> outer-ring opacity along a revealed route. Consulted by
+  // renderMembership rather than painted directly: that pass repaints every
+  // visible node on every change, so anything painted outside it is overwritten
+  // on the next navigation.
+  const routeRamp       = new Map();
   // 2026-08-29 — raised 3 -> 5. The route is now shown INSTEAD of your view
   // rather than added to it, so a longer chain costs nothing: five nodes alone
   // on the canvas is still a simpler picture than any ordinary cluster view.
@@ -2871,12 +2880,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const path = findBridge(from, target);
     mergedRemoteIds.clear();
     bridgeIds.clear();
+    routeRamp.clear();
     cy.elements().hide();
 
     if (path) {
       path.nodes().show();
       path.edges().show().addClass('bridge-edge');
       path.nodes().forEach(pn => { if (pn.id() !== from.id()) bridgeIds.add(pn.id()); });
+      // The shadow brightens toward them: RING_ROUTE_MIN at the node you are
+      // leaving, one even step per hop, reaching the ordinary remote strength at
+      // the far end. The ENDPOINTS still win — your centre is local, theirs is
+      // their centre — so the ramp only really paints what lies between.
+      const ns = path.nodes(), hops = ns.length - 1;
+      if (hops > 0) {
+        const step = (RING_REMOTE - RING_ROUTE_MIN) / hops;
+        ns.forEach((pn, i) => routeRamp.set(pn.id(), RING_ROUTE_MIN + i * step));
+      }
       console.log('[route] showing', path.nodes().length, 'nodes,', path.nodes().length - 1, 'hops');
     } else {
       // No route within the cap. Show the two ends anyway and let the absence of
@@ -2904,6 +2923,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     cy.nodes('.imported-mark').removeClass('imported-mark');
     mergedRemoteIds.clear();
     bridgeIds.clear();
+    routeRamp.clear();
   }
 
   // The ✕ leaves the route, exactly as the Local control does. Kept as a second
@@ -3218,11 +3238,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const id  = n.id();
         const isR = remoteLive &&
                     (remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur);
+        const ramp = routeRamp.get(id);   // undefined unless a route is showing
 
         // Local only: ONE ring, opaque white, thin. Drawn as the outline so it
         // occupies the same band the inner ring would, which means a node
         // gaining an outer ring does not make its inner one move.
-        if (!isR) {
+        // Local only, and not on a revealed route: ONE ring, opaque white, thin.
+        // Drawn as the outline so it occupies the same band the inner ring would,
+        // which means a node gaining an outer ring does not make its inner one
+        // move.
+        if (!isR && ramp === undefined) {
           n.style({
             'border-width': 0,
             'outline-width': HALO_THIN,
@@ -3234,8 +3259,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         }
 
         const isSnap = (id === centralId && id === rCur);
-        const outerOp = isSnap ? RING_SNAP
-                      : (id === rCur ? RING_REMOTE_CUR : RING_REMOTE);
+        const outerOp = isSnap        ? RING_SNAP
+                      : (id === rCur) ? RING_REMOTE_CUR
+                      : (ramp !== undefined) ? ramp
+                      : RING_REMOTE;
         const w = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
 
         // Two bands: yours inside, theirs outside. They OVERLAP by a pixel
