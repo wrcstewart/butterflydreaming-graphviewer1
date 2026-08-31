@@ -262,7 +262,13 @@ const RING_SNAP       = 1.0;    // outer: you are both on it
 // step at each hop until it reaches the ordinary remote strength at the far end.
 // Distance becomes something you can see rather than count.
 const RING_ROUTE_MIN  = 0.2;
-const SEL_WIDTH_MUL   = 2;      // their centre widens the outer ring
+const SEL_WIDTH_MUL   = 2;      // their centre widens the OUTER ring
+// 2026-08-31 — yours widens the INNER ring by FOUR, not two. The two rings are
+// not at the same opacity — 0.5 inside against 0.8 outside — so equal multipliers
+// do not buy equal visibility, and at 2x the inner step was 0.5px to 1px, which
+// the user could barely see. Compensating for the opacity is the principled
+// thing here, not a break in the symmetry.
+const SEL_MUL_IN      = 4;
 // 2026-08-31 — the snap gets 50% more again, so the rare state is not merely one
 // step up from a common one. Derived from SEL_WIDTH_MUL rather than written as 3:
 // the snap should stay proportionally louder than their centre whatever that is
@@ -3286,16 +3292,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // Local control otherwise has to answer in words.
         const isSnap = (id === centralId && id === rCur);
         const wIn = isSnap             ? HALO_THIN * SNAP_WIDTH_MUL
-                  : (id === centralId) ? HALO_THIN * SEL_WIDTH_MUL
+                  : (id === centralId) ? HALO_THIN * SEL_MUL_IN
                   : HALO_THIN;
 
-        // Local only: ONE ring, opaque white, thin. Drawn as the outline so it
-        // occupies the same band the inner ring would, which means a node
-        // gaining an outer ring does not make its inner one move.
-        // Local only, and not on a revealed route: ONE ring, opaque white, thin.
-        // Drawn as the outline so it occupies the same band the inner ring would,
-        // which means a node gaining an outer ring does not make its inner one
-        // move.
+        // Local only, and not on a revealed route: ONE ring. Drawn as the
+        // OUTLINE so it occupies the same band the inner ring would, which means
+        // a node gaining an outer ring does not make its inner one move.
         if (!isR && ramp === undefined) {
           n.style({
             'border-width': 0,
