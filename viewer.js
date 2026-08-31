@@ -181,7 +181,7 @@ const MARK_PREV      = '#6a5b00';
 // 4.5px of band around every node on screen, which was reading as fat. At 1 and 2
 // they still separate — the ratio is what does that, not the absolute size — and
 // the graph gets its air back.
-const HALO_THIN = 1;     // px — the inner ring; the outer is RING_OUTER_MUL times it
+const HALO_THIN = 1;     // px — the base ring width; selected states double it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
@@ -239,28 +239,27 @@ const MARK_ROUTE = '#9FD0FF';
 //
 // Position separates the two rings (inner is the border, outer the outline), so
 // a node can say both things at once without either needing a hue.
+// 2026-08-31 — INVERTED. Yours is the QUIET ring now and theirs the strong one,
+// which puts the weight where the information is: you already know where you
+// are, so the ring with something to tell you should be the louder.
+//
+//   inner, 0.5, 1px            in YOUR view          (reads as grey)
+//   outer, 0.8, 1px            they can see it too
+//   outer, 0.8, 2px            they are ON it        — WIDTH, not opacity
+//   inner 0.5 + outer 1.0, 2px  you are both on it   — the target
+//
+// Their centre differs from their ordinary presence in ONE property, width.
+// Two states that differ in one property read as a scale; differing in two read
+// as two unrelated marks.
 const MARK_RING       = '#ffffff';
-const RING_LOCAL      = 1.0;    // inner: it is in your view
-const RING_REMOTE     = 0.5;    // outer: they can see it
-const RING_REMOTE_CUR = 0.75;   // outer: they are on it
+const RING_LOCAL      = 0.5;    // inner: it is in your view
+const RING_REMOTE     = 0.8;    // outer: they can see it
 const RING_SNAP       = 1.0;    // outer: you are both on it
 // The route's shadow: faint at the node you are leaving, brightening by an even
 // step at each hop until it reaches the ordinary remote strength at the far end.
 // Distance becomes something you can see rather than count.
 const RING_ROUTE_MIN  = 0.2;
-const SNAP_WIDTH_MUL  = 1.5;    // and wider, to read as a target
-// 2026-08-31 — the OUTER ring is THREE times the inner one: 3px against 1.
-//
-// Low opacity and extra width are each other's cure. At 0.5 a thin band is
-// almost invisible without zooming in to check it is there, while a wide one at
-// the same opacity stays quiet — so the partner's ring can be wide and soft
-// where yours is narrow and solid. That contrast in WEIGHT does more work than
-// the opacity difference alone ever did.
-//
-// Went 2 -> 3 after thinning the inner ring to 1px took the outer down with it.
-// The ratio is what separates them, so the multiplier had to grow when the base
-// shrank; they are not independent settings.
-const RING_OUTER_MUL  = 3;
+const SEL_WIDTH_MUL   = 2;      // their centre widens the outer; a snap widens both
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
@@ -3275,26 +3274,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         }
 
         const isSnap = (id === centralId && id === rCur);
-        const outerOp = isSnap        ? RING_SNAP
-                      : (id === rCur) ? RING_REMOTE_CUR
+        const outerOp = isSnap ? RING_SNAP
                       : (ramp !== undefined) ? ramp
                       : RING_REMOTE;
-        const wIn  = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
-        const wOut = wIn * RING_OUTER_MUL;
+        // Their centre widens the OUTER ring; a snap widens both.
+        const wIn  = isSnap ? HALO_THIN * SEL_WIDTH_MUL : HALO_THIN;
+        const wOut = (isSnap || id === rCur) ? HALO_THIN * SEL_WIDTH_MUL : HALO_THIN;
 
         // Two bands: yours inside, theirs outside. They OVERLAP by a pixel
         // rather than abutting — where two separately-stroked paths merely
         // touch, antialiasing leaves a hairline of canvas between them and the
         // eye reads three bands instead of two.
-        // The inner band runs [0, wIn] beyond the body; the outer runs
-        // [wIn-1, wIn-1+wOut]. The one-pixel overlap is deliberate — where two
-        // separately stroked paths merely abut, antialiasing leaves a hairline of
-        // canvas between them and the eye reads three bands instead of two.
+        // 2026-08-31 — the outline runs the WHOLE way out from the body, wIn+wOut
+        // wide, with the border drawn on top of its inner part. The visible bands
+        // are then exactly [0, wIn] for yours and [wIn, wIn+wOut] for theirs.
+        //
+        // This replaces an offset-and-overlap arrangement that had quietly become
+        // wrong at these widths: the border covered part of the outline, so the
+        // visible outer band was a pixel narrower than the number said. Sharing
+        // pixels rather than abutting also removes the hairline of canvas that
+        // antialiasing leaves between two separately stroked paths.
         n.style({
           'border-width': wIn, 'border-position': 'outside',
           'border-color': MARK_RING, 'border-opacity': RING_LOCAL,
-          'outline-width': wOut, 'outline-color': MARK_RING,
-          'outline-opacity': outerOp, 'outline-offset': wIn - 1,
+          'outline-width': wIn + wOut, 'outline-color': MARK_RING,
+          'outline-opacity': outerOp, 'outline-offset': 0,
         });
       });
     });
