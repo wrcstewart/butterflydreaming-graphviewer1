@@ -5607,7 +5607,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     btn.title = full.replace(/\s+/g, ' ');   // the untruncated name, on hover
   }
 
+  // 2026-08-31 — a ROUTE VIEW is not a place to come back to.
+  //
+  // saveState records whatever is visible, and leaving a route by TAPPING a node
+  // clears the route's state while its nodes are still on screen — so the expand
+  // that followed captured the hop diagram as the view Back would restore. The
+  // user spotted it: pressing Back after touring a route brought the route back.
+  //
+  // showRouteToPartner already saved the view you were in BEFORE the route, so
+  // suppressing this one save leaves that on top of the history, which is the
+  // view you actually want returned. The route is transparent to Back rather
+  // than a stop on it.
+  let skipNextSave = false;
+
   function saveState() {
+    if (skipNextSave) { skipNextSave = false; updateBackBtn(); return; }
     const focusEl = activeNodeId ? cy.getElementById(activeNodeId) : null;
     const chipNode = (focusEl && focusEl.length) ? focusEl : lastParentNode;
     history.push({ ids: cy.elements(':visible').map(el => el.id()), parent: lastParentNode, chipNode });
@@ -6636,6 +6650,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // Without this, routeActive and its sets survived every exit except the Back
     // button, so the partner's OLD position kept its blue ring long after they
     // had moved on — which is what the user noticed.
+    //
+    // 2026-08-31 — and the navigation that follows must NOT save the route as
+    // the view to come back to. Set before exitRouteView, since that clears the
+    // flag this reads.
+    // ASSIGNED, not conditionally set: a tap outside a route clears any flag a
+    // previous tap left behind. Without that, a tap that exits a route but does
+    // not navigate — a same-node re-tap under Unified Focus returns early —
+    // would leave the flag armed to eat the next legitimate save.
+    skipNextSave = routeActive;
     exitRouteView();
     advanceOrNavigate(node);
   });
