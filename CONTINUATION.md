@@ -1,4 +1,4 @@
-# Continuation note — 2026-08-30, 17:50 BST
+# Continuation note — 2026-08-31, 11:13 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,11 +10,11 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: 1e33df0 or later
+    git log --oneline -1          # expect: 9bbdbb9 or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=710`, `style.css?v=392`**, canary **red**.
+Current build: **`viewer.js?v=721`, `style.css?v=403`**, canary **blue**.
 Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
 `BD_GRACE_MS=65000` before real use; the server warns at boot).
 
@@ -46,25 +46,58 @@ and is mirrored into the repo as `MEMORY_SNAPSHOT.md`. See `HowToRestore.md`.
 
 ## 3. What the screen means, in one table
 
-| | meaning |
-|---|---|
-| thin yellow ring `#FFD400`, 1.5px | a node in YOUR view |
-| thin blue ring `#4a9bff`, 1.5px | your partner can see it too |
-| **fat turquoise ring `#16CAB8`, 4px** | your partner is ON it |
-| green ring `#50E272`, 8px | you are both on it |
-| solid light-blue arrow `#9FD0FF` | the recommended next step toward them |
-| dotted grey edges | a revealed route (Remote button) |
+**STATE IS ACHROMATIC. Colour belongs to content.** This is the single most
+important thing on the page, and it reversed an earlier decision — see §3a.
 
-**Your own centre is deliberately NOT marked** — you clicked it, and the reading
-panel names it. The rings spend themselves on what you cannot otherwise know.
+Every ring is white; only OPACITY and WIDTH carry meaning.
 
-The three colours are a LADDER in hue *and* luminance: 213/174/134 and
-6.9/9.5/11.7. Do not change one without the others.
+| ring | opacity | width | meaning |
+|---|---|---|---|
+| inner | 0.5 | 0.5px | a node in YOUR view (reads as grey) |
+| outer | 0.8 | 0.5px | your partner can see it too |
+| outer | 0.8 | **1px** | your partner is ON it |
+| inner + outer | 0.5 / **1.0** | **1.5px each** | you are both on it — the target |
+
+Widths come from `HALO_THIN` (0.5) with `SEL_WIDTH_MUL` (2) and
+`SNAP_WIDTH_MUL` (= SEL × 1.5). **They are not independent** — thinning the base
+shrinks everything derived from it, which has silently undone two earlier
+adjustments.
+
+Geometry: the outline runs the whole way from the body, `wIn + wOut` wide, with
+the border drawn over its inner part. So the visible bands are exactly `[0,wIn]`
+yours and `[wIn, wIn+wOut]` theirs, and there is no antialiasing hairline between
+them.
+
+**Your own centre is not marked on the graph.** The Local control names it
+instead — that control shows WHERE YOU ARE, not where Back would take you, and
+pressing it still goes back.
+
+The controls carry the same three strengths as achromatic borders: Local 2px @
+0.5, Remote 2px @ 0.8, Common 3px @ 1.0. Their BACKGROUNDS keep the node's own
+colour, because that is content.
+
+**Route arrow** `#9FD0FF` solid, head on the node to CLICK. **Route shadow**
+ramps 0.2 → 0.8 along the hops, so distance is visible rather than counted.
 
 Card heads say WHO: gold `#8d7900` you, navy `#001f4d` partner, grey `#C9CCD1`
-system. Helper hints share the system grey.
+system (helper hints share the grey).
 
 ---
+
+## 3a. The reversal, and why it matters
+
+`ink_mode.md` says the black bodies exist to FREE COLOUR FOR STATE. **That is no
+longer true and the doc's rationale is superseded.** We went the other way:
+state gave up colour entirely.
+
+The reason, in the user's words, is that colour was doing two unrelated jobs —
+labels use it for CONTENT, rings were using it for STATE — and two vocabularies
+in one channel is confusing however well explained. Needing the explanation was
+the tell.
+
+Ink mode is still right, but for the OTHER two reasons: transparent bodies stop
+nodes occluding each other, and moving identity into the label leaves the node's
+outline free for rings.
 
 ## 4. What is unfinished
 

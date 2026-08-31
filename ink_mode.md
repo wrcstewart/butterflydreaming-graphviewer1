@@ -7,6 +7,22 @@ decisions were reached by being wrong first.
 
 ---
 
+## 0. CORRECTION — 2026-08-31
+
+**§1 below is wrong about the purpose.** It says the black bodies exist to free
+colour *for state*. We went the other way: **state gave up colour entirely** and
+is now carried by white rings differing only in opacity and width. Colour belongs
+to content alone.
+
+Ink mode is still right, for the two reasons §1 lists second: transparent bodies
+stop nodes occluding each other, and moving identity into the LABEL leaves the
+node's outline free for rings to use.
+
+Everything in §2's "label palette" and §3's lessons stands. §2's "local halo" is
+superseded — see `remote_view_spec.md`.
+
+---
+
 ## 1. Why it exists
 
 **Colour currently encodes CONTENT** — which family a node belongs to. The

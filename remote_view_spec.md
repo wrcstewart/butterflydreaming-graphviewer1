@@ -2,7 +2,46 @@
 
 **Branch `remote-graph-view`. Designed and BUILT 2026-08-29.**
 
-> ## AS BUILT, 2026-08-30 — read this box and the next one before §1–§6
+> ## SUPERSEDED BY THE ACHROMATIC SCHEME — 2026-08-31
+>
+> **State is achromatic. Colour belongs to content.** Every ring is white; only
+> opacity and width carry meaning. The coloured scheme described in the box
+> below (yellow / blue / turquoise / green) is GONE.
+>
+> | ring | opacity | width | meaning |
+> |---|---|---|---|
+> | inner | 0.5 | 0.5px | a node in YOUR view |
+> | outer | 0.8 | 0.5px | your partner can see it too |
+> | outer | 0.8 | 1px | your partner is ON it |
+> | inner + outer | 0.5 / 1.0 | 1.5px each | you are both on it |
+>
+> **Why**, in the user's terms: colour was doing two unrelated jobs at once —
+> labels use it for CONTENT, rings were using it for STATE — and two
+> vocabularies in one channel are confusing however well explained. Needing the
+> explanation was the tell.
+>
+> This also supersedes `ink_mode.md`'s stated rationale, which was that black
+> bodies FREE COLOUR FOR STATE. Ink mode is still right, for the other two
+> reasons: transparent bodies stop nodes occluding one another, and identity in
+> the label leaves the outline free for rings.
+>
+> Widths derive from `HALO_THIN` via `SEL_WIDTH_MUL` and `SNAP_WIDTH_MUL` and are
+> NOT independent — thinning the base has silently undone two earlier widenings.
+>
+> The controls carry the same three strengths as achromatic borders (2px@0.5,
+> 2px@0.8, 3px@1.0); their backgrounds keep the node's colour, because that is
+> content.
+>
+> Your own centre is not marked on the graph at all. **The Local control names
+> where you ARE**, not where Back would take you, and pressing it still goes back.
+>
+> Also fixed since: nothing published on pairing, so remote rings appeared on one
+> screen and not the other until BOTH users had navigated. `publishCurrentPosition`
+> now runs on pair, and `resetBuddyBar` clears the previous partner's view.
+>
+> ---
+>
+> ## AS BUILT, 2026-08-30 — superseded above, kept for the reasoning
 >
 > The design moved a long way once it was on screen. **Three simplifications,
 > each made after seeing the previous version, and each smaller than the thing
