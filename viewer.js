@@ -5920,23 +5920,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       cy.elements().hide();
       scheduleBlueReassert();
       node.show();
-      // 2026-08-31 — ALL the work's titles, found by SOURCE_TEXT rather than by
-      // following edges.
+      // 2026-08-31 — the work's sections. CONTAINS_SECTION when the graph has
+      // it, source_text otherwise.
       //
-      // CHILD is the linear reading spine — seq n to seq n+1 — and the titles are
-      // simply nodes sitting in that chain (Hardy's are at seq 0, 5, 10, 13). So
-      // the gateway's single CHILD is only the FIRST title; the rest are reachable
-      // one hop at a time along the whole work. Following CHILD from the gateway
-      // therefore showed exactly one section, which is what the user saw.
+      // CHILD is the linear reading spine — seq n to seq n+1 — so a gateway's
+      // CHILD reaches only the FIRST title and the rest are one hop at a time
+      // along the whole work. That is why only one section showed. It also means
+      // "contains this section" was never a relation the graph had: Grimms
+      // expressed it by hanging a second CHILD off its gateway, which conflated
+      // two meanings in one edge type.
       //
-      // A work's sections are a property of the WORK, so that is what to select
-      // on. Sorted by seq, because they are an ordered table of contents rather
-      // than a set.
+      // CONTAINS_SECTION is that relation, named to match CONTAINS_CLUSTER. The
+      // source_text fallback keeps this correct before the edges exist, and for
+      // any work ingested without them.
       const work = node.data('source_text');
-      const titles = work
-        ? cy.nodes('node[type="TextNode"]').filter(n =>
-            n.data('section_title') && n.data('source_text') === work)
-        : cy.collection();
+      const viaEdge = node.outgoers('edge[type="CONTAINS_SECTION"]').targets();
+      const titles = viaEdge.length
+        ? viaEdge
+        : (work
+            ? cy.nodes('node[type="TextNode"]').filter(n =>
+                n.data('section_title') && n.data('source_text') === work)
+            : cy.collection());
       titles.show();
       // Only edges that genuinely exist between what is shown — which is the
       // gateway's link to the first title. The others connect through passages
