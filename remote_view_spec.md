@@ -15,6 +15,31 @@
 > | outer | 0.8 | 1px | your partner is ON it |
 > | inner + outer | 0.5 / 1.0 | 1.5px each | you are both on it |
 >
+> Since then: **your centre thickens the INNER ring (2px), theirs the OUTER
+> (1px)** — whichever ring grows says whose focus it is. Yours takes a bigger
+> multiplier because the inner sits at 0.5 opacity against the outer's 0.8, so
+> equal widths do not buy equal visibility.
+>
+> **THE ROUTE IS CANONICAL.** Both users compute the identical path: distances
+> run from the endpoint with the smaller url, and ties break by url. Without this
+> A→B and B→A returned different shortest paths of equal length, so two people
+> following their own arrows walked different corridors and never met — the
+> convergence idea failing silently. Ties broken by url rather than by traversal
+> order also survives the two graphs having been built up differently, which
+> `addFetchedRows` can cause.
+>
+> **A route view shows ONLY the route.** The reading spine is suppressed while
+> one is showing, and the legacy `bn-edge` marking is retired — three edge
+> vocabularies were being drawn at once, one of them also revealing hidden edges.
+>
+> **Back is transparent to a route**: leaving one by tapping suppresses that
+> navigation's `saveState`, so Back returns the view you were in BEFORE the
+> route. A route is a way of looking, not a place you went.
+>
+> Every hop carries an arrowhead, set PER EDGE from the travel order — an edge's
+> own source/target come from the database and are arbitrary with respect to the
+> journey.
+>
 > **Why**, in the user's terms: colour was doing two unrelated jobs at once —
 > labels use it for CONTENT, rings were using it for STATE — and two
 > vocabularies in one channel are confusing however well explained. Needing the
