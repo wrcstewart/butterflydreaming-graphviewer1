@@ -1,4 +1,4 @@
-# Continuation note — 2026-08-31, 15:48 BST
+# Continuation note — 2026-08-31, 18:41 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,11 +10,11 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: 8c5b7bd or later
+    git log --oneline -1          # expect: ee1538d or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=728`, `style.css?v=410`**, canary **red**.
+Current build: **`viewer.js?v=741`, `style.css?v=423`**, canary **green**.
 Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
 `BD_GRACE_MS=65000` before real use; the server warns at boot).
 
@@ -37,6 +37,7 @@ Two flags gate everything on this branch:
 | What happened on a given day? | `session_notes_2026-08-2*.md`, and this branch's git log |
 | What is every doc, and how far is each built? | `DOCS_INDEX.md`, `PLANNING_REGISTER.md` |
 | How does the graph actually work? | `edge_model.md` — **read before touching layout or edges** |
+| How is a WORK presented — gateway, titles, passages? | **`work_views.md`** |
 
 Memory lives outside git at
 `~/.claude/projects/-Users-williamstewart2-butterflydreaming-graphviewer1/memory/`

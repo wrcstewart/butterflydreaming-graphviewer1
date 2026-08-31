@@ -35,6 +35,7 @@ Keep this updated when a design moves. A stale register is worse than none.
 | `stable_id_spec.md` | 08-21 | **Built** | `nodeId()`, url-keyed ids throughout |
 | `blue_node_spec.md` | 08-21 | **Built** (partly untested) | `showBlueNode`, `renderMarks`, `markBlueEdges` |
 | `edge_model.md` | 08-22 | **Reference** (not a plan) | describes as-built |
+| `work_views.md` | 08-31 | **Reference** (not a plan) | gateway/title/passage views, as-built |
 | `unified_focus_spec.md` | 08-16 | **Built**, default ON | `UNIFIED_FOCUS` ×5 |
 | `cc-hint-system-spec.md` | 06-12 | **Built, doc stale** | `hint_x_*`, `write_hints` ×9 |
 | `cards_spec.md` | 07-15 | **Built, doc stale** | `createCard`, `card-head` ×23 |
