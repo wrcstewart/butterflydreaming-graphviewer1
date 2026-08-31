@@ -1856,14 +1856,24 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"][?gateway]',
       style: {
-        // 2026-08-31 — a TAG. Gateway, title page and passage were all
-        // round-rectangles, so the three kinds of thing in a work were
-        // indistinguishable by silhouette — and with state now achromatic, shape
-        // is carrying more of the load than it used to.
+        // 2026-08-31 — a RHOMBOID, after a tag proved wrong for a reason worth
+        // recording: a tag is ASYMMETRIC — flat on one side, pointed on the
+        // other — so which face an edge left from depended on where the layout
+        // happened to put the node. The same relationship looked different from
+        // one view to the next.
         //
-        // A tag reads as a label on the outside of something: the front of a
-        // work rather than a part of it, which is what a gateway is.
-        'shape': 'tag',
+        // A rhomboid is symmetric under 180 degrees, so edges attach
+        // consistently however it is placed. It still reads as set apart from
+        // the upright passages, which is the job.
+        //
+        // Dimensions are given explicitly here rather than inherited: a slanted
+        // shape loses usable width to its own lean, so it needs to be longer and
+        // shallower than a passage to hold the same label. Length and depth are
+        // the two numbers to adjust.
+        'shape': 'rhomboid',
+        'width': 150,          // longer than a passage's 120
+        'height': 30,          // and shallower than its 34
+        'text-max-width': '120px',
         'text-transform': 'uppercase',
         'background-color': '#ffffff',
         'background-opacity': 0.85,
