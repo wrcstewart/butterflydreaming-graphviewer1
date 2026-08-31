@@ -5999,8 +5999,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // CHILD explicitly — that created the "click gateway shows no arrow to
     // its TextNodes but click a TextNode shows the arrow to its gateway"
     // asymmetry. Consistent rule: if the relationship exists, show it.
+    //
+    // 2026-08-31 — WITH TWO EXCEPTIONS, because "show every relationship that
+    // exists" produced a moire of lines here rather than information.
+    //
+    // Every passage in this view links to the SAME cluster and to its own title
+    // page, so those two relationships are true of everything on screen: N
+    // passages give 2N lines converging on two points. A fact that holds for
+    // every node distinguishes none of them, and it is not what someone opening
+    // Thomas Hardy is prepared to look at.
+    //
+    // What survives is what varies: the gateway's link to the cluster, and to
+    // its sections. The passages sit as a field to browse.
+    //
+    // KEPT DELIBERATELY: all the passages, not only the titles. Showing titles
+    // alone would be tidier and is the obvious alternative — but then reading
+    // any passage means entering the spine and expanding one at a time, which
+    // is cumbersome, and you lose the ability to scan the set for content and
+    // for OTHER clusters at a glance. The field is worth the untidiness.
+    const HIDE_IN_GATEWAY_VIEW = new Set(['PART_OF', 'CLUSTER_REL']);
     cy.edges().filter(e =>
-      e.source().visible() && e.target().visible()
+      e.source().visible() && e.target().visible() &&
+      !HIDE_IN_GATEWAY_VIEW.has(e.data('type'))
     ).show();
     lastParentNode = lastClusterNode;
     runLayout(cy, lastClusterNode);
