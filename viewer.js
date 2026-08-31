@@ -262,7 +262,12 @@ const RING_SNAP       = 1.0;    // outer: you are both on it
 // step at each hop until it reaches the ordinary remote strength at the far end.
 // Distance becomes something you can see rather than count.
 const RING_ROUTE_MIN  = 0.2;
-const SEL_WIDTH_MUL   = 2;      // their centre widens the outer; a snap widens both
+const SEL_WIDTH_MUL   = 2;      // their centre widens the outer ring
+// 2026-08-31 — the snap gets 50% more again, so the rare state is not merely one
+// step up from a common one. Derived from SEL_WIDTH_MUL rather than written as 3:
+// the snap should stay proportionally louder than their centre whatever that is
+// set to, and a bare literal would silently lose that the next time either moves.
+const SNAP_WIDTH_MUL  = SEL_WIDTH_MUL * 1.5;
 
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
@@ -3281,8 +3286,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                       : (ramp !== undefined) ? ramp
                       : RING_REMOTE;
         // Their centre widens the OUTER ring; a snap widens both.
-        const wIn  = isSnap ? HALO_THIN * SEL_WIDTH_MUL : HALO_THIN;
-        const wOut = (isSnap || id === rCur) ? HALO_THIN * SEL_WIDTH_MUL : HALO_THIN;
+        const wIn  = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
+        const wOut = isSnap        ? HALO_THIN * SNAP_WIDTH_MUL
+                   : (id === rCur) ? HALO_THIN * SEL_WIDTH_MUL
+                   : HALO_THIN;
 
         // Two bands: yours inside, theirs outside. They OVERLAP by a pixel
         // rather than abutting — where two separately-stroked paths merely
