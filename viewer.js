@@ -3719,7 +3719,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       ? (remoteAhead ? '\u2191' : '\u2193') + remoteSeq
       : ((hopDistance && hopDistance > 1) ? String(hopDistance) : '');
     paintNodeButton(bnBtn, n, suffix, 'Remote:');
-    bnBtn.style.borderColor = MARK_BLUE;      // remote, in the mark vocabulary
     // §2 — the partner left: dim, do not remove. They are still where they were.
     // And dim when you are ALREADY on their node: clicking then jumps you to
     // where you already stand, which is correctly a no-op but was a silent one,
@@ -3808,7 +3807,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     btn.classList.toggle('visible', show);
     if (!show) return;
     paintNodeButton(btn, n, gnStack.length > 1 ? String(gnStack.length) : '', 'Common:');
-    btn.style.borderColor = MARK_GREEN;
   }
   const gnBtnEl = document.getElementById('gn-btn');
   if (gnBtnEl) gnBtnEl.addEventListener('click', cycleGn);
@@ -5478,8 +5476,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     backBtn.classList.toggle('visible', show);
     if (!show) return;
 
+    // 2026-08-31 — the border is left to the stylesheet now. It carries STATE,
+    // achromatically, exactly as the rings do; only the background still takes a
+    // colour, because that is the node's CONTENT.
     paintNodeButton(backBtn, here, '', 'Local:');
-    backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
     // Dimmed when there is nowhere to go back TO, so the readout survives while
     // the action's availability stays honest — the same treatment the Remote
     // control gets when you are already standing on its node.

@@ -162,7 +162,7 @@ html, body {
      it goes rather than only that going back is possible. These are the
      fallback for the parentless case, where the arrow stands alone. */
   background: var(--bd-gold);
-  border: 1px solid #a07820;
+  border: 2px solid rgba(255,255,255,0.5);   /* LOCAL — quiet; see the block below */
   border-radius: 4px;
   color: #1a1a20;
   /* Was 18px/700 for a lone arrow. A label needs to be readable without the
@@ -196,7 +196,7 @@ html, body {
   right: 8px;
   z-index: 10;
   background: var(--bd-gold);
-  border: 2px solid #4a9bff;
+  border: 2px solid rgba(255,255,255,0.8);   /* REMOTE — the one with something to say */
   border-radius: 6px;
   color: #1a1a20;
   font-size: 13px;
@@ -222,7 +222,7 @@ html, body {
   left: 8px;
   z-index: 10;
   background: var(--bd-gold);
-  border: 2px solid #1bbb40;
+  border: 3px solid rgba(255,255,255,1);     /* COMMON — thicker AND opaque, as a snap is */
   border-radius: 6px;
   color: #1a1a20;
   font-size: 13px;
@@ -251,7 +251,7 @@ html, body {
   height: 44px;
   box-sizing: border-box;
   background: #1a1a20;
-  border: 2px solid #4a9bff;
+  border: 2px solid rgba(255,255,255,0.5);   /* an action, so it takes the quiet border */
   border-radius: 6px;
   color: #cfd6e0;
   font-size: 15px;
@@ -408,6 +408,19 @@ html, body {
   overflow: hidden;
 }
 #back-btn.visible, #bn-btn.visible, #gn-btn.visible { display: flex; }
+
+/* 2026-08-31 — THE CONTROLS SPEAK THE RINGS' LANGUAGE. Their borders carry STATE
+   and are achromatic, at the three strengths the graph uses:
+
+     Local    2px @ 0.5   quiet — you already know where you are
+     Remote   2px @ 0.8   the one with something to tell you
+     Common   3px @ 1.0   thicker and opaque, as a snap is on the graph
+
+   The blue and green borders are gone with the graph colours they matched.
+
+   BACKGROUNDS are deliberately untouched and still take the node's own colour,
+   because that is CONTENT — the whole distinction the achromatic move was for.
+   A control that stands for a node should still look like that node. */
 
 .btn-role {
   display: block;
@@ -1065,7 +1078,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
