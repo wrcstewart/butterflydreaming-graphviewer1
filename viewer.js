@@ -3357,6 +3357,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (bn && bn.length) applyBlueFill(bn);
     updateBnBtn();      // the corner controls track the same state as the halos
     updateGnBtn();
+    // 2026-08-31 — the Local control names the current node now, so it has to be
+    // repainted whenever that changes, not only when the history does.
+    // expandToCluster marks the node AFTER calling saveState, so driving it from
+    // saveState alone left the readout one navigation behind in that view.
+    try { updateBackBtn(); } catch (_) {}
     const clearBtn = document.getElementById('clear-merge-btn');
     if (clearBtn) clearBtn.classList.toggle('visible', routeActive);
   }
@@ -5424,25 +5429,32 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function updateBackBtn() {
-    const has = history.length > 0;
-    backBtn.classList.toggle('visible', has);
-    if (!has) return;
+    // 2026-08-31 — this names WHERE YOU ARE, not where Back would take you.
+    //
+    // The graph stopped marking your own centre when the rings went achromatic,
+    // on the reasoning that you had just clicked it and the reading panel names
+    // it anyway. In practice that left nothing to glance at — and the button was
+    // naming a DIFFERENT node, which is what made the behaviour confusing.
+    //
+    // Pressing it still goes back, so the label and the action disagree. That is
+    // accepted deliberately: the back behaviour is learned in a few presses,
+    // while "where am I" is asked constantly. The arrow is dropped for the same
+    // reason — a left arrow after the name would claim the name was the
+    // destination.
+    const here = (lastReadNodeId && lastReadNodeCy === cy)
+      ? cy.getElementById(lastReadNodeId) : null;
+    const show = !!(here && here.length);
+    backBtn.classList.toggle('visible', show);
+    if (!show) return;
 
-    const dest = history[history.length - 1].chipNode;
-    if (!dest || !dest.length) {           // parentless view — plain arrow, as before
-      // Clear only what the DESTINATION set, not the whole style attribute.
-      // (This guarded a placement written by JS; the buttons are flex children
-      // of #bd-toppanel now, so nothing else lives in their inline style — but
-      // targeted clearing is still the correct habit.)
-      backBtn.textContent = '\u2190';   // clears both spans as well
-      backBtn.style.background = backBtn.style.color = backBtn.style.borderColor = '';
-      backBtn.style.borderRadius = '';
-      backBtn.removeAttribute('title');
-      return;
-    }
-
-    paintNodeButton(backBtn, dest, '\u2190', 'Local:');
+    paintNodeButton(backBtn, here, '', 'Local:');
     backBtn.style.borderColor = 'rgba(0,0,0,0.55)';
+    // Dimmed when there is nowhere to go back TO, so the readout survives while
+    // the action's availability stays honest — the same treatment the Remote
+    // control gets when you are already standing on its node.
+    const canGoBack = history.length > 0;
+    backBtn.style.opacity = canGoBack ? '' : '0.45';
+    backBtn.style.cursor  = canGoBack ? 'pointer' : 'default';
   }
 
   // Shared by every corner control, so PN, BN and GN cannot drift apart in
