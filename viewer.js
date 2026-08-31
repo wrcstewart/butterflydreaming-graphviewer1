@@ -217,6 +217,31 @@ const REMOTE_HALO_REST    = 0.9;
 // Only the edge and its head take this. Every node halo keeps MARK_BLUE.
 const MARK_ROUTE = '#9FD0FF';
 
+// 2026-08-31 — STATE IS ACHROMATIC. The rings are white; only their OPACITY,
+// WIDTH and POSITION carry meaning.
+//
+// The user's judgement, and it is the sharpest simplification yet: colour was
+// doing two unrelated jobs at once — the labels use it for CONTENT (which family
+// a node belongs to) and the rings were using it for STATE (whose view it is in).
+// Two vocabularies in one channel is confusing however well it is explained, and
+// the explanation is itself the tell.
+//
+// So content keeps colour and state gives it up. One white, and:
+//
+//   inner ring, opaque          this is in YOUR view
+//   outer ring, 0.5             your partner can see it too
+//   outer ring, 0.75            your partner is ON it
+//   outer ring, opaque, x1.5    you are both on it — the target
+//
+// Position separates the two rings (inner is the border, outer the outline), so
+// a node can say both things at once without either needing a hue.
+const MARK_RING       = '#ffffff';
+const RING_LOCAL      = 1.0;    // inner: it is in your view
+const RING_REMOTE     = 0.5;    // outer: they can see it
+const RING_REMOTE_CUR = 0.75;   // outer: they are on it
+const RING_SNAP       = 1.0;    // outer: you are both on it
+const SNAP_WIDTH_MUL  = 1.5;    // and wider, to read as a target
+
 const EDGE_COLOURS = {
   CHILD:         '#4A8C4F',
   CONTAINS:      '#444444',
@@ -1351,9 +1376,12 @@ function buildStyle() {
         // rather than painted per node: clearMarksFrom strips inline outline-*,
         // so a node that stops being marked falls back to this by itself
         // instead of needing to be repainted.
+        // 2026-08-31 — the resting fallback follows the achromatic scheme too,
+        // so a node that has never been through renderMembership still shows the
+        // right ring rather than an amber one from the old vocabulary.
         'outline-width': HALO_THIN,
-        'outline-color': MARK_LOCAL,
-        'outline-opacity': LOCAL_HALO_REST,
+        'outline-color': MARK_RING,
+        'outline-opacity': RING_LOCAL,
         'outline-offset': 0,
         'overlay-padding': 10,
       }
@@ -3182,73 +3210,43 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const rPrev = remoteLive ? remotePrevId    : null;
     const dim = 1;
 
-    const tier       = (id, cur) => id === cur ? LOCAL_HALO_CURRENT  : LOCAL_HALO_REST;
-    const remoteTier = (id, cur) => id === cur ? REMOTE_HALO_CURRENT : REMOTE_HALO_REST;
-    // 2026-08-30 — ONLY THEIR CENTRE IS FAT. Yours is no longer signalled at all.
-    //
-    // The user's reasoning, and it holds: you just clicked it, so you know where
-    // you are — and where you did not click it (Back, leaving a route view, a
-    // resize re-framing the graph) the READING PANEL NAMES IT, in words, more
-    // precisely than a ring could. Its only other use was to say "clicking again
-    // achieves nothing", which is not worth a channel.
-    //
-    // So the rings spend themselves entirely on what you cannot otherwise know:
-    // where your partner is.
-    const widthOf    = id => (id === rCur) ? HALO_FAT : HALO_THIN;
-
+    // 2026-08-31 — the tier and width helpers are gone with the colour scheme.
+    // Opacity is now chosen inline from three named constants and width from
+    // one, so there is nothing left to look up.
     cy.batch(() => {
       cy.nodes(':visible').forEach(n => {
         const id  = n.id();
-        // It is visible, so it is yours. Their view is consulted only to decide
-        // whether to ADD the blue ring.
         const isR = remoteLive &&
                     (remoteViewIds.has(id) || mergedRemoteIds.has(id) || id === rCur);
 
-        const lOp = tier(id, centralId);
-        const rOp = remoteTier(id, rCur) * dim;
-
-        // The Snap: you are both ON this node. ONE green ring, not two — two
-        // rings say "two marks that coincide", one says "a shared position".
-        if (isR && id === centralId && id === rCur) {
-          n.style({ 'border-width': 0, 'outline-width': 8, 'outline-color': MARK_GREEN,
-                    'outline-opacity': 0.9, 'outline-offset': 0 });
-          return;
-        }
-
-        const w = widthOf(id);
-
-        if (isR) {
-          // 2026-08-30 — ONE RING, blue. The amber inner band is gone: blue only
-          // ever appears on a node that is already on your screen, so "this is
-          // also yours" was information the node's presence had already given.
-          //
-          // It does shift what amber MEANS — from the ground everything wears, to
-          // "yours alone", with blue meaning "yours and theirs". Coherent, but a
-          // different idea rather than a tidier version of the same one, and
-          // worth knowing it was chosen rather than inherited.
+        // Local only: ONE ring, opaque white, thin. Drawn as the outline so it
+        // occupies the same band the inner ring would, which means a node
+        // gaining an outer ring does not make its inner one move.
+        if (!isR) {
           n.style({
             'border-width': 0,
-            'outline-width': w,
-            // Their CENTRE takes the turquoise; everything else they can see
-            // stays blue. Colour and width now say the same thing twice, which
-            // is deliberate — width alone was carrying it.
-            'outline-color': (id === rCur) ? MARK_TURQ : MARK_BLUE,
-            'outline-opacity': rOp,
+            'outline-width': HALO_THIN,
+            'outline-color': MARK_RING,
+            'outline-opacity': RING_LOCAL,
             'outline-offset': 0,
           });
           return;
         }
 
-        // Local only: one amber ring, in the same place the border would have
-        // been. Every branch sets every property it depends on — .style() is
-        // inline and persists, so a node that has been through the branch above
-        // keeps its border until something explicitly clears it.
+        const isSnap = (id === centralId && id === rCur);
+        const outerOp = isSnap ? RING_SNAP
+                      : (id === rCur ? RING_REMOTE_CUR : RING_REMOTE);
+        const w = isSnap ? HALO_THIN * SNAP_WIDTH_MUL : HALO_THIN;
+
+        // Two bands: yours inside, theirs outside. They OVERLAP by a pixel
+        // rather than abutting — where two separately-stroked paths merely
+        // touch, antialiasing leaves a hairline of canvas between them and the
+        // eye reads three bands instead of two.
         n.style({
-          'border-width': 0,
-          'outline-width': w,
-          'outline-color': MARK_LOCAL,
-          'outline-opacity': lOp,
-          'outline-offset': 0,
+          'border-width': w, 'border-position': 'outside',
+          'border-color': MARK_RING, 'border-opacity': RING_LOCAL,
+          'outline-width': w, 'outline-color': MARK_RING,
+          'outline-opacity': outerOp, 'outline-offset': w - 1,
         });
       });
     });
