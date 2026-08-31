@@ -1836,6 +1836,10 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"][?section_title]',
       style: {
+        // A clipped plate — still rectangular, so it reads as kin to the
+        // passages it introduces, but cut corners mark it as the heading rather
+        // than one of them. With the italic label it is now distinct twice over.
+        'shape': 'cut-rectangle',
         'background-color': '#cccccc',
         'color': '#1a1a1a',
         // 2026-08-16 — keep the pinned title fully tappable even in a dense
@@ -1852,6 +1856,14 @@ function buildStyle() {
     {
       selector: 'node[type="TextNode"][?gateway]',
       style: {
+        // 2026-08-31 — a TAG. Gateway, title page and passage were all
+        // round-rectangles, so the three kinds of thing in a work were
+        // indistinguishable by silhouette — and with state now achromatic, shape
+        // is carrying more of the load than it used to.
+        //
+        // A tag reads as a label on the outside of something: the front of a
+        // work rather than a part of it, which is what a gateway is.
+        'shape': 'tag',
         'text-transform': 'uppercase',
         'background-color': '#ffffff',
         'background-opacity': 0.85,
