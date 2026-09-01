@@ -731,8 +731,19 @@ body:not(.edit-active):not(.player-active) #action-bar {
    throughout — body backgrounds are very dark so the head reads as a
    distinct stripe. Local takes the brighter yellow (user's compose
    area should stand out); system fades back to the dimmer green. */
-.card.local    .card-head { background: #8d7900; }   /* 2026-08-25 — same gold as #cy-you and the selection ring; inherits white text at 4.3:1 */
-.card.received .card-head { background: #001f4d; }   /* dark navy, matches #cy-buddy breadcrumb */
+/* 2026-09-01 — the heads now speak the RINGS' language, achromatically. Colour
+   had been saying "whose voice" here, which is the job it gave up on the graph;
+   the local gold was also matched to a selection ring that no longer exists.
+
+     local     mid grey, black text    quiet — the ring at 0.5, as a solid
+     remote    white, black text       strong — the ring at 0.8, likewise
+     helper    very dark, white text   neither of you, and recedes
+
+   #8A8A8A rather than a true half-white #808080: that composites correctly but
+   gives only 4.4:1 against the dark text, just under AA. This reads as the same
+   grey at 5.0:1. */
+.card.local    .card-head { background: #8A8A8A; color: #1a1a20; }
+.card.received .card-head { background: #ffffff; color: #1a1a20; }
 /* 2026-07-16 — system card head now uses the Root-node fill colour
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
    on bright yellow fails luminance contrast (see [[user-colour-vision]]).
@@ -744,7 +755,7 @@ body:not(.edit-active):not(.player-active) #action-bar {
    Grey is the honest answer: the system is neither of you, and a neutral says
    that without needing a colour of its own. 10.8:1 against the dark text. */
 #chat-stack .card.system .card-head,
-#current-stack .card.system .card-head { background: #C9CCD1; color: #1a1a20; }
+#current-stack .card.system .card-head { background: #232329; color: #ffffff; }
 
 .card-body {
   width: 100%;
@@ -797,7 +808,9 @@ body:not(.edit-active):not(.player-active) #action-bar {
   text-align: center;
   margin-top: 4px;
 }
-/* 2026-08-30 — the helper's grey, not amber. These hints ARE the system
+/* 2026-08-30 — the helper's grey, not amber. (2026-09-01: the head behind it is
+   now very dark, so this grey sits on dark rather than on light — still the
+   system's voice, still distinct from the amber it replaced.) These hints ARE the system
    speaking ("Tap the ButterflyDreaming node below..."), so they belong to the
    same voice as the header above them. Amber made them read as a local mark
    living inside a system card — and now that the graph's local ring is a strong
@@ -1078,7 +1091,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
+  border: 2px solid #c02020;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

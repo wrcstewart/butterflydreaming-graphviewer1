@@ -4989,6 +4989,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     const card = createCard({ kind: 'system', label });
     if (!card || !card.body) return;
+
+    // 2026-09-01 — the node's OWN colour on the title, so a reading card says
+    // what you are reading as well as that you are reading. A plain passage takes
+    // white: its label on the graph is grey body-text, and there is no identity
+    // colour to echo. Everything else — cluster, family, gateway, title page —
+    // wears the colour it wears on the canvas, inkified, since the stored blend
+    // is far too dark to read on the dark head.
+    try {
+      const lbl = card.el && card.el.querySelector('.card-head-label');
+      if (lbl && node && node.data) {
+        const isPlainPassage = node.data('type') === 'TextNode' &&
+                               !node.data('gateway') && !node.data('section_title');
+        lbl.style.color = isPlainPassage
+          ? '#ffffff'
+          : inkify(node.data('colour'), node.data('inkPurity'));
+      }
+    } catch (_) {}
     // Tag every chunk card so it stands out in DOM inspection. Uniform
     // stack contrast (top = 1.0, others = 0.7) is now handled by
     // refreshCardOpacities in createCard — no per-chunk override needed.
