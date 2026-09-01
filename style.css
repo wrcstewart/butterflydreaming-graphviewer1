@@ -735,14 +735,18 @@ body:not(.edit-active):not(.player-active) #action-bar {
    had been saying "whose voice" here, which is the job it gave up on the graph;
    the local gold was also matched to a selection ring that no longer exists.
 
-     local     mid grey, black text    quiet — the ring at 0.5, as a solid
+     local     mid grey, WHITE text    quiet — the ring at 0.5, as a solid
      remote    white, black text       strong — the ring at 0.8, likewise
      helper    very dark, white text   neither of you, and recedes
 
-   #8A8A8A rather than a true half-white #808080: that composites correctly but
-   gives only 4.4:1 against the dark text, just under AA. This reads as the same
-   grey at 5.0:1. */
-.card.local    .card-head { background: #8A8A8A; color: #1a1a20; }
+   Local keeps WHITE text, so it and the helper both speak in white and only
+   remote inverts — which is the one that should stand out.
+
+   #707070, not the half-white #808080 the ring literally composites to: white on
+   #808080 is 3.9:1, below AA. #707070 is 5.0:1 and reads as the same mid grey.
+   The grey had to move because the TEXT colour was chosen first — legibility
+   decides, then the shade gets as close to the ring as it can. */
+.card.local    .card-head { background: #707070; color: #ffffff; }
 .card.received .card-head { background: #ffffff; color: #1a1a20; }
 /* 2026-07-16 — system card head now uses the Root-node fill colour
    (#FFD700, bright gold). Dark text (#1a1a20) required — white text
@@ -1091,7 +1095,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c02020;             /* CANARY — red (was blue) */
+  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
