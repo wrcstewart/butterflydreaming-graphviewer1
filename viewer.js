@@ -5120,6 +5120,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
       if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
+      // 2026-09-01 — Root boot, when Root's FIRST chunk is also its LAST.
+      //
+      // The reveal-Settling rule at the bottom of this function only runs on
+      // the chunk-advance path, which needs a second tap. That was fine while
+      // Root's text was two chunks. Now that it is one, the fresh tap returns
+      // here and the rule below can never fire — leaving Root a dead end with
+      // a card telling you to tap a node that was never shown. Same rule, both
+      // ends of the function; keep them together if either changes.
+      if (isRoot && isLast && hasNavDescendants(node)) navigateInto(node);
       return;
     }
 
