@@ -56,13 +56,13 @@ Tap for next message from me.
 
 @helper name: helper-nav-hint
 @helper title: Navigation gesture
-@helper trigger: boot — sent as the LAST card of the sequence when the user single-taps Root after the how-to. Its trailing "Tap once more to choose next node" is the exit cue (2026-07-24: double-tap gesture retired — a single tap past the last chunk of a node with descendants now navigates).
+@helper trigger: boot — sent as the LAST card of the sequence when the user single-taps Root after the how-to. (2026-07-24: double-tap gesture retired. 2026-09-01: the tap-again rhythm retired outright — under UNIFIED_FOCUS a node opens its text and its connections on ONE tap, so the old trailing "Tap once more to choose next node" exit cue described a gesture that does nothing. Replaced with the Local-button retrace line.)
 @helper url: butterflydreaming.org/n/a50dbc87-45d8-4356-9bbd-54fc6597ff6b
 @flag update_this: false
 
-Every tap on a node reveals the next message about it. When you reach a message that ends "Tap once more to choose next node", one more tap navigates onward.
+Every tap on a node opens its text and shows what it connects to, together. There is no second tap to make.
 
-Tap once more to choose next node.
+To retrace your steps, click the Local button above the graph.
 
 ---
 

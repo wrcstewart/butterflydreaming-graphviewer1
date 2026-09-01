@@ -500,22 +500,38 @@ function renderTextWithHighlights(container, text) {
   }
 }
 
-function getChunkHint(isLast, hasDescendants, node) {
-  if (!isLast) return CHUNK_HINT_MORE;
+// 2026-09-01 — the tap-again hints are suppressed under UNIFIED_FOCUS.
+//
+// A non-Root node now expands its neighbourhood on the SAME tap that opens its
+// text, and advanceOrNavigate returns immediately on any further tap. So every
+// "tap once more" hint named a gesture that no longer does anything: the
+// connected nodes are already on screen, and chunks past the first are
+// unreachable. Suppressed rather than reworded — there is no second gesture to
+// describe, so any wording would be wrong.
+//
+// Two exceptions keep the original strings, because in both the extra tap is
+// still real: Root, whose staged boot advances message by message, and ?uf=0,
+// which restores the old rhythm wholesale.
+function getChunkHint(isLast, hasDescendants, node, isRoot) {
+  const oneTap = UNIFIED_FOCUS && !isRoot;
+  if (!isLast) return oneTap ? '' : CHUNK_HINT_MORE;
   if (hasDescendants) {
     // bd_V* TextNodes (visual-module preview nodes like bd_V_Kolam_1) get
     // a nudge toward the Player toggle since that's the whole point of
-    // arriving here. The standard "Tap once more..." hint alone hides the
-    // fact that a live module is waiting to be tried.
+    // arriving here — the one hint here that was never about tapping the node.
     if (node && node.data) {
       const type = node.data('type');
       const name = node.data('name') || '';
       if (type === 'TextNode' && name.startsWith('bd_V')) {
-        return 'Try the Player (below right) or tap once more to see connected nodes.';
+        return oneTap
+          ? 'Try the Player, below right.'
+          : 'Try the Player (below right) or tap once more to see connected nodes.';
       }
     }
-    return CHUNK_HINT_NAVIGATE;
+    return oneTap ? '' : CHUNK_HINT_NAVIGATE;
   }
+  // A dead end is a fact about the graph rather than an instruction to tap, so
+  // this one survives the change unaltered.
   return CHUNK_HINT_NO_MORE;
 }
 let chatStackEl            = null;    // #chat-stack — History panel (older cards)
@@ -5091,7 +5107,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // learned to double-tap. The `desc` flag steers getChunkHint to
         // the right message ("Tap once more..." vs "no further descendants").
         readingState = { nodeId: nid, chunkIndex: 0, chunks: [{body: '', hint: null}], hasDescendants: nav, cardsByIdx: {} };
-        const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, nav, node), node, 0);
+        const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, nav, node, isRoot), node, 0);
         if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
         // Unified focus: reveal the neighbourhood on the SAME fresh tap.
         if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
@@ -5100,7 +5116,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: nav, cardsByIdx: {} };
       const isLast = chunks.length === 1;
       const c0     = chunks[0];
-      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node), node, 0);
+      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node, isRoot), node, 0);
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
       if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
@@ -5131,7 +5147,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const cn = readingState.chunks[nextIdx];
     const cnCard = insertNodeChunkAsCard(
       cn.body,
-      cn.hint || getChunkHint(isLast, readingState.hasDescendants, node),
+      cn.hint || getChunkHint(isLast, readingState.hasDescendants, node, isRoot),
       node,
       nextIdx
     );
