@@ -5260,7 +5260,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const id        = 'card_' + nextCardSerial;
     nextCardSerial++;
     const serial    = kind === 'local' ? nextLocalSerial++ : null;
-    const card      = { id, kind, serial, volume: 0.85, text: '' };
+    // Starting volume. refreshCardOpacities overrides this as soon as a card
+    // lands in a stack, so it only governs the moment between creation and
+    // placement — but it was 0.85, which made a new card fade UP, and the flicker
+    // read as a rendering fault rather than as an arrival.
+    const card      = { id, kind, serial, volume: 1, text: '' };
 
     const el = document.createElement('div');
     el.className          = 'card ' + kind;
@@ -5344,8 +5348,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     for (let i = 0; i < cards.length; i++) {
       const c = cards[i];
       if (!c.el) continue;
+      // 2026-09-01 — History was 0.6, which took the head colours down with the
+      // text and made the panel read as switched off rather than as past. 0.78
+      // still recedes behind the Current card without the whole panel looking
+      // disabled.
       const inHistory = !!(chatStackEl && chatStackEl.contains(c.el));
-      c.el.style.opacity = inHistory ? '0.6' : '1';
+      c.el.style.opacity = inHistory ? '0.78' : '1';
     }
   }
 
