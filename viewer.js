@@ -1495,20 +1495,26 @@ function buildStyle() {
       }
     },
     {
-      // 2026-08-16 — Gateways navigation-aid node. White square, black
-      // font. Size 42 (+10 % per user 2026-08-16, was 38). Font 9 (bigger
-      // box, small text) so the "Gateways" label fits without truncating.
-      // Still compact (~55 % of the Conversations node's 76 px).
+      // 2026-09-01 — Gateways is now a CHILD OF CONVERSATIONS, alongside the
+      // six Families, so it takes the Family treatment: a 60px circle at 10px
+      // type. It was a 42px square hanging off Settling, deliberately smaller
+      // than everything around it because it was a side-door nav aid. It is a
+      // sibling now, and size is the loudest status signal on the canvas — a
+      // 42px node among 60px ones reads as subordinate whatever the graph says.
+      //
+      // White body and black type are what still distinguish it: every Family
+      // carries a family colour, and Gateways is the one child that is a route
+      // rather than a subject.
       selector: 'node[type="Entry"][name="Gateways"]',
       style: {
-        'shape': 'square',
-        'width': 42,
-        'height': 42,
+        'shape': 'ellipse',
+        'width': 60,
+        'height': 60,
         'background-color': '#ffffff',
         'background-opacity': 1,
         'color': '#000000',
-        'font-size': '9px',
-        'text-max-width': '40px',
+        'font-size': '10px',
+        'text-max-width': '54px',
         'border-width': 1,
         'border-color': '#000000',
         'border-opacity': 1,
@@ -1519,7 +1525,9 @@ function buildStyle() {
       style: {
         'width': 88,
         'height': 76,
-        'shape': 'hexagon',
+        // 2026-09-01 — heptagon, and the seven sides are not decoration: with
+        // Gateways re-parented here it now has exactly seven children.
+        'shape': 'heptagon',
         'text-max-width': '72px',
         'border-width': 2,
         'border-color': function(node) {
@@ -1752,19 +1760,11 @@ function buildStyle() {
         'curve-style': 'bezier',
       }
     },
-    {
-      // 2026-08-16 — the Settling ↔ Gateways nav-aid hop (Gateways
-      // DESCENDS_FROM Settling). Deliberately faint and arrowless so it
-      // reads as an optional side-door, NOT part of the bright main spine.
-      // More specific than the generic DESCENDS_FROM rule above, so it wins.
-      selector: 'edge[type="DESCENDS_FROM"][source_name="Gateways"]',
-      style: {
-        'line-color': '#5a5a5a',
-        'opacity': 0.28,
-        'width': 0.6,
-        'target-arrow-shape': 'none',
-      }
-    },
+    // 2026-09-01 — the faint Settling->Gateways side-door rule is gone with the
+    // hop itself. Gateways now descends from Conversations, so its edge falls
+    // through to the generic DESCENDS_FROM rule above and looks exactly like
+    // the six Family edges beside it. That IS the equal status, on the edge as
+    // much as on the node.
     {
       // 2026-08-16 — GATEWAY_LINK: navigation-aid edges from each
       // gateway TextNode to the Gateways Entry node. Subtle so a fan
@@ -5846,12 +5846,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     btn.append(roleEl, nameEl);
     btn.style.background = colour;
     btn.style.color      = readableInk(colour);
-    // Gateways is the corpus's one square node. Everything else that can reach
-    // a corner is round-rectangle, hexagon or round-triangle, none of which
-    // survive being drawn 20px high — rounding is the honest half of the shape
-    // signal, and the colour carries the rest.
-    btn.style.borderRadius =
-      (node.data('type') === 'Entry' && node.data('name') === 'Gateways') ? '2px' : '6px';
+    // 2026-09-01 — the Gateways special case is gone: it was the corpus's one
+    // square node and is now a circle like the Families, so there is no square
+    // left to signal. Everything that can reach a corner is round in some
+    // degree, and none of those shapes survive being drawn 20px high — rounding
+    // is the honest half of the shape signal, and the colour carries the rest.
+    btn.style.borderRadius = '6px';
     btn.title = full.replace(/\s+/g, ' ');   // the untruncated name, on hover
   }
 
