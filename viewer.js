@@ -500,6 +500,39 @@ function renderTextWithHighlights(container, text) {
   }
 }
 
+// 2026-09-01 — the INVERSE of the two renderers above, for reading a card back
+// as SOURCE rather than as rendered text.
+//
+// Sv used `querySelector('.chunk-text')` and `.textContent`, and both halves of
+// that were lossy. `%%bd_center` renders a SECOND .chunk-text div, so the
+// singular query silently dropped everything after the directive; and
+// `<<yellow>>…<</>>` renders as a span, so textContent dropped the markup. A
+// curator pressing Sv on a node using either feature destroyed it without a
+// word — which is exactly what happened to the Conversations retrace line.
+//
+// If a renderer is ever added here, its inverse belongs beside it.
+function serialiseHighlights(el) {
+  let out = '';
+  el.childNodes.forEach(n => {
+    if (n.nodeType === 3) { out += n.nodeValue; return; }   // 3 = TEXT_NODE
+    const cls = n.classList && Array.from(n.classList).find(c => c.indexOf('hi-') === 0);
+    out += cls ? `<<${cls.slice(3)}>>${n.textContent}<</>>` : n.textContent;
+  });
+  return out;
+}
+
+// Reassemble one card body into chunk source, restoring the %%bd_center split.
+function readChunkBody(bodyEl) {
+  const parts = bodyEl.querySelectorAll('.chunk-text');
+  const pieces = [];
+  parts.forEach(p => {
+    const s = serialiseHighlights(p).trim();
+    if (!s) return;
+    pieces.push(p.classList.contains('chunk-text--center') ? '%%bd_center\n' + s : s);
+  });
+  return pieces.join('\n\n');
+}
+
 // 2026-09-01 — the tap-again hints are suppressed under UNIFIED_FOCUS.
 //
 // A non-Root node now expands its neighbourhood on the SAME tap that opens its
@@ -7169,10 +7202,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       let body, hint;
       if (cardRef && cardRef.body) {
         // Live DOM read — user may have edited these.
-        const textEl = cardRef.body.querySelector('.chunk-text');
         const hintEl = cardRef.body.querySelector('.chunk-hint');
-        body = textEl ? textEl.textContent.trim() : '';
-        hint = hintEl ? hintEl.textContent.trim() : null;
+        body = readChunkBody(cardRef.body);
+        hint = hintEl ? serialiseHighlights(hintEl).trim() : null;
         // Only preserve author-supplied hints; strip auto-injected fallbacks
         // that we don't want round-tripped back into the DB as if authored.
         if (hint === CHUNK_HINT_MORE || hint === CHUNK_HINT_NAVIGATE || hint === CHUNK_HINT_NO_MORE) {
