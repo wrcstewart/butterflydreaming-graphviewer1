@@ -1490,15 +1490,24 @@ function buildStyle() {
     {
       selector: 'node[type="root"]',
       style: {
-        'width': 76,
-        'height': 76,
+        // 2026-09-01 — the node grew so the LABEL could. "ButterflyDreaming" is
+        // a single 17-character word with no break point, so its type size is
+        // capped by the box it has to fit on one line, and at 76px the ceiling
+        // was smaller than the 10px every Entry around it uses — the root read
+        // as the least important node on its own splash.
+        //
+        // 110px gives a 100px text-max-width; 17 characters at 11px is roughly
+        // 93px, which clears it. 11px also puts Root a step ABOVE Settling
+        // rather than below, which is the right order for the two.
+        //
+        // These are load-bearing together: shrink the node and the font must
+        // follow, or the label truncates.
+        'width': 110,
+        'height': 110,
         'background-color': '#FFD700',
         'color': '#000000',
-        // 2026-09-01 — 4px to 6.8px (+70%). "ButterflyDreaming" is a single
-        // 17-character word that cannot wrap, so it has to fit the 70px
-        // max-width on one line: ~58px at this size, which clears it.
-        'font-size': '6.8px',
-        'text-max-width': '70px',
+        'font-size': '11px',
+        'text-max-width': '100px',
         'border-width': 5,
         'border-color': '#90EE90',
       }
