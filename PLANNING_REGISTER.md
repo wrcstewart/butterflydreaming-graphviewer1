@@ -229,4 +229,5 @@ Not a schedule — a list of what has been designed and not built.
 | Desktop docking for media modules | layout spec | `positionExtendPanel` early-returns above 1024px. |
 | Bot authoring flow | `bot_context.md` | Rendering exists; authoring does not. |
 | Blue Node ring seam | `blue_node_spec.md` | Colour problem, not geometry. |
+| Delete stale BARE layout hints | `cc-hint-system-spec.md` | 166 edges (162 DESCENDS_FROM, 3 CLUSTER_REL, 1 CONTAINS). They route views down the wrong `runLayout` branch — three incidents so far. The Cluster reader already ignores them; deleting is a data change. |
 | Selection rule for capped neighbourhoods | brief §5 | Curation/ethics question. Affects 15 of 105 clusters. |

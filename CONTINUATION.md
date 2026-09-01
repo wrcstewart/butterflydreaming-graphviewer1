@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-01, 10:17 BST
+# Continuation note — 2026-09-01, 10:32 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,11 +10,11 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: 4d98946 or later
+    git log --oneline -1          # expect: b0d60be or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=744`, `style.css?v=426`**, canary **green**.
+Current build: **`viewer.js?v=745`, `style.css?v=427`**, canary **blue**.
 Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
 `BD_GRACE_MS=65000` before real use; the server warns at boot).
 
@@ -152,5 +152,10 @@ outline free for rings.
   nodes must move out of its way, fcose has to be told —
   `fixedNodeConstraint`, not a post-hoc `position()`. Post-layout placement is
   right only when the destination is empty space.
+- **Stale BARE hints send a view down the wrong `runLayout` branch.** Three times
+  now. A bare `hint_x` means "positioned in SOME view" and the reader cannot tell
+  which, so it is applied in views it was never about. Anything that must hold
+  for a KIND of view belongs before the branches, not inside one. 166 bare-hint
+  edges remain: 162 `DESCENDS_FROM`, 3 `CLUSTER_REL`, 1 `CONTAINS`.
 - Client console forwards to **`/private/tmp/bd_server.log`**. A second "no
   different" means instrument, not iterate.
