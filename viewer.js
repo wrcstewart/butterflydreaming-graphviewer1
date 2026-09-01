@@ -3664,23 +3664,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                    : (id === rCur) ? HALO_THIN * SEL_WIDTH_MUL
                    : HALO_THIN;
 
-        // Two bands: yours inside, theirs outside. They OVERLAP by a pixel
-        // rather than abutting — where two separately-stroked paths merely
-        // touch, antialiasing leaves a hairline of canvas between them and the
-        // eye reads three bands instead of two.
-        // 2026-08-31 — the outline runs the WHOLE way out from the body, wIn+wOut
-        // wide, with the border drawn on top of its inner part. The visible bands
-        // are then exactly [0, wIn] for yours and [wIn, wIn+wOut] for theirs.
+        // Two bands: yours inside, theirs outside.
         //
-        // This replaces an offset-and-overlap arrangement that had quietly become
-        // wrong at these widths: the border covered part of the outline, so the
-        // visible outer band was a pixel narrower than the number said. Sharing
-        // pixels rather than abutting also removes the hairline of canvas that
-        // antialiasing leaves between two separately stroked paths.
+        // 2026-09-01 — outline-width is wOut, NOT wIn + wOut.
+        //
+        // The previous line assumed the outline runs the whole way out from the
+        // BODY with the border painted over its inner wIn, so that the padding
+        // was hidden. Measured, it is not: with border-position 'outside' the
+        // outline begins at the border's OUTER edge, so the two are laid end to
+        // end and every pixel of that padding became extra WHITE. On your own
+        // centre that made the outer ring 4.0px where the design says 0.8 — five
+        // times too wide, and wider than the 3.2px inner ring it is supposed to
+        // sit against, which inverted the whole signal.
+        //
+        // The measurement, from a node's bounding box: excess over the body came
+        // to border + outline, not max(border, outline). If that ever changes,
+        // this is the number to re-derive — do not reason about it from the
+        // property names.
         n.style({
           'border-width': wIn, 'border-position': 'outside',
           'border-color': MARK_RING, 'border-opacity': RING_LOCAL,
-          'outline-width': wIn + wOut, 'outline-color': MARK_RING,
+          'outline-width': wOut, 'outline-color': MARK_RING,
           'outline-opacity': outerOp, 'outline-offset': 0,
         });
       });
