@@ -1528,6 +1528,18 @@ function buildStyle() {
         'height': 76,
         'shape': 'round-triangle',
         'text-max-width': '70px',
+        // 2026-09-01 — push the label down about one line.
+        //
+        // text-valign:center puts it at the vertical MIDDLE of the bounding
+        // box, and a triangle is only half its width there: 38px across, for a
+        // word that measures about 42px at 10px type. So it overhung the
+        // slanted sides — the same centring that is right for every other shape
+        // is wrong for this one, because the box and the shape disagree.
+        //
+        // 13px down puts it at 67% of the height, where the triangle is ~51px
+        // across, leaving a few px each side. Tied to the font size: raise the
+        // type and this has to go further down, or the word touches again.
+        'text-margin-y': 13,
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
