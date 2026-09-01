@@ -9429,23 +9429,59 @@ async function init() {
   //
   // Debounced: resize fires continuously during a drag, and re-fitting on
   // every event is wasted work. 120ms is short enough to feel live.
+  function resyncCanvas(reason) {
+    try {
+      positionCyEl();
+      cy.resize();
+      cy.fit(cy.elements(':visible').not('.parked-mark, .imported-mark'), fitPadding(cy, 60));
+      reassertMarks();
+      // The bars have their OWN resize listeners, but those fire immediately
+      // while this one is debounced — so positionCyEl re-lays the panes
+      // AFTER the bars have already corrected themselves, leaving them stale
+      // again. Re-sync them last, once everything else has settled.
+      refitBars();
+    } catch (err) { console.warn('[BD] canvas resync failed (' + reason + ')', err); }
+  }
+
   let cyResizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(cyResizeTimer);
-    cyResizeTimer = setTimeout(() => {
-      try {
-        positionCyEl();
-        cy.resize();
-        cy.fit(cy.elements(':visible').not('.parked-mark, .imported-mark'), fitPadding(cy, 60));
-        reassertMarks();
-        // The bars have their OWN resize listeners, but those fire immediately
-        // while this one is debounced — so positionCyEl re-lays the panes
-        // AFTER the bars have already corrected themselves, leaving them stale
-        // again. Re-sync them last, once everything else has settled.
-        refitBars();
-      } catch (err) { console.warn('[BD] resize re-fit failed', err); }
-    }, 120);
+    cyResizeTimer = setTimeout(() => resyncCanvas('window'), 120);
   });
+
+  // 2026-09-01 — the intermittent "everything tiny on first load".
+  //
+  // cy.fit frames content into the size CYTOSCAPE HAS CACHED, not the size the
+  // element currently is. positionCyEl stamps #cy's height during boot, but the
+  // only cy.resize() that follows sits inside the visibleCount === 1 branch of
+  // the boot rAF — so on any path where the element reaches its final size
+  // after that point, cytoscape keeps the earlier, smaller box and fits into
+  // it. The content is then drawn small inside a container that is genuinely
+  // larger, which is exactly the report. Nudging the window fixed it because
+  // the resize handler above calls cy.resize().
+  //
+  // Watching the ELEMENT catches every such settle — a webfont landing, dvh
+  // panels resolving, a panel appearing — without having to guess which of them
+  // is late, or on which platform. That guessing is why this was intermittent.
+  //
+  // The single-root splash is left alone: the boot rAF owns it, and it applies
+  // a deliberate zoom-DOWN afterwards that a plain fit here would undo.
+  const cyElForObserver = document.getElementById('cy');
+  if (cyElForObserver && typeof ResizeObserver === 'function') {
+    let lastCyW = 0, lastCyH = 0, cyRoTimer = null;
+    new ResizeObserver(entries => {
+      const r = entries[0] && entries[0].contentRect;
+      if (!r) return;
+      const w = Math.round(r.width), h = Math.round(r.height);
+      if (w === lastCyW && h === lastCyH) return;   // no real change
+      lastCyW = w; lastCyH = h;
+      clearTimeout(cyRoTimer);
+      cyRoTimer = setTimeout(() => {
+        if (cy.nodes(':visible').length <= 1) return;   // splash: boot rAF owns it
+        resyncCanvas('element');
+      }, 120);
+    }).observe(cyElForObserver);
+  }
 
   // 2026-08-16 — Breadcrumb persistence triggers.
   //   1. Restore right after setupInteractions returns (youCy is live;
