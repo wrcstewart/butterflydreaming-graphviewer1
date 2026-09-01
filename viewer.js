@@ -453,6 +453,19 @@ function extractChunkHint(chunk) {
 // honest fix is to reconsider the BN stack, not to restore the strip.
 const BREADCRUMB_BARS = false;
 
+// 2026-09-01 — the Pair button waits for the Local button.
+//
+// Both live in the top row, and Pair was there from boot: the user could be
+// offered a REMOTE before they had any LOCAL position of their own to share,
+// which is the wrong way round and reads as such. It now unlocks on the first
+// node tap, the same moment Local appears.
+//
+// A LATCH, not a mirror. updateBackBtn's `show` can fall back to false — a
+// route view, or a swapped cy instance — and a Pair button that vanished
+// mid-session, possibly mid-pair, would be a worse fault than one that arrived
+// too early. Once up, it stays up.
+let pairUnlocked = false;
+
 // The control panel's depth, and the canvas's distance from the bottom of the
 // window. 46 is what the two retired strips occupied (23 + 23); 37 is where the
 // local strip's bottom edge was, which is as far down as the canvas can go
@@ -5886,6 +5899,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       ? cy.getElementById(lastReadNodeId) : null;
     const show = !!(here && here.length);
     backBtn.classList.toggle('visible', show);
+
+    // Pair rides on the same signal — see pairUnlocked. This sits ABOVE the
+    // early return so it still runs on the calls where Local has nothing to
+    // show, which are exactly the ones before the first tap.
+    if (show) pairUnlocked = true;
+    const pairBtn = document.getElementById('chat-btn');
+    if (pairBtn) {
+      pairBtn.style.display = pairUnlocked ? '' : 'none';
+      pairBtn.disabled      = !pairUnlocked;
+    }
+
     if (!show) return;
 
     // 2026-08-31 — the border is left to the stylesheet now. It carries STATE,
