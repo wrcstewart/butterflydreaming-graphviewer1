@@ -88,6 +88,14 @@ No Remote Partner currently waiting to pair — to be expected as Butterfly Drea
 
 You have successfully partnered — why not create a new card and send them a "Hello from your Remote" message. Use the New Card button, type the message and then use the Send button. Watch out for a message back!
 
+ABOUT SHARED NAVIGATION … NOT ESSENTIAL TO READ …BUT MAY HELP…
+
+You may notice some white ringed nodes on your graph - these are nodes your partner is also viewing and thick white ring indicates they have selected that node.
+
+The button labelled “Remote” also shows their currently selected node - if this is not currently visible on your graph you can click the button to see a node hop journey to their current selection.
+
+If you both select the same node it appears on the button labelled “Common” and clicking that button allows you to browse any such previous points of synchronisation.
+
 ---
 
 ## partner disconnected
