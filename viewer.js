@@ -184,7 +184,20 @@ const MARK_PREV      = '#6a5b00';
 // 2026-08-31 — 1 -> 0.5. Hairline throughout: the whole assembly came to 2px of
 // band around every node, and at these opacities it did not need the weight.
 // Both rings follow this, so the pair stays in proportion.
-const HALO_THIN = 0.5;   // px — the base ring width; selected states double it (SEL_WIDTH_MUL)
+// 2026-09-01 — 0.5 -> 0.8. At 0.5 the resting ring was under one device pixel
+// once the view zoomed out at all, so the renderer dithered it and the outline
+// broke up rather than reading as a line.
+//
+// The floor cannot be raised on its own: the four widths are one LADDER built
+// off this number — resting 1x, their centre 2x, snap 3x, your centre 4x — so
+// lifting the bottom to where their centre sits would merge two states. Moving
+// the unit moves all four and keeps the spacing, which is the whole reason it
+// is expressed as multipliers. At 0.8 the ladder reads 0.8 / 1.6 / 2.4 / 3.2.
+//
+// 1.0 is the pre-2026-08-31 weight, judged too heavy then; 0.8 is the step
+// between. Change THIS, never the four multipliers, unless the intent really is
+// to alter the spacing between states.
+const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
 // all: with amber and blue both carrying a scale, three levels in two colours
