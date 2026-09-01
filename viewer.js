@@ -2604,14 +2604,47 @@ function runLayout(cy, parentNode = null) {
   } else {
     // force mode — fCoSE from scratch.  If title nodes are present, pin them at
     // the top (and anchor the parent at centre) so they don't drift randomly.
-    const forceConstraint = titlePins.length > 0 && parentNode
-      ? [...titlePins, { nodeId: parentNode.id(),
-                         position: (() => {
-                           const a = cy.container().getBoundingClientRect();
-                           const z = cy.zoom() || 1;
-                           return { x: (a.width/2 - cy.pan().x)/z, y: (a.height/2 - cy.pan().y)/z };
-                         })() }]
-      : [];
+    const centreAt = () => {
+      const a = cy.container().getBoundingClientRect();
+      const z = cy.zoom() || 1;
+      return { x: (a.width/2 - cy.pan().x)/z, y: (a.height/2 - cy.pan().y)/z };
+    };
+
+    // 2026-09-01 — THE SUCCESSOR IS PINNED INTO THE LAYOUT, not moved afterwards.
+    //
+    // It was previously placed on layoutstop, which meant the simulation never
+    // knew about it: everything else was arranged as though the successor were
+    // wherever fcose had put it, and the node was then dropped on top of them.
+    // It collided every time, and no amount of care in the placement could have
+    // helped — the layout was not constrained, it was ignored.
+    //
+    // fixedNodeConstraint is how you actually tell fcose. The other nodes then
+    // resolve around the pinned pair instead of into them. This branch already
+    // had the mechanism for title pins; the successor simply joins it.
+    //
+    // Positions are computed as NUMBERS here. position() hands back a live
+    // reference, so passing one into a constraint would give the layout a value
+    // that moves while it solves.
+    const seqPins = [];
+    if (parentNode && parentNode.length &&
+        parentNode.data('type') === 'TextNode' && !parentNode.data('gateway')) {
+      const succ = parentNode.outgoers('edge[type="CHILD"]').targets()
+        .filter(n => n.data('type') === 'TextNode' && n.visible());
+      if (succ.length === 1) {
+        const c = centreAt();
+        const s = succ.first();
+        seqPins.push({ nodeId: parentNode.id(), position: { x: c.x, y: c.y } });
+        seqPins.push({ nodeId: s.id(),
+                       position: { x: c.x + (parentNode.width() + s.width()) / 2 + 46,
+                                   y: c.y } });
+      }
+    }
+
+    const forceConstraint = seqPins.length
+      ? [...titlePins, ...seqPins]
+      : (titlePins.length > 0 && parentNode
+          ? [...titlePins, { nodeId: parentNode.id(), position: centreAt() }]
+          : []);
     // 2026-08-23 — padding was a hardcoded 60, and fcose's own fit:true is the
     // only fit this branch performs. On a 430x381 phone canvas that gave away
     // 28% of the width and 31% of the height as margin — worse than the
@@ -4140,7 +4173,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // going to move them. Parking a node emits no layout, so this cannot recurse.
   cy.on('layoutstop', () => {
     try { placeGatewayTopPair(); } catch (err) { console.warn('[gateway] top placement failed', err); }
-    try { placeSeqSuccessor();  } catch (err) { console.warn('[seq] successor placement failed', err); }
+
     try {
       reassertBlueNode();
       reassertGreenNode();
@@ -5962,31 +5995,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // other view builder, so the placement cannot leak into a view it was never
   // meant for.
   let gatewayTopPair = null;
-
-  // 2026-09-01 — the successor sits HORIZONTALLY RIGHT of the node you are on,
-  // so the next passage is always in the same place and reading feels like
-  // reading rather than searching.
-  //
-  // Done after the layout, like the gateway pair, and for the same reason:
-  // fcose's relativePlacementConstraint pins an exact offset and flattens every
-  // node sharing an anchor into one row. Moving one node afterwards cannot do
-  // that.
-  //
-  // The offset is derived from both nodes' widths rather than fixed, so it stays
-  // a consistent GAP whatever they are sized to.
-  function placeSeqSuccessor() {
-    const succ = cy.nodes('.seq-successor').filter(n => n.visible());
-    if (succ.length !== 1) return;                 // ambiguous or none — leave it
-    const centre = lastParentNode;
-    if (!centre || !centre.length || !centre.visible()) return;
-    const s = succ.first();
-    if (s.id() === centre.id()) return;
-    // Read the numbers out: position() hands back a LIVE reference, so holding
-    // it and reading later would track the node instead of snapshotting it.
-    const cx = centre.position('x'), cyPos = centre.position('y');
-    const gap = 46;
-    s.position({ x: cx + (centre.width() + s.width()) / 2 + gap, y: cyPos });
-  }
 
   function placeGatewayTopPair() {
     if (!gatewayTopPair) return;
