@@ -1,4 +1,4 @@
-# Continuation note — 2026-08-31, 22:23 BST
+# Continuation note — 2026-09-01, 10:17 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,11 +10,11 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: e396c54 or later
+    git log --oneline -1          # expect: 4d98946 or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=742`, `style.css?v=424`**, canary **blue**.
+Current build: **`viewer.js?v=744`, `style.css?v=426`**, canary **green**.
 Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
 `BD_GRACE_MS=65000` before real use; the server warns at boot).
 
@@ -148,5 +148,9 @@ outline free for rings.
   RECEIVE whitelist. Two of three fails silently.
 - **Whatever runs last decides** — and its mirror: `publishPosition` ran FIRST
   and so reported the view it was leaving.
+- **Placing a node after a layout is NOT a constraint on that layout.** If other
+  nodes must move out of its way, fcose has to be told —
+  `fixedNodeConstraint`, not a post-hoc `position()`. Post-layout placement is
+  right only when the destination is empty space.
 - Client console forwards to **`/private/tmp/bd_server.log`**. A second "no
   different" means instrument, not iterate.

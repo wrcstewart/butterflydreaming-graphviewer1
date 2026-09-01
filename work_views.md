@@ -134,6 +134,38 @@ the per-edge treatment the route arrows use.
 Neither is marked while a route view is showing, and both clear on every layout
 pass, so they cannot linger onto a view whose centre is not a passage.
 
+### The successor sits horizontally right of the centre
+
+So the next passage is always in the same place and reading feels like reading
+rather than searching. The centre and its successor are pinned via fcose's
+**`fixedNodeConstraint`**, so the rest of the neighbourhood resolves AROUND them.
+
+**This was first done the wrong way, and the mistake is the useful part.** The
+successor was moved on `layoutstop` — after the layout. The simulation therefore
+never knew about it: everything else was arranged as though the node were where
+fcose had put it, and it was then dropped on top of them. **It collided every
+time, and no care in the placement could have helped.** The layout was not
+constrained, it was ignored.
+
+> **Placing a node after a layout is not a constraint on that layout.**
+> If other nodes must accommodate it, the layout has to be told — which for
+> fcose means `fixedNodeConstraint`, not a post-hoc `position()`.
+
+This is the opposite lesson from the gateway/cluster pair, which IS placed after
+the layout — and correctly so, because nothing needs to move out of its way: it
+sits above the content, in space nothing else occupies. **Post-layout placement
+is right when you are moving a node into empty space, and wrong when other nodes
+must yield.**
+
+Two details that are easy to get wrong:
+
+- Positions must be handed over as **numbers**. `position()` returns a LIVE
+  reference, so a constraint built from one gives the layout a value that moves
+  while it solves — the trap that made the August layout pins no-ops.
+- Only one mechanism may own a position. The post-layout mover was DELETED
+  rather than kept as a fallback: two writers would fight and the later would win
+  silently.
+
 ### Why the title (snake) view still earns its place
 
 A gateway view shows only the passages matching the filtering cluster. **The
