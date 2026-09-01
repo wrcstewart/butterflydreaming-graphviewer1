@@ -1365,17 +1365,33 @@ io.on('connection', async (socket) => {
           // (h.hint_x etc), we still honour it — writes to bare hint_x/y/
           // scale. Old edges without view-scoped keys keep working via the
           // reader's fallback path.
+          // 2026-09-01 — report what MATCHED, not what was sent.
+          //
+          // This replied `count: msg.hints.length` — the size of the request. A
+          // relId that matches nothing makes `SET r += h.props` a silent no-op,
+          // so a write that stored NOTHING still answered "saved 8" and the
+          // curator only found out on the next reload, with no way to tell a
+          // failed write from a layout that declined to restore.
+          //
+          // The match is directed now for the same reason. `()-[r]-()` returns
+          // every relationship TWICE, once per orientation — verified against
+          // this DB — so an honest count taken from it would have read double.
+          // Every relationship has a direction, so `->` finds them all exactly
+          // once. The doubled SET was harmless (idempotent), which is precisely
+          // why it survived unnoticed.
           const usingProps = msg.hints.length > 0 && msg.hints[0].props;
           const query = usingProps
             ? 'UNWIND $hints AS h ' +
-              'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
-              'SET r += h.props'
+              'MATCH ()-[r]->() WHERE id(r) = toInteger(h.relId) ' +
+              'SET r += h.props RETURN count(r) AS n'
             : 'UNWIND $hints AS h ' +
-              'MATCH ()-[r]-() WHERE id(r) = toInteger(h.relId) ' +
-              'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y, r.hint_scale = h.hint_scale';
-          await s.run(query, { hints: msg.hints });
-          socket.emit('msg', { type: 'write_hints', ok: true, count: msg.hints.length });
-          console.log(`[BD] Hints written: ${msg.hints.length} edges by ${socket.data.userId} (${usingProps ? 'view-scoped' : 'legacy'})`);
+              'MATCH ()-[r]->() WHERE id(r) = toInteger(h.relId) ' +
+              'SET r.hint_x = h.hint_x, r.hint_y = h.hint_y, r.hint_scale = h.hint_scale RETURN count(r) AS n';
+          const res = await s.run(query, { hints: msg.hints });
+          const rawN = res.records.length ? res.records[0].get('n') : 0;
+          const matched = (rawN && typeof rawN.toNumber === 'function') ? rawN.toNumber() : Number(rawN || 0);
+          socket.emit('msg', { type: 'write_hints', ok: true, count: matched, sent: msg.hints.length });
+          console.log(`[BD] Hints written: ${matched}/${msg.hints.length} edges by ${socket.data.userId} (${usingProps ? 'view-scoped' : 'legacy'})`);
         } catch (err) {
           console.error('[BD] write_hints error:', err.message);
           socket.emit('msg', { type: 'write_hints', error: err.message });

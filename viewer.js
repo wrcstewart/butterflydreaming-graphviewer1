@@ -7125,7 +7125,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (h) for (const [k, v] of Object.entries(h.props)) e.data(k, v);
       });
       editModeUnlocked = true;
-      devStatus(`saved ${msg.count}`);
+      // 2026-09-01 — say so when the server matched fewer edges than we sent.
+      // "saved 8" for a write that stored nothing is worse than an error: it
+      // sends the curator away to find out on the next reload.
+      devStatus(msg.sent != null && msg.count !== msg.sent
+        ? `saved ${msg.count} of ${msg.sent} — ${msg.sent - msg.count} not found`
+        : `saved ${msg.count}`);
       // No layout re-run — positions are already correct on screen
     });
     wsNow.emit('msg', { type: 'write_hints', code, hints });
