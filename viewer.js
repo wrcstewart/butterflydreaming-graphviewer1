@@ -4140,6 +4140,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // going to move them. Parking a node emits no layout, so this cannot recurse.
   cy.on('layoutstop', () => {
     try { placeGatewayTopPair(); } catch (err) { console.warn('[gateway] top placement failed', err); }
+    try { placeSeqSuccessor();  } catch (err) { console.warn('[seq] successor placement failed', err); }
     try {
       reassertBlueNode();
       reassertGreenNode();
@@ -5961,6 +5962,31 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // other view builder, so the placement cannot leak into a view it was never
   // meant for.
   let gatewayTopPair = null;
+
+  // 2026-09-01 — the successor sits HORIZONTALLY RIGHT of the node you are on,
+  // so the next passage is always in the same place and reading feels like
+  // reading rather than searching.
+  //
+  // Done after the layout, like the gateway pair, and for the same reason:
+  // fcose's relativePlacementConstraint pins an exact offset and flattens every
+  // node sharing an anchor into one row. Moving one node afterwards cannot do
+  // that.
+  //
+  // The offset is derived from both nodes' widths rather than fixed, so it stays
+  // a consistent GAP whatever they are sized to.
+  function placeSeqSuccessor() {
+    const succ = cy.nodes('.seq-successor').filter(n => n.visible());
+    if (succ.length !== 1) return;                 // ambiguous or none — leave it
+    const centre = lastParentNode;
+    if (!centre || !centre.length || !centre.visible()) return;
+    const s = succ.first();
+    if (s.id() === centre.id()) return;
+    // Read the numbers out: position() hands back a LIVE reference, so holding
+    // it and reading later would track the node instead of snapshotting it.
+    const cx = centre.position('x'), cyPos = centre.position('y');
+    const gap = 46;
+    s.position({ x: cx + (centre.width() + s.width()) / 2 + gap, y: cyPos });
+  }
 
   function placeGatewayTopPair() {
     if (!gatewayTopPair) return;
