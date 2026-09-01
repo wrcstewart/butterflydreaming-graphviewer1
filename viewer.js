@@ -1525,9 +1525,12 @@ function buildStyle() {
       style: {
         'width': 88,
         'height': 76,
-        // 2026-09-01 — heptagon, and the seven sides are not decoration: with
-        // Gateways re-parented here it now has exactly seven children.
-        'shape': 'heptagon',
+        // 2026-09-01 — octagon, and the eight sides are not decoration: six
+        // Families, Gateways, and Settling. Settling is Conversations' PARENT
+        // rather than a child, but expandToNode uses closedNeighborhood(), so
+        // what a user actually sees hanging off this node is eight — and the
+        // shape answers to the view, not to the direction of the edges.
+        'shape': 'octagon',
         'text-max-width': '72px',
         'border-width': 2,
         'border-color': function(node) {
