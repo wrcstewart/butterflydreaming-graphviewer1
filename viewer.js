@@ -2219,6 +2219,38 @@ function runLayout(cy, parentNode = null) {
   const titleNodes = visible.nodes().filter(n => !!n.data('section_title'));
   const titlePins  = [];
 
+  // 2026-09-01 — the successor pin, computed BEFORE the branches so every layout
+  // path can honour it.
+  //
+  // It used to live inside the force branch only, and Zhuangzi 22 and 23 were the
+  // proof that that was wrong: their CLUSTER_REL edges carry BARE hint_x/hint_y
+  // (the pre-2026-07-23 unscoped form), so the hint scan sends those two views
+  // down the preset/hybrid branch, which has its own pin list and never saw the
+  // constraint. Every other passage falls to force and worked.
+  //
+  // "Successor to the right" is a rule of the VIEW, not a preference of one
+  // layout path, so it belongs where all of them can reach it.
+  const seqPins = [];
+  if (parentNode && parentNode.length &&
+      parentNode.data('type') === 'TextNode' && !parentNode.data('gateway')) {
+    const succ = parentNode.outgoers('edge[type="CHILD"]').targets()
+      .filter(n => n.data('type') === 'TextNode' && n.visible());
+    if (succ.length === 1) {
+      const a = cy.container().getBoundingClientRect();
+      const z = cy.zoom() || 1;
+      // NUMBERS, not a live position() reference — a constraint built from one
+      // gives the layout a value that moves while it solves.
+      const cx = (a.width  / 2 - cy.pan().x) / z;
+      const cyy = (a.height / 2 - cy.pan().y) / z;
+      const s = succ.first();
+      seqPins.push({ nodeId: parentNode.id(), position: { x: cx, y: cyy } });
+      seqPins.push({ nodeId: s.id(),
+                     position: { x: cx + (parentNode.width() + s.width()) / 2 + 46, y: cyy } });
+    }
+  }
+  // Anything the seq pins claim wins over a hint for the same node.
+  const seqPinned = new Set(seqPins.map(p => p.nodeId));
+
   // Seq-grid: detect gateway view with un-curated TextNodes that carry seq numbers.
   // section_title nodes are excluded — they go to the top via titlePins.
   const gridNodes = (hintMode === 'force' && parentNode && parentNode.data('type') === 'Cluster')
@@ -2333,7 +2365,11 @@ function runLayout(cy, parentNode = null) {
       idealEdgeLength: 100,
       nodeRepulsion: 4500,
       gravity: 0.25,
-      fixedNodeConstraint: [...pins, ...titlePins],
+      fixedNodeConstraint: [
+        ...pins.filter(p => !seqPinned.has(p.nodeId)),
+        ...titlePins.filter(p => !seqPinned.has(p.nodeId)),
+        ...seqPins,
+      ],
     }).run();
 
   } else if (gridNodes.length > 0) {
@@ -2610,38 +2646,8 @@ function runLayout(cy, parentNode = null) {
       return { x: (a.width/2 - cy.pan().x)/z, y: (a.height/2 - cy.pan().y)/z };
     };
 
-    // 2026-09-01 — THE SUCCESSOR IS PINNED INTO THE LAYOUT, not moved afterwards.
-    //
-    // It was previously placed on layoutstop, which meant the simulation never
-    // knew about it: everything else was arranged as though the successor were
-    // wherever fcose had put it, and the node was then dropped on top of them.
-    // It collided every time, and no amount of care in the placement could have
-    // helped — the layout was not constrained, it was ignored.
-    //
-    // fixedNodeConstraint is how you actually tell fcose. The other nodes then
-    // resolve around the pinned pair instead of into them. This branch already
-    // had the mechanism for title pins; the successor simply joins it.
-    //
-    // Positions are computed as NUMBERS here. position() hands back a live
-    // reference, so passing one into a constraint would give the layout a value
-    // that moves while it solves.
-    const seqPins = [];
-    if (parentNode && parentNode.length &&
-        parentNode.data('type') === 'TextNode' && !parentNode.data('gateway')) {
-      const succ = parentNode.outgoers('edge[type="CHILD"]').targets()
-        .filter(n => n.data('type') === 'TextNode' && n.visible());
-      if (succ.length === 1) {
-        const c = centreAt();
-        const s = succ.first();
-        seqPins.push({ nodeId: parentNode.id(), position: { x: c.x, y: c.y } });
-        seqPins.push({ nodeId: s.id(),
-                       position: { x: c.x + (parentNode.width() + s.width()) / 2 + 46,
-                                   y: c.y } });
-      }
-    }
-
     const forceConstraint = seqPins.length
-      ? [...titlePins, ...seqPins]
+      ? [...titlePins.filter(p => !seqPinned.has(p.nodeId)), ...seqPins]
       : (titlePins.length > 0 && parentNode
           ? [...titlePins, { nodeId: parentNode.id(), position: centreAt() }]
           : []);
