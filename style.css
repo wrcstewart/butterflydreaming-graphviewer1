@@ -8,8 +8,18 @@
      version gave 12.5:1, so nothing becomes hard to read.
 
      Now a variable because this colour appeared in 12 places and the
-     next adjustment should be one line, not 12. */
-  --bd-gold: #BFAC40;
+     next adjustment should be one line, not 12.
+
+     2026-09-01 — and it was one line: lightness 50% -> 46%, hue and
+     saturation untouched, so it is the same gold a touch quieter. 6.4:1
+     against the dark text it carries, down from 7.6:1 and still well clear
+     of 4.5. Asked for on the radio bar and the Pair button; the corner
+     controls and the mic button share the variable and follow, which is
+     right — the three top-row controls are meant to read as one family.
+
+     The ROOT NODE's gold is NOT this: it is #FFD700 in viewer.js, left
+     bright deliberately. Bright is fine on the home page. */
+  --bd-gold: #b09e3b;
 }
 *, *::before, *::after {
   box-sizing: border-box;
@@ -1095,7 +1105,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
