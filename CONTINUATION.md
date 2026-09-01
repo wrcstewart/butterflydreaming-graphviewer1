@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-01, 10:32 BST
+# Continuation note — 2026-09-01, 18:05 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,11 +10,17 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: b0d60be or later
+    git log --oneline -1          # expect: 8131f32 or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=745`, `style.css?v=427`**, canary **blue**.
+Current build: **`viewer.js?v=763`, `style.css?v=444`**, canary **green**.
+
+**Read `session_notes_2026-09-01.md` next** — it covers the whole of 1 Sept:
+chunked presentation retired, Gateways re-parented under Conversations, the
+splash rebuilt, the ring geometry corrected, and three faults in the curation
+write path (one of which was silently destroying node text). Its closing table
+is the live open-items list.
 Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
 `BD_GRACE_MS=65000` before real use; the server warns at boot).
 
