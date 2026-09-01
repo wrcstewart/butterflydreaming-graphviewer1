@@ -1494,7 +1494,10 @@ function buildStyle() {
         'height': 76,
         'background-color': '#FFD700',
         'color': '#000000',
-        'font-size': '4px',
+        // 2026-09-01 — 4px to 6.8px (+70%). "ButterflyDreaming" is a single
+        // 17-character word that cannot wrap, so it has to fit the 70px
+        // max-width on one line: ~58px at this size, which clears it.
+        'font-size': '6.8px',
         'text-max-width': '70px',
         'border-width': 5,
         'border-color': '#90EE90',
@@ -2330,15 +2333,31 @@ function runLayout(cy, parentNode = null) {
     const rect = cy.container().getBoundingClientRect();
     const cx   = rect.width  / 2;
     const positions = {};
-    const nonRoot = visible.nodes().filter(n => n.data('type') !== 'root');
-    visible.nodes().filter(n => n.data('type') === 'root').forEach(n => {
-      positions[n.id()] = { x: cx, y: rect.height * 0.15 };
-    });
+    const rootNodes = visible.nodes().filter(n => n.data('type') === 'root');
+    const nonRoot   = visible.nodes().filter(n => n.data('type') !== 'root');
+
+    // 2026-09-01 — the vertical gap was a FRACTION of the canvas: root at 0.15
+    // of its height, children at 0.40. The nodes are a fixed 76px and 68px, so
+    // on a short canvas that 0.25 fraction collapses toward the nodes' own
+    // diameter and Root ends up all but touching Settling, with no room for the
+    // edge to read as an edge. cy.fit cannot rescue it — fit scales the gap and
+    // the nodes together, so a separation that is not there in model space is
+    // not there at any zoom.
+    //
+    // Derive it from the two node sizes instead, which is what the eye is
+    // actually judging: rim to rim, with a fixed clear span between them.
+    const ROOT_GAP = 96;
+    const rootH  = rootNodes.length ? rootNodes.first().height() : 76;
+    const childH = nonRoot.length   ? nonRoot.first().height()   : 68;
+    const rootY  = rect.height * 0.15;
+    const childY = rootY + rootH / 2 + childH / 2 + ROOT_GAP;
+
+    rootNodes.forEach(n => { positions[n.id()] = { x: cx, y: rootY }; });
     nonRoot.forEach((n, i) => {
       const spread = Math.min(180, rect.width / (nonRoot.length + 1));
       positions[n.id()] = {
         x: cx + (i - (nonRoot.length - 1) / 2) * spread,
-        y: rect.height * 0.40,
+        y: childY,
       };
     });
     visible.layout({ name: 'preset', positions, fit: false }).run();
