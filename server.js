@@ -242,6 +242,57 @@ app.get('/api/module-sibling', async (req, res) => {
 // Node objects: { url, name, text }
 // Edge objects: { from_url, from_name, to_url, to_name, weight }
 //   (from = parent, to = child; DESCENDS_FROM direction is Parent → Child)
+// ---------------------------------------------------------------------------
+// 2026-09-02 — SPEECH, stage 0.
+//
+// Deliberately macOS `say`. The voice is a placeholder and will be replaced by a
+// fine-tuned one; everything AROUND it — the serialiser that strips the render
+// directives, generation at first request, the cache, the lazy per-node fetch,
+// the playback gesture — is the part that has to be right, and none of it cares
+// whose voice comes out. Proving that with a voice already on the machine costs
+// nothing and finds the plumbing faults before anyone spends an hour recording.
+//
+// Swapping in Piper or a fine-tune later is this one exec call.
+const SPEECH_DIR   = './speech_cache';
+const SPEECH_VOICE = process.env.BD_SPEECH_VOICE || 'Daniel';   // en_GB
+const SPEECH_MAX   = 8000;   // characters; a guard, not a policy
+if (!fs.existsSync(SPEECH_DIR)) fs.mkdirSync(SPEECH_DIR, { recursive: true });
+
+app.post('/api/speak', async (req, res) => {
+  const text = (req.body && typeof req.body.text === 'string') ? req.body.text.trim() : '';
+  if (!text) return res.status(400).json({ error: 'no text' });
+  if (text.length > SPEECH_MAX) return res.status(413).json({ error: 'too long' });
+
+  // Keyed on the TEXT, not the node: a node whose text has not changed is never
+  // re-spoken, an edited node regenerates by itself, and two nodes that happen
+  // to share a line share the file. The voice is in the key too, so changing it
+  // does not serve stale audio from the previous one.
+  const key  = crypto.createHash('sha1').update(SPEECH_VOICE + '\u0000' + text).digest('hex');
+  const file = `${SPEECH_DIR}/${key}.m4a`;
+
+  const send = () => res.sendFile(file, { root: __dirname }, err => {
+    if (err) { console.error('[BD] speak send failed:', err.message); }
+  });
+
+  if (fs.existsSync(file)) return send();
+
+  // `say` takes the text on stdin, so nothing about it is shell-interpolated —
+  // node text is curator-authored and can hold anything.
+  const { execFile } = require('child_process');
+  const child = execFile('say', ['-v', SPEECH_VOICE, '-o', file, '--data-format=aac'],
+    { timeout: 60000 }, (err) => {
+      if (err) {
+        console.error('[BD] say failed:', err.message);
+        try { fs.unlinkSync(file); } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ error: 'synthesis failed' });
+        return;
+      }
+      console.log(`[BD] spoke ${text.length} chars -> ${key}.m4a (${SPEECH_VOICE})`);
+      send();
+    });
+  child.stdin.end(text);
+});
+
 app.get('/api/nav-structure', async (req, res) => {
   const session = driver.session({ database: 'memgraph' });
   try {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=444">
+  <link rel="stylesheet" href="style.css?v=445">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -88,6 +88,11 @@
       <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
       <label><input type="radio" name="view-mode" value="player" disabled> Player</label>
       <label><input type="radio" name="view-mode" value="edit"> Edit</label>
+      <!-- 2026-09-02 — speech, stage 0. A checkbox rather than a radio: it is not
+           a view MODE, it rides alongside whichever one is selected. Ticking it
+           is also the user gesture iOS requires before audio may play, so the
+           control that turns speech on is the one that unlocks it. -->
+      <label><input type="checkbox" id="speak-toggle"> Speak</label>
     </span>
   </div>
   <!-- History panel (was the sole chat panel pre-split). Sits BELOW the
@@ -257,6 +262,6 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=763"></script>
+  <script type="module" src="viewer.js?v=764"></script>
 </body>
 </html>

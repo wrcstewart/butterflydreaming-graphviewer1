@@ -547,6 +547,80 @@ function serialiseHighlights(el) {
   return out;
 }
 
+// --- Speech (2026-09-02, stage 0) -----------------------------------------
+//
+// A THIRD representation of node text, after the renderer and the Sv inverse.
+// Same lesson as the Sv bug: every representation needs its own deliberate
+// conversion, and the failure mode of skipping one is silent.
+//
+// Directives are not words. `%%bd_center` and `%%bd_hint` are layout, and
+// `<<yellow>>…<</>>` is a colour — read aloud they are noise. `%%bd_module` is
+// worse: everything after it is a SCRIPT, so it is a hard stop rather than a
+// line filter. Reading a Kolam program aloud would be alarming, not merely
+// useless.
+function speechTextFrom(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  const mod = raw.search(/^%%bd_module\b/m);
+  let t = mod === -1 ? raw : raw.slice(0, mod);
+  t = t.replace(/^%%bd_\w*.*$/gm, '');
+  t = t.replace(/<<([a-z]+)>>([\s\S]*?)<<\/>>/g, '$2');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// The voice is a placeholder — macOS `say`, server-side, cached on the text's
+// hash. What matters here is everything around it, which a fine-tuned voice
+// will inherit unchanged.
+let speakEnabled = false;
+let speakAudio   = null;
+let speakBusy    = false;
+let speakGen     = 0;          // bumped by an interrupt; a fetch from an older
+const speakQueue = [];         // generation lands after and must be discarded
+
+function playNextSpeech() {
+  if (speakBusy) return;
+  const next = speakQueue.shift();
+  if (!next) return;
+  speakBusy = true;
+  const gen = speakGen;
+  fetch('/api/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: next }),
+  })
+    .then(r => r.ok ? r.blob() : Promise.reject(new Error('speak ' + r.status)))
+    .then(blob => {
+      // Interrupted while this was in flight — do not start it now.
+      if (gen !== speakGen) { speakBusy = false; return; }
+      const url = URL.createObjectURL(blob);
+      if (!speakAudio) speakAudio = new Audio();
+      speakAudio.src = url;
+      const done = () => { URL.revokeObjectURL(url); speakBusy = false; playNextSpeech(); };
+      speakAudio.onended = done;
+      speakAudio.onerror = done;
+      return speakAudio.play();
+    })
+    .catch(err => { console.warn('[BD] speak failed', err); speakBusy = false; playNextSpeech(); });
+}
+
+// interrupt: a node tap means you have MOVED ON, so the previous node's text
+// should stop. An arriving card queues instead — cutting off a partner's
+// message to start another would lose it.
+function speak(raw, { interrupt = false } = {}) {
+  if (!speakEnabled) return;
+  const text = speechTextFrom(raw);
+  if (!text) return;
+  if (interrupt) stopSpeech();
+  speakQueue.push(text);
+  playNextSpeech();
+}
+
+function stopSpeech() {
+  speakGen++;
+  speakQueue.length = 0;
+  if (speakAudio) { try { speakAudio.pause(); speakAudio.currentTime = 0; } catch (_) {} }
+  speakBusy = false;
+}
+
 // Reassemble one card body into chunk source, restoring the %%bd_center split.
 function readChunkBody(bodyEl) {
   const parts = bodyEl.querySelectorAll('.chunk-text');
@@ -5061,6 +5135,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function insertNodeChunkAsCard(chunkBody, hint, node, chunkIndex) {
+    speak(chunkBody, { interrupt: true });
     let text = chunkBody;
     // Bot-context handling — paragraph-normalise, then strip/unnormalise
     // per curator vs ordinary view. Same rules as the old routeNodeText
@@ -5600,6 +5675,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // 'Helper' before any Local exists. Post-2026-07-25 no auto-Local at
   // boot, so pre-Local helpers are the norm during the initial batch.
   function prependSystemCard(text, { toHistory = false } = {}) {
+    speak(text);
     const top = topLocalCard();
     let label;
     if (top) {
@@ -5649,6 +5725,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // 'Remote' before any Local exists. Under the new no-auto-Local model,
   // a paired user who never composes will just see 'Remote' cards.
   function prependPartnerCard(text) {
+    speak(text);
     const top = topLocalCard();
     let label;
     if (top) {
@@ -9442,6 +9519,23 @@ async function init() {
       refitBars();
     } catch (err) { console.warn('[BD] canvas resync failed (' + reason + ')', err); }
   }
+
+  // 2026-09-02 — the Speak toggle. Remembered per browser, like the curation
+  // code: having to re-tick it every visit would make it feel like a setting
+  // that does not stick.
+  (function bindSpeakToggle() {
+    const box = document.getElementById('speak-toggle');
+    if (!box) return;
+    try { speakEnabled = localStorage.getItem('bd_speak') === '1'; } catch (_) {}
+    box.checked = speakEnabled;
+    box.addEventListener('change', () => {
+      speakEnabled = box.checked;
+      try { localStorage.setItem('bd_speak', speakEnabled ? '1' : '0'); } catch (_) {}
+      // Un-ticking must silence what is already playing, not merely stop the
+      // next one — otherwise the control appears not to work for a paragraph.
+      if (!speakEnabled) stopSpeech();
+    });
+  })();
 
   let cyResizeTimer = null;
   window.addEventListener('resize', () => {
