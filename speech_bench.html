@@ -441,7 +441,6 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     const sel = document.getElementById('dtype').value;
     const dtype = sel !== 'auto' ? sel : (isWebKit ? 'q8' : (device === 'webgpu' ? 'fp32' : 'q8'));
     if (device === 'webgpu' && dtype === 'q8') log('  NOTE: q8 on WebGPU is off-spec — expect poor speed. Try fp16.');
-    if (device === 'webgpu' && forceQ8) log('  NOTE: q8 on WebGPU is off-spec — expect poor quality and speed.');
     log('  device ' + device + ', dtype ' + dtype);
     beacon('before-model-load', 'device=' + device + ' dtype=' + dtype);
 
