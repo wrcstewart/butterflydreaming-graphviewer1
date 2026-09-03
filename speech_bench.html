@@ -84,6 +84,7 @@
   </label>
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
+  <button id="run-direct">Piper DIRECT &mdash; IPA + real rate</button>
   <label class="sub" style="display:block;margin:0 0 10px">Kokoro backend:
     <select id="device" style="font-size:16px;padding:6px;background:#101014;color:#e8e8ea;border:1px solid #33333c;border-radius:4px">
       <option value="auto">auto &mdash; WebGPU if present</option>
@@ -107,13 +108,13 @@
     be mis-parsed. <code>Khwan = kwahn</code> and <code>Phing = pung</code> are exact;
     <code>Zhuangzi</code> settles for <i>joo-ahng</i> because <code>d&#658;w</code> has no English spelling.
     Values in <code>[[ ]]</code> are still passed through as espeak phonemes if you want them.</p>
-    <textarea id="lexicon" style="min-height:170px">Zhuangzi = jooahngdzer
-Laozi = loudzer
-Li Bai = Lee Bye
-Li = Lee
-Khwan = kwahn
-Phing = pung
-Tao Te Ching = dow duh jing</textarea>
+    <textarea id="lexicon" style="min-height:170px">Zhuangzi = dʒwˈɑːŋdzə
+Laozi = lˈaʊdzə
+Li Bai = lˈiː bˈaɪ
+Li = lˈiː
+Khwan = kwˈɑːn
+Phing = pˈʌŋ
+Tao Te Ching = dˈaʊ dɐ dʒˈɪŋ</textarea>
   </details>
   <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
@@ -615,6 +616,89 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
   } finally {
     ev.target.disabled = false;
     await sendLog('piper');   // every exit path, especially the failing one
+  }
+});
+
+// ---- Piper DIRECT ----------------------------------------------------------
+//
+// Our own synthesis path (piper_direct.js) rather than vits-web's predict(),
+// which hardcodes [{text}] and reads length_scale from the config. This one
+// injects IPA for lexicon words — bypassing espeak entirely for them, since
+// espeak cannot be given IPA — and passes length_scale to the model, so the
+// rate control changes DELIVERY rather than time-stretching the output.
+document.getElementById('run-direct').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  try {
+    clear(); environment(); await probeOPFS();
+    const { synthesise } = await import('./piper_direct.js');
+    const VOICE = document.getElementById('voice').value;
+
+    // A value with non-ASCII is IPA and goes to the model as phonemes; a plain
+    // ASCII value is an ordinary respelling and is substituted as text.
+    const ipaLex = {}; let textPairs = [];
+    for (const line of (document.getElementById('lexicon').value || '').split('\n')) {
+      const mm = line.match(/^\s*([^=]+?)\s*=\s*(.+?)\s*$/);
+      if (!mm) continue;
+      if (/[^\x00-\x7F]/.test(mm[2])) ipaLex[mm[1]] = mm[2];
+      else textPairs.push([mm[1], mm[2]]);
+    }
+    let passage = document.getElementById('text').value;
+    for (const [w, r] of textPairs.sort((a,b) => b[0].length - a[0].length)) {
+      passage = passage.replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi'), r);
+    }
+    log('  lexicon: ' + Object.keys(ipaLex).length + ' IPA, ' + textPairs.length + ' respelling(s)');
+
+    // slider < 1 reads as "slower", and length_scale > 1 IS slower.
+    const lengthScale = 1 / (Number(document.getElementById('rate').value) || 1);
+    log('  length_scale: ' + lengthScale.toFixed(2) + (lengthScale > 1 ? '  (slower)' : lengthScale < 1 ? '  (faster)' : ''));
+
+    const utterances = splitUtterances(passage);
+    log('  synthesising ' + utterances.length + ' utterance(s), playing as they arrive…');
+    beacon('direct-start', 'utterances=' + utterances.length);
+
+    const player = new Audio();
+    player.src = 'data:audio/wav;base64,UklGRiQNAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQANAAA=';
+    player.play().catch(() => {});
+
+    const queue = []; let playing = false;
+    const playNext = () => {
+      if (playing) return;
+      const n = queue.shift(); if (!n) return;
+      playing = true; player.src = n;
+      player.onended = () => { URL.revokeObjectURL(n); playing = false; playNext(); };
+      player.onerror = () => { URL.revokeObjectURL(n); playing = false; playNext(); };
+      player.play().catch(() => { playing = false; });
+    };
+
+    const t0 = performance.now();
+    let firstMs = null, seconds = 0, allMissing = new Set();
+    for (let i = 0; i < utterances.length; i++) {
+      const r = await synthesise({ voiceId: VOICE, text: utterances[i], lengthScale, lexicon: ipaLex });
+      if (firstMs === null) firstMs = performance.now() - t0;
+      seconds += r.seconds;
+      (r.missing || []).forEach(x => allMissing.add(x));
+      queue.push(URL.createObjectURL(r.blob));
+      playNext();
+      if (i === 0 || (i + 1) % 5 === 0 || i === utterances.length - 1) {
+        log('    ' + (i + 1) + '/' + utterances.length);
+        beacon('direct-utterance', (i + 1) + '/' + utterances.length);
+      }
+      while (queue.length >= 2) await new Promise(r2 => setTimeout(r2, 150));
+    }
+    const synthMs = performance.now() - t0;
+    if (allMissing.size) log('  NOT IN THE VOICE\'S SYMBOL TABLE (dropped): ' + [...allMissing].join(' '));
+    log('  first audio : ' + (firstMs / 1000).toFixed(2) + ' s');
+    log('PIPER DIRECT ' + VOICE);
+    log('  synthesis   : ' + (synthMs / 1000).toFixed(2) + ' s');
+    log('  audio       : ' + seconds.toFixed(2) + ' s');
+    log('  NOTE: RTF here includes waiting for playback, so it reads near 1 by design.');
+    log('');
+  } catch (err) {
+    log('FAILED: ' + (err && err.message ? err.message : err));
+    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 8).join('\n'));
+  } finally {
+    ev.target.disabled = false;
+    await sendLog('direct');
   }
 });
 
