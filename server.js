@@ -243,7 +243,16 @@ app.get('/api/module-sibling', async (req, res) => {
 // Edge objects: { from_url, from_name, to_url, to_name, weight }
 //   (from = parent, to = child; DESCENDS_FROM direction is Parent → Child)
 // ---------------------------------------------------------------------------
-// 2026-09-02 — SPEECH, stage 0.
+// 2026-09-02 — SPEECH, stage 0. **SCAFFOLDING, NOT THE SHIPPING PATH.**
+//
+// 2026-09-03 — BD derives every high-data presentation on the CLIENT; the only
+// exception is one-off .mp3s for the HTML player. Serving synthesised audio from
+// here would put ~1 MB per node of CENTRALISED bandwidth through one machine,
+// which fails at the thousands-of-users scale BD is designed for — caching fixes
+// the CPU cost, not the transfer. **If it cannot be done in the browser it is not
+// viable**, so this endpoint exists only to exercise the toggle, the serialiser,
+// the interrupt/queue behaviour and the iOS gesture before an in-browser engine
+// is chosen. Do not build on it. See speech_plan.md.
 //
 // Deliberately macOS `say`. The voice is a placeholder and will be replaced by a
 // fine-tuned one; everything AROUND it — the serialiser that strips the render
