@@ -55,6 +55,30 @@ app.use((req, res, next) => {
 // HTML must never be cached — otherwise the browser keeps requesting old
 // ?v= numbers and never picks up new CSS/JS. CSS/JS themselves are cache-
 // busted via the ?v= query so they CAN be cached aggressively.
+// 2026-09-03 — cross-origin isolation, opt-in per request (?iso=1).
+//
+// Every bench run so far reports crossOriginIsolated:NO, so onnxruntime is on a
+// SINGLE thread — on an iPhone 14 Pro Max, which has six cores. That is the
+// largest untested lever left: multi-threaded WASM needs SharedArrayBuffer,
+// which needs these two headers, and it is typically worth 3-4x. RTF 1.98 would
+// become roughly 0.5-0.7, i.e. the difference between not viable and viable.
+//
+// COEP credentialless rather than require-corp: the model and the libraries come
+// from huggingface.co and esm.sh, and require-corp would need THEM to send
+// Cross-Origin-Resource-Policy. credentialless drops credentials instead, which
+// costs nothing for public CDN assets.
+//
+// Opt-in by query so the working configuration is still reachable for
+// comparison — if isolation breaks a subresource, the page fails entirely, and
+// losing the only run that works would be a bad trade for an experiment.
+app.use((req, res, next) => {
+  if (req.query.iso === '1') {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  }
+  next();
+});
+
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
