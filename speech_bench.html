@@ -296,7 +296,7 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     log('exports to ONNX, so this is the path her voice would actually take.');
   } catch (err) {
     log('FAILED: ' + (err && err.message ? err.message : err));
-    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 4).join('\n'));
+    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 8).join('\n'));
     log('(A failure here is a real result — it is what step 1 exists to find.)');
   } finally {
     ev.target.disabled = false;
@@ -338,7 +338,7 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     log('cannot become her voice without a separate voice-conversion step.');
   } catch (err) {
     log('FAILED: ' + (err && err.message ? err.message : err));
-    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 4).join('\n'));
+    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 8).join('\n'));
     log('(A failure here is a real result — it is what step 1 exists to find.)');
   } finally {
     ev.target.disabled = false;
@@ -351,7 +351,12 @@ window.addEventListener('error', e => {
   sendLog('uncaught');
 });
 window.addEventListener('unhandledrejection', e => {
-  log('UNHANDLED REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  const r = e.reason;
+  log('UNHANDLED REJECTION: ' + (r && r.message ? r.message : r));
+  // The message alone was not enough to place the fault: "undefined is not a
+  // function" could be kokoro-js, transformers.js, the phonemizer, or Safari
+  // missing an API any of them assume. The stack names the file.
+  if (r && r.stack) log(String(r.stack).split('\n').slice(0, 8).join('\n'));
   sendLog('rejection');
 });
 
