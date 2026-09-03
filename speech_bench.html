@@ -54,6 +54,7 @@
   <legend>Passage</legend>
   <textarea id="text">Dreaming of Li Bai. Written when Du Fu heard that his friend Li Bai — the other great poet of the age — had been banished to the far south under charge of treason and might be dead. Its images cross between worlds: the friend's spirit visits by night, and the poet does not know if it is a living man's soul or a ghost's. Compare the Tao Te Ching, attributed to Laozi, and the Zhuangzi.</textarea>
   <button id="load-zz" style="margin-top:10px">Load Zhuangzi &sect;1 &mdash; The Peng Bird</button>
+  <button id="reset-passage" style="margin-top:10px">Reset to default passage</button>
   <p class="sub" style="margin:8px 0 0">Contains the names that matter: Li Bai, Du Fu, Laozi, Zhuangzi, Tao Te Ching. Listen for how it says them — that is what the lexicon will have to fix.</p>
 </fieldset>
 
@@ -153,6 +154,31 @@ async function sendLog(tag) {
 }
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
 
+// 2026-09-03 — keep whatever passage is in the box across reloads.
+//
+// Nothing overwrites it during a session; a RELOAD does, because the textarea
+// falls back to its HTML default. That is a nuisance when the interesting
+// passage takes a button press and a fetch to assemble, and reloading is the
+// first thing you do after any fix.
+(function persistPassage() {
+  const box = document.getElementById('text');
+  try {
+    const saved = localStorage.getItem('bd_bench_passage');
+    if (saved) { box.value = saved; }
+  } catch (_) {}
+  box.addEventListener('input', () => {
+    try { localStorage.setItem('bd_bench_passage', box.value); } catch (_) {}
+  });
+  window.__savePassage = () => {
+    try { localStorage.setItem('bd_bench_passage', box.value); } catch (_) {}
+  };
+  const reset = document.getElementById('reset-passage');
+  if (reset) reset.addEventListener('click', () => {
+    try { localStorage.removeItem('bd_bench_passage'); } catch (_) {}
+    location.reload();
+  });
+})();
+
 // 2026-09-03 — breadcrumbs that survive a tab crash.
 //
 // A WebKit run reported page-loaded and then NOTHING — no result, no error, not
@@ -187,6 +213,7 @@ document.getElementById('load-zz').addEventListener('click', async (ev) => {
                   .replace(/<<([a-z]+)>>([\s\S]*?)<<\/>>/g, '$2')
                   .replace(/\n{3,}/g, '\n\n').trim();
     document.getElementById('text').value = s;
+    if (window.__savePassage) window.__savePassage();   // .value fires no input event
     log('loaded "' + d.section + '" — ' + d.count + ' passages, ' + s.length + ' characters');
     log('(at ~150 wpm that is roughly ' + Math.round(s.split(/\s+/).length / 150) + ' minutes of speech)');
   } catch (e) { log('could not load section: ' + e.message); }
