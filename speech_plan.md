@@ -81,7 +81,67 @@ in-browser via transformers.js, ~75 MB, downloaded once and cached. A voice mode
 of similar size is a cost this codebase has already accepted and proven on real
 hardware.
 
-## Stage 1 — real engine, stock voice · NEXT
+## STAGE 1 RESULT — 2026-09-03. Engine decided: **Piper**.
+
+**Measured on an iPhone 14 Pro Max, Safari 26.6.1:**
+
+| engine | backend | precision | RTF | quality |
+|---|---|---|---|---|
+| **Piper** (vits-web) | wasm | — | **0.17** | **acceptable** |
+| Kokoro | webgpu | fp16 | 1.44 | distorted |
+| Kokoro | wasm | q8 | 1.98 | clean |
+| Kokoro | wasm+threads | q8 | 1.63 | clean |
+
+Piper: 21.7 s of audio in 3.7 s, six times faster than real time. Also confirmed
+working in Firefox. Kokoro is superb on desktop Chrome (RTF 0.06–0.08 at fp32)
+and **not viable on the phone at any setting tried** — the deciding platform.
+
+**So the trade resolves in Piper's favour twice over:** it is the fast one AND
+the fine-tunable one. Kokoro sounds better but is ~4x the size, too slow on a
+phone, and cannot become anyone's voice without a separate conversion step.
+
+### Three failures on the way, none of them a capability gap
+
+Worth recording, because each looked like "the platform cannot do this" and none
+of them was:
+
+1. **phonemizer died at module evaluation** — `for await (const c of readableStream)`.
+   WebKit has never implemented `ReadableStream[Symbol.asyncIterator]`. Fixed by
+   a five-line polyfill that must run BEFORE the dynamic import.
+2. **Kokoro fp16 produced distorted audio** on Apple's WebGPU. The wasm backend
+   was clean at the same precision, so the numerical path is the fault, not the
+   model. Distortion and slowness are different diagnoses — do not merge them.
+3. **vits-web threw `[unenv] fs.readFile is not implemented`** — on esm.sh. Its
+   piper chunk is Emscripten, which picks its environment at runtime via
+   `typeof process.versions.node == "string"`. esm.sh SHIMS `process`, so that
+   test passes in a browser and Emscripten takes the Node branch. **Load
+   vits-web from jsDelivr**, which does not shim it. The same bundle fails in
+   Chrome — it was never a Safari problem.
+
+Safari 26.6.1 has WebGPU, a writable OPFS, and cross-origin isolation. Safari
+18.5 had none of them, which is where the early "Safari is hostile" reading came
+from — it was one browser version out of date.
+
+### Cross-origin isolation
+
+**`require-corp`, NOT `credentialless`.** Safari does not implement
+credentialless, so the header was silently ignored on the only platform the
+measurement was for. require-corp is supported by Chrome, Firefox AND Safari, so
+it needs no browser detection — it is the strictly better choice, not a
+compromise. Served on `?iso=1`.
+
+It bought Kokoro only 1.98 → 1.63, well short of the 3-4x expected, and whether
+onnxruntime actually raised its thread count was never confirmed.
+
+**OPEN, and it matters: does Piper need isolation at all?** The 0.17 was measured
+on `?iso=1`. **Cross-origin isolation would block BD's embedded module iframes**
+(Kolam and the music modules are served from GitHub Pages and would need CORP
+headers we do not control). If Piper is just as fast WITHOUT isolation, that
+conflict disappears entirely. **Test this before designing anything around it.**
+
+---
+
+## Stage 1 — real engine, stock voice · DONE, kept for the record
 
 Same architecture, real synthesiser, one of **its own** supplied voices. This is
 the test of the wiring that matters, and it is entirely independent of the
