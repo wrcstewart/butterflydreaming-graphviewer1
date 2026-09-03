@@ -141,6 +141,21 @@ async function sendLog(tag) {
 }
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
 
+// 2026-09-03 — breadcrumbs that survive a tab crash.
+//
+// A WebKit run reported page-loaded and then NOTHING — no result, no error, not
+// even the finally-block log. A fetch cannot complete if the tab is gone, so the
+// most likely failure (running out of memory on a large model) is exactly the
+// one that reports least. sendBeacon is queued by the browser and delivered
+// regardless, so each stage leaves a mark and the LAST mark names where it died.
+function beacon(stage, extra) {
+  try {
+    const body = new Blob([JSON.stringify({ tag: 'stage:' + stage, log: (extra || '') + '\n' + outEl.textContent.slice(-1200) })],
+                          { type: 'application/json' });
+    navigator.sendBeacon('/api/bench-log', body);
+  } catch (_) {}
+}
+
 // 2026-09-03 — pull a REAL section of the corpus rather than a pasted paragraph.
 // Short test sentences flatter a synthesiser; long-form authored prose is where
 // prosody, breath and the transliterated names either hold up or do not. The
@@ -400,14 +415,25 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     // small-download run instead of opting into the correct setting.
     const device = ('gpu' in navigator) ? 'webgpu' : 'wasm';
     const forceQ8 = document.getElementById('hq').checked;
-    const dtype  = forceQ8 ? 'q8' : (device === 'webgpu' ? 'fp32' : 'q8');
+    // 2026-09-03 — WebKit takes q8 even WITH WebGPU.
+    //
+    // fp32 is ~330 MB. That is a fine desktop decision and a bad tablet one:
+    // iPadOS Safari has a hard per-tab memory ceiling and kills the tab rather
+    // than throwing, which is why the previous run reported nothing at all.
+    // Presence of WebGPU says the GPU can do the work, not that the tab may hold
+    // a third of a gigabyte.
+    const isWebKit = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    const dtype = (forceQ8 || isWebKit) ? 'q8' : (device === 'webgpu' ? 'fp32' : 'q8');
+    if (isWebKit && !forceQ8) log('  WebKit detected — using q8 (~90 MB); fp32 risks the tab memory ceiling.');
     if (device === 'webgpu' && forceQ8) log('  NOTE: q8 on WebGPU is off-spec — expect poor quality and speed.');
     log('  device ' + device + ', dtype ' + dtype);
+    beacon('before-model-load', 'device=' + device + ' dtype=' + dtype);
 
     const m0 = performance.now();
     const t0 = performance.now();
     const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', { dtype, device });
     const loadMs = performance.now() - t0;
+    beacon('model-loaded');
     const b = bytesSince(m0);
     // HuggingFace does not send Timing-Allow-Origin, so the model itself is
     // invisible to the Resource Timing API. Printing only the known bytes said
@@ -424,6 +450,7 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     // stops mid-sentence. That is what ended the Peng Bird at "the Southern
     // Ocean is the Pool of...". stream() splits into sentences and synthesises
     // each, which is the supported path for long text.
+    beacon('before-synth');
     log('  synthesising (streamed)…');
     const t1 = performance.now();
     const splitter = new TextSplitterStream();
@@ -439,6 +466,7 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
       if (ra && ra.audio) { chunks.push(ra.audio); rate = ra.sampling_rate || rate; nChunks++; }
     }
     const synthMs = performance.now() - t1;
+    beacon('synth-done', 'chunks=' + chunks.length);
     if (!chunks.length) throw new Error('stream produced no audio');
     const { blob, seconds } = chunksToWav(chunks, rate);
     log('  sentences   : ' + nChunks);
