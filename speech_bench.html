@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BD speech bench</title>
+<!--
+  Stage 1, step 1 — the GO/NO-GO measurement. See speech_plan.md.
+
+  BD derives every high-data presentation on the CLIENT. So the question that
+  decides whether spoken node text exists at all is not how good a voice sounds,
+  it is whether a neural TTS model can synthesise a real corpus passage on a
+  PHONE at an acceptable speed. This page measures that and nothing else.
+
+  Two engines, because they answer different questions:
+
+    Piper (vits-web)  — the DESTINATION. Fine-tuning on a custom voice is
+                        supported and exports to ONNX, which is the whole point.
+    Kokoro (kokoro-js)— the QUALITY BAR. Fine-tuning is not open-sourced, so it
+                        cannot become her voice, but it shows what current
+                        in-browser TTS sounds like and how fast it runs.
+
+  Deliberately standalone: no BD chrome, no cytoscape, nothing that could
+  contaminate the timing.
+-->
+<style>
+  :root { color-scheme: dark; }
+  body { background:#1a1a20; color:#e8e8ea; font:15px/1.5 system-ui,-apple-system,sans-serif;
+         margin:0; padding:16px 14px 60px; }
+  h1 { font-size:17px; margin:0 0 2px; }
+  p.sub { color:#9a9aa4; font-size:13px; margin:0 0 16px; }
+  fieldset { border:1px solid #33333c; border-radius:6px; padding:12px; margin:0 0 14px; }
+  legend { font-size:12px; color:#9a9aa4; padding:0 6px; text-transform:uppercase; letter-spacing:.05em; }
+  textarea { width:100%; min-height:130px; background:#101014; color:#e8e8ea; border:1px solid #33333c;
+             border-radius:4px; padding:9px; font:16px/1.45 inherit; }   /* 16px — iOS zooms below it */
+  button { font:600 16px/1 inherit; padding:13px 16px; border-radius:6px; border:1px solid #a07820;
+           background:#b09e3b; color:#1a1a20; margin:6px 8px 0 0; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  #out { white-space:pre-wrap; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;
+         background:#101014; border:1px solid #33333c; border-radius:6px; padding:11px; min-height:120px; }
+  .verdict { font-size:20px; font-weight:700; padding:12px; border-radius:6px; margin:12px 0 0; display:none; }
+  .good { background:#14401f; color:#7fe08f; }
+  .bad  { background:#401414; color:#ff9a9a; }
+  .warn { background:#403314; color:#f0c674; }
+  code { color:#f0c674; }
+</style>
+</head>
+<body>
+
+<h1>BD speech bench</h1>
+<p class="sub">Can a phone synthesise a corpus passage in the browser, fast enough to be worth having?</p>
+
+<fieldset>
+  <legend>Passage</legend>
+  <textarea id="text">Dreaming of Li Bai. Written when Du Fu heard that his friend Li Bai — the other great poet of the age — had been banished to the far south under charge of treason and might be dead. Its images cross between worlds: the friend's spirit visits by night, and the poet does not know if it is a living man's soul or a ghost's. Compare the Tao Te Ching, attributed to Laozi, and the Zhuangzi.</textarea>
+  <p class="sub" style="margin:8px 0 0">Contains the names that matter: Li Bai, Du Fu, Laozi, Zhuangzi, Tao Te Ching. Listen for how it says them — that is what the lexicon will have to fix.</p>
+</fieldset>
+
+<fieldset>
+  <legend>Run</legend>
+  <button id="run-piper">Piper &mdash; the destination</button>
+  <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
+  <button id="clear">Clear log</button>
+</fieldset>
+
+<div id="verdict" class="verdict"></div>
+
+<fieldset>
+  <legend>Measurements</legend>
+  <div id="out">Ready.</div>
+</fieldset>
+
+<script type="module">
+const outEl = document.getElementById('out');
+const vEl   = document.getElementById('verdict');
+const log = (s = '') => { outEl.textContent += (outEl.textContent ? '\n' : '') + s; window.scrollTo(0, document.body.scrollHeight); };
+const clear = () => { outEl.textContent = ''; vEl.style.display = 'none'; };
+document.getElementById('clear').addEventListener('click', clear);
+
+// Environment first — the numbers below are meaningless without it.
+function environment() {
+  const c = navigator.hardwareConcurrency || '?';
+  const gpu = ('gpu' in navigator) ? 'yes' : 'no';
+  // Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin
+  // isolation (COOP/COEP). Without it onnxruntime falls back to a single
+  // thread — a large, and fixable, performance factor. Worth knowing which
+  // regime any measurement was taken in.
+  const iso = self.crossOriginIsolated ? 'yes (multi-thread WASM available)'
+                                       : 'NO (single-thread WASM — see speech_plan.md)';
+  log('device        : ' + (navigator.userAgent.match(/\((.*?)\)/)?.[1] || navigator.platform));
+  log('cores         : ' + c);
+  log('WebGPU        : ' + gpu);
+  log('cross-origin isolated: ' + iso);
+  log('');
+}
+
+// Bytes actually pulled over the wire since a mark. Cross-origin entries only
+// report sizes when the server sends Timing-Allow-Origin, so this can honestly
+// come back unknown rather than wrong.
+function bytesSince(t0) {
+  let known = 0, unknown = 0;
+  for (const e of performance.getEntriesByType('resource')) {
+    if (e.startTime < t0) continue;
+    if (e.transferSize > 0) known += e.transferSize;
+    else if (e.decodedBodySize > 0) known += e.decodedBodySize;
+    else unknown++;
+  }
+  return { known, unknown };
+}
+
+const fmtMB = b => (b / 1048576).toFixed(1) + ' MB';
+
+async function durationOf(blobOrRaw) {
+  // Kokoro returns a RawAudio (Float32Array + sampling_rate) — exact, no decode.
+  if (blobOrRaw && blobOrRaw.audio && blobOrRaw.sampling_rate) {
+    return blobOrRaw.audio.length / blobOrRaw.sampling_rate;
+  }
+  const buf = await blobOrRaw.arrayBuffer();
+  const ac  = new (window.AudioContext || window.webkitAudioContext)();
+  const dec = await ac.decodeAudioData(buf);
+  const d = dec.duration;
+  ac.close();
+  return d;
+}
+
+function verdict(rtf) {
+  vEl.style.display = 'block';
+  if (rtf <= 0.5) {
+    vEl.className = 'verdict good';
+    vEl.textContent = `RTF ${rtf.toFixed(2)} — viable. Comfortably faster than real time.`;
+  } else if (rtf <= 1.0) {
+    vEl.className = 'verdict warn';
+    vEl.textContent = `RTF ${rtf.toFixed(2)} — marginal. Faster than real time, but a long passage will start slowly.`;
+  } else {
+    vEl.className = 'verdict bad';
+    vEl.textContent = `RTF ${rtf.toFixed(2)} — SLOWER than real time. Not viable as-is on this device.`;
+  }
+}
+
+async function report(label, { loadMs, loadBytes, synthMs, seconds, blob }) {
+  log(`${label}`);
+  log('  model load  : ' + (loadMs / 1000).toFixed(1) + ' s'
+      + (loadBytes ? '  (' + loadBytes + ')' : ''));
+  log('  synthesis   : ' + (synthMs / 1000).toFixed(2) + ' s');
+  log('  audio       : ' + seconds.toFixed(2) + ' s');
+  const rtf = (synthMs / 1000) / seconds;
+  log('  REAL-TIME FACTOR : ' + rtf.toFixed(2) + (rtf < 1 ? '  (faster than real time)' : '  (SLOWER than real time)'));
+  log('');
+  verdict(rtf);
+  if (blob) { const a = new Audio(URL.createObjectURL(blob)); a.play().catch(() => log('  (autoplay blocked — press a button again to hear it)')); }
+}
+
+// ---- Piper -----------------------------------------------------------------
+document.getElementById('run-piper').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  try {
+    clear(); environment();
+    log('Piper (vits-web) — loading library…');
+    const tts = await import('https://esm.sh/@diffusionstudio/vits-web@1.0.3');
+    const VOICE = 'en_GB-alba-medium';
+
+    const already = await tts.stored();
+    log('  voices already stored: ' + (already.length ? already.join(', ') : 'none'));
+
+    let total = 0;
+    const t0 = performance.now();
+    if (!already.includes(VOICE)) {
+      log('  downloading ' + VOICE + ' …');
+      await tts.download(VOICE, p => { if (p.total) total = Math.max(total, p.total); });
+    } else {
+      log('  ' + VOICE + ' already cached (OPFS) — this run measures synthesis only');
+    }
+    const loadMs = performance.now() - t0;
+
+    log('  synthesising…');
+    const t1 = performance.now();
+    const wav = await tts.predict({ text: document.getElementById('text').value, voiceId: VOICE });
+    const synthMs = performance.now() - t1;
+
+    const seconds = await durationOf(wav);
+    await report('PIPER ' + VOICE, {
+      loadMs, loadBytes: total ? fmtMB(total) : '', synthMs, seconds, blob: wav,
+    });
+    log('Piper is the DESTINATION: fine-tuning to a custom voice is supported and');
+    log('exports to ONNX, so this is the path her voice would actually take.');
+  } catch (err) {
+    log('FAILED: ' + (err && err.message ? err.message : err));
+    log('(A failure here is a real result — it is what step 1 exists to find.)');
+  } finally { ev.target.disabled = false; }
+});
+
+// ---- Kokoro ----------------------------------------------------------------
+document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  try {
+    clear(); environment();
+    log('Kokoro (kokoro-js) — loading library…');
+    const { KokoroTTS } = await import('https://esm.sh/kokoro-js@1.2.1');
+    const device = ('gpu' in navigator) ? 'webgpu' : 'wasm';
+    const dtype  = device === 'webgpu' ? 'fp32' : 'q8';
+    log('  device ' + device + ', dtype ' + dtype);
+
+    const m0 = performance.now();
+    const t0 = performance.now();
+    const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', { dtype, device });
+    const loadMs = performance.now() - t0;
+    const b = bytesSince(m0);
+    log('  fetched ' + fmtMB(b.known) + (b.unknown ? ' (+' + b.unknown + ' requests of unreported size)' : ''));
+
+    log('  synthesising…');
+    const t1 = performance.now();
+    const audio = await tts.generate(document.getElementById('text').value, { voice: 'bf_emma' });
+    const synthMs = performance.now() - t1;
+
+    const seconds = await durationOf(audio);
+    const blob = audio.toBlob ? audio.toBlob() : null;
+    await report('KOKORO bf_emma', { loadMs, loadBytes: fmtMB(b.known), synthMs, seconds, blob });
+    log('Kokoro is the QUALITY BAR only. Fine-tuning is NOT open-sourced, so it');
+    log('cannot become her voice without a separate voice-conversion step.');
+  } catch (err) {
+    log('FAILED: ' + (err && err.message ? err.message : err));
+    log('(A failure here is a real result — it is what step 1 exists to find.)');
+  } finally { ev.target.disabled = false; }
+});
+
+environment();
+</script>
+</body>
+</html>
