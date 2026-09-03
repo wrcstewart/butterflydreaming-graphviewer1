@@ -61,9 +61,9 @@
   <legend>Run</legend>
   <p class="sub" style="margin:0 0 8px">
     Each engine downloads a model on first run and caches it. <b>Use wi-fi.</b>
-    Piper voice ~60&nbsp;MB. Kokoro uses fp32 (~330&nbsp;MB) where WebGPU exists,
-    q8 (~90&nbsp;MB) otherwise &mdash; that is its own guidance, and forcing q8 onto
-    WebGPU measures the mistake rather than the engine.
+    Piper voice ~60&nbsp;MB. Kokoro size depends on the precision below.
+    <b>q8 on WebGPU is off-spec</b> &mdash; it measures the wrong configuration, not
+    the engine, so try fp16 before judging speed.
   </p>
   <label class="sub" style="display:block;margin:0 0 8px">Piper voice:
     <select id="voice" style="font-size:16px;padding:6px;background:#101014;color:#e8e8ea;border:1px solid #33333c;border-radius:4px">
@@ -83,6 +83,7 @@
   </label>
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
+  <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
   <button id="send">Send log to server</button>
   <button id="reset">Clear cached models</button>
@@ -335,13 +336,9 @@ async function report(label, { loadMs, loadBytes, synthMs, seconds, blob }) {
     const url = URL.createObjectURL(blob);
     const a = new Audio(url);
     a.play().catch(() => log('  (autoplay blocked — use the Play button below)'));
-    let btn = document.getElementById('play-result');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = 'play-result';
-      document.getElementById('verdict').after(btn);
-    }
-    btn.textContent = '▶ Play the result (' + seconds.toFixed(0) + 's)';
+    const btn = document.getElementById('play-result');
+    btn.textContent = '\u25B6 Play the result (' + seconds.toFixed(0) + 's)';
+    btn.disabled = false;
     btn.onclick = () => new Audio(url).play();
   }
 }
