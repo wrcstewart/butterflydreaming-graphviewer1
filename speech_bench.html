@@ -428,7 +428,26 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
   try {
     clear(); environment(); await probeOPFS();
     log('Kokoro (kokoro-js) — loading library…');
-    const { KokoroTTS, TextSplitterStream } = await import('https://esm.sh/kokoro-js@1.2.1');
+    const { KokoroTTS, TextSplitterStream, env } = await import('https://esm.sh/kokoro-js@1.2.1');
+
+    // 2026-09-03 — cross-origin isolation bought only 1.98 -> 1.63, far short of
+    // the 3-4x multi-threaded WASM should give. Availability is not use:
+    // onnxruntime's thread count is set by transformers.js and may still be 1,
+    // in which case that run measured nothing about threading at all. Read it,
+    // set it, and report both — otherwise "threads do not help here" and
+    // "threads were never switched on" look identical.
+    try {
+      const w = env && env.backends && env.backends.onnx && env.backends.onnx.wasm;
+      if (w) {
+        log('  ort numThreads before : ' + w.numThreads);
+        if (self.crossOriginIsolated) {
+          w.numThreads = navigator.hardwareConcurrency || 4;
+          log('  ort numThreads set to : ' + w.numThreads);
+        } else {
+          log('  (not isolated — threads unavailable, leaving as is)');
+        }
+      } else { log('  (could not reach onnx wasm env)'); }
+    } catch (e) { log('  (thread config failed: ' + e.message + ')'); }
     // 2026-09-03 — dtype follows Kokoro's OWN guidance: fp32 on WebGPU, q8 on
     // WASM. An earlier revision forced q8 everywhere to spare mobile data, and
     // that produced a misleading first measurement — RTF 1.40 on a WebGPU
