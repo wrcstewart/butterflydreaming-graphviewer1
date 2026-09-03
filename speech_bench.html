@@ -53,6 +53,7 @@
 <fieldset>
   <legend>Passage</legend>
   <textarea id="text">Dreaming of Li Bai. Written when Du Fu heard that his friend Li Bai — the other great poet of the age — had been banished to the far south under charge of treason and might be dead. Its images cross between worlds: the friend's spirit visits by night, and the poet does not know if it is a living man's soul or a ghost's. Compare the Tao Te Ching, attributed to Laozi, and the Zhuangzi.</textarea>
+  <button id="load-zz" style="margin-top:10px">Load Zhuangzi &sect;1 &mdash; The Peng Bird</button>
   <p class="sub" style="margin:8px 0 0">Contains the names that matter: Li Bai, Du Fu, Laozi, Zhuangzi, Tao Te Ching. Listen for how it says them — that is what the lexicon will have to fix.</p>
 </fieldset>
 
@@ -110,6 +111,31 @@ async function sendLog(tag) {
   } catch (e) { log('  (could not send log: ' + e.message + ')'); }
 }
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
+
+// 2026-09-03 — pull a REAL section of the corpus rather than a pasted paragraph.
+// Short test sentences flatter a synthesiser; long-form authored prose is where
+// prosody, breath and the transliterated names either hold up or do not. The
+// Peng Bird opening is six passages and carries Khwan, Phing, li and Zhuangzi
+// itself — exactly the words the lexicon will have to teach it.
+document.getElementById('load-zz').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  try {
+    const url = 'butterflydreaming.org/n/58e71a98-3ccd-488a-8b25-5d387c540a8c';
+    const r = await fetch('/api/section?url=' + encodeURIComponent(url));
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    // The corpus text carries render directives. speechTextFrom lives in
+    // viewer.js and this page is deliberately standalone, so the same stripping
+    // is repeated here — if the rules ever diverge, THIS is the copy that drifts.
+    let s = d.text.replace(/^%%bd_\w*.*$/gm, '')
+                  .replace(/<<([a-z]+)>>([\s\S]*?)<<\/>>/g, '$2')
+                  .replace(/\n{3,}/g, '\n\n').trim();
+    document.getElementById('text').value = s;
+    log('loaded "' + d.section + '" — ' + d.count + ' passages, ' + s.length + ' characters');
+    log('(at ~150 wpm that is roughly ' + Math.round(s.split(/\s+/).length / 150) + ' minutes of speech)');
+  } catch (e) { log('could not load section: ' + e.message); }
+  finally { ev.target.disabled = false; }
+});
 
 // 2026-09-03 — vits-web's stored() reports a voice as present when its FILES
 // exist. It does not check they are COMPLETE. An interrupted download therefore

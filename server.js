@@ -271,6 +271,52 @@ if (!fs.existsSync(SPEECH_DIR)) fs.mkdirSync(SPEECH_DIR, { recursive: true });
 // standalone and has none of viewer.js's console forwarding, so without this the
 // only way to see a phone's numbers is to read them off the screen and retype
 // them. Scaffolding, like /api/speak.
+// 2026-09-03 — hand the bench a real section of the corpus instead of a pasted
+// paragraph. Reads the reading spine (CHILD) forward from a section-title node
+// and returns the passages in seq order, joined.
+//
+// This is the first time the speech work meets actual authored text at length:
+// six passages, ~3.6 kB, the Peng Bird opening of the Zhuangzi. Short test
+// sentences flatter a synthesiser — long-form prose is where prosody, breath and
+// the transliterated names either hold up or do not.
+app.get('/api/section', async (req, res) => {
+  const url = String(req.query.url || '');
+  const max = Math.min(parseInt(req.query.max, 10) || 12, 40);
+  if (!url) return res.status(400).json({ error: 'no url' });
+  const s = driver.session({ database: 'memgraph' });
+  try {
+    const r = await s.run(
+      'MATCH (t:TextNode {url: $url})-[:CHILD*0..' + max + ']->(p:TextNode) ' +
+      'RETURN p.seq AS seq, p.text AS text ORDER BY p.seq',
+      { url });
+    let parts = r.records
+      .map(x => ({ seq: toNum(x.get('seq')), text: x.get('text') || '' }))
+      .filter(x => x.seq !== null && x.seq > 0 && x.text);
+
+    // The CHILD spine runs through the WHOLE work, so it overshoots the first
+    // section. The passages name their own section — "... - The Peng Bird
+    // (part 3). ..." - so the label is the boundary; take passages up to the
+    // first change of it. Pass ?all=1 for the entire spine.
+    const label = s2 => {
+      const m = String(s2).match(/[-\u2014]\s*([^.]+?)\s*\(part\s*\d+\)/i);
+      return m ? m[1].trim() : null;
+    };
+    let section = null;
+    if (req.query.all !== '1' && parts.length) {
+      const first = label(parts[0].text);
+      if (first) {
+        section = first;
+        const end = parts.findIndex(x => label(x.text) !== first);
+        if (end > 0) parts = parts.slice(0, end);
+      }
+    }
+    res.json({ count: parts.length, section, text: parts.map(x => x.text).join('\n\n') });
+  } catch (err) {
+    console.error('[BD] /api/section failed:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally { await s.close(); }
+});
+
 app.post('/api/bench-log', (req, res) => {
   const body = (req.body && typeof req.body.log === 'string') ? req.body.log : '';
   const tag  = (req.body && typeof req.body.tag === 'string') ? req.body.tag : 'bench';
