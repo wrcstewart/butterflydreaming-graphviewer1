@@ -339,6 +339,33 @@ function chunksToWav(chunks, rate) {
   return { blob: new Blob([buf], { type: 'audio/wav' }), seconds: pcm.length / rate };
 }
 
+// 2026-09-03 — split long text into utterances.
+//
+// VITS synthesises a whole utterance in ONE pass, so handing Piper a 3.6 kB
+// passage means a single enormous tensor and a long block of main-thread WASM:
+// the page freezes and may never come back. Kokoro escaped this only because I
+// stream it. BD will need exactly this splitting too.
+//
+// No lookbehind — WebKit only gained it recently and this has to run there.
+function splitUtterances(text, maxLen = 300) {
+  const out = [];
+  const sentences = text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text];
+  for (const s of sentences) {
+    const trimmed = s.trim();
+    if (!trimmed) continue;
+    if (trimmed.length <= maxLen) { out.push(trimmed); continue; }
+    // A sentence longer than the cap still has to be broken, or the problem
+    // simply reappears inside one utterance. Clause punctuation first.
+    let buf = '';
+    for (const part of trimmed.split(/(?:;|:|,)\s+/)) {
+      if ((buf + ' ' + part).trim().length > maxLen && buf) { out.push(buf.trim()); buf = part; }
+      else { buf = (buf ? buf + ', ' : '') + part; }
+    }
+    if (buf.trim()) out.push(buf.trim());
+  }
+  return out;
+}
+
 function verdict(rtf) {
   vEl.style.display = 'block';
   if (rtf <= 0.5) {
@@ -399,6 +426,7 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     const tts = await import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm');
     const VOICE = document.getElementById('voice').value;
 
+    beacon('piper-start');
     const already = await tts.stored();
     log('  voices already stored: ' + (already.length ? already.join(', ') : 'none'));
 
@@ -412,12 +440,33 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     }
     const loadMs = performance.now() - t0;
 
-    log('  synthesising…');
     const passage = document.getElementById('text').value;
+    const utterances = splitUtterances(passage);
+    log('  synthesising ' + utterances.length + ' utterance(s)…');
+    beacon('piper-before-synth', 'utterances=' + utterances.length + ' chars=' + passage.length);
+
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const chunks = [];
+    let rate = 22050, firstMs = null;
     let t1 = performance.now();
     let wav;
     try {
-      wav = await tts.predict({ text: passage, voiceId: VOICE });
+      for (let i = 0; i < utterances.length; i++) {
+        const one = await tts.predict({ text: utterances[i], voiceId: VOICE });
+        const dec = await ac.decodeAudioData(await one.arrayBuffer());
+        rate = dec.sampleRate;
+        chunks.push(dec.getChannelData(0).slice());
+        if (firstMs === null) firstMs = performance.now() - t1;
+        if (i === 0 || (i + 1) % 5 === 0 || i === utterances.length - 1) {
+          log('    ' + (i + 1) + '/' + utterances.length);
+          beacon('piper-utterance', String(i + 1) + '/' + utterances.length);
+        }
+        // Hand the main thread back between utterances. WASM synthesis blocks
+        // it outright, so without this the page cannot even repaint its own
+        // progress — which is what "nothing happening" looked like.
+        await new Promise(r => setTimeout(r, 0));
+      }
+      wav = null;
     } catch (err) {
       // Self-heal the corrupt-cache case rather than leaving it wedged: a
       // truncated download is indistinguishable from a good one via stored(),
@@ -442,13 +491,24 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
       await tts.download(VOICE, p => { if (p.total) total = Math.max(total, p.total); });
       log('  refetched; re-timing synthesis from clean files');
       t1 = performance.now();
-      wav = await tts.predict({ text: passage, voiceId: VOICE });
+      chunks.length = 0; firstMs = null;
+      for (const u of utterances) {
+        const one = await tts.predict({ text: u, voiceId: VOICE });
+        const dec = await ac.decodeAudioData(await one.arrayBuffer());
+        rate = dec.sampleRate;
+        chunks.push(dec.getChannelData(0).slice());
+        if (firstMs === null) firstMs = performance.now() - t1;
+      }
     }
     const synthMs = performance.now() - t1;
-
-    const seconds = await durationOf(wav);
+    beacon('piper-synth-done', 'chunks=' + chunks.length);
+    try { ac.close(); } catch (_) {}
+    if (!chunks.length) throw new Error('no audio produced');
+    const assembled = chunksToWav(chunks, rate);
+    log('  first audio : ' + (firstMs / 1000).toFixed(2) + ' s  <- when playback could begin');
     await report('PIPER ' + VOICE, {
-      loadMs, loadBytes: total ? fmtMB(total) : '', synthMs, seconds, blob: wav,
+      loadMs, loadBytes: total ? fmtMB(total) : '', synthMs,
+      seconds: assembled.seconds, blob: assembled.blob,
     });
     log('Piper is the DESTINATION: fine-tuning to a custom voice is supported and');
     log('exports to ONNX, so this is the path her voice would actually take.');
