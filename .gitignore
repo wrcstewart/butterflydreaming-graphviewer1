@@ -3,3 +3,11 @@ node_modules/
 backups/
 .claude/
 speech_cache/
+
+# 2026-09-03 — voice recordings. THIS REPO IS PUBLIC.
+# The dataset is a real person's voice, it is the one irreplaceable artefact in
+# the speech work, and it is gigabytes. None of those three belong in git.
+# Trained model weights are excluded for the same reason: they ARE the voice.
+voice_dataset/
+voice_models/
+*.wav
