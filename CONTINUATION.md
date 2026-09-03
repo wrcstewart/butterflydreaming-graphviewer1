@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-03, 09:40 BST
+# Continuation note — 2026-09-03, 18:20 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -16,7 +16,15 @@ state it is in, and which document answers which question.
 
 Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
 
-**Speech work is live and staged — read `speech_plan.md`.** Stage 0 is built
+**Speech: engine DECIDED — Piper, RTF 0.17 on an iPhone.** Read
+`session_notes_2026-09-03.md` first; it is the checkpoint, including the six
+platform faults (none a capability gap) and the one OPEN problem: the
+pronunciation lexicon, where `[[espeak phonemes]]` verify correctly on the
+command line but are read out letter by letter in the browser. espeak-ng is
+installed locally for ground truth. **Do NOT turn on COOP/COEP in BD** — speech
+does not need it and it would block the module iframes.
+
+**Earlier staging — read `speech_plan.md`.** Stage 0 is built
 (`2b9785c`): a Speak checkbox reads node text and arriving cards, synthesised
 server-side by macOS `say` and cached. The voice is a DELIBERATE placeholder.
 **Stage 1 is next: the same architecture with a real neural engine and its own

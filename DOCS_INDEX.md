@@ -101,7 +101,7 @@ architecture.
 Chronological working record. Useful for "why is it like this", not for
 current behaviour.
 
-`session_notes_2026-08-16_17.md` · `…08-19.md` · `…08-20.md` · `…08-21.md` · `…08-22_23.md` · `…08-24_25.md` · `…08-27.md` · `…08-28.md` · **`…09-01.md`** · **`…09-02.md`**
+`session_notes_2026-08-16_17.md` · `…08-19.md` · `…08-20.md` · `…08-21.md` · `…08-22_23.md` · `…08-24_25.md` · `…08-27.md` · `…08-28.md` · **`…09-01.md`** · **`…09-02.md`** · **`…09-03.md`**
 
 ---
 
