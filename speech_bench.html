@@ -73,9 +73,13 @@
       <option value="en_GB-alan-medium">alan &mdash; male, for contrast</option>
     </select>
   </label>
-  <label class="sub" style="display:block;margin:0 0 10px">
-    <input type="checkbox" id="hq"> Force Kokoro q8 (~90&nbsp;MB, lower quality) instead of the
-    correct dtype for this device
+  <label class="sub" style="display:block;margin:0 0 10px">Kokoro precision:
+    <select id="dtype" style="font-size:16px;padding:6px;background:#101014;color:#e8e8ea;border:1px solid #33333c;border-radius:4px">
+      <option value="auto">auto &mdash; q8 on WebKit, fp32 elsewhere with WebGPU</option>
+      <option value="fp16">fp16 &mdash; ~165&nbsp;MB, the middle option</option>
+      <option value="fp32">fp32 &mdash; ~330&nbsp;MB, fastest where it fits</option>
+      <option value="q8">q8 &mdash; ~90&nbsp;MB, smallest</option>
+    </select>
   </label>
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
@@ -324,7 +328,22 @@ async function report(label, { loadMs, loadBytes, synthMs, seconds, blob }) {
   log('  REAL-TIME FACTOR : ' + rtf.toFixed(2) + (rtf < 1 ? '  (faster than real time)' : '  (SLOWER than real time)'));
   log('');
   verdict(rtf);
-  if (blob) { const a = new Audio(URL.createObjectURL(blob)); a.play().catch(() => log('  (autoplay blocked — press a button again to hear it)')); }
+  // The click that started this counts as a user gesture, but the await chain
+  // before playback breaks that chain in WebKit — hence "autoplay blocked" on
+  // Safari after a 68 s synthesis. A dedicated button restores a fresh gesture.
+  if (blob) {
+    const url = URL.createObjectURL(blob);
+    const a = new Audio(url);
+    a.play().catch(() => log('  (autoplay blocked — use the Play button below)'));
+    let btn = document.getElementById('play-result');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'play-result';
+      document.getElementById('verdict').after(btn);
+    }
+    btn.textContent = '▶ Play the result (' + seconds.toFixed(0) + 's)';
+    btn.onclick = () => new Audio(url).play();
+  }
 }
 
 // ---- Piper -----------------------------------------------------------------
@@ -414,17 +433,17 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     // the mistake, not the engine. The checkbox now FORCES q8 for a deliberate
     // small-download run instead of opting into the correct setting.
     const device = ('gpu' in navigator) ? 'webgpu' : 'wasm';
-    const forceQ8 = document.getElementById('hq').checked;
-    // 2026-09-03 — WebKit takes q8 even WITH WebGPU.
+    // 2026-09-03 — dtype is CHOSEN BY THE OPERATOR now, not inferred.
     //
-    // fp32 is ~330 MB. That is a fine desktop decision and a bad tablet one:
-    // iPadOS Safari has a hard per-tab memory ceiling and kills the tab rather
-    // than throwing, which is why the previous run reported nothing at all.
-    // Presence of WebGPU says the GPU can do the work, not that the tab may hold
-    // a third of a gigabyte.
+    // I picked it twice and got it wrong twice in opposite directions: q8 on a
+    // WebGPU desktop (RTF 1.40, garbled), then fp32 on a tablet (tab killed),
+    // then q8 again on WebKit (RTF 2.15). The right value depends on memory
+    // ceiling AND compute path together, and neither is visible from here.
+    // 'auto' keeps the safe guess; the rest let a real device answer.
     const isWebKit = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
-    const dtype = (forceQ8 || isWebKit) ? 'q8' : (device === 'webgpu' ? 'fp32' : 'q8');
-    if (isWebKit && !forceQ8) log('  WebKit detected — using q8 (~90 MB); fp32 risks the tab memory ceiling.');
+    const sel = document.getElementById('dtype').value;
+    const dtype = sel !== 'auto' ? sel : (isWebKit ? 'q8' : (device === 'webgpu' ? 'fp32' : 'q8'));
+    if (device === 'webgpu' && dtype === 'q8') log('  NOTE: q8 on WebGPU is off-spec — expect poor speed. Try fp16.');
     if (device === 'webgpu' && forceQ8) log('  NOTE: q8 on WebGPU is off-spec — expect poor quality and speed.');
     log('  device ' + device + ', dtype ' + dtype);
     beacon('before-model-load', 'device=' + device + ' dtype=' + dtype);
