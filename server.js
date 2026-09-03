@@ -267,6 +267,17 @@ const SPEECH_VOICE = process.env.BD_SPEECH_VOICE || 'Daniel';   // en_GB
 const SPEECH_MAX   = 8000;   // characters; a guard, not a policy
 if (!fs.existsSync(SPEECH_DIR)) fs.mkdirSync(SPEECH_DIR, { recursive: true });
 
+// 2026-09-03 — bench results into the server log. speech_bench.html is
+// standalone and has none of viewer.js's console forwarding, so without this the
+// only way to see a phone's numbers is to read them off the screen and retype
+// them. Scaffolding, like /api/speak.
+app.post('/api/bench-log', (req, res) => {
+  const body = (req.body && typeof req.body.log === 'string') ? req.body.log : '';
+  const tag  = (req.body && typeof req.body.tag === 'string') ? req.body.tag : 'bench';
+  console.log('\n===== SPEECH BENCH [' + tag + '] =====\n' + body.slice(0, 8000) + '\n===== end =====\n');
+  res.json({ ok: true });
+});
+
 app.post('/api/speak', async (req, res) => {
   const text = (req.body && typeof req.body.text === 'string') ? req.body.text.trim() : '';
   if (!text) return res.status(400).json({ error: 'no text' });

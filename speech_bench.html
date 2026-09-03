@@ -76,6 +76,7 @@
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
   <button id="clear">Clear log</button>
+  <button id="send">Send log to server</button>
 </fieldset>
 
 <div id="verdict" class="verdict"></div>
@@ -91,6 +92,20 @@ const vEl   = document.getElementById('verdict');
 const log = (s = '') => { outEl.textContent += (outEl.textContent ? '\n' : '') + s; window.scrollTo(0, document.body.scrollHeight); };
 const clear = () => { outEl.textContent = ''; vEl.style.display = 'none'; };
 document.getElementById('clear').addEventListener('click', clear);
+
+// Ship the numbers back. Reading them off a phone screen and retyping them is
+// exactly the sort of transcription that quietly corrupts a measurement.
+async function sendLog(tag) {
+  try {
+    await fetch('/api/bench-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag, log: outEl.textContent }),
+    });
+    log('  (log sent to server)');
+  } catch (e) { log('  (could not send log: ' + e.message + ')'); }
+}
+document.getElementById('send').addEventListener('click', () => sendLog('manual'));
 
 // Environment first — the numbers below are meaningless without it.
 function environment() {
@@ -198,6 +213,7 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     });
     log('Piper is the DESTINATION: fine-tuning to a custom voice is supported and');
     log('exports to ONNX, so this is the path her voice would actually take.');
+    await sendLog('piper');
   } catch (err) {
     log('FAILED: ' + (err && err.message ? err.message : err));
     log('(A failure here is a real result — it is what step 1 exists to find.)');
@@ -236,6 +252,7 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     await report('KOKORO bf_emma', { loadMs, loadBytes: fmtMB(b.known), synthMs, seconds, blob });
     log('Kokoro is the QUALITY BAR only. Fine-tuning is NOT open-sourced, so it');
     log('cannot become her voice without a separate voice-conversion step.');
+    await sendLog('kokoro');
   } catch (err) {
     log('FAILED: ' + (err && err.message ? err.message : err));
     log('(A failure here is a real result — it is what step 1 exists to find.)');
