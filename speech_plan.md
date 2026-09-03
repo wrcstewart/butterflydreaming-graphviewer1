@@ -133,11 +133,15 @@ compromise. Served on `?iso=1`.
 It bought Kokoro only 1.98 → 1.63, well short of the 3-4x expected, and whether
 onnxruntime actually raised its thread count was never confirmed.
 
-**OPEN, and it matters: does Piper need isolation at all?** The 0.17 was measured
-on `?iso=1`. **Cross-origin isolation would block BD's embedded module iframes**
-(Kolam and the music modules are served from GitHub Pages and would need CORP
-headers we do not control). If Piper is just as fast WITHOUT isolation, that
-conflict disappears entirely. **Test this before designing anything around it.**
+**ANSWERED 2026-09-03: Piper does NOT need isolation.** Measured unisolated
+(`crossOriginIsolated: NO`, single-thread) at **RTF 0.21**, against 0.17 with it.
+About 19%.
+
+**So BD must NOT turn on COOP/COEP.** Isolation would block the embedded module
+iframes — Kolam and the music modules are served from GitHub Pages, whose CORP
+headers we do not control — and a fifth of the synthesis speed is nowhere near
+worth breaking them for at a figure that is already 5x faster than real time.
+The `?iso=1` route stays in the bench for measurement only.
 
 ---
 
@@ -190,6 +194,21 @@ needed to reach it — and if any of it fails, it fails before anyone has spent 
 hour recording.
 
 ---
+
+## Integrating into BD — the actual remaining work
+
+Stage 0's `/api/speak` is scaffolding and comes OUT. The pieces that survive are
+the ones that were never about the voice: `speechTextFrom`, the Speak checkbox,
+interrupt-on-tap / queue-on-arrival, and the iOS gesture unlock.
+
+| step | note |
+|---|---|
+| Load vits-web client-side | **jsDelivr, not esm.sh** — see the Emscripten note above |
+| Ship the ReadableStream polyfill | must run before the import; WebKit needs it |
+| First-use model download | ~60 MB. Needs a considered UX — ask, show progress, and do NOT start it because a checkbox was ticked by accident |
+| Cache | vits-web uses OPFS and handles this; `stored()` does NOT verify integrity, so keep the corrupt-cache recovery |
+| Retire `/api/speak` | and `speech_cache/`, and the gitignore entry |
+| Stream long passages | synthesise per sentence and play as it arrives, rather than accumulating a whole section in memory |
 
 ## Stage 2 — the recording session
 
