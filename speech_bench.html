@@ -77,6 +77,7 @@
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
   <button id="clear">Clear log</button>
   <button id="send">Send log to server</button>
+  <button id="reset">Clear cached models</button>
 </fieldset>
 
 <div id="verdict" class="verdict"></div>
@@ -106,6 +107,19 @@ async function sendLog(tag) {
   } catch (e) { log('  (could not send log: ' + e.message + ')'); }
 }
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
+
+// 2026-09-03 — vits-web's stored() reports a voice as present when its FILES
+// exist. It does not check they are COMPLETE. An interrupted download therefore
+// leaves a truncated .onnx.json in OPFS that every later run trusts and dies
+// parsing ("JSON Parse error: Unexpected EOF"), with no way out from the UI.
+document.getElementById('reset').addEventListener('click', async () => {
+  try {
+    const tts = await import('https://esm.sh/@diffusionstudio/vits-web@1.0.3');
+    const before = await tts.stored();
+    await tts.flush();
+    log('cleared cached Piper voices: ' + (before.length ? before.join(', ') : 'none'));
+  } catch (e) { log('could not clear: ' + e.message); }
+});
 
 // Environment first — the numbers below are meaningless without it.
 function environment() {
@@ -203,8 +217,23 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     const loadMs = performance.now() - t0;
 
     log('  synthesising…');
-    const t1 = performance.now();
-    const wav = await tts.predict({ text: document.getElementById('text').value, voiceId: VOICE });
+    const passage = document.getElementById('text').value;
+    let t1 = performance.now();
+    let wav;
+    try {
+      wav = await tts.predict({ text: passage, voiceId: VOICE });
+    } catch (err) {
+      // Self-heal the corrupt-cache case rather than leaving it wedged: a
+      // truncated download is indistinguishable from a good one via stored(),
+      // so the parse error IS the integrity check.
+      if (!/JSON|EOF|Unexpected/i.test(String(err && err.message))) throw err;
+      log('  cached voice is CORRUPT (truncated download) — clearing and refetching…');
+      await tts.remove(VOICE);
+      await tts.download(VOICE, p => { if (p.total) total = Math.max(total, p.total); });
+      log('  refetched; re-timing synthesis from clean files');
+      t1 = performance.now();
+      wav = await tts.predict({ text: passage, voiceId: VOICE });
+    }
     const synthMs = performance.now() - t1;
 
     const seconds = await durationOf(wav);
