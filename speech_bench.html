@@ -131,7 +131,14 @@ function environment() {
   // regime any measurement was taken in.
   const iso = self.crossOriginIsolated ? 'yes (multi-thread WASM available)'
                                        : 'NO (single-thread WASM — see speech_plan.md)';
-  log('device        : ' + (navigator.userAgent.match(/\((.*?)\)/)?.[1] || navigator.platform));
+  // Full UA, not the parenthetical. Safari freezes the OS string, so the
+  // version number is the only thing that distinguishes "Safari cannot do this"
+  // from "this Safari cannot do this" — and that difference decides whether an
+  // engine is ruled out for BD's phone-first users or merely for one machine.
+  log('UA            : ' + navigator.userAgent);
+  const ver = navigator.userAgent.match(/Version\/([\d.]+).*Safari/) ||
+              navigator.userAgent.match(/(?:Chrome|CriOS)\/([\d.]+)/);
+  log('browser       : ' + (ver ? ver[0].split(' ')[0] + '  (' + ver[1] + ')' : 'unknown'));
   log('cores         : ' + c);
   log('WebGPU        : ' + gpu);
   log('cross-origin isolated: ' + iso);
@@ -258,7 +265,21 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
       // truncated download is indistinguishable from a good one via stored(),
       // so the parse error IS the integrity check.
       if (!/JSON|EOF|Unexpected/i.test(String(err && err.message))) throw err;
-      log('  cached voice is CORRUPT (truncated download) — clearing and refetching…');
+      // 2026-09-03 — measured: this is NOT a corrupt download. If OPFS has no
+      // write API (see the probe above) vits-web creates the file handle but
+      // stores zero bytes, so stored() lies and every refetch lands in the same
+      // hole. Say so instead of retrying into it.
+      const dir = navigator.storage && navigator.storage.getDirectory
+        ? await navigator.storage.getDirectory() : null;
+      const canWrite = dir && typeof (await dir.getFileHandle('bd_probe2.txt', { create: true })).createWritable === 'function';
+      if (dir) await dir.removeEntry('bd_probe2.txt').catch(() => {});
+      if (!canWrite) {
+        log('  CAUSE: this browser has no OPFS write API, so vits-web stored 0 bytes.');
+        log('  Piper via vits-web cannot work here. Try Chrome, or press Kokoro —');
+        log('  kokoro-js stores via the Cache API and does not touch OPFS.');
+        throw err;
+      }
+      log('  cached voice looks truncated - clearing and refetching...');
       await tts.remove(VOICE);
       await tts.download(VOICE, p => { if (p.total) total = Math.max(total, p.total); });
       log('  refetched; re-timing synthesis from clean files');
