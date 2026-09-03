@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-01, 18:05 BST
+# Continuation note — 2026-09-03, 09:40 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -10,13 +10,20 @@ state it is in, and which document answers which question.
 **Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
 
     git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: 8131f32 or later
+    git log --oneline -1          # expect: 2b9785c or later
 
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
-Current build: **`viewer.js?v=763`, `style.css?v=444`**, canary **green**.
+Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
 
-**Read `session_notes_2026-09-01.md` next** — it covers the whole of 1 Sept:
+**Speech work is live and staged — read `speech_plan.md`.** Stage 0 is built
+(`2b9785c`): a Speak checkbox reads node text and arriving cards, synthesised
+server-side by macOS `say` and cached. The voice is a DELIBERATE placeholder.
+**Stage 1 is next: the same architecture with a real neural engine and its own
+stock voice, before anyone records anything.** `session_notes_2026-09-02.md` has
+the reasoning, including why Mandarin tones are not pursued.
+
+**Read `session_notes_2026-09-01.md` too** — it covers the whole of 1 Sept:
 chunked presentation retired, Gateways re-parented under Conversations, the
 splash rebuilt, the ring geometry corrected, and three faults in the curation
 write path (one of which was silently destroying node text). Its closing table
