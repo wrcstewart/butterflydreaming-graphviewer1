@@ -503,6 +503,20 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
         if (firstMs === null) firstMs = performance.now() - t1;
         queue.push(URL.createObjectURL(one));
         playNext();
+
+        // 2026-09-03 — BACKPRESSURE. Ten long runs died at exactly 25 of 37.
+        //
+        // Synthesis is ~5x faster than speech, so it races minutes ahead of the
+        // voice: by utterance 25 it has generated four minutes of audio while
+        // one has been spoken. Each predict() grows the Emscripten WASM heap,
+        // which never shrinks, so the cost of running ahead is paid in memory
+        // that is never returned — and on a phone that is fatal at a repeatable
+        // point.
+        //
+        // Waiting until the voice is close behind caps the heap AND is what BD
+        // actually wants: there is no value in synthesising a passage the reader
+        // may navigate away from. Reading still starts on the first sentence.
+        while (queue.length >= 2) await new Promise(r => setTimeout(r, 150));
         if (i === 0 || (i + 1) % 5 === 0 || i === utterances.length - 1) {
           log('    ' + (i + 1) + '/' + utterances.length);
           beacon('piper-utterance', String(i + 1) + '/' + utterances.length);
