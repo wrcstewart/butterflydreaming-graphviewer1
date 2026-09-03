@@ -71,10 +71,26 @@ app.use((req, res, next) => {
 // Opt-in by query so the working configuration is still reachable for
 // comparison — if isolation breaks a subresource, the page fails entirely, and
 // losing the only run that works would be a bad trade for an experiment.
+// 2026-09-03, corrected — ?iso=1 is require-corp, NOT credentialless.
+//
+// credentialless was chosen to avoid needing CORP headers from huggingface.co
+// and esm.sh. It is also the one COEP value SAFARI DOES NOT IMPLEMENT, so on the
+// only platform this measurement is for, the header was ignored and
+// crossOriginIsolated stayed false. The headers were being delivered correctly
+// the whole time; the value was wrong.
+//
+// require-corp is what WebKit supports. Cross-origin subresources must then be
+// allowed by CORP *or* by being fetched in CORS mode with valid CORS headers —
+// and ES module imports are always CORS-mode, with esm.sh sending
+// access-control-allow-origin: *. So this may simply work; if a model fetch is
+// refused, the page fails loudly and that is its own answer.
+//
+// ?iso=2 keeps credentialless for a Chrome/Firefox comparison.
 app.use((req, res, next) => {
-  if (req.query.iso === '1') {
+  const iso = req.query.iso;
+  if (iso === '1' || iso === '2') {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    res.setHeader('Cross-Origin-Embedder-Policy', iso === '2' ? 'credentialless' : 'require-corp');
   }
   next();
 });
