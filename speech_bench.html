@@ -98,20 +98,24 @@
   </label>
   <details style="margin:0 0 10px">
     <summary class="sub" style="cursor:pointer">Pronunciation lexicon (espeak phonemes)</summary>
-    <p class="sub" style="margin:6px 0">One per line, <code>word = respelling</code> &mdash; write it as an
-    English reader would sound it out. Substitution happens before synthesis, so it needs no change to the
-    model and <b>cannot fail to parse</b>. Espeak phoneme notation was tried first and was read out letter by
-    letter; respelling avoids the whole question of which notation the engine expects.
-    <b>Tune these by ear</b> &mdash; they are starting points and only you can hear the result.
-    A value wrapped in <code>[[ ]]</code> is passed through untouched, if you ever want raw phonemes.</p>
-    <textarea id="lexicon" style="min-height:150px">Zhuangzi = Jwahng dzuh
-Laozi = Lao dzuh
-Li Bai = Lee Bye
-Li = Lee
-Du Fu = Doo Foo
-Khwan = Kwahn
-Phing = Ping
-Tao Te Ching = Dow Duh Jing</textarea>
+    <p class="sub" style="margin:6px 0">One per line. A value in <code>[[ ]]</code> is
+    <b>espeak phonemes</b>; anything else is a plain respelling. Substitution happens before synthesis, so
+    neither needs any change to the model.</p>
+    <p class="sub" style="margin:6px 0">These phoneme strings are <b>verified against espeak-ng locally</b>,
+    not guessed: <code>[[dZw'A:Ndz@]]</code> gives <code>d&#658;w&#712;&#593;&#720;&#331;dz&#592;</code>
+    where the bare word gives <code>&#658;j&#712;u&#720;&#230;&#331;z&#618;</code>.
+    <b>If they are still read out letter by letter, Piper is stripping the brackets before phonemising</b> —
+    in which case swap to respellings, e.g. <code>Zhuangzi = Jwahng dzuh</code>. Note respelling is a guess at
+    English spelling: measured, <code>Tow</code> gives <code>t&#712;&#601;&#650;</code> but
+    <code>Dow</code> gives <code>d&#712;a&#650;</code>.</p>
+    <textarea id="lexicon" style="min-height:170px">Zhuangzi = [[dZw'A:Ndz@]]
+Laozi = [[l'aUdz@]]
+Li Bai = [[l'i: b'aI]]
+Li = [[l'i:]]
+Du Fu = [[d'u: f'u:]]
+Khwan = [[kw'A:n]]
+Phing = [[p'VN]]
+Tao Te Ching = [[d'aU d@ dZ'IN]]</textarea>
   </details>
   <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
