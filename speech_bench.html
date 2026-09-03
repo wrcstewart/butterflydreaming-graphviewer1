@@ -199,7 +199,7 @@ document.getElementById('load-zz').addEventListener('click', async (ev) => {
 // parsing ("JSON Parse error: Unexpected EOF"), with no way out from the UI.
 document.getElementById('reset').addEventListener('click', async () => {
   try {
-    const tts = await import('https://esm.sh/@diffusionstudio/vits-web@1.0.3');
+    const tts = await import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm');
     const before = await tts.stored();
     await tts.flush();
     log('cleared cached Piper voices: ' + (before.length ? before.join(', ') : 'none'));
@@ -355,8 +355,21 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
   ev.target.disabled = true;
   try {
     clear(); environment(); await probeOPFS();
-    log('Piper (vits-web) — loading library…');
-    const tts = await import('https://esm.sh/@diffusionstudio/vits-web@1.0.3');
+    // 2026-09-03 — jsDelivr, NOT esm.sh.
+    //
+    // On esm.sh this died with "[unenv] fs.readFile is not implemented yet".
+    // The piper chunk is an Emscripten module that picks its environment at
+    // runtime:
+    //
+    //   ENVIRONMENT_IS_NODE = typeof process.versions.node == "string"
+    //
+    // esm.sh shims `process`, so that test passes IN A BROWSER, Emscripten takes
+    // the Node branch, and calls fs.readFile — which esm.sh has stubbed with
+    // unenv to throw. Nothing to do with Safari: the same bundle would fail in
+    // Chrome. jsDelivr does not shim process, so the identical code takes the
+    // browser path.
+    log('Piper (vits-web via jsDelivr) — loading library…');
+    const tts = await import('https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm');
     const VOICE = document.getElementById('voice').value;
 
     const already = await tts.stored();
