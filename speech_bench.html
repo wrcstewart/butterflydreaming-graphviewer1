@@ -213,11 +213,14 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     });
     log('Piper is the DESTINATION: fine-tuning to a custom voice is supported and');
     log('exports to ONNX, so this is the path her voice would actually take.');
-    await sendLog('piper');
   } catch (err) {
     log('FAILED: ' + (err && err.message ? err.message : err));
+    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 4).join('\n'));
     log('(A failure here is a real result — it is what step 1 exists to find.)');
-  } finally { ev.target.disabled = false; }
+  } finally {
+    ev.target.disabled = false;
+    await sendLog('piper');   // every exit path, especially the failing one
+  }
 });
 
 // ---- Kokoro ----------------------------------------------------------------
@@ -252,14 +255,27 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     await report('KOKORO bf_emma', { loadMs, loadBytes: fmtMB(b.known), synthMs, seconds, blob });
     log('Kokoro is the QUALITY BAR only. Fine-tuning is NOT open-sourced, so it');
     log('cannot become her voice without a separate voice-conversion step.');
-    await sendLog('kokoro');
   } catch (err) {
     log('FAILED: ' + (err && err.message ? err.message : err));
+    if (err && err.stack) log(String(err.stack).split('\n').slice(0, 4).join('\n'));
     log('(A failure here is a real result — it is what step 1 exists to find.)');
-  } finally { ev.target.disabled = false; }
+  } finally {
+    ev.target.disabled = false;
+    await sendLog('kokoro');
+  }
+});
+
+window.addEventListener('error', e => {
+  log('UNCAUGHT: ' + (e.message || e.type));
+  sendLog('uncaught');
+});
+window.addEventListener('unhandledrejection', e => {
+  log('UNHANDLED REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  sendLog('rejection');
 });
 
 environment();
+sendLog('page-loaded');   // proves the page reached the server at all
 </script>
 </body>
 </html>
