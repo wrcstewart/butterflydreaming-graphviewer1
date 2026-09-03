@@ -138,6 +138,37 @@ function environment() {
   log('');
 }
 
+// 2026-09-03 - OPFS write probe.
+//
+// Piper failed with "JSON Parse error: Unexpected EOF" AFTER a clean refetch, so
+// it is not a corrupt download. The source URLs return 200, and a CORS block
+// would throw a network error rather than a parse error - an EOF means the file
+// was read and was EMPTY. vits-web stores models in the Origin Private File
+// System, and Safari's OPFS has historically lacked createWritable (sync access
+// handles in workers only). A silently no-op write gives exactly this: stored()
+// sees the handle, predict() reads zero bytes.
+//
+// Measure it rather than reasoning about it.
+async function probeOPFS() {
+  try {
+    if (!navigator.storage || !navigator.storage.getDirectory) { log('OPFS         : NOT AVAILABLE'); return; }
+    const dir = await navigator.storage.getDirectory();
+    const fh  = await dir.getFileHandle('bd_probe.txt', { create: true });
+    log('OPFS         : available');
+    log('  createWritable        : ' + (typeof fh.createWritable === 'function' ? 'yes' : 'NO  <-- likely cause'));
+    log('  createSyncAccessHandle: ' + (typeof fh.createSyncAccessHandle === 'function' ? 'yes (workers only)' : 'no'));
+    if (typeof fh.createWritable === 'function') {
+      const w = await fh.createWritable();
+      await w.write('hello');
+      await w.close();
+      const size = (await fh.getFile()).size;
+      log('  write/read back       : ' + size + ' bytes ' + (size === 5 ? '(OK)' : '<-- WROTE NOTHING'));
+    }
+    await dir.removeEntry('bd_probe.txt').catch(() => {});
+  } catch (e) { log('OPFS         : probe failed - ' + e.message); }
+  log('');
+}
+
 // Bytes actually pulled over the wire since a mark. Cross-origin entries only
 // report sizes when the server sends Timing-Allow-Origin, so this can honestly
 // come back unknown rather than wrong.
@@ -198,7 +229,7 @@ async function report(label, { loadMs, loadBytes, synthMs, seconds, blob }) {
 document.getElementById('run-piper').addEventListener('click', async (ev) => {
   ev.target.disabled = true;
   try {
-    clear(); environment();
+    clear(); environment(); await probeOPFS();
     log('Piper (vits-web) — loading library…');
     const tts = await import('https://esm.sh/@diffusionstudio/vits-web@1.0.3');
     const VOICE = document.getElementById('voice').value;
@@ -256,7 +287,7 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
 document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
   ev.target.disabled = true;
   try {
-    clear(); environment();
+    clear(); environment(); await probeOPFS();
     log('Kokoro (kokoro-js) — loading library…');
     const { KokoroTTS } = await import('https://esm.sh/kokoro-js@1.2.1');
     // q8 by default even where WebGPU exists. fp32 is the recommended WebGPU
@@ -304,7 +335,7 @@ window.addEventListener('unhandledrejection', e => {
 });
 
 environment();
-sendLog('page-loaded');   // proves the page reached the server at all
+probeOPFS().then(() => sendLog('page-loaded'));
 </script>
 </body>
 </html>
