@@ -92,6 +92,35 @@
 </fieldset>
 
 <script type="module">
+// 2026-09-03 — WebKit polyfill: async iteration over a ReadableStream.
+//
+// Kokoro failed on Safari inside `phonemizer`, at MODULE EVALUATION rather than
+// in a call. The construct is:
+//
+//   j = new Blob([X]).stream().pipeThrough(new DecompressionStream("gzip"));
+//   for await (const chunk of j) { ... }
+//
+// It embeds a gzipped espeak-ng dataset and decompresses it at load. Chrome and
+// Firefox implement ReadableStream[Symbol.asyncIterator]; WebKit never shipped
+// it, so `for await` finds undefined — exactly the reported "undefined is not a
+// function (near '...J of j...')".
+//
+// Not a missing capability: Safari 26 has WebGPU and a writable OPFS. It is one
+// absent protocol on one object, and the shim is the documented one. Must run
+// BEFORE the dynamic import, which is why it sits at the top of the module.
+if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+  ReadableStream.prototype[Symbol.asyncIterator] = function () {
+    const reader = this.getReader();
+    return {
+      next: () => reader.read(),
+      return: async (value) => { await reader.cancel(); return { done: true, value }; },
+      throw: async (err) => { await reader.cancel(); throw err; },
+      [Symbol.asyncIterator]() { return this; },
+    };
+  };
+  window.__bdStreamPolyfill = true;
+}
+
 const outEl = document.getElementById('out');
 const vEl   = document.getElementById('verdict');
 const log = (s = '') => { outEl.textContent += (outEl.textContent ? '\n' : '') + s; window.scrollTo(0, document.body.scrollHeight); };
@@ -170,6 +199,7 @@ function environment() {
   log('browser       : ' + (ver ? ver[0].split(' ')[0] + '  (' + ver[1] + ')' : 'unknown'));
   log('cores         : ' + c);
   log('WebGPU        : ' + gpu);
+  log('ReadableStream async-iter: ' + (window.__bdStreamPolyfill ? 'POLYFILLED (WebKit lacks it)' : 'native'));
   log('cross-origin isolated: ' + iso);
   log('');
 }
