@@ -98,17 +98,20 @@
   </label>
   <details style="margin:0 0 10px">
     <summary class="sub" style="cursor:pointer">Pronunciation lexicon (espeak phonemes)</summary>
-    <p class="sub" style="margin:6px 0">One per line, <code>word = phonemes</code>. Piper phonemises with
-    espeak-ng, which reads <code>[[...]]</code> in the text as literal phonemes &mdash; so this is pure text
-    substitution before synthesis, and needs no change to the model. These are first guesses:
-    <b>adjust by ear</b>, since only you can hear the result.</p>
-    <textarea id="lexicon" style="min-height:120px">Zhuangzi = dZw'aNdz@
-Laozi = l'aUdz@
-Li Bai = l'i: b'aI
-Du Fu = d'u: f'u:
-Khwan = kw'a:n
-Phing = p'IN
-Tao Te Ching = t'aU t'eI tS'IN</textarea>
+    <p class="sub" style="margin:6px 0">One per line, <code>word = respelling</code> &mdash; write it as an
+    English reader would sound it out. Substitution happens before synthesis, so it needs no change to the
+    model and <b>cannot fail to parse</b>. Espeak phoneme notation was tried first and was read out letter by
+    letter; respelling avoids the whole question of which notation the engine expects.
+    <b>Tune these by ear</b> &mdash; they are starting points and only you can hear the result.
+    A value wrapped in <code>[[ ]]</code> is passed through untouched, if you ever want raw phonemes.</p>
+    <textarea id="lexicon" style="min-height:150px">Zhuangzi = Jwahng dzuh
+Laozi = Lao dzuh
+Li Bai = Lee Bye
+Li = Lee
+Du Fu = Doo Foo
+Khwan = Kwahn
+Phing = Ping
+Tao Te Ching = Dow Duh Jing</textarea>
   </details>
   <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
@@ -409,7 +412,11 @@ function applyLexicon(text) {
   let out = text, n = 0;
   for (const [word, ph] of entries) {
     const re = new RegExp('\\b' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-    out = out.replace(re, () => { n++; return '[[' + ph + ']]'; });
+    // A [[...]] value is raw phonemes and goes through untouched; anything else
+    // is a respelling and is substituted as ordinary words. Respelling is the
+    // default because it cannot be mis-parsed — the espeak notation attempt was
+    // spelled out letter by letter instead of spoken.
+    out = out.replace(re, () => { n++; return ph; });
   }
   return { text: out, substitutions: n };
 }
