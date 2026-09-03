@@ -83,6 +83,13 @@
   </label>
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
+  <label class="sub" style="display:block;margin:0 0 10px">Kokoro backend:
+    <select id="device" style="font-size:16px;padding:6px;background:#101014;color:#e8e8ea;border:1px solid #33333c;border-radius:4px">
+      <option value="auto">auto &mdash; WebGPU if present</option>
+      <option value="wasm">wasm &mdash; CPU, avoids the GPU path entirely</option>
+      <option value="webgpu">webgpu &mdash; force</option>
+    </select>
+  </label>
   <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
   <button id="send">Send log to server</button>
@@ -429,7 +436,13 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     // Running a heavily quantised model down a path not tuned for it measures
     // the mistake, not the engine. The checkbox now FORCES q8 for a deliberate
     // small-download run instead of opting into the correct setting.
-    const device = ('gpu' in navigator) ? 'webgpu' : 'wasm';
+    // 2026-09-03 — backend is selectable too. fp16 on WebKit's WebGPU produced
+    // audible DISTORTION as well as RTF 1.44, and those are different faults:
+    // slow is a performance result, distorted suggests the numerical path itself
+    // is wrong on this hardware. Forcing wasm separates "this GPU backend is bad
+    // here" from "this model is bad here" — and nothing else in the matrix can.
+    const devSel = document.getElementById('device').value;
+    const device = devSel !== 'auto' ? devSel : (('gpu' in navigator) ? 'webgpu' : 'wasm');
     // 2026-09-03 — dtype is CHOSEN BY THE OPERATOR now, not inferred.
     //
     // I picked it twice and got it wrong twice in opposite directions: q8 on a
