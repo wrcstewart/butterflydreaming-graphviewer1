@@ -442,74 +442,80 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
 
     const passage = document.getElementById('text').value;
     const utterances = splitUtterances(passage);
-    log('  synthesising ' + utterances.length + ' utterance(s)…');
+    log('  synthesising ' + utterances.length + ' utterance(s), playing as they arrive…');
     beacon('piper-before-synth', 'utterances=' + utterances.length + ' chars=' + passage.length);
 
-    const ac = new (window.AudioContext || window.webkitAudioContext)();
-    const chunks = [];
-    let rate = 22050, firstMs = null;
+    // 2026-09-03 — PLAY AND RELEASE. Do not accumulate.
+    //
+    // The previous version decoded every utterance and kept the Float32 data to
+    // assemble one WAV at the end. On a phone that died at 25 of 37: 37 decoded
+    // AudioBuffers plus 37 blobs plus 37 copies, all alive at once. It is the
+    // same memory mistake that killed the Kokoro run, rebuilt in the Piper path.
+    //
+    // Each utterance is now played and its URL revoked. Nothing is decoded —
+    // duration comes from the WAV header, which is exact and free. This is also
+    // precisely what BD needs: reading starts on the first sentence rather than
+    // after the last, and memory stays flat however long the passage is.
+    //
+    // The audio element is unlocked SYNCHRONOUSLY on the click. WebKit only
+    // honours playback started from a user gesture, and every await after the
+    // click breaks that chain — which is what "autoplay blocked" was.
+    const player = new Audio();
+    player.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+    try { await player.play(); } catch (_) {}
+
+    const queue = [];
+    let playing = false;
+    const playNext = () => {
+      if (playing) return;
+      const next = queue.shift();
+      if (!next) return;
+      playing = true;
+      player.src = next;
+      player.onended = () => { URL.revokeObjectURL(next); playing = false; playNext(); };
+      player.onerror = () => { URL.revokeObjectURL(next); playing = false; playNext(); };
+      player.play().catch(() => { playing = false; });
+    };
+
+    // Duration from the WAV header: data bytes / (rate * channels * bytes).
+    async function wavSeconds(blob) {
+      const h = new DataView(await blob.slice(0, 44).arrayBuffer());
+      const rate = h.getUint32(24, true), ch = h.getUint16(22, true), bits = h.getUint16(34, true);
+      return (blob.size - 44) / (rate * ch * (bits / 8));
+    }
+
     let t1 = performance.now();
-    let wav;
+    let firstMs = null, totalSeconds = 0;
     try {
       for (let i = 0; i < utterances.length; i++) {
         const one = await tts.predict({ text: utterances[i], voiceId: VOICE });
-        const dec = await ac.decodeAudioData(await one.arrayBuffer());
-        rate = dec.sampleRate;
-        chunks.push(dec.getChannelData(0).slice());
+        totalSeconds += await wavSeconds(one);
         if (firstMs === null) firstMs = performance.now() - t1;
+        queue.push(URL.createObjectURL(one));
+        playNext();
         if (i === 0 || (i + 1) % 5 === 0 || i === utterances.length - 1) {
           log('    ' + (i + 1) + '/' + utterances.length);
           beacon('piper-utterance', String(i + 1) + '/' + utterances.length);
         }
-        // Hand the main thread back between utterances. WASM synthesis blocks
-        // it outright, so without this the page cannot even repaint its own
-        // progress — which is what "nothing happening" looked like.
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise(r => setTimeout(r, 0));   // let the UI repaint
       }
-      wav = null;
     } catch (err) {
-      // Self-heal the corrupt-cache case rather than leaving it wedged: a
-      // truncated download is indistinguishable from a good one via stored(),
-      // so the parse error IS the integrity check.
       if (!/JSON|EOF|Unexpected/i.test(String(err && err.message))) throw err;
-      // 2026-09-03 — measured: this is NOT a corrupt download. If OPFS has no
-      // write API (see the probe above) vits-web creates the file handle but
-      // stores zero bytes, so stored() lies and every refetch lands in the same
-      // hole. Say so instead of retrying into it.
-      const dir = navigator.storage && navigator.storage.getDirectory
-        ? await navigator.storage.getDirectory() : null;
-      const canWrite = dir && typeof (await dir.getFileHandle('bd_probe2.txt', { create: true })).createWritable === 'function';
-      if (dir) await dir.removeEntry('bd_probe2.txt').catch(() => {});
-      if (!canWrite) {
-        log('  CAUSE: this browser has no OPFS write API, so vits-web stored 0 bytes.');
-        log('  Piper via vits-web cannot work here. Try Chrome, or press Kokoro —');
-        log('  kokoro-js stores via the Cache API and does not touch OPFS.');
-        throw err;
-      }
-      log('  cached voice looks truncated - clearing and refetching...');
-      await tts.remove(VOICE);
-      await tts.download(VOICE, p => { if (p.total) total = Math.max(total, p.total); });
-      log('  refetched; re-timing synthesis from clean files');
-      t1 = performance.now();
-      chunks.length = 0; firstMs = null;
-      for (const u of utterances) {
-        const one = await tts.predict({ text: u, voiceId: VOICE });
-        const dec = await ac.decodeAudioData(await one.arrayBuffer());
-        rate = dec.sampleRate;
-        chunks.push(dec.getChannelData(0).slice());
-        if (firstMs === null) firstMs = performance.now() - t1;
-      }
+      log('  CAUSE: cached voice unreadable — press "Clear cached models" and retry.');
+      throw err;
     }
     const synthMs = performance.now() - t1;
-    beacon('piper-synth-done', 'chunks=' + chunks.length);
-    try { ac.close(); } catch (_) {}
-    if (!chunks.length) throw new Error('no audio produced');
-    const assembled = chunksToWav(chunks, rate);
-    log('  first audio : ' + (firstMs / 1000).toFixed(2) + ' s  <- when playback could begin');
-    await report('PIPER ' + VOICE, {
-      loadMs, loadBytes: total ? fmtMB(total) : '', synthMs,
-      seconds: assembled.seconds, blob: assembled.blob,
-    });
+    beacon('piper-synth-done', 'seconds=' + totalSeconds.toFixed(1));
+
+    log('  first audio : ' + (firstMs / 1000).toFixed(2) + ' s  <- playback started here');
+    log('PIPER ' + VOICE);
+    log('  model load  : ' + (loadMs / 1000).toFixed(1) + ' s' + (total ? '  (' + fmtMB(total) + ')' : ''));
+    log('  synthesis   : ' + (synthMs / 1000).toFixed(2) + ' s');
+    log('  audio       : ' + totalSeconds.toFixed(2) + ' s');
+    const rtf = (synthMs / 1000) / totalSeconds;
+    log('  REAL-TIME FACTOR : ' + rtf.toFixed(2) + (rtf < 1 ? '  (faster than real time)' : '  (SLOWER)'));
+    log('');
+    verdict(rtf);
     log('Piper is the DESTINATION: fine-tuning to a custom voice is supported and');
     log('exports to ONNX, so this is the path her voice would actually take.');
   } catch (err) {
