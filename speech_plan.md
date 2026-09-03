@@ -150,6 +150,40 @@ Only after stage 1 passes.
   is in there too — useful for *verifying* she read what the script said, not for
   generating transcripts, which are known in advance.
 
+### Where the recordings live
+
+**LJSpeech format**, which is what Piper's preprocessing expects:
+
+    voice_dataset/                 <- gitignored
+      wav/  0001.wav 0002.wav ...  one file PER PROMPT, mono 16-bit PCM
+      metadata.csv                 0001|exact transcript
+      prompts.json                 the script, so a second session resumes
+
+**One file per prompt, not one long recording.** Training pairs each clip with
+its exact text. Reading twenty minutes into a single file means segmenting and
+aligning it afterwards - the most tedious part of building a voice dataset, and
+entirely avoidable at no cost to the reader.
+
+Record at 48 kHz and downsample to 22.05 kHz for a Piper medium model. **Record
+high and come down; you can never go back up.** Three hours is about a gigabyte
+at 48 kHz.
+
+**THIS REPO IS PUBLIC.** `voice_dataset/` and `voice_models/` are gitignored,
+along with `*.wav`, and the guard is in place before there is anything to
+protect. Trained weights are excluded for the same reason as the audio: they ARE
+the voice.
+
+**The raw WAVs are the one irreplaceable artefact here.** A model can be
+retrained from them; they cannot be recreated - not the room, not the mic
+position, not her voice on that day. Back them up off this machine before doing
+anything else with them, and never overwrite them with processed versions.
+
+**A local recording tool is authoring infrastructure, not runtime.** It writes to
+this dev machine, like `bd_tool.js` does; the client-only rule governs
+presentation to thousands of users, not a one-off capture rig. So it may POST
+clips to the server to be written to disk, which is far better than a browser
+downloading several hundred files.
+
 ## Stage 3 — fine-tune, then lexicon refinement
 
 Train, swap the engine config, listen. Then extend the lexicon for whatever it
