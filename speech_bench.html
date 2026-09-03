@@ -91,6 +91,25 @@
       <option value="webgpu">webgpu &mdash; force</option>
     </select>
   </label>
+  <label class="sub" style="display:block;margin:0 0 10px">Speaking rate:
+    <input type="range" id="rate" min="0.75" max="1.15" step="0.01" value="1.0" style="vertical-align:middle;width:170px">
+    <span id="rate-val">1.00</span>
+    <span style="opacity:.7">&mdash; below 1 is slower</span>
+  </label>
+  <details style="margin:0 0 10px">
+    <summary class="sub" style="cursor:pointer">Pronunciation lexicon (espeak phonemes)</summary>
+    <p class="sub" style="margin:6px 0">One per line, <code>word = phonemes</code>. Piper phonemises with
+    espeak-ng, which reads <code>[[...]]</code> in the text as literal phonemes &mdash; so this is pure text
+    substitution before synthesis, and needs no change to the model. These are first guesses:
+    <b>adjust by ear</b>, since only you can hear the result.</p>
+    <textarea id="lexicon" style="min-height:120px">Zhuangzi = dZw'aNdz@
+Laozi = l'aUdz@
+Li Bai = l'i: b'aI
+Du Fu = d'u: f'u:
+Khwan = kw'a:n
+Phing = p'IN
+Tao Te Ching = t'aU t'eI tS'IN</textarea>
+  </details>
   <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
   <button id="send">Send log to server</button>
@@ -153,6 +172,11 @@ async function sendLog(tag) {
   } catch (e) { log('  (could not send log: ' + e.message + ')'); }
 }
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
+(function bindRate() {
+  const r = document.getElementById('rate'), out = document.getElementById('rate-val');
+  const show = () => { out.textContent = Number(r.value).toFixed(2); };
+  r.addEventListener('input', show); show();
+})();
 
 // 2026-09-03 — keep whatever passage is in the box across reloads.
 //
@@ -366,6 +390,30 @@ function splitUtterances(text, maxLen = 300) {
   return out;
 }
 
+// 2026-09-03 — pronunciation lexicon.
+//
+// Piper's voice config says phoneme_type: espeak, and espeak-ng reads [[...]] in
+// its input as literal phonemes. So a dictionary needs no model change at all —
+// it is text substitution before synthesis, which is exactly the shape BD wants:
+// inspectable, correctable, and fixable the moment you hear one that is wrong.
+//
+// Longest key first, so "Tao Te Ching" is matched before "Tao" would be.
+function applyLexicon(text) {
+  const raw = (document.getElementById('lexicon').value || '').split('\n');
+  const entries = [];
+  for (const line of raw) {
+    const m = line.match(/^\s*([^=]+?)\s*=\s*(.+?)\s*$/);
+    if (m) entries.push([m[1], m[2]]);
+  }
+  entries.sort((a, b) => b[0].length - a[0].length);
+  let out = text, n = 0;
+  for (const [word, ph] of entries) {
+    const re = new RegExp('\\b' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    out = out.replace(re, () => { n++; return '[[' + ph + ']]'; });
+  }
+  return { text: out, substitutions: n };
+}
+
 function verdict(rtf) {
   vEl.style.display = 'block';
   if (rtf <= 0.5) {
@@ -440,8 +488,15 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     }
     const loadMs = performance.now() - t0;
 
-    const passage = document.getElementById('text').value;
+    const lex = applyLexicon(document.getElementById('text').value);
+    if (lex.substitutions) log('  lexicon: ' + lex.substitutions + ' substitution(s) applied');
+    const passage = lex.text;
     const utterances = splitUtterances(passage);
+    // playbackRate rather than the model's length_scale, which lives in the
+    // voice's config file and is not reachable through predict(). It is a
+    // time-stretch, not a prosody change — pitch is preserved, but a real
+    // length_scale would sound better. Good enough to find the rate you want.
+    const rate = Number(document.getElementById('rate').value) || 1;
     log('  synthesising ' + utterances.length + ' utterance(s), playing as they arrive…');
     beacon('piper-before-synth', 'utterances=' + utterances.length + ' chars=' + passage.length);
 
@@ -482,6 +537,8 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
       if (!next) return;
       playing = true;
       player.src = next;
+      player.playbackRate = rate;
+      player.preservesPitch = true;
       player.onended = () => { URL.revokeObjectURL(next); playing = false; playNext(); };
       player.onerror = () => { URL.revokeObjectURL(next); playing = false; playNext(); };
       player.play().catch(() => { playing = false; });
