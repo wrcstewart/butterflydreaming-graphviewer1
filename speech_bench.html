@@ -60,7 +60,9 @@
   <legend>Run</legend>
   <p class="sub" style="margin:0 0 8px">
     Each engine downloads a model on first run and caches it. <b>Use wi-fi.</b>
-    Piper voice ~60&nbsp;MB; Kokoro q8 ~90&nbsp;MB, fp32 ~330&nbsp;MB.
+    Piper voice ~60&nbsp;MB. Kokoro uses fp32 (~330&nbsp;MB) where WebGPU exists,
+    q8 (~90&nbsp;MB) otherwise &mdash; that is its own guidance, and forcing q8 onto
+    WebGPU measures the mistake rather than the engine.
   </p>
   <label class="sub" style="display:block;margin:0 0 8px">Piper voice:
     <select id="voice" style="font-size:16px;padding:6px;background:#101014;color:#e8e8ea;border:1px solid #33333c;border-radius:4px">
@@ -71,7 +73,8 @@
     </select>
   </label>
   <label class="sub" style="display:block;margin:0 0 10px">
-    <input type="checkbox" id="hq"> Kokoro at fp32 (~330&nbsp;MB) instead of q8
+    <input type="checkbox" id="hq"> Force Kokoro q8 (~90&nbsp;MB, lower quality) instead of the
+    correct dtype for this device
   </label>
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
@@ -311,12 +314,17 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     clear(); environment(); await probeOPFS();
     log('Kokoro (kokoro-js) — loading library…');
     const { KokoroTTS } = await import('https://esm.sh/kokoro-js@1.2.1');
-    // q8 by default even where WebGPU exists. fp32 is the recommended WebGPU
-    // dtype and sounds better, but it is a ~330 MB download and this page is a
-    // SPEED bench, not a quality shoot-out — making that the default would tax a
-    // phone on mobile data to answer a question it was not asked. Opt in above.
+    // 2026-09-03 — dtype follows Kokoro's OWN guidance: fp32 on WebGPU, q8 on
+    // WASM. An earlier revision forced q8 everywhere to spare mobile data, and
+    // that produced a misleading first measurement — RTF 1.40 on a WebGPU
+    // desktop, plus output described as "a woman speaking a foreign language".
+    // Running a heavily quantised model down a path not tuned for it measures
+    // the mistake, not the engine. The checkbox now FORCES q8 for a deliberate
+    // small-download run instead of opting into the correct setting.
     const device = ('gpu' in navigator) ? 'webgpu' : 'wasm';
-    const dtype  = document.getElementById('hq').checked ? 'fp32' : 'q8';
+    const forceQ8 = document.getElementById('hq').checked;
+    const dtype  = forceQ8 ? 'q8' : (device === 'webgpu' ? 'fp32' : 'q8');
+    if (device === 'webgpu' && forceQ8) log('  NOTE: q8 on WebGPU is off-spec — expect poor quality and speed.');
     log('  device ' + device + ', dtype ' + dtype);
 
     const m0 = performance.now();
@@ -324,7 +332,13 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', { dtype, device });
     const loadMs = performance.now() - t0;
     const b = bytesSince(m0);
-    log('  fetched ' + fmtMB(b.known) + (b.unknown ? ' (+' + b.unknown + ' requests of unreported size)' : ''));
+    // HuggingFace does not send Timing-Allow-Origin, so the model itself is
+    // invisible to the Resource Timing API. Printing only the known bytes said
+    // "3.9 MB" for a ~90 MB download, which is worse than saying nothing.
+    log('  fetched ' + (b.unknown
+      ? fmtMB(b.known) + ' measurable + ' + b.unknown + ' cross-origin requests of UNREPORTED size'
+        + ' (the model — expect ~90 MB at q8, ~330 MB at fp32)'
+      : fmtMB(b.known)));
 
     log('  synthesising…');
     const t1 = performance.now();
