@@ -58,6 +58,21 @@
 
 <fieldset>
   <legend>Run</legend>
+  <p class="sub" style="margin:0 0 8px">
+    Each engine downloads a model on first run and caches it. <b>Use wi-fi.</b>
+    Piper voice ~60&nbsp;MB; Kokoro q8 ~90&nbsp;MB, fp32 ~330&nbsp;MB.
+  </p>
+  <label class="sub" style="display:block;margin:0 0 8px">Piper voice:
+    <select id="voice" style="font-size:16px;padding:6px;background:#101014;color:#e8e8ea;border:1px solid #33333c;border-radius:4px">
+      <option value="en_GB-jenny_dioco-medium">jenny_dioco &mdash; softer English female</option>
+      <option value="en_GB-alba-medium">alba &mdash; Scottish female</option>
+      <option value="en_GB-cori-high">cori &mdash; high quality, bigger</option>
+      <option value="en_GB-alan-medium">alan &mdash; male, for contrast</option>
+    </select>
+  </label>
+  <label class="sub" style="display:block;margin:0 0 10px">
+    <input type="checkbox" id="hq"> Kokoro at fp32 (~330&nbsp;MB) instead of q8
+  </label>
   <button id="run-piper">Piper &mdash; the destination</button>
   <button id="run-kokoro">Kokoro &mdash; the quality bar</button>
   <button id="clear">Clear log</button>
@@ -157,7 +172,7 @@ document.getElementById('run-piper').addEventListener('click', async (ev) => {
     clear(); environment();
     log('Piper (vits-web) — loading library…');
     const tts = await import('https://esm.sh/@diffusionstudio/vits-web@1.0.3');
-    const VOICE = 'en_GB-alba-medium';
+    const VOICE = document.getElementById('voice').value;
 
     const already = await tts.stored();
     log('  voices already stored: ' + (already.length ? already.join(', ') : 'none'));
@@ -196,8 +211,12 @@ document.getElementById('run-kokoro').addEventListener('click', async (ev) => {
     clear(); environment();
     log('Kokoro (kokoro-js) — loading library…');
     const { KokoroTTS } = await import('https://esm.sh/kokoro-js@1.2.1');
+    // q8 by default even where WebGPU exists. fp32 is the recommended WebGPU
+    // dtype and sounds better, but it is a ~330 MB download and this page is a
+    // SPEED bench, not a quality shoot-out — making that the default would tax a
+    // phone on mobile data to answer a question it was not asked. Opt in above.
     const device = ('gpu' in navigator) ? 'webgpu' : 'wasm';
-    const dtype  = device === 'webgpu' ? 'fp32' : 'q8';
+    const dtype  = document.getElementById('hq').checked ? 'fp32' : 'q8';
     log('  device ' + device + ', dtype ' + dtype);
 
     const m0 = performance.now();
