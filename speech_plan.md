@@ -36,6 +36,41 @@ that can make the plan unworkable, and none of them need her voice to test.
 
 ---
 
+## Where the engine runs — settled 2026-09-03
+
+**With a cache, server load scales with the CORPUS, not with clients.** A node's
+text is synthesised the first time anyone reaches it and served as a static file
+ever after; ten thousand clients viewing one node cost one generation. Pre-generate
+at ingest and steady-state speech CPU is **zero**.
+
+So the load question does not decide this. **Bandwidth and storage do** — at
+roughly 1 MB of audio per node, a thousand nodes is a gigabyte and ten thousand
+is ten, served from a home machine over cloudflared.
+
+**The split is by whether the text is SHARED or UNIQUE:**
+
+| kind | property | where it is generated |
+|---|---|---|
+| Corpus node text | finite, stable, identical for every client | **server, precomputed, static** — client-side would make every client redo identical work |
+| Ephemeral text (chat cards, partner messages, newly typed) | unbounded, unique per user, never reused | **client** — caching buys nothing when nothing repeats, and this is what genuinely scales with clients × activity |
+
+**Consequence for the engine choice, and it is a hard filter: it must have a
+browser-runnable inference path.** ONNX/WASM or equivalent. Discovering this
+after settling on an engine would be painful, so it belongs in the stage 1
+criteria below.
+
+**Precedent already in this project:** the SR editor ships Whisper `base.en`
+in-browser via transformers.js, ~75 MB, downloaded once and cached. A voice model
+of similar size is a cost this codebase has already accepted and proven on real
+hardware.
+
+**Measure, do not assume: mobile inference speed.** Desktop CPU synthesis is
+comfortably fast; a phone running the same model in WASM is the open question. If
+it is slower than real-time for a long passage the split above becomes essential
+rather than merely tidy. **Testable with a stock voice.**
+
+---
+
 ## Stage 1 — real engine, stock voice · NEXT
 
 Same architecture, real synthesiser, one of **its own** supplied voices. This is
@@ -56,7 +91,9 @@ fine-tune path from the same model family. *Verify currency before committing:
 this field moves monthly and my knowledge has a cutoff.* The requirements to
 check any candidate against are: runs locally (her voice never leaves the
 machine), licence compatible with a free public site, stock voices now,
-fine-tunable on ~1 hr later, and a pronunciation-override mechanism.
+fine-tunable on ~1 hr later, a pronunciation-override mechanism, **and a
+browser-runnable inference path** — see the section above; without that last one
+the ephemeral-text half has no engine.
 
 **3. Add the lexicon, and test it before it matters.** A small
 `speech_lexicon.json` of word → phonemes, applied before synthesis. Seed it with
@@ -69,9 +106,15 @@ and wall-clock. That converts the storage question from an estimate into a
 number, and gives the ingest-time generation hook its home. Run it against the
 stock voice.
 
+**5. Measure the same engine in the browser, on a phone.** Real-time factor for
+a long passage, and the model download size. This decides whether the
+shared/unique split is a convenience or a necessity, and it is the one number
+that cannot be reasoned out from here.
+
 **Exit criterion for stage 1: a stock neural voice reads a Du Fu passage,
-pronounces the names from the lexicon correctly, and the whole corpus generates
-in a known time into a known number of megabytes.** Nothing about her voice is
+pronounces the names from the lexicon correctly, the whole corpus generates in a
+known time into a known number of megabytes, and the same model has a measured
+real-time factor on a phone.** Nothing about her voice is
 needed to reach it — and if any of it fails, it fails before anyone has spent an
 hour recording.
 
@@ -124,4 +167,6 @@ is the route — **but that is a stage 1 model choice, not a stage 3 addition.**
 | Total cache size | unknown until the warm-up CLI runs |
 | Generation trigger | on-demand now; ingest-time hook wanted once the corpus grows |
 | Speech vs music | speech uses a plain `Audio`, separate from `#media-bar` — they can overlap |
+| Client-side engine | required for ephemeral text; browser-runnable path is now a stage 1 filter |
+| Mobile real-time factor | unknown, and decisive for the split. Measure at stage 1 |
 | Cache eviction | none. Fine while the corpus is small; needs a policy later |
