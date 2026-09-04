@@ -78,7 +78,16 @@ export async function loadVoice(voiceId, onProgress) {
   ortMod = ortMod || await import(/* @vite-ignore */ `${ORT}/+esm`);
   ortMod.env.allowLocalModels = false;
   ortMod.env.wasm.wasmPaths = `${ORT}/dist/`;
-  ortMod.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
+  // 2026-09-04 — threads only where they can actually be used.
+  //
+  // Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin
+  // isolation — and BD deliberately does NOT enable COOP/COEP, because it would
+  // block the Kolam and music iframes served from GitHub Pages. Asking for 8
+  // threads anyway just produced an onnxruntime warning on every load and got
+  // silently reduced to 1. Ask for what is available.
+  ortMod.env.wasm.numThreads = self.crossOriginIsolated
+    ? (navigator.hardwareConcurrency || 4)
+    : 1;
 
   const cfgBuf = await cached(`${HF}/${path}.onnx.json`, onProgress);
   const cfg = JSON.parse(new TextDecoder().decode(cfgBuf));
