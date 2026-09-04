@@ -692,15 +692,25 @@ function applyDuck(el, to, ms) {
   }, 25);
 }
 
-function duckMedia() {
+// Is the voice running right now? Used by the media player at start-up, which
+// has to know whether to come in quietly.
+function speechActive() {
+  return speakBusy || speakQueue.length > 0;
+}
+
+// `fast` starts the track already low instead of sliding down from full. A
+// 250ms slide is right when the music is playing and the voice arrives; it is
+// wrong when the music arrives during speech, because the first quarter-second
+// is a burst of full-volume music over a sentence.
+function duckMedia(fast) {
   const el = mediaAudioEl();
   if (!el || el.paused) return;
   // Already ducked — do NOT re-save, or the held-down value becomes "the
   // user's volume" and the music never comes back up.
   if (duckSaved !== null) return;
   duckSaved = duckGainFor(el) ? 1 : el.volume;
-  console.log('[BD] duck: down to ' + (duckSaved * DUCK_LEVEL).toFixed(2));
-  applyDuck(el, duckSaved * DUCK_LEVEL, DUCK_MS);
+  console.log('[BD] duck: down to ' + (duckSaved * DUCK_LEVEL).toFixed(2) + (fast ? ' (fast)' : ''));
+  applyDuck(el, duckSaved * DUCK_LEVEL, fast ? 30 : DUCK_MS);
 }
 
 function unduckMedia() {
@@ -748,7 +758,7 @@ function splitUtterances(text, maxLen = 300) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=769');
+    const mod = await import('./piper_direct.js?v=770');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -7205,6 +7215,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     audio.loop = mediaLoopOn;
     loopBtn.classList.toggle('on', mediaLoopOn);
+
+    // 2026-09-04 — the player checks the voice at START-UP.
+    //
+    // Ducking only ever fired when SPEECH began, so starting a track while a
+    // node was being read came in at full volume and stayed there until the
+    // next utterance — a few seconds of music over the voice. This is the
+    // mirror case, and it needs to be asked at every play rather than once when
+    // the bar is built: a track can be started, paused and restarted, and each
+    // restart is a fresh chance to be loud.
+    audio.addEventListener('play', () => {
+      if (typeof speechActive === 'function' && speechActive()) duckMedia(true);
+    });
 
     btn.addEventListener('click', () => {
       if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
