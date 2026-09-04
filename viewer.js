@@ -576,11 +576,66 @@ let speakBusy    = false;
 let speakGen     = 0;          // bumped by an interrupt; a fetch from an older
 const speakQueue = [];         // generation lands after and must be discarded
 
+// 2026-09-04 — DUCK the media bar while speech plays.
+//
+// Text now has a second representation as sound, so the music and the reading
+// voice compete for the same ear. Pausing the music outright is heavy-handed —
+// the user can already do that — so the default is to push it into the
+// background at 30% and bring it back afterwards.
+//
+// Three details that matter more than the level itself:
+//
+//   * Remember the USER'S volume, not 1.0. Restoring to full would be a bug for
+//     anyone who had deliberately set it low.
+//   * RAMP rather than step. A sudden drop reads as a glitch; a 250ms slide
+//     reads as intentional, which is the whole point of ducking.
+//   * Re-query the element every time. The media bar rebuilds its <audio> via
+//     innerHTML when the track changes, so a cached reference goes stale.
+const DUCK_LEVEL = 0.30;
+const DUCK_MS    = 250;
+let duckSaved = null;      // the user's own volume, while we are holding it down
+let duckTimer = null;
+
+function mediaAudioEl() {
+  return document.querySelector('#media-bar audio');
+}
+
+function rampVolume(el, to, ms) {
+  clearInterval(duckTimer);
+  const from = el.volume, steps = Math.max(1, Math.round(ms / 25));
+  let i = 0;
+  duckTimer = setInterval(() => {
+    i++;
+    el.volume = Math.max(0, Math.min(1, from + (to - from) * (i / steps)));
+    if (i >= steps) clearInterval(duckTimer);
+  }, 25);
+}
+
+function duckMedia() {
+  const el = mediaAudioEl();
+  if (!el || el.paused) return;
+  // Already ducked — do NOT re-save, or the held-down value becomes "the
+  // user's volume" and the music never comes back up.
+  if (duckSaved !== null) return;
+  duckSaved = el.volume;
+  rampVolume(el, duckSaved * DUCK_LEVEL, DUCK_MS);
+}
+
+function unduckMedia() {
+  const el = mediaAudioEl();
+  if (duckSaved === null) return;
+  const back = duckSaved;
+  duckSaved = null;
+  if (el) rampVolume(el, back, DUCK_MS);
+}
+
 function playNextSpeech() {
   if (speakBusy) return;
   const next = speakQueue.shift();
-  if (!next) return;
+  // Nothing left to say — let the music back up.
+  if (!next) { unduckMedia(); return; }
   speakBusy = true;
+  duckMedia();
   const gen = speakGen;
   fetch('/api/speak', {
     method: 'POST',
@@ -600,6 +655,8 @@ function playNextSpeech() {
       return speakAudio.play();
     })
     .catch(err => { console.warn('[BD] speak failed', err); speakBusy = false; playNextSpeech(); });
+  // playNextSpeech un-ducks when the queue drains, so every exit path — ended,
+  // errored, or interrupted — arrives back there and restores the volume.
 }
 
 // interrupt: a node tap means you have MOVED ON, so the previous node's text
@@ -616,6 +673,7 @@ function speak(raw, { interrupt = false } = {}) {
 
 function stopSpeech() {
   speakGen++;
+  unduckMedia();          // un-ticking Speak must not leave the music quiet
   speakQueue.length = 0;
   if (speakAudio) { try { speakAudio.pause(); speakAudio.currentTime = 0; } catch (_) {} }
   speakBusy = false;
