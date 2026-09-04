@@ -79,7 +79,53 @@ Zhuangzi is the true `dʒw` here. The earlier "joo-ahng" compromise existed only
 because English spelling cannot write that onset — going in as phonemes, it
 disappears.
 
-## 4. OPEN — commas and the final phrase
+## 4. RESOLVED — the prosody faults
+
+Both reported by ear, and both were the input doing exactly what it was told.
+Neither was the model, the engine, or the dictionary mechanism.
+
+**Fault A: a phrase break before "Te Ching" that nobody wrote, and the real comma
+after "Laozi" going missing.** Cause: the first implementation split the text on
+lexicon keys and phonemised each ordinary fragment separately. **espeak treats
+every entry it is given as a COMPLETE UTTERANCE**, so each fragment got its own
+intonation contour — a break at every segment boundary — while a comma sitting at
+the START of a fragment (", and the ") was dropped as leading punctuation.
+Splitting the text split the prosody with it.
+
+Fix: swap each lexicon word for a pronounceable nonsense PLACEHOLDER, phonemise
+the WHOLE sentence in one call with punctuation intact, then locate the
+placeholder's phoneme run and replace it with the intended IPA. espeak computes
+prosody over a real sentence and never sees the name. Verified before shipping:
+
+    whole  : kəmpˈeə ðə zˈɔːbɪk ɐtɹˈɪbjuːtɪd tə vˈændɛks, ænd ðə plˈɪmʌk.
+    after  : kəmpˈeə ðə dˈaʊ dɐ dʒˈɪŋ ɐtɹˈɪbjuːtɪd tə lˈaʊdzə, ænd ðə dʒwˈɑːŋdzə.
+
+**Fault B: "Tao Te Ching" read as a series of words being compared, with "Te"
+drifting toward "to".** Diagnosed by the user, and the IPA was the cause:
+`dˈaʊ dɐ dʒˈɪŋ` contains SPACES — word boundaries in the phoneme stream — and TWO
+primary stress marks. It said "three words, two of them stressed" and the model
+obliged.
+
+**The two rules for writing lexicon IPA:**
+
+| | |
+|---|---|
+| A **space** is a word boundary | omit it to bind syllables into one word |
+| `ˈ` is **primary stress** | at most one per name; `ˌ` for secondary |
+
+    Tao Te Ching = dˌaʊdədʒˈɪŋ     one word, secondary + primary
+    Li Bai       = lˌiː bˈaɪ       genuinely two words, not two stresses
+
+Check every symbol against `phoneme_id_map` first, `ˌ` included — a missing
+symbol is silently dropped, so the failure is a word with a hole in it.
+
+**A diagnostic trap worth remembering:** the bench logged only the FIRST
+utterance's phonemes, and the names were in the second, so every run had been
+showing the uninteresting half.
+
+Confirmed on the iPhone after both fixes: *"Perfect!"*
+
+## 5. Also open
 
 Reported at the end of the session: **commas "seem to be going astray"**, and
 something is off with the last phrase of the test passage. Not yet investigated.
@@ -94,8 +140,6 @@ Candidates worth checking first:
   punctuation could disturb spacing.
 - The final utterance has no trailing sentence punctuation if the passage does
   not end in `.!?`, which may change how it is spoken.
-
-## 5. Also open
 
 | item | note |
 |---|---|
