@@ -93,9 +93,10 @@
     </select>
   </label>
   <label class="sub" style="display:block;margin:0 0 10px">Speaking rate:
-    <input type="range" id="rate" min="0.75" max="1.15" step="0.01" value="1.0" style="vertical-align:middle;width:170px">
+    <input type="range" id="rate" min="0.5" max="1.15" step="0.01" value="1.0" style="vertical-align:middle;width:200px">
     <span id="rate-val">1.00</span>
-    <span style="opacity:.7">&mdash; below 1 is slower</span>
+    <span class="sub" id="rate-ls" style="opacity:.75"></span>
+    <span style="opacity:.7">&mdash; below 1 is slower; 0.5 is very slow, for hearing detail</span>
   </label>
   <details style="margin:0 0 10px">
     <summary class="sub" style="cursor:pointer">Pronunciation lexicon (espeak phonemes)</summary>
@@ -180,7 +181,15 @@ async function sendLog(tag) {
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
 (function bindRate() {
   const r = document.getElementById('rate'), out = document.getElementById('rate-val');
-  const show = () => { out.textContent = Number(r.value).toFixed(2); };
+  const ls = document.getElementById('rate-ls');
+  const show = () => {
+    const v = Number(r.value);
+    out.textContent = v.toFixed(2);
+    // DIRECT sends length_scale = 1/rate, and the two run in opposite
+    // directions — worth showing both so a slow setting is not mistaken for a
+    // small number going to the model.
+    if (ls) ls.textContent = '  (length_scale ' + (1 / v).toFixed(2) + ')';
+  };
   r.addEventListener('input', show); show();
 })();
 
