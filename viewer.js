@@ -729,7 +729,7 @@ const SPEAK_VOICE = 'en_GB-jenny_dioco-medium';
 // own timing parameter, not a time-stretch: the delivery changes rather than the
 // audio being slowed after the fact. It also buys synthesis more time to stay
 // ahead of playback, which is a second reason to want it.
-const SPEAK_LENGTH_SCALE = 1 / 0.6;   // TEMPORARY — 0.6 for testing; 0.8 was the settled value
+const SPEAK_LENGTH_SCALE = 1 / 0.7;
 const SPEAK_MODEL_MB = 60;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
@@ -740,16 +740,34 @@ let speakAhead   = null;        // { text, promise } — one utterance in advanc
 // over the cap at clause punctuation — an over-long single sentence would
 // otherwise reproduce the problem inside one utterance. No lookbehind: WebKit
 // only gained it recently.
-function splitUtterances(text, maxLen = 300) {
+// 2026-09-04 — the cap is 400, and clause splitting KEEPS its punctuation.
+//
+// Two faults found in the Settling node, where a colon produced a very long
+// pause. The sentence is 351 characters, so it exceeded the old 300 cap and was
+// clause-split — and `split(/(?:;|:|,)\s+/)` CONSUMES the delimiter. The colon
+// was destroyed and an utterance boundary put in its place, so espeak read the
+// remainder as a fresh sentence with full sentence-initial intonation. The
+// capital after the colon made that worse, but was not the cause.
+//
+// The rejoin path was lossy too: fragments were glued back with ", ", so any
+// colon or semicolon that did NOT trigger a split silently became a comma.
+//
+// Now each part keeps its own trailing punctuation, and the cap is high enough
+// that this sentence is not split at all. The cap exists only to keep VITS from
+// being handed one enormous tensor — 3.6 kB froze a tab, 400 is nowhere near it.
+function splitUtterances(text, maxLen = 400) {
   const out = [];
   for (const s of (text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text])) {
     const trimmed = s.trim();
     if (!trimmed) continue;
     if (trimmed.length <= maxLen) { out.push(trimmed); continue; }
+    // Keep the delimiter attached to the chunk it closes, so a fragment ends
+    // with its own punctuation rather than with nothing.
+    const parts = trimmed.match(/[^;:,]+[;:,]?\s*/g) || [trimmed];
     let buf = '';
-    for (const part of trimmed.split(/(?:;|:|,)\s+/)) {
-      if ((buf + ' ' + part).trim().length > maxLen && buf) { out.push(buf.trim()); buf = part; }
-      else { buf = (buf ? buf + ', ' : '') + part; }
+    for (const part of parts) {
+      if ((buf + part).trim().length > maxLen && buf) { out.push(buf.trim()); buf = part; }
+      else buf += part;
     }
     if (buf.trim()) out.push(buf.trim());
   }
@@ -758,7 +776,7 @@ function splitUtterances(text, maxLen = 300) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=771');
+    const mod = await import('./piper_direct.js?v=772');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
