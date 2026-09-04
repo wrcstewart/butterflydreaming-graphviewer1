@@ -88,6 +88,18 @@ export async function loadVoice(voiceId, onProgress) {
   ortMod.env.wasm.numThreads = self.crossOriginIsolated
     ? (navigator.hardwareConcurrency || 4)
     : 1;
+  // 2026-09-04 — run inference in a WORKER, not on the main thread.
+  //
+  // Measured: an utterance reported as "prefetched" still waited the full
+  // synthesis time, because session.run() is synchronous WASM. It blocks
+  // everything while it runs — including the audio element's own buffering,
+  // which produced `waiting` and `stalled` events on the sentence that dropped
+  // out mid-word. Synthesising "ahead" bought nothing, since the work could only
+  // happen when the main thread was free, which is exactly when it was needed.
+  //
+  // proxy:true moves inference into a worker, so the prefetch can actually
+  // overlap playback and the audio stops starving.
+  ortMod.env.wasm.proxy = true;
 
   const cfgBuf = await cached(`${HF}/${path}.onnx.json`, onProgress);
   const cfg = JSON.parse(new TextDecoder().decode(cfgBuf));

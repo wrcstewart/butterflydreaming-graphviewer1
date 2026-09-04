@@ -788,7 +788,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=777');
+    const mod = await import('./piper_direct.js?v=778');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -876,7 +876,14 @@ function playNextSpeech() {
     // loaded into the other element. One ahead, not more: synthesis runs ~5x
     // faster than speech, and each call grows the Emscripten heap, which never
     // shrinks, so running further ahead is paid for in memory never returned.
-    if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: prepareUtterance(speakQueue[0]) };
+    // Start the prefetch once THIS clip is actually playing, not before. Even
+    // in a worker there is main-thread work at each end of a run, and doing it
+    // between el.play() and playback actually starting is the worst possible
+    // moment for it.
+    el.onplaying = () => {
+      el.onplaying = null;
+      if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: prepareUtterance(speakQueue[0]) };
+    };
     const done = (ev) => {
       if (ev && ev.type === 'error') {
         console.warn('[BD] playback error on: ' + JSON.stringify(next.slice(0, 60)) +
