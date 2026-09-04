@@ -788,7 +788,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=773');
+    const mod = await import('./piper_direct.js?v=774');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -826,7 +826,14 @@ function speakElement() {
 
 // Synthesise, then get the audio loaded and ready BEFORE it is wanted.
 function prepareUtterance(text) {
-  return synthOne(text).then(res => {
+  // 2026-09-04 — one sentence failing and then recovering is the signature of
+  // the catch path below: the error is swallowed and playNextSpeech moves on.
+  // Without naming the utterance, an intermittent failure is unattributable.
+  return synthOne(text).catch(err => {
+    console.warn('[BD] synth FAILED on: ' + JSON.stringify(text.slice(0, 60)) +
+                 ' — ' + (err && err.message ? err.message : err));
+    throw err;
+  }).then(res => {
     const url = URL.createObjectURL(res.blob);
     const el = speakElement();
     el.src = url;
@@ -856,7 +863,11 @@ function playNextSpeech() {
     // faster than speech, and each call grows the Emscripten heap, which never
     // shrinks, so running further ahead is paid for in memory never returned.
     if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: prepareUtterance(speakQueue[0]) };
-    const done = () => {
+    const done = (ev) => {
+      if (ev && ev.type === 'error') {
+        console.warn('[BD] playback error on: ' + JSON.stringify(next.slice(0, 60)) +
+                     ' — ' + (el.error ? 'code ' + el.error.code : 'unknown'));
+      }
       URL.revokeObjectURL(url);
       speakBusy = false;
       // Safe against a tap during the gap: speak() calls playNextSpeech
@@ -868,7 +879,12 @@ function playNextSpeech() {
     el.onerror = done;
     return el.play();
   })
-    .catch(err => { console.warn('[BD] speak failed', err); speakBusy = false; playNextSpeech(); });
+    .catch(err => {
+      console.warn('[BD] speak failed on ' + JSON.stringify(next.slice(0, 60)) +
+                   ' — ' + (err && err.message ? err.message : err));
+      speakBusy = false;
+      playNextSpeech();
+    });
   // playNextSpeech un-ducks when the queue drains, so every exit path — ended,
   // errored, or interrupted — arrives back there and restores the volume.
 }
