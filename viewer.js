@@ -788,7 +788,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=776');
+    const mod = await import('./piper_direct.js?v=777');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -830,7 +830,12 @@ function prepareUtterance(text) {
   // 2026-09-04 — one sentence failing and then recovering is the signature of
   // the catch path below: the error is swallowed and playNextSpeech moves on.
   // Without naming the utterance, an intermittent failure is unattributable.
-  return synthOne(text).catch(err => {
+  const synthT0 = performance.now();
+  return synthOne(text).then(res => {
+    const ms = Math.round(performance.now() - synthT0);
+    if (ms > 900) console.log('[BD] slow synth ' + ms + 'ms — ' + JSON.stringify(text.slice(0, 46)));
+    return res;
+  }).catch(err => {
     console.warn('[BD] synth FAILED on: ' + JSON.stringify(text.slice(0, 60)) +
                  ' — ' + (err && err.message ? err.message : err));
     throw err;
@@ -847,10 +852,21 @@ function playNextSpeech() {
   const gen = speakGen;
 
   // Use the utterance prepared in advance if it is the one we want.
-  const p = (speakAhead && speakAhead.text === next) ? speakAhead.promise : prepareUtterance(next);
+  // 2026-09-04 — report whether the prefetch HIT, and how long the wait was.
+  // A pause before one particular sentence has three possible causes — the
+  // prefetch missing, inference being slow for that text, or the gap simply
+  // feeling long — and they are indistinguishable by ear.
+  const prefetched = !!(speakAhead && speakAhead.text === next);
+  const waitT0 = performance.now();
+  const p = prefetched ? speakAhead.promise : prepareUtterance(next);
   speakAhead = null;
 
   p.then(({ blob }) => {
+    const waited = Math.round(performance.now() - waitT0);
+    if (!prefetched || waited > 150) {
+      console.log('[BD] speak: ' + (prefetched ? 'prefetched' : 'NOT prefetched') +
+                  ', waited ' + waited + 'ms — ' + JSON.stringify(next.slice(0, 46)));
+    }
     const el = speakElement();
     const url = URL.createObjectURL(blob);
     el.src = url;
