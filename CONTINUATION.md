@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-03, 18:20 BST
+# Continuation note — 2026-09-04, 11:05 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -16,7 +16,11 @@ state it is in, and which document answers which question.
 
 Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
 
-**Speech: engine DECIDED — Piper, RTF 0.17 on an iPhone.** Read
+**Speech: Piper DIRECT is BUILT AND WORKING** (`piper_direct.js`) — our own
+synthesis path giving IPA pronunciation control and the model's real speaking
+rate. Read `session_notes_2026-09-04.md` first, then `…09-03.md`.
+
+**Engine DECIDED — Piper, RTF 0.17 on an iPhone.** Read
 `session_notes_2026-09-03.md` first; it is the checkpoint, including the six
 platform faults (none a capability gap) and the one OPEN problem: the
 pronunciation lexicon, where `[[espeak phonemes]]` verify correctly on the

@@ -195,6 +195,26 @@ hour recording.
 
 ---
 
+## Piper DIRECT — BUILT 2026-09-04, `piper_direct.js`
+
+Our own synthesis path, replacing vits-web's `predict()` while keeping its two
+hard parts. Working on the iPhone. Gives **IPA in the lexicon** and the model's
+real **`length_scale`**, and drops the OPFS dependency in favour of the Cache API.
+
+The mechanism, since it is not obvious: espeak cannot be given IPA and the
+phonemiser has no phonemes input mode — but it returns the PHONEME ARRAY, and ids
+are a pure function of that array and `phoneme_id_map` (`[^, _, p, _, …, $]`,
+verified byte-exact against real output). So we rebuild the ids ourselves and
+espeak is bypassed for lexicon words. It takes an ARRAY, one result per entry, so
+an utterance needs one call however many segments it has.
+
+**A symbol absent from `phoneme_id_map` is silently dropped** — validate lexicon
+entries against it.
+
+**OPEN: commas going astray and the final phrase.** Prime suspect is
+`splitUtterances`, which splits long sentences on `,;:` — and `split()` consumes
+the separator, so the comma is lost, and punctuation is what drives prosody.
+
 ## Integrating into BD — the actual remaining work
 
 Stage 0's `/api/speak` is scaffolding and comes OUT. The pieces that survive are
