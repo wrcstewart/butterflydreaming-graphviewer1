@@ -582,6 +582,18 @@ function speechTextFrom(raw) {
   let t = mod === -1 ? raw : raw.slice(0, mod);
   t = t.replace(/^%%bd_\w*.*$/gm, '');
   t = t.replace(/<<([a-z]+)>>([\s\S]*?)<<\/>>/g, '$2');
+  // 2026-09-04 — a SPACED dash is a pause; a word-internal hyphen is not.
+  //
+  // Measured against the phonemiser: " — " already becomes a semicolon, which is
+  // the "comma but a bit longer" the author intended. " - " becomes NOTHING —
+  // the pause is silently lost, and the corpus has 70 of them. Normalising the
+  // spaced forms to the em-dash reuses behaviour that already works rather than
+  // inventing a rule.
+  //
+  // Whitespace on BOTH sides is required, and that is the whole safety of it:
+  // the corpus also holds 223 word-internal hyphens — Kung-ni, Snow-white,
+  // Dze-yu — which must stay joined, and a looser pattern would break every one.
+  t = t.replace(/\s+[-–—]\s+/g, ' — ');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -609,7 +621,7 @@ const speakQueue = [];         // generation lands after and must be discarded
 //     reads as intentional, which is the whole point of ducking.
 //   * Re-query the element every time. The media bar rebuilds its <audio> via
 //     innerHTML when the track changes, so a cached reference goes stale.
-const DUCK_LEVEL = 0.30;
+const DUCK_LEVEL = 0.24;   // 2026-09-04 — down a further 20% from 0.30
 const DUCK_MS    = 250;
 let duckSaved = null;      // the user's own volume, while we are holding it down
 let duckTimer = null;
@@ -679,7 +691,7 @@ function splitUtterances(text, maxLen = 300) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=766');
+    const mod = await import('./piper_direct.js?v=767');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
