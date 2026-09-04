@@ -103,19 +103,19 @@
     <p class="sub" style="margin:6px 0">One per line. A value in <code>[[ ]]</code> is
     <b>espeak phonemes</b>; anything else is a plain respelling. Substitution happens before synthesis, so
     neither needs any change to the model.</p>
-    <p class="sub" style="margin:6px 0">These are <b>plain respellings, verified against espeak-ng</b>
-    rather than guessed &mdash; each was searched for by taking the looked-up IPA and finding a spelling espeak
-    provably renders as it (<code>ipa_respell.py</code>). So no brackets, no phoneme notation, nothing that can
-    be mis-parsed. <code>Khwan = kwahn</code> and <code>Phing = pung</code> are exact;
-    <code>Zhuangzi</code> settles for <i>joo-ahng</i> because <code>d&#658;w</code> has no English spelling.
-    Values in <code>[[ ]]</code> are still passed through as espeak phonemes if you want them.</p>
+    <p class="sub" style="margin:6px 0"><b>Spaces are word boundaries and
+    <code>&#712;</code> is primary stress</b> &mdash; so <code>d&#712;a&#650; d&#592; d&#658;&#712;&#618;&#331;</code> asks for
+    three words with two stresses, and is heard as "Tao&hellip; Te&hellip; Ching" being compared rather than as one
+    name. A single noun wants ONE word and ONE primary stress, with <code>&#716;</code> for secondary:
+    <code>d&#716;a&#650;d&#601;d&#658;&#712;&#618;&#331;</code>. Values in <code>[[ ]]</code> are espeak phonemes; plain ASCII is
+    treated as a respelling.</p>
     <textarea id="lexicon" style="min-height:170px">Zhuangzi = dʒwˈɑːŋdzə
 Laozi = lˈaʊdzə
-Li Bai = lˈiː bˈaɪ
+Li Bai = lˌiː bˈaɪ
 Li = lˈiː
 Khwan = kwˈɑːn
 Phing = pˈʌŋ
-Tao Te Ching = dˈaʊ dɐ dʒˈɪŋ</textarea>
+Tao Te Ching = dˌaʊdədʒˈɪŋ</textarea>
   </details>
   <button id="play-result" disabled>&#9654; Play the result</button>
   <button id="clear">Clear log</button>
@@ -683,17 +683,12 @@ document.getElementById('run-direct').addEventListener('click', async (ev) => {
     let firstMs = null, seconds = 0, allMissing = new Set();
     for (let i = 0; i < utterances.length; i++) {
       const r = await synthesise({ voiceId: VOICE, text: utterances[i], lengthScale, lexicon: ipaLex });
+      if (r.phonemes) {
+        const s = r.phonemes.join('');
+        log('  [' + (i + 1) + '] ' + (s.length > 220 ? s.slice(0, 220) + '…' : s));
+      }
       if (firstMs === null) {
         firstMs = performance.now() - t0;
-        // The decisive line. A comma in the stream with no placeholder residue
-        // means the whole-sentence path is live and the fault is elsewhere;
-        // absence means the module is stale or the substitution failed. Those
-        // two sound identical and nothing else distinguishes them.
-        if (r.phonemes) {
-          const s = r.phonemes.join('');
-          log('  phonemes: ' + (s.length > 220 ? s.slice(0, 220) + '…' : s));
-          log('  comma in stream: ' + (s.includes(',') ? 'yes' : 'NO'));
-        }
       }
       seconds += r.seconds;
       (r.missing || []).forEach(x => allMissing.add(x));
