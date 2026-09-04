@@ -632,7 +632,56 @@ function mediaAudioEl() {
   return document.querySelector('#media-bar audio');
 }
 
-function rampVolume(el, to, ms) {
+// 2026-09-04 — ducking has to go through a GainNode, not element.volume.
+//
+// Reported as having no effect, and the cause is a platform rule I should have
+// known: **on iOS, HTMLMediaElement.volume is READ-ONLY.** Assigning to it is
+// silently ignored — no error, no warning, no change. So the whole first
+// implementation was a no-op on exactly the device it was written for, and
+// lowering DUCK_LEVEL would not have helped at any value.
+//
+// Web Audio gain IS settable there. The element is routed through a GainNode
+// once, and the gain is ramped instead.
+//
+// Two constraints that shape this. createMediaElementSource may be called only
+// ONCE per element, and the media bar rebuilds its <audio> via innerHTML on
+// every track change — so the wiring is keyed to the element and redone when it
+// changes. And once routed, audio reaches the speakers only through the graph,
+// so a failure here would silence the music entirely: hence the try/catch and
+// the fall back to element.volume, which still works on desktop.
+let duckCtx = null, duckGain = null, duckWiredEl = null;
+
+function duckGainFor(el) {
+  if (!el) return null;
+  if (duckWiredEl === el && duckGain) return duckGain;
+  try {
+    duckCtx = duckCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (duckCtx.state === 'suspended') duckCtx.resume().catch(() => {});
+    const src = duckCtx.createMediaElementSource(el);
+    duckGain = duckCtx.createGain();
+    src.connect(duckGain);
+    duckGain.connect(duckCtx.destination);
+    duckWiredEl = el;
+    console.log('[BD] duck: gain node wired to media element');
+    return duckGain;
+  } catch (err) {
+    console.warn('[BD] duck: gain routing failed, falling back to volume —', err && err.message);
+    duckGain = null; duckWiredEl = null;
+    return null;
+  }
+}
+
+function applyDuck(el, to, ms) {
+  const g = duckGainFor(el);
+  if (g) {
+    const now = duckCtx.currentTime;
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(g.gain.value, now);
+    g.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, to)), now + ms / 1000);
+    return;
+  }
+  // Desktop fallback. On iOS this line does nothing at all, which is the bug
+  // this function exists to route around.
   clearInterval(duckTimer);
   const from = el.volume, steps = Math.max(1, Math.round(ms / 25));
   let i = 0;
@@ -649,8 +698,9 @@ function duckMedia() {
   // Already ducked — do NOT re-save, or the held-down value becomes "the
   // user's volume" and the music never comes back up.
   if (duckSaved !== null) return;
-  duckSaved = el.volume;
-  rampVolume(el, duckSaved * DUCK_LEVEL, DUCK_MS);
+  duckSaved = duckGainFor(el) ? 1 : el.volume;
+  console.log('[BD] duck: down to ' + (duckSaved * DUCK_LEVEL).toFixed(2));
+  applyDuck(el, duckSaved * DUCK_LEVEL, DUCK_MS);
 }
 
 function unduckMedia() {
@@ -658,7 +708,7 @@ function unduckMedia() {
   if (duckSaved === null) return;
   const back = duckSaved;
   duckSaved = null;
-  if (el) rampVolume(el, back, DUCK_MS);
+  if (el) applyDuck(el, back, DUCK_MS);
 }
 
 // 2026-09-04 — synthesis is CLIENT-SIDE now. The /api/speak scaffold and its
@@ -698,7 +748,7 @@ function splitUtterances(text, maxLen = 300) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=768');
+    const mod = await import('./piper_direct.js?v=769');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
