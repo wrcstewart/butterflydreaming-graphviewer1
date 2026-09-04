@@ -601,7 +601,6 @@ function speechTextFrom(raw) {
 // hash. What matters here is everything around it, which a fine-tuned voice
 // will inherit unchanged.
 let speakEnabled = false;
-let speakAudio   = null;
 let speakBusy    = false;
 let speakGen     = 0;          // bumped by an interrupt; a fetch from an older
 const speakQueue = [];         // generation lands after and must be discarded
@@ -621,7 +620,10 @@ const speakQueue = [];         // generation lands after and must be discarded
 //     reads as intentional, which is the whole point of ducking.
 //   * Re-query the element every time. The media bar rebuilds its <audio> via
 //     innerHTML when the track changes, so a cached reference goes stale.
-const DUCK_LEVEL = 0.24;   // 2026-09-04 — down a further 20% from 0.30
+// 2026-09-04 — 0.30 -> 0.24 -> 0.10. The music was still louder than the voice
+// at a quarter, which makes sense: a track is mastered loud and a TTS voice is
+// not, so "background" needs a far bigger gap than the numbers suggest.
+const DUCK_LEVEL = 0.10;
 const DUCK_MS    = 250;
 let duckSaved = null;      // the user's own volume, while we are holding it down
 let duckTimer = null;
@@ -663,6 +665,11 @@ function unduckMedia() {
 // macOS `say` voice are gone from this path; BD derives every high-data
 // presentation on the client, and audio is the most expensive of them.
 const SPEAK_VOICE = 'en_GB-jenny_dioco-medium';
+// length_scale > 1 is SLOWER, so a "rate of 0.8" is 1/0.8. This is the model's
+// own timing parameter, not a time-stretch: the delivery changes rather than the
+// audio being slowed after the fact. It also buys synthesis more time to stay
+// ahead of playback, which is a second reason to want it.
+const SPEAK_LENGTH_SCALE = 1 / 0.8;
 const SPEAK_MODEL_MB = 60;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
@@ -691,7 +698,7 @@ function splitUtterances(text, maxLen = 300) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=767');
+    const mod = await import('./piper_direct.js?v=768');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -705,7 +712,37 @@ async function speakReady() {
 
 function synthOne(text) {
   return speakReady().then(fn =>
-    fn({ voiceId: SPEAK_VOICE, text, lexicon: speakLexicon || {} }));
+    fn({ voiceId: SPEAK_VOICE, text, lexicon: speakLexicon || {},
+         lengthScale: SPEAK_LENGTH_SCALE }));
+}
+
+// 2026-09-04 — TWO audio elements, alternating.
+//
+// The gap between utterances was not synthesis: at RTF ~0.2 the next utterance
+// is ready long before the current one ends. It is the ELEMENT. Assigning .src
+// starts a fresh load, and that load only began when the previous clip had
+// already finished — so every join paid for a decode that could have happened
+// during the preceding sentence.
+//
+// With two elements the next clip is loaded into the idle one while the other is
+// still speaking, and the join becomes a play() on something already buffered.
+let speakEls = null, speakElIdx = 0;
+function speakElement() {
+  if (!speakEls) speakEls = [new Audio(), new Audio()];
+  const el = speakEls[speakElIdx];
+  speakElIdx ^= 1;
+  return el;
+}
+
+// Synthesise, then get the audio loaded and ready BEFORE it is wanted.
+function prepareUtterance(text) {
+  return synthOne(text).then(res => {
+    const url = URL.createObjectURL(res.blob);
+    const el = speakElement();
+    el.src = url;
+    try { el.load(); } catch (_) {}
+    return { el, url };
+  });
 }
 
 function playNextSpeech() {
@@ -717,25 +754,22 @@ function playNextSpeech() {
   duckMedia();
   const gen = speakGen;
 
-  // Use the utterance synthesised in advance if it is the one we want.
-  const p = (speakAhead && speakAhead.text === next) ? speakAhead.promise : synthOne(next);
+  // Use the utterance prepared in advance if it is the one we want.
+  const p = (speakAhead && speakAhead.text === next) ? speakAhead.promise : prepareUtterance(next);
   speakAhead = null;
 
-  p.then(res => {
+  p.then(({ el, url }) => {
     // Interrupted while this was in flight — do not start it now.
-    if (gen !== speakGen) { speakBusy = false; return; }
-    // Synthesise the FOLLOWING utterance while this one plays. One ahead, not
-    // more: synthesis runs ~5x faster than speech, and each call grows the
-    // Emscripten heap, which never shrinks — running ahead is paid for in
-    // memory that is never returned, and on a phone that is fatal.
-    if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: synthOne(speakQueue[0]) };
-    const url = URL.createObjectURL(res.blob);
-    if (!speakAudio) speakAudio = new Audio();
-    speakAudio.src = url;
+    if (gen !== speakGen) { speakBusy = false; URL.revokeObjectURL(url); return; }
+    // Prepare the FOLLOWING utterance while this one plays — synthesised AND
+    // loaded into the other element. One ahead, not more: synthesis runs ~5x
+    // faster than speech, and each call grows the Emscripten heap, which never
+    // shrinks, so running further ahead is paid for in memory never returned.
+    if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: prepareUtterance(speakQueue[0]) };
     const done = () => { URL.revokeObjectURL(url); speakBusy = false; playNextSpeech(); };
-    speakAudio.onended = done;
-    speakAudio.onerror = done;
-    return speakAudio.play();
+    el.onended = done;
+    el.onerror = done;
+    return el.play();
   })
     .catch(err => { console.warn('[BD] speak failed', err); speakBusy = false; playNextSpeech(); });
   // playNextSpeech un-ducks when the queue drains, so every exit path — ended,
@@ -762,7 +796,7 @@ function stopSpeech() {
   unduckMedia();          // un-ticking Speak must not leave the music quiet
   speakAhead = null;      // the pre-synthesised utterance is for a queue that no longer exists
   speakQueue.length = 0;
-  if (speakAudio) { try { speakAudio.pause(); speakAudio.currentTime = 0; } catch (_) {} }
+  if (speakEls) for (const el of speakEls) { try { el.pause(); el.currentTime = 0; } catch (_) {} }
   speakBusy = false;
 }
 
@@ -9703,9 +9737,13 @@ async function init() {
       // chain is broken by the first await. Unlock a reusable element here,
       // synchronously in spirit, before any model download begins.
       try {
-        if (!speakAudio) speakAudio = new Audio();
-        speakAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
-        speakAudio.play().catch(() => {});
+        if (!speakEls) speakEls = [new Audio(), new Audio()];
+        // Both, or the first join hits an element iOS has never been told it
+        // may use and the second utterance is silent.
+        for (const el of speakEls) {
+          el.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+          el.play().catch(() => {});
+        }
       } catch (_) {}
       // Warm the model now rather than on the first tap, so the wait lands on
       // the tick the user just made instead of on a node they were reading.
