@@ -729,7 +729,7 @@ const SPEAK_VOICE = 'en_GB-jenny_dioco-medium';
 // own timing parameter, not a time-stretch: the delivery changes rather than the
 // audio being slowed after the fact. It also buys synthesis more time to stay
 // ahead of playback, which is a second reason to want it.
-const SPEAK_LENGTH_SCALE = 1 / 0.8;
+const SPEAK_LENGTH_SCALE = 1 / 0.6;   // TEMPORARY — 0.6 for testing; 0.8 was the settled value
 const SPEAK_MODEL_MB = 60;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
@@ -758,7 +758,7 @@ function splitUtterances(text, maxLen = 300) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=770');
+    const mod = await import('./piper_direct.js?v=771');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
