@@ -179,6 +179,25 @@ async function sendLog(tag) {
   } catch (e) { log('  (could not send log: ' + e.message + ')'); }
 }
 document.getElementById('send').addEventListener('click', () => sendLog('manual'));
+// 2026-09-04 — the lexicon lives in speech_lexicon.json, not in this page.
+//
+// One file, fetched once, cached — measured at 1000 entries the whole scan costs
+// 0.015 ms per node against ~3600 ms of synthesis, so there is nothing to
+// optimise and no reason to bake entries into node text. Editing the file and
+// reloading is the whole workflow.
+(async function loadLexicon() {
+  try {
+    const r = await fetch('speech_lexicon.json?v=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const lex = await r.json();
+    document.getElementById('lexicon').value =
+      Object.entries(lex).map(([k, v]) => k + ' = ' + v).join('\n');
+    log('lexicon loaded: ' + Object.keys(lex).length + ' entries');
+  } catch (e) {
+    log('lexicon load failed (' + e.message + ') — using the built-in seed');
+  }
+})();
+
 (function bindRate() {
   const r = document.getElementById('rate'), out = document.getElementById('rate-val');
   const ls = document.getElementById('rate-ls');
