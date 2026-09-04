@@ -215,7 +215,22 @@ entries against it.
 `splitUtterances`, which splits long sentences on `,;:` — and `split()` consumes
 the separator, so the comma is lost, and punctuation is what drives prosody.
 
-## Integrating into BD — the actual remaining work
+## Integrating into BD — PHASE 1 DONE 2026-09-04 (`599efdb` and after)
+
+Shipped and working on desktop; iOS retest pending. `viewer.js` drives
+`piper_direct.js` and nothing about speech touches the server.
+
+**Three platform rules learned the hard way, all in `session_notes_2026-09-04.md`
+Part 2:** ONNX `session.run()` blocks the main thread and starves audio (fix:
+`ort.env.wasm.proxy = true`); `HTMLMediaElement.volume` is read-only on iOS (fix:
+Web Audio `GainNode`); WebKit restricts concurrent media (fix: one audio element).
+
+Still to do: retire `/api/speak` and `speech_cache/` (phase 3), the lexicon
+validator in `bd_tool` (phase 4), and `%%bd_say` overrides if a homograph ever
+bites (phase 5, and it needs ONE shared tokeniser across the renderer, Sv's
+inverse and `speechTextFrom`).
+
+## The original plan — kept for the record
 
 Stage 0's `/api/speak` is scaffolding and comes OUT. The pieces that survive are
 the ones that were never about the voice: `speechTextFrom`, the Speak checkbox,

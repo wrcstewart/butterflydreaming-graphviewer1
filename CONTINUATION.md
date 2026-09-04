@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-04, 11:05 BST
+# Continuation note — 2026-09-04, 22:40 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -16,7 +16,14 @@ state it is in, and which document answers which question.
 
 Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
 
-**Speech: Piper DIRECT is BUILT AND WORKING** (`piper_direct.js`) — our own
+**Speech is SHIPPED INTO BD** and working on desktop (iOS retest pending). The
+Speak checkbox drives client-side Piper with an IPA lexicon; nothing about speech
+touches the server. Read `session_notes_2026-09-04.md` — Part 2 carries three
+platform rules that cost most of a day: ONNX `session.run()` blocks the main
+thread and starves audio, `HTMLMediaElement.volume` is read-only on iOS, and
+WebKit restricts concurrent media.
+
+**Piper DIRECT** (`piper_direct.js`) — our own
 synthesis path giving IPA pronunciation control and the model's real speaking
 rate. Read `session_notes_2026-09-04.md` first, then `…09-03.md`.
 

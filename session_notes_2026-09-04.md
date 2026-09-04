@@ -148,3 +148,126 @@ Candidates worth checking first:
 | First-use download | ~60 MB, must not start from an accidental checkbox tick |
 | Her voice vs stock | undecided and deferrable — a fine-tune drops into this same path |
 | `cori-high` | 108.9 MB, untried |
+
+---
+
+# Part 2 — Speech shipped into BD (same day, later)
+
+Piper is in BD proper. `viewer.js` no longer touches the server for speech.
+Ended at **`viewer.js?v=778`, `style.css?v=458`**, canary **red**.
+Verified working on desktop; iOS to be retested.
+
+## 6. The integration
+
+`599efdb`. The Speak checkbox drives `piper_direct.js`; the `/api/speak` scaffold
+is off the path entirely. Four pieces came over from the bench, each of which had
+cost something to learn: the **ReadableStream polyfill** (at the top of the file,
+before any dynamic import — WebKit dies at module evaluation without it),
+`splitUtterances`, queueing utterances rather than passages, and synthesising one
+ahead.
+
+The ~60 MB download is gated behind a `confirm()` naming the size, asked once and
+remembered. Blunt on purpose: unambiguous, works everywhere, cannot be dismissed
+by accident. Worth redoing in BD's idiom later.
+
+## 7. Ducking the media bar — and a platform rule I should have known
+
+Text now has a sonic form, so music and voice compete. The default is to push the
+music to the background rather than pause it.
+
+**`HTMLMediaElement.volume` is READ-ONLY on iOS.** Assigning to it is silently
+ignored — no error, no warning, no change. The first implementation was therefore
+a no-op on precisely the device it was written for, and lowering the level would
+not have helped at any value including zero. **Web Audio gain IS settable**, so
+the element is routed once through a `GainNode`.
+
+Two constraints shape that: `createMediaElementSource` may be called only ONCE
+per element, and the media bar rebuilds its `<audio>` via `innerHTML` on every
+track change — so the wiring is keyed to the element. And once routed, audio
+reaches the speakers only through the graph, so a failure would silence the music
+entirely; hence the try/catch and the fallback to `element.volume`.
+
+Level went 0.30 → 0.24 → **0.10**. A track is mastered loud and a TTS voice is
+not, so "background" needs a far bigger gap than the numbers suggest.
+
+**The mirror case was missing**: ducking only fired when SPEECH began, so starting
+a track during a reading came in at full volume. The player now asks
+`speechActive()` on its own `play` event — at every play, since a track can be
+started, paused and restarted — and comes in already low (30ms, not the 250ms
+ramp, which in that direction IS the problem).
+
+## 8. Punctuation and pauses
+
+**Spaced dashes.** Measured: `" — "` already becomes a semicolon in the
+phonemiser, which is the "comma but a bit longer" the author wanted. `" - "`
+became NOTHING, and the corpus had 70 of them. Spaced forms are normalised to the
+em-dash — **whitespace on both sides is the entire safety of it**, because the
+corpus also holds 223 word-internal hyphens (Kung-ni, Snow-white, Dze-yu) that
+must stay joined.
+
+**Clause splitting was destroying punctuation.** `split(/(?:;|:|,)\s+/)` CONSUMES
+the delimiter, so a colon in an over-long sentence was replaced by an utterance
+boundary — heard as a very long pause, with the following capital read as a fresh
+sentence. Worse, the rejoin glued fragments with `", "`, so any colon or
+semicolon that did NOT trigger a split silently became a comma. Every long
+sentence in the corpus had been losing its punctuation hierarchy. Parts now keep
+their trailing punctuation, and the cap went 300 → **400** so the offending
+sentence is not split at all.
+
+**Sentence pauses had to be added back.** They had only ever been the audio
+element's load latency. Removing that latency — correctly — took the pause with
+it, because the stall and the pause were the same accident. `SPEAK_GAP_MS = 420`
+is deliberate now, and wants tuning alongside `SPEAK_LENGTH_SCALE` (currently
+`1/0.7`).
+
+## 9. THE ROOT CAUSE — inference was blocking the main thread
+
+A sentence dropped out mid-word and resumed a few words later. Three theories
+died before the diagnostics named it:
+
+- **not a missing phoneme** — every symbol in that sentence is in the voice table
+- **not an exception** — nothing thrown, nothing logged
+- **not phonemiser instantiation** — measured at 9–24 ms, not seconds
+
+The logs settled it:
+
+    prefetched, waited 1640ms
+    slow synth      1641ms          <- the same milliseconds
+    audio WAITING / STALLED on that sentence
+
+**An utterance reported as prefetched still waited the full synthesis time.**
+That is only possible if the work was not progressing during playback — and it
+was not, because **`session.run()` is synchronous WASM on the main thread.** It
+blocks everything for its duration, including the audio element's own buffering.
+So synthesising "ahead" bought nothing: the work could only happen when the main
+thread was free, which is exactly when it was already needed.
+
+Fixed with **`ort.env.wasm.proxy = true`**, which moves inference into a worker.
+The prefetch also now starts on the element's `playing` event rather than
+immediately before `play()`.
+
+**A related but separate WebKit fault, found first**: pre-loading the next clip
+into a second audio element stalls the playing one, because iOS restricts
+concurrent media. Removing the load-ahead helped without curing it — the blocking
+was underneath. Confirmed by the user: the fault appeared in Safari and iOS and
+never in Firefox.
+
+## 10. What made this findable
+
+Nothing here was diagnosable by ear. Each round needed the run to report
+something: whether the prefetch HIT, how long it waited, whether synthesis was
+slow, whether the element stalled. **"Seems no different" and "not firing" are
+indistinguishable without instrumentation**, and guessing between them cost the
+most time in this session.
+
+## Open
+
+| item | note |
+|---|---|
+| iOS retest | desktop confirmed; the phone is the platform that decides |
+| Root reads at boot without a gesture | `NotAllowedError` in the log — speech starts before any tap |
+| `/api/speak`, `speech_cache/` | still present in server.js, unused. Phase 3 |
+| Bench duplicates `speechTextFrom` | won't get the dash fix until reconciled — argues for one shared tokeniser |
+| Paragraph vs sentence gap | `splitUtterances` discards paragraph structure, so both get 420ms |
+| `confirm()` download prompt | works, not in BD's idiom |
+
