@@ -107,7 +107,39 @@ async function phonemise(entries, espeakVoice) {
   return lines.map(l => JSON.parse(l).phonemes);
 }
 
+// 2026-09-04 — PLACEHOLDERS, because segmenting destroyed the prosody.
+//
+// The first version split the text on lexicon keys and phonemised each ordinary
+// fragment separately. espeak treats every entry it is given as a COMPLETE
+// UTTERANCE, so each fragment got its own intonation contour: a phrase break
+// appeared at every segment boundary — audible as a comma before "Te Ching" that
+// nobody wrote — and a real comma sitting at the START of a fragment (", and
+// the ") was dropped as leading punctuation. The dictionary was innocent; the
+// splitting was the fault.
+//
+// So the sentence must reach espeak WHOLE. Each lexicon word is swapped for a
+// pronounceable nonsense placeholder, the entire sentence is phonemised in one
+// go — punctuation, phrasing and all — and then each placeholder's phoneme run
+// is located in the result and replaced with the IPA we wanted. espeak still
+// computes the prosody over a real sentence; it simply never sees the name.
+//
+// Placeholders are two syllables with distinctive consonants, so their phoneme
+// runs are easy to find and unlikely to occur in ordinary English.
+const PLACEHOLDERS = ['zorbik', 'vandex', 'plimuk', 'kwenzo', 'trufal',
+                      'gimbot', 'yaxnol', 'dwepru', 'flombu', 'snarvo'];
+
+// Find `needle` inside `hay`, both arrays. Returns index or -1.
+function findRun(hay, needle, from = 0) {
+  if (!needle.length) return -1;
+  outer: for (let i = from; i <= hay.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer;
+    return i;
+  }
+  return -1;
+}
+
 // Split on the lexicon keys, longest first so "Tao Te Ching" wins over "Tao".
+// Retained for the fallback path and for testing.
 function segment(text, lexicon) {
   const keys = Object.keys(lexicon).sort((a, b) => b.length - a.length);
   if (!keys.length) return [{ text }];
@@ -162,21 +194,41 @@ function toWav(pcm, rate) {
  */
 export async function synthesise({ voiceId, text, lengthScale, noiseScale, noiseW, lexicon = {} }) {
   const { cfg, session } = await loadVoice(voiceId);
-  const segs = segment(text, lexicon);
 
-  // Every ordinary segment in ONE phonemiser call; the IPA segments need none.
-  const textSegs = segs.map((s, i) => ({ i, s })).filter(x => x.s.text != null && x.s.text.trim());
-  const phonLists = textSegs.length
-    ? await phonemise(textSegs.map(x => ({ text: x.s.text })), cfg.espeak.voice)
-    : [];
-  const byIndex = new Map();
-  textSegs.forEach((x, n) => byIndex.set(x.i, phonLists[n] || []));
+  // Swap each lexicon word for a placeholder, keeping the sentence whole.
+  const keys = Object.keys(lexicon).sort((a, b) => b.length - a.length);
+  const used = [];                       // { holder, ipa }
+  let prepared = text;
+  for (const key of keys) {
+    const re = new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    if (!re.test(prepared)) continue;
+    const holder = PLACEHOLDERS[used.length % PLACEHOLDERS.length];
+    used.push({ holder, ipa: lexicon[key] });
+    prepared = prepared.replace(new RegExp(re.source, 'gi'), holder);
+  }
 
-  const phonemes = [];
-  segs.forEach((s, i) => {
-    if (s.ipa != null) phonemes.push(...s.ipa);
-    else phonemes.push(...(byIndex.get(i) || []));
+  // ONE call: the whole sentence, plus each placeholder alone so we know the
+  // phoneme run to look for. The phonemiser returns one result per entry.
+  const entries = [{ text: prepared }, ...used.map(u => ({ text: u.holder }))];
+  const results = await phonemise(entries, cfg.espeak.voice);
+  let phonemes = results[0] || [];
+
+  // Replace each placeholder's run with the IPA. Work left to right, and keep a
+  // cursor so two uses of the same placeholder cannot both match the first.
+  const notFound = [];
+  used.forEach((u, n) => {
+    const run = results[n + 1] || [];
+    let at = findRun(phonemes, run);
+    if (at < 0) { notFound.push(u.holder); return; }
+    while (at >= 0) {
+      phonemes = [...phonemes.slice(0, at), ...u.ipa, ...phonemes.slice(at + run.length)];
+      at = findRun(phonemes, run, at + [...u.ipa].length);
+    }
   });
+  if (notFound.length) {
+    // Do not fail silently: a placeholder that survives would be SPOKEN.
+    console.warn('[piper_direct] placeholder run not found for', notFound);
+  }
 
   const { ids, missing } = toIds(phonemes, cfg.phoneme_id_map);
   if (!ids.length) throw new Error('no phonemes produced');
