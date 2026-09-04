@@ -52,7 +52,7 @@
 
 <fieldset>
   <legend>Passage</legend>
-  <textarea id="text">Dreaming of Li Bai. Written when Du Fu heard that his friend Li Bai — the other great poet of the age — had been banished to the far south under charge of treason and might be dead. Its images cross between worlds: the friend's spirit visits by night, and the poet does not know if it is a living man's soul or a ghost's. Compare the Tao Te Ching attributed to Laozi, and the Zhuangzi.</textarea>
+  <textarea id="text">Its images cross between worlds: the friend's spirit visits by night, and the poet does not know if it is a living man's soul or a ghost's. Compare the Tao Te Ching attributed to Laozi, and the Zhuangzi.</textarea>
   <button id="load-zz" style="margin-top:10px">Load Zhuangzi &sect;1 &mdash; The Peng Bird</button>
   <button id="reset-passage" style="margin-top:10px">Reset to default passage</button>
   <p class="sub" style="margin:8px 0 0">Contains the names that matter: Li Bai, Du Fu, Laozi, Zhuangzi, Tao Te Ching. Listen for how it says them — that is what the lexicon will have to fix.</p>
@@ -630,7 +630,7 @@ document.getElementById('run-direct').addEventListener('click', async (ev) => {
   ev.target.disabled = true;
   try {
     clear(); environment(); await probeOPFS();
-    const { synthesise } = await import('./piper_direct.js');
+    const { synthesise } = await import('./piper_direct.js?v=' + Date.now());
     const VOICE = document.getElementById('voice').value;
 
     // A value with non-ASCII is IPA and goes to the model as phonemes; a plain
@@ -674,7 +674,18 @@ document.getElementById('run-direct').addEventListener('click', async (ev) => {
     let firstMs = null, seconds = 0, allMissing = new Set();
     for (let i = 0; i < utterances.length; i++) {
       const r = await synthesise({ voiceId: VOICE, text: utterances[i], lengthScale, lexicon: ipaLex });
-      if (firstMs === null) firstMs = performance.now() - t0;
+      if (firstMs === null) {
+        firstMs = performance.now() - t0;
+        // The decisive line. A comma in the stream with no placeholder residue
+        // means the whole-sentence path is live and the fault is elsewhere;
+        // absence means the module is stale or the substitution failed. Those
+        // two sound identical and nothing else distinguishes them.
+        if (r.phonemes) {
+          const s = r.phonemes.join('');
+          log('  phonemes: ' + (s.length > 220 ? s.slice(0, 220) + '…' : s));
+          log('  comma in stream: ' + (s.includes(',') ? 'yes' : 'NO'));
+        }
+      }
       seconds += r.seconds;
       (r.missing || []).forEach(x => allMissing.add(x));
       queue.push(URL.createObjectURL(r.blob));

@@ -97,7 +97,11 @@ app.use((req, res, next) => {
 
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
+    // 2026-09-04 — .js too. The bench imports piper_direct.js as a module.
+    // max-age=0 already forces revalidation so this was probably never the
+    // cause of a stale module, but a dev bench should not leave the question
+    // open at all.
+    if (filePath.endsWith('.html') || filePath.endsWith('.js')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
