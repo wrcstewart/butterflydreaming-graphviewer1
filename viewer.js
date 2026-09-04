@@ -547,6 +547,24 @@ function serialiseHighlights(el) {
   return out;
 }
 
+// 2026-09-04 — WebKit polyfill, and it must run BEFORE the phonemiser is
+// imported. Piper's phonemiser decompresses an espeak dataset at MODULE
+// EVALUATION with `for await (const c of readableStream)`, and WebKit has never
+// implemented ReadableStream[Symbol.asyncIterator]. Without this the module dies
+// on load with "undefined is not a function" and speech simply never starts on
+// any iPhone or iPad.
+if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+  ReadableStream.prototype[Symbol.asyncIterator] = function () {
+    const reader = this.getReader();
+    return {
+      next: () => reader.read(),
+      return: async (value) => { await reader.cancel(); return { done: true, value }; },
+      throw: async (err) => { await reader.cancel(); throw err; },
+      [Symbol.asyncIterator]() { return this; },
+    };
+  };
+}
+
 // --- Speech (2026-09-02, stage 0) -----------------------------------------
 //
 // A THIRD representation of node text, after the renderer and the Sv inverse.
@@ -629,6 +647,55 @@ function unduckMedia() {
   if (el) rampVolume(el, back, DUCK_MS);
 }
 
+// 2026-09-04 — synthesis is CLIENT-SIDE now. The /api/speak scaffold and its
+// macOS `say` voice are gone from this path; BD derives every high-data
+// presentation on the client, and audio is the most expensive of them.
+const SPEAK_VOICE = 'en_GB-jenny_dioco-medium';
+const SPEAK_MODEL_MB = 60;
+let speakLexicon = null;        // word -> IPA, fetched once
+let speakSynth   = null;        // piper_direct's synthesise(), imported once
+let speakAhead   = null;        // { text, promise } — one utterance in advance
+
+// VITS synthesises an utterance in ONE pass, so a whole passage means one
+// enormous tensor and a frozen tab. Split on sentences, and break anything
+// over the cap at clause punctuation — an over-long single sentence would
+// otherwise reproduce the problem inside one utterance. No lookbehind: WebKit
+// only gained it recently.
+function splitUtterances(text, maxLen = 300) {
+  const out = [];
+  for (const s of (text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text])) {
+    const trimmed = s.trim();
+    if (!trimmed) continue;
+    if (trimmed.length <= maxLen) { out.push(trimmed); continue; }
+    let buf = '';
+    for (const part of trimmed.split(/(?:;|:|,)\s+/)) {
+      if ((buf + ' ' + part).trim().length > maxLen && buf) { out.push(buf.trim()); buf = part; }
+      else { buf = (buf ? buf + ', ' : '') + part; }
+    }
+    if (buf.trim()) out.push(buf.trim());
+  }
+  return out;
+}
+
+async function speakReady() {
+  if (!speakSynth) {
+    const mod = await import('./piper_direct.js?v=766');
+    speakSynth = mod.synthesise;
+  }
+  if (!speakLexicon) {
+    try {
+      const r = await fetch('speech_lexicon.json');
+      speakLexicon = r.ok ? await r.json() : {};
+    } catch (_) { speakLexicon = {}; }
+  }
+  return speakSynth;
+}
+
+function synthOne(text) {
+  return speakReady().then(fn =>
+    fn({ voiceId: SPEAK_VOICE, text, lexicon: speakLexicon || {} }));
+}
+
 function playNextSpeech() {
   if (speakBusy) return;
   const next = speakQueue.shift();
@@ -637,23 +704,27 @@ function playNextSpeech() {
   speakBusy = true;
   duckMedia();
   const gen = speakGen;
-  fetch('/api/speak', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: next }),
+
+  // Use the utterance synthesised in advance if it is the one we want.
+  const p = (speakAhead && speakAhead.text === next) ? speakAhead.promise : synthOne(next);
+  speakAhead = null;
+
+  p.then(res => {
+    // Interrupted while this was in flight — do not start it now.
+    if (gen !== speakGen) { speakBusy = false; return; }
+    // Synthesise the FOLLOWING utterance while this one plays. One ahead, not
+    // more: synthesis runs ~5x faster than speech, and each call grows the
+    // Emscripten heap, which never shrinks — running ahead is paid for in
+    // memory that is never returned, and on a phone that is fatal.
+    if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: synthOne(speakQueue[0]) };
+    const url = URL.createObjectURL(res.blob);
+    if (!speakAudio) speakAudio = new Audio();
+    speakAudio.src = url;
+    const done = () => { URL.revokeObjectURL(url); speakBusy = false; playNextSpeech(); };
+    speakAudio.onended = done;
+    speakAudio.onerror = done;
+    return speakAudio.play();
   })
-    .then(r => r.ok ? r.blob() : Promise.reject(new Error('speak ' + r.status)))
-    .then(blob => {
-      // Interrupted while this was in flight — do not start it now.
-      if (gen !== speakGen) { speakBusy = false; return; }
-      const url = URL.createObjectURL(blob);
-      if (!speakAudio) speakAudio = new Audio();
-      speakAudio.src = url;
-      const done = () => { URL.revokeObjectURL(url); speakBusy = false; playNextSpeech(); };
-      speakAudio.onended = done;
-      speakAudio.onerror = done;
-      return speakAudio.play();
-    })
     .catch(err => { console.warn('[BD] speak failed', err); speakBusy = false; playNextSpeech(); });
   // playNextSpeech un-ducks when the queue drains, so every exit path — ended,
   // errored, or interrupted — arrives back there and restores the volume.
@@ -667,13 +738,17 @@ function speak(raw, { interrupt = false } = {}) {
   const text = speechTextFrom(raw);
   if (!text) return;
   if (interrupt) stopSpeech();
-  speakQueue.push(text);
+  // Queue utterances, not the whole passage: reading starts on the first
+  // sentence instead of after the last, and memory stays flat however long the
+  // text is.
+  for (const u of splitUtterances(text)) speakQueue.push(u);
   playNextSpeech();
 }
 
 function stopSpeech() {
   speakGen++;
   unduckMedia();          // un-ticking Speak must not leave the music quiet
+  speakAhead = null;      // the pre-synthesised utterance is for a queue that no longer exists
   speakQueue.length = 0;
   if (speakAudio) { try { speakAudio.pause(); speakAudio.currentTime = 0; } catch (_) {} }
   speakBusy = false;
@@ -9586,12 +9661,43 @@ async function init() {
     if (!box) return;
     try { speakEnabled = localStorage.getItem('bd_speak') === '1'; } catch (_) {}
     box.checked = speakEnabled;
-    box.addEventListener('change', () => {
+    box.addEventListener('change', async () => {
+      // 2026-09-04 — the voice is a ~60 MB download on first use, and it must
+      // NOT begin because a checkbox was ticked out of curiosity. Asked once,
+      // then remembered; un-ticking and re-ticking does not ask again.
+      //
+      // A browser confirm() is blunt, and deliberately so for now: it is
+      // unambiguous, works on every device, and cannot be dismissed by
+      // accident. Worth replacing with something in BD's own idiom once the
+      // rest is settled.
+      if (box.checked) {
+        let agreed = false;
+        try { agreed = localStorage.getItem('bd_speak_dl') === '1'; } catch (_) {}
+        if (!agreed) {
+          const ok = window.confirm(
+            'Read node text aloud?\n\n' +
+            'This downloads a ' + SPEAK_MODEL_MB + ' MB voice to your device the first ' +
+            'time, then works offline. Best on wi-fi.');
+          if (!ok) { box.checked = false; return; }
+          try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
+        }
+      }
       speakEnabled = box.checked;
       try { localStorage.setItem('bd_speak', speakEnabled ? '1' : '0'); } catch (_) {}
       // Un-ticking must silence what is already playing, not merely stop the
       // next one — otherwise the control appears not to work for a paragraph.
-      if (!speakEnabled) stopSpeech();
+      if (!speakEnabled) { stopSpeech(); return; }
+      // Ticking IS the user gesture iOS requires before audio may play, and the
+      // chain is broken by the first await. Unlock a reusable element here,
+      // synchronously in spirit, before any model download begins.
+      try {
+        if (!speakAudio) speakAudio = new Audio();
+        speakAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+        speakAudio.play().catch(() => {});
+      } catch (_) {}
+      // Warm the model now rather than on the first tap, so the wait lands on
+      // the tick the user just made instead of on a node they were reading.
+      speakReady().catch(err => console.warn('[BD] voice load failed', err));
     });
   })();
 
