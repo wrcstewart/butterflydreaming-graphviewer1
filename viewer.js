@@ -788,7 +788,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=775');
+    const mod = await import('./piper_direct.js?v=776');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -806,25 +806,26 @@ function synthOne(text) {
          lengthScale: SPEAK_LENGTH_SCALE }));
 }
 
-// 2026-09-04 — TWO audio elements, alternating.
+// 2026-09-04 — ONE audio element, and the clip is loaded only when wanted.
 //
-// The gap between utterances was not synthesis: at RTF ~0.2 the next utterance
-// is ready long before the current one ends. It is the ELEMENT. Assigning .src
-// starts a fresh load, and that load only began when the previous clip had
-// already finished — so every join paid for a decode that could have happened
-// during the preceding sentence.
+// A previous revision kept two elements and pre-loaded the next clip into the
+// idle one while the other played. That was to hide join latency — but iOS
+// restricts CONCURRENT MEDIA, and calling .load() on a second element while the
+// first is playing can stall the one that is playing. The symptom was a sentence
+// dropping out in the middle and resuming a few words later, with no error
+// thrown anywhere, which is what made it so hard to place.
 //
-// With two elements the next clip is loaded into the idle one while the other is
-// still speaking, and the join becomes a play() on something already buffered.
-let speakEls = null, speakElIdx = 0;
+// The explicit SPEAK_GAP_MS pause now covers the load anyway, so the two
+// optimisations were redundant and one of them was harmful. Synthesis still runs
+// one utterance AHEAD — that is the expensive part and it never touches an audio
+// element.
+let speakEls = null;
 function speakElement() {
-  if (!speakEls) speakEls = [new Audio(), new Audio()];
-  const el = speakEls[speakElIdx];
-  speakElIdx ^= 1;
-  return el;
+  if (!speakEls) speakEls = [new Audio()];
+  return speakEls[0];
 }
 
-// Synthesise, then get the audio loaded and ready BEFORE it is wanted.
+// Synthesise ahead; do NOT touch an audio element until the clip is wanted.
 function prepareUtterance(text) {
   // 2026-09-04 — one sentence failing and then recovering is the signature of
   // the catch path below: the error is swallowed and playNextSpeech moves on.
@@ -833,13 +834,7 @@ function prepareUtterance(text) {
     console.warn('[BD] synth FAILED on: ' + JSON.stringify(text.slice(0, 60)) +
                  ' — ' + (err && err.message ? err.message : err));
     throw err;
-  }).then(res => {
-    const url = URL.createObjectURL(res.blob);
-    const el = speakElement();
-    el.src = url;
-    try { el.load(); } catch (_) {}
-    return { el, url };
-  });
+  }).then(res => ({ blob: res.blob }));
 }
 
 function playNextSpeech() {
@@ -855,7 +850,10 @@ function playNextSpeech() {
   const p = (speakAhead && speakAhead.text === next) ? speakAhead.promise : prepareUtterance(next);
   speakAhead = null;
 
-  p.then(({ el, url }) => {
+  p.then(({ blob }) => {
+    const el = speakElement();
+    const url = URL.createObjectURL(blob);
+    el.src = url;
     // Interrupted while this was in flight — do not start it now.
     if (gen !== speakGen) { speakBusy = false; URL.revokeObjectURL(url); return; }
     // Prepare the FOLLOWING utterance while this one plays — synthesised AND
@@ -877,6 +875,8 @@ function playNextSpeech() {
     };
     el.onended = done;
     el.onerror = done;
+    el.onstalled = () => console.warn('[BD] audio STALLED on: ' + JSON.stringify(next.slice(0, 60)));
+    el.onwaiting = () => console.warn('[BD] audio WAITING on: ' + JSON.stringify(next.slice(0, 60)));
     return el.play();
   })
     .catch(err => {
@@ -9862,13 +9862,12 @@ async function init() {
       // chain is broken by the first await. Unlock a reusable element here,
       // synchronously in spirit, before any model download begins.
       try {
-        if (!speakEls) speakEls = [new Audio(), new Audio()];
-        // Both, or the first join hits an element iOS has never been told it
-        // may use and the second utterance is silent.
-        for (const el of speakEls) {
-          el.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
-          el.play().catch(() => {});
-        }
+        // One element, matching speakElement(). And a clip with REAL silence in
+        // it — the zero-length WAV used before is one WebKit may fail to load,
+        // and an element that never loaded is not an element that got unlocked.
+        const el = speakElement();
+        el.src = 'data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+        el.play().catch(() => {});
       } catch (_) {}
       // Warm the model now rather than on the first tap, so the wait lands on
       // the tick the user just made instead of on a node they were reading.
