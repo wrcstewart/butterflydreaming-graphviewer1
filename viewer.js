@@ -730,6 +730,18 @@ const SPEAK_VOICE = 'en_GB-jenny_dioco-medium';
 // audio being slowed after the fact. It also buys synthesis more time to stay
 // ahead of playback, which is a second reason to want it.
 const SPEAK_LENGTH_SCALE = 1 / 0.7;
+// 2026-09-04 — an explicit gap between utterances.
+//
+// Each sentence is synthesised separately, so the only pause between them was
+// whatever the audio element took to load the next clip. Double-buffering
+// removed that latency — correctly, since it was also causing a long stall at
+// paragraph breaks — and took the sentence pause with it, because the two were
+// the same accident. What was left ran sentences together.
+//
+// So the gap is deliberate now rather than a side effect of buffering. 420ms is
+// about what an unhurried reader leaves at a full stop; it wants tuning by ear
+// against SPEAK_LENGTH_SCALE, since a slower delivery asks for a longer pause.
+const SPEAK_GAP_MS = 420;
 const SPEAK_MODEL_MB = 60;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
@@ -776,7 +788,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=772');
+    const mod = await import('./piper_direct.js?v=773');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -844,7 +856,14 @@ function playNextSpeech() {
     // faster than speech, and each call grows the Emscripten heap, which never
     // shrinks, so running further ahead is paid for in memory never returned.
     if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: prepareUtterance(speakQueue[0]) };
-    const done = () => { URL.revokeObjectURL(url); speakBusy = false; playNextSpeech(); };
+    const done = () => {
+      URL.revokeObjectURL(url);
+      speakBusy = false;
+      // Safe against a tap during the gap: speak() calls playNextSpeech
+      // immediately, and when this timer fires speakBusy is true again so it
+      // returns without starting a second utterance.
+      setTimeout(playNextSpeech, SPEAK_GAP_MS);
+    };
     el.onended = done;
     el.onerror = done;
     return el.play();
