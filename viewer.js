@@ -765,7 +765,11 @@ const SPEAK_VOICE = (() => {
     const v = new URLSearchParams(location.search).get('voice');
     if (v) return v;
   } catch (_) {}
-  return 'en_GB-jenny_dioco-medium';
+  // 2026-09-05 — alba (Scottish) preferred over jenny_dioco (Irish) by ear.
+  // Fetched from the normal distribution path rather than voices/, which stays
+  // for locally-trained voices; there is no reason to ship 63 MB in the repo for
+  // a voice anyone can fetch.
+  return 'en_GB-alba-medium';
 })();
 // length_scale > 1 is SLOWER, so a "rate of 0.8" is 1/0.8. This is the model's
 // own timing parameter, not a time-stretch: the delivery changes rather than the
@@ -831,7 +835,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=791');
+    const mod = await import('./piper_direct.js?v=792');
     speakSynth = mod.synthesise;
     speakLoadVoice = mod.loadVoice;
   }
