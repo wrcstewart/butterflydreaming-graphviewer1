@@ -103,6 +103,41 @@ describing work that was not there.
 already says this. Writing long anchors is the recurring mistake, not forgetting
 the rule.
 
+## 7. Audio balance — two knobs, and a fade
+
+`MEDIA_BASE_GAIN` **0.7** (about -3 dB) is the music's own level;
+`DUCK_LEVEL` **0.10** is how far it drops beneath the voice. They do different
+jobs, and the distinction matters: the complaint was the dynamic RANGE, not the
+duck depth. Unducked music sat far louder than the voice, so returning to full
+after a sentence was a jump — **lowering the baseline narrows that gap, whereas
+deepening the duck would have widened it.**
+
+Both go through the same `GainNode`, because `element.volume` is read-only on iOS
+and setting it there does nothing at all. The baseline is applied on the track's
+own `play` event, so the level is right from the first note rather than being
+discovered when the first sentence arrives.
+
+**It is a fade, not a switch**: `linearRampToValueAtTime` over 250ms when the
+voice arrives over playing music, and 30ms when music starts during speech —
+short in that direction because a slow ramp there IS a burst of loud music over a
+sentence.
+
+If it still feels wide, lower the baseline. If the music disappears under the
+voice, raise `DUCK_LEVEL`. If the transition itself draws attention, lengthen the
+250ms.
+
+## 8. The download note was measuring the wrong thing
+
+`speakReady()` did only the cheap half — import the module, fetch the lexicon —
+while the 60 MB model was fetched lazily inside `synthesise()` on the first
+utterance. So the note flashed, cleared, and the real wait happened in silence.
+**A function called "ready" that returned before the expensive part had started.**
+It now awaits `loadVoice()` too.
+
+On a warm cache the note still flashes, because the model comes from the Cache
+API in milliseconds. That is correct, not a regression — clear it with
+`caches.delete('bd-piper-v1')` to see the real first-visit behaviour.
+
 ## Open
 
 | item | note |

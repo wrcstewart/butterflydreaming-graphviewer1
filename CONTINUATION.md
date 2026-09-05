@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-05, 19:20 BST
+# Continuation note — 2026-09-05, 21:15 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
