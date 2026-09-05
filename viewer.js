@@ -198,6 +198,17 @@ const MARK_PREV      = '#6a5b00';
 // between. Change THIS, never the four multipliers, unless the intent really is
 // to alter the spacing between states.
 let bootPriming = false;   // true only while primeRootReading runs
+// 2026-09-05 — the boot card needs its OWN tap hint.
+//
+// A hint belongs to the node, so the card shown at boot and the card shown after
+// the tap inherit the same one. Root's authored hint points at Settling — right
+// after the tap, wrong before it, because Settling is not on screen until Root
+// has been opened. So the opening screen was telling the user to tap something
+// that was not there.
+//
+// Overridden only for the primed boot card. The authored hint is untouched and
+// still applies to every later presentation.
+const ROOT_BOOT_HINT = 'Tap the ButterflyDreaming node above to begin.';
 const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
@@ -789,7 +800,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=784');
+    const mod = await import('./piper_direct.js?v=785');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -5776,7 +5787,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                     '  (?intro=1 forces it; clearing bd_speak also restores it)');
       }
       if (introWillShow) speechSuppressed = true;
-      const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node, isRoot), node, 0);
+      const bootHint = (isRoot && bootPriming) ? ROOT_BOOT_HINT : null;
+      const c0Card = insertNodeChunkAsCard(
+        c0.body,
+        bootHint || c0.hint || getChunkHint(isLast, nav, node, isRoot),
+        node, 0);
       if (introWillShow) speechSuppressed = false;
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
