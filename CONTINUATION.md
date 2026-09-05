@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-04, 22:40 BST
+# Continuation note — 2026-09-05, 19:20 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -15,6 +15,13 @@ state it is in, and which document answers which question.
 **Nothing here is merged.** If `main` is what you want, `git checkout main`.
 
 Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
+
+**Read `session_notes_2026-09-05.md` FIRST** — it is the most recent state:
+onboarding, the speech offer on the first Root click, and the pairing split.
+
+Test URL: `http://localhost:8080/?ink=1&intro=1` (grey rings, speech dialog
+forced). Phone: the same parameters on `https://graph.virtualfictions.uk/`.
+`?intro=1` also clears the Speak checkbox, so it simulates a true first visit.
 
 **Speech is SHIPPED INTO BD** and working on desktop (iOS retest pending). The
 Speak checkbox drives client-side Piper with an IPA lexicon; nothing about speech
