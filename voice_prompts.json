@@ -30,6 +30,14 @@
     "avoid — common enough that a model hearing it twice would mangle them. They",
     "also top up tʃ. Targeted additions, not padding.",
     "",
+    "The final eight are LONG on purpose. Prosody spans clauses — pitch declines",
+    "across an utterance, phrases lengthen before a boundary, breath groups shape",
+    "the whole arc — and a model trained only on short sentences has never had to",
+    "sustain one. BD's own corpus is full of long sentences, so the voice would",
+    "otherwise be least practised at the thing it is most often asked to do.",
+    "Checked: the trainer imposes no utterance-length cap, and these sit at 8-10",
+    "seconds, well inside convention.",
+    "",
     "Each is one utterance, 3-10 seconds. Read at the pace you want back."
   ],
   "prompts": [
@@ -216,6 +224,38 @@
     {
       "id": "0046",
       "text": "The chair by the window catches the last of the light."
+    },
+    {
+      "id": "0047",
+      "text": "When the rain finally stopped, the whole valley seemed to be listening, and nobody in the house wanted to be the first to speak."
+    },
+    {
+      "id": "0048",
+      "text": "She had meant to say something kinder, but the moment passed the way such moments do, quietly and without warning."
+    },
+    {
+      "id": "0049",
+      "text": "There is a particular hour, late in the afternoon, when the light lies flat across the fields and everything looks older than it is."
+    },
+    {
+      "id": "0050",
+      "text": "He kept the letter for years without reading it again, partly from respect and partly because he already knew what it would say."
+    },
+    {
+      "id": "0051",
+      "text": "If you sit long enough beside any water, the noise in your head settles, and what remains is usually simpler than you feared."
+    },
+    {
+      "id": "0052",
+      "text": "The old woman told the story slowly, stopping whenever she liked, and nobody thought to hurry her along."
+    },
+    {
+      "id": "0053",
+      "text": "What we call patience is mostly a willingness to stay uncertain for longer than is comfortable, without pretending otherwise."
+    },
+    {
+      "id": "0054",
+      "text": "Snow began before dawn and went on all morning, softening the roofs, the walls, and the long road out of the village."
     }
   ]
 }

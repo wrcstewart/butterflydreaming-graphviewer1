@@ -1,39 +1,37 @@
 # Recording prompts
 
-46 sentences to be read aloud, one per clip, for fine-tuning a Piper voice.
-Generated from `voice_prompts.json` — that file is the source, this one is for
-reading.
+54 sentences to be read aloud, one per clip, for fine-tuning a Piper voice.
+Generated from `voice_prompts.json` — that file is the source, this is for reading.
 
 **Read them at the pace you want the finished voice to read at.** A fine-tune
-learns delivery more stubbornly than it learns timbre: read briskly and
-everything the voice ever says will be brisk, whatever is done to it afterwards.
+learns delivery more stubbornly than timbre: read briskly and everything the
+voice ever says will be brisk, whatever is done to it afterwards.
+
+Lengths are mixed on purpose — 36 short, 10 medium, 8 long. Prosody spans
+clauses, and a voice trained only on short sentences has never had to sustain
+one. BD's corpus is full of long sentences, so that would leave it least
+practised at what it most often does.
 
 ## Why these and not a standard set
 
-The established phonetic sets — CMU Arctic, the Harvard Sentences — have
-excellent coverage and no music. They are drawn from plain narrative, so they
-would train a plain reading. These are written to invite an unhurried, attentive
-one instead, which for BD is the more consequential property.
+CMU Arctic and the Harvard Sentences have excellent coverage and no music. They
+are plain narrative, and would train a plain reading. These are written to invite
+an unhurried, attentive one, which for BD is the more consequential property.
 
 ## Why no names and no archaic diction
 
-The model never sees words at all — only sequences of phoneme ids that espeak
-derives from the spelling. So it can say words it has never heard, which is why
-a short recording can read a whole corpus. But where espeak mispronounces a word
-the reader will not say what the label claims, and the model then learns that
-those phonemes sound like something else. Since they occur throughout ordinary
-English, that corrupts far more than the word itself.
-
-That is why literary source texts are the worst candidates here rather than the
-best, and why the Chinese names are absent: the lexicon handles them at synthesis
-time, so the model only ever needs ordinary English sounds.
+The model never sees words — only phoneme ids espeak derives from the spelling.
+So it can say words it has never heard, which is why a short recording can read a
+whole corpus. But where espeak mispronounces a word, the reader will not say what
+the label claims, and the model learns that those phonemes sound like something
+else. They occur throughout ordinary English, so it corrupts far more than the
+word itself.
 
 ## Counted, not assumed
 
-Every word checked against espeak for spelling-out — none. 43 distinct phonemes
-across 1,301 tokens. The last four sentences were added after counting: the
-diphthong ɔɪ appeared only twice in the first 42, and it carries *voice*,
-*choice*, *point* and *avoid*. It now appears six times.
+Every word checked against espeak for spelling-out — none. Every phoneme appears
+at least five times bar one marginal vowel. ɔɪ was thin at two, so four
+sentences were added for it: it carries *voice*, *choice*, *point*, *avoid*.
 
 ---
 
@@ -128,6 +126,22 @@ diphthong ɔɪ appeared only twice in the first 42, and it carries *voice*,
 **45.**  He avoided the point until it found him.
 
 **46.**  The chair by the window catches the last of the light.
+
+**47.**  When the rain finally stopped, the whole valley seemed to be listening, and nobody in the house wanted to be the first to speak.
+
+**48.**  She had meant to say something kinder, but the moment passed the way such moments do, quietly and without warning.
+
+**49.**  There is a particular hour, late in the afternoon, when the light lies flat across the fields and everything looks older than it is.
+
+**50.**  He kept the letter for years without reading it again, partly from respect and partly because he already knew what it would say.
+
+**51.**  If you sit long enough beside any water, the noise in your head settles, and what remains is usually simpler than you feared.
+
+**52.**  The old woman told the story slowly, stopping whenever she liked, and nobody thought to hurry her along.
+
+**53.**  What we call patience is mostly a willingness to stay uncertain for longer than is comfortable, without pretending otherwise.
+
+**54.**  Snow began before dawn and went on all morning, softening the roofs, the walls, and the long road out of the village.
 
 
 ---
