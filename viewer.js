@@ -789,7 +789,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=783');
+    const mod = await import('./piper_direct.js?v=784');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -10077,7 +10077,14 @@ async function init() {
   (function bindSpeakToggle() {
     const box = document.getElementById('speak-toggle');
     if (!box) return;
-    try { speakEnabled = localStorage.getItem('bd_speak') === '1'; } catch (_) {}
+    // 2026-09-05 — ?intro=1 simulates a user who has NOT decided yet, so the
+    // checkbox must start clear too. Forcing the dialog while the box already
+    // reads "on" is a half-simulation: it shows speech enabled before the
+    // question has been put, which is precisely the state the dialog exists to
+    // avoid.
+    try {
+      speakEnabled = !speechIntroForced() && localStorage.getItem('bd_speak') === '1';
+    } catch (_) { speakEnabled = false; }
     box.checked = speakEnabled;
     box.addEventListener('change', async () => {
       // 2026-09-04 — the voice is a ~60 MB download on first use, and it must
