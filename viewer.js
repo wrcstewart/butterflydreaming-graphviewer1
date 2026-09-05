@@ -800,7 +800,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=786');
+    const mod = await import('./piper_direct.js?v=787');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
