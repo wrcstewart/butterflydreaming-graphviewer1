@@ -637,6 +637,16 @@ const speakQueue = [];         // generation lands after and must be discarded
 // 2026-09-04 — 0.30 -> 0.24 -> 0.10. The music was still louder than the voice
 // at a quarter, which makes sense: a track is mastered loud and a TTS voice is
 // not, so "background" needs a far bigger gap than the numbers suggest.
+// 2026-09-05 — the music's own baseline, below the duck.
+//
+// The complaint was the dynamic RANGE, not the duck depth: unducked music sat
+// far louder than the voice, so returning to full after a sentence was a jump.
+// Lowering the baseline narrows that gap — the opposite move to deepening the
+// duck, which would have widened it.
+//
+// 0.7 is about -3 dB. Applied through the same GainNode as the duck, because
+// element.volume is read-only on iOS and would silently do nothing there.
+const MEDIA_BASE_GAIN = 0.7;
 const DUCK_LEVEL = 0.10;
 const DUCK_MS    = 250;
 let duckSaved = null;      // the user's own volume, while we are holding it down
@@ -716,13 +726,22 @@ function speechActive() {
 // 250ms slide is right when the music is playing and the voice arrives; it is
 // wrong when the music arrives during speech, because the first quarter-second
 // is a burst of full-volume music over a sentence.
+// Put the track at its baseline as soon as it plays, so the level is set before
+// any ducking rather than being discovered on the first sentence.
+function applyMediaBase() {
+  const el = mediaAudioEl();
+  if (!el) return;
+  if (duckSaved !== null) return;   // ducked: leave it alone
+  applyDuck(el, MEDIA_BASE_GAIN, 60);
+}
+
 function duckMedia(fast) {
   const el = mediaAudioEl();
   if (!el || el.paused) return;
   // Already ducked — do NOT re-save, or the held-down value becomes "the
   // user's volume" and the music never comes back up.
   if (duckSaved !== null) return;
-  duckSaved = duckGainFor(el) ? 1 : el.volume;
+  duckSaved = duckGainFor(el) ? MEDIA_BASE_GAIN : el.volume;
   console.log('[BD] duck: down to ' + (duckSaved * DUCK_LEVEL).toFixed(2) + (fast ? ' (fast)' : ''));
   applyDuck(el, duckSaved * DUCK_LEVEL, fast ? 30 : DUCK_MS);
 }
@@ -803,7 +822,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=789');
+    const mod = await import('./piper_direct.js?v=790');
     speakSynth = mod.synthesise;
     speakLoadVoice = mod.loadVoice;
   }
@@ -7537,6 +7556,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // restart is a fresh chance to be loud.
     audio.addEventListener('play', () => {
       if (typeof speechActive === 'function' && speechActive()) duckMedia(true);
+      else if (typeof applyMediaBase === 'function') applyMediaBase();
     });
 
     btn.addEventListener('click', () => {
