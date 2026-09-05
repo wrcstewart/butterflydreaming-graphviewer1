@@ -25,6 +25,11 @@
     "38 distinct phonemes, none appearing once or twice. Four questions, for",
     "intonation variety.",
     "",
+    "The last four were added deliberately after counting: the diphthong ɔɪ",
+    "appeared only twice in the first 42, and it carries voice, choice, point and",
+    "avoid — common enough that a model hearing it twice would mangle them. They",
+    "also top up tʃ. Targeted additions, not padding.",
+    "",
     "Each is one utterance, 3-10 seconds. Read at the pace you want back."
   ],
   "prompts": [
@@ -195,6 +200,22 @@
     {
       "id": "0042",
       "text": "The world asks very little, and gives a great deal."
+    },
+    {
+      "id": "0043",
+      "text": "Each choice closes one door and opens another."
+    },
+    {
+      "id": "0044",
+      "text": "Her voice carried further than she meant it to."
+    },
+    {
+      "id": "0045",
+      "text": "He avoided the point until it found him."
+    },
+    {
+      "id": "0046",
+      "text": "The chair by the window catches the last of the light."
     }
   ]
 }

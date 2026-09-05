@@ -1,6 +1,6 @@
 # Recording prompts
 
-42 sentences to be read aloud, one per clip, for fine-tuning a Piper voice.
+46 sentences to be read aloud, one per clip, for fine-tuning a Piper voice.
 Generated from `voice_prompts.json` — that file is the source, this one is for
 reading.
 
@@ -17,16 +17,23 @@ one instead, which for BD is the more consequential property.
 
 ## Why no names and no archaic diction
 
-Training pairs espeak's phonemes with the reader's audio. Where espeak
-mispronounces a word the reader will not say what the label claims, and the model
-learns that those phonemes sound like something else — and since they occur
-throughout ordinary English, that corrupts far more than the word itself. Which
-is why literary source texts are the worst candidates here rather than the best,
-and why the Chinese names are absent: the lexicon handles those at synthesis
+The model never sees words at all — only sequences of phoneme ids that espeak
+derives from the spelling. So it can say words it has never heard, which is why
+a short recording can read a whole corpus. But where espeak mispronounces a word
+the reader will not say what the label claims, and the model then learns that
+those phonemes sound like something else. Since they occur throughout ordinary
+English, that corrupts far more than the word itself.
+
+That is why literary source texts are the worst candidates here rather than the
+best, and why the Chinese names are absent: the lexicon handles them at synthesis
 time, so the model only ever needs ordinary English sounds.
 
-Verified rather than assumed: no word trips the spelling-out check, and all 38
-phonemes appear at least three times across differing contexts.
+## Counted, not assumed
+
+Every word checked against espeak for spelling-out — none. 43 distinct phonemes
+across 1,301 tokens. The last four sentences were added after counting: the
+diphthong ɔɪ appeared only twice in the first 42, and it carries *voice*,
+*choice*, *point* and *avoid*. It now appears six times.
 
 ---
 
@@ -113,6 +120,14 @@ phonemes appear at least three times across differing contexts.
 **41.**  Youth is generous with everything except patience.
 
 **42.**  The world asks very little, and gives a great deal.
+
+**43.**  Each choice closes one door and opens another.
+
+**44.**  Her voice carried further than she meant it to.
+
+**45.**  He avoided the point until it found him.
+
+**46.**  The chair by the window catches the last of the light.
 
 
 ---
