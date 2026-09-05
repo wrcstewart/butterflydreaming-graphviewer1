@@ -789,7 +789,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=782');
+    const mod = await import('./piper_direct.js?v=783');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -940,12 +940,25 @@ function speechIntroForced() {
   try { return new URLSearchParams(location.search).get('intro') === '1'; }
   catch (_) { return false; }
 }
+// 2026-09-05 — ONE key, not two.
+//
+// This used a separate `bd_speech_intro` flag beside `bd_speak`, so two keys
+// recorded one decision and they could disagree: clearing bd_speak turned the
+// checkbox off while the intro still counted itself as asked, which looks
+// exactly like the dialog being broken. It cost a round to find, and the log
+// only said `seen=true` without saying why.
+//
+// The rule is now simply: has the user made a speech decision at all? Accepting
+// writes '1', declining writes '0', and either way the question is settled.
+// Absent means never asked — so clearing bd_speak alone restores a true
+// first-visit state, which is what anyone testing would expect it to do.
 function speechIntroSeen() {
   if (speechIntroForced()) return false;
-  try { return localStorage.getItem('bd_speech_intro') === '1'; } catch (_) { return false; }
+  try { return localStorage.getItem('bd_speak') !== null; } catch (_) { return false; }
 }
 function markSpeechIntroSeen() {
-  try { localStorage.setItem('bd_speech_intro', '1'); } catch (_) {}
+  // Nothing to record separately: the accept and decline paths both write
+  // bd_speak, which IS the record.
 }
 
 function showSpeechIntro() {
@@ -5754,9 +5767,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const introWillShow = isRoot && isLast && !bootPriming &&
                             !speechIntroSeen() && hasNavDescendants(node);
       if (isRoot && !bootPriming && !introWillShow) {
+        let stored = null;
+        try { stored = localStorage.getItem('bd_speak'); } catch (_) {}
         console.log('[BD] speech intro not shown — seen=' + speechIntroSeen() +
                     ' isLast=' + isLast + ' hasDesc=' + hasNavDescendants(node) +
-                    '  (use ?intro=1 to force it)');
+                    ' bd_speak=' + JSON.stringify(stored) +
+                    ' search=' + JSON.stringify(location.search) +
+                    '  (?intro=1 forces it; clearing bd_speak also restores it)');
       }
       if (introWillShow) speechSuppressed = true;
       const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node, isRoot), node, 0);
