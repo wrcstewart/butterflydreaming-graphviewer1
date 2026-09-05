@@ -757,7 +757,16 @@ function unduckMedia() {
 // 2026-09-04 — synthesis is CLIENT-SIDE now. The /api/speak scaffold and its
 // macOS `say` voice are gone from this path; BD derives every high-data
 // presentation on the client, and audio is the most expensive of them.
-const SPEAK_VOICE = 'en_GB-jenny_dioco-medium';
+// 2026-09-05 — ?voice= overrides, so a locally-trained voice can be heard in BD
+// without editing code. `?voice=local/william` loads voices/william.onnx and its
+// .onnx.json from BD itself.
+const SPEAK_VOICE = (() => {
+  try {
+    const v = new URLSearchParams(location.search).get('voice');
+    if (v) return v;
+  } catch (_) {}
+  return 'en_GB-jenny_dioco-medium';
+})();
 // length_scale > 1 is SLOWER, so a "rate of 0.8" is 1/0.8. This is the model's
 // own timing parameter, not a time-stretch: the delivery changes rather than the
 // audio being slowed after the fact. It also buys synthesis more time to stay
@@ -822,7 +831,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=790');
+    const mod = await import('./piper_direct.js?v=791');
     speakSynth = mod.synthesise;
     speakLoadVoice = mod.loadVoice;
   }

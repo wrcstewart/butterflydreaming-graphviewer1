@@ -11,3 +11,6 @@ speech_cache/
 voice_dataset/
 voice_models/
 *.wav
+
+# 2026-09-05 — locally-trained voices. Large, and a fine-tune IS someone's voice.
+voices/

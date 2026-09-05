@@ -62,6 +62,28 @@ async function cached(url, onProgress) {
   return res.arrayBuffer();
 }
 
+// 2026-09-05 — LOCAL voices, served by BD itself.
+//
+// A fine-tuned voice has no HuggingFace path to derive, so an id beginning
+// `local/` is resolved against BD's own /voices/ directory instead. This is the
+// far end of the training pipeline, and it is deliberately testable BEFORE there
+// is anything to train: drop a stock voice into voices/ and load it under a
+// local id.
+//
+// Both files must be present and named as a pair — <name>.onnx and
+// <name>.onnx.json — because the config carries phoneme_id_map and the
+// inference scales, and a model without its config cannot be spoken at all.
+const LOCAL_PREFIX = 'local/';
+
+function voiceUrls(voiceId) {
+  if (voiceId.startsWith(LOCAL_PREFIX)) {
+    const name = voiceId.slice(LOCAL_PREFIX.length);
+    return { cfg: `voices/${name}.onnx.json`, model: `voices/${name}.onnx` };
+  }
+  const path = voicePath(voiceId);
+  return { cfg: `${HF}/${path}.onnx.json`, model: `${HF}/${path}.onnx` };
+}
+
 // PATH_MAP in vits-web is a full table; the layout is regular enough to derive.
 // en_GB-jenny_dioco-medium -> en/en_GB/jenny_dioco/medium/en_GB-jenny_dioco-medium
 function voicePath(voiceId) {
@@ -73,7 +95,7 @@ function voicePath(voiceId) {
 
 export async function loadVoice(voiceId, onProgress) {
   if (voices.has(voiceId)) return voices.get(voiceId);
-  const path = voicePath(voiceId);
+  const urls = voiceUrls(voiceId);
 
   ortMod = ortMod || await import(/* @vite-ignore */ `${ORT}/+esm`);
   ortMod.env.allowLocalModels = false;
@@ -101,9 +123,9 @@ export async function loadVoice(voiceId, onProgress) {
   // overlap playback and the audio stops starving.
   ortMod.env.wasm.proxy = true;
 
-  const cfgBuf = await cached(`${HF}/${path}.onnx.json`, onProgress);
+  const cfgBuf = await cached(urls.cfg, onProgress);
   const cfg = JSON.parse(new TextDecoder().decode(cfgBuf));
-  const modelBuf = await cached(`${HF}/${path}.onnx`, onProgress);
+  const modelBuf = await cached(urls.model, onProgress);
   const session = await ortMod.InferenceSession.create(modelBuf);
 
   const v = { cfg, session };
