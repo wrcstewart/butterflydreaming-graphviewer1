@@ -1,58 +1,200 @@
 {
-  "version": 1,
+  "version": 2,
   "notes": [
     "Prompts for fine-tuning a Piper voice. Read one per recording.",
     "",
-    "These are ORIGINAL sentences written for this purpose, not corpus extracts.",
-    "That is deliberate: it lets the phonetic coverage be controlled, and avoids",
-    "tying the training set to any particular text.",
+    "ORIGINAL sentences, written for two purposes at once.",
     "",
-    "Three things they are built to do:",
-    "  1. Cover the English phoneme inventory and its awkward junctions.",
-    "  2. Carry the corpus's transliterated names, distributed rather than",
-    "     clustered, so the model hears them in varied positions.",
-    "  3. Sit in the register BD actually wants — contemplative and unhurried.",
-    "     The fine-tune learns DELIVERY, not just timbre: read briskly and the",
-    "     whole corpus is read briskly for ever.",
+    "REGISTER. A fine-tune learns DELIVERY, not just timbre — read briskly and",
+    "everything the voice ever says is brisk. Standard phonetic sets (CMU Arctic,",
+    "Harvard) are drawn from plain narrative and would train a plain reading, so",
+    "these are written to invite an unhurried, warm, attentive one instead. That is",
+    "the single most consequential property of the set.",
     "",
-    "Each is one utterance, roughly 3-10 seconds. Read at the pace you want the",
-    "system to read at."
+    "NO NAMES, NO ARCHAIC DICTION. Training pairs espeak's phonemes with the",
+    "reader's audio. Where espeak mispronounces a word, the reader will not say what",
+    "the label claims — and the model then learns that those phonemes sound like",
+    "something else. Since they occur throughout ordinary English, that corrupts far",
+    "more than the word itself. It is why literary source texts are the WORST",
+    "candidates here, not the best, and why the Chinese names are absent: the",
+    "lexicon handles them at synthesis time, so the model only ever needs ordinary",
+    "English phonemes.",
+    "",
+    "VERIFIED, not asserted: every word checked against espeak for spelling-out,",
+    "and every phoneme appears at least three times across differing contexts.",
+    "38 distinct phonemes, none appearing once or twice. Four questions, for",
+    "intonation variety.",
+    "",
+    "Each is one utterance, 3-10 seconds. Read at the pace you want back."
   ],
   "prompts": [
-    { "id": "0001", "text": "The morning light moves slowly across the water." },
-    { "id": "0002", "text": "He asked whether the road continued beyond the village." },
-    { "id": "0003", "text": "Zhuangzi dreamed he was a butterfly, and woke uncertain." },
-    { "id": "0004", "text": "Nothing in the garden had changed since the summer before." },
-    { "id": "0005", "text": "She counted the years by the trees she had planted." },
-    { "id": "0006", "text": "Du Fu wrote of his friend Li Bai, far away in exile." },
-    { "id": "0007", "text": "The child laughed once, then hid behind the door." },
-    { "id": "0008", "text": "Judge the work by what it makes possible, not by what it cost." },
-    { "id": "0009", "text": "The Tao Te Ching is attributed to Laozi, though nobody is certain." },
-    { "id": "0010", "text": "Rain fell through the night and stopped a little before dawn." },
-    { "id": "0011", "text": "Would you rather begin again, or carry on as you are?" },
-    { "id": "0012", "text": "The old bridge sank a little further each winter." },
-    { "id": "0013", "text": "Khwan the fish became Phing the bird, and flew south." },
-    { "id": "0014", "text": "Words are for holding meaning; once it is held, the words may go." },
-    { "id": "0015", "text": "He walked the whole length of the shore without speaking." },
-    { "id": "0016", "text": "Three thousand miles, and still the same sky overhead." },
-    { "id": "0017", "text": "The question was not difficult, only badly put." },
-    { "id": "0018", "text": "Music entered the room a moment before the musician did." },
-    { "id": "0019", "text": "Zhuangzi and Huizi argued beside the river, as usual." },
-    { "id": "0020", "text": "Every path looks shorter on the way home." },
-    { "id": "0021", "text": "A cup of wine, a shadow, and the moon for company." },
-    { "id": "0022", "text": "What use is a tree that no carpenter wants?" },
-    { "id": "0023", "text": "The letters arrived out of order, months apart." },
-    { "id": "0024", "text": "Snow covered the roof, the wall, and the low wooden gate." },
-    { "id": "0025", "text": "Yen Hui sat quietly for a long while, and forgot himself." },
-    { "id": "0026", "text": "She spoke of things she had not thought of in years." },
-    { "id": "0027", "text": "Between waking and sleeping there is a small country." },
-    { "id": "0028", "text": "The fire burned low, and nobody moved to feed it." },
-    { "id": "0029", "text": "Lieh could ride the wind, but still depended on the wind." },
-    { "id": "0030", "text": "Enough has been said; the rest is for walking." },
-    { "id": "0031", "text": "Six hundred and ninety-four, exactly, and not one more." },
-    { "id": "0032", "text": "Which would you choose: the harbour, or the open sea?" },
-    { "id": "0033", "text": "Thoughtless judgements are cheap, and usually wrong." },
-    { "id": "0034", "text": "The oldest yew in the churchyard split during the storm." },
-    { "id": "0035", "text": "Ask again tomorrow; the answer may have changed by then." }
+    {
+      "id": "0001",
+      "text": "The light changes long before the day does."
+    },
+    {
+      "id": "0002",
+      "text": "Sit with it a while; there is no hurry."
+    },
+    {
+      "id": "0003",
+      "text": "What you noticed first is often what matters."
+    },
+    {
+      "id": "0004",
+      "text": "Water finds its way without deciding."
+    },
+    {
+      "id": "0005",
+      "text": "She listened more than she spoke, and heard more than she said."
+    },
+    {
+      "id": "0006",
+      "text": "Some questions are better carried than answered."
+    },
+    {
+      "id": "0007",
+      "text": "The garden does not mind being watched."
+    },
+    {
+      "id": "0008",
+      "text": "He forgave himself slowly, the way frost leaves a field."
+    },
+    {
+      "id": "0009",
+      "text": "Nothing is asked of you here."
+    },
+    {
+      "id": "0010",
+      "text": "The road bends, and the house is gone from view."
+    },
+    {
+      "id": "0011",
+      "text": "Warmth arrives before you notice the fire."
+    },
+    {
+      "id": "0012",
+      "text": "Would you rather be understood, or left in peace?"
+    },
+    {
+      "id": "0013",
+      "text": "Old wood holds the shape of the weather."
+    },
+    {
+      "id": "0014",
+      "text": "There is a kindness in not explaining everything."
+    },
+    {
+      "id": "0015",
+      "text": "The river is the same river, and never the same water."
+    },
+    {
+      "id": "0016",
+      "text": "Breathe out first, and the rest follows."
+    },
+    {
+      "id": "0017",
+      "text": "A small window is enough if the view is good."
+    },
+    {
+      "id": "0018",
+      "text": "Grief settles like snow, quietly and everywhere."
+    },
+    {
+      "id": "0019",
+      "text": "What would you keep, if you could keep only one thing?"
+    },
+    {
+      "id": "0020",
+      "text": "The bell sounds once, and the silence afterwards is larger."
+    },
+    {
+      "id": "0021",
+      "text": "Kindness costs attention, which is why it is rare."
+    },
+    {
+      "id": "0022",
+      "text": "He wondered whether the answer had been there all along."
+    },
+    {
+      "id": "0023",
+      "text": "Moss grows on the side that is patient."
+    },
+    {
+      "id": "0024",
+      "text": "Say less, and mean it more."
+    },
+    {
+      "id": "0025",
+      "text": "The child sleeps through the storm without knowing."
+    },
+    {
+      "id": "0026",
+      "text": "Every ending is joined to something."
+    },
+    {
+      "id": "0027",
+      "text": "Her hands remembered the work her mind had forgotten."
+    },
+    {
+      "id": "0028",
+      "text": "Joy is quieter than people expect."
+    },
+    {
+      "id": "0029",
+      "text": "The path was steep, but the walking was easy."
+    },
+    {
+      "id": "0030",
+      "text": "Let the thought finish before you judge it."
+    },
+    {
+      "id": "0031",
+      "text": "Autumn does not argue with summer."
+    },
+    {
+      "id": "0032",
+      "text": "Who taught you to be gentle with yourself?"
+    },
+    {
+      "id": "0033",
+      "text": "The lamp burns lower, and the room grows kinder."
+    },
+    {
+      "id": "0034",
+      "text": "Some things are understood only by waiting."
+    },
+    {
+      "id": "0035",
+      "text": "A stranger's music carried across the field."
+    },
+    {
+      "id": "0036",
+      "text": "He held the question rather than solving it."
+    },
+    {
+      "id": "0037",
+      "text": "The morning was cold, bright, and entirely ordinary."
+    },
+    {
+      "id": "0038",
+      "text": "Forgiveness is mostly a matter of time."
+    },
+    {
+      "id": "0039",
+      "text": "What is enough, and how would you know?"
+    },
+    {
+      "id": "0040",
+      "text": "She walked home through the wet leaves, unhurried."
+    },
+    {
+      "id": "0041",
+      "text": "Youth is generous with everything except patience."
+    },
+    {
+      "id": "0042",
+      "text": "The world asks very little, and gives a great deal."
+    }
   ]
 }
