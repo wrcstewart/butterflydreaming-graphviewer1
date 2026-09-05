@@ -759,6 +759,7 @@ const SPEAK_GAP_MS = 420;
 const SPEAK_MODEL_MB = 60;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
+let speakLoadVoice = null;      // piper_direct's loadVoice(), for the 60 MB model
 let speakAhead   = null;        // { text, promise } — one utterance in advance
 
 // VITS synthesises an utterance in ONE pass, so a whole passage means one
@@ -802,8 +803,9 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=788');
+    const mod = await import('./piper_direct.js?v=789');
     speakSynth = mod.synthesise;
+    speakLoadVoice = mod.loadVoice;
   }
   if (!speakLexicon) {
     try {
@@ -811,6 +813,14 @@ async function speakReady() {
       speakLexicon = r.ok ? await r.json() : {};
     } catch (_) { speakLexicon = {}; }
   }
+  // 2026-09-05 — load the VOICE here too, not lazily on the first utterance.
+  //
+  // This function is called before the progress note is cleared, and it used to
+  // do only the cheap half: import the module and fetch the lexicon. The 60 MB
+  // model was fetched later, inside synthesise(), so the note flashed and
+  // vanished and the real wait happened in silence. It now does what its name
+  // says, and the note stays up for the part that actually takes time.
+  if (speakLoadVoice) await speakLoadVoice(SPEAK_VOICE);
   return speakSynth;
 }
 
@@ -1031,7 +1041,7 @@ async function enableSpeechFromIntro() {
   audioUnlocked = true;
   try { localStorage.setItem('bd_speak', '1'); } catch (_) {}
   try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
-  speechProgress('Downloading voice…');
+  speechProgress('Downloading voice (' + SPEAK_MODEL_MB + ' MB)…');
   try {
     await speakReady();
     speechProgress('');
