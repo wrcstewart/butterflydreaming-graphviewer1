@@ -1105,7 +1105,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #1f8a3a;             /* CANARY — green (was red) */
+  border: 2px solid #2050d0;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1928,3 +1928,34 @@ body.player-active #bd-invite-panel-viewer { display: block; }
   display: none;
   z-index: 100;
 }
+
+/* 2026-09-05 — the speech intro. The first thing anyone meets, so it is kept to
+   four short lines and declining is made as easy as accepting: the two buttons
+   are the same size and neither is styled as the "right" one. */
+#speech-intro {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,10,14,0.72);
+  padding: 20px;
+}
+#speech-intro .si-box {
+  max-width: 420px; width: 100%;
+  background: #1a1a20; color: #e8e8ea;
+  border: 1px solid #3a3a44; border-radius: 8px;
+  padding: 20px 20px 16px;
+  font: 15px/1.5 system-ui, -apple-system, sans-serif;
+}
+#speech-intro h2 { font-size: 17px; margin: 0 0 10px; font-weight: 600; }
+#speech-intro p  { margin: 0 0 10px; color: #c9c9d0; }
+#speech-intro .si-fine { font-size: 13px; color: #9a9aa4; }
+#speech-intro .si-row { display: flex; gap: 10px; margin-top: 14px; }
+#speech-intro button {
+  flex: 1 1 0; font: 600 16px/1 inherit; padding: 12px 10px;
+  border-radius: 6px; cursor: pointer;
+  background: #2a2a32; color: #e8e8ea; border: 1px solid #4a4a56;
+}
+#speech-intro button.si-yes { background: var(--bd-gold); color: #1a1a20; border-color: #a07820; }
+/* The download note lives where the Pair button will later sit: the message
+   itself must stay readable, so progress cannot go in the reading panel. */
+#pair-status { font-size: 13px; color: #9a9aa4; }
+

@@ -197,6 +197,7 @@ const MARK_PREV      = '#6a5b00';
 // 1.0 is the pre-2026-08-31 weight, judged too heavy then; 0.8 is the step
 // between. Change THIS, never the four multipliers, unless the intent really is
 // to alter the spacing between states.
+let bootPriming = false;   // true only while primeRootReading runs
 const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
@@ -788,7 +789,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=779');
+    const mod = await import('./piper_direct.js?v=780');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -915,6 +916,94 @@ function playNextSpeech() {
 // interrupt: a node tap means you have MOVED ON, so the previous node's text
 // should stop. An arriving card queues instead — cutting off a partner's
 // message to start another would lose it.
+// 2026-09-05 — the speech introduction.
+//
+// It fires on the FIRST CLICK ON ROOT, not on the checkbox. That matters: a
+// dialog raised by ticking the box arrives too late to tell anyone the box
+// exists. Root is the only thing on the first screen, so this is the first
+// interaction anyone has, and it is the one moment where the offer reaches
+// everybody.
+//
+// The dialog takes responsibility for the whole thing — it ticks the box,
+// starts the download and speaks. Having asked the user to click Root, asking
+// them to click again would be a poor return on the interruption.
+//
+// The pointerdown that opened it has already unlocked audio (see
+// bindFirstGestureUnlock), so playback is permitted by the time it resolves.
+function speechIntroSeen() {
+  try { return localStorage.getItem('bd_speech_intro') === '1'; } catch (_) { return false; }
+}
+function markSpeechIntroSeen() {
+  try { localStorage.setItem('bd_speech_intro', '1'); } catch (_) {}
+}
+
+function showSpeechIntro() {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.id = 'speech-intro';
+    const box = document.createElement('div');
+    box.className = 'si-box';
+
+    const h = document.createElement('h2');
+    h.textContent = 'Would you like the text read aloud?';
+    const p1 = document.createElement('p');
+    p1.textContent = 'ButterflyDreaming can speak each node as you open it, in a voice that runs '
+                   + 'entirely on your device — nothing is sent anywhere.';
+    const p2 = document.createElement('p');
+    p2.textContent = 'There is a music player at the foot of the screen. Music drops to the '
+                   + 'background while text is being read.';
+    const p3 = document.createElement('p');
+    p3.className = 'si-fine';
+    p3.textContent = 'A ' + SPEAK_MODEL_MB + ' MB voice downloads once, then works offline. Best on wi-fi.';
+
+    const row = document.createElement('div');
+    row.className = 'si-row';
+    const yes = document.createElement('button');
+    yes.className = 'si-yes';
+    yes.textContent = 'Read aloud';
+    const no = document.createElement('button');
+    no.textContent = 'Not now';
+    row.append(yes, no);
+
+    box.append(h, p1, p2, p3, row);
+    wrap.append(box);
+    document.body.appendChild(wrap);
+
+    const done = (accepted) => {
+      wrap.remove();
+      markSpeechIntroSeen();
+      resolve(accepted);
+    };
+    yes.addEventListener('click', () => done(true));
+    no.addEventListener('click', () => done(false));
+  });
+}
+
+// Progress goes where the Pair button will later sit — NOT in the reading
+// panel, which the user is still reading when the download starts.
+function speechProgress(msg) {
+  const el = document.getElementById('pair-status');
+  if (el) el.textContent = msg || '';
+}
+
+async function enableSpeechFromIntro() {
+  const box = document.getElementById('speak-toggle');
+  if (box) box.checked = true;
+  speakEnabled = true;
+  audioUnlocked = true;
+  try { localStorage.setItem('bd_speak', '1'); } catch (_) {}
+  try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
+  speechProgress('Downloading voice…');
+  try {
+    await speakReady();
+    speechProgress('');
+  } catch (err) {
+    console.warn('[BD] voice load failed', err);
+    speechProgress('Voice unavailable');
+    setTimeout(() => speechProgress(''), 4000);
+  }
+}
+
 // 2026-09-05 — has the user actually interacted yet?
 //
 // Root's card is primed at BOOT by handleChatReady, long before any gesture. It
@@ -5612,6 +5701,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (type === 'Entry' || type === 'Family' || type === 'Cluster' || type === 'TextNode') {
         addYouChip(node);
       }
+      // Reaching Conversations is what unlocks Pair — see updateBackBtn.
+      if (type === 'Entry' && node.data('name') === 'Conversations') pairUnlocked = true;
       const rawText = node.data('text') || '';
       const chunks = splitNodeChunks(rawText);   // → [{body, hint}, …]
       const desc   = hasNavDescendants(node);
@@ -5639,6 +5730,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
       if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
+      // Suppressed while priming: see primeRootReading.
       // 2026-09-01 — Root boot, when Root's FIRST chunk is also its LAST.
       //
       // The reveal-Settling rule at the bottom of this function only runs on
@@ -5647,7 +5739,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // here and the rule below can never fire — leaving Root a dead end with
       // a card telling you to tap a node that was never shown. Same rule, both
       // ends of the function; keep them together if either changes.
-      if (isRoot && isLast && hasNavDescendants(node)) navigateInto(node);
+      if (isRoot && isLast && hasNavDescendants(node) && !bootPriming) {
+        // First real click on Root: offer speech BEFORE opening the graph, so
+        // the dialog is not competing with a layout animation.
+        if (!speechIntroSeen()) {
+          showSpeechIntro().then(async accepted => {
+            if (accepted) { await enableSpeechFromIntro(); speak(c0.body, { interrupt: true }); }
+            navigateInto(node);
+          });
+          return;
+        }
+        navigateInto(node);
+      }
       return;
     }
 
@@ -6044,7 +6147,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function primeRootReading() {
     const rootNode = cy.nodes('[type="root"]').first();
     if (rootNode && rootNode.length) {
-      advanceOrNavigate(rootNode);
+      // 2026-09-05 — Root ALONE on the first screen. Priming used to reveal
+      // Settling as a side effect, which let the user click straight past Root
+      // and skip the introduction entirely. Root is now the only thing to click.
+      bootPriming = true;
+      try { advanceOrNavigate(rootNode); } finally { bootPriming = false; }
       // Mark it as PRIMED rather than read. advanceOrNavigate keys off
       // readingState.nodeId, so without this the user's first tap on Root looks
       // like a second tap — it advances (or, with Root down to one chunk, just
@@ -6326,10 +6433,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const show = !!(here && here.length);
     backBtn.classList.toggle('visible', show);
 
-    // Pair rides on the same signal — see pairUnlocked. This sits ABOVE the
-    // early return so it still runs on the calls where Local has nothing to
-    // show, which are exactly the ones before the first tap.
-    if (show) pairUnlocked = true;
+    // 2026-09-05 — Pair waits for CONVERSATIONS, not merely for a first tap.
+    // It used to unlock the moment the Local button appeared. Two reasons to
+    // move it: the space belongs to the download note until then, and a Remote
+    // offered on the opening screen is one the user has no position to share
+    // into. pairUnlocked is now set where Conversations is entered.
+    //
+    // Still a LATCH — once up it stays, since a Pair button vanishing
+    // mid-session, possibly mid-pair, is worse than one that arrived early.
+    // This sits ABOVE the early return so it runs even when Local has nothing
+    // to show.
     const pairBtn = document.getElementById('chat-btn');
     if (pairBtn) {
       pairBtn.style.display = pairUnlocked ? '' : 'none';
