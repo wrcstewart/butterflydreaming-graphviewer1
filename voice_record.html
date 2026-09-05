@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BD voice recording</title>
+<!--
+  2026-09-05 — capture rig for a Piper fine-tune.
+
+  Deliberately a separate page from speech_bench.html. The bench is a measuring
+  instrument and gets broken repeatedly while iterating; this has to be reliable
+  while somebody is sitting in front of it reading aloud, and a lost take is a
+  person's time rather than a number.
+
+  Capture is AudioWorklet direct-PCM, not MediaRecorder. MediaRecorder truncates
+  on Safari — the SR editor hit that and the fix was this same approach.
+
+  Clips are written straight to disk by the server in LJSpeech layout. That is
+  authoring infrastructure, in the same family as bd_tool.js: BD's client-only
+  rule governs what is served to thousands of users, not a capture rig for one
+  person on one machine.
+-->
+<style>
+  :root { color-scheme: dark; }
+  body { background:#14141a; color:#e8e8ea; font:16px/1.55 system-ui,-apple-system,sans-serif;
+         margin:0; padding:18px 16px 40px; max-width:760px; margin-inline:auto; }
+  h1 { font-size:17px; margin:0 0 3px; font-weight:600; }
+  .sub { color:#9a9aa4; font-size:13px; margin:0 0 16px; }
+  .prompt-box { background:#1c1c24; border:1px solid #33333e; border-radius:8px;
+                padding:24px 22px; margin:0 0 14px; min-height:132px;
+                display:flex; flex-direction:column; justify-content:center; }
+  .counter { font-size:12px; color:#8a8a95; letter-spacing:.05em; text-transform:uppercase; margin:0 0 10px; }
+  .prompt { font-size:25px; line-height:1.45; margin:0; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { font:600 16px/1 inherit; padding:14px 18px; border-radius:6px; cursor:pointer;
+           background:#2a2a34; color:#e8e8ea; border:1px solid #4a4a58; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.rec  { background:#b03a3a; border-color:#d05050; color:#fff; min-width:190px; }
+  button.rec.on { background:#e04a4a; }
+  button.go   { background:#b09e3b; border-color:#a07820; color:#1a1a20; }
+  .meter { height:8px; background:#26262f; border-radius:4px; overflow:hidden; flex:1 1 130px; min-width:110px; }
+  .meter i { display:block; height:100%; width:0; background:#5fbf6a; transition:width .05s linear; }
+  .status { font-size:13px; color:#9a9aa4; min-height:20px; margin:0 0 10px; }
+  .done { color:#7fe08f; }
+  .warn { color:#f0c674; }
+  .bad  { color:#ff9a9a; }
+  #log { white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+         background:#101015; border:1px solid #2c2c36; border-radius:6px; padding:10px; color:#9a9aa4;
+         max-height:150px; overflow:auto; }
+  details { margin:14px 0 0; } summary { cursor:pointer; color:#9a9aa4; font-size:13px; }
+  details p, details li { font-size:14px; color:#c2c2ca; }
+</style>
+</head>
+<body>
+
+<h1>Voice recording</h1>
+<p class="sub">One prompt per clip. Read at the pace you want the finished voice to read at.</p>
+
+<div class="prompt-box">
+  <p class="counter" id="counter">loading…</p>
+  <p class="prompt" id="prompt">&nbsp;</p>
+</div>
+
+<div class="row">
+  <button class="rec" id="rec">Hold to record</button>
+  <div class="meter"><i id="level"></i></div>
+</div>
+<div class="row">
+  <button id="play" disabled>Play back</button>
+  <button class="go" id="keep" disabled>Keep &amp; next</button>
+  <button id="skip">Skip</button>
+  <button id="prev">Previous</button>
+</div>
+
+<p class="status" id="status">&nbsp;</p>
+<div id="log">ready.</div>
+
+<details>
+  <summary>How to record — read this first</summary>
+  <p><b>Setup matters more than quantity.</b> One quiet room, one microphone position,
+  and don't move between clips. Inconsistent conditions poison a fine-tune, because the
+  model learns the room as part of the voice.</p>
+  <ul>
+    <li><b>Hold the button</b> while speaking, release when finished. Leave a breath of
+        silence at each end — don't clip the first or last word.</li>
+    <li><b>Read at the pace you want back.</b> The model learns delivery, not just
+        timbre: read briskly and everything it ever says will be brisk.</li>
+    <li><b>Play back the first two or three</b> and listen for room echo, hum, or
+        clipping — the green bar should peak around three-quarters, never full.</li>
+    <li><b>Fluff it? Just record again</b> before pressing Keep. Only the last take is
+        written, and re-recording a kept clip replaces it.</li>
+    <li><b>Stop when tired.</b> Progress is saved on the server, so you can resume
+        later — but a tired voice in the middle of a set is worse than a short set.</li>
+  </ul>
+</details>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; };
+const status = (m, cls) => { const el = $('status'); el.textContent = m; el.className = 'status ' + (cls || ''); };
+
+let prompts = [], idx = 0, recorded = new Set();
+let ctx = null, stream = null, node = null, chunks = [], recording = false, sampleRate = 48000;
+let lastWav = null;
+
+// ---- prompts + resume ------------------------------------------------------
+async function boot() {
+  const p = await (await fetch('voice_prompts.json')).json();
+  prompts = p.prompts || [];
+  try {
+    const s = await (await fetch('/api/voice-status')).json();
+    (s.recorded || []).forEach(id => recorded.add(id));
+    if (recorded.size) log(`resuming — ${recorded.size} clip(s) already recorded`);
+  } catch (_) {}
+  // Start at the first prompt without audio, so a second sitting continues
+  // rather than re-treading what is already done.
+  const firstGap = prompts.findIndex(x => !recorded.has(x.id));
+  idx = firstGap === -1 ? 0 : firstGap;
+  render();
+}
+
+function render() {
+  const p = prompts[idx];
+  if (!p) { $('prompt').textContent = 'All prompts recorded.'; $('counter').textContent = 'done'; return; }
+  $('prompt').textContent = p.text;
+  $('counter').textContent =
+    `prompt ${idx + 1} of ${prompts.length}  ·  ${recorded.size} recorded` +
+    (recorded.has(p.id) ? '  ·  ALREADY RECORDED' : '');
+  $('play').disabled = true; $('keep').disabled = true; lastWav = null;
+  status(recorded.has(p.id) ? 'Already recorded — record again to replace it.' : ' ',
+         recorded.has(p.id) ? 'warn' : '');
+}
+
+// ---- capture ---------------------------------------------------------------
+// AudioWorklet direct PCM. MediaRecorder truncates on Safari, which is exactly
+// the failure that must not happen while somebody is reading aloud.
+const WORKLET = `
+class Cap extends AudioWorkletProcessor {
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch && ch.length) {
+      let peak = 0; for (let i = 0; i < ch.length; i++) { const a = Math.abs(ch[i]); if (a > peak) peak = a; }
+      this.port.postMessage({ pcm: ch.slice(0), peak });
+    }
+    return true;
+  }
+}
+registerProcessor('cap', Cap);`;
+
+async function ensureMic() {
+  if (ctx) return;
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  });
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  sampleRate = ctx.sampleRate;
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' })));
+  node = new AudioWorkletNode(ctx, 'cap');
+  node.port.onmessage = e => {
+    if (recording && e.data.pcm) chunks.push(e.data.pcm);
+    $('level').style.width = Math.min(100, (e.data.peak || 0) * 130) + '%';
+  };
+  ctx.createMediaStreamSource(stream).connect(node);
+  // Not connected to destination: monitoring the mic through the speakers would
+  // feed back, and the reader does not need to hear themselves.
+  log(`microphone ready — ${sampleRate} Hz` +
+      (sampleRate < 22050 ? '  <-- LOW, expect poor quality' : ''));
+}
+
+// Echo cancellation and AGC are off deliberately: both are designed to make
+// conference calls intelligible and both alter the voice, which is the one thing
+// this recording must preserve.
+
+function encodeWav(parts, rate) {
+  let n = 0; for (const c of parts) n += c.length;
+  const pcm = new Float32Array(n); let o = 0;
+  for (const c of parts) { pcm.set(c, o); o += c.length; }
+  const buf = new ArrayBuffer(44 + pcm.length * 2), dv = new DataView(buf);
+  const s = (off, str) => { for (let i = 0; i < str.length; i++) dv.setUint8(off + i, str.charCodeAt(i)); };
+  s(0, 'RIFF'); dv.setUint32(4, 36 + pcm.length * 2, true); s(8, 'WAVE');
+  s(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  s(36, 'data'); dv.setUint32(40, pcm.length * 2, true);
+  let peak = 0;
+  for (let i = 0; i < pcm.length; i++) {
+    const v = Math.max(-1, Math.min(1, pcm[i]));
+    if (Math.abs(v) > peak) peak = Math.abs(v);
+    dv.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+  }
+  return { blob: new Blob([buf], { type: 'audio/wav' }), seconds: pcm.length / rate, peak };
+}
+
+async function startRec() {
+  if (recording) return;
+  try { await ensureMic(); } catch (e) { status('Microphone refused: ' + e.message, 'bad'); return; }
+  if (ctx.state === 'suspended') await ctx.resume();
+  chunks = []; recording = true;
+  $('rec').classList.add('on'); $('rec').textContent = 'Recording — release to stop';
+  status('Recording…');
+}
+
+function stopRec() {
+  if (!recording) return;
+  recording = false;
+  $('rec').classList.remove('on'); $('rec').textContent = 'Hold to record';
+  if (!chunks.length) { status('Nothing captured — hold the button while speaking.', 'warn'); return; }
+  lastWav = encodeWav(chunks, sampleRate);
+  $('play').disabled = false; $('keep').disabled = false;
+  // Say what is wrong rather than leaving it to be discovered at training time,
+  // when the reader has gone and the take cannot be redone.
+  const warn = lastWav.peak > 0.99 ? ' — CLIPPED, move back from the mic'
+             : lastWav.peak < 0.05 ? ' — very quiet, move closer'
+             : lastWav.seconds < 0.8 ? ' — very short, did it catch the whole line?'
+             : '';
+  status(`${lastWav.seconds.toFixed(1)}s, peak ${(lastWav.peak * 100).toFixed(0)}%${warn}`,
+         warn ? 'warn' : 'done');
+}
+
+// Hold-to-record on both pointer and keyboard, because a long read is easier
+// with a spacebar than with a mouse held down.
+const rec = $('rec');
+rec.addEventListener('pointerdown', e => { e.preventDefault(); startRec(); });
+rec.addEventListener('pointerup', stopRec);
+rec.addEventListener('pointerleave', () => { if (recording) stopRec(); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'BUTTON') { e.preventDefault(); startRec(); }
+});
+document.addEventListener('keyup', e => { if (e.code === 'Space') { e.preventDefault(); stopRec(); } });
+
+$('play').addEventListener('click', () => {
+  if (lastWav) new Audio(URL.createObjectURL(lastWav.blob)).play().catch(() => {});
+});
+
+$('keep').addEventListener('click', async () => {
+  const p = prompts[idx];
+  if (!lastWav || !p) return;
+  $('keep').disabled = true;
+  status('Saving…');
+  try {
+    const r = await fetch(`/api/voice-clip?id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}`,
+      { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: lastWav.blob });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    recorded.add(p.id);
+    log(`saved ${p.id}  (${(d.bytes / 1024).toFixed(0)} kB)  ${d.recorded} recorded`);
+    idx = Math.min(idx + 1, prompts.length);
+    render();
+  } catch (e) {
+    status('Save FAILED: ' + e.message + ' — the take is still here, try Keep again.', 'bad');
+    $('keep').disabled = false;
+  }
+});
+
+$('skip').addEventListener('click', () => { idx = Math.min(idx + 1, prompts.length - 1); render(); });
+$('prev').addEventListener('click', () => { idx = Math.max(idx - 1, 0); render(); });
+
+boot().catch(e => status('Could not load prompts: ' + e.message, 'bad'));
+</script>
+</body>
+</html>

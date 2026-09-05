@@ -361,6 +361,73 @@ app.get('/api/section', async (req, res) => {
   } finally { await s.close(); }
 });
 
+// ---------------------------------------------------------------------------
+// 2026-09-05 — VOICE RECORDING. Authoring infrastructure, not runtime.
+//
+// BD derives every high-data presentation on the client, but that rule governs
+// what is served to thousands of users. This is a capture rig for one person on
+// one machine, in the same family as bd_tool.js: it writes to local disk and has
+// no place in the deployed system.
+//
+// LJSpeech layout, which is what piper's preprocessing expects:
+//   voice_dataset/wav/0001.wav        one file PER PROMPT
+//   voice_dataset/metadata.csv        0001|exact transcript
+//
+// One file per prompt rather than one long take: training pairs each clip with
+// its text, so recording prompt-by-prompt buys the alignment for free instead of
+// requiring it to be recovered by hand afterwards.
+const VOICE_DIR = './voice_dataset';
+const VOICE_WAV = `${VOICE_DIR}/wav`;
+
+app.post('/api/voice-clip', express.raw({ type: 'audio/wav', limit: '80mb' }),
+  (req, res) => {
+    const id   = String(req.query.id   || '').replace(/[^0-9A-Za-z_-]/g, '');
+    const text = String(req.query.text || '');
+    if (!id)   return res.status(400).json({ error: 'no id' });
+    if (!text) return res.status(400).json({ error: 'no text' });
+    if (!req.body || !req.body.length) return res.status(400).json({ error: 'no audio' });
+    try {
+      fs.mkdirSync(VOICE_WAV, { recursive: true });
+      fs.writeFileSync(`${VOICE_WAV}/${id}.wav`, req.body);
+
+      // Rewrite the whole manifest rather than appending: a re-take must REPLACE
+      // its line, and appending would leave two rows for one clip — which
+      // preprocessing would read as two examples, one of them pointing at audio
+      // that no longer matches.
+      const csv = `${VOICE_DIR}/metadata.csv`;
+      const rows = new Map();
+      if (fs.existsSync(csv)) {
+        for (const line of fs.readFileSync(csv, 'utf8').split('\n')) {
+          const i = line.indexOf('|');
+          if (i > 0) rows.set(line.slice(0, i), line.slice(i + 1));
+        }
+      }
+      rows.set(id, text);
+      const out = [...rows.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => `${k}|${v}`).join('\n');
+      fs.writeFileSync(csv, out + '\n');
+
+      console.log(`[BD] voice clip ${id} (${(req.body.length / 1024).toFixed(0)} kB), ${rows.size} recorded`);
+      res.json({ ok: true, id, recorded: rows.size, bytes: req.body.length });
+    } catch (err) {
+      console.error('[BD] voice-clip failed:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+// Which prompts already have audio — so the page can resume rather than
+// restart, and so a session can be done in more than one sitting.
+app.get('/api/voice-status', (req, res) => {
+  try {
+    const ids = fs.existsSync(VOICE_WAV)
+      ? fs.readdirSync(VOICE_WAV).filter(f => f.endsWith('.wav')).map(f => f.slice(0, -4))
+      : [];
+    let bytes = 0;
+    for (const id of ids) { try { bytes += fs.statSync(`${VOICE_WAV}/${id}.wav`).size; } catch (_) {} }
+    res.json({ recorded: ids.sort(), bytes });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/bench-log', (req, res) => {
   const body = (req.body && typeof req.body.log === 'string') ? req.body.log : '';
   const tag  = (req.body && typeof req.body.tag === 'string') ? req.body.tag : 'bench';
