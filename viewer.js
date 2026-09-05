@@ -198,17 +198,19 @@ const MARK_PREV      = '#6a5b00';
 // between. Change THIS, never the four multipliers, unless the intent really is
 // to alter the spacing between states.
 let bootPriming = false;   // true only while primeRootReading runs
-// 2026-09-05 — the boot card needs its OWN tap hint.
+// 2026-09-05 — the boot card carries its OWN message, not Root's text.
 //
-// A hint belongs to the node, so the card shown at boot and the card shown after
-// the tap inherit the same one. Root's authored hint points at Settling — right
-// after the tap, wrong before it, because Settling is not on screen until Root
-// has been opened. So the opening screen was telling the user to tap something
-// that was not there.
+// It used to show the whole welcome and then show it again after the tap. That
+// forced the tap instruction to live inside the node's body so it would appear
+// on the opening card — where it was right — and it was then SPOKEN after the
+// tap, where it describes something already done. One sentence cannot serve both
+// positions once one of them is heard rather than read.
 //
-// Overridden only for the primed boot card. The authored hint is untouched and
-// still applies to every later presentation.
-const ROOT_BOOT_HINT = 'Tap the ButterflyDreaming node below to begin.';
+// So the opening screen is a greeting and a prompt, and nothing else. The
+// welcome proper arrives on the tap, written and optionally spoken, and never
+// mentions tapping Root because by then it has happened.
+const ROOT_BOOT_MESSAGE =
+  'Welcome to ButterflyDreaming. Click the node below for orientation.';
 const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
@@ -800,7 +802,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=787');
+    const mod = await import('./piper_direct.js?v=788');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -5787,10 +5789,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
                     '  (?intro=1 forces it; clearing bd_speak also restores it)');
       }
       if (introWillShow) speechSuppressed = true;
-      const bootHint = (isRoot && bootPriming) ? ROOT_BOOT_HINT : null;
+      // The boot card is a prompt, not the node's text — see ROOT_BOOT_MESSAGE.
+      // No hint either: the message IS the instruction, and a cue beneath it
+      // would only repeat itself.
+      const isBootCard = isRoot && bootPriming;
       const c0Card = insertNodeChunkAsCard(
-        c0.body,
-        bootHint || c0.hint || getChunkHint(isLast, nav, node, isRoot),
+        isBootCard ? ROOT_BOOT_MESSAGE : c0.body,
+        isBootCard ? '' : (c0.hint || getChunkHint(isLast, nav, node, isRoot)),
         node, 0);
       if (introWillShow) speechSuppressed = false;
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
