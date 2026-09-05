@@ -3,258 +3,285 @@
   "notes": [
     "Prompts for fine-tuning a Piper voice. Read one per recording.",
     "",
-    "ORIGINAL sentences, written for two purposes at once.",
+    "ORIGINAL sentences, shaped by three constraints that pull against each other.",
     "",
-    "REGISTER. A fine-tune learns DELIVERY, not just timbre — read briskly and",
-    "everything the voice ever says is brisk. Standard phonetic sets (CMU Arctic,",
-    "Harvard) are drawn from plain narrative and would train a plain reading, so",
-    "these are written to invite an unhurried, warm, attentive one instead. That is",
-    "the single most consequential property of the set.",
+    "REGISTER. A fine-tune learns DELIVERY most stubbornly of all. The standard",
+    "phonetic sets (CMU Arctic, Harvard) are plain narrative and would train a plain",
+    "reading, so these are written to invite an unhurried, attentive one.",
     "",
-    "NO NAMES, NO ARCHAIC DICTION. Training pairs espeak's phonemes with the",
-    "reader's audio. Where espeak mispronounces a word, the reader will not say what",
-    "the label claims — and the model then learns that those phonemes sound like",
-    "something else. Since they occur throughout ordinary English, that corrupts far",
-    "more than the word itself. It is why literary source texts are the WORST",
-    "candidates here, not the best, and why the Chinese names are absent: the",
-    "lexicon handles them at synthesis time, so the model only ever needs ordinary",
-    "English phonemes.",
+    "STRUCTURE. An earlier draft was mostly EPIGRAMS — two members with a pivot,",
+    "'say less and mean it more'. That shape has one characteristic contour, and a",
+    "model trained on it learns the contour as the default shape of a sentence,",
+    "imposing a knowing sing-song cadence on flat prose. Most are now plain",
+    "declaratives that CONTINUE rather than turn: warm in content, not construction.",
+    "A few epigrams are kept deliberately, so the contour is available without being",
+    "the default. Test for each: remove the second half — does the first still stand?",
     "",
-    "VERIFIED, not asserted: every word checked against espeak for spelling-out,",
-    "and every phoneme appears at least three times across differing contexts.",
-    "38 distinct phonemes, none appearing once or twice. Four questions, for",
-    "intonation variety.",
+    "LENGTH is mixed on purpose. Prosody spans clauses, and BD's corpus is full of",
+    "long sentences, so a voice trained only on short ones would be least practised",
+    "at what it most often does.",
     "",
-    "The last four were added deliberately after counting: the diphthong ɔɪ",
-    "appeared only twice in the first 42, and it carries voice, choice, point and",
-    "avoid — common enough that a model hearing it twice would mangle them. They",
-    "also top up tʃ. Targeted additions, not padding.",
+    "NO NAMES, NO ARCHAIC DICTION. The model never sees words, only phoneme ids",
+    "espeak derives from spelling — which is why it can say words it has never",
+    "heard. But where espeak mispronounces one, the reader will not say what the",
+    "label claims, and the model learns that those phonemes sound like something",
+    "else. They occur throughout ordinary English, so it corrupts far more than the",
+    "word. Hence no literary source texts, and no Chinese names: the lexicon handles",
+    "those at synthesis time.",
     "",
-    "The final eight are LONG on purpose. Prosody spans clauses — pitch declines",
-    "across an utterance, phrases lengthen before a boundary, breath groups shape",
-    "the whole arc — and a model trained only on short sentences has never had to",
-    "sustain one. BD's own corpus is full of long sentences, so the voice would",
-    "otherwise be least practised at the thing it is most often asked to do.",
-    "Checked: the trainer imposes no utterance-length cap, and these sit at 8-10",
-    "seconds, well inside convention.",
+    "COUNTED, not assumed: 62 sentences, 44 distinct phonemes over",
+    "2241 tokens, none below five occurrences, no word tripping the",
+    "spelling-out check.",
     "",
-    "Each is one utterance, 3-10 seconds. Read at the pace you want back."
+    "Each is one utterance. Read at the pace you want back."
   ],
   "prompts": [
     {
       "id": "0001",
-      "text": "The light changes long before the day does."
+      "text": "The kettle was still warm when she came back down."
     },
     {
       "id": "0002",
-      "text": "Sit with it a while; there is no hurry."
+      "text": "There were three chairs by the window and nobody in them."
     },
     {
       "id": "0003",
-      "text": "What you noticed first is often what matters."
+      "text": "He hung his coat on the hook and went through to the kitchen."
     },
     {
       "id": "0004",
-      "text": "Water finds its way without deciding."
+      "text": "The dog slept in the same square of sunlight all afternoon."
     },
     {
       "id": "0005",
-      "text": "She listened more than she spoke, and heard more than she said."
+      "text": "Someone had left the gate open again."
     },
     {
       "id": "0006",
-      "text": "Some questions are better carried than answered."
+      "text": "The bread was still warm from the oven."
     },
     {
       "id": "0007",
-      "text": "The garden does not mind being watched."
+      "text": "She wrote the address on the back of an envelope."
     },
     {
       "id": "0008",
-      "text": "He forgave himself slowly, the way frost leaves a field."
+      "text": "It rained steadily from lunchtime until dark."
     },
     {
       "id": "0009",
-      "text": "Nothing is asked of you here."
+      "text": "The apples this year are small and very sweet."
     },
     {
       "id": "0010",
-      "text": "The road bends, and the house is gone from view."
+      "text": "There is a footpath along the top of the hill."
     },
     {
       "id": "0011",
-      "text": "Warmth arrives before you notice the fire."
+      "text": "A blackbird was singing somewhere behind the shed."
     },
     {
       "id": "0012",
-      "text": "Would you rather be understood, or left in peace?"
+      "text": "The bus comes twice a day and stops at the corner."
     },
     {
       "id": "0013",
-      "text": "Old wood holds the shape of the weather."
+      "text": "She keeps her mother's photographs in a wooden box."
     },
     {
       "id": "0014",
-      "text": "There is a kindness in not explaining everything."
+      "text": "The paint on the door has faded to a soft grey."
     },
     {
       "id": "0015",
-      "text": "The river is the same river, and never the same water."
+      "text": "He reads the same page over several times."
     },
     {
       "id": "0016",
-      "text": "Breathe out first, and the rest follows."
+      "text": "Two boats were moored at the far end of the harbour."
     },
     {
       "id": "0017",
-      "text": "A small window is enough if the view is good."
+      "text": "The children were playing in the field behind the church."
     },
     {
       "id": "0018",
-      "text": "Grief settles like snow, quietly and everywhere."
+      "text": "Her voice on the telephone sounded a little tired."
     },
     {
       "id": "0019",
-      "text": "What would you keep, if you could keep only one thing?"
+      "text": "The floorboards creak in the same three places."
     },
     {
       "id": "0020",
-      "text": "The bell sounds once, and the silence afterwards is larger."
+      "text": "We walked as far as the bridge and turned back."
     },
     {
       "id": "0021",
-      "text": "Kindness costs attention, which is why it is rare."
+      "text": "There was a smell of woodsmoke on the cold air."
     },
     {
       "id": "0022",
-      "text": "He wondered whether the answer had been there all along."
+      "text": "The lamp in the hall stays on all night."
     },
     {
       "id": "0023",
-      "text": "Moss grows on the side that is patient."
+      "text": "She has kept every letter he ever sent her."
     },
     {
       "id": "0024",
-      "text": "Say less, and mean it more."
+      "text": "The garden wall is covered in moss and small ferns."
     },
     {
       "id": "0025",
-      "text": "The child sleeps through the storm without knowing."
+      "text": "A train went by while they were talking."
     },
     {
       "id": "0026",
-      "text": "Every ending is joined to something."
+      "text": "He learned the names of all the birds that visit."
     },
     {
       "id": "0027",
-      "text": "Her hands remembered the work her mind had forgotten."
+      "text": "The water in the bay was completely still this morning."
     },
     {
       "id": "0028",
-      "text": "Joy is quieter than people expect."
+      "text": "She sat down and took her shoes off."
     },
     {
       "id": "0029",
-      "text": "The path was steep, but the walking was easy."
+      "text": "The clock in the kitchen runs four minutes fast."
     },
     {
       "id": "0030",
-      "text": "Let the thought finish before you judge it."
+      "text": "The fire had gone out during the night."
     },
     {
       "id": "0031",
-      "text": "Autumn does not argue with summer."
+      "text": "He waited at the window until the car appeared."
     },
     {
       "id": "0032",
-      "text": "Who taught you to be gentle with yourself?"
+      "text": "A boy was throwing stones into the water."
     },
     {
       "id": "0033",
-      "text": "The lamp burns lower, and the room grows kinder."
+      "text": "She could hear voices in the next room."
     },
     {
       "id": "0034",
-      "text": "Some things are understood only by waiting."
+      "text": "He pointed at the far side of the field."
     },
     {
       "id": "0035",
-      "text": "A stranger's music carried across the field."
+      "text": "The coins were still in his coat pocket."
     },
     {
       "id": "0036",
-      "text": "He held the question rather than solving it."
+      "text": "It was a pleasure to see them again after so long."
     },
     {
       "id": "0037",
-      "text": "The morning was cold, bright, and entirely ordinary."
+      "text": "The usual bus was late and nobody seemed to mind."
     },
     {
       "id": "0038",
-      "text": "Forgiveness is mostly a matter of time."
+      "text": "She measured the flour into a blue bowl."
     },
     {
       "id": "0039",
-      "text": "What is enough, and how would you know?"
+      "text": "There was a garage at the end of the lane."
     },
     {
       "id": "0040",
-      "text": "She walked home through the wet leaves, unhurried."
+      "text": "They watched television together until quite late."
     },
     {
       "id": "0041",
-      "text": "Youth is generous with everything except patience."
+      "text": "Some questions are better carried than answered."
     },
     {
       "id": "0042",
-      "text": "The world asks very little, and gives a great deal."
+      "text": "Joy is quieter than people expect."
     },
     {
       "id": "0043",
-      "text": "Each choice closes one door and opens another."
+      "text": "Who taught you to be gentle with yourself?"
     },
     {
       "id": "0044",
-      "text": "Her voice carried further than she meant it to."
+      "text": "What would you keep, if you could keep only one thing?"
     },
     {
       "id": "0045",
-      "text": "He avoided the point until it found him."
+      "text": "She listened more than she spoke, and heard more than she said."
     },
     {
       "id": "0046",
-      "text": "The chair by the window catches the last of the light."
+      "text": "He forgave himself slowly, the way frost leaves a field."
     },
     {
       "id": "0047",
-      "text": "When the rain finally stopped, the whole valley seemed to be listening, and nobody in the house wanted to be the first to speak."
+      "text": "The road bends, and the house is gone from view."
     },
     {
       "id": "0048",
-      "text": "She had meant to say something kinder, but the moment passed the way such moments do, quietly and without warning."
+      "text": "The river is the same river, and never the same water."
     },
     {
       "id": "0049",
-      "text": "There is a particular hour, late in the afternoon, when the light lies flat across the fields and everything looks older than it is."
+      "text": "A small window is enough if the view is good."
     },
     {
       "id": "0050",
-      "text": "He kept the letter for years without reading it again, partly from respect and partly because he already knew what it would say."
+      "text": "What would you keep, if you could keep only one thing?"
     },
     {
       "id": "0051",
-      "text": "If you sit long enough beside any water, the noise in your head settles, and what remains is usually simpler than you feared."
+      "text": "The bell sounds once, and the silence afterwards is larger."
     },
     {
       "id": "0052",
-      "text": "The old woman told the story slowly, stopping whenever she liked, and nobody thought to hurry her along."
+      "text": "He wondered whether the answer had been there all along."
     },
     {
       "id": "0053",
-      "text": "What we call patience is mostly a willingness to stay uncertain for longer than is comfortable, without pretending otherwise."
+      "text": "The world asks very little, and gives a great deal."
     },
     {
       "id": "0054",
+      "text": "The chair by the window catches the last of the light."
+    },
+    {
+      "id": "0055",
+      "text": "When the rain finally stopped, the whole valley seemed to be listening, and nobody in the house wanted to be the first to speak."
+    },
+    {
+      "id": "0056",
+      "text": "She had meant to say something kinder, but the moment passed the way such moments do, quietly and without warning."
+    },
+    {
+      "id": "0057",
+      "text": "There is a particular hour, late in the afternoon, when the light lies flat across the fields and everything looks older than it is."
+    },
+    {
+      "id": "0058",
+      "text": "He kept the letter for years without reading it again, partly from respect and partly because he already knew what it would say."
+    },
+    {
+      "id": "0059",
+      "text": "If you sit long enough beside any water, the noise in your head settles, and what remains is usually simpler than you feared."
+    },
+    {
+      "id": "0060",
+      "text": "The old woman told the story slowly, stopping whenever she liked, and nobody thought to hurry her along."
+    },
+    {
+      "id": "0061",
+      "text": "What we call patience is mostly a willingness to stay uncertain for longer than is comfortable, without pretending otherwise."
+    },
+    {
+      "id": "0062",
       "text": "Snow began before dawn and went on all morning, softening the roofs, the walls, and the long road out of the village."
     }
   ]
