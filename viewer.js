@@ -789,7 +789,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=781');
+    const mod = await import('./piper_direct.js?v=782');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -930,7 +930,18 @@ function playNextSpeech() {
 //
 // The pointerdown that opened it has already unlocked audio (see
 // bindFirstGestureUnlock), so playback is permitted by the time it resolves.
+// 2026-09-05 — ?intro=1 forces the dialog regardless of what is remembered.
+//
+// This is the first thing anyone meets, so it will be iterated on, and clearing
+// localStorage by hand between every attempt is both tedious and easy to get
+// half-right: clearing bd_speak turns the box off but leaves the intro marked
+// seen, which looks exactly like the dialog being broken.
+function speechIntroForced() {
+  try { return new URLSearchParams(location.search).get('intro') === '1'; }
+  catch (_) { return false; }
+}
 function speechIntroSeen() {
+  if (speechIntroForced()) return false;
   try { return localStorage.getItem('bd_speech_intro') === '1'; } catch (_) { return false; }
 }
 function markSpeechIntroSeen() {
@@ -971,7 +982,8 @@ function showSpeechIntro() {
 
     const done = (accepted) => {
       wrap.remove();
-      markSpeechIntroSeen();
+      // Not remembered when forced, so ?intro=1 can be used repeatedly.
+      if (!speechIntroForced()) markSpeechIntroSeen();
       resolve(accepted);
     };
     yes.addEventListener('click', () => done(true));
@@ -5741,6 +5753,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // one thing this dialog must not do.
       const introWillShow = isRoot && isLast && !bootPriming &&
                             !speechIntroSeen() && hasNavDescendants(node);
+      if (isRoot && !bootPriming && !introWillShow) {
+        console.log('[BD] speech intro not shown — seen=' + speechIntroSeen() +
+                    ' isLast=' + isLast + ' hasDesc=' + hasNavDescendants(node) +
+                    '  (use ?intro=1 to force it)');
+      }
       if (introWillShow) speechSuppressed = true;
       const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node, isRoot), node, 0);
       if (introWillShow) speechSuppressed = false;
