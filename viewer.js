@@ -789,7 +789,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=780');
+    const mod = await import('./piper_direct.js?v=781');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -1019,12 +1019,22 @@ async function enableSpeechFromIntro() {
 // unlock.
 let audioUnlocked = false;
 
+// 2026-09-05 — hard mute while the introduction is on screen.
+//
+// insertNodeChunkAsCard speaks unconditionally, and it runs BEFORE the intro
+// check further down the same function. So a user whose Speak box was already
+// ticked from a previous visit heard Root start reading underneath the dialog
+// asking whether they wanted it read. Set around the card insertion, cleared
+// immediately after; the accepted branch then speaks deliberately.
+let speechSuppressed = false;
+
 function speak(raw, { interrupt = false } = {}) {
   if (!speakEnabled) return;
   // Queue nothing until audio can actually play. Dropping it is right: this is
   // text the user has not asked for yet, and it will be spoken properly on the
   // tap that follows.
   if (!audioUnlocked) return;
+  if (speechSuppressed) return;
   const text = speechTextFrom(raw);
   if (!text) return;
   if (interrupt) stopSpeech();
@@ -5726,7 +5736,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: nav, cardsByIdx: {} };
       const isLast = chunks.length === 1;
       const c0     = chunks[0];
+      // Decided BEFORE the card is inserted, because inserting it is what
+      // speaks. Asking whether to read aloud while already reading aloud is the
+      // one thing this dialog must not do.
+      const introWillShow = isRoot && isLast && !bootPriming &&
+                            !speechIntroSeen() && hasNavDescendants(node);
+      if (introWillShow) speechSuppressed = true;
       const c0Card = insertNodeChunkAsCard(c0.body, c0.hint || getChunkHint(isLast, nav, node, isRoot), node, 0);
+      if (introWillShow) speechSuppressed = false;
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
       if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
@@ -5742,9 +5759,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (isRoot && isLast && hasNavDescendants(node) && !bootPriming) {
         // First real click on Root: offer speech BEFORE opening the graph, so
         // the dialog is not competing with a layout animation.
-        if (!speechIntroSeen()) {
+        if (introWillShow) {
           showSpeechIntro().then(async accepted => {
-            if (accepted) { await enableSpeechFromIntro(); speak(c0.body, { interrupt: true }); }
+            if (accepted) {
+              await enableSpeechFromIntro();
+              speak(c0.body, { interrupt: true });
+            } else {
+              // "Not now" means not now. The box may already have been ticked
+              // from a previous visit, and leaving it on would contradict the
+              // answer just given.
+              const box = document.getElementById('speak-toggle');
+              if (box) box.checked = false;
+              speakEnabled = false;
+              try { localStorage.setItem('bd_speak', '0'); } catch (_) {}
+            }
             navigateInto(node);
           });
           return;
