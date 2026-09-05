@@ -208,7 +208,7 @@ let bootPriming = false;   // true only while primeRootReading runs
 //
 // Overridden only for the primed boot card. The authored hint is untouched and
 // still applies to every later presentation.
-const ROOT_BOOT_HINT = 'Tap the ButterflyDreaming node above to begin.';
+const ROOT_BOOT_HINT = 'Tap the ButterflyDreaming node below to begin.';
 const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
@@ -800,7 +800,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=785');
+    const mod = await import('./piper_direct.js?v=786');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
