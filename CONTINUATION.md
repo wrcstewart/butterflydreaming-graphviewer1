@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-05, 21:15 BST
+# Continuation note — 2026-09-05, 23:05 BST
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -16,7 +16,12 @@ state it is in, and which document answers which question.
 
 Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
 
-**Read `session_notes_2026-09-05.md` FIRST** — it is the most recent state:
+**Read `session_notes_2026-09-05.md` FIRST — Part 2 is the live work**: voice
+training. Toolchain verified in `~/bd_voice_train`, BD loads `local/` voices,
+recording rig at `/voice_record.html`, 62 prompts designed and counted.
+NEXT: record ~25 prompts, fine-tune, export, listen. Part 1 covers onboarding.
+
+**Read `session_notes_2026-09-05.md`** — it is the most recent state:
 onboarding, the speech offer on the first Root click, and the pairing split.
 
 Test URL: `http://localhost:8080/?ink=1&intro=1` (grey rings, speech dialog

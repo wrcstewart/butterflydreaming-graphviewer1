@@ -148,3 +148,124 @@ API in milliseconds. That is correct, not a regression — clear it with
 | Paragraph vs sentence gap | both get `SPEAK_GAP_MS` 420 |
 | `confirm()` in the checkbox path | the intro dialog is custom, the checkbox path still uses confirm() |
 | Merge to main | 180+ commits; deliberately separate from the ink flip |
+
+---
+
+# Part 2 — Voice training: rehearsal set up, prompts designed
+
+Plan: rehearse the whole pipeline with the author's own voice first, so any
+snagging is found before his wife's time is spent. Same principle as using macOS
+`say` for stage 0 — prove the plumbing with a throwaway.
+
+## 9. Step 0 — the toolchain PASSES
+
+`~/bd_voice_train/venv`, 1.3 GB, entirely removable. Nothing touched the repo.
+
+| piece | state |
+|---|---|
+| Python 3.12 (brew) + isolated venv | ✓ |
+| PyTorch 2.14, **MPS working** | ✓ 20 × 2048² matmuls in 0.10s — real GPU, not a flag |
+| `piper.train` | ✓ runs (needed lightning, pysilero-vad, jsonargparse) |
+| `piper.train.export_onnx` | ✓ runs — produces what BD loads |
+| espeak phonemisation | ✓ bundled; `en-gb-x-rp` accepted, `en-gb` rejected |
+
+**Two useful surprises.** Modern `piper-tts` bundles training AND phonemisation,
+so the separate `piper-phonemize` package — which used to be the arm64
+stumbling block — no longer exists. And `phoneme_ids` exports BOS/PAD/EOS,
+**confirming the id convention reverse-engineered from the wasm build**. Our
+pipeline and theirs agree, so a voice trained here should drop straight into
+`piper_direct.js`.
+
+Hardware: M4 Max, 16 cores, 128 GB, 3 TB free. Fine-tuning locally is realistic.
+
+**A macOS "Python quit unexpectedly" dialog is expected and harmless** — when a
+probe fails on a missing module, PyTorch's C++ layer aborts during teardown. Only
+meaningful if it happens during an actual training run.
+
+## 10. BD can load a local voice
+
+`local/<name>` resolves against BD's own `voices/` directory instead of
+HuggingFace; `?voice=` overrides without editing code. Done FIRST deliberately —
+testable before there is anything to train, and the step most likely to surprise.
+Proved with a stock voice: config 4,888 bytes, model 63 MB, both served locally
+and spoken.
+
+**The pair is inseparable** — `<name>.onnx` and `<name>.onnx.json`. The config
+carries `phoneme_id_map` and the inference scales, so a model without it cannot
+be spoken at all. That is the shape training must produce.
+
+`voices/` is gitignored: large, and a fine-tune IS someone's voice.
+
+**Default voice changed to `en_GB-alba-medium`** (Scottish), preferred by ear over
+jenny_dioco (Irish). `cori-high` judged "silly-wet", `alan` "aggressively precise
+and artificial".
+
+## 11. The recording rig
+
+`voice_record.html` + `/api/voice-clip` + `/api/voice-status`. A separate page
+from the bench on purpose: the bench is a measuring instrument that gets broken
+while iterating, and this must be reliable while somebody is reading aloud, where
+a lost take costs a person's time.
+
+- **AudioWorklet direct-PCM**, not MediaRecorder, which truncates on Safari.
+- **Echo cancellation, noise suppression and AGC all OFF** — they exist to make
+  conference calls intelligible and all three alter the voice.
+- **Warns at the moment of recording** — clipping, too quiet, too short — because
+  that is the only point where a retake is free.
+- **LJSpeech layout**, manifest REWRITTEN not appended, so a retake replaces its
+  row rather than leaving two rows for one clip.
+- Resumable, so a session can span sittings.
+
+## 12. PROMPT DESIGN — the substantial part
+
+Three constraints that pull against each other, and they interact: **any edit
+needs the counts re-run, not eyeballed.**
+
+**The model never sees words — only phoneme ids espeak derives from the
+spelling.** That single fact explains everything else: it can say words it has
+never heard (so a five-minute recording reads a whole corpus); the lexicon works
+without retraining; and coverage is counted in phonemes, never words.
+
+**NO NAMES, NO ARCHAIC DICTION — and this is the non-obvious one.** Training pairs
+espeak's phonemes with the reader's audio. Where espeak mispronounces a word the
+reader will not say what the label claims, so the model learns that **those
+phonemes** sound like something else — and they occur throughout ordinary
+English, so it corrupts far more than the word. **Literary source texts are
+therefore the WORST candidates, not the best**, which is the opposite of the
+natural instinct. Raiding Hardy or the Grimms was proposed and rejected on this.
+
+**REGISTER.** A fine-tune learns delivery most stubbornly of all. CMU Arctic and
+the Harvard Sentences have excellent coverage and no music — plain narrative
+would train a plain reading, permanently.
+
+**STRUCTURE — the author's catch, and the sharpest observation of the session.**
+The first draft had 21 of 36 short sentences as two-member EPIGRAMS turning on a
+pivot ("say less, and mean it more"). That shape has one characteristic contour,
+and a model trained mostly on it learns the contour as *the shape of a sentence*,
+then imposes a knowing sing-song cadence on flat prose. **Same error as the
+register point one level down**: uniform register trains a flat reading, uniform
+STRUCTURE trains a mannered one — both the set being homogeneous in a dimension
+nobody was watching. Now 2 of 25. Test: remove the second half; does the first
+still stand?
+
+**LENGTH.** Also the author's catch. Prosody spans clauses — declination,
+phrase-final lengthening, breath groups — and BD's corpus is full of long
+sentences, so a voice trained only on short ones is least practised at what it
+most often does. Checked: **the trainer imposes no utterance-length cap**
+(`segment_size` is the discriminator's slice, `filter_length` the FFT window).
+
+**COUNTING BEATS SCANNING.** /z/ looked absent by eye and occurs 45 times, because
+English spells it "s" — *changes, does, is, leaves*. Meanwhile ɔɪ was genuinely
+thin at 2, and it carries *voice, choice, point, avoid*. **Coverage is not
+presence; it is repetition across contexts.**
+
+Final: **62 sentences, 44 phonemes over 2,241 tokens, none below five, no word
+tripping the spelling-out check.** 25 short / 29 medium / 8 long.
+
+## Next
+
+1. Record ~25 prompts (author's voice) at `/voice_record.html`
+2. Preprocess → fine-tune a few hundred steps → export ONNX
+3. Load as `?voice=local/<name>` and listen — badly, which is the point
+4. Only then, the real session
+
