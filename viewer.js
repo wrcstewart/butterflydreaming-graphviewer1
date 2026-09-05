@@ -788,7 +788,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=778');
+    const mod = await import('./piper_direct.js?v=779');
     speakSynth = mod.synthesise;
   }
   if (!speakLexicon) {
@@ -915,8 +915,27 @@ function playNextSpeech() {
 // interrupt: a node tap means you have MOVED ON, so the previous node's text
 // should stop. An arriving card queues instead — cutting off a partner's
 // message to start another would lose it.
+// 2026-09-05 — has the user actually interacted yet?
+//
+// Root's card is primed at BOOT by handleChatReady, long before any gesture. It
+// used to be spoken too, and every play() was rejected with NotAllowedError —
+// whereupon the catch moved to the next utterance and burned through the whole
+// queue failing. Two visible consequences: nothing spoke when Root was then
+// clicked, because readingState already pointed at it; and if audio happened to
+// unlock while that queue was draining, playback began from the MIDDLE of the
+// text. Both reported, both this.
+//
+// Set by any gesture, not only the Speak tick — the checkbox is remembered in
+// localStorage, so a returning user never ticks it and would otherwise never
+// unlock.
+let audioUnlocked = false;
+
 function speak(raw, { interrupt = false } = {}) {
   if (!speakEnabled) return;
+  // Queue nothing until audio can actually play. Dropping it is right: this is
+  // text the user has not asked for yet, and it will be spoken properly on the
+  // tap that follows.
+  if (!audioUnlocked) return;
   const text = speechTextFrom(raw);
   if (!text) return;
   if (interrupt) stopSpeech();
@@ -5582,6 +5601,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const isRoot = node.data('type') === 'root';
 
     // Different node → reset reading state to fresh chunks of the new node.
+    // A PRIMED state counts as different: the card was placed at boot without
+    // the user asking, so their first tap should read it from the beginning
+    // rather than continue from it.
+    if (readingState && readingState.primed) readingState = null;
     if (!readingState || readingState.nodeId !== nid) {
       // Breadcrumb chip: add once per node visited, on the FRESH tap only —
       // subsequent chunk-advance taps on the same node don't duplicate the chip.
@@ -6020,7 +6043,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function primeRootReading() {
     const rootNode = cy.nodes('[type="root"]').first();
-    if (rootNode && rootNode.length) advanceOrNavigate(rootNode);
+    if (rootNode && rootNode.length) {
+      advanceOrNavigate(rootNode);
+      // Mark it as PRIMED rather than read. advanceOrNavigate keys off
+      // readingState.nodeId, so without this the user's first tap on Root looks
+      // like a second tap — it advances (or, with Root down to one chunk, just
+      // navigates) instead of reading from the top.
+      if (readingState) readingState.primed = true;
+    }
   }
 
   // Per-local-card counter for inbound partner messages
@@ -9850,6 +9880,25 @@ async function init() {
   // 2026-09-02 — the Speak toggle. Remembered per browser, like the curation
   // code: having to re-tick it every visit would make it feel like a setting
   // that does not stick.
+  // 2026-09-05 — unlock the audio element on the FIRST gesture of any kind.
+  //
+  // iOS only permits playback started from a user gesture, and the Speak state
+  // is remembered across visits — so a returning user with it already ticked
+  // never touches the checkbox and would never unlock. A once-only listener on
+  // the first pointerdown covers every route in.
+  (function bindFirstGestureUnlock() {
+    const unlock = () => {
+      audioUnlocked = true;
+      try {
+        const el = speakElement();
+        el.src = 'data:audio/wav;base64,UklGRiQNAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQANAAA=';
+        el.play().catch(() => {});
+      } catch (_) {}
+      document.removeEventListener('pointerdown', unlock, true);
+    };
+    document.addEventListener('pointerdown', unlock, true);
+  })();
+
   (function bindSpeakToggle() {
     const box = document.getElementById('speak-toggle');
     if (!box) return;
@@ -9877,6 +9926,7 @@ async function init() {
         }
       }
       speakEnabled = box.checked;
+      audioUnlocked = true;   // ticking is itself a gesture
       try { localStorage.setItem('bd_speak', speakEnabled ? '1' : '0'); } catch (_) {}
       // Un-ticking must silence what is already playing, not merely stop the
       // next one — otherwise the control appears not to work for a paragraph.
