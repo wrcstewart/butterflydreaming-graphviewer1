@@ -835,7 +835,7 @@ function splitUtterances(text, maxLen = 400) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=792');
+    const mod = await import('./piper_direct.js?v=793');
     speakSynth = mod.synthesise;
     speakLoadVoice = mod.loadVoice;
   }
@@ -1858,7 +1858,18 @@ function getClusterRelWidth(edge) {
 // So: every node body goes BLACK and the identity moves to the LABEL. That
 // frees the fill and the outline for state, which is the precondition for the
 // remote-graph idea rather than a separate cosmetic change.
-const INK_MODE = new URLSearchParams(location.search).get('ink') === '1';
+// 2026-09-06 — the achromatic model is now the DEFAULT. `?ink=0` returns the
+// coloured one, mirroring `?uf=0` for UNIFIED_FOCUS.
+//
+// Stage 1 of ink_promotion_plan.md. The flip itself is this line; the cost is
+// that every colour decision made against the coloured model is now untested in
+// the ground it actually sits on. The base stylesheet's colour work is left in
+// place deliberately — it costs nothing, and it is what keeps ?ink=0 working as
+// a comparison and a way back.
+const INK_MODE = (() => {
+  try { return new URLSearchParams(location.search).get('ink') !== '0'; }
+  catch (_) { return true; }
+})();
 const INK_BG   = '#0b0b0f';
 
 // 2026-08-29 — the bodies are TRANSPARENT, not black.
