@@ -1000,39 +1000,20 @@ function playNextSpeech() {
 //
 // What IS remembered is only what cannot change with the occasion:
 //
-//   bd_speak_explained  the long form has been read once — later visits get
-//                       the question without the lecture
-//   bd_speak_dl         the download has been agreed to once, so there is no
-//                       longer a 60 MB surprise to warn about
+// The dialog is IDENTICAL every time — no short form for returning readers, no
+// state deciding which paragraphs appear. A first draft varied it, and the
+// variation bought nothing worth the two extra flags, the branch in the
+// builder, the `.si-short` spacing rule and the question of which flag the
+// download note should key on. One dialog, always the same, is simpler to
+// reason about and simpler to meet.
 //
-// Neither records an ANSWER. `bd_speak` is gone, and nothing seeds the checkbox
-// at boot — which is what makes "it began speaking while I was reading the
-// dialog" impossible rather than merely unlikely.
+// So NOTHING is remembered about the offer. `bd_speak` is gone, and nothing
+// seeds the checkbox at boot — which is what makes "it began speaking while I
+// was reading the dialog" impossible rather than merely unlikely.
 //
-// ?intro=1 forces the LONG form, for reviewing the wording without clearing
-// localStorage by hand.
-function speechIntroForced() {
-  try { return new URLSearchParams(location.search).get('intro') === '1'; }
-  catch (_) { return false; }
-}
-function speechIntroExplained() {
-  if (speechIntroForced()) return false;
-  try { return localStorage.getItem('bd_speak_explained') === '1'; }
-  catch (_) { return false; }
-}
-// The download warning belongs to "has not agreed to the download", NOT to
-// "has not read the explanation". Someone who declines on a first visit and
-// accepts on a second reaches the SHORT form having never downloaded anything,
-// and must still be told about the 60 MB before it starts.
-//
-// bd_speak_dl records CONSENT rather than completion — it is set when the user
-// agrees, not when the bytes arrive — so the helper is named for that.
-function speechDownloadAgreed() {
-  try { return localStorage.getItem('bd_speak_dl') === '1'; } catch (_) { return false; }
-}
-function markSpeechIntroSeen() {
-  try { localStorage.setItem('bd_speak_explained', '1'); } catch (_) {}
-}
+// (`bd_speak_dl` still exists, but belongs to the CHECKBOX path: it stops the
+// download confirm() re-firing every time the box is ticked. It has no say in
+// what this dialog shows.)
 
 function showSpeechIntro() {
   return new Promise(resolve => {
@@ -1043,26 +1024,15 @@ function showSpeechIntro() {
 
     const h = document.createElement('h2');
     h.textContent = 'Would you like the text read aloud?';
-    // The QUESTION is put every visit; the EXPLANATION is not. A returning
-    // reader gets the heading and the two buttons and nothing else — they have
-    // read it, and repeating it would make the tap feel like an obstacle
-    // rather than a choice.
-    const parts = [h];
-    if (!speechIntroExplained()) {
-      const p1 = document.createElement('p');
-      p1.textContent = 'ButterflyDreaming can speak each node as you open it, in a voice that runs '
-                     + 'entirely on your device — nothing is sent anywhere.';
-      const p2 = document.createElement('p');
-      p2.textContent = 'There is a music player at the foot of the screen. Music drops to the '
-                     + 'background while text is being read.';
-      parts.push(p1, p2);
-    }
-    if (!speechDownloadAgreed()) {
-      const p3 = document.createElement('p');
-      p3.className = 'si-fine';
-      p3.textContent = 'A ' + SPEAK_MODEL_MB + ' MB voice downloads once, then works offline. Best on wi-fi.';
-      parts.push(p3);
-    }
+    const p1 = document.createElement('p');
+    p1.textContent = 'ButterflyDreaming can speak each node as you open it, in a voice that runs '
+                   + 'entirely on your device — nothing is sent anywhere.';
+    const p2 = document.createElement('p');
+    p2.textContent = 'There is a music player at the foot of the screen. Music drops to the '
+                   + 'background while text is being read.';
+    const p3 = document.createElement('p');
+    p3.className = 'si-fine';
+    p3.textContent = 'A ' + SPEAK_MODEL_MB + ' MB voice downloads once, then works offline. Best on wi-fi.';
 
     const row = document.createElement('div');
     row.className = 'si-row';
@@ -1073,17 +1043,13 @@ function showSpeechIntro() {
     no.textContent = 'Not now';
     row.append(yes, no);
 
-    // Heading + buttons only: the heading's bottom margin was sized to sit
-    // above a paragraph, and left alone it leaves the short form looking hollow.
-    if (parts.length === 1) box.classList.add('si-short');
-    box.append(...parts, row);
+    box.append(h, p1, p2, p3, row);
     wrap.append(box);
     document.body.appendChild(wrap);
 
     const done = (accepted) => {
       wrap.remove();
-      // Not remembered when forced, so ?intro=1 can be used repeatedly.
-      if (!speechIntroForced()) markSpeechIntroSeen();
+      // Nothing recorded: the offer is made afresh on the next visit.
       resolve(accepted);
     };
     yes.addEventListener('click', () => done(true));
@@ -5863,7 +5829,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Decided BEFORE the card is inserted, because inserting it is what
       // speaks. Asking whether to read aloud while already reading aloud is the
       // one thing this dialog must not do.
-      // Every visit — see the note above speechIntroForced. The only conditions
+      // Every visit — see the note above showSpeechIntro. The only conditions
       // left are structural: a real click on Root, the whole text in one card,
       // and somewhere to go afterwards.
       const introWillShow = isRoot && isLast && !bootPriming && hasNavDescendants(node);
@@ -10189,10 +10155,11 @@ async function init() {
     // speech as enabled before the question had been put.
     speakEnabled = false;
     box.checked = false;
-    // Retire the key from the remembered-answer era. Nothing reads it now, so
-    // leaving it would only mislead whoever next opens localStorage looking
-    // for why speech is behaving as it is.
+    // Retire the keys from the remembered-answer era. Nothing reads either
+    // now, so leaving them would only mislead whoever next opens localStorage
+    // looking for why speech is behaving as it is.
     try { localStorage.removeItem('bd_speak'); } catch (_) {}
+    try { localStorage.removeItem('bd_speak_explained'); } catch (_) {}
     box.addEventListener('change', async () => {
       // 2026-09-04 — the voice is a ~60 MB download on first use, and it must
       // NOT begin because a checkbox was ticked out of curiosity. Asked once,

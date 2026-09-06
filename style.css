@@ -1105,7 +1105,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #4a7fd4;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1949,9 +1949,6 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #speech-intro p  { margin: 0 0 10px; color: #c9c9d0; }
 #speech-intro .si-fine { font-size: 13px; color: #9a9aa4; }
 #speech-intro .si-row { display: flex; gap: 10px; margin-top: 14px; }
-/* 2026-09-06 — the returning-visitor form: heading and buttons, nothing between. */
-#speech-intro .si-short h2 { margin-bottom: 0; }
-#speech-intro .si-short .si-row { margin-top: 18px; }
 #speech-intro button {
   flex: 1 1 0; font: 600 16px/1 inherit; padding: 12px 10px;
   border-radius: 6px; cursor: pointer;
