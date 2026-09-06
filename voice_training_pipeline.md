@@ -260,6 +260,21 @@ draft of the current prompts was ~58% two-member epigrams, a shape that trains
 one characteristic contour and then imposes it on flat prose. Mixed lengths
 matter because prosody spans clauses.
 
+### The screening step, concretely
+
+When the text arrives, before any chunking:
+
+1. **Phonemise every line** with `EspeakPhonemizer().phonemize('en-gb-x-rp', text)`
+   and flag any word espeak spells out letter by letter, plus every term from the
+   list above. Do not eyeball this — the failure is silent.
+2. For each flagged word, decide: **remove the sentence**, **replace the word**
+   with an everyday equivalent, or **keep it and add a lexicon entry**, then
+   re-check. Keeping a term is only worth it if BD will need to *say* it.
+3. **Count phonemes across the whole set** and top up the gaps with extra
+   sentences. Counting beats scanning.
+4. **Report the length and structure distribution** before recording starts, not
+   after — that is the last moment a homogeneity problem is cheap to fix.
+
 ### Chunking
 
 One utterance per line, `NNNN|text`, ideally 3–12 seconds. Split on sentences;
@@ -279,6 +294,11 @@ rather than optional:
   ear.** If they differ, that is found while it is still fixable.
 - The recorder resumes at the first *gap*, not where you stopped — a skipped
   prompt sends you back to it next sitting. That is deliberate.
+
+The same guidance, written for whoever is actually at the microphone rather than
+for the pipeline, is in `voice_prompts.md` under *Recording sessions, and taking
+breaks* — that is the document the reader has in front of them, so it belongs
+there too.
 
 Six minutes gave something usable. An hour, recorded consistently, should give
 something considerably better than "not bad considering".

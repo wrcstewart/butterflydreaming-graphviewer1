@@ -34,6 +34,45 @@ corrupts far more than the word itself.
 No word trips the spelling-out check. 44 distinct phonemes across 2,977 tokens,
 **none below five occurrences**. Longest utterance about ten seconds.
 
+## Recording sessions, and taking breaks
+
+**Progress is saved on the server after every clip you Keep**, so closing the
+tab, sleeping the machine or losing the connection costs at most the take you
+were on. Reopening the page drops you at the first prompt without audio.
+
+One quirk: it resumes at the first **gap**, not where you stopped. Skip prompt 12
+and carry on to 30, and next time you will start back at 12. That is deliberate,
+but it looks like it has lost your place when it has not.
+
+**Breaks are fine — the risk is acoustic, not mechanical.** A fine-tune learns
+whatever stays consistent across the set, including things nobody meant to teach
+it. If half the sentences are recorded before a break and half after, any
+difference between the two sittings becomes structure the model can see. In order
+of how much damage it does:
+
+- **Microphone position.** By far the largest. A few centimetres changes level
+  and low-end audibly. If it is on a stand, leave it; if you hold it, that is the
+  thing to fix before starting.
+- **Your chair.** The same problem from the other end.
+- **The room.** Heating cycling on, a window opened, traffic building through the
+  afternoon. The noise floor is in every clip.
+- **Your voice.** An hour after eating it genuinely differs — often warmer and
+  slower. That one you can only notice, not control.
+
+So **short breaks are nearly free; long ones are where the risk lives.** Twenty
+minutes with the setup untouched will not show. Resuming the next morning with
+the microphone re-placed is effectively two datasets.
+
+If you do break for long, the cheap insurance is to **re-record two or three
+sentences you had already kept, and listen to them against the originals.** If
+they match, carry on. If they do not, you have found it while it is still
+fixable rather than at training time.
+
+**Sixty-three sentences is about forty minutes** including retakes, so this set
+does not need a break at all. That changes at scale: an hour of finished audio is
+roughly 600 utterances, or something over two hours of sitting, where breaks stop
+being optional and the discipline above starts to matter.
+
 ---
 
 **1.**  The kettle was still warm when she came back down.
