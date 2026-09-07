@@ -505,7 +505,69 @@ not by deepening the duck.
 
 ---
 
-## 10. Questions the save-path design has to answer
+## 10. The SC problem, and the metaphorical wrapper
+
+*Named here as the "Santa Claus problem": adults hold things they do not disclose
+to children, and a shared space has to hold both readerships at once.*
+
+BD is public, has no sign-in, and **children may read it**. Contributors are
+adults who may want to write about adult experience. Refusing them flattens the
+corpus; admitting them plainly is not defensible in a space a child can wander
+into.
+
+**The design's answer is already in the system: myth and story.** Giving people a
+metaphorical vehicle is not decoration — it is the mechanism. A metaphor operates
+at two levels at once, and a child reads the surface while an adult reads both.
+It is also, independently, where the artistic and therapeutic power lives:
+saying a thing *through* an image is often the only way it can be said at all.
+
+**The property worth naming, because it cuts both ways.** A classifier reads the
+surface, not the metaphor.
+
+- **In BD's favour:** a filter that punishes literalness pushes writers toward
+  metaphor — which is the direction the design wants anyway. The screening bias
+  and the aesthetic goal happen to align, which is rare and worth exploiting
+  rather than fighting.
+- **Against:** the same opacity that protects a child reader makes genuinely
+  harmful content equally invisible to the filter. **Metaphor is not a safety
+  property; it is an encoding.** Whether the encoded thing is a gift or a payload
+  is a judgement no surface classifier can make.
+
+That is the strongest argument for the two-stage design being **two different
+jobs, not the same job twice**. Stage one reads the surface, cheaply, in real
+time, and mostly nudges. Stage two must be able to read *through* the metaphor,
+which is exactly what a language model can do and a classifier cannot. If stage
+two is only a slower version of stage one, the wrapper defeats both.
+
+## 11. The open research questions
+
+These sit under BD rather than inside any one feature, and are the reason the
+save-path conversation is worth having slowly.
+
+1. **Does a metaphorical wrapper actually protect a young reader, or only delay
+   comprehension?** Fairy tales carry very dark material and are thought to work
+   *because* of it, not despite it. If that is right, the wrapper is not a
+   filter at all but a pacing device — and the design should say which it
+   believes.
+2. **What is the audience model?** "Written for children" and "a child might
+   wander in" imply completely different thresholds. BD has never had to state
+   which it is, and the screening design cannot be specified until it does.
+3. **Is there an age gate, and can there be?** Any gate contradicts *"no sign-in,
+   no tracking"* (§12, item 12), and self-declared gates are widely understood to
+   be theatre. The alternative is to set the corpus threshold such that no gate is
+   needed — which is a decision about what BD is, not about screening.
+4. **Is the therapeutic aspect intended, incidental, or to be encouraged?**
+   Expression through myth is a recognised therapeutic mode, and BD's register
+   invites it. But BD is not a therapeutic setting and has no duty-of-care
+   structure. This does not need solving before saving ships; it does need
+   deciding whether anything is signposted, because people will bring more to a
+   space like this than its designers planned for.
+5. **Does the pairing itself change what people write?** Two people composing
+   together produce something neither would alone. Whether that makes disclosure
+   more likely or less is unknown, and it bears directly on both screening and
+   consent.
+
+## 12. Questions the save-path design has to answer
 
 Offered as an agenda rather than a position.
 
@@ -636,21 +698,23 @@ Offered as an agenda rather than a position.
     Also worth costing: the toxicity model is a second download on top of the
     60 MB voice. On a phone, when each arrives matters.
 
-    *The risk specific to BD, and probably the hard part.* Toxicity classifiers
-    are trained on social-media abuse, where darkness of subject correlates with
-    intent to harm. **In a contemplative corpus it does not.** BD's texts are
-    about death, grief, loss, impermanence, suffering — a pair writing well, in
-    exactly the register the corpus invites, will produce sentences that a
-    general-purpose classifier has every reason to score highly. The failure mode
-    is therefore not missed abuse; it is **a filter that rejects the best
-    contributions and admits bland ones**, teaching people to write flatly to get
-    past it.
+    *What the classifier actually tests.* The TensorFlow.js toxicity model exposes
+    seven labels: `identity_attack`, `insult`, `obscene`, `severe_toxicity`,
+    `sexual_explicit`, `threat`, `toxicity`. Note what is **not** there — it has no
+    concept of grief, death or despair. The sharp edge is `sexual_explicit`, which
+    is the live concern given who may be reading (§10).
 
-    That argues for the real-time check being **advisory in tone as well as in
-    authority** — flagging for the later pass rather than refusing — and for
-    keeping a record of what it flagged and what a human then decided. Without
-    that record there is no way to discover the filter is mis-calibrated, because
-    the contributions it discourages never arrive.
+    The residual calibration worry is narrower than it first looks: only the broad
+    `toxicity` catch-all, trained on abuse, might score bleak-but-legitimate
+    contemplative writing. **That is measurable rather than arguable** — run the
+    existing corpus through the model before relying on it, and see what it says
+    about passages already judged good.
+
+    Whatever it says, the real-time check should be **advisory in tone as well as
+    in authority** — flagging for the later pass rather than refusing — and there
+    should be a record of what it flagged against what a human then decided.
+    Without that record mis-calibration is undiscoverable, because the
+    contributions it discourages never arrive to be counted.
 
 12. **The landing page already promises this**, in these words:
 
