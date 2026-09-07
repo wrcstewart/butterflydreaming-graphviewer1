@@ -528,28 +528,79 @@ Offered as an agenda rather than a position.
    A user node has no lineage to inherit a colour from, which is itself a fact
    worth expressing rather than a problem to paper over.
 
-**Who may save**
-9. **Saving requires both users to agree** — that is settled. What is open is how
-   the two are established as two. A **two-browser setup should be allowed
-   initially** and tightened only if it causes trouble.
+**Who may save — a settled position, not an open question**
 
-   Two facts constrain any tightening. The server already enforces **one BD socket
-   per browser instance** via a device cookie, so two tabs do not present as two
-   people — testing a pair means two different browsers or a private window.
-   And **restricting by IP address cannot be done naively**: a tunnel runs on the
-   same host, so every public visitor arrives from the loopback address and an
-   allowlist written against the socket's address would admit the entire internet.
-   The real client address is available only in a forwarded header.
+9. **Saving requires both users to agree.** Establishing that the two are
+   genuinely two is **deliberately not enforced**, and the reasoning is worth
+   keeping because it is easy to relitigate.
+
+   *Where things stand.* The device cookie enforces one socket per **browser
+   instance**, not per person, so Safari and Chrome on one machine already present
+   as two users. There is no barrier today.
+
+   *Why a same-IP check was rejected.* It would work, and it would catch the wrong
+   people. Two users in one house or one office share an address — and given what
+   BD is for, **a couple on a sofa with a laptop and a phone is plausibly the most
+   likely genuine pairing there is.** Meanwhile the person you are aiming at
+   switches one device to mobile data and walks through it. The control breaks the
+   primary use case to inconvenience a determined user for a few seconds.
+
+   *The reframing that settles it.* The both-agree rule is an **etiquette
+   mechanism, not an authorisation boundary.** Someone who defeats it alone has
+   published under a pretence; they have not breached anything. And it could not
+   be load-bearing security in any case while §6.4 stands, since the whole gate
+   can be bypassed without pairing at all.
+
+   *Effort as a filter.* Sustaining two devices on two networks through a
+   plausible conversation is far past the point where trolling stops being
+   enjoyable. **Anyone willing to do it has probably spent more care on the
+   contribution than most genuine pairs will** — which makes the residual risk
+   less alarming than it first appears. Screening after the fact (below) lowers
+   the reward further, and being *known* to screen lowers the attempt rate more
+   cheaply than any gate.
+
+   *So: limit consequences rather than access.* Rate-limit saves per address per
+   day; give user-saved nodes a pending state rather than immediate publication —
+   the corpus is curated anyway, so a review step is in the grain of the system;
+   and make them revertible per node, which is needed regardless for the case of a
+   **genuine** pair saving something poor.
+
+   *What the IP is still for.* Recorded at page load against the session, so a
+   specific troublemaker can be **barred afterwards**. Reactive, tolerant of being
+   coarse, and it does not punish the sofa. It must come from the
+   `CF-Connecting-IP` header on the handshake, **never from the socket address** —
+   a tunnel sits in front, so every public visitor arrives from loopback and an
+   allowlist written against the socket would admit the entire internet. The
+   header is absent on localhost, so any check must handle that or it locks the
+   author out of his own machine. Combine with the device cookie: either alone is
+   weak, together they separate "same person returned" from "same coffee shop"
+   tolerably well. An address held against a session is personal data, so decide a
+   retention period at design time rather than accumulating a log forever.
+
+**Content screening — planned, and none of it exists yet**
+
+10. The intention is a **real-time check as text is composed** and a **later AI
+    pass** over what was saved. Neither is built. To be exact about the present
+    state: there is **no content moderation in BD of any kind** — no filter, no
+    screening, no review queue. The only thing in the code that touches this is a
+    *structural* trust boundary on deep links, where a shared payload's script is
+    honoured for module targets and ignored for ordinary ones, so free text cannot
+    be pushed into another person's cards through a link. That prevents one
+    injection route; it inspects nothing.
+
+    This matters to question 9: the argument above leans on screening existing.
+    Until it does, the pending state is doing all the work.
 
 **Safety**
-10. The unguarded query channel (§6.4). Any authenticated write path is
-    decoration until that is closed.
-11. What can be undone? There is a backup on every curator write, but no
+11. The unguarded query channel (§6.4). Any authenticated write path is
+    decoration until that is closed — and it is the reason the both-agree rule
+    cannot be treated as security.
+12. What can be undone? There is a backup on every curator write, but no
     per-node history and no delete path for user content.
 
 **Editing together**
-12. Whose text is authoritative while two people are editing? There is no
+13. Whose text is authoritative while two people are editing? There is no
     conflict model — the current design anchors both users to one node and lets
     them wander, but does not merge simultaneous edits.
-13. Does saving end the joint session, or can a pair produce several nodes? If
+14. Does saving end the joint session, or can a pair produce several nodes? If
     several, that is an argument for the session pen name in question 2.
