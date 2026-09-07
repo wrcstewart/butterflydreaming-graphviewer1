@@ -549,9 +549,40 @@ save-path conversation is worth having slowly.
    *because* of it, not despite it. If that is right, the wrapper is not a
    filter at all but a pacing device — and the design should say which it
    believes.
-2. **What is the audience model?** "Written for children" and "a child might
-   wander in" imply completely different thresholds. BD has never had to state
-   which it is, and the screening design cannot be specified until it does.
+2. **The audience model — SETTLED, and it is not the easy option.** BD is *not*
+   written for children. But children are **first-class citizens** of it, as are
+   other vulnerable readers.
+
+   That is a stronger commitment than a safety threshold, and it is worth being
+   clear why. "A child might wander in" licenses a filter and nothing more:
+   keep the harmful things out and the child's experience is beside the point.
+   **First-class citizenship makes their experience a design constraint**, and it
+   reaches well past screening — reading level, the pacing of the onboarding, what
+   the spoken voice sounds like, whether a young reader can tell where they are in
+   the graph, whether anything talks down to them. A corpus can be perfectly safe
+   and still make a child feel it was not for them.
+
+   The same applies to "other vulnerable readers", which is the broader and less
+   tractable half: someone in distress, someone who arrives at a passage about
+   loss at the wrong moment, someone using BD therapeutically without saying so
+   (question 4). Screening does not touch any of that. **Signposting, pacing and
+   what happens after a difficult passage** do.
+
+   **Two child-protection advisors will review the system** once content,
+   screening and saving are built. That sequencing is sound, because everything
+   is behind the curation code until then (§6.4a), so nothing is public while it
+   is being judged.
+
+   One suggestion for that engagement. A review of a working prototype will
+   naturally concentrate on the *interface*, which is the cheap thing to change.
+   **Ask them early — before the build is finished — about what must be
+   RECORDED**: what a flag log has to contain, how long it is kept, whether a
+   human decision must be attributable, what has to be reconstructable after the
+   fact. Those are data-model questions, they are expensive to retrofit, and they
+   are exactly the sort of thing a protection specialist has firm views about.
+   The flagged-content record argued for in §10 is already half of that answer;
+   it is worth confirming the shape with them before it is written rather than
+   after.
 3. **Is there an age gate, and can there be?** Any gate contradicts *"no sign-in,
    no tracking"* (§12, item 12), and self-declared gates are widely understood to
    be theatre. The alternative is to set the corpus threshold such that no gate is
