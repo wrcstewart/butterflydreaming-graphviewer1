@@ -390,6 +390,25 @@ Three endpoints create structure — `create-cluster`, `create-subfamily`, and a
 clone operation for clusters. All are curator tools. **There is no path by which
 an ordinary user creates a node.** That is the gap.
 
+### 6.4a DECIDED — editing, agreeing and saving ship behind the curation code
+
+**Until screening exists, the whole compose → agree → save path stays behind the
+developer code**, alongside Sv / Wr / Re. Screening is the largest single
+challenge in BD and it gates everything downstream of it.
+
+Three notes on doing this well:
+
+- **The code gates the buttons, not the database** (§6.4). For a development
+  gate that is sufficient — the goal is that no visitor can stumble into an
+  unscreened write, and it achieves that. It is not a security boundary, and
+  should not start being described as one.
+- **Build the gate as one condition, not as a mode.** A temporary restriction
+  that threads itself through the UI becomes a refactor to remove. Everything
+  should be built as though ungated, with a single check deciding whether the
+  controls appear.
+- **Testing a pair needs two browsers, each with the code entered** — the device
+  cookie means two tabs are one user, and the code is remembered per browser.
+
 ### 6.4 The unguarded channel — must be faced before any of this
 
 The socket handler ends with a fall-through: any message carrying a `query` field
@@ -616,6 +635,22 @@ Offered as an agenda rather than a position.
 
     Also worth costing: the toxicity model is a second download on top of the
     60 MB voice. On a phone, when each arrives matters.
+
+    *The risk specific to BD, and probably the hard part.* Toxicity classifiers
+    are trained on social-media abuse, where darkness of subject correlates with
+    intent to harm. **In a contemplative corpus it does not.** BD's texts are
+    about death, grief, loss, impermanence, suffering — a pair writing well, in
+    exactly the register the corpus invites, will produce sentences that a
+    general-purpose classifier has every reason to score highly. The failure mode
+    is therefore not missed abuse; it is **a filter that rejects the best
+    contributions and admits bland ones**, teaching people to write flatly to get
+    past it.
+
+    That argues for the real-time check being **advisory in tone as well as in
+    authority** — flagging for the later pass rather than refusing — and for
+    keeping a record of what it flagged and what a human then decided. Without
+    that record there is no way to discover the filter is mis-calibrated, because
+    the contributions it discourages never arrive.
 
 12. **The landing page already promises this**, in these words:
 
