@@ -577,30 +577,68 @@ Offered as an agenda rather than a position.
    tolerably well. An address held against a session is personal data, so decide a
    retention period at design time rather than accumulating a log forever.
 
-**Content screening — planned, and none of it exists yet**
+**Content screening — designed, promised publicly, not yet built**
 
-10. The intention is a **real-time check as text is composed** and a **later AI
-    pass** over what was saved. Neither is built. To be exact about the present
-    state: there is **no content moderation in BD of any kind** — no filter, no
-    screening, no review queue. The only thing in the code that touches this is a
-    *structural* trust boundary on deep links, where a shared payload's script is
-    honoured for module targets and ignored for ordinary ones, so free text cannot
-    be pushed into another person's cards through a link. That prevents one
-    injection route; it inspects nothing.
+10. **The plan.** Two stages: a **real-time check as text is composed**, expected
+    to use the TensorFlow.js toxicity classifier, plus **checks against identity
+    disclosure**; and a **later AI pass** over what was saved.
 
-    This matters to question 9: the argument above leans on screening existing.
-    Until it does, the pending state is doing all the work.
+    **What exists today: nothing.** No filter, no screening, no review queue. The
+    only thing in the code that touches this is a *structural* trust boundary on
+    deep links — a shared payload's script is honoured for module targets and
+    ignored for ordinary ones, so free text cannot be pushed into another person's
+    cards through a link. That closes one injection route and inspects nothing.
+
+    **Beware one document.** `BD_SR_Editor_Design_Notes_v0.1.md` §1.1 refers to
+    "the existing toxicity and anonymity screening" as though it were built. It is
+    not. That sentence describes the intended pipeline, not the system.
+
+11. **Two design points the plan should carry.**
+
+    *Client-side screening is advisory, not enforcement.* BD's rule that
+    everything expensive runs on the client is about **presentation** — deriving
+    what the reader sees. It does not extend to authorisation. A check running in
+    the composer improves the writing experience and catches the careless case,
+    but anything a browser decides, a browser can decline to decide; and while
+    §6.4 stands, the database can be written without going near the composer at
+    all. **The authoritative check has to be the server-side or review-time one.**
+    Worth being explicit, or the client-only principle will be read as covering
+    something it was never meant to.
+
+    *Identity disclosure is two problems, not one.* **Deliberate or formatted**
+    disclosure — an email address, a phone number, a postcode, a handle, a URL —
+    is pattern-matchable, cheap and reliable, and belongs in the real-time check.
+    **Accidental contextual** disclosure — naming a daughter's school beside a
+    town, an employer beside a street — carries no pattern at all and needs
+    semantic understanding. A small classifier will not catch it in real time.
+    That case belongs to the later pass, which is an argument for the pending
+    state doing real work rather than being a formality.
+
+    Also worth costing: the toxicity model is a second download on top of the
+    60 MB voice. On a phone, when each arrives matters.
+
+12. **The landing page already promises this**, in these words:
+
+    > *Anonymous, free, moderated. No sign-in, no tracking, no charge.
+    > Contributions are moderated.*
+
+    Two consequences. **"Contributions are moderated" becomes load-bearing the
+    moment saving ships** — it is not false today only because contributions are
+    impossible. And **"no tracking" sits against recording an IP at page load**
+    (question 9). A short-retention abuse log is arguably not "tracking" in the
+    sense a reader takes from that sentence, but that is a judgement to make
+    deliberately and, if necessary, to reword — not to drift past.
 
 **Safety**
-11. The unguarded query channel (§6.4). Any authenticated write path is
+13. The unguarded query channel (§6.4). Any authenticated write path is
     decoration until that is closed — and it is the reason the both-agree rule
     cannot be treated as security.
-12. What can be undone? There is a backup on every curator write, but no
+14. What can be undone? There is a backup on every curator write, but no
     per-node history and no delete path for user content.
 
 **Editing together**
-13. Whose text is authoritative while two people are editing? There is no
+15. Whose text is authoritative while two people are editing? There is no
     conflict model — the current design anchors both users to one node and lets
     them wander, but does not merge simultaneous edits.
-14. Does saving end the joint session, or can a pair produce several nodes? If
+16. Does saving end the joint session, or can a pair produce several nodes? If
     several, that is an argument for the session pen name in question 2.
