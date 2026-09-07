@@ -17,6 +17,7 @@ Keep this current when adding a doc. One line is enough.
 
 | file | what it is |
 |---|---|
+| ✔ **BD_SYSTEM_OVERVIEW.md** | **The master description of the system as built** — data model with live counts, views, the ring ladder, pairing, every write path, speech synthesis and recognition. Written to be read without the repo. Ends with the open questions for the user-created-node design. |
 | ✔ **HowToRestore.md** | **Read first if memory is missing.** Explains the out-of-git memory directory, how it is mirrored here, and what else to read. |
 | **MEMORY_SNAPSHOT.md** | Mirror of the live memory directory, written by `sync_memory_snapshot.sh` via a Stop hook. **Auto-generated — never hand-edit;** edit the memory files and re-run the script. |
 | **DOCS_INDEX.md** | This file — what every document *is*. |
