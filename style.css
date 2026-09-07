@@ -192,6 +192,8 @@ html, body {
 
 @media (max-width: 767px) {
   #back-btn { left: 8px; }
+  /* Panel is full width here, so its left edge is the 8px gutter. */
+  #view-mode-toggle { left: 10px; }
 }
 
 /* 2026-08-27 — the BN corner control. Same shape language as #back-btn, which
@@ -1105,7 +1107,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #4a7fd4;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1191,11 +1193,20 @@ body:not(.player-active) #copy-up-btn {
    visually paired with the yellow Back + Pair buttons that flank it.
    All three radios (Nodes / Player / Edit) always visible; disabled state
    is contextual and will get a click-time explanatory message soon. */
+/* 2026-09-07 — LEFT-ALIGNED to the panel, not centred.
+   Centring put the strip's right end under #pair-control on a narrow screen
+   (reported on an iPhone 8, where Pair was partially overlaid). The top row has
+   nothing on its left — #back-btn moved into #bd-toppanel — so the space was
+   there to take.
+   30% is the panel's left edge, the same convention #back-btn used before it
+   moved and #pair-control still uses from the right; 8px is the mobile
+   equivalent once the panel goes full width. The extra 2px is deliberate
+   slack so sub-pixel rounding can never put the border outside the panel. */
 #view-mode-toggle {
   position: fixed;
   top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: calc(30% + 2px);
+  transform: none;
   z-index: 10;
   display: inline-flex;
   align-items: center;
