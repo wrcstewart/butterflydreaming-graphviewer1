@@ -195,11 +195,35 @@ transparent, and identity lives in the *label* rather than in a fill. `?ink=0`
 returns the older coloured model, which is kept working deliberately so the two
 can be compared.
 
-The reason is not aesthetic. Colour used to say *what a node was about*. The
-paired-browsing work needs colour to say *whose it is*. One channel cannot carry
-both, so content moved to the label and the channel was freed. A corollary the
-author put sharply: **equal legibility means equal indistinguishability** — if
-every node reads as strongly as every other, nothing stands out.
+**Colour has not been removed. It has moved from the fill to the label.** Every
+node's *name* is drawn in its own colour, and the whole colour-inheritance scheme
+still operates unchanged:
+
+- A top-level family has a pure colour of its own.
+- A child blends its parents' colours, and carries an **ink purity** of
+  `1 / √(number of parents)`, averaged down the chain.
+- So **the further a node sits from a single lineage, the less saturated its name
+  becomes.** Desaturation is not a fading-out; it is the information. A greyish
+  label says *descended from many things*, and a vivid one says *descended from
+  one*.
+- Text nodes are deliberately exempt, drawn in plain light grey. They are the
+  great majority, so this is what decides whether the scheme reads calm or noisy.
+
+What was freed is the **node body**, whose opacity is now zero, and the
+**border**. Type borders were removed on principle: *border and outline carry
+state — local, remote, shared, selected — and nothing else.* Type is carried by
+shape and by label colour.
+
+So there are two live channels, and they do not compete:
+
+| channel | carries |
+|---|---|
+| **hue and saturation of the label** | what the node *is* — its lineage |
+| **achromatic rings, by width and opacity** | who is *looking at* it |
+
+A corollary the author put sharply: **equal legibility means equal
+indistinguishability** — if every node reads as strongly as every other, nothing
+stands out. Low saturation is a signal, not a defect.
 
 ### 4.2 The ring ladder
 
@@ -470,8 +494,16 @@ Offered as an agenda rather than a position.
 1. What *is* a user-created node — a new label, or a `TextNode` with provenance
    properties? The 84 orphans (§2.5) argue for something that cannot exist
    without a type and a `url`.
-2. Who is the author, given that viewer identity is currently an in-memory UUID
-   with no persistent user record? A jointly created node has *two* authors.
+2. **There is no user provenance in the system at all**, and none is assumed.
+   Viewer identity is an in-memory UUID that dies with the tab; there is no
+   account, no login and no user record. As things stand the only durable trace a
+   saved node could carry is its **timestamp**.
+   One candidate under consideration — not a decision — is a **temporary
+   per-session pen name**: something a pair chooses for the sitting, recorded on
+   what they make, and meaningless afterwards. Enough to say *these two nodes came
+   from the same conversation* without creating identity infrastructure. The
+   question to settle is whether a node needs to be attributable at all, or only
+   dated.
 
 **Attachment**
 3. What does it hang off? A user node with no edge is unreachable. If it attaches
@@ -489,18 +521,35 @@ Offered as an agenda rather than a position.
 **Visibility**
 7. Does a user node appear to everyone immediately, or is there a state between
    private and published? The graph has no notion of draft.
-8. How is it distinguished visually? The achromatic model has spent its colour
-   channel on *whose view a node is in*; provenance would be a third claim on a
-   scarce signal.
+8. How is it distinguished visually? Note that **colour is not available**: hue
+   and saturation already mean lineage (§4.1), and rings already mean presence.
+   What *is* unclaimed is the **node body**, currently transparent at zero
+   opacity, and the label's **weight or style** — italic is taken by title pages.
+   A user node has no lineage to inherit a colour from, which is itself a fact
+   worth expressing rather than a problem to paper over.
+
+**Who may save**
+9. **Saving requires both users to agree** — that is settled. What is open is how
+   the two are established as two. A **two-browser setup should be allowed
+   initially** and tightened only if it causes trouble.
+
+   Two facts constrain any tightening. The server already enforces **one BD socket
+   per browser instance** via a device cookie, so two tabs do not present as two
+   people — testing a pair means two different browsers or a private window.
+   And **restricting by IP address cannot be done naively**: a tunnel runs on the
+   same host, so every public visitor arrives from the loopback address and an
+   allowlist written against the socket's address would admit the entire internet.
+   The real client address is available only in a forwarded header.
 
 **Safety**
-9. The unguarded query channel (§6.4). Any authenticated write path is
-   decoration until that is closed.
-10. What can be undone? There is a backup on every curator write, but no
+10. The unguarded query channel (§6.4). Any authenticated write path is
+    decoration until that is closed.
+11. What can be undone? There is a backup on every curator write, but no
     per-node history and no delete path for user content.
 
 **Editing together**
-11. Whose text is authoritative while two people are editing? There is no
+12. Whose text is authoritative while two people are editing? There is no
     conflict model — the current design anchors both users to one node and lets
     them wander, but does not merge simultaneous edits.
-12. Does saving end the joint session, or can a pair produce several nodes?
+13. Does saving end the joint session, or can a pair produce several nodes? If
+    several, that is an argument for the session pen name in question 2.
