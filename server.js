@@ -16,10 +16,34 @@ console.log('[BD] Media files:', mediaFiles);
 
 // Load curation code from gitignored config — absent = curation disabled, app still works.
 let CURATION_CODE = null;
+// 2026-09-08 — pairing has its OWN code, separate from curation.
+//
+// They protect different things and are handed out to different people: the
+// curation code carries write access to the corpus, the pairing code only lets
+// two readers browse together. Giving a visitor the pairing code must not hand
+// them the ability to edit, so it cannot be the same string.
+//
+// The curation code is accepted for pairing as well, since a curator already
+// holds strictly more authority and should not have to carry two codes.
+let PAIR_CODE = null;
 try {
   const cfg = require('./config');
   CURATION_CODE = cfg.CURATION_CODE || null;
-} catch { /* no config or no CURATION_CODE — curation disabled */ }
+  PAIR_CODE     = cfg.PAIR_CODE     || null;
+} catch { /* no config — curation and pair gating both disabled */ }
+
+// Constant-time against EITHER code. Length is compared first because
+// timingSafeEqual throws on a mismatch rather than returning false.
+function pairCodeOk(code) {
+  if (!PAIR_CODE && !CURATION_CODE) return true;      // nothing configured: no gate
+  if (typeof code !== 'string' || !code) return false;
+  const buf = Buffer.from(code);
+  for (const want of [PAIR_CODE, CURATION_CODE]) {
+    if (!want || want.length !== code.length) continue;
+    if (crypto.timingSafeEqual(buf, Buffer.from(want))) return true;
+  }
+  return false;
+}
 
 // ── Node timestamps (blue_node_spec.md §7.1) ──────────────────────────────
 // Integer ms UTC, from the SERVER's clock — every write goes through here, so
@@ -1395,14 +1419,10 @@ io.on('connection', async (socket) => {
           //
           // The dev convenience it protected is gone anyway: the code is
           // remembered per browser, so the developer already has it entered.
-          if (CURATION_CODE) {
-            const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
-              crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
-            if (!codeOk) {
-              socket.emit('msg', { type: 'pair_denied', reason: 'code_required' });
-              console.log(`[BD] Wait denied (no/bad code): ${socket.data.userId}`);
-              return;
-            }
+          if (!pairCodeOk(msg.code)) {
+            socket.emit('msg', { type: 'pair_denied', reason: 'code_required' });
+            console.log(`[BD] Wait denied (no/bad code): ${socket.data.userId}`);
+            return;
           }
           waitingUser = { userId: socket.data.userId, socket };
           socket.emit('msg', { type: 'wait_state' });
@@ -1433,14 +1453,10 @@ io.on('connection', async (socket) => {
           // testing without needing to enter their own code; but a random
           // arriving to complete the pair must present a valid code, so
           // the system can't be used for unmonitored anonymous chatting.
-          if (CURATION_CODE) {
-            const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
-              crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
-            if (!codeOk) {
-              socket.emit('msg', { type: 'pair_denied', reason: 'code_required' });
-              console.log(`[BD] Pair denied (no/bad code): ${socket.data.userId}`);
-              return;
-            }
+          if (!pairCodeOk(msg.code)) {
+            socket.emit('msg', { type: 'pair_denied', reason: 'code_required' });
+            console.log(`[BD] Pair denied (no/bad code): ${socket.data.userId}`);
+            return;
           }
           const buddy = waitingUser;
           waitingUser = null;

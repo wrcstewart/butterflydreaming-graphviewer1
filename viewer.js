@@ -1048,9 +1048,25 @@ function showDevNotice() {
                      + 'It sits behind a short code while the content checks that will accompany '
                      + 'it are still being built.';
 
+    // The code field lives HERE rather than on the main screen: the notice is
+    // already explaining why pairing is closed, so the place to open it is the
+    // same breath — and it costs no permanent screen space on a phone.
+    const codeRow = document.createElement('label');
+    codeRow.className = 'dn-code';
+    const codeLab = document.createElement('span');
+    codeLab.textContent = 'Have a code? Enter it here:';
+    const codeIn = document.createElement('input');
+    codeIn.type = 'text';
+    codeIn.maxLength = PAIR_CODE_LEN;
+    codeIn.inputMode = 'numeric';
+    codeIn.autocomplete = 'off';
+    codeIn.placeholder = '••••';
+    codeIn.value = storedPairCode();          // so a returning reader sees it is already held
+    codeRow.append(codeLab, codeIn);
+
     const p3 = document.createElement('p');
     p3.className = 'si-fine';
-    p3.textContent = 'If you would like the code, please ask for it by email:';
+    p3.textContent = 'If you do not have one, you are welcome to ask for it by email:';
 
     const a = document.createElement('a');
     a.className = 'dn-mail';
@@ -1065,10 +1081,22 @@ function showDevNotice() {
     ok.textContent = 'Continue';
     row.append(ok);
 
-    box.append(h, p1, p2, p3, a, row);
+    box.append(h, p1, p2, codeRow, p3, a, row);
     wrap.append(box);
     document.body.appendChild(wrap);
-    ok.addEventListener('click', () => { wrap.remove(); resolve(); });
+
+    const done = () => {
+      const typed = codeIn.value.trim();
+      // A complete code is stored; an emptied field REVOKES the stored one, so
+      // clearing it is how a reader hands the code back.
+      if (typed.length >= PAIR_CODE_LEN) rememberPairCode(typed);
+      else if (!typed) forgetPairCode();
+      wrap.remove();
+      resolve();
+    };
+    ok.addEventListener('click', done);
+    // Enter submits, since the field is the only thing to fill in.
+    codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); done(); } });
   });
 }
 
@@ -5926,7 +5954,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         if (introWillShow) {
           // The development notice first: it explains why a control is missing,
           // and that belongs before a question about a different subject.
-          showDevNotice().then(() => showSpeechIntro()).then(async accepted => {
+          showDevNotice().then(() => {
+            // A code entered in the dialog has to reach the button immediately;
+            // updateBackBtn is what paints it.
+            updateBackBtn();
+            return showSpeechIntro();
+          }).then(async accepted => {
             if (accepted) {
               await enableSpeechFromIntro();
               speak(c0.body, { interrupt: true });
@@ -6647,7 +6680,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const pairBtn = document.getElementById('chat-btn');
     if (pairBtn) {
       const pairAllowed = pairUnlocked &&
-        (curationCodePresent() || pairingState.active || pairingState.waiting);
+        (pairCodePresent() || pairingState.active || pairingState.waiting);
       pairBtn.style.display = pairAllowed ? '' : 'none';
       pairBtn.disabled      = !pairAllowed;
     }
@@ -8542,6 +8575,41 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // so every public visitor reaches the server from 127.0.0.1 and a loopback
 // check would have handed the code to the internet.
 const CURATION_STORE_KEY = 'bd_curation_code';
+// 2026-09-08 — the PAIRING code is a separate secret with a separate store.
+//
+// It is handed to visitors who ask; the curation code carries write access to
+// the corpus and is not. Keeping one key per secret means revoking one cannot
+// disturb the other, and a visitor's browser never holds a curation code it was
+// never given.
+const PAIR_STORE_KEY = 'bd_pair_code';
+const PAIR_CODE_LEN  = 4;
+
+function storedPairCode() {
+  try { return localStorage.getItem(PAIR_STORE_KEY) || ''; } catch (_) { return ''; }
+}
+function rememberPairCode(code) {
+  try {
+    if (code && code.length >= PAIR_CODE_LEN) localStorage.setItem(PAIR_STORE_KEY, code);
+    else if (!code) localStorage.removeItem(PAIR_STORE_KEY);
+  } catch (_) {}
+}
+function forgetPairCode() {
+  try { localStorage.removeItem(PAIR_STORE_KEY); } catch (_) {}
+}
+// The code actually sent when Join is pressed. A curator holds strictly more
+// authority than a paired reader, so their code is accepted for pairing too and
+// they need carry only one.
+function pairCodeToSend() {
+  const stored = storedPairCode();
+  if (stored) return stored;
+  try {
+    const el = document.getElementById('dev-code');
+    return el ? el.value.trim() : '';
+  } catch (_) { return ''; }
+}
+function pairCodePresent() {
+  return storedPairCode().length >= PAIR_CODE_LEN || curationCodePresent();
+}
 
 // Storage throws in Safari Private mode and when cookies are blocked. Every
 // path here degrades to "type it in", which is exactly the status quo, so
@@ -9506,9 +9574,8 @@ async function init() {
     // configured, gates on it (arriver only) if one is. Server responds
     // with wait_state, paired, or pair_denied; those flow through the
     // message dispatch below to update pairingState + label.
-    const devCodeEl = document.getElementById('dev-code');
-    const code = devCodeEl ? devCodeEl.value.trim() : '';
-    console.log('[pair-debug] Join press → ready_to_pair (code:', code ? `"${code}"` : 'empty', ')');
+    const code = pairCodeToSend();
+    console.log('[pair-debug] Join press → ready_to_pair (code:', code ? 'present' : 'empty', ')');
     wsNow.emit('msg', { type: 'ready_to_pair', code });
     pairingState.waiting = true;
     updateJoinButtonLabel();
@@ -11003,9 +11070,12 @@ async function init() {
       // Under the always-on chat model (2026-07-15) neither reason closes
       // chat — the panel stays active for solo composition / bot dialogue
       // / system status; only the pair state resets.
-      if (msg.reason === 'code_required') forgetCurationCode();
+      // Drop the rejected code so the dialog offers the field again next time.
+      // Leaving a bad code in storage looks exactly like the gate being broken:
+      // the button appears, the press fails, and nothing says why.
+      if (msg.reason === 'code_required') { forgetPairCode(); forgetCurationCode(); }
       const reasonMessage =
-          msg.reason === 'code_required' ? 'Code required to chat'
+          msg.reason === 'code_required' ? 'That pairing code was not accepted — reload to enter another'
         : msg.reason === 'same_device'   ? 'Another BD tab on this device is already waiting to chat — close that tab or use it instead'
         :                                  `Pair denied: ${msg.reason || 'unknown'}`;
       pairStatus.textContent = reasonMessage;
