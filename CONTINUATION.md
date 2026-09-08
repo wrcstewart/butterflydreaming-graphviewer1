@@ -1,205 +1,153 @@
-# Continuation note — 2026-09-05, 23:05 BST
+# Continuation note — 2026-09-08
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
+
+Written before a period away from the machine, so it assumes nothing is
+remembered.
 
 ---
 
 ## 1. Where the work is
 
-**Branch `remote-graph-view`.** `main` is untouched and still the stable viewer.
+**Branch `remote-graph-view`.** `main` is untouched and 226 commits behind; it is
+still the stable viewer.
 
-    git branch --show-current     # expect: remote-graph-view
-    git log --oneline -1          # expect: 2b9785c or later
+    git branch --show-current      # expect: remote-graph-view
+    git log -1 --oneline           # expect: 1f58147 or later
 
-**Nothing here is merged.** If `main` is what you want, `git checkout main`.
+Everything below is on that branch and pushed. Merging to `main` is a deliberate
+act still to be taken — see §5.
 
-Current build: **`viewer.js?v=764`, `style.css?v=445`**, canary **blue**.
+**To bring the site back up after a restart:**
 
-**Read `session_notes_2026-09-05.md` FIRST — Part 2 is the live work**: voice
-training. Toolchain verified in `~/bd_voice_train`, BD loads `local/` voices,
-recording rig at `/voice_record.html`, 62 prompts designed and counted.
-NEXT: record ~25 prompts, fine-tune, export, listen. Part 1 covers onboarding.
+    cd ~/butterflydreaming_graphviewer1
+    node server.js                 # or: nohup node server.js > /private/tmp/bd_server.log 2>&1 &
 
-**Read `session_notes_2026-09-05.md`** — it is the most recent state:
-onboarding, the speech offer on the first Root click, and the pairing split.
+Local `http://localhost:8080/`, public `https://graph.virtualfictions.uk/` via a
+long-running `cloudflared` tunnel. **Client console output is forwarded to
+`/private/tmp/bd_server.log`** — that log is the primary diagnostic and has
+settled arguments that days of reasoning did not.
 
-Test URL: `http://localhost:8080/?ink=1&intro=1` (grey rings, speech dialog
-forced). Phone: the same parameters on `https://graph.virtualfictions.uk/`.
-`?intro=1` also clears the Speak checkbox, so it simulates a true first visit.
+Current served versions: `viewer.js?v=798`, `style.css?v=480`, canary **green**.
 
-**Speech is SHIPPED INTO BD** and working on desktop (iOS retest pending). The
-Speak checkbox drives client-side Piper with an IPA lexicon; nothing about speech
-touches the server. Read `session_notes_2026-09-04.md` — Part 2 carries three
-platform rules that cost most of a day: ONNX `session.run()` blocks the main
-thread and starves audio, `HTMLMediaElement.volume` is read-only on iOS, and
-WebKit restricts concurrent media.
+---
 
-**Piper DIRECT** (`piper_direct.js`) — our own
-synthesis path giving IPA pronunciation control and the model's real speaking
-rate. Read `session_notes_2026-09-04.md` first, then `…09-03.md`.
+## 2. Start here, in this order
 
-**Engine DECIDED — Piper, RTF 0.17 on an iPhone.** Read
-`session_notes_2026-09-03.md` first; it is the checkpoint, including the six
-platform faults (none a capability gap) and the one OPEN problem: the
-pronunciation lexicon, where `[[espeak phonemes]]` verify correctly on the
-command line but are read out letter by letter in the browser. espeak-ng is
-installed locally for ground truth. **Do NOT turn on COOP/COEP in BD** — speech
-does not need it and it would block the module iframes.
+0. **`BD_SYSTEM_OVERVIEW.md`** — the master description of the system as built.
+   Data model with live counts, views, the ring ladder, pairing, every write
+   path, speech, and the open design questions. Written to be readable without
+   the repo. **If you read one document, read this one.**
+1. **`DOCS_INDEX.md`** — what every other .md in the repo is for.
+2. **`PLANNING_REGISTER.md`** — how far each design is actually built.
+3. **`MEMORY_SNAPSHOT.md`** — mirror of the out-of-git memory directory, written
+   by `sync_memory_snapshot.sh` via a Stop hook. Never hand-edit it.
 
-**Earlier staging — read `speech_plan.md`.** Stage 0 is built
-(`2b9785c`): a Speak checkbox reads node text and arriving cards, synthesised
-server-side by macOS `say` and cached. The voice is a DELIBERATE placeholder.
-**Stage 1 is next: the same architecture with a real neural engine and its own
-stock voice, before anyone records anything.** `session_notes_2026-09-02.md` has
-the reasoning, including why Mandarin tones are not pursued.
+---
 
-**Read `session_notes_2026-09-01.md` too** — it covers the whole of 1 Sept:
-chunked presentation retired, Gateways re-parented under Conversations, the
-splash rebuilt, the ring geometry corrected, and three faults in the curation
-write path (one of which was silently destroying node text). Its closing table
-is the live open-items list.
-Server: `BD_GRACE_MS=5000 node server.js` (5s grace is a DEVELOPMENT value —
-`BD_GRACE_MS=65000` before real use; the server warns at boot).
+## 3. What changed in the last three days
 
-Two flags gate everything on this branch:
+**2026-09-06 — the speech offer, and the first voice fine-tune.**
 
-| flag | default | what it does |
+- The speech dialog is asked **every visit** and is **identical every time**.
+  Nothing about the answer is remembered. A short form for returning readers was
+  built and reverted the same day, on the author's call: the variation cost two
+  flags, a branch, a CSS rule and a real question about which flag the download
+  warning should key on. `bd_speak` and `bd_speak_explained` are retired and
+  cleared at boot; only `bd_speak_dl` survives, and only for the checkbox path.
+- **A voice was fine-tuned end to end** from 6.2 minutes of the author's own
+  reading — 42 minutes of training, exported to ONNX, loaded, and judged
+  intelligible. Everything about it, including seven toolchain breakages and a
+  re-runnable command block, is in **`voice_training_pipeline.md`**.
+
+**2026-09-07 — the overview, and a cascade bug.**
+
+- `BD_SYSTEM_OVERVIEW.md` written and then corrected several times against the
+  author's knowledge: colour did **not** go away with the achromatic model, the
+  audience model is settled, and the SC problem got its own section.
+- The radio strip was left-aligned to the panel edge. **It first moved the wrong
+  way**, because a media override placed earlier in the stylesheet loses to the
+  base rule at every width — a media query carries no extra specificity. Fixed by
+  moving it below the rule it overrides.
+
+**2026-09-08 — pairing closed to the public.**
+
+- **Pairing now requires a code, on the client and on the server, for both the
+  waiter and the arriver.** BD is publicly reachable with no content screening,
+  so it is not fit for public pairing.
+- **Pairing has its own code, separate from curation.** Both live in the
+  gitignored `config.js`. The curation code is also accepted for pairing, since a
+  curator holds strictly more authority; the reverse is not true.
+- A **development notice** appears on the first click on Root, before the speech
+  offer. It explains that pairing is closed, carries the code field, and invites
+  a request by email. **Delete it outright when it stops being true.**
+
+---
+
+## 4. The state of the collaborative work
+
+Everything downstream of composing is **behind the code** until content screening
+exists. That is a decision, recorded in `BD_SYSTEM_OVERVIEW.md` §6.4a.
+
+**The next design conversation** is what data is written when a user saves a node
+they created, and how joint editing should work. The author is holding that
+conversation elsewhere and will bring conclusions back. §12 of the overview is
+the agenda; §10 and §11 are the harder ground beneath it.
+
+Two positions already settled, so do not reopen them:
+
+- **Self-pairing is not prevented.** A same-IP check would break the most likely
+  genuine pairing — two people in one house — while a determined user switches to
+  mobile data and walks through it. The both-agree rule is etiquette, not an
+  authorisation boundary. Limit consequences, not access.
+- **BD is not written for children, but children are first-class citizens**, as
+  are other vulnerable readers. Two child-protection advisors will review once
+  content, screening and saving are built.
+
+---
+
+## 5. What is unfinished
+
+| item | note |
+|---|---|
+| **Content screening** | The largest single challenge. TF.js toxicity plus identity-disclosure checks, then a later AI pass. **Nothing is built.** |
+| **User-created nodes** | No node type, no write path, no provenance. The subject of the next conversation. |
+| **The unguarded query channel** | `server.js` runs any Cypher a client sends. Any authenticated write path is decoration until this is faced. |
+| **Merge to `main`** | 226 commits. A deliberate act, kept separate from the visual default flip. |
+| **`BD_GRACE_MS`** | Still 5000, a development value. 65000 before real use. |
+| **Recording the author's wife** | Planned within ~2 weeks. See `voice_training_pipeline.md` §7 — the espeak trap on contemplative vocabulary is the thing to check first. |
+
+---
+
+## 6. What exists ONLY on this machine
+
+Nothing here is in git, deliberately — the repository is public and a voice is
+personal data.
+
+| path | size | if lost |
 |---|---|---|
-| `?ink=1` | off | the whole colour scheme. **Without it the branch renders like `main`.** |
-| `BREADCRUMB_BARS` in viewer.js | `false` | the retired breadcrumb strips. Flip to bring them back. |
+| `voice_dataset/` | 34 MB | **the recordings would have to be made again** — the only irreplaceable item |
+| `voices/` | 121 MB | rebuildable from the recordings |
+| `~/bd_voice_train/` | 5.7 GB | rebuildable; the venv and base checkpoint are downloads |
+| `config.js` | — | holds `CURATION_CODE` and `PAIR_CODE` |
+| `backups/` | 71 files | DB dumps from curator writes |
+
+**`voice_dataset/` has no second copy anywhere.** Everything else can be
+regenerated from it or re-downloaded.
 
 ---
 
-## 2. Which document answers which question
+## 7. Traps that have cost real time
 
-| question | file |
-|---|---|
-| What does the screen mean? Why is it built this way? | **`remote_view_spec.md`** — read the AS-BUILT box at its head first |
-| Why are the colours what they are? | **`ink_mode.md`**, and `ink_palette_swatch.html` (open at `localhost:8080/ink_palette_swatch.html`) |
-| What was decided about the corner controls? | `corner_controls_plan.md`, `editing_spec.md` §v0.2 |
-| What happened on a given day? | `session_notes_2026-08-2*.md`, and this branch's git log |
-| What is every doc, and how far is each built? | `DOCS_INDEX.md`, `PLANNING_REGISTER.md` |
-| How does the graph actually work? | `edge_model.md` — **read before touching layout or edges** |
-| How is a WORK presented — gateway, titles, passages? | **`work_views.md`** |
-
-Memory lives outside git at
-`~/.claude/projects/-Users-williamstewart2-butterflydreaming-graphviewer1/memory/`
-and is mirrored into the repo as `MEMORY_SNAPSHOT.md`. See `HowToRestore.md`.
-
----
-
-## 3. What the screen means, in one table
-
-**STATE IS ACHROMATIC. Colour belongs to content.** This is the single most
-important thing on the page, and it reversed an earlier decision — see §3a.
-
-Every ring is white; only OPACITY and WIDTH carry meaning.
-
-| ring | opacity | width | meaning |
-|---|---|---|---|
-| inner | 0.5 | 0.5px | a node in YOUR view (reads as grey) |
-| inner | 0.5 | **2px** | **YOUR centre** |
-| outer | 0.8 | 0.5px | your partner can see it too |
-| outer | 0.8 | **1px** | **THEIR centre** |
-| inner + outer | 0.5 / **1.0** | **1.5px each** | you are both on it — the target |
-
-**Yours thickens the INNER ring, theirs the OUTER.** Whichever ring grows says
-whose focus it is, and neither needs a colour to say it.
-
-Widths come from `HALO_THIN` (0.5) via `SEL_MUL_IN` (4, yours), `SEL_WIDTH_MUL`
-(2, theirs) and `SNAP_WIDTH_MUL` (= SEL × 1.5). **They are not independent** —
-thinning the base shrinks everything derived from it, which has silently undone
-two earlier adjustments. Yours takes a BIGGER multiplier because the inner ring
-sits at 0.5 opacity against the outer's 0.8, so equal widths do not buy equal
-visibility.
-
-Geometry: the outline runs the whole way from the body, `wIn + wOut` wide, with
-the border drawn over its inner part. So the visible bands are exactly `[0,wIn]`
-yours and `[wIn, wIn+wOut]` theirs, and there is no antialiasing hairline between
-them.
-
-**Your own centre is not marked on the graph.** The Local control names it
-instead — that control shows WHERE YOU ARE, not where Back would take you, and
-pressing it still goes back.
-
-The controls carry the same three strengths as achromatic borders: Local 2px @
-0.5, Remote 2px @ 0.8, Common 3px @ 1.0. Their BACKGROUNDS keep the node's own
-colour, because that is content.
-
-**Route arrow** `#9FD0FF` solid 2.5px, head on the node to CLICK. **Route
-shadow** ramps 0.2 → 0.8 along the hops, so distance is visible rather than
-counted. **Reading-spine successor** is dotted grey (white @ 0.5) — a suggestion,
-where the route arrow is solid because it is a recommendation.
-
-**The route is CANONICAL**: both users compute the identical path. Distances run
-from the endpoint with the smaller url and ties break by url, so A→B and B→A
-agree. Without that they walk equal-length but different corridors and never
-meet — which is the whole convergence idea failing silently.
-
-**A route view shows ONLY the route.** The reading spine is suppressed while one
-is showing, and the legacy `bn-edge` marking is retired — three edge vocabularies
-were being drawn at once.
-
-**Back is transparent to a route**: leaving one by tapping suppresses that
-navigation's `saveState`, so Back returns the view you were in BEFORE the route
-rather than the hop diagram.
-
-Card heads say WHO: gold `#8d7900` you, navy `#001f4d` partner, grey `#C9CCD1`
-system (helper hints share the grey).
-
----
-
-## 3a. The reversal, and why it matters
-
-`ink_mode.md` says the black bodies exist to FREE COLOUR FOR STATE. **That is no
-longer true and the doc's rationale is superseded.** We went the other way:
-state gave up colour entirely.
-
-The reason, in the user's words, is that colour was doing two unrelated jobs —
-labels use it for CONTENT, rings were using it for STATE — and two vocabularies
-in one channel is confusing however well explained. Needing the explanation was
-the tell.
-
-Ink mode is still right, but for the OTHER two reasons: transparent bodies stop
-nodes occluding each other, and moving identity into the label leaves the node's
-outline free for rings.
-
-## 4. What is unfinished
-
-| | |
-|---|---|
-| **The crossing** | Simultaneous clicks swap without reaching green. Detectable with no protocol via `previous`. **The user is deciding what it should MEAN** — "you passed each other" vs "you crossed". `remote_view_spec.md` open list. |
-| Weighted hubs | Routes currently EXCLUDE hubs outright. Measured: 0 of 400 pairs unreachable, so this is a refinement for a larger corpus, not a fix. |
-| Gateway row at scale | At ~40 works a Cluster view shows ~10 gateways (27 for popular themes) against 2.2 now. **This is what breaks first.** |
-| `.card.local .card-head` | Still `#8d7900`, chosen to match the old selection ring. The ring is now `#FFD400`, so that correspondence has lapsed. |
-| `isGreen` in renderMarks | Declared, now unused. |
-| Explore protocol | Retired. A consent step is still wanted for SAVING — see `editing_spec.md` §7, which is the part worth re-reading. |
-
----
-
-## 5. Traps that have cost real time
-
-- **Verify the effect, not the exit code.** A `&&` chain commits even when the
-  edit aborted. One commit shipped only a version bump. Put the verifying grep
-  BEFORE the commit.
-- **After replacing a span of code, grep for every function the new code CALLS**
-  — not for what you just wrote. A span replacement silently deleted
-  `findBridge` and no route appeared; `node --check` passes on a deletion.
-- **Never `git add -A` here.** The repo root permanently holds ~127 MB of
-  untracked mp3s. Stage by name.
-- **A relayed message needs THREE sites** — sender, server whitelist, client
-  RECEIVE whitelist. Two of three fails silently.
-- **Whatever runs last decides** — and its mirror: `publishPosition` ran FIRST
-  and so reported the view it was leaving.
-- **Placing a node after a layout is NOT a constraint on that layout.** If other
-  nodes must move out of its way, fcose has to be told —
-  `fixedNodeConstraint`, not a post-hoc `position()`. Post-layout placement is
-  right only when the destination is empty space.
-- **Stale BARE hints send a view down the wrong `runLayout` branch.** Three times
-  now. A bare `hint_x` means "positioned in SOME view" and the reader cannot tell
-  which, so it is applied in views it was never about. Anything that must hold
-  for a KIND of view belongs before the branches, not inside one. 166 bare-hint
-  edges remain: 162 `DESCENDS_FROM`, 3 `CLUSTER_REL`, 1 `CONTAINS`.
-- Client console forwards to **`/private/tmp/bd_server.log`**. A second "no
-  different" means instrument, not iterate.
+- **Never `git add -A`.** The repo root permanently holds ~127 MB of untracked
+  mp3s and ingest files. Stage by name.
+- **Verify the effect, not the exit code** — and for CSS, verify what *wins*, not
+  what is served. A rule being present says nothing about whether it applies.
+- **A relayed message needs three sites**: sender, server whitelist, receiving
+  client whitelist. Two of three fails silently.
+- **Anchor scripted edits on constant names**, never on a paragraph of prose.
+  Long anchors drift, the script raises, and an `&&` chain commits anyway.
+- **Sv saves text, Wr saves layout**, and both say "saved".
+- **Never grant authorisation by IP address** — the tunnel makes every public
+  visitor arrive from loopback. The real address is in `CF-Connecting-IP`.

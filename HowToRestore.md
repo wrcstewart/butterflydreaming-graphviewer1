@@ -1,6 +1,6 @@
 # HowToRestore.md
 
-> **2026-08-30 17:50 BST — active work is on branch `remote-graph-view`, not
+> **2026-09-08 — active work is on branch `remote-graph-view`, not
 > `main`. Read [`CONTINUATION.md`](CONTINUATION.md) FIRST**: it says what state
 > the branch is in, which document answers which question, and what is
 > unfinished.
