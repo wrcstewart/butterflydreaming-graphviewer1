@@ -415,6 +415,37 @@ app.post('/api/voice-clip', express.raw({ type: 'audio/wav', limit: '80mb' }),
     }
   });
 
+// 2026-09-05 — check an edited prompt before it is recorded.
+//
+// The reader may reword a sentence so it flows better, which is welcome — a
+// sentence that fights the reader gives a worse take than a duller one. But an
+// added word espeak MISPRONOUNCES would teach the model that those phonemes
+// sound like something else, and they recur throughout ordinary English. So the
+// edit is checked at the moment it is made, using the same local espeak the
+// training pipeline will use.
+//
+// The ratio test: a word espeak spells out produces far more phonemes than it
+// has letters.
+app.get('/api/check-prompt', (req, res) => {
+  const text = String(req.query.text || '');
+  if (!text.trim()) return res.json({ suspect: [] });
+  const { execFileSync } = require('child_process');
+  const suspect = [];
+  try {
+    for (const w of text.match(/[A-Za-z][A-Za-z']*/g) || []) {
+      if (w.length < 3) continue;
+      const ipa = execFileSync('espeak-ng', ['-v', 'en-gb-x-rp', '--ipa', '-q', w],
+                               { encoding: 'utf8', timeout: 4000 }).trim();
+      const syms = [...ipa].filter(c => !' \u02c8\u02cc.,;:!?\''.includes(c)).length;
+      if (syms / w.length > 1.9) suspect.push({ word: w, ipa });
+    }
+    res.json({ suspect });
+  } catch (err) {
+    // espeak absent is not a reason to block recording — report and carry on.
+    res.json({ suspect: [], note: 'check unavailable: ' + err.message });
+  }
+});
+
 // Which prompts already have audio — so the page can resume rather than
 // restart, and so a session can be done in more than one sitting.
 app.get('/api/voice-status', (req, res) => {
@@ -1354,8 +1385,25 @@ io.on('connection', async (socket) => {
           return;
         }
         if (waitingUser === null) {
-          // First one in — no code gate. Sitting alone in the queue is
-          // harmless (no one to talk to yet).
+          // 2026-09-08 — the waiter is gated TOO.
+          //
+          // It used to be exempt, on the reasoning that sitting alone in the
+          // queue is harmless. That held while the arriver gate was the whole
+          // control, but it let an uncoded member of the public occupy the slot
+          // and be paired the moment a code-holder arrived. With no content
+          // screening yet, nobody should reach a pair without the code.
+          //
+          // The dev convenience it protected is gone anyway: the code is
+          // remembered per browser, so the developer already has it entered.
+          if (CURATION_CODE) {
+            const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
+              crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
+            if (!codeOk) {
+              socket.emit('msg', { type: 'pair_denied', reason: 'code_required' });
+              console.log(`[BD] Wait denied (no/bad code): ${socket.data.userId}`);
+              return;
+            }
+          }
           waitingUser = { userId: socket.data.userId, socket };
           socket.emit('msg', { type: 'wait_state' });
           // 2026-07-16 — helper card explaining the situation. Fires

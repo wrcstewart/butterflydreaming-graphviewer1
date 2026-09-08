@@ -6577,10 +6577,20 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // mid-session, possibly mid-pair, is worse than one that arrived early.
     // This sits ABOVE the early return so it runs even when Local has nothing
     // to show.
+    // 2026-09-08 — pairing now ALSO requires the curation code.
+    //
+    // BD is publicly reachable and there is no content screening yet, so it is
+    // not fit for public pairing. Restoring the dev-code gate that was dropped
+    // when Pair folded into Chat closes that off until screening exists.
+    //
+    // The pair state itself keeps the button alive: clearing the field while
+    // paired must not strand someone mid-session with no way to leave.
     const pairBtn = document.getElementById('chat-btn');
     if (pairBtn) {
-      pairBtn.style.display = pairUnlocked ? '' : 'none';
-      pairBtn.disabled      = !pairUnlocked;
+      const pairAllowed = pairUnlocked &&
+        (curationCodePresent() || pairingState.active || pairingState.waiting);
+      pairBtn.style.display = pairAllowed ? '' : 'none';
+      pairBtn.disabled      = !pairAllowed;
     }
 
     if (!show) return;
@@ -7848,7 +7858,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // --- Dev panel (position curation) ---
   const devCodeEl   = document.getElementById('dev-code');
   const devStatusEl = document.getElementById('dev-status');
-  devCodeEl.addEventListener('input', () => rememberCurationCode(devCodeEl.value.trim()));
+  devCodeEl.addEventListener('input', () => {
+    rememberCurationCode(devCodeEl.value.trim());
+    // The Pair button's visibility depends on the code, and updateBackBtn is
+    // what paints it — without this the button would not appear until the next
+    // navigation, which reads as the gate being broken.
+    updateBackBtn();
+  });
 
   function devStatus(msg) {
     devStatusEl.textContent = msg;
@@ -8478,6 +8494,20 @@ function restoreCurationCode() {
     const saved = localStorage.getItem(CURATION_STORE_KEY);
     if (saved) el.value = saved;
   } catch (_) {}
+}
+
+// 2026-09-08 — is a COMPLETE curation code present, typed or restored?
+//
+// Not "is it correct": only the server can say that, and it does. This is the
+// gate on OFFERING an action, so it must be answerable synchronously on every
+// keystroke. A wrong code gets you as far as the button and no further.
+function curationCodePresent() {
+  try {
+    const el = document.getElementById('dev-code');
+    if (!el) return false;
+    const full = el.maxLength > 0 ? el.maxLength : 4;
+    return el.value.trim().length >= full;
+  } catch (_) { return false; }
 }
 
 function rememberCurationCode(code) {
