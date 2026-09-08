@@ -1015,6 +1015,63 @@ function playNextSpeech() {
 // download confirm() re-firing every time the box is ticked. It has no say in
 // what this dialog shows.)
 
+// 2026-09-08 — the development notice, shown on the first click on Root and
+// BEFORE the speech offer.
+//
+// It exists to explain an absence. Pairing now sits behind the curation code
+// (there is no content screening yet), so a visitor finds a button missing and
+// no account of why. An explained restriction reads as care; an unexplained one
+// reads as a broken site.
+//
+// Shown every visit, like the speech dialog and for the same reason: no state,
+// nothing to get out of step, and while BD is in development the notice is
+// worth repeating. It should be deleted outright when it stops being true —
+// not quietly left to rot behind a flag.
+const DEV_CONTACT_EMAIL = 'wrcstewart@yahoo.co.uk';
+
+function showDevNotice() {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.id = 'dev-notice';
+    const box = document.createElement('div');
+    box.className = 'si-box';
+
+    const h = document.createElement('h2');
+    h.textContent = 'This is a development version';
+
+    const p1 = document.createElement('p');
+    p1.textContent = 'You are very welcome to explore. All of the writing is here to be read, '
+                   + 'and everything you need for that works normally.';
+
+    const p2 = document.createElement('p');
+    p2.textContent = 'What is not open yet is pairing — browsing together with another reader. '
+                     + 'It sits behind a short code while the content checks that will accompany '
+                     + 'it are still being built.';
+
+    const p3 = document.createElement('p');
+    p3.className = 'si-fine';
+    p3.textContent = 'If you would like the code, please ask for it by email:';
+
+    const a = document.createElement('a');
+    a.className = 'dn-mail';
+    a.href = 'mailto:' + DEV_CONTACT_EMAIL + '?subject=' +
+             encodeURIComponent('ButterflyDreaming — request for the pairing code');
+    a.textContent = DEV_CONTACT_EMAIL;
+
+    const row = document.createElement('div');
+    row.className = 'si-row';
+    const ok = document.createElement('button');
+    ok.className = 'si-yes';
+    ok.textContent = 'Continue';
+    row.append(ok);
+
+    box.append(h, p1, p2, p3, a, row);
+    wrap.append(box);
+    document.body.appendChild(wrap);
+    ok.addEventListener('click', () => { wrap.remove(); resolve(); });
+  });
+}
+
 function showSpeechIntro() {
   return new Promise(resolve => {
     const wrap = document.createElement('div');
@@ -5867,7 +5924,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // First real click on Root: offer speech BEFORE opening the graph, so
         // the dialog is not competing with a layout animation.
         if (introWillShow) {
-          showSpeechIntro().then(async accepted => {
+          // The development notice first: it explains why a control is missing,
+          // and that belongs before a question about a different subject.
+          showDevNotice().then(() => showSpeechIntro()).then(async accepted => {
             if (accepted) {
               await enableSpeechFromIntro();
               speak(c0.body, { interrupt: true });
