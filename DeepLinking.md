@@ -260,3 +260,27 @@ A URL pasted into Notes appears to break after `…/bd_V_Kolam/` with space left
 on the line. That is ordinary text layout: everything after the final `/` is one
 unbreakable ~600-char token, so the renderer breaks at the last legal
 opportunity. The clipboard contains no newline.
+
+### Verified on the live page (CDP-driven Chrome, 2026-09-11)
+
+| Step | Result |
+|---|---|
+| Navigate to `#data=` symmetry 21 | textarea shows 21 |
+| Change **only** the fragment to symmetry 34 | load event fires, textarea shows 34 |
+
+That second row is the gesture that was failing: replacing the URL of an
+already-running standalone.
+
+### Known remaining limitation — re-pasting an IDENTICAL link
+
+Edit the script locally, then paste back the **same** link to reset it: nothing
+happens. Measured — 0 load events, local edit (symmetry 99) survives.
+
+The hash is unchanged, so no `hashchange` fires; there is no event to hook, and
+it cannot be fixed from inside the page. **Reload (⌘R) resets it.**
+
+This is a real, narrow regression against `?data=`: re-entering an identical URL
+containing a query reloads, whereas an identical URL differing only by fragment
+does not. Accepted rather than worked around — the alternative is polling
+`location.hash`, which costs a timer forever to serve one rare gesture that
+already has a keyboard shortcut.
