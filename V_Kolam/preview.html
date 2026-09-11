@@ -1136,7 +1136,12 @@ F: F+F-F-F+F+F+F-F
     function bdLinkLabel() {
       const who = currentName ||
                   [currentSourceText, currentTitle].filter(Boolean).join(' \u2014 ');
-      return who ? ('ButterflyDreaming \u2014 ' + who) : 'ButterflyDreaming link';
+      // _YYYYMMDD_HHMM, local time — without it every link from the same node
+      // pastes under an identical phrase and a note full of them is unreadable.
+      const d = new Date(), p = (n) => String(n).padStart(2, '0');
+      const stamp = '_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+                    '_' + p(d.getHours()) + p(d.getMinutes());
+      return (who ? ('ButterflyDreaming \u2014 ' + who) : 'ButterflyDreaming link') + stamp;
     }
 
     // Rich clipboard write: a real <a href> alongside the plain URL.

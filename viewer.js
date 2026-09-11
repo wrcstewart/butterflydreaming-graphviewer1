@@ -10813,12 +10813,22 @@ async function init() {
     // clicks. Prefer the module-node name (bd_V_Kolam_001), then the node
     // title, so a pasted link says what it opens rather than showing 686
     // characters of base64.
+    // _YYYYMMDD_HHMM, local time. Without it every link copied from the same
+    // node pastes under an identical phrase, and a note holding several
+    // becomes unreadable — you cannot tell which one you made when.
+    const linkStamp = () => {
+      const d = new Date(), p = (n) => String(n).padStart(2, '0');
+      return '_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+             '_' + p(d.getHours()) + p(d.getMinutes());
+    };
+
     const linkLabelFor = (payload) => {
       const name  = payload && payload.name;
       const title = payload && payload.title;
       const src   = payload && payload.source_text;
       const who   = name || [src, title].filter(Boolean).join(' — ') || null;
-      return who ? ('ButterflyDreaming — ' + who) : 'ButterflyDreaming link';
+      return (who ? ('ButterflyDreaming — ' + who) : 'ButterflyDreaming link')
+             + linkStamp();
     };
 
     const showFallback = (url) => {
