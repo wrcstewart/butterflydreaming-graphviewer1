@@ -864,6 +864,17 @@ F: F+F-F-F+F+F+F-F
     // GitHub Pages deployment. Cold start (no URL params) now loads
     // DEFAULT_SCRIPT directly.
 
+    // A fragment-only navigation does NOT reload the document — the browser
+    // fires hashchange and nothing else. So pasting a fresh #data= link into a
+    // tab already showing this page kept whatever script was already loaded,
+    // which reads as "the deep link gave me the default script". ?data= never
+    // had this failure mode: changing a query string is always a full
+    // navigation. Restore that behaviour explicitly. Loop-safe — nothing in
+    // this file ever assigns location.hash. (2026-09-11, with the ?data= ->
+    // #data= move. See DeepLinking.md.)
+    window.addEventListener('hashchange', () => {
+      if (window.location.hash.startsWith('#data=')) window.location.reload();
+    });
     (async function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
 

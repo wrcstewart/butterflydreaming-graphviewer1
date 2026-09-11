@@ -225,3 +225,38 @@ The debugging trap is now live: a `#data=` payload appears in **no** request
 log, **no** Network tab entry and **no** `document.referrer`. When a link
 appears not to deliver, read `location.hash` in the console — the request will
 always look empty, and that is correct, not a symptom.
+
+## Gotcha found in testing — a fragment-only navigation does not reload
+
+Symptom: Jump worked, but a **copied** link opened the standalone showing the
+**default script**. The clipboard was innocent — verified at 678 bytes with zero
+line breaks, decoding to the correct live script.
+
+Cause: **changing only the fragment does not reload the document.** The browser
+fires `hashchange` and nothing else, so `loadInitialScript()` never ran again and
+the tab kept whatever script it already had. `window.open` (Jump) always makes a
+fresh document, which is why only the paste path failed. `?data=` never had this
+failure mode — a query change is always a full navigation.
+
+Fix (all five receivers):
+
+```js
+window.addEventListener('hashchange', () => {
+  if (window.location.hash.startsWith('#data=')) window.location.reload();
+});
+```
+
+Loop-safe: nothing in any of these files assigns `location.hash`.
+
+**Note for the collage module:** this reload is a deliberate restoration of the
+old semantics, not the only option. Re-applying the payload *without* reloading
+is the nicer behaviour — a collage could be rearranged and re-linked live — but
+it needs the load path factored out of the IIFE so it can be called twice. Worth
+doing there; not worth destabilising four deployed players for.
+
+### Red herring, recorded so it isn't chased twice
+
+A URL pasted into Notes appears to break after `…/bd_V_Kolam/` with space left
+on the line. That is ordinary text layout: everything after the final `/` is one
+unbreakable ~600-char token, so the renderer breaks at the last legal
+opportunity. The clipboard contains no newline.

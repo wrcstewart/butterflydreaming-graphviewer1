@@ -11173,13 +11173,25 @@ async function init() {
 
   // MM1 (2026-07-05) — Return-from-standalone flow. When the URL carries a
   // #data= (or legacy ?data=) <base64 JSON> payload (produced by the
-  // standalone player's
-  // "Enter ButterflyDreaming" / "Copy BD Link" buttons), decode it, find
+  // standalone player's "Enter ButterflyDreaming" / "Copy BD Link"
+  // buttons), decode it, find
   // the originating node by url match, engage Chat + Player modes, and
   // populate the top local card with the (possibly edited) script from the
   // payload. Locally overwriting node.data('text') means Player mode's
   // auto-load in setViewMode('player') will push the edited script (not
   // the DB copy) into the iframe.
+
+  // A fragment-only navigation does NOT reload the document — the browser
+  // fires hashchange and nothing else. So pasting a fresh #data= link into a
+  // tab already showing this page kept whatever script was already loaded,
+  // which reads as "the deep link gave me the default script". ?data= never
+  // had this failure mode: changing a query string is always a full
+  // navigation. Restore that behaviour explicitly. Loop-safe — nothing in
+  // this file ever assigns location.hash. (2026-09-11, with the ?data= ->
+  // #data= move. See DeepLinking.md.)
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash.startsWith('#data=')) window.location.reload();
+  });
   (function handleReturnFromStandalone() {
     const params = new URLSearchParams(window.location.search);
     // Payload transport (2026-09-11): prefer #data= over ?data=.
