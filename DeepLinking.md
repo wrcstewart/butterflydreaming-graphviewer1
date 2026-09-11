@@ -327,3 +327,39 @@ was never the binding constraint for sharing; **659 is.**
 Format shape when implemented: a distinct marker (e.g. `#z=`) rather than
 overloading `#data=`, so receivers can tell compressed from legacy without
 guessing, and old links keep working.
+
+## Why it worked before: the `name` field, not the script
+
+The script never grew. The **envelope** did.
+
+| Payload shape | URL chars | ≤ 659? |
+|---|---|---|
+| Pre-2026-07-17 (no `name`) | **654** | yes |
+| Current (with `name`) | **686** | **no** |
+| Current + deflate + base64url | **434** | yes |
+
+`name` was added to the payload on 2026-07-17 (module-node identity for EV's
+source-context). It costs ~32 chars and pushed the URL from 654 to 686 —
+across the detector's 659 limit. **The link had been sitting 5 characters
+under the ceiling.**
+
+So deep links broke for app-clicks ~2 months ago, silently, and not because of
+`?` → `#`: both forms are the same length and both truncate at 660. An older
+saved link (in Stickies, say) still works because it *is* a pre-2026-07-17
+payload, still 654 chars.
+
+The stored, unedited `bd_V_Kolam_001` node also produces 686 — the
+`%%bd_score` block is not the variable. Any payload-shape change is a
+sharing-compatibility change, and there is no room left to absorb one.
+
+### The other route to the same symptom — a real newline
+
+If a genuine newline lands at the wrap point, the detector stops at **40
+chars**: `https://wrcstewart.github.io/bd_V_Kolam/` — which returns 200 and
+serves symmetry 8, i.e. the default. Measured.
+
+BD does not emit one (copy verified at 678 bytes, zero newlines) and Notes
+stores the URL unbroken (verified by reading a test note back). The visible
+break when pasting is soft wrap. But anything that hard-wraps a URL in transit
+produces this, and it is indistinguishable from the length failure by symptom
+alone. Tell them apart by the detected length: **57 = too long, 40 = newline.**
