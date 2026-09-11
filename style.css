@@ -1093,9 +1093,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
-   blue → red → green per commit to a cached BD viewer file. 2026-08-18:
-   GREEN (ABC desktop: iframe constrained to the panel-width column, centred,
-   5px under History; dock-slots now run above 1024px). Next rotation = red. */
+   blue → red → green per commit to a cached BD viewer file. 2026-09-11:
+   BLUE (deep-link payloads moved from ?data= to #data=, so a fragment
+   carries them and no request-line limit applies). Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -1105,7 +1105,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #4a7fd4;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

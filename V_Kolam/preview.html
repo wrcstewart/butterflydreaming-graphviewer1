@@ -867,7 +867,18 @@ F: F+F-F-F+F+F+F-F
     (async function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
 
-      const dataParam = params.get('data');
+      // Payload transport (2026-09-11): prefer #data= over ?data=.
+      // A URL fragment is never put into the HTTP request, so a static host's
+      // ~8 KB request-line limit (GitHub Pages answers 414 URI Too Long) simply
+      // does not apply to it. Measurements + rationale in DeepLinking.md.
+      // ?data= is still accepted, for links already in the wild.
+      // NOTE: location.hash is NOT percent-decoded the way URLSearchParams.get()
+      // is — decode explicitly, or %2B reaches atob() and throws, which surfaces
+      // as a silent fall back to DEFAULT_SCRIPT.
+      const hashData = window.location.hash.startsWith('#data=')
+        ? decodeURIComponent(window.location.hash.slice(6))
+        : null;
+      const dataParam = hashData || params.get('data');
       if (dataParam) {
         try {
           const payload = JSON.parse(b64DecodeUtf8(dataParam));
@@ -1000,7 +1011,7 @@ F: F+F-F-F+F+F+F-F
         title:       currentTitle      ?? null
       };
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(returnPayload))));
-      const url = `https://graph.virtualfictions.uk?data=${encodeURIComponent(encoded)}`;
+      const url = `https://graph.virtualfictions.uk/#data=${encodeURIComponent(encoded)}`;
       return { url, returnPayload, scriptLen: script.length };
     }
 

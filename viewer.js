@@ -10747,7 +10747,10 @@ async function init() {
       // — all legal in URLs but `+` gets decoded as space by URLSearchParams
       // (application/x-www-form-urlencoded rules), which corrupts the round
       // trip and silently drops the standalone into DEFAULT_SCRIPT.
-      // encodeURIComponent turns +→%2B, /→%2F, =→%3D.
+      // encodeURIComponent turns +→%2B, /→%2F, =→%3D. Kept after the move to
+      // #data= — a fragment read raw is safe from the `+ → space` rule, but
+      // percent-encoding costs ~5% and survives anything that re-parses the
+      // URL as a query. Revisit together with base64url if size ever binds.
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
       // v16: module-aware standalone URL. Read the module id from the
       // current script (via %%bd_module directive) and route to the matching
@@ -10756,7 +10759,7 @@ async function init() {
       // legacy cases.
       const moduleId  = parseModuleId(payload.script) || 'bd_V_Kolam';
       const baseUrl   = getStandaloneUrl(moduleId) || getStandaloneUrl('bd_V_Kolam');
-      const url = `${baseUrl}?data=${encodeURIComponent(encoded)}`;
+      const url = `${baseUrl}#data=${encodeURIComponent(encoded)}`;
       return { url, payload };
     }
 
@@ -10930,7 +10933,7 @@ async function init() {
       // just the payload, then re-encoding for the BD-origin URL.
       const { payload } = buildExternalWebsiteUrl();
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      const url = `${window.location.origin}/?data=${encodeURIComponent(encoded)}`;
+      const url = `${window.location.origin}/#data=${encodeURIComponent(encoded)}`;
       return { url, payload };
     }
 
@@ -11169,7 +11172,8 @@ async function init() {
   });
 
   // MM1 (2026-07-05) — Return-from-standalone flow. When the URL carries a
-  // ?data=<base64 JSON> payload (produced by the standalone player's
+  // #data= (or legacy ?data=) <base64 JSON> payload (produced by the
+  // standalone player's
   // "Enter ButterflyDreaming" / "Copy BD Link" buttons), decode it, find
   // the originating node by url match, engage Chat + Player modes, and
   // populate the top local card with the (possibly edited) script from the
@@ -11178,11 +11182,23 @@ async function init() {
   // the DB copy) into the iframe.
   (function handleReturnFromStandalone() {
     const params = new URLSearchParams(window.location.search);
-    const dataParam = params.get('data');
+    // Payload transport (2026-09-11): prefer #data= over ?data=.
+    // A URL fragment is never put into the HTTP request, so a static host's
+    // ~8 KB request-line limit (GitHub Pages answers 414 URI Too Long) simply
+    // does not apply to it. Measurements + rationale in DeepLinking.md.
+    // ?data= is still accepted, for links already in the wild.
+    // NOTE: location.hash is NOT percent-decoded the way URLSearchParams.get()
+    // is — decode explicitly, or %2B reaches atob() and throws, which surfaces
+    // as a silent fall back to DEFAULT_SCRIPT.
+    const hashData = window.location.hash.startsWith('#data=')
+      ? decodeURIComponent(window.location.hash.slice(6))
+      : null;
+    const dataParam = hashData || params.get('data');
     if (!dataParam) return;
 
-    // Strip ?data= from the URL bar unconditionally, even on failure paths,
-    // so a browser refresh doesn't re-fire this flow.
+    // Strip the payload from the URL bar unconditionally, even on failure
+    // paths, so a browser refresh doesn't re-fire this flow. Assigning
+    // pathname drops query AND fragment, so this still covers #data=.
     const cleanUrl = () => {
       try { history.replaceState({}, '', window.location.pathname); } catch (_) {}
     };
