@@ -10764,11 +10764,61 @@ async function init() {
     }
 
     // ── Clipboard helpers ──────────────────────────────────────────────
-    const copyLinkText = (text) => {
+    const escapeHtml = (s) => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    // Copy the URL in TWO clipboard flavours (2026-09-11).
+    //
+    //   text/plain — the bare URL. For the address bar, a terminal, anywhere
+    //                that just wants text.
+    //   text/html  — a real <a href>. THIS is the one that matters.
+    //
+    // Why: macOS data detection (NSDataDetector — the engine behind "Open
+    // Link" in Notes, Mail, Messages, Stickies) scans PLAIN TEXT only, and
+    // silently truncates any URL longer than 659 chars. At 660 it returns a
+    // 57-char match ending at "#data", so the payload is dropped and the
+    // module opens its DEFAULT_SCRIPT — the "deep link gives me the default"
+    // report. Our links are ~686 chars, i.e. 27 over, and have been since the
+    // `name` field joined the payload on 2026-07-17.
+    //
+    // An href is an attribute, not detected text, so it is not scanned and
+    // not subject to that limit. Pasting into Notes/Mail then yields a
+    // clickable phrase carrying the whole URL. Measurements: DeepLinking.md.
+    //
+    // Degrades twice: no ClipboardItem -> plain text; rich write throws ->
+    // plain text. A URL that must go via the address bar still beats nothing.
+    const copyLinkText = async (text, label) => {
       console.log('External Website URL:', text);
-      return navigator.clipboard && navigator.clipboard.writeText
-        ? navigator.clipboard.writeText(text)
-        : Promise.reject(new Error('clipboard API unavailable'));
+      if (!navigator.clipboard) throw new Error('clipboard API unavailable');
+      if (window.ClipboardItem && navigator.clipboard.write) {
+        try {
+          const anchor = label || 'ButterflyDreaming link';
+          const html = '<meta charset="utf-8"><a href="' + escapeHtml(text) +
+                       '">' + escapeHtml(anchor) + '</a>';
+          await navigator.clipboard.write([new ClipboardItem({
+            'text/html':  new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([text], { type: 'text/plain' })
+          })]);
+          return;
+        } catch (err) {
+          console.warn('[BD] rich clipboard write failed, using plain text:', err);
+        }
+      }
+      if (!navigator.clipboard.writeText) throw new Error('clipboard API unavailable');
+      return navigator.clipboard.writeText(text);
+    };
+
+    // Anchor text for the rich flavour — what the reader actually sees and
+    // clicks. Prefer the module-node name (bd_V_Kolam_001), then the node
+    // title, so a pasted link says what it opens rather than showing 686
+    // characters of base64.
+    const linkLabelFor = (payload) => {
+      const name  = payload && payload.name;
+      const title = payload && payload.title;
+      const src   = payload && payload.source_text;
+      const who   = name || [src, title].filter(Boolean).join(' — ') || null;
+      return who ? ('ButterflyDreaming — ' + who) : 'ButterflyDreaming link';
     };
 
     const showFallback = (url) => {
@@ -10905,8 +10955,8 @@ async function init() {
     if (copyLinkToBtn) {
       copyLinkToBtn.addEventListener('click', () => {
         withUpdatePrompt(() => {
-          const { url } = buildExternalWebsiteUrl();
-          copyLinkText(url).then(() => {
+          const { url, payload } = buildExternalWebsiteUrl();
+          copyLinkText(url, linkLabelFor(payload)).then(() => {
             const original = copyLinkToBtn.textContent;
             copyLinkToBtn.textContent = 'Copied!';
             setTimeout(() => { copyLinkToBtn.textContent = original; }, 1500);
@@ -10945,8 +10995,8 @@ async function init() {
       const originalLabel = copyLinkBtn.innerHTML;
       copyLinkBtn.addEventListener('click', () => {
         withUpdatePrompt(() => {
-          const { url } = buildBdSelfUrl();
-          copyLinkText(url).then(() => {
+          const { url, payload } = buildBdSelfUrl();
+          copyLinkText(url, linkLabelFor(payload)).then(() => {
             copyLinkBtn.textContent = 'Copied!';
             setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
           }).catch((err) => {

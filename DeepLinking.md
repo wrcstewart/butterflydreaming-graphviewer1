@@ -363,3 +363,55 @@ stores the URL unbroken (verified by reading a test note back). The visible
 break when pasting is soft wrap. But anything that hard-wraps a URL in transit
 produces this, and it is indistinguishable from the length failure by symptom
 alone. Tell them apart by the detected length: **57 = too long, 40 = newline.**
+
+---
+
+# SOLVED — copy a real hyperlink, not plain text
+
+**The 659-char limit applies to PLAIN TEXT ONLY.** `NSDataDetector` scans text
+to *find* URLs. An `<a href>` is an attribute, already a link, so nothing scans
+it and no length rule reaches it.
+
+Measured through `NSAttributedString.initWithHTML…` — the exact AppKit importer
+an app runs when you paste HTML into it:
+
+| href length | After import |
+|---|---|
+| 659 | intact |
+| 660 | **intact** (plain text dies here) |
+| 1,200 | intact |
+| 5,000 | intact |
+| 20,000 | intact |
+| **100,000** | **intact** |
+
+The ceiling is not raised, it is **removed**.
+
+## What ships
+
+`copyLinkText` (BD) and `copyTextSmart` (standalones) now write **two clipboard
+flavours**:
+
+- `text/html` — `<a href="<full url>">ButterflyDreaming — bd_V_Kolam_001</a>`
+- `text/plain` — the bare URL, unchanged
+
+Paste into Notes, Mail, Messages or Stickies and you get a clickable phrase
+naming what it opens. Paste into the address bar or a terminal and you get the
+URL exactly as before. Both work; neither is degraded.
+
+Degrades twice over: no `ClipboardItem` → plain text; rich write throws → plain
+text. Script copying (not a URL) stays plain — an anchor there would be nonsense.
+
+## What this means for the design
+
+**Compression is no longer required, and neither is corpus hosting.** Those were
+answers to a limit that has gone. Links stay self-contained — still working with
+the laptop off, still no server, still permanent — and a 3-node collage at ~955
+chars is now perfectly clickable, as would be one ten times larger.
+
+Both remain worth having later for their own reasons: compression to keep links
+from looking absurd, ids-plus-deltas to make them legible and updatable. Neither
+is now load-bearing.
+
+**Side benefit:** a pasted link reads as *"ButterflyDreaming — bd_V_Kolam_001"*
+instead of 686 characters of base64 — which also disposes of the "looks like
+malware" objection to sharing these at all.
