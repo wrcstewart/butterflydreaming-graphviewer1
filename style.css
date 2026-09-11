@@ -1094,9 +1094,9 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
 /* Copy Link — bottom-row utility strip, same visual family as #media-bar
    and #user-count-panel. CANARY host: border colour rotates
    blue → red → green per commit to a cached BD viewer file. 2026-09-11:
-   GREEN (Copy now writes a rich text/html <a href> flavour beside the
-   plain URL, lifting the 659-char macOS data-detector limit entirely).
-   Next rotation = blue. */
+   BLUE (link label carries _YYYYMMDD_HHMM; copy logs which clipboard
+   rung ran, so a misbehaving link can be diagnosed from the log).
+   Next rotation = red. */
 #copy-link-btn {
   position: fixed;
   bottom: 6px;
@@ -1106,7 +1106,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #4a7fd4;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

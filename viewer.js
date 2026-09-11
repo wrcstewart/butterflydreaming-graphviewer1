@@ -10800,12 +10800,21 @@ async function init() {
             'text/html':  new Blob([html], { type: 'text/html' }),
             'text/plain': new Blob([text], { type: 'text/plain' })
           })]);
+          console.log('[BD] link copied: RICH (text/html anchor + text/plain) — ' + anchor);
           return;
         } catch (err) {
-          console.warn('[BD] rich clipboard write failed, using plain text:', err);
+          // Most likely cause: the user-gesture chain was broken before we got
+          // here (withUpdatePrompt's 'update' path awaits requestModuleSyncBD
+          // first), and Safari refuses clipboard.write outside a gesture.
+          // Plain text still lands, but the 659-char detector limit returns
+          // with it — so this line is worth reading when a link misbehaves.
+          console.warn('[BD] rich clipboard write FAILED, using plain text ' +
+                       '(659-char link limit applies again):', err);
         }
       }
       if (!navigator.clipboard.writeText) throw new Error('clipboard API unavailable');
+      console.log('[BD] link copied: PLAIN text only — length ' + text.length +
+                  (text.length > 659 ? ' (OVER the 659 detector limit)' : ''));
       return navigator.clipboard.writeText(text);
     };
 
