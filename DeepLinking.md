@@ -284,3 +284,46 @@ containing a query reloads, whereas an identical URL differing only by fragment
 does not. Accepted rather than worked around — the alternative is polling
 `location.hash`, which costs a timer forever to serve one rare gesture that
 already has a keyboard shortcut.
+
+---
+
+# The real sharing ceiling: 659 chars (macOS data detector)
+
+**Measured 2026-09-11 via `NSDataDetector` directly.** This is the limit that
+actually governs links a person clicks on a Mac or iPhone — it is an order of
+magnitude tighter than GitHub's 8 KB and four orders tighter than the browser's.
+
+| URL length | Detected |
+|---|---|
+| ≤ **659 chars** | full URL |
+| ≥ **660 chars** | **57 chars** — `https://…/preview.html#data`, payload gone |
+
+Over the limit the detector falls back to a short, conservative match that stops
+before the `=`. The browser then loads `preview.html` with fragment `#data`,
+which fails `startsWith('#data=')`, so the page shows DEFAULT_SCRIPT. Symptom:
+*"the link opens the default script"* — from Notes, Mail, Messages, anything
+using macOS data detection.
+
+**This is NOT caused by the move to `#data=`.** The identical payload as
+`?data=` truncates the same way at the same length (57/684, measured side by
+side). It has always been broken for long links; a Kolam script carrying a
+`%%bd_score` block is simply the first to cross 659.
+
+Pasting into the **browser address bar** is unaffected — no data detection is
+involved. Only click-a-link-in-an-app is.
+
+## Compression clears it
+
+| Same payload | URL chars | Detected |
+|---|---|---|
+| base64 + percent-encoding (current) | 684 | **CUT** |
+| deflate + base64url | **438** | full |
+
+So `CompressionStream('deflate-raw')` is not a nice-to-have for the collage
+module — it is what keeps an ordinary single-node link clickable in Notes today.
+This supersedes the "deliberately not done" note above: the 8 KB server limit
+was never the binding constraint for sharing; **659 is.**
+
+Format shape when implemented: a distinct marker (e.g. `#z=`) rather than
+overloading `#data=`, so receivers can tell compressed from legacy without
+guessing, and old links keep working.
