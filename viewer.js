@@ -10944,7 +10944,16 @@ async function init() {
       // just the payload, then re-encoding for the BD-origin URL.
       const { payload } = buildExternalWebsiteUrl();
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      const url = `${window.location.origin}/?data=${encodeURIComponent(encoded)}`;
+      // Same shared codec as the outbound leg. This button also copies plain
+      // TextNodes, whose text is prose rather than directives — encode()
+      // returns null for those and the envelope is used, automatically.
+      const moduleId = parseModuleId(payload.script);
+      const jsp = moduleId
+        ? buildJspUrl(`${window.location.origin}/`, payload.script, payload.node_url, moduleId)
+        : null;
+      const url = jsp || `${window.location.origin}/?data=${encodeURIComponent(encoded)}`;
+      if (jsp) console.log('[JSP] BD self-link ' + jsp.length + ' chars (envelope would be ' +
+                           (window.location.origin.length + 7 + encodeURIComponent(encoded).length) + ')');
       return { url, payload };
     }
 
