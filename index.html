@@ -262,6 +262,9 @@
   <script src="https://unpkg.com/cytoscape-fcose@2/cytoscape-fcose.js"></script>
   <!-- Socket.IO client (2026-07-13). Auto-served by the socket.io server. -->
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="viewer.js?v=798"></script>
+  <!-- JSP wire table — authored here, copied to the standalones by
+       sync_module_tables.sh. Must load before viewer.js. -->
+  <script src="module_wire_tables.js"></script>
+  <script type="module" src="viewer.js?v=799"></script>
 </body>
 </html>

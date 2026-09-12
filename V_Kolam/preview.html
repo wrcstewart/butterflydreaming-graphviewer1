@@ -596,6 +596,9 @@
     </div>
   </div>
 
+  <!-- JSP wire table. Authored in the BD repo; copied here by
+       sync_module_tables.sh. Must load BEFORE the inline script. -->
+  <script src="module_wire_tables.js"></script>
   <script>
     'use strict';
 
@@ -875,6 +878,64 @@ F: F+F-F-F+F+F+F-F
     window.addEventListener('hashchange', () => {
       if (window.location.hash.startsWith('#data=')) window.location.reload();
     });
+
+    // ── JSP decode — "just send parameters" (v1, 2026-09-12) ────────────────
+    // ?j=<tag>v<ver>.<node uuid>.<pairs>~<score>
+    // Pairs are two-char key + percent-encoded value, from module_wire_tables.js
+    // (authored in the BD repo, copied here by sync_module_tables.sh).
+    //
+    // Roughly a third the length of the ?data= envelope: 211 chars against 650
+    // for the same Kolam. ?data= is still read and still emitted for anything
+    // this cannot express.
+    function decodeJspParam(raw) {
+      if (!raw) return null;
+      const tables = window.BD_WIRE_TABLES, byTag = window.BD_WIRE_BY_TAG;
+      if (!tables || !byTag) { console.warn('[JSP] wire tables missing'); return null; }
+
+      // Split on the FIRST TWO dots only — values contain dots (weight 1.5).
+      const d1 = raw.indexOf('.'); if (d1 < 0) return null;
+      const d2 = raw.indexOf('.', d1 + 1); if (d2 < 0) return null;
+      const tagPart = raw.slice(0, d1);           // e.g. kv1
+      const nodeId  = raw.slice(d1 + 1, d2);
+      let   rest    = raw.slice(d2 + 1);
+
+      const m = /^([a-z]+)v(\d+)$/.exec(tagPart);
+      if (!m) { console.warn('[JSP] unrecognised tag', tagPart); return null; }
+      const moduleId = byTag[m[1]];
+      if (!moduleId) { console.warn('[JSP] unknown module tag', m[1]); return null; }
+      const spec = tables[moduleId];
+      // A version we do not know must FAIL LOUDLY rather than decode wrongly —
+      // a bumped version means a key was renamed or removed.
+      if (Number(m[2]) !== spec.wire_version) {
+        console.warn('[JSP] wire version ' + m[2] + ' but this build knows ' +
+                     spec.wire_version + ' — refusing to decode. Update ' +
+                     'module_wire_tables.js via sync_module_tables.sh.');
+        return null;
+      }
+
+      let score = '';
+      const tilde = rest.indexOf('~');
+      if (tilde >= 0) { score = decodeURIComponent(rest.slice(tilde + 1)); rest = rest.slice(0, tilde); }
+
+      const lines = ['%%bd_module ' + moduleId];
+      rest.split(',').forEach((pair) => {
+        if (!pair) return;
+        const key = pair.slice(0, 2), val = pair.slice(2);
+        const name = spec.keys[key];
+        // Unknown key: ignore it. That is the point of keys over positions —
+        // a newer sender can add one without corrupting everything after it.
+        if (!name) { console.warn('[JSP] ignoring unknown key', key); return; }
+        if (val === '') return;
+        lines.push('%%bd_' + name + ' ' + decodeURIComponent(val));
+      });
+      if (score) { lines.push('%%bd_score ['); lines.push(score); lines.push('%%bd_]'); }
+
+      return {
+        script: lines.join('\n') + '\n',
+        node_url: nodeId ? ('butterflydreaming.org/n/' + nodeId) : null
+      };
+    }
+
     (async function loadInitialScript() {
       const params = new URLSearchParams(window.location.search);
 
@@ -890,6 +951,26 @@ F: F+F-F-F+F+F+F-F
         ? decodeURIComponent(window.location.hash.slice(6))
         : null;
       const dataParam = hashData || params.get('data');
+
+      // JSP first — a ?j= link is the compact form of the same payload.
+      const jspParam = params.get('j');
+      if (jspParam) {
+        const decoded = decodeJspParam(jspParam);
+        if (decoded) {
+          incomingPayload = { script: decoded.script, node_url: decoded.node_url,
+                              source_text: null, title: null };
+          window.incomingPayload = incomingPayload;
+          bdReturnContext = { node_url: decoded.node_url, source_text: null, title: null };
+          window.bdReturnContext = bdReturnContext;
+          console.log('preview: loaded from ?j= (JSP) payload', {
+            scriptLen: decoded.script.length, node_url: decoded.node_url });
+          loadScript(decoded.script, { node_url: decoded.node_url,
+                                       source_text: null, title: null });
+          return;
+        }
+        console.warn('preview: ?j= present but could not be decoded — falling through');
+      }
+
       if (dataParam) {
         try {
           const payload = JSON.parse(b64DecodeUtf8(dataParam));

@@ -10682,6 +10682,59 @@ async function init() {
     // on 2026-07-17. Same file is still served locally at
     // http://<hostname>:8080/bd_V_Kolam/preview.html as a fallback,
     // but the shared Copy Link URL points at the public deployment.
+
+    // ── JSP encode — "just send parameters" (v1, 2026-09-12) ───────────────
+    // A module script is a human-readable serialisation for editing and
+    // storage; it has no business being the transport format. A Kolam's whole
+    // state is twelve values carried in ~300 chars of %%bd_ directive text.
+    //
+    //   ?j=<tag>v<ver>.<node uuid>.<pairs>~<score>
+    //
+    // 211 chars against 650 for the same Kolam. The table is
+    // module_wire_tables.js — authored here, copied to each standalone by
+    // sync_module_tables.sh.
+    //
+    // Returns null to mean "use the ?data= envelope instead". It does that
+    // whenever the script contains anything the wire table cannot express, so
+    // a new directive makes links LONGER rather than silently losing a value.
+    function buildJspUrl(baseUrl, script, nodeUrl, moduleId) {
+      const tables = window.BD_WIRE_TABLES;
+      const spec = tables && tables[moduleId];
+      if (!spec || typeof script !== 'string' || !script) return null;
+
+      const vals = {};
+      const score = [];
+      let inScore = false;
+      for (const line of script.split('\n')) {
+        if (line.startsWith('%%bd_score')) { inScore = true; continue; }
+        if (line.startsWith('%%bd_]'))     { inScore = false; continue; }
+        if (inScore) { score.push(line); continue; }
+        if (!line.trim()) continue;
+        const m = /^%%bd_(\w+)\s*(.*)$/.exec(line);
+        // Anything that is not a directive (prose a user typed into the card,
+        // say) cannot be carried — fall back rather than drop it.
+        if (!m) { console.log('[JSP] non-directive line, using ?data='); return null; }
+        if (m[1] === 'module') continue;
+        vals[m[1]] = m[2];
+      }
+
+      const byName = {};
+      Object.keys(spec.keys).forEach((k) => { byName[spec.keys[k]] = k; });
+      const unknown = Object.keys(vals).filter((n) => !byName[n]);
+      if (unknown.length) {
+        console.log('[JSP] using ?data= — directives not in the wire table: ' + unknown.join(', '));
+        return null;
+      }
+
+      const uuid = String(nodeUrl || '').replace(/^butterflydreaming\.org\/n\//, '');
+      const pairs = Object.keys(vals)
+        .map((n) => byName[n] + encodeURIComponent(vals[n]))
+        .join(',');
+      const tail = score.length ? '~' + encodeURIComponent(score.join('\n')) : '';
+      return baseUrl + '?j=' + spec.tag + 'v' + spec.wire_version + '.' +
+             uuid + '.' + pairs + tail;
+    }
+
     function buildExternalWebsiteUrl() {
       let currentNodeUrl = null, currentSourceText = null, currentTitle = null, currentName = null;
       let activeNode = null;
@@ -10759,7 +10812,12 @@ async function init() {
       // legacy cases.
       const moduleId  = parseModuleId(payload.script) || 'bd_V_Kolam';
       const baseUrl   = getStandaloneUrl(moduleId) || getStandaloneUrl('bd_V_Kolam');
-      const url = `${baseUrl}?data=${encodeURIComponent(encoded)}`;
+      // Prefer the compact JSP form where the wire table can express the whole
+      // script; buildJspUrl returns null when it cannot, and we fall back.
+      const jsp = buildJspUrl(baseUrl, payload.script, payload.node_url, moduleId);
+      const url = jsp || `${baseUrl}?data=${encodeURIComponent(encoded)}`;
+      if (jsp) console.log('[JSP] link ' + jsp.length + ' chars (envelope would be ' +
+                           (baseUrl.length + 6 + encodeURIComponent(encoded).length) + ')');
       return { url, payload };
     }
 
