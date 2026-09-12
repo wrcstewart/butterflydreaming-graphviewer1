@@ -782,3 +782,23 @@ outweigh giving up self-containment.
 - **Collages remain blocked** in the inline shape: 8,276 chars against GitHub
   Pages' ~8 KB request-line limit, failing on a button press. JSP with saved-node
   ids is the way through — 87 chars — not a bigger envelope.
+
+## JSP verified in use (2026-09-12)
+
+Round trip via Jump confirmed working by the author in a real browser, after a
+hard refresh. Kolam links are `?j=` at **237 chars** against 650.
+
+One fault was found and fixed on the way: `decodeURIComponent` throws `URIError`
+on a malformed percent sequence, and the decoder called it unguarded inside the
+`async loadInitialScript` IIFE. An uncaught throw there rejects that promise
+silently, **skipping the `loadScript(DEFAULT_SCRIPT)` fallback at its foot** —
+so the module sat on "Waiting for script..." with no route forward. Not a wrong
+pattern: a dead page.
+
+**The general lesson, worth carrying to the other modules:** any throw inside
+that initialisation IIFE removes the default fallback. Guard every decode path,
+so a bad payload degrades to the default rather than killing the page.
+
+The originally reported failure was never reproduced — the link in question
+renders correctly. A stale `preview.html` (Pages sets `max-age=600`) or a moment
+when the wire table had not yet propagated remain the likeliest explanations.
