@@ -211,6 +211,24 @@ let bootPriming = false;   // true only while primeRootReading runs
 // mentions tapping Root because by then it has happened.
 const ROOT_BOOT_MESSAGE =
   'Welcome to ButterflyDreaming. Click the node below for orientation.';
+
+// 2026-09-12 — the same card, for a visitor who did NOT start at the opening
+// screen. Boot runs before the deep-link arrival handler, so this card is built
+// either way; on an arrival the standard message is wrong twice over — they did
+// not begin here, and there is no node below to click. They are looking at
+// someone else's link, so what they need is the way in.
+const ROOT_ARRIVAL_MESSAGE =
+  'Use the Local button to start at the ButterflyDreaming Root node.';
+
+// Read at load, because the boot card is built before the arrival handler runs:
+// by the time that handler knows this is an arrival, the card already exists.
+const ARRIVED_VIA_LINK = (() => {
+  try {
+    const p = new URLSearchParams(location.search);
+    return !!(p.get('j') || p.get('data')) ||
+           String(location.hash || '').startsWith('#data=');
+  } catch (_) { return false; }
+})();
 const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
 // 2026-08-29 — TWO TIERS, not three. The predecessor is no longer signalled at
@@ -5932,7 +5950,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // would only repeat itself.
       const isBootCard = isRoot && bootPriming;
       const c0Card = insertNodeChunkAsCard(
-        isBootCard ? ROOT_BOOT_MESSAGE : c0.body,
+        isBootCard ? (ARRIVED_VIA_LINK ? ROOT_ARRIVAL_MESSAGE : ROOT_BOOT_MESSAGE)
+                  : c0.body,
         isBootCard ? '' : (c0.hint || getChunkHint(isLast, nav, node, isRoot)),
         node, 0);
       if (introWillShow) speechSuppressed = false;
