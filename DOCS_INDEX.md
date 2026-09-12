@@ -138,6 +138,7 @@ Bulk-review artefacts. Do not read them for architecture.
 | **nav_nodes_text.md** | Structural review sheet, 172 blocks of navigation-node text. |
 | **subfamily_candidates.md** | SubFamily review sheet, consumed by `bd_tool.js apply-subfamily-labels`. |
 | **voice_prompts.md** | 63 recording prompts for the Piper fine-tune. **Read at the pace you want the finished voice to read at** — a fine-tune learns delivery more stubbornly than timbre. |
+| **ingest_tao_te_ching/** | Per-chapter tagging notes for the Tao Te Ching ingest — source translation, `CHILD` weights, cluster assignments. **Provenance that cannot be reconstructed from the database.** The cypher it produced is `TaoTeChing11_81.cypher`. |
 | **Note on Cluster-Textnode edges.md** | Short note on the cluster↔textnode relationship. |
 
 ## Session notes
@@ -147,7 +148,7 @@ behaviour.
 
 `session_notes_2026-08-16_17` · `…08-19` · `…08-20` · `…08-21` · `…08-22_23` ·
 `…08-24_25` · `…08-27` · `…08-28` · `…09-01` · `…09-02` · `…09-03` · `…09-04` ·
-`…09-05`
+`…09-05` · **`…09-12`**
 
 ---
 
@@ -170,6 +171,8 @@ verified applied against the live DB.
    citation is wrong.
 3. **`(2)` / `(3)` suffixes** are browser re-download artefacts. Prefer a
    tracked original where one exists.
-4. **Untracked files sit in the repo root** — `apply_mm.js`, `migrate_mm1.js`,
-   `migrate_mm2.js`, `TaoTeChing11_81.cypher`, several `.mp3`s and a
-   `files (3)/` directory. Decide: track, move, or delete.
+4. ~~Untracked files in the repo root~~ — **RESOLVED 2026-09-12.** Migration
+   scripts and `TaoTeChing11_81.cypher` are tracked; the ingest notes moved to
+   `ingest_tao_te_ching/`; the duplicate cypher fragments were removed;
+   `config.js.bak*` and root-level `*.mp3` are now ignored. **0 untracked
+   files remain.**
