@@ -729,3 +729,56 @@ Under JSP, staying below the 659 Notes ceiling leaves roughly 500 chars for a
 score — a short tune. A substantial piece will not fit under any encoding,
 because the notes are the content. Email has no such limit, so that is where
 real scores get shared.
+
+---
+
+# DECIDED 2026-09-12 — data stays in the URL, short keys, no JSON
+
+Shipped for Kolam: `?j=kv1.<uuid>.sy8,de2,st50,…~<score>` — **237 chars**
+against 650, decoding to a byte-identical script.
+
+## Why not JSON in the URL
+
+Measured, same payload:
+
+| form | URL chars |
+|---|---|
+| **JSP short keys (shipped)** | **237** |
+| JSON short keys, base64 | 347 |
+| JSON short keys, percent-encoded | 478 |
+| JSON full names, base64 | 497 |
+| `?data=` today | 686 |
+
+**`?data=` already IS JSON**, base64-encoded — it is the 686-char form being
+replaced. Braces, quotes and colons are pure overhead for a flat list of twelve
+scalars. JSON earns its keep when structure varies; here it does not.
+
+This is a *wire format* only. Nothing stops the data model being JSON at both
+ends — compact on the wire, structured in memory, is the normal arrangement.
+
+## Why not a cloud store either
+
+Considered and rejected. A stored payload would give ~40-char links, no size
+limit, previews, updates and revocation.
+
+**The objection that settled it:** a cloud store is only an intermediary. Its
+sole merit is being awake when the laptop is not — so if a dependency is
+acceptable at all, the honest version is to read from BD's own server, and then
+links die whenever the machine sleeps. Either way the payload stops being
+self-contained, which is the property that makes a link last.
+
+Noted for completeness, since it was nearly the deciding argument the other way:
+the laptop objection is weaker than it first appears, because **writing** only
+happens in BD (laptop on by definition — you are sitting at it) while
+**reading** needs no credential. The asymmetry is real. It just does not
+outweigh giving up self-containment.
+
+## What this leaves open
+
+- **ABC and Fractal still use `?data=`.** ABC will gain least — it is 75% score,
+  and a score is irreducible.
+- **The return trip (standalone → BD) still uses `?data=`.** It works; JSP there
+  is the natural next increment.
+- **Collages remain blocked** in the inline shape: 8,276 chars against GitHub
+  Pages' ~8 KB request-line limit, failing on a button press. JSP with saved-node
+  ids is the way through — 87 chars — not a bigger envelope.

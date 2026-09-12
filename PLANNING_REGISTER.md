@@ -249,7 +249,7 @@ Not a schedule — a list of what has been designed and not built.
 
 | item | where | note |
 |---|---|---|
-| **JSP — "just send parameters"** | `DeepLinking.md` | Designed, not built. Positional parameter arrays instead of `%%bd_` directive text: Kolam 650→181 chars, Fractal 822→188, ABC 664→266. A 3-node collage of saved nodes is **87 chars** against 1,730 today. **Version the format from day one** — the exact lesson of the `name` field. |
+| **JSP — "just send parameters"** | `DeepLinking.md` | **BUILT for Kolam 2026-09-12** (`77c5bba` + `2d44c71`): `?j=` short-key pairs, 237 chars against 650, verified round-trip. ABC, Fractal and the return trip still use `?data=`. Originally: Positional parameter arrays instead of `%%bd_` directive text: Kolam 650→181 chars, Fractal 822→188, ABC 664→266. A 3-node collage of saved nodes is **87 chars** against 1,730 today. **Version the format from day one** — the exact lesson of the `name` field. |
 | **Collage module** | `DeepLinking.md` | Not built, no repo. Blocked in its current shape: a 3-node collage inline is **8,276 chars** and fails GitHub Pages' ~8 KB request-line limit **on a button press**, sharing not involved. |
 | Deep links unclickable in Apple native apps | `DeepLinking.md` | Links are ~686 chars against a **659-char** data-detector cap. Email and the address bar are unaffected. Four fixes ranked in the doc; the fragment move and the rich-`<a href>` clipboard were both built and **reverted**. |
 | Pronunciation lexicon | `speech_plan.md`, `speech_lexicon_draft.md` | The live edge of the speech work. The draft needs checking by ear — the corpus mixes Legge's 1891 romanisation with modern pinyin. |
