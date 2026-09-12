@@ -514,3 +514,39 @@ and do not read 8 as proof of failure.
 
 Also: any test value must lie in **1..16**. An out-of-range symmetry falls back
 to 8, so a working link carrying symmetry 21 would render as 8 and look broken.
+
+## Yahoo Mail carries the same 702-char link fine (2026-09-12)
+
+Link B (702 chars, symmetry 13) pasted into Yahoo Mail, sent, and clicked from
+the received message: **arrived intact, symmetry 13.**
+
+Yahoo Mail is a web app with its own JavaScript linkifier — it does not use
+`NSDataDetector` — and it turns a pasted URL into an `<a href>`. Which is
+independent confirmation of the anchor result: **once the URL is an anchor
+rather than detected text, the length limit does not apply.**
+
+## The whole finding, in one rule
+
+| How the URL reaches the click | Limit |
+|---|---|
+| Plain text scanned by Apple data detection (Notes, Messages, Stickies) | **659 chars** |
+| A real `<a href>` (webmail, HTML mail, any browser link) | none measured to 100,000 |
+
+Real links are ~686 chars — just over the line, and only in Apple's native apps.
+
+## Practical consequence
+
+**Sharing by email needs no change at all.** Neither does the address bar. Only
+Notes / Messages / Stickies are affected, and only above 659 chars.
+
+Options for closing that last gap, cheapest first:
+
+1. **Do nothing** — share by email, paste locally into the address bar.
+2. **Trim the payload** — dropping `name` returns 654 chars, proven working by
+   test A. One line, no migration; but only 5 chars of margin, which is exactly
+   how this broke when `name` was added on 2026-07-17.
+3. **Compress** — deflate + base64url gives ~434 chars, 225 of headroom, and is
+   the only option that also survives a multi-node collage.
+4. **Rich `<a href>` clipboard** — removes the limit rather than ducking under
+   it. Reverted because the anchor label showed in Messages; using the bare URL
+   as the anchor text would look like an ordinary link while keeping the effect.
