@@ -1022,7 +1022,7 @@ F: F+F-F-F+F+F+F-F
         title:       currentTitle      ?? null
       };
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(returnPayload))));
-      const url = `https://graph.virtualfictions.uk/#data=${encodeURIComponent(encoded)}`;
+      const url = `https://graph.virtualfictions.uk/?data=${encodeURIComponent(encoded)}`;
       return { url, returnPayload, scriptLen: script.length };
     }
 

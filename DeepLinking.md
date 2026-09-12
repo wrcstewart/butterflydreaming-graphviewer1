@@ -415,3 +415,46 @@ is now load-bearing.
 **Side benefit:** a pasted link reads as *"ButterflyDreaming — bd_V_Kolam_001"*
 instead of 686 characters of base64 — which also disposes of the "looks like
 malware" objection to sharing these at all.
+
+---
+
+# REVERTED to `?data=` (2026-09-12, at the user's request)
+
+Senders emit `?data=` again. **Receivers still accept both**, so hash links
+already copied keep working, and the `hashchange` reload stays for the same
+reason.
+
+## What this costs
+
+The request-line limit comes back: **GitHub Pages 414 over ~7,995 chars**,
+BD's Express 431 over ~16,157. A three-node collage encodes to 8,276, so it
+will fail on a button press — no sharing involved. That is the constraint the
+fragment move was made to remove; it is now back.
+
+## What it does NOT change
+
+The Notes truncation. Measured twice, side by side, through `NSDataDetector`:
+
+| Form | 650 chars | 684 chars |
+|---|---|---|
+| `?data=` | full | **cut to 57** |
+| `#data=` | full | **cut to 57** |
+
+Identical. The detector's limit is on **length**, and both forms are the same
+length for the same payload. Reverting does not address it.
+
+The fix that does address it — copying a real `<a href>` — is **independent of
+transport** and stays in place. It works the same with `?data=`.
+
+## If the hash is nonetheless suspected
+
+Things genuinely specific to the fragment, all fixed and none matching the
+reported symptom:
+
+- a fragment-only navigation does not reload (fixed: `hashchange` → reload)
+- `location.hash` is not percent-decoded (fixed: explicit `decodeURIComponent`)
+- re-pasting an identical link fires no event (documented, reload resets it)
+
+None of these produce "a pasted link opens the default script in Notes"; they
+affect an already-open tab. The 659-char detector limit does produce exactly
+that, and does so for `?data=` too.

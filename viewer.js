@@ -10759,7 +10759,7 @@ async function init() {
       // legacy cases.
       const moduleId  = parseModuleId(payload.script) || 'bd_V_Kolam';
       const baseUrl   = getStandaloneUrl(moduleId) || getStandaloneUrl('bd_V_Kolam');
-      const url = `${baseUrl}#data=${encodeURIComponent(encoded)}`;
+      const url = `${baseUrl}?data=${encodeURIComponent(encoded)}`;
       return { url, payload };
     }
 
@@ -11002,7 +11002,7 @@ async function init() {
       // just the payload, then re-encoding for the BD-origin URL.
       const { payload } = buildExternalWebsiteUrl();
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      const url = `${window.location.origin}/#data=${encodeURIComponent(encoded)}`;
+      const url = `${window.location.origin}/?data=${encodeURIComponent(encoded)}`;
       return { url, payload };
     }
 
