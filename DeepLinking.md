@@ -481,3 +481,36 @@ its pre-2026-09-11 state.
 **The 659-char limit is therefore live again**, and links are ~686 chars, so
 pasting one as plain text into Notes/Messages will truncate and open the
 default script. The address bar is unaffected.
+
+---
+
+# CONFIRMED BY CONTROLLED TEST (2026-09-12)
+
+Two `?data=` links, **identical payload shape and format**, differing only in
+48 chars of padding in the `title` metadata field:
+
+| Link | Length | Clicked from Notes | Meaning |
+|---|---|---|---|
+| A | **654** | symmetry **5** | payload arrived |
+| B | **702** | symmetry **3** | payload lost → `DEFAULT_SCRIPT` |
+
+**Length is the cause.** Not the fragment (neither link had one), not a newline
+(both wrapped identically, clipboard verified at 0 newline chars). The boundary
+sits at the measured 659.
+
+Corroborating: link B was **not directly clickable** — it needed "Open Link"
+from the selection context menu, i.e. the detector could not form a link from
+the over-length URL at all.
+
+## Failure signature: symmetry 3, NOT 8
+
+`DEFAULT_SCRIPT` in `preview.html` is `%%bd_symmetry 3`. The **8** is something
+else — the slider's `fallback` for an out-of-range value
+(`{name:'symmetry', min:1, max:16, fallback:8}`), and also what
+`wrcstewart.github.io/bd_V_Kolam/` (index.html, a different page) renders.
+
+When diagnosing a lost payload, **3 is the tell**. Do not use 8 as a test marker
+and do not read 8 as proof of failure.
+
+Also: any test value must lie in **1..16**. An out-of-range symmetry falls back
+to 8, so a working link carrying symmetry 21 would render as 8 and look broken.
