@@ -10683,57 +10683,10 @@ async function init() {
     // http://<hostname>:8080/bd_V_Kolam/preview.html as a fallback,
     // but the shared Copy Link URL points at the public deployment.
 
-    // ── JSP encode — "just send parameters" (v1, 2026-09-12) ───────────────
-    // A module script is a human-readable serialisation for editing and
-    // storage; it has no business being the transport format. A Kolam's whole
-    // state is twelve values carried in ~300 chars of %%bd_ directive text.
-    //
-    //   ?j=<tag>v<ver>.<node uuid>.<pairs>~<score>
-    //
-    // 211 chars against 650 for the same Kolam. The table is
-    // module_wire_tables.js — authored here, copied to each standalone by
-    // sync_module_tables.sh.
-    //
-    // Returns null to mean "use the ?data= envelope instead". It does that
-    // whenever the script contains anything the wire table cannot express, so
-    // a new directive makes links LONGER rather than silently losing a value.
-    function buildJspUrl(baseUrl, script, nodeUrl, moduleId) {
-      const tables = window.BD_WIRE_TABLES;
-      const spec = tables && tables[moduleId];
-      if (!spec || typeof script !== 'string' || !script) return null;
-
-      const vals = {};
-      const score = [];
-      let inScore = false;
-      for (const line of script.split('\n')) {
-        if (line.startsWith('%%bd_score')) { inScore = true; continue; }
-        if (line.startsWith('%%bd_]'))     { inScore = false; continue; }
-        if (inScore) { score.push(line); continue; }
-        if (!line.trim()) continue;
-        const m = /^%%bd_(\w+)\s*(.*)$/.exec(line);
-        // Anything that is not a directive (prose a user typed into the card,
-        // say) cannot be carried — fall back rather than drop it.
-        if (!m) { console.log('[JSP] non-directive line, using ?data='); return null; }
-        if (m[1] === 'module') continue;
-        vals[m[1]] = m[2];
-      }
-
-      const byName = {};
-      Object.keys(spec.keys).forEach((k) => { byName[spec.keys[k]] = k; });
-      const unknown = Object.keys(vals).filter((n) => !byName[n]);
-      if (unknown.length) {
-        console.log('[JSP] using ?data= — directives not in the wire table: ' + unknown.join(', '));
-        return null;
-      }
-
-      const uuid = String(nodeUrl || '').replace(/^butterflydreaming\.org\/n\//, '');
-      const pairs = Object.keys(vals)
-        .map((n) => byName[n] + encodeURIComponent(vals[n]))
-        .join(',');
-      const tail = score.length ? '~' + encodeURIComponent(score.join('\n')) : '';
-      return baseUrl + '?j=' + spec.tag + 'v' + spec.wire_version + '.' +
-             uuid + '.' + pairs + tail;
-    }
+    // JSP encoding lives in module_wire_tables.js — one implementation shared
+    // with every standalone, so the two can never disagree on an edge case.
+    const buildJspUrl = (baseUrl, script, nodeUrl, moduleId) =>
+      (window.BD_JSP ? window.BD_JSP.encode(baseUrl, script, nodeUrl, moduleId) : null);
 
     function buildExternalWebsiteUrl() {
       let currentNodeUrl = null, currentSourceText = null, currentTitle = null, currentName = null;
@@ -11252,7 +11205,8 @@ async function init() {
   });
   (function handleReturnFromStandalone() {
     const params = new URLSearchParams(window.location.search);
-    // Payload transport (2026-09-11): prefer #data= over ?data=.
+
+    // Payload transport (2026-09-11): prefer #data= over ?data=
     // A URL fragment is never put into the HTTP request, so a static host's
     // ~8 KB request-line limit (GitHub Pages answers 414 URI Too Long) simply
     // does not apply to it. Measurements + rationale in DeepLinking.md.
@@ -11264,7 +11218,13 @@ async function init() {
       ? decodeURIComponent(window.location.hash.slice(6))
       : null;
     const dataParam = hashData || params.get('data');
-    if (!dataParam) return;
+
+    // A ?j= return from a standalone — the compact form, same shared codec as
+    // the outbound leg (module_wire_tables.js). It yields script + node_url,
+    // which is all this flow reads: source_text and title were never used
+    // here, because BD already holds the node.
+    const jspParam = params.get('j');
+    if (!dataParam && !jspParam) return;
 
     // Strip the payload from the URL bar unconditionally, even on failure
     // paths, so a browser refresh doesn't re-fire this flow. Assigning
@@ -11274,12 +11234,24 @@ async function init() {
     };
 
     let payload;
-    try {
-      payload = JSON.parse(decodeURIComponent(escape(atob(dataParam))));
-    } catch (err) {
-      console.warn('[MM1] return-from-standalone: failed to decode ?data payload:', err);
-      cleanUrl();
-      return;
+    if (jspParam) {
+      const d = window.BD_JSP && window.BD_JSP.decode(jspParam);
+      if (!d) {
+        console.warn('[MM1] return-from-standalone: ?j= present but undecodable');
+        cleanUrl();
+        return;
+      }
+      payload = { script: d.script, node_url: d.node_url,
+                  source_text: null, title: null, name: null };
+      console.log('[MM1] return-from-standalone: ?j= (JSP), ' + d.script.length + ' chars');
+    } else {
+      try {
+        payload = JSON.parse(decodeURIComponent(escape(atob(dataParam))));
+      } catch (err) {
+        console.warn('[MM1] return-from-standalone: failed to decode ?data payload:', err);
+        cleanUrl();
+        return;
+      }
     }
     if (!payload || typeof payload !== 'object') { cleanUrl(); return; }
 
