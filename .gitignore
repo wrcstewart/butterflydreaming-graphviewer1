@@ -14,3 +14,15 @@ voice_models/
 
 # 2026-09-05 — locally-trained voices. Large, and a fine-tune IS someone's voice.
 voices/
+
+# 2026-09-12 — config backups carry the same secrets as config.js itself
+# (NEO4J_PASSWORD, CURATION_CODE, PAIR_CODE). config.js is ignored; its
+# backups were NOT, so one `git add -A` would have published them.
+config.js.bak*
+
+# Large media kept deliberately out of git — ~121 MB of source recordings.
+# Ignored explicitly so they cannot be staged by accident.
+# ROOT ONLY (leading /): the bass-recorder samples under M_Fractal/ and
+# M_Music/ ARE tracked, and a blanket *.mp3 would silently skip them if they
+# were ever removed and re-added.
+/*.mp3
