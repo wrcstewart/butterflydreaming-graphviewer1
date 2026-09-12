@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08
+# Continuation note — 2026-09-08, updated 2026-09-12
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -14,7 +14,7 @@ remembered.
 still the stable viewer.
 
     git branch --show-current      # expect: remote-graph-view
-    git log -1 --oneline           # expect: 1f58147 or later
+    git log -1 --oneline           # expect: 947e4a2 or later (17 commits past 1f58147)
 
 Everything below is on that branch and pushed. Merging to `main` is a deliberate
 act still to be taken — see §5.
@@ -30,6 +30,42 @@ long-running `cloudflared` tunnel. **Client console output is forwarded to
 settled arguments that days of reasoning did not.
 
 Current served versions: `viewer.js?v=798`, `style.css?v=480`, canary **green**.
+
+---
+
+## 1a. What has happened since this note was written (2026-09-12)
+
+One day's work, all on `remote-graph-view`, all pushed. **Nothing in the
+sections below was invalidated** — this is additive.
+
+**Deep-link sizing was investigated and documented.** New reference:
+`DeepLinking.md`, which opens with a START HERE summary. The finding: links are
+~686 chars and Apple's data detector (Notes, Messages, Stickies) silently
+truncates plain-text URLs over **659**, dropping the payload so the module
+opens `DEFAULT_SCRIPT`. **Email and the address bar are unaffected.** It broke
+on 2026-07-17 when the `name` field joined the payload and took the URL from
+654 to 686 — it had been sitting 5 chars under the ceiling.
+
+**Two changes were built, shipped and then REVERTED at the user's request:**
+moving the payload to `#data=`, and copying a rich `<a href>` clipboard
+flavour. The system is back to `?data=` and plain-text copy. Receivers still
+accept `#data=` and a `hashchange` reload remains — inert, kept so links copied
+on 09-11 still resolve. **Do not re-investigate the fragment or a supposed
+newline**; both were measured and excluded, and `DeepLinking.md` has a
+dead-ends list.
+
+**Still live from this work:** the ~8 KB request-line limit means a 3-node
+collage (8,276 chars) would fail **on a button press**. That is the real
+blocker for the collage module, not sharing. The **JSP** design (positional
+parameter arrays — a 3-node collage of saved nodes is 87 chars) is recorded in
+`DeepLinking.md` and `PLANNING_REGISTER.md`.
+
+**Housekeeping done the same day:** `MEMORY.md` had reached 29 KB against a
+~24 KB load limit and was being truncated, so entries past the cut were
+invisible to new sessions — trimmed to 15 KB by moving detail into the topic
+files, nothing deleted (pre-trim state at `398a508`). `DOCS_INDEX.md` was
+rewritten as past/present/future with 19 missing documents added, and
+`PLANNING_REGISTER.md` updated with eight designs and two corrected statuses.
 
 ---
 

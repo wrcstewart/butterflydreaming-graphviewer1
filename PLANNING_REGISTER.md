@@ -1,6 +1,9 @@
 # Planning register — design docs and how far each is built
 
-**Created 2026-08-23.** Companion to `DOCS_INDEX.md`, which says what every
+**Created 2026-08-23. Updated 2026-09-12** — eight designs added, two statuses
+corrected against the code, one open item closed.
+
+Companion to `DOCS_INDEX.md`, which says what every
 file in the repo *is*. This one covers the **design and planning documents
 only**, and answers the question the index does not: *how much of this is
 actually built?*
@@ -43,8 +46,16 @@ Keep this updated when a design moves. A stale register is worse than none.
 | `music_player_layout_spec.md` | 08-19 | **Partly built** | ABC done; see below |
 | `SR_Editor_Rules_v0.1.md` | 08-13 | **Built** (separate page) | `sr_editor.html` |
 | `bot_context.md` | 06-24 | **Partly built** | `stripBotBlocks` etc. ×5 — despite "not yet built" |
-| `convergence_node.md` | 06-28 | **Design only** | **zero** hits in `viewer.js` |
+| `convergence_node.md` | 06-28 | **Design only — idea absorbed** | 12 `convergence` hits in `viewer.js`, but all are Explore vocabulary ("a recorded convergence" = a GN mark). This doc's own design was never built. *Corrected 09-12: the earlier "zero hits" evidence is stale and reads misleadingly.* |
 | `BD_Viewer_Scaling_Brief.md` | 08-23 | **Planning only** | nothing scheduled, by intent |
+| `speech_plan.md` | 09-04 | **Built** (stages 0–1, shipped) | `piper_direct.js`, `speakReady` ×7 in `viewer.js` |
+| `voice_training_pipeline.md` | 09-06 | **Built** (first fine-tune) | `voices/bd_will_01.onnx` present |
+| `ink_mode.md` | 08-28 | **Built, now DEFAULT** | `get('ink') !== '0'` — `?ink=0` is the escape |
+| `ink_promotion_plan.md` | 09-04 | **Partly built** | stage 1 done (above); stage 2, walking every view, open |
+| `remote_view_spec.md` | 08-31 | **Built**, colour scheme superseded | `gn_mark`/`#gn-btn` ×13; achromatic model replaced its ladder |
+| `DeepLinking.md` | 09-12 | **Reference** (not a plan) | measurements; two experiments reverted |
+| `speech_lexicon_draft.md` | 09-04 | **Design only** | explicitly a draft for checking by ear |
+| `corner_controls_plan.md` | 08-28 | **Partly built** | breadcrumb bars retired (`BREADCRUMB_BARS = false`); offer/accept/lapse retirement open |
 
 ---
 
@@ -220,7 +231,7 @@ Not a schedule — a list of what has been designed and not built.
 | item | where | note |
 |---|---|---|
 | Draft/panel persistence across reload | brief `CC.7` | Present-tense risk. Design complete, including the `pagehide` trap. |
-| Retire breadcrumb bars + panel above canvas | `corner_controls_plan.md` §6 | **DECIDED 2026-08-27, next up.** Parallel view sacrificed for simplicity. |
+| ~~Retire breadcrumb bars + panel above canvas~~ | `corner_controls_plan.md` §6 | **DONE** — `BREADCRUMB_BARS = false` at `viewer.js:468`. Verified 2026-09-12. |
 | Retire explore offer/accept/lapse | `corner_controls_plan.md` | Superseded by GN-on-BN-click; spans client and server. |
 | Explore: reconnect behaviour | `editing_spec.md` §10 | Acceptance dialog is moot — the negotiation is going. |
 | Pair-agreed edit → SAVE a new node | — | The Explore ceremony is its front door. Consent vocabularies deliberately kept apart. |
@@ -231,3 +242,26 @@ Not a schedule — a list of what has been designed and not built.
 | Blue Node ring seam | `blue_node_spec.md` | Colour problem, not geometry. |
 | Delete stale BARE layout hints | `cc-hint-system-spec.md` | 166 edges (162 DESCENDS_FROM, 3 CLUSTER_REL, 1 CONTAINS). They route views down the wrong `runLayout` branch — three incidents so far. The Cluster reader already ignores them; deleting is a data change. |
 | Selection rule for capped neighbourhoods | brief §5 | Curation/ethics question. Affects 15 of 105 clusters. |
+
+---
+
+## Added 2026-09-12
+
+| item | where | note |
+|---|---|---|
+| **JSP — "just send parameters"** | `DeepLinking.md` | Designed, not built. Positional parameter arrays instead of `%%bd_` directive text: Kolam 650→181 chars, Fractal 822→188, ABC 664→266. A 3-node collage of saved nodes is **87 chars** against 1,730 today. **Version the format from day one** — the exact lesson of the `name` field. |
+| **Collage module** | `DeepLinking.md` | Not built, no repo. Blocked in its current shape: a 3-node collage inline is **8,276 chars** and fails GitHub Pages' ~8 KB request-line limit **on a button press**, sharing not involved. |
+| Deep links unclickable in Apple native apps | `DeepLinking.md` | Links are ~686 chars against a **659-char** data-detector cap. Email and the address bar are unaffected. Four fixes ranked in the doc; the fragment move and the rich-`<a href>` clipboard were both built and **reverted**. |
+| Pronunciation lexicon | `speech_plan.md`, `speech_lexicon_draft.md` | The live edge of the speech work. The draft needs checking by ear — the corpus mixes Legge's 1891 romanisation with modern pinyin. |
+| Ink promotion stage 2 | `ink_promotion_plan.md` | Walk every view under the achromatic default. |
+| `MEMORY.md` index discipline | — | The index hit 29 KB against a ~24 KB load limit on 2026-09-12 and was being truncated. Trimmed to 15 KB by moving detail into topic files. **Keep entries under ~230 chars.** |
+
+## Verified still open (2026-09-12)
+
+Re-checked against code and the live DB rather than carried forward on trust:
+
+| item | evidence |
+|---|---|
+| Delete stale BARE layout hints | **166 edges** still carry `hint_x` — unchanged since 08-23. |
+| Drop `raw_text` duplication | No references in `server.js` or `viewer.js`; the duplication is DB-side only, so this is a migration, not a code change. |
+| Desktop docking for media modules | `positionExtendPanel` still early-returns above 1024px. |
