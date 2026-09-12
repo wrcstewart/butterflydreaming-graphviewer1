@@ -458,3 +458,26 @@ reported symptom:
 None of these produce "a pasted link opens the default script in Notes"; they
 affect an already-open tab. The 659-char detector limit does produce exactly
 that, and does so for `?data=` too.
+
+## Rich-clipboard copy also reverted (2026-09-12)
+
+Pasting into Messages showed the anchor label rather than a plain link, which
+was not wanted. Copy is back to **plain text only** — `copyLinkText` and
+`copyTextSmart` restored byte-for-byte to their original form, labels and
+timestamps removed, `ClipboardItem` gone.
+
+Verified by diff: against the state before any of this work, the only
+functional differences left in the whole system are
+
+1. receivers accept `#data=` before falling back to `?data=`
+2. a `hashchange` listener that reloads when the hash starts `#data=`
+3. one added `/` in the standalones' return URL (cosmetic, equivalent)
+
+All three are **inert while senders emit `?data=`** — nothing produces a hash
+link any more. They are kept only so hash links copied on 2026-09-11 still
+resolve. Say the word and they go too; the system is otherwise identical to
+its pre-2026-09-11 state.
+
+**The 659-char limit is therefore live again**, and links are ~686 chars, so
+pasting one as plain text into Notes/Messages will truncate and open the
+default script. The address bar is unaffected.

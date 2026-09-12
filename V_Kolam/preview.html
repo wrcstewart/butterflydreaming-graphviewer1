@@ -1132,47 +1132,8 @@ F: F+F-F-F+F+F+F-F
     // Unified copy strategy: try async Clipboard API, fall back to legacy
     // execCommand, and only surface the visible textarea if BOTH fail.
     // Returns a Promise that resolves with the method name used, or rejects.
-    // Anchor text for a rich-flavour link — what the reader sees and clicks.
-    function bdLinkLabel() {
-      const who = currentName ||
-                  [currentSourceText, currentTitle].filter(Boolean).join(' \u2014 ');
-      // _YYYYMMDD_HHMM, local time — without it every link from the same node
-      // pastes under an identical phrase and a note full of them is unreadable.
-      const d = new Date(), p = (n) => String(n).padStart(2, '0');
-      const stamp = '_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
-                    '_' + p(d.getHours()) + p(d.getMinutes());
-      return (who ? ('ButterflyDreaming \u2014 ' + who) : 'ButterflyDreaming link') + stamp;
-    }
-
-    // Rich clipboard write: a real <a href> alongside the plain URL.
-    //
-    // macOS data detection (NSDataDetector, behind "Open Link" in Notes,
-    // Mail, Messages, Stickies) scans PLAIN TEXT only and silently truncates
-    // URLs over 659 chars — at 660 it yields a 57-char match ending at
-    // "#data", so the payload is lost and the module opens DEFAULT_SCRIPT.
-    // Our links run ~686 chars. An href is an attribute, not detected text,
-    // so it is never scanned and the length limit does not reach it.
-    // Measurements in the BD repo's DeepLinking.md.
-    function copyRichLink(text, label) {
-      if (!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write)) {
-        return Promise.reject(new Error('no ClipboardItem'));
-      }
-      const esc = (s) => String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      const html = '<meta charset="utf-8"><a href="' + esc(text) + '">' +
-                   esc(label) + '</a>';
-      return navigator.clipboard.write([new ClipboardItem({
-        'text/html':  new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([text], { type: 'text/plain' })
-      })]);
-    }
-
-    // Pass a label to get the rich flavour (URLs); omit it for plain text
-    // (the script copy, where an anchor would be nonsense).
-    // Rungs: rich -> async writeText -> legacy execCommand -> reject.
-    function copyTextSmart(text, label) {
-      const plain = (resolve, reject) => {
+    function copyTextSmart(text) {
+      return new Promise((resolve, reject) => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text).then(
             () => resolve('async'),
@@ -1185,16 +1146,6 @@ F: F+F-F-F+F+F+F-F
           resolve('legacy');
         } else {
           reject(new Error('no clipboard API and legacy failed'));
-        }
-      };
-      return new Promise((resolve, reject) => {
-        if (label) {
-          copyRichLink(text, label).then(
-            () => resolve('rich'),
-            () => plain(resolve, reject)
-          );
-        } else {
-          plain(resolve, reject);
         }
       });
     }
@@ -1272,7 +1223,7 @@ F: F+F-F-F+F+F+F-F
             source_text: returnPayload.source_text,
             title:       returnPayload.title
           });
-          copyTextSmart(url, bdLinkLabel()).then((method) => {
+          copyTextSmart(url).then((method) => {
             console.log(`Copy BD Link: copied via ${method}`);
             const original = bdCopyLinkBtn.textContent;
             bdCopyLinkBtn.textContent = 'Copied ✓';
@@ -1396,7 +1347,7 @@ F: F+F-F-F+F+F+F-F
           // atob). Matches the fix in viewer.js Copy Link.
           const encoded = b64EncodeUtf8(textarea.value);
           const url = `${window.location.origin}${window.location.pathname}?script=${encodeURIComponent(encoded)}`;
-          copyTextSmart(url, bdLinkLabel()).then((method) => {
+          copyTextSmart(url).then((method) => {
             console.log(`Copy Link: copied via ${method}`);
             const original = copyLinkBtn.textContent;
             copyLinkBtn.textContent = 'Link Copied ✓';

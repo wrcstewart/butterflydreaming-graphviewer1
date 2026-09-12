@@ -10764,80 +10764,11 @@ async function init() {
     }
 
     // ── Clipboard helpers ──────────────────────────────────────────────
-    const escapeHtml = (s) => String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-    // Copy the URL in TWO clipboard flavours (2026-09-11).
-    //
-    //   text/plain — the bare URL. For the address bar, a terminal, anywhere
-    //                that just wants text.
-    //   text/html  — a real <a href>. THIS is the one that matters.
-    //
-    // Why: macOS data detection (NSDataDetector — the engine behind "Open
-    // Link" in Notes, Mail, Messages, Stickies) scans PLAIN TEXT only, and
-    // silently truncates any URL longer than 659 chars. At 660 it returns a
-    // 57-char match ending at "#data", so the payload is dropped and the
-    // module opens its DEFAULT_SCRIPT — the "deep link gives me the default"
-    // report. Our links are ~686 chars, i.e. 27 over, and have been since the
-    // `name` field joined the payload on 2026-07-17.
-    //
-    // An href is an attribute, not detected text, so it is not scanned and
-    // not subject to that limit. Pasting into Notes/Mail then yields a
-    // clickable phrase carrying the whole URL. Measurements: DeepLinking.md.
-    //
-    // Degrades twice: no ClipboardItem -> plain text; rich write throws ->
-    // plain text. A URL that must go via the address bar still beats nothing.
-    const copyLinkText = async (text, label) => {
+    const copyLinkText = (text) => {
       console.log('External Website URL:', text);
-      if (!navigator.clipboard) throw new Error('clipboard API unavailable');
-      if (window.ClipboardItem && navigator.clipboard.write) {
-        try {
-          const anchor = label || 'ButterflyDreaming link';
-          const html = '<meta charset="utf-8"><a href="' + escapeHtml(text) +
-                       '">' + escapeHtml(anchor) + '</a>';
-          await navigator.clipboard.write([new ClipboardItem({
-            'text/html':  new Blob([html], { type: 'text/html' }),
-            'text/plain': new Blob([text], { type: 'text/plain' })
-          })]);
-          console.log('[BD] link copied: RICH (text/html anchor + text/plain) — ' + anchor);
-          return;
-        } catch (err) {
-          // Most likely cause: the user-gesture chain was broken before we got
-          // here (withUpdatePrompt's 'update' path awaits requestModuleSyncBD
-          // first), and Safari refuses clipboard.write outside a gesture.
-          // Plain text still lands, but the 659-char detector limit returns
-          // with it — so this line is worth reading when a link misbehaves.
-          console.warn('[BD] rich clipboard write FAILED, using plain text ' +
-                       '(659-char link limit applies again):', err);
-        }
-      }
-      if (!navigator.clipboard.writeText) throw new Error('clipboard API unavailable');
-      console.log('[BD] link copied: PLAIN text only — length ' + text.length +
-                  (text.length > 659 ? ' (OVER the 659 detector limit)' : ''));
-      return navigator.clipboard.writeText(text);
-    };
-
-    // Anchor text for the rich flavour — what the reader actually sees and
-    // clicks. Prefer the module-node name (bd_V_Kolam_001), then the node
-    // title, so a pasted link says what it opens rather than showing 686
-    // characters of base64.
-    // _YYYYMMDD_HHMM, local time. Without it every link copied from the same
-    // node pastes under an identical phrase, and a note holding several
-    // becomes unreadable — you cannot tell which one you made when.
-    const linkStamp = () => {
-      const d = new Date(), p = (n) => String(n).padStart(2, '0');
-      return '_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
-             '_' + p(d.getHours()) + p(d.getMinutes());
-    };
-
-    const linkLabelFor = (payload) => {
-      const name  = payload && payload.name;
-      const title = payload && payload.title;
-      const src   = payload && payload.source_text;
-      const who   = name || [src, title].filter(Boolean).join(' — ') || null;
-      return (who ? ('ButterflyDreaming — ' + who) : 'ButterflyDreaming link')
-             + linkStamp();
+      return navigator.clipboard && navigator.clipboard.writeText
+        ? navigator.clipboard.writeText(text)
+        : Promise.reject(new Error('clipboard API unavailable'));
     };
 
     const showFallback = (url) => {
@@ -10974,8 +10905,8 @@ async function init() {
     if (copyLinkToBtn) {
       copyLinkToBtn.addEventListener('click', () => {
         withUpdatePrompt(() => {
-          const { url, payload } = buildExternalWebsiteUrl();
-          copyLinkText(url, linkLabelFor(payload)).then(() => {
+          const { url } = buildExternalWebsiteUrl();
+          copyLinkText(url).then(() => {
             const original = copyLinkToBtn.textContent;
             copyLinkToBtn.textContent = 'Copied!';
             setTimeout(() => { copyLinkToBtn.textContent = original; }, 1500);
@@ -11014,8 +10945,8 @@ async function init() {
       const originalLabel = copyLinkBtn.innerHTML;
       copyLinkBtn.addEventListener('click', () => {
         withUpdatePrompt(() => {
-          const { url, payload } = buildBdSelfUrl();
-          copyLinkText(url, linkLabelFor(payload)).then(() => {
+          const { url } = buildBdSelfUrl();
+          copyLinkText(url).then(() => {
             copyLinkBtn.textContent = 'Copied!';
             setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
           }).catch((err) => {
