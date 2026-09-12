@@ -1,4 +1,76 @@
-# Deep Linking — corpus text-size measurements
+# Deep Linking — START HERE
+
+> **This document is append-only and chronological. Sections below this one
+> record things that were tried, measured, and in two cases REVERTED. Read this
+> summary first; do not act on a later section without checking it against this.**
+
+*Last updated 2026-09-12.*
+
+## State of the system right now
+
+| | |
+|---|---|
+| Transport | **`?data=`** (query string). Reverted from `#data=` on 2026-09-12. |
+| Clipboard | **Plain text only.** The rich `<a href>` flavour was built, shipped, then reverted. |
+| Receivers | Accept `#data=` first, falling back to `?data=`. **Inert** — nothing emits hash links. Kept so 2026-09-11 links still resolve. |
+| Real link length | **~686 chars** |
+
+## The one rule that explains every symptom
+
+| How the URL reaches the click | Limit |
+|---|---|
+| **Plain text scanned by Apple data detection** (Notes, Messages, Stickies) | **659 chars** |
+| **A real `<a href>`** (webmail, HTML mail, any browser link) | none measured, to 100,000 |
+
+At 660 chars the detector returns a 57-char match ending mid-URL, the payload is
+dropped and the module loads `DEFAULT_SCRIPT`. Links are ~686, i.e. 27 over.
+
+**Proven by controlled test** (2026-09-12): two `?data=` links, identical shape,
+differing only by 48 chars of `title` padding — 654 arrived (symmetry 5), 702
+did not (symmetry 3). The same 702-char link then went through **Yahoo Mail**
+intact, because a web linkifier makes an `<a href>` rather than scanning text.
+
+### Failure signature: symmetry 3, NOT 8
+
+`DEFAULT_SCRIPT` is `%%bd_symmetry 3`. The **8** is the slider's `fallback` for
+an out-of-range value (`min:1, max:16, fallback:8`) and is what `…/bd_V_Kolam/`
+(index.html — a different page) renders. **3 is the tell for a lost payload.**
+Any test marker must be in **1..16**, or a *working* link renders as 8 and looks
+broken.
+
+## Dead ends — do not re-investigate
+
+- **The fragment (`#`) was never the cause.** `?data=` and `#data=` truncate
+  identically (both full at 650, both cut to 57 at 684). Measured twice.
+- **There is no newline.** Clipboard verified at 0 newline chars. What looks like
+  one is Notes wrapping an unbreakable run at the last legal break point — which
+  is why the break *moved* (after `bd_V_Kolam/` under `#data=`, after `?` under
+  `?data=`) when the format changed. A character cannot relocate itself.
+- **Open Graph previews cannot be fixed by switching to `?`.** The standalones
+  are on GitHub Pages: zero `og:` tags, and byte-identical HTML for any query
+  string (checksummed). Dynamic OG tags need a server BD does not have in that
+  path.
+
+## What this costs today
+
+Two limits are live:
+
+1. **~8 KB request line** — Pages 414 over ~7,995 chars, Express 431 over
+   ~16,157. A 3-node collage inline is 8,276 and **fails on a button press**.
+2. **659-char data detector** — only in Apple's native apps.
+
+**Sharing by email works unchanged. So does the address bar.** Only
+Notes/Messages/Stickies are affected.
+
+## Where the design is going
+
+See **"JSP — just send parameters"** at the end of this document. Short version:
+a 3-node collage of saved nodes is **87 chars** under JSP, versus 1,730 inline
+today.
+
+---
+
+# Corpus text-size measurements (2026-09-11)
 
 **Measured 2026-09-11** against the live Memgraph corpus (477 nodes, 2,715 edges)
 via `bolt://localhost:7687`. Figures are for the `text` property of `:TextNode` —
@@ -550,3 +622,110 @@ Options for closing that last gap, cheapest first:
 4. **Rich `<a href>` clipboard** — removes the limit rather than ducking under
    it. Reverted because the anchor label showed in Messages; using the bare URL
    as the anchor text would look like an ordinary link while keeping the effect.
+
+---
+
+# JSP — "just send parameters" (design, 2026-09-12)
+
+Not built. This records the measurements and the design so it survives context
+loss.
+
+## The idea
+
+A module script is a *human-readable serialisation for editing and storage*. It
+has no business being the transport format. A Kolam's entire state is twelve
+numbers; we currently ship 298 chars of `%%bd_` directive text to carry them.
+
+Proposed shape (the user's, and it is the right one):
+
+1. a master table **module name ↔ module id** (`bd_V_Kolam` = 1, …)
+2. per module, a table **`%%bd_` keyword ↔ array index**
+3. transmit a positional array of values
+
+## Measured: compression alone is weak
+
+| Module | Script | Deflated | Ratio |
+|---|---|---|---|
+| `bd_M_ABC` | 304 | 211 | **1.44x** |
+| `bd_V_Kolam` | 298 | 182 | 1.64x |
+| `bd_M_Fractal` | 424 | 233 | 1.82x |
+
+**Correction to an earlier claim in this document: a single script deflates only
+1.4–1.8x, not 2.3x.** The 2.3x figure was for a whole collage JSON, where
+repeated keys give deflate redundancy to exploit. A lone 300-char script has
+almost none.
+
+## Measured: JSP is much stronger
+
+| Module | Current URL | Deflated | **JSP** | Gain |
+|---|---|---|---|---|
+| `bd_M_Fractal` | 822 | 491 | **188** | 4.4x |
+| `bd_V_Kolam` | 650 | 426 | **181** | 3.6x |
+| `bd_M_ABC` | 664 | 469 | **266** | **2.5x** |
+
+## Why ABC lags — the params/content split
+
+Every module is really TWO things:
+
+| Module | Scalar params | Free text (score / axiom / rules) |
+|---|---|---|
+| `bd_V_Kolam` | 12 params, 41 chars | 41-char axiom |
+| `bd_M_ABC` | 8 params, **31 chars** | **96-char score** |
+| `bd_M_Fractal` | 19 "params", 122 chars | (rules are *inside* the param list) |
+
+**ABC is 75% content.** Parameters compress to nothing; a score is irreducible —
+the notes ARE the payload. Design the format around this split, not around
+"every directive is equal".
+
+Note `bd_M_Fractal` currently hides content inside its parameter list:
+`XFYFX+F+YFXFY-F-XFYFX` and its sibling rule are 60 of its 122 chars.
+
+## Collage lengths
+
+| Encoding | URL |
+|---|---|
+| Inline, current | 1,730 |
+| Inline, deflated | 955 |
+| JSP, live-edited modules | 404 |
+| **JSP, saved nodes only (ids)** | **87** |
+
+## Engineering caveats — learned the hard way here
+
+**Version the format from day one.** Append-only discipline is not enough; you
+will eventually need to insert or retire a parameter. `m=1v2.<id>.<values>`
+costs two chars. *This is the exact lesson of the `name` field*: a payload
+addition in July silently broke sharing, because there was no room and no
+version to branch on.
+
+**Decide where the keyword tables live.** They must exist in BD *and* in each
+standalone — separate repos on separate deploy schedules. That is the drift risk
+that forced two-phase deploys (receivers to Pages first, polled until live, only
+then flip senders). A shared JSON fetched by both, or duplicated with a version
+check that fails loudly.
+
+**Don't deflate short strings.** At 80–180 chars the gain is small and sometimes
+negative, and it costs a decode step. JSP payloads do not need compression.
+
+**Percent-encode the free-text tail** (newlines, spaces). Included in the figures
+above.
+
+## The uniformity question
+
+The uniform presentation was always false; measurement only made it visible.
+Three operations with genuinely different physics:
+
+| Operation | Carries | Size | Works where |
+|---|---|---|---|
+| Share **saved** state | node ids | ~87 chars | everywhere, incl. QR |
+| Share **live edits** | content | 400–1,700 | email yes, Notes no |
+| Collage in the **same browser** as BD | nothing (local) | n/a | unlimited |
+
+Better to make the constraint visible than to force one presentation — e.g. a
+Copy button that says *"link (saved state)"* vs *"link with your edits — 1,400
+chars, email only"*. The manual script paste remains the escape hatch.
+
+**Consequence to accept: live-edit sharing of ABC is structurally limited.**
+Under JSP, staying below the 659 Notes ceiling leaves roughly 500 chars for a
+score — a short tune. A substantial piece will not fit under any encoding,
+because the notes are the content. Email has no such limit, so that is where
+real scores get shared.
