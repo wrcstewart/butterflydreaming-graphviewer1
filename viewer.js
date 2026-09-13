@@ -217,8 +217,21 @@ const ROOT_BOOT_MESSAGE =
 // either way; on an arrival the standard message is wrong twice over — they did
 // not begin here, and there is no node below to click. They are looking at
 // someone else's link, so what they need is the way in.
+//
+// Names the control AND what it does. The button is #back-btn, labelled
+// "Local: <where you are>" since 2026-08-31 — it names your position, not its
+// destination — so on an arrival it reads "Local: Chapter 1" and a reader told
+// only to "use the Local button" has nothing that announces itself as a way
+// back. Saying it steps back to Root closes that gap.
+//
+// No colon after "Local": conversations_colon_2026-09-04.md retired that form
+// deliberately, and the same wording should not reintroduce it.
+//
+// Once they follow it they are at Root, where the standard opening card —
+// "click or tap the node below" — is correct again, and they begin exactly as
+// a visitor arriving on the landing page does. So nothing else needs changing.
 const ROOT_ARRIVAL_MESSAGE =
-  'Use the Local button to start at the ButterflyDreaming Root node.';
+  'Press the Local button to step back to Root, where ButterflyDreaming begins.';
 
 // Read at load, because the boot card is built before the arrival handler runs:
 // by the time that handler knows this is an arrival, the card already exists.
