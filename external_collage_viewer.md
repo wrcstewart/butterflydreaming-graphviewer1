@@ -82,3 +82,75 @@ Caveat if built: BD deliberately overwrites `node.data('text')` on a deep-link
 arrival, so a node that received an edited version earlier in the session would
 compare "unchanged" against that shadowed text and silently ship the database
 version instead. Mark locally-shadowed nodes and never send `?n=` for them.
+
+---
+
+# Leaning: BD stays central, with a second TAB for real estate (2026-09-13)
+
+Rather than an external app fed from the server, a **second tab served by BD
+itself**. Pairing and editing stay a few clicks away, and the browser-only
+requirement — which is what makes XR plausible — is preserved.
+
+## The same-origin dividend
+
+**`BroadcastChannel` works again.** It was abandoned earlier only because of the
+EV → GitHub-Pages **origin split**; a tab served by BD is the same origin, so the
+two tabs can talk directly, instantly, with **no size limit at all**.
+
+That dissolves this entire week's sizing problem *for this case*: no 659-char
+ceiling, no ~8 KB request line, no JSP encoding, no wire table. You hand the tab
+an arrangement object. All that machinery remains necessary for the GitHub-Pages
+standalones and for anything sent to another person — it simply does not apply
+between two tabs of the same origin.
+
+## Correction — a second BD tab is NOT kicked
+
+Checked in `server.js` rather than assumed. The connect-time kick was tried and
+**abandoned** in July 2026: it tore down a live pair when a user returned from a
+standalone. What survives is narrower — `ready_to_pair` refuses to pair two
+sockets carrying the same `bd_device_id`, purely to stop self-pairing across two
+tabs. A second tab connects and lives normally.
+
+## XR — two different things
+
+Browsers are generally present (Quest ships Chromium with WebXR; Vision Pro's
+Safari gained WebXR in visionOS 2; Pico has one). But:
+
+- **A 2D page on a floating panel in a headset** — you already have this. Any BD
+  tab works there today, and a wider tab is exactly the "more real estate" win.
+- **An immersive WebXR scene** — `navigator.xr`, a session request, a 3D-rendered
+  scene. A different build, not a bigger window.
+
+Decide which is wanted. The first is nearly free; the second is a project.
+
+*(XR support noted from knowledge to ~May 2026 — moves quickly, verify before
+relying on it.)*
+
+---
+
+# If a slimmed-down external TEXT viewer is still wanted
+
+Measured across the 207 prose nodes (text 8–1,796 chars, avg 597):
+
+| encoding | avg URL | max | fit under 659 |
+|---|---|---|---|
+| current `?data=` | 1,076 | 2,685 | **41 / 207** |
+| deflate + base64url | 584 | 1,183 | **142 / 207** |
+
+Compression is worth **1.84x** on the URL and takes it from a fifth of the
+corpus working to about two thirds. **It is not sufficient on its own.**
+
+**Maximum raw text that fits under 659 when deflated: ~708 chars** — roughly 120
+words of English prose. 65 of 207 nodes exceed it; their text runs 661–1,796.
+
+## On truncating to fit
+
+Possible, but note what is being traded. The 659 ceiling binds **only** for a URL
+pasted as plain text into an Apple app. The same 2,685-char link is fine through
+webmail, an HTML mail link, or the address bar. So truncation sacrifices the
+author's text to satisfy one channel.
+
+If it is done anyway, truncate visibly — an ellipsis and a "read the whole thing
+in BD" link — so the reader knows they have part of something, rather than
+silently receiving a poem with its last third removed. A third of this corpus
+would be affected, and for the longest node more than half the text would go.
