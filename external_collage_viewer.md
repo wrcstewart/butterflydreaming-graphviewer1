@@ -154,3 +154,44 @@ If it is done anyway, truncate visibly — an ellipsis and a "read the whole thi
 in BD" link — so the reader knows they have part of something, rather than
 silently receiving a poem with its last third removed. A third of this corpus
 would be affected, and for the longest node more than half the text would go.
+
+## The way back into BD — two invitations, not one
+
+If a viewer shows a passage, the link home is the point of the whole thing. Two
+different invitations, landing in different places:
+
+| Invitation | When | Lands on | Cost |
+|---|---|---|---|
+| "Read the rest of this passage" | only when truncated | **that node** — `?n=<uuid>` | ~72 chars |
+| "See more of where this came from" | always | **Root** | ~33 chars, no id needed |
+
+Not exclusive; the strongest version carries both. The first converts a reader
+who is mid-passage, the second catches one who has finished and is wondering
+what this was.
+
+Both are `<a href>` **inside the page**, so the 659-char detector ceiling never
+applies to them. The only URL under pressure is the one handed to the reader in
+the first place — the viewer's own.
+
+**A stranger following "see more" arrives at Root** — which is the path made
+coherent on 2026-09-13: development notice, speech offer, then Root's
+orientation text, in the same order a landing-page visitor gets them.
+
+### On the wording
+
+**"Media corpus" is BD's internal language.** Someone who has just read eight
+lines of Whitman on a phone does not know what a corpus is, or that there is a
+collection behind what they are looking at. Name what they would *find* — the
+writing, the music, the graphics — or simply "where this came from". That link
+is the one moment the system has a stranger's attention while they know nothing
+about it.
+
+## What this settles
+
+The open question at the head of this document — *what does an external viewer
+give that BD does not?* — has an answer now, and it is not "a complete reading
+experience". That needs the corpus, and having the corpus **is** BD.
+
+It is: **a passage put in front of someone who was never going to open BD, with
+a door back into it.** A taster, not a rival. Which also turns truncation from a
+loss into the reason the link exists.
