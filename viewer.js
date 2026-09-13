@@ -11581,6 +11581,34 @@ async function init() {
       }
     }
 
+    // 7. Re-fit the graph. enterNode shows the neighbourhood but nothing in
+    //    this flow calls runLayout, which is what normally ends in a fit, so
+    //    the viewport kept whatever zoom it had at boot. Measured at
+    //    1440x1000: 30 elements drawing 704x458 inside a 243px canvas, i.e.
+    //    overflowing top and bottom — the graph looked half-size and high, and
+    //    snapped right on the first click only because that made cytoscape
+    //    re-render.
+    //
+    //    setTimeout rather than requestAnimationFrame: rAF does not fire in a
+    //    tab that is not being painted, and a deep link very often opens in a
+    //    background tab — precisely the case that must still work.
+    //    Skipped for module targets, which switch to Player and manage their
+    //    own layout.
+    if (!isModuleTarget) {
+      setTimeout(() => {
+        try {
+          cy.resize();
+          const visible = cy.elements(':visible');
+          if (visible.length) {
+            const before = cy.zoom();
+            cy.fit(visible.not('.parked-mark, .imported-mark'), fitPadding(cy, 120));
+            console.log('[MM1] arrival fit: ' + visible.length + ' elements, zoom ' +
+                        before.toFixed(3) + ' -> ' + cy.zoom().toFixed(3));
+          }
+        } catch (err) { console.warn('[MM1] arrival fit failed', err); }
+      }, 250);
+    }
+
     cleanUrl();
   })();
 }
