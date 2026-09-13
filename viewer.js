@@ -235,13 +235,18 @@ const ROOT_ARRIVAL_MESSAGE =
 
 // Read at load, because the boot card is built before the arrival handler runs:
 // by the time that handler knows this is an arrival, the card already exists.
-// Set at the END of a deep-link arrival and cleared by the next navigation of
-// any kind (markReadNode is the one place every navigation passes through).
+// 2026-09-13 — "this visitor has not yet had Root's opening".
 //
-// It must NOT outlive that first choice. If the visitor carries on into the
-// graph instead of pressing Local, the button has a real trail to walk back
-// and must behave normally; leaving this set kept it jumping to Root forever.
-let arrivalBackPending = false;
+// Set on a deep-link arrival and cleared only when that opening actually runs.
+// Deliberately NOT cleared by navigation: someone who jumps in, reads three
+// nodes and then goes to Root is in exactly the same position as someone who
+// pressed Local straight away — they still have not been told this is a
+// development version, and still have not been offered speech. Tying that to
+// which route they took was arbitrary.
+//
+// Honoured wherever Root is reached: a direct tap already runs the opening via
+// advanceOrNavigate; restoreState (ordinary Back) did not, which was the gap.
+let rootIntroPending = false;
 
 const ARRIVED_VIA_LINK = (() => {
   try {
@@ -3646,8 +3651,6 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       cytoNode.style({ 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
     }
-    // Any navigation ends the post-arrival special case for the Local button.
-    arrivalBackPending = false;
   }
 
   // ══ Blue Node (blue_node_spec.md) ═══════════════════════════════════════
@@ -6028,6 +6031,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // First real click on Root: offer speech BEFORE opening the graph, so
         // the dialog is not competing with a layout animation.
         if (introWillShow) {
+          rootIntroPending = false;   // consumed — however Root was reached
           // The development notice first: it explains why a control is missing,
           // and that belongs before a question about a different subject.
           showDevNotice().then(() => {
@@ -6866,6 +6870,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // leaves Unified Focus with nothing to focus. Guarded on visible() so a
       // node the restored view does not show cannot become the selection.
       if (dest.visible()) { activeNodeId = dest.id(); markReadNode(dest, cy); }
+
+      // Arrived back at Root without ever having had its opening — a deep-link
+      // visitor who wandered first. restoreState restores the VIEW only: no
+      // card, no dev notice, no speech offer, because in ordinary use you saw
+      // all three on the way out. Run it now, so reaching Root is the same
+      // experience however you got there.
+      if (rootIntroPending && dest.data('type') === 'root') {
+        rootIntroPending = false;
+        advanceOrNavigate(dest);
+      }
     }
     return true;
   }
@@ -6873,61 +6887,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // 2026-09-13 — consumed by the FIRST Local press after a deep-link arrival.
 
 
-  backBtn.addEventListener('click', () => {
-    // A deep-link arrival must NOT fall through to restoreState() here.
-    //
-    // The arrival seeds breadcrumb chips and fills a card but performs no
-    // navigation — no advanceOrNavigate, so no saveState. What IS on the
-    // back-stack is the pre-first-click landing view pushed during boot, so
-    // restoreState() succeeds, pops that, and nothing appears to happen: the
-    // cards are a separate stack and persist, and the label keeps wearing the
-    // arrived node. That is the stale button.
-    //
-    // There is no value in returning a visitor to a screen whose only content
-    // is an instruction to click. Go to Root in the state they would be in ONE
-    // CLICK into a normal visit — orientation text shown — from where they
-    // continue exactly as someone who arrived on the landing page and took
-    // that first step. Once consumed, Back behaves normally.
-    if (arrivalBackPending) {
-      const rootNode = cy.nodes().filter(n => n.data('type') === 'root').first();
-      if (rootNode && rootNode.length) {
-        arrivalBackPending = false;
-        console.log('[BD] Local pressed after a deep-link arrival — opening Root');
-        // BOTH calls are needed, and each was verified alone first:
-        //   markReadNode      — the single writer of lastReadNodeId, which is
-        //                       what updateBackBtn labels this button from.
-        //                       Without it the button kept wearing the arrived
-        //                       node while Root's text was on screen.
-        //   advanceOrNavigate — renders the node's text card. jumpToNode marks
-        //                       and navigates but leaves no card, so the label
-        //                       moved and the orientation text did not.
-        // advanceOrNavigate calls updateBackBtn itself, so marking first means
-        // the label is repainted from the new position.
-        markReadNode(rootNode, cy);
-        advanceOrNavigate(rootNode);
-        // This press adds a card, which changes #cy's box, and shows Root's
-        // neighbourhood — but advanceOrNavigate never calls runLayout, which is
-        // what normally ends in a fit. Re-frame once the layout settles.
-        fitVisibleWhenSettled(cy, 'post-arrival Local');
-        return;
-      }
-    }
-    if (restoreState()) return;
-
-    // Nothing on the stack and not an arrival — nothing to do.
-    //
-    // The arrival flow seeds the breadcrumb chips (Root → target) and fills a
-    // card with the payload, but it performs NO navigation — no
-    // advanceOrNavigate, so no saveState, so nothing on the back-stack. The
-    // button therefore wore the arrived node and did nothing when pressed, and
-    // the label stayed stale because nothing repainted it.
-    //
-    // Take the visitor to Root in the state they would be in ONE CLICK into a
-    // normal visit — orientation text shown — not the pre-click landing screen.
-    // There is no value in returning them to a screen whose only content is an
-    // instruction to click; from here they continue exactly as someone who
-    // arrived on the landing page and took that first step.
-  });
+  // Plain Back. The deep-link arrival now records Root as a real step
+  // (jumpToNode in handleReturnFromStandalone), so there is a trail to walk and
+  // no special case is needed here. Root's opening is attached to Root, in
+  // restoreState, rather than to this button.
+  backBtn.addEventListener('click', () => { restoreState(); });
 
   // Expand
 
@@ -11634,7 +11598,7 @@ async function init() {
     //    the same breath. The visitor's next navigation clears it again, so
     //    carrying on into the graph restores ordinary Back behaviour rather
     //    than leaving the button jumping to Root forever.
-    arrivalBackPending = true;
+    rootIntroPending = true;
 
     cleanUrl();
   })();
