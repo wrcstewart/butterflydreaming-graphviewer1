@@ -235,6 +235,14 @@ const ROOT_ARRIVAL_MESSAGE =
 
 // Read at load, because the boot card is built before the arrival handler runs:
 // by the time that handler knows this is an arrival, the card already exists.
+// Set at the END of a deep-link arrival and cleared by the next navigation of
+// any kind (markReadNode is the one place every navigation passes through).
+//
+// It must NOT outlive that first choice. If the visitor carries on into the
+// graph instead of pressing Local, the button has a real trail to walk back
+// and must behave normally; leaving this set kept it jumping to Root forever.
+let arrivalBackPending = false;
+
 const ARRIVED_VIA_LINK = (() => {
   try {
     const p = new URLSearchParams(location.search);
@@ -3638,6 +3646,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     } else {
       cytoNode.style({ 'border-width': 2, 'border-color': '#cccccc', 'border-opacity': 1 });
     }
+    // Any navigation ends the post-arrival special case for the Local button.
+    arrivalBackPending = false;
   }
 
   // ══ Blue Node (blue_node_spec.md) ═══════════════════════════════════════
@@ -6861,7 +6871,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   // 2026-09-13 — consumed by the FIRST Local press after a deep-link arrival.
-  let arrivalBackPending = ARRIVED_VIA_LINK;
+
 
   backBtn.addEventListener('click', () => {
     // A deep-link arrival must NOT fall through to restoreState() here.
@@ -11596,6 +11606,14 @@ async function init() {
     //    Skipped for module targets, which switch to Player and manage their
     //    own layout.
     if (!isModuleTarget) fitVisibleWhenSettled(cy, 'arrival');
+
+    // 8. Arm the Local button's one-off "go to Root" behaviour. Set HERE, at
+    //    the end, because enterNode above already called markReadNode — which
+    //    is what clears this — so setting it earlier would arm and disarm in
+    //    the same breath. The visitor's next navigation clears it again, so
+    //    carrying on into the graph restores ordinary Back behaviour rather
+    //    than leaving the button jumping to Root forever.
+    arrivalBackPending = true;
 
     cleanUrl();
   })();
