@@ -8509,7 +8509,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
 
 }
 
@@ -10383,7 +10383,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
   // breadcrumb bars and the media player listened, so the graph kept its old
