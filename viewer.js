@@ -11511,6 +11511,27 @@ async function init() {
     //    DB text.
     if (isModuleTarget && script !== null) target.data('text', script);
 
+    // 2b. Record Root as a real step FIRST, so the route the system believes in
+    //     is "Root pressed -> this node clicked".
+    //
+    //     jumpToNode marks, dispatches by type and saves state — but creates NO
+    //     card, which is exactly what is wanted: an arriving visitor should see
+    //     the node they were sent to, not the panel history of a visit they
+    //     never made. Root's card appears only if they press Local and actually
+    //     go there, which is ordinary behaviour from that point on.
+    //
+    //     Without this the arrival pushed NOTHING onto the back-stack — there is
+    //     no saveState anywhere in this flow — so Root was never a step, and the
+    //     earliest thing Back could reach was the boot landing view.
+    try {
+      const rootForTrail = cy.nodes().filter(n => n.data('type') === 'root').first();
+      if (rootForTrail && rootForTrail.length && rootForTrail.id() !== target.id()) {
+        jumpToNode(rootForTrail);
+      }
+    } catch (e) {
+      console.warn('[MM1] return-from-standalone: could not record Root as a step', e);
+    }
+
     // 3. Navigate to the node (sets lastReadNodeId + activeNodeId + expands).
     enterNode(target);
 
