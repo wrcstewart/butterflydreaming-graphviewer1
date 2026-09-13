@@ -6826,7 +6826,60 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     return true;
   }
 
-  backBtn.addEventListener('click', () => { restoreState(); });
+  // 2026-09-13 — consumed by the FIRST Local press after a deep-link arrival.
+  let arrivalBackPending = ARRIVED_VIA_LINK;
+
+  backBtn.addEventListener('click', () => {
+    // A deep-link arrival must NOT fall through to restoreState() here.
+    //
+    // The arrival seeds breadcrumb chips and fills a card but performs no
+    // navigation — no advanceOrNavigate, so no saveState. What IS on the
+    // back-stack is the pre-first-click landing view pushed during boot, so
+    // restoreState() succeeds, pops that, and nothing appears to happen: the
+    // cards are a separate stack and persist, and the label keeps wearing the
+    // arrived node. That is the stale button.
+    //
+    // There is no value in returning a visitor to a screen whose only content
+    // is an instruction to click. Go to Root in the state they would be in ONE
+    // CLICK into a normal visit — orientation text shown — from where they
+    // continue exactly as someone who arrived on the landing page and took
+    // that first step. Once consumed, Back behaves normally.
+    if (arrivalBackPending) {
+      const rootNode = cy.nodes().filter(n => n.data('type') === 'root').first();
+      if (rootNode && rootNode.length) {
+        arrivalBackPending = false;
+        console.log('[BD] Local pressed after a deep-link arrival — opening Root');
+        // BOTH calls are needed, and each was verified alone first:
+        //   markReadNode      — the single writer of lastReadNodeId, which is
+        //                       what updateBackBtn labels this button from.
+        //                       Without it the button kept wearing the arrived
+        //                       node while Root's text was on screen.
+        //   advanceOrNavigate — renders the node's text card. jumpToNode marks
+        //                       and navigates but leaves no card, so the label
+        //                       moved and the orientation text did not.
+        // advanceOrNavigate calls updateBackBtn itself, so marking first means
+        // the label is repainted from the new position.
+        markReadNode(rootNode, cy);
+        advanceOrNavigate(rootNode);
+        return;
+      }
+    }
+    if (restoreState()) return;
+
+    // Nothing on the stack and not an arrival — nothing to do.
+    //
+    // The arrival flow seeds the breadcrumb chips (Root → target) and fills a
+    // card with the payload, but it performs NO navigation — no
+    // advanceOrNavigate, so no saveState, so nothing on the back-stack. The
+    // button therefore wore the arrived node and did nothing when pressed, and
+    // the label stayed stale because nothing repainted it.
+    //
+    // Take the visitor to Root in the state they would be in ONE CLICK into a
+    // normal visit — orientation text shown — not the pre-click landing screen.
+    // There is no value in returning them to a screen whose only content is an
+    // instruction to click; from here they continue exactly as someone who
+    // arrived on the landing page and took that first step.
+  });
 
   // Expand
 
