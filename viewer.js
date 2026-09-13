@@ -6861,6 +6861,40 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // the label is repainted from the new position.
         markReadNode(rootNode, cy);
         advanceOrNavigate(rootNode);
+        // advanceOrNavigate calls neither positionCyEl nor cy.resize, and this
+        // press ADDS a card — which changes #cy's box. Cytoscape keeps the old
+        // dimensions, so the graph draws small and high in the canvas until any
+        // interaction makes it re-read its container. Two frames: one for the
+        // card to land and the layout to settle, one to re-measure.
+        // setTimeout, NOT requestAnimationFrame. rAF does not fire in a tab that
+        // is not being painted — a backgrounded tab, which is exactly where a
+        // deep link often opens — so the fit would silently never happen. (It
+        // also never fires in headless Chrome, which made this look like a fit
+        // that ran and was overridden.) 200ms lets the card land and the
+        // neighbourhood become visible before measuring.
+        setTimeout(() => {
+          try {
+            // NOT positionCyEl() — it lives in another closure and is not in
+            // scope here; calling it threw and skipped everything after it.
+            // cy.resize() re-reads the container, which is what was needed.
+            cy.resize();
+            // And FIT. advanceOrNavigate does not call runLayout, which is what
+            // normally ends in a fit, so the viewport kept the zoom it had
+            // before Root's neighbourhood appeared: measured at 1440x1000, 30
+            // elements drawing 455px tall inside a 243px canvas, overflowing
+            // top and bottom. Any interaction made cytoscape re-render and it
+            // snapped right, which is what made this look like a resize bug.
+            // Same call and padding runLayout uses, so framing matches every
+            // other view.
+            const visible = cy.elements(':visible');
+            if (visible.length) {
+              const before = cy.zoom();
+              cy.fit(visible.not('.parked-mark, .imported-mark'), fitPadding(cy, 120));
+              console.log('[BD] post-arrival fit: ' + visible.length + ' elements, zoom ' +
+                          before.toFixed(3) + ' -> ' + cy.zoom().toFixed(3));
+            }
+          } catch (err) { console.warn('[BD] post-arrival cy fit failed', err); }
+        }, 200);
         return;
       }
     }
