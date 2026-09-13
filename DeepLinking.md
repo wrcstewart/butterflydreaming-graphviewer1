@@ -802,3 +802,62 @@ so a bad payload degrades to the default rather than killing the page.
 The originally reported failure was never reproduced — the link in question
 renders correctly. A stale `preview.html` (Pages sets `max-age=600`) or a moment
 when the wire table had not yet propagated remain the likeliest explanations.
+
+---
+
+# Deep-link ARRIVAL behaviour (2026-09-13)
+
+Not about sizing, but it lives with the rest of the deep-link story.
+
+## Three faults found
+
+**The breadcrumb seed has been dead since 2026-08-27.** `addYouChip` returns
+immediately when `BREADCRUMB_BARS` is false, which it now is, so the arrival's
+`addYouChip(root); addYouChip(target)` only publishes position to a partner. It
+reads like the code that builds the trail. It is not.
+
+**The arrival pushed nothing onto the back-stack** — no `saveState` anywhere in
+that flow — so Root was never a step. Now `jumpToNode(root)` runs before
+`enterNode(target)`: it marks, dispatches by type and saves state but creates
+**no card**. The route the system believes in is "Root pressed → node clicked",
+while the arriving visitor sees only the node they were sent to.
+
+**Root's opening was attached to the Local button rather than to Root.**
+`rootIntroPending` — "this visitor has not yet had Root's opening" — is set on
+arrival, never cleared by navigation, cleared only when the opening runs, and
+honoured on every route to Root including `restoreState`.
+
+## The graph drew at half size — and three instrument failures
+
+30 elements at **704x458 inside a 243px canvas**, at the zoom held from boot,
+because nothing in the arrival calls `runLayout` (which is what normally ends in
+a fit).
+
+The fixes that appeared not to work, and why:
+
+| Attempt | Why it silently did nothing |
+|---|---|
+| `positionCyEl()` then fit | Not in scope at that listener — threw, catch swallowed it |
+| `requestAnimationFrame` | Does not fire in an unpainted tab: headless AND a backgrounded tab |
+| fixed 200-250ms delay | Lands mid-animation (`animationDuration: 400-450`) and is overridden |
+
+`fitVisibleWhenSettled()` waits for `layoutstop`, with a 900ms fallback.
+
+**In headless Chrome rAF never fires, so the animation never runs, so a
+mid-animation fit survives.** Every measurement looked clean while the real
+browser was unchanged. Do not trust a headless viewport measurement to prove a
+fit.
+
+## Scope map — worth keeping
+
+`setupInteractions()` (line ~3574) holds `markReadNode`, `jumpToNode`,
+`addYouChip`, `saveState`, `restoreState`, `enterNode`.
+`init()` (line ~8792) holds `handleReturnFromStandalone`, `positionCyEl`.
+
+They are **different scopes**. Crossing from `init` into `setupInteractions`
+requires the bundle `setupInteractions` returns and `init` destructures. A call
+written without it throws `ReferenceError` — and if it sits inside a `try`, the
+behaviour simply does not change, with only a warning in the log.
+
+`Runtime.evaluate` (CDP, browser-console scope) cannot see ANY of these: they
+are module-scope. `window.cy` is exposed; nothing else is.
