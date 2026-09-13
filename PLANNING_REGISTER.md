@@ -256,6 +256,13 @@ Not a schedule — a list of what has been designed and not built.
 | Ink promotion stage 2 | `ink_promotion_plan.md` | Walk every view under the achromatic default. |
 | `MEMORY.md` index discipline | — | The index hit 29 KB against a ~24 KB load limit on 2026-09-12 and was being truncated. Trimmed to 15 KB by moving detail into topic files. **Keep entries under ~230 chars.** |
 
+## Added 2026-09-13
+
+| item | where | note |
+|---|---|---|
+| **External collage viewer** | `external_collage_viewer.md` | **Mulling, nothing decided.** A public viewer opened by URL, showing a collage of saved-node material; superficial controls, no saving; content from the BD database via the server. **Inverts the model**: BD designs the experience, externals are viewers — today's standalones are editors. Open question the author is holding: what does it give that BD does not? |
+| `?n=<uuid>` for BD self-links | `external_collage_viewer.md` | Deferred pending the button/context table. When the panel text equals the node's stored text the id alone suffices — measured 999 → 72 chars. BD→BD only; a standalone has no corpus to resolve against. |
+
 ## Verified still open (2026-09-12)
 
 Re-checked against code and the live DB rather than carried forward on trust:
