@@ -256,6 +256,14 @@ Not a schedule — a list of what has been designed and not built.
 | Ink promotion stage 2 | `ink_promotion_plan.md` | Walk every view under the achromatic default. |
 | `MEMORY.md` index discipline | — | The index hit 29 KB against a ~24 KB load limit on 2026-09-12 and was being truncated. Trimmed to 15 KB by moving detail into topic files. **Keep entries under ~230 chars.** |
 
+## Added 2026-09-14 — direction change
+
+| item | where | note |
+|---|---|---|
+| **Ancillary tabs (AT) replace standalones for new work** | `external_collage_viewer.md` | **DECIDED 2026-09-14.** A second tab served by BD, for presentation: near-full screen, collage, minimal chrome. Same origin, so `BroadcastChannel` carries an arrangement with **no size limit** — no encoding, no wire table, no deploy lag. |
+| **Standalones FROZEN, not retired** | — | `bd_V_Kolam`, `bd_M_ABC`, `bd_M_Fractal` stay deployed and working; still useful to an experimenter and still a good way to send one node. No new features. **Finish Fractal and ABC first** so all three are left coherent. |
+| AT controls | `external_collage_viewer.md` | **The open question.** Presentation is the job, so "few" — which few is undecided. Keep the AT (for the BD user) distinct from the external viewer (for a stranger). |
+
 ## Added 2026-09-13
 
 | item | where | note |

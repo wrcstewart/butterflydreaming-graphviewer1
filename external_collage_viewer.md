@@ -195,3 +195,66 @@ experience". That needs the corpus, and having the corpus **is** BD.
 It is: **a passage put in front of someone who was never going to open BD, with
 a door back into it.** A taster, not a rival. Which also turns truncation from a
 loss into the reason the link exists.
+
+---
+
+# DIRECTION CHANGE — ancillary tabs, not standalones (2026-09-14)
+
+**The advantages of the standalones do not outweigh those of ancillary tabs (AT)
+inside main BD.** New presentation work goes to ATs.
+
+## What an AT is
+
+A second tab **served by BD itself**, whose job is **presentation**: near-full
+screen, collage, minimal chrome. Same origin, so:
+
+- `BroadcastChannel` works — the two tabs exchange an arrangement object
+  **directly, instantly, with no size limit at all**
+- no URL encoding, no wire table, no request-line ceiling, no detector ceiling
+- no deploy lag: BD serves it, so there is no second repo on GitHub's schedule
+- pairing and editing remain a few clicks away, in the tab next door
+- browser-only is preserved, which is what makes XR plausible
+
+## Standalones: FROZEN, not retired
+
+`bd_V_Kolam`, `bd_M_ABC`, `bd_M_Fractal` stay deployed and working. They remain
+useful **to an experimenter** — the Kolam one especially, for anyone developing
+L-system graphics — and they remain a decent way to send someone a single node.
+
+**Freeze means:** no new features; keep them running; fix them if they break.
+Finish the Fractal and ABC players to the same standard first, so all three are
+left in a coherent state rather than mid-thought.
+
+**Do not** start new presentation features there.
+
+## What this does and does not waste
+
+**Still earns its keep:** JSP (`?j=`, Kolam both directions, 237/219/218 chars
+against 650/633/667) — the standalones still exist and are still shared, and a
+link that fits under the 659 detector ceiling is the difference between one that
+can be sent and one that cannot.
+
+**Stops being the growth path:** the wire table and its codec are now
+*maintenance* for three frozen players, not infrastructure for new work. An AT
+needs none of it.
+
+**Stops applying to new work:** the two-phase deploy discipline (receivers to
+Pages first, polled until live, only then flip senders). That exists because the
+standalones deploy on GitHub's schedule. An AT deploys when BD does.
+
+## Next: AT controls
+
+The open design question is **what controls an AT should carry**. Its job is
+presentation, so the answer is "few" — but which few is not yet decided.
+
+Worth keeping distinct while deciding, because they are different audiences:
+
+| | AT | external viewer (earlier in this doc) |
+|---|---|---|
+| who | the BD user, wanting more room | a stranger who was never going to open BD |
+| job | presentation surface | a taster with a door back into BD |
+| content | whatever BD hands it, unlimited | must travel in a URL, ~708 chars of prose |
+| controls | TBD — few | volume, opacity, no saving |
+
+The external viewer is not superseded by this: it answers a different question
+and has its own entry above.
