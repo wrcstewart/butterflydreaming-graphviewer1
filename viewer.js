@@ -11102,12 +11102,29 @@ async function init() {
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
       jumpToBtn.addEventListener('click', () => {
+        // CLAIM THE WINDOW HERE, first thing, synchronously.
+        //
+        // Not inside withUpdatePrompt: its 'update' branch runs the action
+        // after requestModuleSyncBD() resolves, which breaks the user-gesture
+        // chain — and this button only fires in Player mode, which is exactly
+        // where that branch applies. Safari then refuses window.open and the
+        // press does nothing at all. (The dialog branch is safe, since the Yes
+        // click is itself a gesture, but it is not the only branch.)
+        //
+        // So the window is claimed in the click, unconditionally, and pointed
+        // at the viewer or the standalone once we know which. An unused blank
+        // window is closed below.
+        let claimed = null;
+        try { claimed = window.open('about:blank', '_blank'); } catch (_) {}
+        if (!claimed) console.warn('[AV] window.open refused even in-gesture — popups blocked for this site');
+
         withUpdatePrompt(async () => {
           // Already open? Focus it rather than opening a second one. Two
           // viewers on one session is not wrong — the server pushes to all of
           // them — but it is never what a second press MEANT.
           if (avWindow && !avWindow.closed) {
             try { avWindow.focus(); } catch (_) {}
+            try { if (claimed && claimed !== avWindow) claimed.close(); } catch (_) {}
             console.log('[AV] viewer already open — focused it');
             return;
           }
@@ -11126,12 +11143,7 @@ async function init() {
           //
           // So: claim the window while we are still in the gesture, park it on
           // about:blank, and navigate it once the token arrives.
-          let w = null;
-          if (wantViewer) {
-            w = window.open('about:blank', '_blank');
-            if (!w) console.warn('[AV] popup blocked — falling back to the standalone');
-          }
-
+          const w = claimed;    // claimed in the click, above
           const token = wantViewer && w ? await window.bdRequestModuleToken() : null;
 
           if (!token) {
