@@ -262,7 +262,8 @@ Not a schedule — a list of what has been designed and not built.
 |---|---|---|
 | **Socket.IO CORS allowlist** | `server.js` | **BUILT 2026-09-14** (`5dae4f4`). Cross-origin modules can now open a session socket. Allowlist, not `*`. Verified allowed/denied/same-origin. |
 | **LD / SD / UD data modes** | `module_data_modes.md` | **Design, partly built.** LD needs MST minting + MDP over the socket (not built). SD needs a publish step (not built). UD is built — that is JSP. |
-| **Ancillary tabs (AT) replace standalones for new work** | `external_collage_viewer.md` | **DECIDED 2026-09-14.** A second tab served by BD, for presentation: near-full screen, collage, minimal chrome. Same origin, so `BroadcastChannel` carries an arrangement with **no size limit** — no encoding, no wire table, no deploy lag. |
+| **Ancillary Viewer (AV)** | `AV/README.md` | **BUILT 2026-09-14** (`4b1106c`): MST tokens, `av_push` relay, client shim, Kolam reference viewer, Jump repurposed as launcher. Verified end to end. Terminology settled: **AV**, superseding the earlier **AT**. |
+| ~~Ancillary tabs (AT) replace standalones for new work~~ | `external_collage_viewer.md` | **DECIDED 2026-09-14.** A second tab served by BD, for presentation: near-full screen, collage, minimal chrome. Same origin, so `BroadcastChannel` carries an arrangement with **no size limit** — no encoding, no wire table, no deploy lag. |
 | **Standalones FROZEN, not retired** | — | `bd_V_Kolam`, `bd_M_ABC`, `bd_M_Fractal` stay deployed and working; still useful to an experimenter and still a good way to send one node. No new features. **Finish Fractal and ABC first** so all three are left coherent. |
 | AT controls | `external_collage_viewer.md` | **The open question.** Presentation is the job, so "few" — which few is undecided. Keep the AT (for the BD user) distinct from the external viewer (for a stranger). |
 
