@@ -248,6 +248,44 @@ const ROOT_ARRIVAL_MESSAGE =
 // advanceOrNavigate; restoreState (ordinary Back) did not, which was the gap.
 let rootIntroPending = false;
 
+// --- Ancillary Viewer (AV) — 2026-09-14 -------------------------------------
+//
+// An AV is a PRESENTATION SURFACE: more screen, fewer controls, nothing sent
+// back. BD holds the state and drives it; the viewer renders. It supersedes the
+// "AT / ancillary tab" wording used in earlier notes — same idea, settled name.
+//
+// Why a socket rather than the URL or postMessage:
+//   - the URL cannot carry live changes, only an opening state, and is capped
+//     (659 chars once a person has to paste it — see DeepLinking.md);
+//   - postMessage WOULD work and is far faster (<1 ms against ~30 ms through
+//     Cloudflare), but only reaches a window THIS page opened, on THIS machine.
+// The socket is the only route that also serves a viewer hosted by somebody
+// else, which is the point: a third party can build an AV without anything of
+// theirs living here. `AV/kolam.html` is the reference implementation.
+//
+// We hold the window handle only to avoid opening a second viewer on a second
+// press, and to focus the existing one instead. All DATA goes over the socket —
+// the handle is never used to postMessage, precisely so the same code path
+// works for a viewer we did not open and could not reach directly.
+let avWindow = null;
+
+// Mirror BD's current script to any open AV. Called wherever BD pushes a script
+// into its OWN renderer, so a viewer follows every change by the same route,
+// whatever caused it — a slider, a node tap, a pulled-down module script.
+//
+// Silent and cheap when no viewer is open: the server delivers to zero sockets
+// and says nothing. That matters because this sits on a path that runs during
+// slider drags.
+function pushToAV(script) {
+  try {
+    if (typeof script !== 'string' || !script) return;
+    const ws = window.__bdWsRef && window.__bdWsRef.current;
+    if (!ws || !ws.connected) return;
+    ws.emit('msg', { type: 'av_push', payload: { script } });
+  } catch (_) { /* a viewer is an extra, never a reason to break the main path */ }
+}
+
+
 const ARRIVED_VIA_LINK = (() => {
   try {
     const p = new URLSearchParams(location.search);
@@ -3587,6 +3625,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // Resolves to null rather than throwing: a module that cannot be given a token
   // should fall back to a lesser data mode (SD or UD — see module_data_modes.md),
   // not fail to open.
+  // pushToAV lives at module scope, outside setupInteractions, so it needs a
+  // way to reach the socket. Exposed here rather than passed down, because the
+  // push sites are scattered across the file.
+  window.__bdWsRef = wsRef;
+
   async function requestModuleToken() {
     const ws = wsRef.current;
     if (!ws || !ws.connected) return null;
@@ -9238,6 +9281,7 @@ async function init() {
       console.log('[MM1.6] loadModuleForNode: fast path, posting bd_script_update, script length=', text.length);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+        pushToAV(text);   // mirror to any open Ancillary Viewer
         enableCopyUp();
       } catch (_) {}
       return;
@@ -9254,6 +9298,7 @@ async function init() {
       window.removeEventListener('message', onReady);
       try {
         visualIframe.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+        pushToAV(text);   // mirror to any open Ancillary Viewer
         enableCopyUp();
         console.log('[MM1.6] onReady: bd_script_update posted');
         // 2026-08-09 — module (and its abc-pane) is now up; re-anchor
@@ -11018,22 +11063,84 @@ async function init() {
       };
     }
 
-    // ── Jump to External Website (MM3) ─────────────────────────────────
-    // Opens the standalone EV in a new tab (Q3 answer 2026-07-12: new tab
-    // for now, preserves the BD chat/pair session).
+    // ── Jump → open an Ancillary Viewer (AV) — repurposed 2026-09-14 ───
+    //
+    // WAS: opened the frozen standalone with the whole payload in the URL.
+    // NOW: opens a VIEWER and drives it live over the socket.
+    //
+    // Why this button and not Copy Link. The two have different physics:
+    //
+    //   Jump      has a window reference and a live session, so it can mint a
+    //             token, open a viewer, and keep pushing as things change.
+    //   Copy Link has neither — there is no window to talk to and no session at
+    //             the far end — so everything it sends must fit in the URL.
+    //             That is what the standalone is for, and Copy Link still goes
+    //             there, unchanged.
+    //
+    // So the standalone is not orphaned: it remains reachable, and remains the
+    // right answer for sending someone a node. This button simply stops using
+    // the worse of the two mechanisms available to it.
+    //
+    // Falls back to the old behaviour whenever a viewer cannot be opened —
+    // no session, no token, popup blocked. A press must always do SOMETHING.
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
       jumpToBtn.addEventListener('click', () => {
-        withUpdatePrompt(() => {
-          const { url } = buildExternalWebsiteUrl();
-          console.log('Jump to External Website URL:', url);
-          // Silence our own player before handing over — the standalone has
-          // its own, and two tracks over each other is nobody's intention.
-          // Guarded: a bare call here threw ReferenceError (the function is in
-          // setupInteractions()'s scope, this is init()'s), and the enclosing
-          // promise swallowed it, so the jump silently never happened.
+        withUpdatePrompt(async () => {
+          // Already open? Focus it rather than opening a second one. Two
+          // viewers on one session is not wrong — the server pushes to all of
+          // them — but it is never what a second press MEANT.
+          if (avWindow && !avWindow.closed) {
+            try { avWindow.focus(); } catch (_) {}
+            console.log('[AV] viewer already open — focused it');
+            return;
+          }
+
+          const { url, payload } = buildExternalWebsiteUrl();
+          const moduleId = parseModuleId(payload.script);
+
+          // Only Kolam has a viewer so far. Anything else keeps the old route,
+          // which still works and is still the only thing that can carry a
+          // payload to a page BD did not open.
+          const token = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken)
+            ? await window.bdRequestModuleToken()
+            : null;
+
+          if (!token) {
+            console.log('[AV] no token (' + (moduleId || 'no module') +
+                        ') — falling back to the standalone');
+            if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
+            window.open(url, '_blank');
+            return;
+          }
+
+          // The token is the ONLY thing in the URL. Everything else arrives
+          // over the socket, so this link has no size problem and no payload
+          // to leak — and it is useless to anyone else, being single-use.
+          const avUrl = window.location.origin + '/AV/kolam.html?t=' +
+                        encodeURIComponent(token);
+          console.log('[AV] opening viewer');
           if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
-          window.open(url, '_blank');
+          // '_blank', NOT a named window. window.name SURVIVES navigation, so a
+          // tab that was once a viewer keeps the name — and window.open() with
+          // that name then matches the CURRENT window and navigates BD into the
+          // viewer, replacing itself. Found the hard way: it silently ate the
+          // BD session mid-test. The avWindow handle above already prevents a
+          // second viewer, so the name bought nothing.
+          avWindow = window.open(avUrl, '_blank');
+
+          if (!avWindow) {
+            console.warn('[AV] popup blocked — falling back to the standalone');
+            window.open(url, '_blank');
+            return;
+          }
+
+          // Send the current state once the viewer has had time to connect.
+          // Its own connect is asynchronous, and the server drops a push that
+          // arrives before any viewer socket exists — so this first one is
+          // deliberately late. Everything after it rides the ordinary mirror
+          // in pushToAV.
+          setTimeout(() => pushToAV(payload.script), 1200);
         });
       });
     }

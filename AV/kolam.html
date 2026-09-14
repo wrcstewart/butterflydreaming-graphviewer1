@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ButterflyDreaming — Kolam viewer</title>
+<!--
+  Ancillary Viewer (AV) — Kolam. The reference implementation.
+
+  WHAT THIS IS
+  A presentation surface. BD holds the state and drives it; this page renders.
+  Near-full screen, no controls that change anything, nothing sent back. Move a
+  slider in BD and the figure here follows.
+
+  WHY IT IS WORTH COPYING
+  Everything here works the same from ANY host. It is served by BD only because
+  that is convenient; move the file to your own domain and it behaves
+  identically, because BD's Socket.IO server accepts any origin and the token
+  travels in the URL rather than in storage. That is the whole point: a third
+  party can build an AV without anything of theirs living in BD's repo, and
+  without asking permission.
+
+  WHAT IT DELIBERATELY DOES NOT DO
+  - It does not send anything back. An AV is a viewer, not an editor.
+  - It does not save. There is no path from here into the BD database.
+  - It does not reconnect on refusal. The token is single-use; only BD can
+    issue another, so retrying would just fail more quietly.
+
+  HOW IT DRAWS
+  The module iframe (visual_module.html) is the SAME renderer BD and the frozen
+  standalone use. We hand it a %%bd_ script over postMessage exactly as they do,
+  so the figure is identical and there is one renderer to maintain, not three.
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0a0a0f; overflow: hidden; }
+  #frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  /* Status is deliberately visible and deliberately small. A viewer that shows
+     nothing when it cannot reach BD is the failure we are avoiding — but it
+     must not compete with the work it is displaying. */
+  #status {
+    position: fixed; left: 10px; bottom: 8px; z-index: 5;
+    font: 11px/1.4 system-ui, sans-serif; color: #7a7a86;
+    background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 2px;
+    pointer-events: none; transition: opacity .6s ease; max-width: 70vw;
+  }
+  #status.live { opacity: 0; }          /* fades away once it is working */
+  #status.problem { color: #d98a8a; opacity: 1; }
+</style>
+</head>
+<body>
+  <!-- NO src here, deliberately. The renderer announces itself with BD_READY
+       as soon as it loads; if the iframe starts loading while the parser is
+       still on its way to the script below, that announcement arrives before
+       anything is listening and is lost forever — leaving a viewer that is
+       connected, receiving pushes, and permanently blank. BD's own loader
+       avoids this the same way ("the iframe has no src at page load").
+       The src is set from JS, after the listener is attached. -->
+  <iframe id="frame" title="Kolam"></iframe>
+  <div id="status">connecting…</div>
+
+  <!-- Socket.IO's client, served by BD itself. Loading it from BD ties startup
+       to BD being up — which costs nothing, since the socket needs BD anyway. -->
+  <script src="https://graph.virtualfictions.uk/socket.io/socket.io.js"></script>
+  <script src="bd_av_client.js"></script>
+  <script>
+  (function () {
+    const frame  = document.getElementById('frame');
+    const status = document.getElementById('status');
+
+    // The renderer loads asynchronously. Anything that arrives before it is
+    // ready is held and replayed on BD_READY — the same pattern the standalone
+    // uses (pendingScript), and the reason a fast first push is not lost.
+    let moduleReady = false;
+    let pending     = null;
+
+    window.addEventListener('message', function (e) {
+      const d = e && e.data;
+      if (d && d.type === 'BD_READY') {
+        moduleReady = true;
+        if (pending) { const p = pending; pending = null; post(p); }
+      }
+    });
+
+    // Listener is attached; only now start the renderer loading.
+    frame.src = '/bd_V_Kolam/visual_module.html';
+
+    function post(script) {
+      if (!moduleReady) { pending = script; return; }
+      try {
+        frame.contentWindow.postMessage({ type: 'bd_script_update', script: script }, '*');
+      } catch (err) {
+        say('renderer unreachable', true);
+      }
+    }
+
+    function say(text, problem) {
+      status.textContent = text;
+      status.classList.toggle('problem', !!problem);
+      status.classList.toggle('live', !problem && text === 'live');
+    }
+
+    // Kept on window deliberately: a viewer that misbehaves is otherwise a
+    // closed box, and the socket is the one thing worth inspecting from a
+    // console. It is a read handle — nothing here sends.
+    window.__avSocket = BD_AV.connect({
+      // Same origin as the page when served by BD; a third party would set
+      // their own value here, or leave the default.
+      bdOrigin: location.origin.startsWith('http://localhost')
+                  ? location.origin
+                  : BD_AV.DEFAULT_BD_ORIGIN,
+
+      onUpdate: function (payload) {
+        // The payload is whatever BD pushed. For Kolam that is a %%bd_ script,
+        // the same text the editor and the standalone use.
+        const script = (payload && payload.script) || (typeof payload === 'string' ? payload : null);
+        if (!script) return;
+        post(script);
+        say('live');
+      },
+
+      onState: function (state, info) {
+        if (state === 'live')       say('live');
+        else if (state === 'connecting') say('connecting…');
+        else if (state === 'no-token')   say('opened without a session — open this from ButterflyDreaming', true);
+        else if (state === 'refused')    say('BD refused the session: ' + (info.reason || '') , true);
+        else if (state === 'lost')       say('connection lost — ' + (info.reason || ''), true);
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

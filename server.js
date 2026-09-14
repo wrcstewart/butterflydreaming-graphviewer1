@@ -1482,6 +1482,36 @@ io.on('connection', async (socket) => {
       // the operator can watch a mobile client's runtime from the same
       // terminal that shows the server logs, no cable to DevTools
       // required.
+      // --- MDP: BD -> AV push (2026-09-14) --------------------------------
+      //
+      // The Module Data Protocol, in its smallest useful form. An Ancillary
+      // Viewer (AV) is a presentation surface: BD holds the state, the AV
+      // renders it. So the only message that matters is one-way, BD to AV.
+      //
+      // Addressing is implicit and deliberately so. A module socket carries
+      // socket.data.moduleFor = the userId that minted its token, so BD never
+      // names a recipient: it pushes, and the server delivers to every AV
+      // launched by THIS session. A BD client therefore cannot address another
+      // user's viewer even by accident — there is no field in which to try.
+      //
+      // No acknowledgement, no return channel. An AV that wants to talk back
+      // would need a message type of its own and a decision about what an AV is
+      // allowed to say; deliberately not invented here.
+      if (type === 'av_push') {
+        if (!socket.data.userId) return;
+        let delivered = 0;
+        for (const [, s] of io.sockets.sockets) {
+          if (s.data && s.data.role === 'module' && s.data.moduleFor === socket.data.userId) {
+            s.emit('msg', { type: 'av_update', payload: msg.payload ?? null });
+            delivered++;
+          }
+        }
+        // Quiet when there is no viewer open — that is the normal case, not an
+        // error, and logging it would drown the console during ordinary use.
+        if (delivered) console.log(`[BD] av_push -> ${delivered} viewer(s) for ${socket.data.userId}`);
+        return;
+      }
+
       // BD asks for a token to hand to a module it is about to open.
       // Answered only for a socket that already has a userId — i.e. a real BD
       // session — so a token cannot be obtained by an anonymous connection.
