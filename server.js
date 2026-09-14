@@ -1026,7 +1026,7 @@ const io = new SocketIOServer(server, {
     skipMiddlewares: true,
   },
   cors: {
-    origin: MODULE_ORIGINS,
+    origin: '*',
     methods: ['GET', 'POST'],
   }
 });
@@ -1091,6 +1091,50 @@ const helpersByName = new Map();  // name → { name, title, trigger, text }
 // buddy_disconnected. If no reconnect, the timer fires and we tear
 // down the pair, notify the buddy, and clean up.
 const pendingPurges = new Map();  // userId → timer handle
+
+// --- Module Session Tokens (MST) — 2026-09-14 -----------------------------
+//
+// A module may be hosted anywhere (see the cors setting above), so it cannot
+// read BD's localStorage and cannot share a cookie. BD therefore MINTS a token,
+// hands it over in the module's URL (?t=...), and the module presents it in the
+// Socket.IO handshake as auth.token.
+//
+// SHORT-LIVED and SINGLE-USE. The token exists only to bootstrap one socket; it
+// is consumed on first successful use. A token in a URL is visible in history,
+// in Referer headers and over a shoulder, so the window in which a leaked one is
+// worth anything is kept small.
+//
+// Not built here, deliberately: any notion of WRITE permission. A module socket
+// is identified, not privileged. Pair-and-save is gated on the curation code and
+// stays that way.
+const MODULE_TOKEN_TTL_MS = 2 * 60 * 1000;   // generous: covers a slow page load
+const moduleTokens = new Map();              // token → { userId, issuedAt }
+
+function mintModuleToken(userId) {
+  const token = crypto.randomUUID();
+  moduleTokens.set(token, { userId, issuedAt: Date.now() });
+  return token;
+}
+
+// Returns the issuing userId, or null. Consumes the token on success.
+function consumeModuleToken(token) {
+  const rec = moduleTokens.get(token);
+  if (!rec) return null;
+  moduleTokens.delete(token);                       // single use
+  if (Date.now() - rec.issuedAt > MODULE_TOKEN_TTL_MS) return null;
+  return rec.userId;
+}
+
+// Sweep expired tokens. Small map, generous interval — this is hygiene, not a
+// hot path, and consumeModuleToken re-checks the age anyway.
+setInterval(() => {
+  const now = Date.now();
+  for (const [t, rec] of moduleTokens) {
+    if (now - rec.issuedAt > MODULE_TOKEN_TTL_MS) moduleTokens.delete(t);
+  }
+}, 60 * 1000).unref?.();
+
+
 
 // MM3 (2026-07-12, revised) — anti-self-pair. Cookie parse in the
 // connection handler stamps socket.data.deviceId, and ready_to_pair
@@ -1336,6 +1380,31 @@ function serializeRecord(rec) {
   return obj;
 }
 
+// MST handshake check (2026-09-14).
+//
+// A token is OPTIONAL. Absence means an ordinary BD client, which is every
+// existing client and must keep working untouched. Presence means "I claim to
+// be a module launched by this BD session" — and a token that is absent from
+// the store, or expired, is REFUSED rather than quietly downgraded, so a module
+// developer sees the failure instead of a socket that silently does nothing.
+//
+// connectionStateRecovery has skipMiddlewares: true, so a RECOVERED socket does
+// not pass through here — which is what lets a single-use token survive a
+// dropped connection inside the recovery window without being reissued.
+io.use((socket, next) => {
+  const token = socket.handshake && socket.handshake.auth && socket.handshake.auth.token;
+  if (!token) return next();                     // ordinary client
+  const userId = consumeModuleToken(token);
+  if (!userId) {
+    console.warn(`[BD] MST refused (unknown or expired) from origin ${socket.handshake.headers.origin || '?'}`);
+    return next(new Error('module_token_invalid'));
+  }
+  socket.data.role         = 'module';
+  socket.data.moduleFor    = userId;             // the BD session that launched it
+  console.log(`[BD] Module socket accepted for ${userId} from origin ${socket.handshake.headers.origin || '?'}`);
+  next();
+});
+
 // --- Socket.IO connection handler (2026-07-13 migration from raw ws) ---
 
 io.on('connection', async (socket) => {
@@ -1413,6 +1482,20 @@ io.on('connection', async (socket) => {
       // the operator can watch a mobile client's runtime from the same
       // terminal that shows the server logs, no cable to DevTools
       // required.
+      // BD asks for a token to hand to a module it is about to open.
+      // Answered only for a socket that already has a userId — i.e. a real BD
+      // session — so a token cannot be obtained by an anonymous connection.
+      if (type === 'mint_module_token') {
+        if (!socket.data.userId) {
+          socket.emit('msg', { type: 'module_token', token: null, reason: 'no_session' });
+          return;
+        }
+        const token = mintModuleToken(socket.data.userId);
+        console.log(`[BD] MST minted for ${socket.data.userId}`);
+        socket.emit('msg', { type: 'module_token', token, ttl_ms: MODULE_TOKEN_TTL_MS });
+        return;
+      }
+
       if (msg.type === 'client_log') {
         const uid = socket.data.userId || '???';
         const lvl = (msg.level || 'log').toUpperCase();

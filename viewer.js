@@ -3577,6 +3577,40 @@ function showSessionExpired(message) {
 }
 
 function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
+  // --- Module Session Token (MST) — 2026-09-14 ------------------------------
+  //
+  // A module may be hosted anywhere, so it cannot read BD's localStorage and
+  // cannot share a cookie. BD asks the server to mint a short-lived, single-use
+  // token and hands it over in the module's URL (?t=...); the module presents it
+  // in its Socket.IO handshake as auth.token.
+  //
+  // Resolves to null rather than throwing: a module that cannot be given a token
+  // should fall back to a lesser data mode (SD or UD — see module_data_modes.md),
+  // not fail to open.
+  async function requestModuleToken() {
+    const ws = wsRef.current;
+    if (!ws || !ws.connected) return null;
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (t) => {
+        if (done) return;
+        done = true;
+        try { ws.off('msg', onMsg); } catch (_) {}
+        resolve(t);
+      };
+      const onMsg = (m) => {
+        if (!m || m.type !== 'module_token') return;
+        if (!m.token) console.warn('[BD] MST refused by server:', m.reason || 'unknown');
+        finish(m.token || null);
+      };
+      ws.on('msg', onMsg);
+      ws.emit('msg', { type: 'mint_module_token' });
+      setTimeout(() => finish(null), 4000);   // never hang a module launch
+    });
+  }
+  // Exposed for a module launcher, and so the path can be exercised without one.
+  window.bdRequestModuleToken = requestModuleToken;
+
 
   async function safeQuery(type, query, params = {}) {
     // Once expired, stay expired. Without this the reconnect below would
