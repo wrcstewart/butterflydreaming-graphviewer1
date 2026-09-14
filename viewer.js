@@ -276,6 +276,22 @@ let avWindow = null;
 // Silent and cheap when no viewer is open: the server delivers to zero sockets
 // and says nothing. That matters because this sits on a path that runs during
 // slider drags.
+// The renderer announces its live script on every render (bd_av_state). That is
+// the ONLY signal BD gets when the user moves a stepper inside the module, so it
+// is what keeps a viewer following. Deduplicated: during drift this fires about
+// five times a second and most frames are identical in text.
+let avLastPushed = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (e) => {
+    const d = e && e.data;
+    if (!d || d.type !== 'bd_av_state') return;
+    const text = d.text;
+    if (typeof text !== 'string' || text === avLastPushed) return;
+    avLastPushed = text;
+    pushToAV(text);
+  });
+}
+
 function pushToAV(script) {
   try {
     if (typeof script !== 'string' || !script) return;
@@ -11098,19 +11114,33 @@ async function init() {
 
           const { url, payload } = buildExternalWebsiteUrl();
           const moduleId = parseModuleId(payload.script);
+          const wantViewer = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken);
 
-          // Only Kolam has a viewer so far. Anything else keeps the old route,
-          // which still works and is still the only thing that can carry a
-          // payload to a page BD did not open.
-          const token = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken)
-            ? await window.bdRequestModuleToken()
-            : null;
+          // OPEN THE WINDOW FIRST, synchronously, INSIDE the click.
+          //
+          // Safari refuses window.open once the user-gesture chain is broken,
+          // and awaiting the token breaks it — so the previous version minted a
+          // token and then silently opened nothing. Observed: three presses,
+          // three tokens in the server log, no viewer ever connecting. Same
+          // trap as the clipboard write earlier in this file.
+          //
+          // So: claim the window while we are still in the gesture, park it on
+          // about:blank, and navigate it once the token arrives.
+          let w = null;
+          if (wantViewer) {
+            w = window.open('about:blank', '_blank');
+            if (!w) console.warn('[AV] popup blocked — falling back to the standalone');
+          }
+
+          const token = wantViewer && w ? await window.bdRequestModuleToken() : null;
 
           if (!token) {
-            console.log('[AV] no token (' + (moduleId || 'no module') +
+            console.log('[AV] no viewer (' + (moduleId || 'no module') +
+                        (wantViewer && !w ? ', popup blocked' : '') +
                         ') — falling back to the standalone');
             if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
-            window.open(url, '_blank');
+            if (w) { try { w.location.replace(url); } catch (_) { w.close(); window.open(url, '_blank'); } }
+            else   { window.open(url, '_blank'); }
             return;
           }
 
@@ -11121,26 +11151,21 @@ async function init() {
                         encodeURIComponent(token);
           console.log('[AV] opening viewer');
           if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
-          // '_blank', NOT a named window. window.name SURVIVES navigation, so a
-          // tab that was once a viewer keeps the name — and window.open() with
-          // that name then matches the CURRENT window and navigates BD into the
-          // viewer, replacing itself. Found the hard way: it silently ate the
-          // BD session mid-test. The avWindow handle above already prevents a
-          // second viewer, so the name bought nothing.
-          avWindow = window.open(avUrl, '_blank');
+          // The window is already ours (claimed in the gesture above); just
+          // point it at the viewer. replace() rather than assignment so the
+          // blank page does not become a back-stack entry.
+          avWindow = w;
+          try { avWindow.location.replace(avUrl); }
+          catch (err) { console.warn('[AV] could not navigate the viewer', err); }
 
-          if (!avWindow) {
-            console.warn('[AV] popup blocked — falling back to the standalone');
-            window.open(url, '_blank');
-            return;
-          }
-
-          // Send the current state once the viewer has had time to connect.
-          // Its own connect is asynchronous, and the server drops a push that
-          // arrives before any viewer socket exists — so this first one is
-          // deliberately late. Everything after it rides the ordinary mirror
-          // in pushToAV.
-          setTimeout(() => pushToAV(payload.script), 1200);
+          // Start mirroring. The first push is deliberately repeated: the
+          // viewer's connect is asynchronous and travels to Cloudflare and
+          // back, and the server drops a push that arrives before any viewer
+          // socket exists. Cheap to send three times; a blank viewer is not.
+          [900, 2000, 3500].forEach(ms => setTimeout(() => pushToAV(payload.script), ms));
+          // No poller: the renderer announces itself (bd_av_state), handled
+          // below. Polling would have meant BD_REQUEST_UPDATE, whose BD_UPDATE
+          // reply rewrites the focused card — several times a second.
         });
       });
     }

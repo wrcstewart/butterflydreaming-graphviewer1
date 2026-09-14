@@ -950,6 +950,20 @@
         setStatus('Rendering…');
         storedText = nodeText;
 
+        // 2026-09-14 — announce the live script to the host on EVERY render.
+        //
+        // The host cannot otherwise know that anything changed: the steppers
+        // are in here, not out there, and BD_UPDATE is pull-only (it answers
+        // BD_REQUEST_UPDATE and says nothing on its own). An Ancillary Viewer
+        // being driven from these controls therefore froze after its first
+        // frame.
+        //
+        // A NEW type deliberately, not BD_UPDATE: BD's BD_UPDATE handler writes
+        // into the focused card, so reusing it would rewrite the user's card
+        // several times a second while the drift runs. Anything that does not
+        // know this type ignores it — the frozen standalones included.
+        try { postToParent({ type: 'bd_av_state', text: storedText }); } catch (_) {}
+
         if (typeof nodeText !== 'string') {
           console.error('visual_module: render() expected text string, got:', nodeText);
           throw new Error('No valid text provided in BD_INIT payload');
