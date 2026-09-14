@@ -51,7 +51,12 @@
     // BD_READY never fires, and the initial script gets dropped silently.
 
     const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update']);
-    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY']);
+    // 2026-09-14: bd_av_state added. The inner module announces its live script
+    // on every render; without it in this set the announcement stops here, at
+    // the wrapper, and BD never learns that a stepper moved — which is exactly
+    // how an Ancillary Viewer came to show the opening frame and then freeze.
+    // This relay is a whitelist, so a NEW message type is invisible by default.
+    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY', 'bd_av_state']);
 
     const moduleFrame = document.getElementById('module-frame');
 

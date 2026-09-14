@@ -11114,8 +11114,28 @@ async function init() {
         // So the window is claimed in the click, unconditionally, and pointed
         // at the viewer or the standalone once we know which. An unused blank
         // window is closed below.
+        // A WINDOW, not a tab. A tab covers BD, and the whole point of a viewer
+        // is to watch it while working the controls in BD — so a tab defeats
+        // the feature entirely.
+        //
+        // Passing a features string (width/height) is what makes a browser open
+        // a window rather than a tab; '_blank' alone gives a tab. Sized to the
+        // right-hand side of the screen so BD stays usable beside it, and the
+        // user can move or resize it from there.
+        //
+        // No 'noopener': we need the handle to navigate this window once the
+        // token arrives, and to close it if it turns out to be unwanted.
         let claimed = null;
-        try { claimed = window.open('about:blank', '_blank'); } catch (_) {}
+        try {
+          const vw   = Math.max(640, Math.round(screen.availWidth  * 0.55));
+          const vh   = Math.max(480, Math.round(screen.availHeight * 0.88));
+          const vleft = Math.max(0, screen.availWidth - vw);
+          claimed = window.open(
+            'about:blank', '_blank',
+            `popup=yes,width=${vw},height=${vh},left=${vleft},top=0,` +
+            'menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no'
+          );
+        } catch (_) {}
         if (!claimed) console.warn('[AV] window.open refused even in-gesture — popups blocked for this site');
 
         withUpdatePrompt(async () => {
