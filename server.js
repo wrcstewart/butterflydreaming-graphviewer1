@@ -998,10 +998,36 @@ setInterval(pingMemgraph, 5 * 60 * 1000);
 // screen-on → reconnect within 60 s: session and pair survive.
 // skipMiddlewares means the auth/etc. path (we don't have one yet) isn't
 // re-run on recovery.
+// 2026-09-14 — cross-origin module clients.
+//
+// Socket.IO does NOT start with a WebSocket: it opens with HTTP long-polling
+// and upgrades. That first XHR IS CORS-gated, so without this a module served
+// from anywhere but BD's own origin fails at the handshake. (A raw WebSocket
+// would not be — the browser sends Origin and the server decides — but forcing
+// transports:['websocket'] to exploit that loses the polling fallback that gets
+// through restrictive networks, which is worth keeping.)
+//
+// An explicit ALLOWLIST, not '*': a module socket carries session authority, so
+// the set of origins that may even attempt a handshake stays small and named.
+// Adding a third-party module means adding its origin here.
+//
+// BD's own client is unaffected — it calls io() with no args, same origin, and
+// never reaches this check.
+const MODULE_ORIGINS = [
+  'https://wrcstewart.github.io',        // the frozen standalones
+  'http://localhost:8080',               // BD itself, for completeness
+  'http://localhost:5173',               // a module under development
+  'http://127.0.0.1:5173',
+];
+
 const io = new SocketIOServer(server, {
   connectionStateRecovery: {
     maxDisconnectionDuration: 60 * 1000,
     skipMiddlewares: true,
+  },
+  cors: {
+    origin: MODULE_ORIGINS,
+    methods: ['GET', 'POST'],
   }
 });
 
