@@ -52,10 +52,16 @@
   }
   /* Return to BD. Small, out of the way, but always reachable — this window has
      no address bar and no tab strip, so without it there is no way back. */
+  /* CANARY host for the viewer. The AV is cached separately from BD and on a
+     different origin's rules, so BD's canary says nothing about which viewer
+     you are looking at. Same rotation, same meaning: blue -> red -> green per
+     change to a cached AV file. 2026-09-15: RED (the canvas nudge undone).
+     Next rotation = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
-    background: rgba(0,0,0,.55); border: 1px solid #3a3a46;
+    background: rgba(0,0,0,.55);
+    border: 2px solid #c0392b;              /* CANARY — red (was none) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -87,7 +93,7 @@
   <!-- Socket.IO's client, served by BD itself. Loading it from BD ties startup
        to BD being up — which costs nothing, since the socket needs BD anyway. -->
   <script src="https://graph.virtualfictions.uk/socket.io/socket.io.js"></script>
-  <script src="bd_av_client.js?v=3"></script>
+  <script src="bd_av_client.js?v=4"></script>
   <script>
   (function () {
     const frame  = document.getElementById('frame');
@@ -118,7 +124,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to visual_module.html.
-    frame.src = '/bd_V_Kolam/visual_module.html?v=3';
+    frame.src = '/bd_V_Kolam/visual_module.html?v=4';
 
     function post(script) {
       if (!moduleReady) { pending = script; return; }

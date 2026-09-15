@@ -273,6 +273,12 @@
        about 15% of the width and pushed the figure off-centre. Reclaim it and
        centre, but ONLY in this mode: BD's embedded player and the standalones
        still need those gutters. */
+    /* And undo the small layout's canvas nudge. It shifts the canvas
+       translateX(calc(-15% - 20px)) to free a band for BD's ↓↑ arrows beside
+       the stepper column — 84.5px at a 430px width, measured. With no arrows
+       and no column, that band is empty screen and the figure hangs off the
+       left edge. This was the whole of the "square is over to the left". */
+    body.controls-hidden .canvas-wrapper canvas { transform: none; }
     body.controls-hidden .module-layout  { padding-left: 0; padding-right: 0; }
     body.controls-hidden .canvas-wrapper {
       justify-content: center;
