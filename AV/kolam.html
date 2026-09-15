@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-15: RED (the canvas nudge undone).
-     Next rotation = green. */
+     change to a cached AV file. 2026-09-15: GREEN (desktop label reads ButterflyDreaming).
+     Next rotation = blue. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #c0392b;              /* CANARY — red (was none) */
+    border: 2px solid #27ae60;              /* CANARY — green (was red) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -87,13 +87,14 @@
        avoids this the same way ("the iframe has no src at page load").
        The src is set from JS, after the listener is attached. -->
   <iframe id="frame" class="waiting" title="Kolam"></iframe>
+  <!-- Label set in JS: it differs by device. See the comment at the handler. -->
   <button id="back" type="button" title="Back to ButterflyDreaming">← controls</button>
   <div id="status">connecting…</div>
 
   <!-- Socket.IO's client, served by BD itself. Loading it from BD ties startup
        to BD being up — which costs nothing, since the socket needs BD anyway. -->
   <script src="https://graph.virtualfictions.uk/socket.io/socket.io.js"></script>
-  <script src="bd_av_client.js?v=4"></script>
+  <script src="bd_av_client.js?v=6"></script>
   <script>
   (function () {
     const frame  = document.getElementById('frame');
@@ -124,7 +125,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to visual_module.html.
-    frame.src = '/bd_V_Kolam/visual_module.html?v=4';
+    frame.src = '/bd_V_Kolam/visual_module.html?v=6';
 
     function post(script) {
       if (!moduleReady) { pending = script; return; }
@@ -148,9 +149,43 @@
     // close itself, and on iOS — where it is a tab, not a window — closing is
     // the only thing that reliably returns you. focus() on the opener is the
     // desktop nicety and the fallback when close is refused.
-    document.getElementById('back').addEventListener('click', function () {
-      try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (_) {}
-      try { window.close(); } catch (_) {}
+    // The label depends on whether BD is already visible.
+    //
+    // On a desktop the viewer is a WINDOW sitting beside BD, so BD's controls
+    // are on screen the whole time and this button does not take you to them —
+    // it raises the ButterflyDreaming window. "controls" would be describing
+    // something you are already looking at.
+    //
+    // On a phone the viewer is a TAB with BD hidden behind it, and the only way
+    // to reach the controls is through this button — so "controls" is exactly
+    // what it gives you.
+    //
+    // The test is whether this viewer LEAVES ROOM for BD, which is the actual
+    // question — not screen size, and not a device sniff.
+    //
+    // A desktop viewer is opened at ~55% of the screen, so there is a wide
+    // margin beside it where BD sits. A phone tab fills the screen, so there is
+    // none and BD is hidden behind it. Comparing our own outer width against
+    // the screen says which of those we are, without guessing at device class.
+    const backBtn = document.getElementById('back');
+    try {
+      const roomForBoth = (window.outerWidth || innerWidth) < screen.availWidth * 0.9;
+      if (roomForBoth) {
+        backBtn.textContent = 'ButterflyDreaming';
+        backBtn.title = 'Raise the ButterflyDreaming window';
+      }
+    } catch (_) { /* keep the default label */ }
+
+    backBtn.addEventListener('click', function () {
+      let raised = false;
+      try {
+        if (window.opener && !window.opener.closed) { window.opener.focus(); raised = true; }
+      } catch (_) {}
+      // Close only when the viewer is in the way — the phone case. On a desktop
+      // the two windows sit side by side and closing the one you are working
+      // with, every time you glance at the controls, would be absurd.
+      const roomForBoth = backBtn.textContent === 'ButterflyDreaming';
+      if (!roomForBoth || !raised) { try { window.close(); } catch (_) {} }
     });
 
     window.__avSocket = BD_AV.connect({
