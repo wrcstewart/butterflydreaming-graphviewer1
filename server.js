@@ -45,6 +45,28 @@ function pairCodeOk(code) {
   return false;
 }
 
+// The CURATION code specifically — write access to the corpus. Separate from
+// pairCodeOk, which accepts EITHER code and only grants browsing together.
+//
+// 2026-09-15 — made a function because it was not one. The check lived inline
+// at each call site, and so did the decision to perform it at all: write_hints
+// and edit_node_text verified the code, while edit_save, edit_delete and
+// edit_clone_cluster checked only that a code was CONFIGURED and then wrote.
+// With cors.origin '*' that left three corpus-mutating handlers reachable by
+// any page on the internet. Duplicating a security check is how half of them
+// come to be missing, so there is now exactly one to find.
+//
+// Byte length, not string length: timingSafeEqual THROWS on unequal buffers,
+// and a multi-byte character makes String.length disagree with Buffer.length.
+function curationCodeOk(code) {
+  if (!CURATION_CODE) return false;                   // curation disabled
+  if (typeof code !== 'string' || !code) return false;
+  const got  = Buffer.from(code);
+  const want = Buffer.from(CURATION_CODE);
+  if (got.length !== want.length) return false;
+  return crypto.timingSafeEqual(got, want);
+}
+
 // ── Node timestamps (blue_node_spec.md §7.1) ──────────────────────────────
 // Integer ms UTC, from the SERVER's clock — every write goes through here, so
 // clients never contribute a time. `updated_at` is the one the delta keys on:
@@ -1478,6 +1500,24 @@ io.on('connection', async (socket) => {
     let type;
     try {
       type = msg && msg.type;
+
+      // ── What a MODULE socket is allowed to say ───────────────────────────
+      //
+      // A module socket is one that presented an AV token in its handshake. It
+      // is otherwise an ordinary socket: the connection handler gives EVERY
+      // socket a userId and registers it in `sessions`, so without this guard a
+      // viewer — or anything that got hold of a token, or with cors.origin '*'
+      // anything at all — reaches every handler below exactly as a BD client
+      // does.
+      //
+      // The allowlist is deliberately one entry long. An AV is a presentation
+      // surface: it renders what BD sends and says only "I am ready". Adding a
+      // message type here is a decision about what a viewer may DO, and should
+      // be made deliberately rather than inherited by default.
+      //
+      // Silent: a viewer has no UI in which to show a protocol error, and a
+      // reply would tell a prober which names exist.
+      if (socket.data.role === 'module' && type !== 'av_hello') return;
       // Activity clock for the idle reaper. client_log is deliberately
       // excluded: a tab forwarding console noise is not a user doing
       // anything, and counting it would keep an abandoned tab alive forever
@@ -1801,9 +1841,7 @@ io.on('connection', async (socket) => {
           socket.emit('msg', { type: 'write_hints', error: 'rate_limited' });
           return;
         }
-        const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
-          crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
-        if (!codeOk) {
+        if (!curationCodeOk(msg.code)) {
           socket.emit('msg', { type: 'write_hints', error: 'bad_code' });
           return;
         }
@@ -1861,6 +1899,14 @@ io.on('connection', async (socket) => {
       if (msg.type === 'edit_save' || msg.type === 'edit_delete') {
         if (!CURATION_CODE) {
           socket.emit('msg', { type: msg.type, error: 'curation_disabled' });
+          return;
+        }
+        // 2026-09-15 — this check was MISSING. The handler asked only whether
+        // curation was configured, then wrote. Its only real protection was
+        // that BD hides the editor UI unless a code is typed, which is no
+        // protection at all against a socket opened by hand.
+        if (!curationCodeOk(msg.code)) {
+          socket.emit('msg', { type: msg.type, error: 'bad_code' });
           return;
         }
         const { textNodeUrl, clusterName, work, props } = msg;
@@ -1944,6 +1990,11 @@ io.on('connection', async (socket) => {
           socket.emit('msg', { type: 'edit_clone_cluster', error: 'curation_disabled' });
           return;
         }
+        // 2026-09-15 — was missing, same as edit_save above.
+        if (!curationCodeOk(msg.code)) {
+          socket.emit('msg', { type: 'edit_clone_cluster', error: 'bad_code' });
+          return;
+        }
         const { sourceName, newName } = msg;
         if (!sourceName || !newName) {
           socket.emit('msg', { type: 'edit_clone_cluster', error: 'missing_params' });
@@ -2019,9 +2070,7 @@ io.on('connection', async (socket) => {
           socket.emit('msg', { type: 'edit_node_text', error: 'curation_disabled' });
           return;
         }
-        const codeOk = msg.code && msg.code.length === CURATION_CODE.length &&
-          crypto.timingSafeEqual(Buffer.from(msg.code), Buffer.from(CURATION_CODE));
-        if (!codeOk) {
+        if (!curationCodeOk(msg.code)) {
           socket.emit('msg', { type: 'edit_node_text', error: 'bad_code' });
           return;
         }

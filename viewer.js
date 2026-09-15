@@ -8369,6 +8369,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     wsNow.emit('msg', {
       type:        'edit_save',
+      code:        curationCodeToSend(),
       textNodeUrl: textNode.data('url'),
       clusterName: clusterNode.data('name'),
       work:        textNode.data('source_text'),
@@ -8386,6 +8387,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     wsNow.emit('msg', {
       type:        'edit_delete',
+      code:        curationCodeToSend(),
       textNodeUrl: textNode.data('url'),
       clusterName: clusterNode.data('name'),
       work:        textNode.data('source_text'),
@@ -8446,6 +8448,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     if (!wsNow || !wsNow.connected) return;
     wsNow.emit('msg', {
       type:       'edit_clone_cluster',
+      code:       curationCodeToSend(),
       sourceName: sourceCluster.data('name'),
       newName,
     });
@@ -8600,7 +8603,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities };
+  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities, devStatus };
 
 }
 
@@ -8845,6 +8848,20 @@ function restoreCurationCode() {
     const saved = localStorage.getItem(CURATION_STORE_KEY);
     if (saved) el.value = saved;
   } catch (_) {}
+}
+
+// The curation code to SEND with a write. Companion to curationCodePresent()
+// below: that one decides whether to offer a button, this one supplies the
+// proof. Neither judges correctness — only the server can, and it does.
+//
+// 2026-09-15 — added when the server began requiring a code on edit_save /
+// edit_delete / edit_clone_cluster. Those three had never sent one, because
+// the server had never asked.
+function curationCodeToSend() {
+  try {
+    const el = document.getElementById('dev-code');
+    return el ? el.value.trim() : '';
+  } catch (_) { return ''; }
 }
 
 // 2026-09-08 — is a COMPLETE curation code present, typed or restored?
@@ -10476,7 +10493,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities, devStatus } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
   // breadcrumb bars and the media player listened, so the graph kept its old
@@ -11475,6 +11492,21 @@ async function init() {
       handleClusterRelMsg(msg);
     } else if (msg.type === 'cluster_cloned') {
       handleClusterCloned(msg);
+    } else if (msg.type === 'edit_save' || msg.type === 'edit_delete' ||
+               msg.type === 'edit_clone_cluster') {
+      // The FAILURE replies for the three cluster-editor writes. Success comes
+      // back under a different name (cluster_rel_saved / cluster_rel_deleted /
+      // cluster_cloned, handled above), so before 2026-09-15 nothing listened
+      // for these at all and every error — including a refused write — was
+      // dropped in silence. That was survivable while the server refused
+      // almost nothing; now that it checks the curation code it is not, since
+      // the commonest outcome of a stale code would have been a button that
+      // did nothing and said nothing.
+      if (msg.error) {
+        if (msg.error === 'bad_code') forgetCurationCode();
+        devStatus(msg.error === 'bad_code' ? 'code rejected — re-enter it'
+                                           : msg.error);
+      }
     }
   });
 
