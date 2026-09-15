@@ -266,6 +266,21 @@
     body.controls-hidden .control-panel { display: none; }
     body.controls-hidden .canvas-wrapper { flex: 1 1 auto; }
 
+    /* 2026-09-15 — controls-hidden means the HOST supplies the control surface
+       and nothing of ours is on screen, so the gutters the small layout
+       reserves (88px left for the host's arrows, 52px bottom for its band) are
+       reserving space for things that are not there. On a phone that cost
+       about 15% of the width and pushed the figure off-centre. Reclaim it and
+       centre, but ONLY in this mode: BD's embedded player and the standalones
+       still need those gutters. */
+    body.controls-hidden .module-layout  { padding-left: 0; padding-right: 0; }
+    body.controls-hidden .canvas-wrapper {
+      justify-content: center;
+      align-items: center;
+      padding-bottom: 0;
+      padding-right: 0;
+    }
+
     /* Selects retain their native appearance for iOS/mobile compatibility. */
     .control-panel select {
       width: 100%;

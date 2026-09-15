@@ -38,6 +38,10 @@
      window allows — centred. Letting the iframe fill a non-square window made
      the module lay itself out for the wider box and draw a small square at the
      bottom, which is what it was doing on iOS. */
+  /* Hidden until the first real script arrives. The module renders its own
+     DEFAULT the moment it loads, and showing that — then replacing it a moment
+     later — is the flicker of a wrong figure the viewer used to open with. */
+  #frame.waiting { visibility: hidden; }
   #frame {
     position: fixed;
     width:  min(100vw, 100vh);
@@ -76,7 +80,7 @@
        connected, receiving pushes, and permanently blank. BD's own loader
        avoids this the same way ("the iframe has no src at page load").
        The src is set from JS, after the listener is attached. -->
-  <iframe id="frame" title="Kolam"></iframe>
+  <iframe id="frame" class="waiting" title="Kolam"></iframe>
   <button id="back" type="button" title="Back to ButterflyDreaming">← controls</button>
   <div id="status">connecting…</div>
 
@@ -153,6 +157,9 @@
         const script = (payload && payload.script) || (typeof payload === 'string' ? payload : null);
         if (!script) return;
         post(script);
+        // Real content has arrived — reveal. Until now the module has been
+        // showing its own default behind a hidden frame.
+        frame.classList.remove('waiting');
         say('live');
       },
 

@@ -87,6 +87,11 @@
 
     socket.on('connect', function () {
       onState('live', { id: socket.id });
+      // Ask for the current state immediately. A viewer knows exactly when it
+      // is ready and nobody else does, so asking beats being guessed at — BD
+      // used to push on a timer after opening the window, which left the
+      // viewer showing the module's DEFAULT figure until a guess landed.
+      try { socket.emit('msg', { type: 'av_hello' }); } catch (_) {}
     });
 
     // A refused token is reported rather than retried. Retrying is pointless:

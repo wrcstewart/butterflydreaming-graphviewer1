@@ -276,6 +276,23 @@ let avWindow = null;
 // Silent and cheap when no viewer is open: the server delivers to zero sockets
 // and says nothing. That matters because this sits on a path that runs during
 // slider drags.
+// A viewer that has just connected asks for the current state (av_hello, which
+// the server turns into this). Answering on request rather than guessing with a
+// timer is what removes the seconds of DEFAULT figure a viewer used to show on
+// every trip — it knows when it is ready, and nobody else does.
+function answerAVStateRequest() {
+  if (typeof avLastPushed === 'string' && avLastPushed) {
+    pushToAV(avLastPushed);
+    return;
+  }
+  // Nothing pushed yet this session: ask the module what it is showing. Its
+  // bd_av_state reply arrives through the ordinary mirror below.
+  try {
+    const f = document.getElementById('visual-iframe');
+    if (f && f.contentWindow) f.contentWindow.postMessage({ type: 'bd_script_request' }, '*');
+  } catch (_) {}
+}
+
 // The renderer announces its live script on every render (bd_av_state). That is
 // the ONLY signal BD gets when the user moves a stepper inside the module, so it
 // is what keeps a viewer following. Deduplicated: during drift this fires about
@@ -295,6 +312,7 @@ if (typeof window !== 'undefined') {
 function pushToAV(script) {
   try {
     if (typeof script !== 'string' || !script) return;
+    avLastPushed = script;          // so a viewer that asks later can be answered
     const ws = window.__bdWsRef && window.__bdWsRef.current;
     if (!ws || !ws.connected) return;
     ws.emit('msg', { type: 'av_push', payload: { script } });
@@ -3645,6 +3663,22 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // way to reach the socket. Exposed here rather than passed down, because the
   // push sites are scattered across the file.
   window.__bdWsRef = wsRef;
+
+  // A viewer asking for state. Attached once, to whatever socket is current at
+  // the time the message arrives — wsRef.current is re-pointed on reconnect, so
+  // reading it lazily is what keeps this working across a drop.
+  (function attachAVStateListener() {
+    const bind = () => {
+      const ws = wsRef.current;
+      if (!ws || ws.__avStateBound) return;
+      ws.__avStateBound = true;
+      ws.on('msg', (m) => {
+        if (m && m.type === 'av_request_state') answerAVStateRequest();
+      });
+    };
+    bind();
+    setInterval(bind, 2000);   // cheap, and survives a reconnect replacing the socket
+  })();
 
   async function requestModuleToken() {
     const ws = wsRef.current;

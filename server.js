@@ -1482,6 +1482,26 @@ io.on('connection', async (socket) => {
       // the operator can watch a mobile client's runtime from the same
       // terminal that shows the server logs, no cable to DevTools
       // required.
+      // --- MDP: AV -> BD "send me the current state" (2026-09-15) ----------
+      //
+      // A viewer that has just connected has nothing to show. Previously BD
+      // guessed, pushing on a timer after opening the window — which meant the
+      // viewer sat on the module's DEFAULT figure until a guess landed, and
+      // showed the wrong image for seconds on every trip.
+      //
+      // So the viewer asks. It knows exactly when it is ready; nobody else
+      // does. The server forwards the request to the BD session that launched
+      // it — again without either side naming the other.
+      if (type === 'av_hello') {
+        if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
+        const owner = sessions.get(socket.data.moduleFor);
+        if (owner) {
+          owner.emit('msg', { type: 'av_request_state' });
+          console.log(`[BD] av_hello -> asked ${socket.data.moduleFor} for state`);
+        }
+        return;
+      }
+
       // --- MDP: BD -> AV push (2026-09-14) --------------------------------
       //
       // The Module Data Protocol, in its smallest useful form. An Ancillary
