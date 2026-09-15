@@ -1277,7 +1277,14 @@ function broadcastCorpusUpdate(msg) {
 // the behaviour the 65 was chosen to prevent.
 //
 // Override without editing code: BD_GRACE_MS=65000 node server.js
-const GRACE_MS = Number(process.env.BD_GRACE_MS) || 5 * 1000;
+//
+// 10s is the user's chosen development compromise (2026-09-12): long enough
+// that a brief blur does not tear a pair down, short enough that a dev restart
+// does not leave a ghost user occupying the pair slot. It lives here, not in
+// the launch command, so a plain `node server.js` gives the agreed value —
+// previously the 10 existed only as an env var on one running process and
+// silently reverted to 5 on every restart.
+const GRACE_MS = Number(process.env.BD_GRACE_MS) || 10 * 1000;
 if (GRACE_MS < 60 * 1000) {
   console.log(`[BD] *** GRACE PERIOD ${GRACE_MS / 1000}s — DEVELOPMENT VALUE, restore to 65000 for real use ***`);
 }
