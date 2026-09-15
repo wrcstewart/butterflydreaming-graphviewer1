@@ -11101,42 +11101,47 @@ async function init() {
     // no session, no token, popup blocked. A press must always do SOMETHING.
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
-      jumpToBtn.addEventListener('click', () => {
-        // CLAIM THE WINDOW HERE, first thing, synchronously.
-        //
-        // Not inside withUpdatePrompt: its 'update' branch runs the action
-        // after requestModuleSyncBD() resolves, which breaks the user-gesture
-        // chain — and this button only fires in Player mode, which is exactly
-        // where that branch applies. Safari then refuses window.open and the
-        // press does nothing at all. (The dialog branch is safe, since the Yes
-        // click is itself a gesture, but it is not the only branch.)
-        //
-        // So the window is claimed in the click, unconditionally, and pointed
-        // at the viewer or the standalone once we know which. An unused blank
-        // window is closed below.
-        // A WINDOW, not a tab. A tab covers BD, and the whole point of a viewer
-        // is to watch it while working the controls in BD — so a tab defeats
-        // the feature entirely.
-        //
-        // Passing a features string (width/height) is what makes a browser open
-        // a window rather than a tab; '_blank' alone gives a tab. Sized to the
-        // right-hand side of the screen so BD stays usable beside it, and the
-        // user can move or resize it from there.
-        //
-        // No 'noopener': we need the handle to navigate this window once the
-        // token arrives, and to close it if it turns out to be unwanted.
-        let claimed = null;
+      // Opening the viewer window: WHEN, not just whether.
+      //
+      // Two constraints that look contradictory:
+      //   - Safari refuses window.open once the user-gesture chain is broken.
+      //   - The update dialog must be dealt with FIRST. A blank window appearing
+      //     ahead of it is distracting on desktop and fatal on iOS, where Back
+      //     returns to the dialog but the onward step to the viewer is lost.
+      //
+      // They reconcile because the DIALOG'S OWN Yes CLICK IS A GESTURE. So in
+      // every path that shows a dialog — or that runs synchronously — the window
+      // can be opened inside the action, after the dialog, and still be allowed.
+      //
+      // Exactly one path breaks the chain without showing anything:
+      // player-active with updateModePref 'update', which awaits
+      // requestModuleSyncBD(). There is no dialog on that path, so pre-claiming
+      // hides nothing. That is the only case that opens early.
+      function openViewerWindow() {
+        // A WINDOW, not a tab: a tab covers BD, and the point of a viewer is to
+        // watch it while working BD's controls. The features string is what
+        // makes a browser give a window; '_blank' alone gives a tab. Sized to
+        // the right-hand side so BD stays usable beside it.
+        // No 'noopener' — the handle is needed to navigate and to close.
         try {
-          const vw   = Math.max(640, Math.round(screen.availWidth  * 0.55));
-          const vh   = Math.max(480, Math.round(screen.availHeight * 0.88));
+          const vw    = Math.max(640, Math.round(screen.availWidth  * 0.55));
+          const vh    = Math.max(480, Math.round(screen.availHeight * 0.88));
           const vleft = Math.max(0, screen.availWidth - vw);
-          claimed = window.open(
+          const w = window.open(
             'about:blank', '_blank',
             `popup=yes,width=${vw},height=${vh},left=${vleft},top=0,` +
             'menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no'
           );
-        } catch (_) {}
-        if (!claimed) console.warn('[AV] window.open refused even in-gesture — popups blocked for this site');
+          if (!w) console.warn('[AV] window.open refused — popups blocked for this site');
+          return w;
+        } catch (_) { return null; }
+      }
+
+      jumpToBtn.addEventListener('click', () => {
+        const playerActive = document.body.classList.contains('player-active');
+        // The one path that goes async without showing anything.
+        const silentlyAsync = playerActive && updateModePref === 'update';
+        let claimed = silentlyAsync ? openViewerWindow() : null;
 
         withUpdatePrompt(async () => {
           // Already open? Focus it rather than opening a second one. Two
@@ -11163,7 +11168,12 @@ async function init() {
           //
           // So: claim the window while we are still in the gesture, park it on
           // about:blank, and navigate it once the token arrives.
-          const w = claimed;    // claimed in the click, above
+          // Open it NOW if it was not pre-claimed: we are still inside a
+          // gesture here — either the original click (synchronous paths) or the
+          // dialog's Yes click — so this is allowed, and the dialog has already
+          // been dealt with.
+          if (!claimed && wantViewer) claimed = openViewerWindow();
+          const w = claimed;
           const token = wantViewer && w ? await window.bdRequestModuleToken() : null;
 
           if (!token) {
