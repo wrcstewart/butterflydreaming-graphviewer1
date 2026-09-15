@@ -62,16 +62,30 @@ Route A, chosen 2026-09-14 and **built**: allow the origin on the Socket.IO
 server, keeping the polling fallback.
 
 ```js
-// server.js — an explicit allowlist, never '*', because a module socket
-// carries session authority.
+// server.js
 const io = new SocketIOServer(server, {
   connectionStateRecovery: { maxDisconnectionDuration: 60_000, skipMiddlewares: true },
-  cors: { origin: MODULE_ORIGINS, methods: ['GET', 'POST'] }
+  cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
 // module page — hosted anywhere
 const socket = io('https://graph.virtualfictions.uk', { auth: { token } });
 ```
+
+**This said "an explicit allowlist, never `'*'`, because a module socket carries
+session authority" until 2026-09-15.** It was widened to `'*'` deliberately: an
+allowlist is a registration step, and requiring a stranger to ask us before
+building anything is the opposite of the point.
+
+The premise was also wrong, and worth correcting rather than quietly deleting.
+A module socket does **not** carry session authority. It carries an *address* —
+`socket.data.moduleFor`, the session it may be pushed to — and since
+2026-09-15 it may send exactly one message type, `av_hello`. CORS was never the
+thing protecting the corpus; it was standing in front of write handlers that
+had no check of their own, and three of them turned out to have none at all
+(`edit_save`, `edit_delete`, `edit_clone_cluster` — fixed in `dd6368d`, see
+`PLANNING_REGISTER.md`). **An open origin is safe exactly to the degree that
+every handler behind it is gated on its own.**
 
 **Why not raw WebSocket-only:** a raw `new WebSocket` is not CORS-gated at all,
 but Socket.IO opens with HTTP long-polling and upgrades, and that first XHR is.
@@ -87,8 +101,9 @@ reissue. Past that, BD must be able to mint a fresh one.
 
 - **Who may mint an MST, and can a cold module ask for one?** It cannot
   authenticate, so the answer is probably no: cold means SD or UD.
-- **The origin allowlist is a registration step.** Deliberate policy or friction
-  to remove? It is the only gate on third-party development.
+- ~~**The origin allowlist is a registration step.**~~ **RESOLVED 2026-09-15:
+  friction, removed.** `cors.origin` is `'*'`; anyone may host a module without
+  asking. The gate that replaced it is per-handler, which is where it belonged.
 - **Does BD ever need to push unprompted** (a partner saved something), or is
   request/response enough? Push is the reason LD exists at all.
 

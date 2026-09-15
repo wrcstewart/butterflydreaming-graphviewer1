@@ -6,6 +6,46 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-14 → 2026-09-15 — Ancillary Viewers, and closing three write holes
+
+> **Gap notice.** The entry below this one is dated 2026-07-24. This file was
+> not kept up through August and early September — roughly 200 commits covering
+> speech synthesis and voice training, work views, cluster layout, remote view
+> sharing, ink mode and the deep-link investigation are absent. `git log` is
+> authoritative; `PLANNING_REGISTER.md` and `DOCS_INDEX.md` were brought current
+> on 2026-09-12 and are the better summaries for that period.
+
+**The Ancillary Viewer (AV) shipped.** BD mints a short-lived, single-use token
+and opens a viewer WINDOW beside itself, driven live over the socket. The
+viewer is BD's own page using the same renderer as BD and the standalone, so
+there is one renderer to maintain rather than three. Verified on desktop and
+iOS. Standalones are now **frozen, not retired** — new presentation work goes
+to AVs.
+
+**`Jump` became `View`, and its confirm dialog was removed.** The dialog asked
+whether to pull the module's live script into the focused card before baking a
+URL. An AV never reads the card — it asks the module directly — so the question
+had no consequence to attach to. Removing it also removed the only reason the
+handler was async before opening a window, which is what Safari requires. The
+click is now the gesture, and the pre-claim machinery went with the dialog.
+`Copy external url` was retired but deliberately not deleted.
+
+**Three corpus-write handlers had no authentication at all.** `edit_save`,
+`edit_delete` and `edit_clone_cluster` checked only whether a curation code was
+*configured*, then wrote — while two sibling handlers verified it properly.
+With CORS open, any page on the internet could reach them. Proven with an
+anonymous socket from a foreign origin, run against both the pre-fix and
+post-fix servers so the pass was not vacuous. The check is now a single
+function; a module socket may send only `av_hello`; and refusals are surfaced
+in the UI, which they never were.
+
+**Kolam:** the `colour_speed` readout shows the directive's own value again
+(the script said 4 while the stepper said 34), and the `step` ceiling went
+200 → 999 — with a hold-repeat that now scales with the range, because at one
+step per tick the new ceiling would have taken 60 seconds of holding to reach.
+
+---
+
 ## 2026-07-19 → 2026-07-24 — SubFamily label + curator browser + view-scoped hints + auto-backup + one-tap chunked UX
 
 Long span, many strands, all interconnected through the theme "make the graph properly navigable and editable". Runs across two dozen commits.

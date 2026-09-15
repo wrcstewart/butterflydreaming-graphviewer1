@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08, updated 2026-09-12
+# Continuation note — 2026-09-08, updated 2026-09-12 and 2026-09-15
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -66,6 +66,69 @@ invisible to new sessions — trimmed to 15 KB by moving detail into the topic
 files, nothing deleted (pre-trim state at `398a508`). `DOCS_INDEX.md` was
 rewritten as past/present/future with 19 missing documents added, and
 `PLANNING_REGISTER.md` updated with eight designs and two corrected statuses.
+
+---
+
+## 1b. And since then (2026-09-14 / 15) — a direction change
+
+Still `remote-graph-view`, all pushed. **Additive again: nothing below is
+invalidated, but two things in §2's reading list have been superseded in
+detail.** Read `AV/README.md` and `PLANNING_REGISTER.md`'s 2026-09-15 block
+before acting on anything in this area.
+
+**The Ancillary Viewer (AV) is built and in daily use.** BD mints a
+short-lived single-use token, opens a viewer WINDOW beside itself, and drives
+it live over the socket. The viewer is BD's own page (`/AV/kolam.html`) using
+the SAME renderer as BD and the standalone. Confirmed working on desktop and
+iOS, and described by the author as "very snappy on ios so the design is
+validated".
+
+**Standalones are FROZEN, not retired.** New presentation work goes to AVs.
+The frozen copies stay deployed and still work.
+
+**`Jump` is now `View`, and its confirm dialog is gone** (`b6f603e`). The
+dialog asked whether to pull the module's script into the card before baking a
+URL; an AV never reads the card, so the question had no consequence. Removing
+it made the handler synchronous up to `window.open`, which is what Safari
+requires — **the click is the gesture**. This is the fourth time an `await`
+before `window.open` or a clipboard write has broken Safari in this codebase;
+the rule is now structural and commented as such. `Copy external url` is
+**retired, not deleted** — `hidden`, handler still wired.
+
+**CORS is now `origin: '*'`**, widened by the author so anyone may host a
+module without asking. `module_data_modes.md` said "an allowlist, never `'*'`"
+until 09-15 and has been corrected.
+
+**A security hole was found and closed** (`dd6368d`). `edit_save`,
+`edit_delete` and `edit_clone_cluster` checked only that a curation code was
+CONFIGURED, then wrote — reachable by any origin. Proven with an anonymous
+socket from a foreign origin, before and after. Three durable lessons, all now
+in `project_curation_access.md`:
+
+- **`curationCodeOk()` is the ONE check.** It was inline at each call site, and
+  so was the decision whether to check at all. Never inline it again.
+- **`socket.data.userId` is NOT authorisation.** Every socket gets one,
+  including an AV's.
+- **A module socket may send only `av_hello`** — verified even when it holds
+  the correct curation code.
+
+**ONE THING IS UNVERIFIED.** The gate was proven over a socket, but **Sv / Wr /
+the cluster editor have not been clicked in a browser since**. The client now
+sends a `code` on three messages it never sent one on. If curation looks dead,
+start there — a refusal shows in `#dev-status` as "code rejected — re-enter
+it", so it should no longer fail silently.
+
+**Where the QR code goes, since it keeps being asked:** entirely BD-side. Only
+BD can mint a token; an AV only consumes one and already accepts any token in
+`?t=`. BD renders the token as a QR instead of opening a local window, and
+another device's camera becomes the viewer. **The protocol needs nothing** —
+`moduleFor` is a userId, not a device. Not built. Full note in `AV/README.md`.
+
+**Canaries now rotate per code set, and the last line of every reply names
+them.** BD's is `#copy-link-btn`'s border (`style.css`), the AV's is `#back`'s
+(`AV/kolam.html`). They are deliberately out of step. **The media modules have
+no canary host at all**, which is why renderer changes also bump
+`AV/kolam.html`'s `?v=` — currently `?v=9`.
 
 ---
 

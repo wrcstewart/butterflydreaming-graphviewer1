@@ -65,6 +65,13 @@ BD is the failure we are trying to avoid. Say what happened.
   issue another.
 - It identifies you. It does **not** privilege you. Pair-and-save stays gated on
   the curation code, and no token grants write access to anything.
+- **Your socket may send exactly one message type: `av_hello`.** Everything
+  else is dropped, silently and before any handler sees it (2026-09-15). This
+  is not a courtesy limit you could talk us out of by sending a curation code —
+  it was verified that a module socket holding the CORRECT code still reaches
+  nothing. An AV renders what it is sent and says "I am ready"; anything more
+  is a decision about what a viewer may DO, and has to be made deliberately
+  rather than inherited.
 
 Why the URL and not storage: `localStorage` and cookies are per-origin, so a
 viewer hosted elsewhere cannot read BD's. The URL is the only channel that
@@ -117,8 +124,54 @@ reach BD depends on what it displays.
 
 ## Trying it
 
-Open a Kolam node in BD, enter Player mode, press **Jump**. BD mints a token,
-opens `AV/kolam.html`, and pushes. Move things in BD; the viewer follows.
+Open a Kolam node in BD, enter Player mode, press **View**. BD mints a token,
+opens `AV/kolam.html` in a WINDOW beside BD, and pushes. Move things in BD; the
+viewer follows.
 
-If a viewer cannot be opened — no session, no token, popup blocked — Jump falls
+If a viewer cannot be opened — no session, no token, popup blocked — View falls
 back to the frozen standalone, so the button always does something.
+
+(The button was called **Jump** until 2026-09-15, when it stopped jumping
+anywhere: BD stays put and the viewer opens beside it.)
+
+## Another device — where the QR code goes
+
+Short answer: **entirely on the BD side. The AV needs no change at all.**
+
+The confusion is worth dissolving properly, because the asymmetry is the whole
+design. Only BD can **mint** a token — it is the party with the session. An AV
+only ever **consumes** one, and it already accepts any token handed to it in
+`?t=`. A camera opening `…/AV/kolam.html?t=<token>` is indistinguishable, to
+the viewer and to the server, from BD navigating a window to the same URL.
+
+So the feature is: **BD renders the token as a QR code instead of opening a
+local window.** Another device's camera scans it and becomes the viewer.
+
+**The protocol needs nothing.** `socket.data.moduleFor` holds a `userId`, not a
+device, an IP, or a tab — the server has no idea and no opinion about where a
+module socket comes from. Phone running BD with a desktop browser as the big
+window works today, as does the reverse.
+
+What has to be built, all of it in BD:
+
+- A second action beside View — "View on another device" — because View's job
+  is to `window.open`, and this one must NOT.
+- A QR renderer. The payload is the same URL View would have navigated to.
+
+Constraints to design around, all already true:
+
+- **Mint on the press, never in advance.** The token expires in 2 minutes and
+  is single-use, so a pre-rendered QR is a dead QR.
+- **One scan, one viewer.** A second device needs a second press.
+- **Whoever photographs the QR gets that stream** for the life of that socket.
+  The short TTL is what bounds this, and is why it should stay short.
+- **BD must stay awake.** The viewer follows BD; if the device running BD
+  sleeps or drops, the viewer goes quiet. This matters most in exactly the
+  phone-drives-desktop case, where the phone is the one that sleeps.
+- A typed code instead of a scan would want a longer TTL and a shorter string —
+  a different decision, not a harder one.
+
+**Keep this separate from the question of whether a viewer may CONTROL BD.**
+Reaching more devices is addressing — plumbing. A viewer that talks back is a
+different system: `av_push` has no recipient field and no return channel, on
+purpose. Conflating the two is what makes the design space feel infinite.
