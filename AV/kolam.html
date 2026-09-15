@@ -34,7 +34,27 @@
 <style>
   :root { color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: #0a0a0f; overflow: hidden; }
-  #frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  /* The kolam is a SQUARE figure, so the viewer is a square — as large as the
+     window allows — centred. Letting the iframe fill a non-square window made
+     the module lay itself out for the wider box and draw a small square at the
+     bottom, which is what it was doing on iOS. */
+  #frame {
+    position: fixed;
+    width:  min(100vw, 100vh);
+    height: min(100vw, 100vh);
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    border: 0; display: block;
+  }
+  /* Return to BD. Small, out of the way, but always reachable — this window has
+     no address bar and no tab strip, so without it there is no way back. */
+  #back {
+    position: fixed; top: 10px; right: 12px; z-index: 6;
+    font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
+    background: rgba(0,0,0,.55); border: 1px solid #3a3a46;
+    padding: 6px 10px; border-radius: 3px; cursor: pointer;
+  }
+  #back:hover { color: #fff; border-color: #6a6a78; }
   /* Status is deliberately visible and deliberately small. A viewer that shows
      nothing when it cannot reach BD is the failure we are avoiding — but it
      must not compete with the work it is displaying. */
@@ -57,6 +77,7 @@
        avoids this the same way ("the iframe has no src at page load").
        The src is set from JS, after the listener is attached. -->
   <iframe id="frame" title="Kolam"></iframe>
+  <button id="back" type="button" title="Back to ButterflyDreaming">← controls</button>
   <div id="status">connecting…</div>
 
   <!-- Socket.IO's client, served by BD itself. Loading it from BD ties startup
@@ -78,6 +99,13 @@
       const d = e && e.data;
       if (d && d.type === 'BD_READY') {
         moduleReady = true;
+        // No controls here. BD is the control surface; this is the display.
+        // The module hides its own stepper column and resizes the canvas into
+        // the reclaimed space, which is also what makes the figure fill the
+        // square rather than sitting small in a corner.
+        try {
+          frame.contentWindow.postMessage({ type: 'bd_ui_config', hideControls: true }, '*');
+        } catch (_) {}
         if (pending) { const p = pending; pending = null; post(p); }
       }
     });
@@ -103,6 +131,15 @@
     // Kept on window deliberately: a viewer that misbehaves is otherwise a
     // closed box, and the socket is the one thing worth inspecting from a
     // console. It is a read handle — nothing here sends.
+    // Back to BD. close() first: this window was opened by script, so it may
+    // close itself, and on iOS — where it is a tab, not a window — closing is
+    // the only thing that reliably returns you. focus() on the opener is the
+    // desktop nicety and the fallback when close is refused.
+    document.getElementById('back').addEventListener('click', function () {
+      try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (_) {}
+      try { window.close(); } catch (_) {}
+    });
+
     window.__avSocket = BD_AV.connect({
       // Same origin as the page when served by BD; a third party would set
       // their own value here, or leave the default.

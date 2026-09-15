@@ -11137,13 +11137,31 @@ async function init() {
         } catch (_) { return null; }
       }
 
+      // Asked once per session, not once per trip.
+      //
+      // Going back and forth between BD and the viewer is the intended way to
+      // work — adjust here, look there — so a dialog on every outward trip
+      // would be an obstacle to the main gesture rather than a safeguard. The
+      // question it asks ("pull the module's live script first?") has the same
+      // answer every time within a session, and the user has already given it.
+      //
+      // A happy side effect: skipping the prompt keeps the whole handler
+      // synchronous, so the window opens inside the click with no gesture
+      // question at all — which is the Safari case that has bitten three times.
+      let avPromptAnswered = false;
+
       jumpToBtn.addEventListener('click', () => {
         const playerActive = document.body.classList.contains('player-active');
         // The one path that goes async without showing anything.
-        const silentlyAsync = playerActive && updateModePref === 'update';
+        const silentlyAsync = playerActive && updateModePref === 'update' && !avPromptAnswered;
         let claimed = silentlyAsync ? openViewerWindow() : null;
 
-        withUpdatePrompt(async () => {
+        const gate = avPromptAnswered
+          ? (fn) => fn()            // second trip onward: straight through
+          : withUpdatePrompt;
+
+        gate(async () => {
+          avPromptAnswered = true;
           // Already open? Focus it rather than opening a second one. Two
           // viewers on one session is not wrong — the server pushes to all of
           // them — but it is never what a second press MEANT.
