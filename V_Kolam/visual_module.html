@@ -358,7 +358,7 @@
         <button class="step-btn" type="button" data-target="step-slider" data-delta="1">+</button>
       </div>
       <label>step</label>
-      <input id="step-slider" class="stepper-source" type="number" min="10" max="200" step="1" value="40">
+      <input id="step-slider" class="stepper-source" type="number" min="10" max="999" step="1" value="40">
     </div>
 
     <div class="control-row">
@@ -586,7 +586,11 @@
       symmetrySelect.value = String(symmetryValue);
       const depthValue = Math.min(Math.max(safeParseInt(directives.depth, 4), 1), 5);
       depthSelect.value = String(depthValue);
-      stepSlider.value = String(Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 200));
+      // 2026-09-15 — ceiling 200 → 999. The renderer never needed the 200;
+      // long steps read well, especially on desktop. Raised in all THREE
+      // places that clamp it (this one, the input's max attr, and the render
+      // clamp) — miss one and the control moves while the drawing does not.
+      stepSlider.value = String(Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 999));
       angleSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90));
       angleMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_minutes, 0), 0), 59));
       // angle_seconds is now internal-only — never present in the script.
@@ -725,13 +729,17 @@
     // pair of buttons flanking a value display. The hidden source input still
     // owns min / max / step / value; buttons read those attrs, clamp, and dispatch
     // a native 'input' event so the existing handleControlChange chain fires.
-    function stepControl(input, delta) {
+    // `magnitude` is how far ONE press moves the value. It defaults to the
+    // input's own step, which is what a single tap uses; the hold-repeat below
+    // passes a larger one so a long range stays reachable.
+    function stepControl(input, delta, magnitude) {
       const min  = parseFloat(input.min);
       const max  = parseFloat(input.max);
       const step = parseFloat(input.step) || 1;
       const cur  = parseFloat(input.value);
       if (!Number.isFinite(cur)) return;
-      let next = cur + delta * step;
+      const move = Number.isFinite(magnitude) && magnitude > 0 ? magnitude : step;
+      let next = cur + delta * move;
       if (Number.isFinite(min)) next = Math.max(min, next);
       if (Number.isFinite(max)) next = Math.min(max, next);
       // Round to the step grid, then trim FP noise (0.1 * 3 = 0.30000000000000004).
@@ -745,15 +753,60 @@
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
+    // Hold-repeat acceleration, added 2026-09-15 with the step ceiling 200 → 999.
+    //
+    // A held button repeats every REPEAT_MS. At one step per tick that is ~17
+    // units a second, which crosses 10..200 in 12s — brisk — but 10..999 in
+    // 60s, so raising the ceiling alone would have given the user a maximum
+    // they could not actually reach. A ceiling you cannot get to is not a
+    // feature.
+    //
+    // Rather than hand-tune this control, the rate is derived FROM THE RANGE:
+    // whatever the control, holding the button crosses it in about
+    // FULL_TRAVERSE_MS. Self-scaling, so it needs no revisiting when a range
+    // changes again, and it cannot be set inconsistently across the nine
+    // steppers.
+    //
+    // Small ranges are untouched by construction — symmetry (1..16) works out
+    // below one step per tick, so it clamps back to its own step and behaves
+    // exactly as before. Only ranges big enough to be tedious speed up.
+    //
+    // The rate RAMPS IN over RAMP_MS instead of starting fast, so a short hold
+    // is still fine adjustment; a single tap never accelerates at all, because
+    // it never enters the repeat.
+    const REPEAT_MS        = 60;    // gap between repeats while held
+    const HOLD_MS          = 400;   // press-and-hold before repeating starts
+    const FULL_TRAVERSE_MS = 2500;  // target time to cross a whole range
+    const RAMP_MS          = 900;   // time to reach full speed
+
+    function repeatMagnitude(input, ticks) {
+      const step = parseFloat(input.step) || 1;
+      const min  = parseFloat(input.min);
+      const max  = parseFloat(input.max);
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return step;
+      // Fastest magnitude this control is allowed: range / ticks-per-traverse.
+      const fastest = (max - min) / (FULL_TRAVERSE_MS / REPEAT_MS);
+      // Below one step, the control is already quick enough — leave it alone.
+      if (fastest <= step) return step;
+      const ramp = Math.min(1, (ticks * REPEAT_MS) / RAMP_MS);
+      const mag  = step + (fastest - step) * ramp;
+      // Stay on the control's own grid, so the value never lands off-step.
+      return Math.max(step, Math.round(mag / step) * step);
+    }
+
     document.querySelectorAll('.step-btn').forEach((btn) => {
       let holdTimer     = null;
       let repeatTimer   = null;
+      let repeatTicks   = 0;
 
-      const doStep = () => {
+      // magnitude omitted → stepControl uses the input's own step. That is the
+      // single-tap case, and it must stay exactly 1 unit however long the
+      // range is, or fine adjustment is lost.
+      const doStep = (magnitude) => {
         const input = document.getElementById(btn.dataset.target);
         const delta = parseFloat(btn.dataset.delta);
         if (!input || input.disabled) return;
-        stepControl(input, delta);
+        stepControl(input, delta, magnitude);
       };
 
       const start = (ev) => {
@@ -761,15 +814,22 @@
         // Prevent the follow-up synthetic 'click' + iOS text-selection.
         ev.preventDefault();
         try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
+        repeatTicks = 0;
         doStep();
         holdTimer = setTimeout(() => {
-          repeatTimer = setInterval(doStep, 60);
-        }, 400);
+          repeatTimer = setInterval(() => {
+            const input = document.getElementById(btn.dataset.target);
+            if (!input) return;
+            doStep(repeatMagnitude(input, repeatTicks));
+            repeatTicks += 1;
+          }, REPEAT_MS);
+        }, HOLD_MS);
       };
 
       const stop = () => {
         if (holdTimer)   { clearTimeout(holdTimer);   holdTimer   = null; }
         if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+        repeatTicks = 0;
       };
 
       btn.addEventListener('pointerdown',   start);
@@ -1035,7 +1095,7 @@
         const params = {
           symmetry:   safeParseInt(directives.symmetry, 8),
           depth:      Math.min(Math.max(safeParseInt(directives.depth, 4), 1), 5),
-          step:       Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 200),
+          step:       Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 999),
           angle:      Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90),
           stroke:     directives.stroke                  || 'angle',   /* A42 fix: was '#4a9b8e' — that killed hue cycling when the script omitted %%bd_stroke angle. */
           background: directives.background             || '#0a0a0f',
