@@ -1101,8 +1101,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-15: GREEN (colour_speed readout shows the directive's own value).
-   Next rotation = blue.
+   2026-09-15: BLUE (Jump renamed View, its dialog removed, Copy external
+   url retired). Next rotation = red.
 
    NB the block that used to sit here said "2026-09-11: GREEN, next = blue"
    while the border below painted RED — it had been left behind through two
@@ -1117,7 +1117,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1368,11 +1368,17 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 }
 #copy-link-to-ext-btn:hover { background: #5c5c5c; }
 
-/* Shared object of both verb-buttons above — sits below them so the panel
-   reads "Jump to External / Website" / "Copy Link to External / Website".
-   Forced to two lines via <br> in the markup. 2026-08-09 — font unified
-   with #bd-invite-text-viewer above (sans-serif, blue) per user request;
-   was Georgia italic amber. */
+/* Caption under the panel's button(s). 2026-08-09 — font unified with
+   #bd-invite-text-viewer above (sans-serif, blue) per user request; was
+   Georgia italic amber.
+
+   2026-09-15 — reads "Ancillary Viewer", was "External Website". The panel
+   used to hold two verb-buttons that shared this as their object ("Jump to
+   External Website" / "Copy Link to External Website"), which is why the
+   wording was a bare noun phrase and why it was forced onto two lines with
+   a <br>. Now there is one button, View, and it opens BD's own viewer on
+   this origin — not an external site. The <br> is gone; the 76px panel
+   wraps it anyway. */
 #bd-invite-target-viewer {
   margin: 8px 0 0 0;
   text-align: center;

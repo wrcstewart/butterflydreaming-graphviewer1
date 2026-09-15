@@ -126,10 +126,24 @@
   <aside id="bd-invite-panel-viewer">
     <p id="bd-invite-text-viewer">Extension</p>
     <div id="bd-invite-actions-viewer">
-      <button id="jump-to-ext-btn"      type="button" title="Open the external player in this tab, carrying the current script + node context">Jump to external player</button>
-      <button id="copy-link-to-ext-btn" type="button" title="Copy an external-player link (with current script + node context) to the clipboard">Copy external url</button>
+      <!-- "View", not "Jump" (2026-09-15). The button no longer JUMPS
+           anywhere: BD stays exactly where it is and a viewer opens beside
+           it, following the module live. "Jump to external player" described
+           the retired standalone behaviour, where BD navigated away. -->
+      <button id="jump-to-ext-btn"      type="button" title="Open a viewer window beside BD that follows this module live">View</button>
+      <!-- RETIRED 2026-09-15, NOT DELETED. Copies a standalone URL carrying
+           the whole payload. Hidden because the panel now offers one thing —
+           View — and a second button asking the user to choose between two
+           transports is the choice we made FOR them when standalones were
+           frozen. The handler in viewer.js is deliberately left wired: drop
+           the `hidden` attribute and the button works again, unchanged, if
+           the standalone-url idea is ever restarted. -->
+      <button id="copy-link-to-ext-btn" type="button" hidden title="Copy an external-player link (with current script + node context) to the clipboard">Copy external url</button>
     </div>
-    <p id="bd-invite-target-viewer">External Website</p>
+    <!-- Was "External Website". The View button opens BD's OWN Ancillary
+         Viewer on this origin, not a third-party site — the old caption now
+         names the wrong destination. -->
+    <p id="bd-invite-target-viewer">Ancillary Viewer</p>
   </aside>
   <div id="media-bar"></div>
   <div id="cluster-editor-bar" style="display:none">
@@ -213,12 +227,23 @@
   </div>
 
   <!-- 2026-07-15 — Copy-Link update-script confirm dialog for BD.
-       Mirrors preview.html's dialog. Wraps the three Player-mode share
-       actions (#copy-link-btn, #copy-link-to-ext-btn, #jump-to-ext-btn)
-       so the sender is asked to sync module state → focused card before
-       the URL is baked. Same localStorage key as EV so a user's "don't
-       ask again" choice carries across. Only fires when body.player-
-       active — normal-node BD-self Copy Links skip the gate. -->
+       Mirrors preview.html's dialog. Asks the sender to sync module state
+       → focused card before a URL is baked out of that card. Only fires
+       when body.player-active — normal-node BD-self Copy Links skip the
+       gate.
+
+       2026-09-15 — #jump-to-ext-btn (now "View") no longer goes through
+       this. It opens the Ancillary Viewer, which asks the MODULE for its
+       live script and overwrites whatever the card held, so the question
+       had no consequence left to attach to — and a dialog with no
+       consequence is just an obstacle in front of the main gesture.
+       Removing it also let the View handler become fully synchronous up to
+       window.open, which is what Safari requires.
+
+       Still reached by #copy-link-btn, which does bake the card into a
+       URL. Kept in the markup rather than deleted: #copy-link-to-ext-btn
+       is retired-not-deleted too, and un-hiding it should restore working
+       behaviour, dialog included. -->
   <div id="update-script-dialog" class="modal-overlay" hidden>
     <div class="modal-box">
       <p class="modal-heading">Pull latest settings from the module?</p>

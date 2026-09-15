@@ -11040,9 +11040,12 @@ async function init() {
     // module may have drifted since the focused card was last synced
     // (Copy Up in BD = ↑ in EV: postMessage bd_script_request →
     // bd_script_response handler at §42.7 writes into the focused card).
-    // The three Player-mode share buttons below (#jump-to-ext-btn,
-    // #copy-link-to-ext-btn, #copy-link-btn) bake the focused card into
-    // the outgoing URL — stale card means stale share. withUpdatePrompt
+    // A button that bakes the focused CARD into an outgoing URL has this
+    // problem — stale card means stale share. As of 2026-09-15 that is
+    // #copy-link-btn (live) and #copy-link-to-ext-btn (retired but wired).
+    // #jump-to-ext-btn is NO LONGER one of them: it opens a viewer that
+    // reads the module directly, so the card it would have synced is
+    // never consulted. withUpdatePrompt
     // fires the dialog by default, honours the session-scoped
     // updateModePref if the user has ticked "Don't ask again this
     // session", and only fires when body.player-active — normal-node
@@ -11135,22 +11138,32 @@ async function init() {
     // no session, no token, popup blocked. A press must always do SOMETHING.
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
-      // Opening the viewer window: WHEN, not just whether.
+      // Opening the viewer window: the CLICK is the gesture.
       //
-      // Two constraints that look contradictory:
-      //   - Safari refuses window.open once the user-gesture chain is broken.
-      //   - The update dialog must be dealt with FIRST. A blank window appearing
-      //     ahead of it is distracting on desktop and fatal on iOS, where Back
-      //     returns to the dialog but the onward step to the viewer is lost.
+      // Safari refuses window.open once the user-gesture chain is broken, and
+      // every await breaks it. This has bitten three times in this file (the
+      // clipboard write, the token mint, and the dialog's update branch), so
+      // the rule is now structural rather than remembered:
       //
-      // They reconcile because the DIALOG'S OWN Yes CLICK IS A GESTURE. So in
-      // every path that shows a dialog — or that runs synchronously — the window
-      // can be opened inside the action, after the dialog, and still be allowed.
+      //   EVERYTHING from the click to window.open is SYNCHRONOUS.
+      //   The only await happens AFTER the window is already ours.
       //
-      // Exactly one path breaks the chain without showing anything:
-      // player-active with updateModePref 'update', which awaits
-      // requestModuleSyncBD(). There is no dialog on that path, so pre-claiming
-      // hides nothing. That is the only case that opens early.
+      // 2026-09-15 — this used to be much harder, because the update dialog
+      // had to be answered before the window appeared (a blank window ahead of
+      // it is distracting on desktop and fatal on iOS, where Back reaches the
+      // dialog but the onward step to the viewer is lost). The reconciliation
+      // was that the dialog's own Yes click is also a gesture.
+      //
+      // The dialog is gone from this path, so none of that applies. It asked
+      // "pull the module's live script into the card before baking the URL?",
+      // which mattered when the button baked a standalone URL out of the CARD.
+      // The viewer does not read the card at all: it asks (av_hello) and
+      // answerAVStateRequest replies with the MODULE's live script, so
+      // whatever the card holds is overwritten in the viewer regardless. The
+      // question had no consequence left to attach to.
+      //
+      // Removing it removed the only reason this handler was ever async before
+      // opening — so the awkward pre-claim/gate machinery went with it.
       function openViewerWindow() {
         // A WINDOW, not a tab: a tab covers BD, and the point of a viewer is to
         // watch it while working BD's controls. The features string is what
@@ -11171,67 +11184,40 @@ async function init() {
         } catch (_) { return null; }
       }
 
-      // Asked once per session, not once per trip.
-      //
-      // Going back and forth between BD and the viewer is the intended way to
-      // work — adjust here, look there — so a dialog on every outward trip
-      // would be an obstacle to the main gesture rather than a safeguard. The
-      // question it asks ("pull the module's live script first?") has the same
-      // answer every time within a session, and the user has already given it.
-      //
-      // A happy side effect: skipping the prompt keeps the whole handler
-      // synchronous, so the window opens inside the click with no gesture
-      // question at all — which is the Safari case that has bitten three times.
-      let avPromptAnswered = false;
-
       jumpToBtn.addEventListener('click', () => {
-        const playerActive = document.body.classList.contains('player-active');
-        // The one path that goes async without showing anything.
-        const silentlyAsync = playerActive && updateModePref === 'update' && !avPromptAnswered;
-        let claimed = silentlyAsync ? openViewerWindow() : null;
+        // ── Synchronous section. Do not introduce an await above window.open. ──
 
-        const gate = avPromptAnswered
-          ? (fn) => fn()            // second trip onward: straight through
-          : withUpdatePrompt;
+        // Already open? Focus it rather than opening a second one. Two viewers
+        // on one session is not wrong — the server pushes to all of them — but
+        // it is never what a second press MEANT.
+        if (avWindow && !avWindow.closed) {
+          try { avWindow.focus(); } catch (_) {}
+          // Refresh it. On iOS you leave a viewer by switching tabs rather than
+          // closing it, so the window is usually still open — and while it was
+          // in the background iOS may have suspended it and dropped its socket,
+          // losing anything sent meanwhile.
+          answerAVStateRequest();
+          console.log('[AV] viewer already open — focused and refreshed it');
+          return;
+        }
 
-        gate(async () => {
-          avPromptAnswered = true;
-          // Already open? Focus it rather than opening a second one. Two
-          // viewers on one session is not wrong — the server pushes to all of
-          // them — but it is never what a second press MEANT.
-          if (avWindow && !avWindow.closed) {
-            try { avWindow.focus(); } catch (_) {}
-            try { if (claimed && claimed !== avWindow) claimed.close(); } catch (_) {}
-            // Refresh it. On iOS you leave a viewer by switching tabs rather
-            // than closing it, so the window is usually still open — and while
-            // it was in the background iOS may have suspended it and dropped
-            // its socket, losing anything sent meanwhile.
-            answerAVStateRequest();
-            console.log('[AV] viewer already open — focused and refreshed it');
-            return;
-          }
+        const { url, payload } = buildExternalWebsiteUrl();
+        const moduleId   = parseModuleId(payload.script);
+        const wantViewer = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken);
 
-          const { url, payload } = buildExternalWebsiteUrl();
-          const moduleId = parseModuleId(payload.script);
-          const wantViewer = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken);
+        // Claim the window HERE, in the click, and park it on about:blank. The
+        // token cannot be minted without an await, so the window has to be won
+        // first and navigated second. Getting this backwards is what produced
+        // the observed "three presses, three tokens in the server log, no
+        // viewer ever connecting".
+        const w = wantViewer ? openViewerWindow() : null;
 
-          // OPEN THE WINDOW FIRST, synchronously, INSIDE the click.
-          //
-          // Safari refuses window.open once the user-gesture chain is broken,
-          // and awaiting the token breaks it — so the previous version minted a
-          // token and then silently opened nothing. Observed: three presses,
-          // three tokens in the server log, no viewer ever connecting. Same
-          // trap as the clipboard write earlier in this file.
-          //
-          // So: claim the window while we are still in the gesture, park it on
-          // about:blank, and navigate it once the token arrives.
-          // Open it NOW if it was not pre-claimed: we are still inside a
-          // gesture here — either the original click (synchronous paths) or the
-          // dialog's Yes click — so this is allowed, and the dialog has already
-          // been dealt with.
-          if (!claimed && wantViewer) claimed = openViewerWindow();
-          const w = claimed;
-          const token = wantViewer && w ? await window.bdRequestModuleToken() : null;
+        (async () => {
+          // The ternary short-circuits when there is no window, so the no-viewer
+          // fallback below never awaits — it is still inside the gesture and can
+          // still open the standalone. Only the path that ALREADY holds a window
+          // gives up the gesture, and it no longer needs it.
+          const token = w ? await window.bdRequestModuleToken() : null;
 
           if (!token) {
             console.log('[AV] no viewer (' + (moduleId || 'no module') +
@@ -11268,7 +11254,7 @@ async function init() {
           // No poller: the renderer announces itself (bd_av_state), handled
           // below. Polling would have meant BD_REQUEST_UPDATE, whose BD_UPDATE
           // reply rewrites the focused card — several times a second.
-        });
+        })();
       });
     }
 
