@@ -390,18 +390,18 @@
     <div class="control-row">
       <div class="stepper">
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="-1">−</button>
-        <span class="stepper-value" data-target="colour-speed-slider">34</span>
+        <span class="stepper-value" data-target="colour-speed-slider">4</span>
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="1">+</button>
       </div>
-      <!-- NOT "colour_speed" (2026-09-15). Every other label here IS the
-           directive name and shows the directive's value; this one could not.
-           The readout is a 1-100 scale where higher means faster cycling,
-           while %%bd_colour_speed holds the multiplier (0.25-16) and the input
-           behind it holds the exponent (-2..4) — three numbers for one
-           control, of which the label named the one it was NOT showing.
-           "colour cycle" is the same width as the old label, so the column is
-           unchanged, and it no longer claims to be the directive. -->
-      <label>colour cycle</label>
+      <!-- Back to naming the directive (2026-09-15, second pass). This label
+           is honest again because the readout beside it now shows the
+           directive's own value: script "%%bd_colour_speed 4" -> readout "4".
+           Earlier today this said "colour cycle", to stop it claiming to be a
+           directive while a 1..100 remap sat in the box. Showing the real
+           number is the better fix — the value the user reads is the value
+           they can search for in the script and in Memgraph, and no stored
+           data had to change to get it. -->
+      <label>colour_speed</label>
       <input id="colour-speed-slider" class="stepper-source" type="number" min="-2" max="4" step="1" value="2">
     </div>
 
@@ -611,32 +611,42 @@
 
     function updateValueDisplays() {
       // Sync every stepper's centre span from its hidden source input.
-      // Every stepper here shows its source input's value directly EXCEPT the
-      // colour one — see the branch below. (This comment used to claim the
-      // readout showed the multiplier 2^exp so it would match a label reading
-      // "colour_speed"; both halves of that stopped being true — the readout
-      // became a 1..100 scale on 2026-08-17, and the label became "colour
-      // cycle" on 2026-09-15 precisely because it could not match.)
+      // Every stepper here shows the value its %%bd_ directive carries. Eight
+      // of them do that by showing the input verbatim; the colour one has to
+      // convert, because its input holds the exponent and the directive holds
+      // 2^exponent — see the branch below.
       document.querySelectorAll('.stepper-value').forEach((span) => {
         const targetId = span.dataset.target;
         const input = targetId && document.getElementById(targetId);
         if (!input) return;
         if (targetId === 'colour-speed-slider') {
-          // The one stepper whose readout is NOT its directive's value. Three
-          // numbers describe this control and no two are equal:
-          //   %%bd_colour_speed  0.25 .. 16   multiplier, BIGGER = SLOWER
-          //                                   (hue spans 360 * colourSpeed)
-          //   the input below    -2 .. 4      exponent, log2 of the above
-          //   this readout       1 .. 100     BIGGER = FASTER
-          // 2026-08-17 — show 1..100 so the readout stays ≤3 chars (the
-          // multiplier needs 5: "0.25x"/"16.0x") and so it rises the way a
-          // "speed" is expected to. exp 4 = slowest → 1, exp -2 = fastest →
-          // 100. Because it can equal neither the directive nor the input, the
-          // label above deliberately does NOT name the directive. Rendering
-          // and script round-trip are unchanged — this is display-only.
+          // Show the DIRECTIVE's value, so the readout, the label and the
+          // script all say the same number. The hidden input holds the
+          // exponent (-2..4); %%bd_colour_speed holds 2^exponent, i.e. one of
+          //   0.25  0.5  1  2  4  8  16
+          // and formatDirectiveNumber is the very function that writes the
+          // script, so the two can never drift apart.
+          //
+          // 2026-08-17 had remapped this to a 1..100 scale to keep the readout
+          // ≤3 chars. That bought width at the cost of truth: a stored Kolam
+          // read 4 in the script and 34 in the box. Reverted 2026-09-15 —
+          // deliberately WITHOUT touching any script or any Memgraph value.
+          //
+          // The leading zero is dropped (0.25 -> ".25", 0.5 -> ".5") purely
+          // for width. MEASURED: .control-row is 94px, two 34px buttons and
+          // two 2px gaps leave the span 22px, and its own border+padding
+          // leave 18px of text — 3 Courier chars at 0.7rem (the width "100"
+          // already proved), but not 4. ".25" is the same NUMBER as the
+          // script's "0.25"; widening the column instead would undo the
+          // 2026-08-17 tap-target spacing, which is a worse trade.
+          //
+          // Note the direction is counter-intuitive and always was: the
+          // renderer spans the hue over 360 * colourSpeed, so a BIGGER number
+          // cycles SLOWER. That is the directive's own meaning; the readout's
+          // job is to report it, not to reinterpret it.
           const exp = parseFloat(input.value);
           span.textContent = Number.isFinite(exp)
-            ? String(Math.round(((4 - exp) / 6) * 99 + 1))
+            ? formatDirectiveNumber(2 ** exp).replace(/^0\./, '.')
             : input.value;
         } else {
           span.textContent = input.value;
@@ -1162,8 +1172,9 @@
     disableControls();
     // Sync stepper display spans from their source-input defaults so any
     // HTML/JS drift shows the correct pre-render value (esp. the colour
-    // stepper's exponent → 1..100 remap: the markup's hardcoded 34 is only
-    // right for the default exponent 2, and this call is what keeps it right).
+    // stepper's exponent → multiplier conversion: the markup's hardcoded 4 is
+    // only right for the default exponent 2, and this call is what keeps it
+    // right if that default ever moves).
     updateValueDisplays();
     // Defer initial draw until layout has flushed — otherwise the wrapper's
     // clientWidth / clientHeight can still be 0 and the canvas ends up at its
