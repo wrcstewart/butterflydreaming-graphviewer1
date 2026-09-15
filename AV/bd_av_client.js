@@ -105,6 +105,20 @@
       onState('lost', { reason });
     });
 
+    // Re-ask when the page comes back to the foreground.
+    //
+    // iOS suspends background tabs and drops their sockets, and leaving a
+    // viewer there means switching tabs rather than closing it — so a viewer
+    // returns to the foreground still showing whatever it last rendered, having
+    // missed everything sent meanwhile. Asking again costs one message.
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'visible') return;
+        if (!socket.connected) return;          // 'connect' will ask for us
+        try { socket.emit('msg', { type: 'av_hello' }); } catch (_) {}
+      });
+    } catch (_) {}
+
     socket.on('msg', function (m) {
       if (!m || m.type !== 'av_update') return;
       onUpdate(m.payload);

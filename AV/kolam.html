@@ -87,7 +87,7 @@
   <!-- Socket.IO's client, served by BD itself. Loading it from BD ties startup
        to BD being up — which costs nothing, since the socket needs BD anyway. -->
   <script src="https://graph.virtualfictions.uk/socket.io/socket.io.js"></script>
-  <script src="bd_av_client.js"></script>
+  <script src="bd_av_client.js?v=3"></script>
   <script>
   (function () {
     const frame  = document.getElementById('frame');
@@ -115,7 +115,10 @@
     });
 
     // Listener is attached; only now start the renderer loading.
-    frame.src = '/bd_V_Kolam/visual_module.html';
+    // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
+    // here means layout and behaviour fixes silently never arrive. Bump on any
+    // change to visual_module.html.
+    frame.src = '/bd_V_Kolam/visual_module.html?v=3';
 
     function post(script) {
       if (!moduleReady) { pending = script; return; }

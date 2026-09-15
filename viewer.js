@@ -11202,7 +11202,12 @@ async function init() {
           if (avWindow && !avWindow.closed) {
             try { avWindow.focus(); } catch (_) {}
             try { if (claimed && claimed !== avWindow) claimed.close(); } catch (_) {}
-            console.log('[AV] viewer already open — focused it');
+            // Refresh it. On iOS you leave a viewer by switching tabs rather
+            // than closing it, so the window is usually still open — and while
+            // it was in the background iOS may have suspended it and dropped
+            // its socket, losing anything sent meanwhile.
+            answerAVStateRequest();
+            console.log('[AV] viewer already open — focused and refreshed it');
             return;
           }
 
@@ -11252,11 +11257,14 @@ async function init() {
           try { avWindow.location.replace(avUrl); }
           catch (err) { console.warn('[AV] could not navigate the viewer', err); }
 
-          // Start mirroring. The first push is deliberately repeated: the
-          // viewer's connect is asynchronous and travels to Cloudflare and
-          // back, and the server drops a push that arrives before any viewer
-          // socket exists. Cheap to send three times; a blank viewer is not.
-          [900, 2000, 3500].forEach(ms => setTimeout(() => pushToAV(payload.script), ms));
+          // NO opening push. The viewer asks (av_hello) the moment it connects,
+          // and BD answers with the module's LIVE script.
+          //
+          // The timed volley that used to live here was the cause of the
+          // "flashes back to the previous trip" fault: payload.script comes
+          // from the focused CARD, not from the module, so 900 ms after the
+          // handshake had delivered the right figure these timers overwrote it
+          // with an older one. A guess racing an answer, and winning.
           // No poller: the renderer announces itself (bd_av_state), handled
           // below. Polling would have meant BD_REQUEST_UPDATE, whose BD_UPDATE
           // reply rewrites the focused card — several times a second.
