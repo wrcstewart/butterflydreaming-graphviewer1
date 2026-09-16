@@ -368,14 +368,14 @@
         <button class="step-btn" type="button" data-target="angle-slider" data-delta="1">+</button>
       </div>
       <label>angle</label>
-      <!-- 2026-09-16 — max 90 → 360. The ceiling was never a rendering limit:
-           angle is the turtle's TURN PER STEP, and the renderer is happy with
-           any value. But driftTick wraps at 360 while render() clamped at 90,
-           so drift walked 270 degrees that all drew identically as 90 — the
-           pattern visibly froze (under 3 minutes at drift 100), and a script
-           recording angle 211 did not reproduce what was on screen. Raised in
-           all THREE places: here, setControlValues, and the render clamp. -->
-      <input id="angle-slider" class="stepper-source" type="number" min="5" max="360" step="1" value="45">
+      <!-- 2026-09-16 — was 5..90. The ceiling was never a rendering limit:
+           angle is the turtle's TURN PER STEP and the renderer takes any
+           value. driftTick wrapped at 360 while render() clamped at 90, so
+           drift walked 270 degrees that all drew identically as 90.
+           Now the full turn, 0..359, and data-wrap makes the stepper CYCLE
+           rather than stop: + at 359 gives 0, − at 0 gives 359. The default
+           stays 45, so the default script is unchanged. -->
+      <input id="angle-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="45" data-wrap="1">
     </div>
 
     <!-- angle_minutes is a visible stepper again (2026-09-16); it was hidden
@@ -476,19 +476,27 @@
     // ── The angle cycle (2026-09-16) ──────────────────────────────────────
     // ONE definition of the range, because there were three and they disagreed:
     // the input said 5..90, render() clamped 5..90, and driftTick wrapped at
-    // 360. Drift therefore walked 270 degrees that every one of them drew as 90.
+    // 360. Drift walked 270 degrees that every one of them drew as 90.
     //
-    // The cycle runs 5..360 and wraps back to ANGLE_MIN, not to 0. 0 and 360
-    // are the SAME figure and it is a degenerate one — angle is the turtle's
-    // turn per step, so at 0 it never turns and the kolam collapses to a
-    // straight line. Wrapping to 0 would show that once per cycle rather than
-    // only at startup, which is the thing we were trying to avoid.
-    const ANGLE_MIN  = 5;
-    const ANGLE_MAX  = 360;
+    // The cycle is [0, 360): a full turn, wrapping 359 -> 0 like any bearing.
+    // 360 is never STORED, because 360 and 0 are the same figure and one
+    // picture must not have two spellings — a script has to round-trip.
+    //
+    // An earlier version of this started at 5, on the reasoning that turn-per-
+    // step 0 means the turtle never turns and the kolam collapses to a line.
+    // That was WRONG, and instructively so: the turn is
+    //     angle + angle_minutes/60 + angle_seconds/3600
+    // so angle 0 with minutes 1..59 gives turns of 1/60 to 59/60 of a degree —
+    // a whole region of very slowly curving, near-circular figures, and the
+    // most interesting part of the range rather than a dead spot. ONLY
+    // 0/0/0 is a straight line, and that is a legitimate state to ask for.
+    // This is exactly what restoring the angle_minutes stepper unlocks.
+    const ANGLE_MIN  = 0;
+    const ANGLE_MAX  = 360;            // exclusive — the wrap point, not a value
     const ANGLE_SPAN = ANGLE_MAX - ANGLE_MIN;
 
-    // Wrap a drifting angle into [ANGLE_MIN, ANGLE_MAX). Handles both
-    // directions so a future negative drift needs no second thought.
+    // Wrap an angle into [0, 360). Handles both directions, so stepping DOWN
+    // from 0 lands on 359 rather than stopping dead.
     function wrapAngle(deg) {
       return ANGLE_MIN + ((((deg - ANGLE_MIN) % ANGLE_SPAN) + ANGLE_SPAN) % ANGLE_SPAN);
     }
@@ -782,8 +790,16 @@
       if (!Number.isFinite(cur)) return;
       const move = Number.isFinite(magnitude) && magnitude > 0 ? magnitude : step;
       let next = cur + delta * move;
-      if (Number.isFinite(min)) next = Math.max(min, next);
-      if (Number.isFinite(max)) next = Math.min(max, next);
+      // data-wrap marks a CYCLIC control — angle is one, because 360 degrees
+      // is a turn, not a ceiling. Stepping + past the top comes round to the
+      // bottom and vice versa, instead of stopping dead at an arbitrary edge.
+      if (input.dataset.wrap && Number.isFinite(min) && Number.isFinite(max)) {
+        const span = (max - min) + step;          // max is inclusive, so 0..359 spans 360
+        next = min + ((((next - min) % span) + span) % span);
+      } else {
+        if (Number.isFinite(min)) next = Math.max(min, next);
+        if (Number.isFinite(max)) next = Math.min(max, next);
+      }
       // Round to the step grid, then trim FP noise (0.1 * 3 = 0.30000000000000004).
       if (Number.isFinite(step) && step > 0) {
         next = Math.round(next / step) * step;
@@ -880,6 +896,11 @@
       btn.addEventListener('pointerleave',  stop);
     });
 
+    // True only while driftTick is inside render(). Read by the bd_av_state
+    // announcement so BD can distinguish "the timer moved the angle" from
+    // "someone changed a parameter".
+    let renderingFromDrift = false;
+
     // ── Angle Drift Automation ────────────────────────────────────────────────
     // Advance angle by drift (seconds of arc) on a depth-dependent interval,
     // propagating carry through seconds → minutes → degrees. Uses setTimeout
@@ -937,7 +958,14 @@
 
       if (storedText) {
         const updatedText = applyControlDirectives(storedText);
-        render(updatedText);
+        // Tell render() this frame came from the drift timer, not from a
+        // person or a script. BD uses it to decide what to forward to a
+        // viewer — see the bd_av_state announcement in render(). render() is
+        // synchronous, so the flag cannot outlive the call; try/finally
+        // anyway, because a throw inside render must not leave every
+        // subsequent frame wearing this label.
+        renderingFromDrift = true;
+        try { render(updatedText); } finally { renderingFromDrift = false; }
       }
 
       // Broadcast the drift-updated fields to the host harness so its outer
@@ -1114,7 +1142,13 @@
         // into the focused card, so reusing it would rewrite the user's card
         // several times a second while the drift runs. Anything that does not
         // know this type ignores it — the frozen standalones included.
-        try { postToParent({ type: 'bd_av_state', text: storedText }); } catch (_) {}
+        // fromDrift lets BD forward EVERY real parameter change to a viewer —
+        // including one arriving via the Down button from a script — while
+        // still declining to forward the drift timer's own angle steps, which
+        // the viewer is computing for itself. Before this flag BD had to guess
+        // from a text diff, and an angle-only change made by a PERSON while
+        // drift was running looked exactly like a drift tick and was dropped.
+        try { postToParent({ type: 'bd_av_state', text: storedText, fromDrift: renderingFromDrift }); } catch (_) {}
 
         if (typeof nodeText !== 'string') {
           console.error('visual_module: render() expected text string, got:', nodeText);

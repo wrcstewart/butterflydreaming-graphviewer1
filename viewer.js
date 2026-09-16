@@ -348,12 +348,32 @@ if (typeof window !== 'undefined') {
     if (typeof text !== 'string') return;
     avLastState = text;
     if (text === avLastPushed) return;
-    if (avLastPushed && avDriftRunning(text) &&
-        avWithoutAngle(text) === avWithoutAngle(avLastPushed)) {
-      // Drift-only frame. The viewer is computing this for itself.
+
+    // Forward EVERY real parameter change, and only decline the drift timer's
+    // own angle steps — which the viewer computes for itself.
+    //
+    // 2026-09-16 — the renderer now LABELS the frame (fromDrift), so this is a
+    // fact rather than an inference. The previous version inferred it from a
+    // text diff, and that was wrong in a way worth remembering: an angle-only
+    // change made by a PERSON while drift was running — a stepper nudge, or a
+    // script arriving via the Down button — is textually identical to a drift
+    // tick, so it was silently dropped and the viewer never saw it.
+    //
+    // The diff is kept as a fallback for one case only: an OLD cached renderer
+    // that predates the flag and sends no fromDrift at all. Without it such a
+    // renderer would push every drift frame again and the iOS backward-jump
+    // would return until its cache cleared.
+    const labelled = typeof d.fromDrift === 'boolean';
+    const isDriftFrame = labelled
+      ? d.fromDrift
+      : (avLastPushed && avDriftRunning(text) &&
+         avWithoutAngle(text) === avWithoutAngle(avLastPushed));
+
+    if (isDriftFrame) {
       avSuppressed += 1;
       if (avSuppressed % 200 === 0) {
-        console.log('[AV] drift frames left to the viewer: ' + avSuppressed);
+        console.log('[AV] drift frames left to the viewer: ' + avSuppressed +
+                    (labelled ? '' : ' (inferred — renderer sends no fromDrift)'));
       }
       return;
     }
