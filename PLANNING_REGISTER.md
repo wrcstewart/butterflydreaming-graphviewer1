@@ -256,6 +256,17 @@ Not a schedule — a list of what has been designed and not built.
 | Ink promotion stage 2 | `ink_promotion_plan.md` | Walk every view under the achromatic default. |
 | `MEMORY.md` index discipline | — | The index hit 29 KB against a ~24 KB load limit on 2026-09-12 and was being truncated. Trimmed to 15 KB by moving detail into topic files. **Keep entries under ~230 chars.** |
 
+## Added 2026-09-16
+
+| item | where | note |
+|---|---|---|
+| **An exploration survives wandering off** | `viewer.js` | **BUILT** (`5a4f0aa`). `loadModuleForNode` posted the node's SAVED text to the module and pushed it to any viewer, so walking away and returning destroyed the explored steppers in both places — on desktop too, where BD was never suspended and had the state all along. Now cached per node, in memory only, and **VALUES merged onto the saved text**: the node supplies the score block and structure, and a directive is restored only if the node already has it. The card is untouched, so Down still loads what the author wrote. |
+| **One viewer per module TYPE** | `server.js`, `viewer.js` | **BUILT + PROVEN** (`383194d`). `av_push` fanned out to every module socket the user had open and the token carried no type — a second viewer of another kind would have been handed an L-system score to play. Token now carries the type, handshake stamps it, delivery filters on it, **server-side** so a third-party author need not implement "ignore what is not mine". Grants BD no new reach — still scoped to `moduleFor`. Verified with two viewers of different types on one session. `avWindow` is now a registry keyed by module id. |
+| **The viewer answers when asked** | `server.js`, `viewer.js`, `AV/` | **BUILT + PROVEN** (`afbaf5e`). The one thing a viewer knows that BD cannot: while you look at the viewer, BD is a background tab and is throttled or suspended, so the viewer's drift is the only record. BD asks on return to the foreground; the answer is merged values-only. Module allowlist gains its **second** entry (`av_state_report`, solicited only) — a viewer still cannot push, address anything, or reach a corpus handler, verified while holding a valid curation code. Guards: 1.2s expiry, node-id verification via the `?n=` handed at launch, and no adoption unless the module still shows that node. |
+| **A viewer page for ABC / Fractal** | `AV/` | **NOT BUILT — the blocker on the type rule being visible.** Only `/AV/kolam.html` exists, so a different module type reports "no viewer page yet" and falls back to the standalone. The second window becomes real when these are written. |
+| **QR code for a cross-device viewer** | `AV/README.md` | Still not built; design unchanged and still entirely BD-side. |
+| **Background-rate probe** | `viewer.js` | **BUILT** (`c92eec9`), not yet read. Logs one line on return to visible: how many of BD's own 1s timers fired against wall clock, and how many frames the renderer managed. Inference from the old symptom was ~0.2 ticks/s, about 2% of foreground — near-total suspension in bursts, not a steady slow tick. |
+
 ## Added 2026-09-15
 
 | item | where | note |

@@ -65,13 +65,48 @@ BD is the failure we are trying to avoid. Say what happened.
   issue another.
 - It identifies you. It does **not** privilege you. Pair-and-save stays gated on
   the curation code, and no token grants write access to anything.
-- **Your socket may send exactly one message type: `av_hello`.** Everything
-  else is dropped, silently and before any handler sees it (2026-09-15). This
-  is not a courtesy limit you could talk us out of by sending a curation code —
-  it was verified that a module socket holding the CORRECT code still reaches
-  nothing. An AV renders what it is sent and says "I am ready"; anything more
-  is a decision about what a viewer may DO, and has to be made deliberately
-  rather than inherited.
+- **Your socket may send exactly two message types**, and everything else is
+  dropped silently before any handler sees it. This is not a courtesy limit you
+  could talk us out of by sending a curation code — it was verified that a
+  module socket holding the CORRECT code still reaches nothing.
+
+  | | |
+  |---|---|
+  | `av_hello` | unsolicited, but says nothing except "I exist" |
+  | `av_state_report` | **solicited only** — BD asks, you answer |
+
+  Note what is still absent: you cannot push, cannot address anything, and
+  cannot reach a single corpus handler. Adding to that list is a decision about
+  what a viewer may DO, made deliberately rather than inherited.
+
+## Answering "what are you showing?" (2026-09-16)
+
+Supply `onStateRequest` and return `{ script, nodeId }`, or `null` if you have
+not rendered anything yet — silence is a perfectly good answer.
+
+```js
+onStateRequest: function () {
+  return liveScript ? { script: liveScript, nodeId: launchNodeId } : null;
+}
+```
+
+**Why BD needs this.** On a phone the user sees BD or your viewer, never both,
+so while they are looking at you BD is a BACKGROUND tab and the OS throttles or
+suspends it. If your viewer animates, it is the only record of where things
+actually got to. BD asks when it returns to the foreground.
+
+**Answer only when asked.** BD is not listening otherwise, and a viewer that
+volunteers state is a viewer that can surprise the thing driving it.
+
+**What BD does with it:** takes the VALUES only, merged onto the node's saved
+text. It will not accept a directive the node does not already have, will not
+take a bracket block, and will not touch the user's card. You are still
+read-only with respect to the corpus — BD listening to you does not change
+that.
+
+**`nodeId`** is whatever BD put in your launch URL as `?n=`. Echo it back
+untouched; BD uses it to check the answer is about the node it asked about. Do
+not interpret it.
 
 Why the URL and not storage: `localStorage` and cookies are per-origin, so a
 viewer hosted elsewhere cannot read BD's. The URL is the only channel that
@@ -133,6 +168,18 @@ back to the frozen standalone, so the button always does something.
 
 (The button was called **Jump** until 2026-09-15, when it stopped jumping
 anywhere: BD stays put and the viewer opens beside it.)
+
+## One viewer per module TYPE (2026-09-16)
+
+Your token carries the module type it was minted for, stamped on the socket at
+the handshake. **BD's pushes are filtered on it**, so a Kolam script is never
+delivered to a music viewer — filtered on the server, so you do not have to
+implement "ignore what is not mine" correctly to avoid rendering someone else's
+payload.
+
+A viewer FOLLOWS BD from node to node while the type matches. A node of a
+different type gets its own window. An untyped push still reaches everything,
+so a viewer written before this keeps working.
 
 ## Another device — where the QR code goes
 
