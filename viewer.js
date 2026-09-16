@@ -10787,7 +10787,32 @@ async function init() {
     // Read/write helpers so callers don't have to know whether a card body is
     // a textarea (Local cards) or a contentEditable div (system/received).
     function getCardText(body) {
-      return body.tagName === 'TEXTAREA' ? body.value : body.textContent;
+      if (body.tagName === 'TEXTAREA') return body.value;
+      // ── A chunk card's body is BUILT, so it must be READ back (2026-09-16) ──
+      //
+      // This was `body.textContent`, and that is what broke the Down button.
+      //
+      // A chunk card's body is not one text node. It is one or two .chunk-text
+      // divs plus an optional .chunk-hint div, and textContent concatenates
+      // block elements with NO separator. So the script's last line and the
+      // hint were run together: "%%bd_]" became "%%bd_]Tap the node again…".
+      //
+      // parseBD closes a bracket block only on a line whose trim is exactly
+      // "%%bd_]". With the hint welded on, it never closed — the parser stayed
+      // in bracket state to the end of the text and never committed `score`.
+      // The renderer then had no axiom and threw, silently, inside its own
+      // try/catch. Measured in the log: 14 directives on load, 13 after Down,
+      // with `score` the one missing.
+      //
+      // readChunkBody is the INVERSE the Sv save path already uses: it takes
+      // only .chunk-text children, skips the hint, and restores <<colour>>
+      // markup. The lesson is the one Sv taught in September — a renderer needs
+      // its inverse beside it, and reading the rendered DOM back as plain text
+      // is not that inverse.
+      if (body.querySelector && body.querySelector('.chunk-text')) {
+        return readChunkBody(body);
+      }
+      return body.textContent;
     }
     function setCardText(body, text) {
       if (body.tagName === 'TEXTAREA') body.value = text;

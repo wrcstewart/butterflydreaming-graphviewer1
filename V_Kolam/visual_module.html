@@ -1313,6 +1313,11 @@
         try {
           const line = Array.prototype.map.call(args, (a) => {
             if (typeof a === 'string') return a;
+            // An Error JSON.stringifies to "{}" — its message and stack are
+            // non-enumerable. That is exactly what happened the first time
+            // this ran: 506 lines of "render error: {}", the one fact needed
+            // missing from all of them.
+            if (a instanceof Error) return a.message + (a.stack ? ' | ' + a.stack.split('\n')[1] : '');
             try { return JSON.stringify(a); } catch (_) { return String(a); }
           }).join(' ');
           postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
