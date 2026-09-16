@@ -368,13 +368,35 @@
         <button class="step-btn" type="button" data-target="angle-slider" data-delta="1">+</button>
       </div>
       <label>angle</label>
-      <input id="angle-slider" class="stepper-source" type="number" min="5" max="90" step="1" value="45">
+      <!-- 2026-09-16 — max 90 → 360. The ceiling was never a rendering limit:
+           angle is the turtle's TURN PER STEP, and the renderer is happy with
+           any value. But driftTick wraps at 360 while render() clamped at 90,
+           so drift walked 270 degrees that all drew identically as 90 — the
+           pattern visibly froze (under 3 minutes at drift 100), and a script
+           recording angle 211 did not reproduce what was on screen. Raised in
+           all THREE places: here, setControlValues, and the render clamp. -->
+      <input id="angle-slider" class="stepper-source" type="number" min="5" max="360" step="1" value="45">
     </div>
 
-    <!-- angle_minutes ("Angle Fine") hidden per user 2026-07-02.
-         angle_seconds already hidden. Both remain in DOM so the drift-automation
-         tick (driftTick) can still carry seconds → minutes → degrees. -->
-    <input id="angle-minutes-slider" type="hidden" value="0">
+    <!-- angle_minutes is a visible stepper again (2026-09-16); it was hidden
+         2026-07-02 as "Angle Fine". It is back because the SCRIPT is how a
+         user returns to a graphical state they wandered into, and Copy Up has
+         always written angle_minutes into the script — so the state was being
+         recorded with a precision the user had no way to set or correct.
+         One arcminute is the script's resolution: angle_seconds is a
+         sub-arcminute drift accumulator and is deliberately NOT written out.
+         Still in the DOM either way, because driftTick carries
+         seconds → minutes → degrees through them. -->
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="angle-minutes-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="angle-minutes-slider">0</span>
+        <button class="step-btn" type="button" data-target="angle-minutes-slider" data-delta="1">+</button>
+      </div>
+      <label>angle_minutes</label>
+      <input id="angle-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
+    </div>
+
     <input id="angle-seconds-slider" type="hidden" value="0">
 
     <div class="control-row">
@@ -451,6 +473,26 @@
     const depthSelect    = document.getElementById('depth-select');
     const stepSlider     = document.getElementById('step-slider');
     const angleSlider    = document.getElementById('angle-slider');
+    // ── The angle cycle (2026-09-16) ──────────────────────────────────────
+    // ONE definition of the range, because there were three and they disagreed:
+    // the input said 5..90, render() clamped 5..90, and driftTick wrapped at
+    // 360. Drift therefore walked 270 degrees that every one of them drew as 90.
+    //
+    // The cycle runs 5..360 and wraps back to ANGLE_MIN, not to 0. 0 and 360
+    // are the SAME figure and it is a degenerate one — angle is the turtle's
+    // turn per step, so at 0 it never turns and the kolam collapses to a
+    // straight line. Wrapping to 0 would show that once per cycle rather than
+    // only at startup, which is the thing we were trying to avoid.
+    const ANGLE_MIN  = 5;
+    const ANGLE_MAX  = 360;
+    const ANGLE_SPAN = ANGLE_MAX - ANGLE_MIN;
+
+    // Wrap a drifting angle into [ANGLE_MIN, ANGLE_MAX). Handles both
+    // directions so a future negative drift needs no second thought.
+    function wrapAngle(deg) {
+      return ANGLE_MIN + ((((deg - ANGLE_MIN) % ANGLE_SPAN) + ANGLE_SPAN) % ANGLE_SPAN);
+    }
+
     const angleMinutesSlider = document.getElementById('angle-minutes-slider');
     const angleSecondsSlider = document.getElementById('angle-seconds-slider');
     const angleDriftSlider  = document.getElementById('angle-drift-slider');
@@ -591,7 +633,7 @@
       // places that clamp it (this one, the input's max attr, and the render
       // clamp) — miss one and the control moves while the drawing does not.
       stepSlider.value = String(Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 999));
-      angleSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90));
+      angleSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle, 45), ANGLE_MIN), ANGLE_MAX));
       angleMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_minutes, 0), 0), 59));
       // angle_seconds is now internal-only — never present in the script.
       // Only touch the slider if the directive was explicitly supplied
@@ -883,7 +925,9 @@
       degs += Math.floor(mins / 60);
       mins  = mins % 60;
 
-      degs  = ((degs % 360) + 360) % 360;
+      // Was ((degs % 360) + 360) % 360 — a compass-bearing wrap, which is why
+      // it disagreed with a renderer that clamped at 90. Now the one wrap.
+      degs  = wrapAngle(degs);
 
       angleSlider.value        = String(degs);
       angleMinutesSlider.value = String(mins);
@@ -1096,7 +1140,7 @@
           symmetry:   safeParseInt(directives.symmetry, 8),
           depth:      Math.min(Math.max(safeParseInt(directives.depth, 4), 1), 5),
           step:       Math.min(Math.max(safeParseNumber(directives.step, 40), 10), 999),
-          angle:      Math.min(Math.max(safeParseNumber(directives.angle, 45), 5), 90),
+          angle:      Math.min(Math.max(safeParseNumber(directives.angle, 45), ANGLE_MIN), ANGLE_MAX),
           stroke:     directives.stroke                  || 'angle',   /* A42 fix: was '#4a9b8e' — that killed hue cycling when the script omitted %%bd_stroke angle. */
           background: directives.background             || '#0a0a0f',
           weight:     Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5),
