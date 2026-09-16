@@ -1297,11 +1297,57 @@
       setStatus(`Waiting… body ${bw}×${bh}  wrap ${w}×${h}  canvas ${canvas.width}×${canvas.height}`);
     }
 
+    // ── The renderer was BLIND (2026-09-16) ───────────────────────────────
+    // BD forwards ITS console to the server log, and that log has settled
+    // arguments that days of reasoning could not. But this file runs in an
+    // IFRAME: its console and its uncaught errors stayed inside that document
+    // and reached nobody. Three bugs in this area were debugged without ever
+    // being able to see what the renderer thought was happening, and render()
+    // catches its own exceptions, so a throw in here is silent twice over.
+    //
+    // So: forward to the host, which forwards to the server log. Best-effort
+    // and non-fatal by construction — a logger that can break the thing it is
+    // logging is worse than no logger.
+    (function forwardModuleConsole() {
+      const send = (level, args) => {
+        try {
+          const line = Array.prototype.map.call(args, (a) => {
+            if (typeof a === 'string') return a;
+            try { return JSON.stringify(a); } catch (_) { return String(a); }
+          }).join(' ');
+          postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
+        } catch (_) {}
+      };
+      ['log', 'warn', 'error'].forEach((level) => {
+        const original = console[level].bind(console);
+        console[level] = function () { send(level, arguments); original.apply(console, arguments); };
+      });
+      window.addEventListener('error', (e) => {
+        send('error', ['uncaught: ' + (e && e.message) + ' @ ' + (e && e.lineno)]);
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        send('error', ['unhandled rejection: ' + (e && e.reason && (e.reason.message || e.reason))]);
+      });
+    })();
+
     // Wrapped render — first call clears the waiting state.
     function renderFromScript(scriptText) {
       if (waitingForFirstScript) {
         waitingForFirstScript = false;
         enableControls();
+      }
+      // Only script ARRIVALS are logged, never the drift timer's renders —
+      // those fire 5-10 times a second and would drown the log.
+      try {
+        const d = parseBD(scriptText);
+        const keys = Object.keys(d);
+        console.log('[module] script in: ' + scriptText.length + ' chars, ' +
+          keys.length + ' directives' +
+          (keys.length
+            ? ' {' + keys.map(k => k + '=' + String(d[k]).slice(0, 24)).join(' ') + '}'
+            : '  <-- NONE PARSED; every value will be a default'));
+      } catch (err) {
+        console.error('[module] could not parse the incoming script: ' + err.message);
       }
       render(scriptText);
     }

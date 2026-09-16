@@ -10905,6 +10905,24 @@ async function init() {
       });
     }
 
+    // ── The renderer's console, relayed into ours (2026-09-16) ────────────
+    // visual_module.html runs in an iframe, so its console and its uncaught
+    // errors reached nobody — and render() catches its own exceptions, so a
+    // throw in there was silent twice over. Three bugs in this area were
+    // debugged blind. BD's console IS forwarded to /private/tmp/bd_server.log,
+    // so re-emitting here is all it takes to make the renderer visible.
+    //
+    // Prefixed [module] so it is distinguishable from BD's own output at a
+    // glance, and never trusted as anything but text.
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'bd_module_log') return;
+      const line = '[module] ' + String(d.line == null ? '' : d.line).slice(0, 600);
+      if (d.level === 'error')      console.error(line);
+      else if (d.level === 'warn')  console.warn(line);
+      else                          console.log(line);
+    });
+
     // §42.7 — inbound bd_script_response from the iframe writes into the
     // currently focused card body (2026-08-05 v6 — any kind, not just local).
     // setCardText handles the textarea-vs-contentEditable-div type split.

@@ -56,7 +56,11 @@
     // the wrapper, and BD never learns that a stepper moved — which is exactly
     // how an Ancillary Viewer came to show the opening frame and then freeze.
     // This relay is a whitelist, so a NEW message type is invisible by default.
-    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY', 'bd_av_state']);
+    // 2026-09-16: bd_module_log added, so the inner renderer's console and
+    // uncaught errors reach BD and therefore the server log. Same trap as
+    // bd_av_state above — this relay is a WHITELIST, so a new message type is
+    // invisible by default and fails silently at exactly this line.
+    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY', 'bd_av_state', 'bd_module_log']);
 
     const moduleFrame = document.getElementById('module-frame');
 
