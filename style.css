@@ -1101,8 +1101,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-16: GREEN (one viewer per module TYPE; a script can no longer
-   reach a viewer of another kind). Next rotation = blue.
+   2026-09-16: BLUE (BD asks the viewer where the exploration got to when it
+   returns to the foreground). Next rotation = red.
 
    NB the block that used to sit here said "2026-09-11: GREEN, next = blue"
    while the border below painted RED — it had been left behind through two
@@ -1117,7 +1117,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

@@ -1523,14 +1523,23 @@ io.on('connection', async (socket) => {
       // anything at all — reaches every handler below exactly as a BD client
       // does.
       //
-      // The allowlist is deliberately one entry long. An AV is a presentation
-      // surface: it renders what BD sends and says only "I am ready". Adding a
-      // message type here is a decision about what a viewer may DO, and should
-      // be made deliberately rather than inherited by default.
+      // The allowlist is deliberately short. An AV is a presentation surface:
+      // it renders what BD sends, says "I am ready", and — since 2026-09-16 —
+      // ANSWERS WHEN ASKED. Adding a message type here is a decision about
+      // what a viewer may DO, and is made deliberately rather than inherited.
+      //
+      //   av_hello         unsolicited, but says nothing except "I exist"
+      //   av_state_report  solicited ONLY: BD asks, the viewer answers. A
+      //                    viewer that sends one unbidden is merely ignored by
+      //                    BD, which is not listening except after a request.
+      //
+      // Note what is still absent: a viewer cannot push, cannot address
+      // anything, and cannot reach a single one of the corpus handlers.
       //
       // Silent: a viewer has no UI in which to show a protocol error, and a
       // reply would tell a prober which names exist.
-      if (socket.data.role === 'module' && type !== 'av_hello') return;
+      const MODULE_MAY_SEND = new Set(['av_hello', 'av_state_report']);
+      if (socket.data.role === 'module' && !MODULE_MAY_SEND.has(type)) return;
       // Activity clock for the idle reaper. client_log is deliberately
       // excluded: a tab forwarding console noise is not a user doing
       // anything, and counting it would keep an abandoned tab alive forever
@@ -1559,6 +1568,47 @@ io.on('connection', async (socket) => {
           owner.emit('msg', { type: 'av_request_state' });
           console.log(`[BD] av_hello -> asked ${socket.data.moduleFor} for state`);
         }
+        return;
+      }
+
+      // --- MDP: BD -> AV "what are you showing?" (2026-09-16) -------------
+      //
+      // The one thing a viewer knows that BD cannot. On a phone you see BD or
+      // the viewer, never both, so opening the viewer backgrounds BD and the
+      // OS throttles or suspends it. The viewer goes on drifting; BD does not.
+      // When BD comes back, the viewer is the only record of where the
+      // exploration actually got to.
+      //
+      // Addressed the same way everything else is — implicitly, by moduleFor,
+      // narrowed by type. BD names no recipient.
+      if (type === 'av_pull') {
+        if (!socket.data.userId) return;
+        const want = typeof msg.moduleId === 'string' ? msg.moduleId : null;
+        let asked = 0;
+        for (const [, s] of io.sockets.sockets) {
+          if (!s.data || s.data.role !== 'module' || s.data.moduleFor !== socket.data.userId) continue;
+          if (want && s.data.moduleType && s.data.moduleType !== want) continue;
+          s.emit('msg', { type: 'av_state_request' });
+          asked++;
+        }
+        if (asked) console.log(`[BD] av_pull -> asked ${asked} viewer(s) for ${socket.data.userId}`);
+        return;
+      }
+
+      // The answer, travelling back to the session that launched the viewer.
+      // socket.data.moduleFor is the ONLY address involved: a viewer cannot
+      // name a destination, so it cannot report state at anyone else.
+      if (type === 'av_state_report') {
+        if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
+        const owner = sessions.get(socket.data.moduleFor);
+        if (!owner) return;
+        owner.emit('msg', {
+          type:     'av_state_report',
+          moduleId: socket.data.moduleType || null,   // from the TOKEN, not the viewer
+          nodeId:   typeof msg.nodeId === 'string' ? msg.nodeId : null,
+          script:   typeof msg.script === 'string' ? msg.script : null
+        });
+        console.log(`[BD] av_state_report -> ${socket.data.moduleFor}`);
         return;
       }
 

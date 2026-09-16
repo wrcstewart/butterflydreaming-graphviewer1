@@ -327,6 +327,7 @@ let avLastState  = null;   // freshest announcement, pushed or not
 // stays the authored record, the Down button still loads it, and nothing here
 // ever reaches the database.
 const explorationByNode = new Map();   // nodeId -> latest live script
+const savedByNode       = new Map();   // nodeId -> the node's authored text
 let   avNodeId = null;                 // node whose script the module is showing
 
 // Only the VALUES move. The saved text supplies the structure — the score
@@ -435,6 +436,10 @@ if (typeof document !== 'undefined') {
       bgTimer = setInterval(() => { bgTimerTicks += 1; }, 1000);
     } else {
       if (bgTimer) { clearInterval(bgTimer); bgTimer = null; }
+      // BD is back in front. If a viewer has been running while BD was
+      // throttled or suspended, it is holding drift BD never performed — ask
+      // for it before anything else pushes a staler picture at it.
+      try { requestAVState(); } catch (_) {}
       if (bgHiddenAt) {
         const secs = (Date.now() - bgHiddenAt) / 1000;
         const expected = Math.floor(secs);
@@ -493,6 +498,70 @@ if (typeof window !== 'undefined') {
     avLastPushed = text;
     pushToAV(text);
   });
+}
+
+// ── Asking the viewer where things got to (2026-09-16) ──────────────────────
+//
+// The cache above covers everything BD could see for itself. This covers the
+// one case it cannot: on a phone, looking at the viewer BACKGROUNDS BD, and
+// the OS throttles or suspends it. The viewer drifts on; BD does not. Coming
+// back, the viewer holds the only record of where the exploration actually
+// reached.
+//
+// Asked on return to the foreground rather than on opening a node, because
+// that is the moment BD knows it has been asleep — waiting for a re-tap would
+// show stale steppers until the user happened to provide one.
+//
+// The answer is merged the same way a cached exploration is: values only, onto
+// the node's saved text. So a viewer cannot introduce a directive, cannot
+// touch the score block, and cannot reach the card — the Down button still
+// loads what the author wrote. A read-only viewer stays read-only even when
+// BD is listening to it.
+let avPullPending = null;   // { nodeId, timer } — cleared on answer or timeout
+
+function requestAVState(moduleId) {
+  const ws = window.__bdWsRef && window.__bdWsRef.current;
+  if (!ws || !ws.connected) return;
+  if (!avNodeId) return;                       // nothing to reconcile against
+  if (avPullPending) return;                   // one in flight is enough
+  // A viewer window can be closed without BD ever hearing about it, so an
+  // unanswered ask must expire rather than leave BD waiting on a ghost.
+  avPullPending = {
+    nodeId: avNodeId,
+    timer: setTimeout(() => {
+      if (avPullPending) console.log('[AV] no answer from a viewer — carrying on with what BD has');
+      avPullPending = null;
+    }, 1200)
+  };
+  try { ws.emit('msg', { type: 'av_pull', moduleId: moduleId || undefined }); } catch (_) {}
+}
+window.bdRequestAVState = requestAVState;
+
+function applyAVStateReport(msg) {
+  const pending = avPullPending;
+  if (!pending) return;                        // unsolicited: ignore
+  clearTimeout(pending.timer);
+  avPullPending = null;
+  if (!msg || typeof msg.script !== 'string' || !msg.script) return;
+  // Verify it is about the node we asked about. The viewer echoes the id BD
+  // gave it at launch; if it names a different node, it is showing something
+  // else and its state is not ours to adopt.
+  if (msg.nodeId && msg.nodeId !== pending.nodeId) {
+    console.log('[AV] viewer is showing ' + msg.nodeId + ', not ' + pending.nodeId + ' — ignored');
+    return;
+  }
+  explorationByNode.set(pending.nodeId, msg.script);
+  // Apply it only if the module is still showing that node.
+  if (avNodeId !== pending.nodeId) return;
+  const savedText = savedByNode.get(pending.nodeId);
+  if (!savedText) return;
+  const merged = mergeExploredValues(savedText, msg.script);
+  const frame = document.getElementById('visual-iframe');
+  if (!frame || !frame.contentWindow) return;
+  try {
+    frame.contentWindow.postMessage({ type: 'bd_script_update', script: merged }, '*');
+    console.log('[AV] adopted the viewer\'s state for ' + pending.nodeId);
+  } catch (_) {}
 }
 
 function pushToAV(script, moduleId) {
@@ -9533,6 +9602,7 @@ async function init() {
     // Sent to the module AND the viewer, so the two never disagree about what
     // reopening a node means.
     avNodeId = nodeId;
+    savedByNode.set(nodeId, savedText);
     const explored = explorationByNode.get(nodeId);
     const text = explored ? mergeExploredValues(savedText, explored) : savedText;
     if (explored && text !== savedText) {
@@ -11564,8 +11634,14 @@ async function init() {
           // The token is the ONLY thing in the URL. Everything else arrives
           // over the socket, so this link has no size problem and no payload
           // to leak — and it is useless to anyone else, being single-use.
+          // The node id rides along so the viewer can echo it back when asked
+          // what it is showing — BD then VERIFIES an answer is about the node
+          // it asked about, instead of assuming the viewer is where it was
+          // left. Not a secret and not load-bearing: the viewer never
+          // interprets it.
           const avUrl = window.location.origin + '/AV/kolam.html?t=' +
-                        encodeURIComponent(token);
+                        encodeURIComponent(token) +
+                        (avNodeId ? '&n=' + encodeURIComponent(avNodeId) : '');
           console.log('[AV] opening viewer');
           if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
           // The window is already ours (claimed in the gesture above); just
@@ -11803,6 +11879,8 @@ async function init() {
       handleBuddyCardAck(msg);
     } else if (msg.type === 'chat_ready') {
       handleChatReady();
+    } else if (msg.type === 'av_state_report') {
+      applyAVStateReport(msg);
     } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {
       handleClusterRelMsg(msg);
     } else if (msg.type === 'cluster_cloned') {

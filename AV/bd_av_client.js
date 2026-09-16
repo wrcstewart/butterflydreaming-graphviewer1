@@ -67,6 +67,9 @@
     const bdOrigin = o.bdOrigin || DEFAULT_BD_ORIGIN;
     const onUpdate = typeof o.onUpdate === 'function' ? o.onUpdate : function () {};
     const onState  = typeof o.onState  === 'function' ? o.onState  : function () {};
+    // Optional. Called when BD asks what this viewer is showing; return
+    // { script, nodeId } or null. See the av_state_request handler below.
+    const onStateRequest = typeof o.onStateRequest === 'function' ? o.onStateRequest : null;
 
     const token = readToken();
     if (!token) {
@@ -120,8 +123,37 @@
     } catch (_) {}
 
     socket.on('msg', function (m) {
-      if (!m || m.type !== 'av_update') return;
-      onUpdate(m.payload);
+      if (!m) return;
+
+      if (m.type === 'av_update') { onUpdate(m.payload); return; }
+
+      // BD asking "what are you showing?" — 2026-09-16.
+      //
+      // The one thing you know that BD cannot. On a phone BD is backgrounded
+      // whenever you are looking at this window, so the OS throttles or
+      // suspends it while you go on rendering. When BD returns, your answer is
+      // the only record of where things actually got to.
+      //
+      // SOLICITED ONLY. Do not send this unbidden: BD is not listening except
+      // after asking, and a viewer that volunteers state is a viewer that can
+      // surprise the thing driving it.
+      //
+      // Supply onStateRequest to answer. Return null (or omit the callback)
+      // and nothing is sent — silence is a perfectly good answer from a viewer
+      // that has not rendered anything yet.
+      if (m.type === 'av_state_request') {
+        let state = null;
+        try { state = onStateRequest ? onStateRequest() : null; } catch (_) { state = null; }
+        if (!state || typeof state.script !== 'string' || !state.script) return;
+        try {
+          socket.emit('msg', {
+            type:   'av_state_report',
+            nodeId: state.nodeId || null,
+            script: state.script
+          });
+        } catch (_) {}
+        return;
+      }
     });
 
     return socket;
