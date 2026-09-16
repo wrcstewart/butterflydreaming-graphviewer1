@@ -1132,19 +1132,30 @@ const pendingPurges = new Map();  // userId → timer handle
 const MODULE_TOKEN_TTL_MS = 2 * 60 * 1000;   // generous: covers a slow page load
 const moduleTokens = new Map();              // token → { userId, issuedAt }
 
-function mintModuleToken(userId) {
+// 2026-09-16 — the token now carries the MODULE TYPE as well as the user.
+//
+// A viewer is bound to a kind of thing: a Kolam viewer cannot render a tune.
+// Once a second viewer of a different type can be open, av_push has to know
+// which one a script is for — see the delivery loop, which used to fan out to
+// every viewer the user had open and would have handed an L-system score to a
+// music player.
+//
+// This narrows delivery WITHIN one user's own viewers. It grants BD no new
+// reach: everything is still scoped to moduleFor, so a BD client still cannot
+// address another user's viewer, and still has no field in which to try.
+function mintModuleToken(userId, moduleId) {
   const token = crypto.randomUUID();
-  moduleTokens.set(token, { userId, issuedAt: Date.now() });
+  moduleTokens.set(token, { userId, moduleId: moduleId || null, issuedAt: Date.now() });
   return token;
 }
 
-// Returns the issuing userId, or null. Consumes the token on success.
+// Returns { userId, moduleId }, or null. Consumes the token on success.
 function consumeModuleToken(token) {
   const rec = moduleTokens.get(token);
   if (!rec) return null;
   moduleTokens.delete(token);                       // single use
   if (Date.now() - rec.issuedAt > MODULE_TOKEN_TTL_MS) return null;
-  return rec.userId;
+  return { userId: rec.userId, moduleId: rec.moduleId };
 }
 
 // Sweep expired tokens. Small map, generous interval — this is hygiene, not a
@@ -1423,14 +1434,16 @@ function serializeRecord(rec) {
 io.use((socket, next) => {
   const token = socket.handshake && socket.handshake.auth && socket.handshake.auth.token;
   if (!token) return next();                     // ordinary client
-  const userId = consumeModuleToken(token);
-  if (!userId) {
+  const claim = consumeModuleToken(token);
+  if (!claim) {
     console.warn(`[BD] MST refused (unknown or expired) from origin ${socket.handshake.headers.origin || '?'}`);
     return next(new Error('module_token_invalid'));
   }
   socket.data.role         = 'module';
-  socket.data.moduleFor    = userId;             // the BD session that launched it
-  console.log(`[BD] Module socket accepted for ${userId} from origin ${socket.handshake.headers.origin || '?'}`);
+  socket.data.moduleFor    = claim.userId;       // the BD session that launched it
+  socket.data.moduleType   = claim.moduleId;     // which KIND of viewer this is
+  console.log(`[BD] Module socket accepted for ${claim.userId} (${claim.moduleId || 'untyped'}) ` +
+              `from origin ${socket.handshake.headers.origin || '?'}`);
   next();
 });
 
@@ -1566,13 +1579,25 @@ io.on('connection', async (socket) => {
       // allowed to say; deliberately not invented here.
       if (type === 'av_push') {
         if (!socket.data.userId) return;
-        let delivered = 0;
+        // msg.moduleId names the KIND of viewer this script is for. A viewer
+        // whose type differs is skipped: a Kolam script must never reach a
+        // music player, which is what happened when this loop delivered to
+        // every module socket the user had open.
+        //
+        // Filtered HERE rather than in each viewer, because a third-party
+        // author should not have to implement "ignore what is not mine"
+        // correctly in order to avoid rendering someone else's payload. An
+        // untyped push (or an untyped socket) still matches everything, so a
+        // viewer opened before this existed keeps working.
+        const want = typeof msg.moduleId === 'string' ? msg.moduleId : null;
+        let delivered = 0, skipped = 0;
         for (const [, s] of io.sockets.sockets) {
-          if (s.data && s.data.role === 'module' && s.data.moduleFor === socket.data.userId) {
-            s.emit('msg', { type: 'av_update', payload: msg.payload ?? null });
-            delivered++;
-          }
+          if (!s.data || s.data.role !== 'module' || s.data.moduleFor !== socket.data.userId) continue;
+          if (want && s.data.moduleType && s.data.moduleType !== want) { skipped++; continue; }
+          s.emit('msg', { type: 'av_update', payload: msg.payload ?? null });
+          delivered++;
         }
+        if (skipped) console.log(`[BD] av_push: ${skipped} viewer(s) of another type skipped`);
         // Quiet when there is no viewer open — that is the normal case, not an
         // error, and logging it would drown the console during ordinary use.
         if (delivered) console.log(`[BD] av_push -> ${delivered} viewer(s) for ${socket.data.userId}`);
@@ -1587,8 +1612,9 @@ io.on('connection', async (socket) => {
           socket.emit('msg', { type: 'module_token', token: null, reason: 'no_session' });
           return;
         }
-        const token = mintModuleToken(socket.data.userId);
-        console.log(`[BD] MST minted for ${socket.data.userId}`);
+        const moduleId = typeof msg.moduleId === 'string' ? msg.moduleId : null;
+        const token = mintModuleToken(socket.data.userId, moduleId);
+        console.log(`[BD] MST minted for ${socket.data.userId} (${moduleId || 'untyped'})`);
         socket.emit('msg', { type: 'module_token', token, ttl_ms: MODULE_TOKEN_TTL_MS });
         return;
       }

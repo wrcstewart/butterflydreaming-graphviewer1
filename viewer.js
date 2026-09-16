@@ -267,7 +267,14 @@ let rootIntroPending = false;
 // press, and to focus the existing one instead. All DATA goes over the socket —
 // the handle is never used to postMessage, precisely so the same code path
 // works for a viewer we did not open and could not reach directly.
-let avWindow = null;
+// One viewer per MODULE TYPE, not one viewer (2026-09-16).
+//
+// A viewer follows BD from node to node while the module type is the same —
+// Kolam to Kolam — because it can render those. A node of a different type
+// needs its own window, since a Kolam viewer cannot show a tune. So the handle
+// is a registry keyed by module id, and "View again focuses the open one"
+// becomes "focuses the open one OF THIS TYPE".
+const avWindows = new Map();   // moduleId -> window handle
 
 // Mirror BD's current script to any open AV. Called wherever BD pushes a script
 // into its OWN renderer, so a viewer follows every change by the same route,
@@ -488,13 +495,17 @@ if (typeof window !== 'undefined') {
   });
 }
 
-function pushToAV(script) {
+function pushToAV(script, moduleId) {
   try {
     if (typeof script !== 'string' || !script) return;
     avLastPushed = script;          // so a viewer that asks later can be answered
     const ws = window.__bdWsRef && window.__bdWsRef.current;
     if (!ws || !ws.connected) return;
-    ws.emit('msg', { type: 'av_push', payload: { script } });
+    // moduleId names the kind of viewer this is for; the server declines to
+    // deliver it to a viewer of another type. Derived from the script itself
+    // when the caller does not say, so no call site can forget to label one.
+    const forType = moduleId || (typeof parseModuleId === 'function' ? parseModuleId(script) : null);
+    ws.emit('msg', { type: 'av_push', moduleId: forType || undefined, payload: { script } });
   } catch (_) { /* a viewer is an extra, never a reason to break the main path */ }
 }
 
@@ -3859,7 +3870,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     setInterval(bind, 2000);   // cheap, and survives a reconnect replacing the socket
   })();
 
-  async function requestModuleToken() {
+  async function requestModuleToken(moduleId) {
     const ws = wsRef.current;
     if (!ws || !ws.connected) return null;
     return new Promise((resolve) => {
@@ -3876,7 +3887,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         finish(m.token || null);
       };
       ws.on('msg', onMsg);
-      ws.emit('msg', { type: 'mint_module_token' });
+      ws.emit('msg', { type: 'mint_module_token', moduleId: moduleId || undefined });
       setTimeout(() => finish(null), 4000);   // never hang a module launch
     });
   }
@@ -11498,23 +11509,33 @@ async function init() {
       jumpToBtn.addEventListener('click', () => {
         // ── Synchronous section. Do not introduce an await above window.open. ──
 
-        // Already open? Focus it rather than opening a second one. Two viewers
-        // on one session is not wrong — the server pushes to all of them — but
-        // it is never what a second press MEANT.
-        if (avWindow && !avWindow.closed) {
-          try { avWindow.focus(); } catch (_) {}
+        const { url, payload } = buildExternalWebsiteUrl();
+        const moduleId   = parseModuleId(payload.script);
+
+        // Already open FOR THIS TYPE? Focus it rather than opening a second
+        // one. A viewer of a DIFFERENT type may also be open and is left
+        // exactly alone — it is showing its own kind of thing, and the server
+        // will not deliver this script to it.
+        const existing = moduleId ? avWindows.get(moduleId) : null;
+        if (existing && !existing.closed) {
+          try { existing.focus(); } catch (_) {}
           // Refresh it. On iOS you leave a viewer by switching tabs rather than
           // closing it, so the window is usually still open — and while it was
           // in the background iOS may have suspended it and dropped its socket,
           // losing anything sent meanwhile.
           answerAVStateRequest();
-          console.log('[AV] viewer already open — focused and refreshed it');
+          console.log('[AV] ' + moduleId + ' viewer already open — focused and refreshed it');
           return;
         }
+        if (existing) avWindows.delete(moduleId);   // it was closed; forget it
 
-        const { url, payload } = buildExternalWebsiteUrl();
-        const moduleId   = parseModuleId(payload.script);
+        // A viewer page exists for Kolam only. Another module type is not an
+        // error and not a fallback-to-standalone either — it simply has no
+        // viewer yet, and says so rather than opening the wrong one.
         const wantViewer = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken);
+        if (moduleId && moduleId !== 'bd_V_Kolam') {
+          console.log('[AV] no viewer page for ' + moduleId + ' yet — falling back to the standalone');
+        }
 
         // Claim the window HERE, in the click, and park it on about:blank. The
         // token cannot be minted without an await, so the window has to be won
@@ -11528,7 +11549,7 @@ async function init() {
           // fallback below never awaits — it is still inside the gesture and can
           // still open the standalone. Only the path that ALREADY holds a window
           // gives up the gesture, and it no longer needs it.
-          const token = w ? await window.bdRequestModuleToken() : null;
+          const token = w ? await window.bdRequestModuleToken(moduleId) : null;
 
           if (!token) {
             console.log('[AV] no viewer (' + (moduleId || 'no module') +
@@ -11550,8 +11571,8 @@ async function init() {
           // The window is already ours (claimed in the gesture above); just
           // point it at the viewer. replace() rather than assignment so the
           // blank page does not become a back-stack entry.
-          avWindow = w;
-          try { avWindow.location.replace(avUrl); }
+          avWindows.set(moduleId, w);
+          try { w.location.replace(avUrl); }
           catch (err) { console.warn('[AV] could not navigate the viewer', err); }
 
           // NO opening push. The viewer asks (av_hello) the moment it connects,
