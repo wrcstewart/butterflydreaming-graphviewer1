@@ -281,8 +281,12 @@ let avWindow = null;
 // timer is what removes the seconds of DEFAULT figure a viewer used to show on
 // every trip — it knows when it is ready, and nobody else does.
 function answerAVStateRequest() {
-  if (typeof avLastPushed === 'string' && avLastPushed) {
-    pushToAV(avLastPushed);
+  // Answer with the FRESHEST state, not the last one pushed. During drift most
+  // frames are deliberately not pushed (see below), so avLastPushed can be
+  // seconds behind — and a viewer joining mid-drift should start in phase.
+  const current = avLastState || avLastPushed;
+  if (typeof current === 'string' && current) {
+    pushToAV(current);
     return;
   }
   // Nothing pushed yet this session: ask the module what it is showing. Its
@@ -296,14 +300,63 @@ function answerAVStateRequest() {
 // The renderer announces its live script on every render (bd_av_state). That is
 // the ONLY signal BD gets when the user moves a stepper inside the module, so it
 // is what keeps a viewer following. Deduplicated: during drift this fires about
-// five times a second and most frames are identical in text.
+// five to ten times a second and most frames are identical in text.
 let avLastPushed = null;
+let avLastState  = null;   // freshest announcement, pushed or not
+
+// ── While drift runs, the ANGLE belongs to the viewer ────────────────────────
+//
+// 2026-09-16, fixing "on iOS the AV jumps backwards about every 5 seconds".
+//
+// Angle drift is animated by the RENDERER, on its own timer. The viewer runs
+// the same renderer from the same script, so it is already advancing the angle
+// itself, correctly, without being told. Pushing our angle at it 5-10 times a
+// second therefore carries no information — it can only ever overwrite the
+// viewer's own smoothly advancing value with ours.
+//
+// On a desktop that is invisible: both windows are foreground, both timers run
+// at full speed, so the two angles agree and the overwrite lands on the value
+// already there. On iOS window.open gives a TAB, not a window, so BD is a
+// BACKGROUND tab — and Safari throttles or suspends background timers. BD's
+// angle then stops advancing while the viewer's keeps going. Every time iOS
+// lets BD run, it pushes an angle from several seconds ago and the viewer
+// SNAPS BACK to it. Hence a backward jump, hence only on iOS, hence roughly
+// every 5 seconds: that is the wake-up interval, not anything in our code.
+//
+// So: while drift is running, suppress a push whose ONLY difference is the
+// angle triple. Everything else — symmetry, colour, step, the drift rate
+// itself, and the angle when drift is OFF — still goes straight through.
+//
+// A pleasant side effect: it removes 5-10 socket messages a second through
+// Cloudflare for as long as drift runs, which on a phone is radio wake-ups
+// and battery spent to make the picture worse.
+const AV_ANGLE_LINES = /^%%bd_angle(?:_minutes|_seconds)?[ \t]+.*$/gm;
+function avWithoutAngle(text) {
+  return text.replace(AV_ANGLE_LINES, '');
+}
+function avDriftRunning(text) {
+  const m = /^%%bd_angle_drift[ \t]+(-?[\d.]+)/m.exec(text);
+  return !!m && parseFloat(m[1]) !== 0;
+}
+let avSuppressed = 0;
+
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
     const d = e && e.data;
     if (!d || d.type !== 'bd_av_state') return;
     const text = d.text;
-    if (typeof text !== 'string' || text === avLastPushed) return;
+    if (typeof text !== 'string') return;
+    avLastState = text;
+    if (text === avLastPushed) return;
+    if (avLastPushed && avDriftRunning(text) &&
+        avWithoutAngle(text) === avWithoutAngle(avLastPushed)) {
+      // Drift-only frame. The viewer is computing this for itself.
+      avSuppressed += 1;
+      if (avSuppressed % 200 === 0) {
+        console.log('[AV] drift frames left to the viewer: ' + avSuppressed);
+      }
+      return;
+    }
     avLastPushed = text;
     pushToAV(text);
   });
