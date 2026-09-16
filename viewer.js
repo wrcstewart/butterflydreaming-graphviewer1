@@ -340,6 +340,58 @@ function avDriftRunning(text) {
 }
 let avSuppressed = 0;
 
+// ── How fast does BD run when it is NOT on screen? (2026-09-16) ─────────────
+//
+// On a phone you can see BD or the viewer, never both, so opening the viewer
+// BACKGROUNDS BD — and a backgrounded tab is throttled or suspended by the OS.
+// That is what made the viewer jump backwards before the drift fix: BD's angle
+// had stopped advancing while the viewer's kept going.
+//
+// The jump is gone, so the symptom that revealed the rate is gone with it.
+// This measures the rate directly instead, and it costs nothing when the tab
+// is visible.
+//
+// Two counters over the hidden period:
+//   timers  — how many of our own 1-second intervals actually fired. The gap
+//             between this and the wall clock IS the throttling.
+//   frames  — how many times the renderer announced a new script. At depth
+//             1-3 the drift timer renders ~10/s when BD is in front, so this
+//             says what the module managed while out of sight.
+//
+// Reported on RETURN TO VISIBLE, never while hidden. A log line emitted by a
+// suspended tab may never reach the socket at all — measuring a suspension by
+// asking the suspended thing to phone home is how you measure nothing.
+let bgHiddenAt   = null;
+let bgTimerTicks = 0;
+let bgFrames     = 0;
+let bgTimer      = null;
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      bgHiddenAt = Date.now();
+      bgTimerTicks = 0;
+      bgFrames = 0;
+      if (bgTimer) clearInterval(bgTimer);
+      bgTimer = setInterval(() => { bgTimerTicks += 1; }, 1000);
+    } else {
+      if (bgTimer) { clearInterval(bgTimer); bgTimer = null; }
+      if (bgHiddenAt) {
+        const secs = (Date.now() - bgHiddenAt) / 1000;
+        const expected = Math.floor(secs);
+        const pct = expected ? Math.round((bgTimerTicks / expected) * 100) : 100;
+        console.log(
+          '[bg] BD hidden ' + secs.toFixed(1) + 's — ' +
+          'timers ' + bgTimerTicks + '/' + expected + ' (' + pct + '% of real time), ' +
+          'renderer frames ' + bgFrames + ' (' + (secs ? (bgFrames / secs).toFixed(2) : '0') +
+          '/s; ~10/s at depth<=3 when in front)'
+        );
+        bgHiddenAt = null;
+      }
+    }
+  });
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
     const d = e && e.data;
@@ -347,6 +399,7 @@ if (typeof window !== 'undefined') {
     const text = d.text;
     if (typeof text !== 'string') return;
     avLastState = text;
+    if (document.hidden && bgHiddenAt) bgFrames += 1;   // background-rate probe
     if (text === avLastPushed) return;
 
     // Forward EVERY real parameter change, and only decline the drift timer's
