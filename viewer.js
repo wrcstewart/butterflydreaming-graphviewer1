@@ -10783,14 +10783,55 @@ async function init() {
     //   2. topLocalCard() body
     //   3. Topmost card of any kind (system/received cards use contentEditable
     //      divs; setCardText handles the type difference)
+    // Which rung of getFocusedCardBody last matched. Diagnostic only — see the
+    // note below for why it exists.
+    let lastCardRung = '?';
+
+    // 2026-09-16 — instrumentation for an INTERMITTENT report: "the up arrow
+    // that maps stepper state into the script is not working reliably, and
+    // when it fails it also messes up View".
+    //
+    // The two symptoms are one symptom. Copy Up WRITES to getFocusedCardBody()
+    // and buildExternalWebsiteUrl READS from getFocusedCardBody() — the same
+    // function, so they cannot disagree about which card at a single instant.
+    // But rung 1 is document.activeElement, which moves as the user taps, and
+    // the write and the read happen at DIFFERENT instants. If focus shifts
+    // between the two presses, the script was pulled into one card and the URL
+    // is built from another. When that other card holds no %%bd_module
+    // paragraph, buildExternalWebsiteUrl falls through to the active NODE's
+    // text; if the user has since navigated to a non-module node, parseModuleId
+    // returns null, wantViewer is false, and View opens the standalone instead
+    // of a viewer. That is "it also messes up the View jump".
+    //
+    // This is a hypothesis, not a diagnosis, and the fault is intermittent by
+    // nature — it depends on where focus happens to be, so it will "work fine"
+    // on any given try. Guessing at it again is not worth another round: BD
+    // forwards client console to /private/tmp/bd_server.log, so log which card
+    // each side actually touched and let the next occurrence say what happened.
+    function describeCardBody(body) {
+      if (!body) return 'none';
+      try {
+        const card  = body.closest('.card');
+        const stack = card && card.parentElement ? (card.parentElement.id || '?') : '?';
+        const sibs  = card && card.parentElement ? Array.prototype.slice.call(card.parentElement.children) : [];
+        const idx   = card ? sibs.indexOf(card) : -1;
+        const kind  = card ? (card.className || '').replace(/\s+/g, '.') : '?';
+        const text  = (body.value != null ? body.value : body.textContent) || '';
+        const mod   = /^%%bd_module\s+(\S+)/m.exec(text);
+        return lastCardRung + ' ' + stack + '[' + idx + '] ' + kind +
+               ' len=' + text.length + ' module=' + (mod ? mod[1] : 'NONE');
+      } catch (_) { return lastCardRung + ' (undescribable)'; }
+    }
+
     function getFocusedCardBody() {
       const active = document.activeElement;
       if (active && (active.tagName === 'TEXTAREA' || active.isContentEditable)
                  && active.closest('.card')) {
+        lastCardRung = 'activeElement';
         return active;
       }
       const top = topLocalCard();
-      if (top && top.body) return top.body;
+      if (top && top.body) { lastCardRung = 'topLocalCard'; return top.body; }
       // 2026-08-14 — panel split: the newest card lives in #current-stack
       // now, older cards in #chat-stack. Check both, current-first.
       const topEl =
@@ -10798,8 +10839,9 @@ async function init() {
         document.querySelector('#chat-stack .card');
       if (topEl) {
         const body = topEl.querySelector('.card-body');
-        if (body) return body;
+        if (body) { lastCardRung = 'firstCardInStack'; return body; }
       }
+      lastCardRung = 'none';
       return null;
     }
 
@@ -10835,7 +10877,7 @@ async function init() {
           console.warn('[Copy Up] no card body found — response would have nowhere to land');
           return;
         }
-        console.log('[Copy Up] posting bd_script_request');
+        console.log('[Copy Up] requesting — will land in: ' + describeCardBody(body));
         iframeEl2.contentWindow.postMessage(
           { type: 'bd_script_request' },
           '*'
@@ -10850,7 +10892,14 @@ async function init() {
       const d = e && e.data;
       if (!d || d.type !== 'bd_script_response') return;
       const body = getFocusedCardBody();
-      if (!body || typeof d.script !== 'string') return;
+      if (!body || typeof d.script !== 'string') {
+        console.warn('[Copy Up] response had nowhere to land (body=' +
+                     describeCardBody(body) + ')');
+        return;
+      }
+      // Logged BEFORE the write, so the line describes the target as it was.
+      console.log('[Copy Up] writing ' + d.script.length + ' chars into: ' +
+                  describeCardBody(body));
       setCardText(body, d.script);
     });
 
@@ -11020,6 +11069,10 @@ async function init() {
       // caused stale DB text to be shipped in the URL after a successful pull.
       let currentPanelText = '';
       const focusedBody = getFocusedCardBody();
+      // Same describe format as [Copy Up] above, so the two lines in the log
+      // can be compared directly: if View names a different card from the one
+      // Copy Up wrote into, that IS the fault, and the log says so.
+      console.log('[View] reading from: ' + describeCardBody(focusedBody));
       let cardText = null;
       if (focusedBody) {
         cardText = getCardText(focusedBody);
