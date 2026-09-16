@@ -304,6 +304,58 @@ function answerAVStateRequest() {
 let avLastPushed = null;
 let avLastState  = null;   // freshest announcement, pushed or not
 
+// ── The exploration survives wandering off (2026-09-16) ─────────────────────
+//
+// Opening a module node calls loadModuleForNode, which posts the node's SAVED
+// text to the module and pushes that same saved text to any viewer. So walking
+// away to read something and coming back destroyed whatever you had explored
+// with the steppers — in BOTH places at once, and on desktop, where nothing
+// was ever suspended and BD had the explored state the whole time. It was
+// arriving in bd_av_state on every render and being thrown away.
+//
+// So keep it. Keyed by node, because wandering between two Kolam nodes must
+// not cross their states over.
+//
+// Deliberately IN MEMORY ONLY. An exploration is not an edit: the node's text
+// stays the authored record, the Down button still loads it, and nothing here
+// ever reaches the database.
+const explorationByNode = new Map();   // nodeId -> latest live script
+let   avNodeId = null;                 // node whose script the module is showing
+
+// Only the VALUES move. The saved text supplies the structure — the score
+// block, the %%bd_module line, anything the author wrote — and a directive is
+// restored only if the saved text already has that directive, so an
+// exploration can never introduce a line the node does not have. That is the
+// "state for the steppers, not for the script" rule, enforced here rather than
+// trusted to the sender.
+//
+// Single-line directives only. A bracket block (%%bd_score [ … %%bd_]) is
+// structure, not a stepper, and must come from the node.
+function mergeExploredValues(savedText, exploredText) {
+  if (typeof savedText !== 'string' || typeof exploredText !== 'string') return savedText;
+  const values = new Map();
+  exploredText.split('\n').forEach((line) => {
+    const m = /^%%bd_([A-Za-z_]+)[ \t]+(.*)$/.exec(line);
+    if (!m) return;
+    const name = m[1], value = m[2];
+    if (name === 'module' || value.trim() === '[' || name === ']') return;
+    values.set(name, value);
+  });
+  let changed = 0;
+  const out = savedText.split('\n').map((line) => {
+    const m = /^%%bd_([A-Za-z_]+)[ \t]+(.*)$/.exec(line);
+    if (!m) return line;
+    const name = m[1];
+    if (name === 'module' || m[2].trim() === '[') return line;
+    if (!values.has(name)) return line;
+    const next = values.get(name);
+    if (next === m[2]) return line;
+    changed += 1;
+    return '%%bd_' + name + ' ' + next;
+  }).join('\n');
+  return changed ? out : savedText;
+}
+
 // ── While drift runs, the ANGLE belongs to the viewer ────────────────────────
 //
 // 2026-09-16, fixing "on iOS the AV jumps backwards about every 5 seconds".
@@ -399,7 +451,8 @@ if (typeof window !== 'undefined') {
     const text = d.text;
     if (typeof text !== 'string') return;
     avLastState = text;
-    if (document.hidden && bgHiddenAt) bgFrames += 1;   // background-rate probe
+    if (avNodeId) explorationByNode.set(avNodeId, text);   // remember where we got to
+    if (document.hidden && bgHiddenAt) bgFrames += 1;      // background-rate probe
     if (text === avLastPushed) return;
 
     // Forward EVERY real parameter change, and only decline the drift timer's
@@ -9453,9 +9506,28 @@ async function init() {
     if (!nodeId || !visualIframe) return;
     const node = cy.getElementById(nodeId);
     if (!node || node.length === 0) return;
-    const text = node.data('text');
-    const moduleId = parseModuleId(text);
+    const savedText = node.data('text');
+    const moduleId = parseModuleId(savedText);
     if (!moduleId) return;                                // not a media node
+
+    // Restore where this node was last explored to, if it was.
+    //
+    // The values are merged ONTO the saved text rather than replacing it, so
+    // the node stays the source of everything structural and only the stepper
+    // values come back. The CARD is untouched either way — it still shows the
+    // node's saved script, so the Down button remains the way back to it. That
+    // is the whole point: the exploration is what you see, the saved script is
+    // one press away, and neither can quietly become the other.
+    //
+    // Sent to the module AND the viewer, so the two never disagree about what
+    // reopening a node means.
+    avNodeId = nodeId;
+    const explored = explorationByNode.get(nodeId);
+    const text = explored ? mergeExploredValues(savedText, explored) : savedText;
+    if (explored && text !== savedText) {
+      console.log('[BD] restored exploration for ' + nodeId);
+    }
+
     const url = getModuleUrl(moduleId);
     if (!url) {
       console.warn(`[MM1.6] Unknown module id '${moduleId}' on node ${nodeId} — ignoring`);
