@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: BLUE (a viewer whose token is
-     spent asks BD for another). Next rotation = red. */
+     change to a cached AV file. 2026-09-17: RED (the monitor survives an
+     ordinary update instead of vanishing). Next rotation = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
+    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -74,7 +74,13 @@
     background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 2px;
     pointer-events: none; transition: opacity .6s ease; max-width: 70vw;
   }
-  #status.live { opacity: 0; }          /* fades away once it is working */
+  #status.live { opacity: 0; }          /* the bare transient — fades away */
+  /* The MONITOR, by contrast, stays. Quiet enough not to compete with the
+     drawing, present enough to be read on purpose. It must not use the .live
+     fade: a monitor you cannot see is not a monitor, and this one vanished the
+     first time a stepper was moved because an ordinary update re-rendered the
+     strip as the bare word "live". */
+  #status.health { opacity: .5; }
   #status.problem { color: #d98a8a; opacity: 1; }
 </style>
 </head>
@@ -158,9 +164,55 @@
 
     function say(text, problem) {
       status.textContent = text;
+      status.classList.remove('health');
       status.classList.toggle('problem', !!problem);
       status.classList.toggle('live', !problem && text === 'live');
     }
+
+    // ── The monitor owns the strip once it has something to say ────────────
+    //
+    // Two things wrote to #status and the last writer won, which is how the
+    // monitor disappeared the moment a stepper moved: onUpdate called
+    // say('live'), and say() fades anything that is exactly "live". A monitor
+    // that survives only until the next ordinary event is not one.
+    //
+    // So there is now a single place that renders it, and every caller goes
+    // through it. Transient messages (connecting, renewing, refused) still use
+    // say(); the monitor re-asserts itself afterwards.
+    let lastHealth   = null;   // the minute snapshot, for the tooltip
+    let lastUpdateAt = null;
+    // Connectivity is tracked HERE rather than read from lastHealth, for two
+    // reasons: the snapshot is up to a minute old, and waiting a minute to
+    // show anything would leave the strip blank exactly when a viewer is being
+    // watched most closely — the first minute after opening it.
+    let connected    = false;
+
+    function showHealth() {
+      if (!connected && !lastHealth) return false;
+      if (!connected) {
+        say('NO CONTACT with ButterflyDreaming — press View there to reconnect', true);
+        return true;
+      }
+      // "last change", not "last heard from". BD deliberately says nothing
+      // while drift runs — the viewer animates that itself — so a long silence
+      // here is normal and must not read as a fault.
+      let age = 'no changes yet';
+      if (lastUpdateAt != null) {
+        const secs = Math.round((Date.now() - lastUpdateAt) / 1000);
+        age = secs < 90 ? 'last change ' + secs + 's ago'
+                        : 'last change ' + Math.round(secs / 60) + 'm ago';
+      }
+      status.textContent = 'live · ' + age;
+      status.classList.remove('live', 'problem');
+      status.classList.add('health');
+      if (lastHealth) { try { status.title = JSON.stringify(lastHealth, null, 1); } catch (_) {} }
+      return true;
+    }
+
+    // The age has to keep up on its own, or the strip sits reading "last
+    // change 12s ago" for a whole minute — which is worse than no number,
+    // because it looks live and is not. Display only; no network, no work.
+    setInterval(function () { if (connected) showHealth(); }, 15 * 1000);
 
     // Kept on window deliberately: a viewer that misbehaves is otherwise a
     // closed box, and the socket is the one thing worth inspecting from a
@@ -265,7 +317,10 @@
         // Real content has arrived — reveal. Until now the module has been
         // showing its own default behind a hidden frame.
         frame.classList.remove('waiting');
-        say('live');
+        lastUpdateAt = Date.now();
+        // Re-render the monitor rather than overwriting it with a bare "live",
+        // which is what made it disappear on the first stepper change.
+        if (!showHealth()) say('live');
       },
 
       // Solicited only — BD asks, we answer. Null until the renderer has
@@ -278,26 +333,22 @@
       // talking to it — it animates from its own timer — so being cut off
       // looks exactly like working. Say the quiet part out loud.
       onHealth: function (h) {
-        if (h.connected) {
-          const mins = h.sinceUpdate == null ? null : Math.round(h.sinceUpdate / 60);
-          say('live' + (mins ? ' · ' + mins + 'm since BD spoke' : ''));
-        } else {
-          say('NO CONTACT with ButterflyDreaming — press View there to reconnect', true);
-        }
-        // The detail lives in the tooltip rather than the strip, which has to
-        // stay small enough not to compete with the drawing.
-        try { status.title = JSON.stringify(h, null, 1); } catch (_) {}
+        lastHealth = h;
+        showHealth();
       },
 
       // Tells the shim which kind of replacement token to ask BD for.
       moduleId: 'bd_V_Kolam',
 
       onState: function (state, info) {
-        if (state === 'live')       say('live');
-        else if (state === 'renewing')   say('reconnecting to ButterflyDreaming…');
+        // 'live' hands the strip back to the monitor if it has anything to
+        // say; the bare word is only for the very first connection.
+        if (state === 'live')       { connected = true; showHealth(); }
+        else if (state === 'renewing')   { connected = false; say('reconnecting to ButterflyDreaming…'); }
         else if (state === 'connecting') say('connecting…');
         else if (state === 'no-token')   say('opened without a session — open this from ButterflyDreaming', true);
         else if (state === 'refused') {
+          connected = false;
           // The single-use token is spent. This is not something the user did:
           // past the 60s recovery window every retry is re-checked against a
           // token that was consumed at first connect, so it can never succeed.
@@ -309,8 +360,9 @@
                 ? 'lost contact — press View in ButterflyDreaming for a fresh viewer'
                 : 'BD refused the session: ' + ((info && info.reason) || ''), true);
         }
-        else if (state === 'lost')       say('connection lost — ' + ((info && info.reason) || '') +
-                                             ' — reconnecting…', true);
+        else if (state === 'lost')       { connected = false;
+                                           say('connection lost — ' + ((info && info.reason) || '') +
+                                               ' — reconnecting…', true); }
       }
     });
   })();
