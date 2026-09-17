@@ -1606,7 +1606,16 @@ io.on('connection', async (socket) => {
       if (type === 'av_return') {
         if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
         const owner = sessions.get(socket.data.moduleFor);
-        if (!owner) return;
+        // Say so. A viewer whose BD session has gone looks, from the viewer,
+        // exactly like a button that does nothing — and this returned in
+        // silence, so the one place that KNEW said nothing.
+        if (!owner) {
+          console.log(`[BD] av_return from a viewer whose session ${socket.data.moduleFor} is gone`);
+          return;
+        }
+        if (owner.disconnected) {
+          console.log(`[BD] av_return: session ${socket.data.moduleFor} is registered but disconnected`);
+        }
         owner.emit('msg', { type: 'av_return' });
         console.log(`[BD] av_return -> ${socket.data.moduleFor}`);
         return;
@@ -1618,7 +1627,10 @@ io.on('connection', async (socket) => {
       if (type === 'av_state_report') {
         if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
         const owner = sessions.get(socket.data.moduleFor);
-        if (!owner) return;
+        if (!owner) {
+          console.log(`[BD] av_state_report dropped: session ${socket.data.moduleFor} is gone`);
+          return;
+        }
         owner.emit('msg', {
           type:     'av_state_report',
           moduleId: socket.data.moduleType || null,   // from the TOKEN, not the viewer

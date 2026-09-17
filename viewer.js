@@ -5301,9 +5301,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // These are the two steps the canvas tap handler runs, in its order. If that
   // handler grows a third that belongs here too, this is where it goes — the
   // point of the name is that there is one place to look.
-  function openNodeAsTap(node) {
+  //
+  // `fresh` re-opens a node BD is ALREADY reading. advanceOrNavigate is a
+  // one-gesture toggle: on a node whose readingState already matches, and
+  // whose chunks are exhausted, it deliberately returns doing nothing —
+  // correct for a finger on a canvas, wrong for a button in another window
+  // that means "show me this". Without it the way-back button worked once and
+  // was then inert until the user tapped some other node, which is precisely
+  // the erratic behaviour reported: "clicking once or twice on BD nodes
+  // restores responsivity".
+  function openNodeAsTap(node, opts) {
     if (!node || !node.length) return;
     markReadNode(node, cy);
+    if (opts && opts.fresh && readingState && readingState.nodeId === node.id()) {
+      readingState = null;
+    }
     advanceOrNavigate(node);
   }
 
@@ -11921,7 +11933,9 @@ async function init() {
       if (avNodeId) {
         const n = cy.getElementById(avNodeId);
         if (n && n.length) {
-          openNodeAsTap(n);
+          // fresh: the button must always show the node, even if BD was
+          // already reading it. It is a request, not a toggle.
+          openNodeAsTap(n, { fresh: true });
           console.log('[AV] return: opened ' + avNodeId);
         } else {
           console.log('[AV] return: node ' + avNodeId + ' is not on the graph');
