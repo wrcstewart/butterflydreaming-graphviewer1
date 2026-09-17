@@ -5290,6 +5290,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
+  // Open a node as though the user had tapped it on the canvas.
+  //
+  // 2026-09-17 — jumpToNode was being used for this and only does half the
+  // job: it navigates the graph but never opens the node's card, so the
+  // viewer's way-back button left BD sitting on a graph with no card and no
+  // Player. The Player is engaged by LANDING on a module node in the reading
+  // sense, not by arriving at it in the graph sense.
+  //
+  // These are the two steps the canvas tap handler runs, in its order. If that
+  // handler grows a third that belongs here too, this is where it goes — the
+  // point of the name is that there is one place to look.
+  function openNodeAsTap(node) {
+    if (!node || !node.length) return;
+    markReadNode(node, cy);
+    advanceOrNavigate(node);
+  }
+
   function jumpToPartner() {
     const atHead   = (bnCursor === 0);
     const targetId = bnStack.length ? bnStack[Math.min(bnCursor, bnStack.length - 1)] : bnNodeId;
@@ -8875,7 +8892,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     renderMarks();
   }
 
-  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities, devStatus };
+  return { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId: () => activeNodeId, getLastReadNodeId: () => lastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities, devStatus, openNodeAsTap };
 
 }
 
@@ -10785,7 +10802,7 @@ async function init() {
   })();
 
   const { addBadge }      = setupNrBadges(cy);
-  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities, devStatus } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
+  const { publishCurrentPosition, refitBars, reassertMarks, handleExploreMsg, markBuddyGone, appendBuddyChip, resetBuddyBar, handleClusterRelMsg, handleClusterCloned, createCard, setChatText, prependSystemCard, prependPartnerCard, handleChatReady, setSendBtn, updateSendBtn, sendTopLocalCard, handleBuddyCardAck, topLocalCard, getActiveNodeId, getLastReadNodeId, enterNode, jumpToNode, addYouChip, toggleMediaBar, addSessionTrack, saveYouBreadcrumbs, restoreYouBreadcrumbs, refreshCardOpacities, devStatus, openNodeAsTap } = setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState);
 
   // 2026-08-25 — live resize. #cy had NO resize handler: only the two
   // breadcrumb bars and the media player listened, so the graph kept its old
@@ -11904,7 +11921,7 @@ async function init() {
       if (avNodeId) {
         const n = cy.getElementById(avNodeId);
         if (n && n.length) {
-          jumpToNode(n);
+          openNodeAsTap(n);
           console.log('[AV] return: opened ' + avNodeId);
         } else {
           console.log('[AV] return: node ' + avNodeId + ' is not on the graph');
