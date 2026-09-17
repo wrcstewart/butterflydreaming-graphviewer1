@@ -1496,6 +1496,16 @@ io.on('connection', async (socket) => {
   // for the old setInterval ws.ping() loop.
 
   socket.on('disconnect', (reason) => {
+    // A VIEWER leaving is worth a line of its own. Its token is single-use, so
+    // if it cannot recover inside connectionStateRecovery's 60s window it will
+    // retry for ever and be refused every time — and it goes on DRAWING while
+    // cut off, because after the opening frames it animates from its own timer.
+    // This is the only place that sees the moment it happens.
+    if (socket.data && socket.data.role === 'module') {
+      console.log(`[BD] viewer disconnected (${socket.data.moduleType || 'untyped'}) ` +
+                  `for ${socket.data.moduleFor}: ${reason} — 60s to recover before ` +
+                  `its spent token is re-checked and refused`);
+    }
     const userId = socket.data.userId;
     if (!userId) return;
     // Remove from sessions immediately so user_count broadcasts reflect the

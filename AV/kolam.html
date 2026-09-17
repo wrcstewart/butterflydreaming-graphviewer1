@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: RED (the viewer hands its state
-     to BD on the way back — it is about to close). Next rotation = green. */
+     change to a cached AV file. 2026-09-17: GREEN (the viewer watches its own
+     connection and says when it is cut off). Next rotation = blue. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
+    border: 2px solid #27ae60;              /* CANARY — green (was red) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -274,12 +274,36 @@
         return liveScript ? { script: liveScript, nodeId: showingNodeId } : null;
       },
 
+      // Once a minute. A viewer keeps drawing whether or not anyone is
+      // talking to it — it animates from its own timer — so being cut off
+      // looks exactly like working. Say the quiet part out loud.
+      onHealth: function (h) {
+        if (h.connected) {
+          const mins = h.sinceUpdate == null ? null : Math.round(h.sinceUpdate / 60);
+          say('live' + (mins ? ' · ' + mins + 'm since BD spoke' : ''));
+        } else {
+          say('NO CONTACT with ButterflyDreaming — press View there to reconnect', true);
+        }
+        // The detail lives in the tooltip rather than the strip, which has to
+        // stay small enough not to compete with the drawing.
+        try { status.title = JSON.stringify(h, null, 1); } catch (_) {}
+      },
+
       onState: function (state, info) {
         if (state === 'live')       say('live');
         else if (state === 'connecting') say('connecting…');
         else if (state === 'no-token')   say('opened without a session — open this from ButterflyDreaming', true);
-        else if (state === 'refused')    say('BD refused the session: ' + (info.reason || '') , true);
-        else if (state === 'lost')       say('connection lost — ' + (info.reason || ''), true);
+        else if (state === 'refused') {
+          // The single-use token is spent. This is not something the user did:
+          // past the 60s recovery window every retry is re-checked against a
+          // token that was consumed at first connect, so it can never succeed.
+          // Say what to do rather than what went wrong.
+          say(info && info.afterGoodConnection
+                ? 'contact lost for good — press View in ButterflyDreaming for a fresh viewer'
+                : 'BD refused the session: ' + ((info && info.reason) || ''), true);
+        }
+        else if (state === 'lost')       say('connection lost — ' + ((info && info.reason) || '') +
+                                             ' — reconnecting…', true);
       }
     });
   })();

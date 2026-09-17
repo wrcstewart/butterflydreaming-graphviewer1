@@ -70,6 +70,9 @@
     // Optional. Called when BD asks what this viewer is showing; return
     // { script, nodeId } or null. See the av_state_request handler below.
     const onStateRequest = typeof o.onStateRequest === 'function' ? o.onStateRequest : null;
+    // Optional. Called once a minute with a snapshot of the connection. See
+    // the monitor at the foot of connect() for why a viewer needs one.
+    const onHealth = typeof o.onHealth === 'function' ? o.onHealth : null;
 
     const token = readToken();
     if (!token) {
@@ -88,7 +91,65 @@
     onState('connecting', { bdOrigin });
     const socket = root.io(bdOrigin, { auth: { token } });
 
+    // ── Connection monitor (2026-09-17) ───────────────────────────────────
+    //
+    // A viewer can go on rendering perfectly while being completely cut off,
+    // because after the first frames it is animating from its own timer and
+    // BD deliberately stays quiet during drift. Reported after 45 minutes:
+    // "both are still happily processing the graphic but it seems no longer
+    // in sync and they have lost contact with each other." Nothing on screen
+    // said so.
+    //
+    // THE LIKELY CAUSE, and it is structural rather than anything the user
+    // did: the MST is single-use. The server's connectionStateRecovery covers
+    // a 60-second gap with skipMiddlewares, so a brief drop is invisible. Past
+    // that window a reconnect is a FRESH connection, the handshake middleware
+    // runs, and the token was consumed at first connect — so every retry is
+    // refused as module_token_invalid, for ever. Socket.IO keeps trying and
+    // never succeeds.
+    //
+    // So: watch, and SAY so. A silent failure that looks like success is the
+    // thing worth instrumenting.
+    const health = {
+      connectedAt:  null,
+      lastUpdateAt: null,
+      drops:        0,
+      lastError:    null,
+      everConnected: false
+    };
+
+    function healthSnapshot() {
+      const now = Date.now();
+      let transport = null;
+      try { transport = socket.io.engine.transport.name; } catch (_) {}
+      return {
+        connected:    !!socket.connected,
+        id:           socket.id || null,
+        transport:    transport,
+        upSeconds:    health.connectedAt  ? Math.round((now - health.connectedAt)  / 1000) : null,
+        sinceUpdate:  health.lastUpdateAt ? Math.round((now - health.lastUpdateAt) / 1000) : null,
+        drops:        health.drops,
+        lastError:    health.lastError,
+        everConnected: health.everConnected
+      };
+    }
+    // Exposed so a viewer (or a person in a console) can ask at any moment,
+    // not only on the minute.
+    socket.bdHealth = healthSnapshot;
+
+    const healthTimer = setInterval(function () {
+      const snap = healthSnapshot();
+      try { console.log('[AV health] ' + JSON.stringify(snap)); } catch (_) {}
+      if (onHealth) { try { onHealth(snap); } catch (_) {} }
+    }, 60 * 1000);
+    try {
+      root.addEventListener('pagehide', function () { clearInterval(healthTimer); });
+    } catch (_) {}
+
     socket.on('connect', function () {
+      health.connectedAt   = Date.now();
+      health.everConnected = true;
+      health.lastError     = null;
       onState('live', { id: socket.id });
       // Ask for the current state immediately. A viewer knows exactly when it
       // is ready and nobody else does, so asking beats being guessed at — BD
@@ -101,11 +162,21 @@
     // the token is single-use and already consumed, or it expired, and either
     // way only BD can issue another.
     socket.on('connect_error', function (err) {
-      onState('refused', { reason: (err && err.message) || 'connect_error' });
+      health.lastError = (err && err.message) || 'connect_error';
+      // A refusal AFTER a good connection is the token having been spent: the
+      // recovery window lapsed and the handshake is being re-checked against a
+      // token that no longer exists. Distinguished from a refusal on the very
+      // first attempt, which means the link was already stale when opened.
+      onState('refused', {
+        reason: health.lastError,
+        afterGoodConnection: health.everConnected
+      });
     });
 
     socket.on('disconnect', function (reason) {
-      onState('lost', { reason });
+      health.drops += 1;
+      health.connectedAt = null;
+      onState('lost', { reason, drops: health.drops });
     });
 
     // Re-ask when the page comes back to the foreground.
@@ -125,7 +196,7 @@
     socket.on('msg', function (m) {
       if (!m) return;
 
-      if (m.type === 'av_update') { onUpdate(m.payload); return; }
+      if (m.type === 'av_update') { health.lastUpdateAt = Date.now(); onUpdate(m.payload); return; }
 
       // BD asking "what are you showing?" — 2026-09-16.
       //
