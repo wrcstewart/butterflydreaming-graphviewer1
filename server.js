@@ -1532,13 +1532,18 @@ io.on('connection', async (socket) => {
       //   av_state_report  solicited ONLY: BD asks, the viewer answers. A
       //                    viewer that sends one unbidden is merely ignored by
       //                    BD, which is not listening except after a request.
+      //   av_return        "the user pressed the way-back button". CARRIES NO
+      //                    PAYLOAD, deliberately: BD decides where to go, from
+      //                    the node IT believes the viewer is on. So a viewer
+      //                    can say that a person asked to come back, and
+      //                    cannot say where to.
       //
-      // Note what is still absent: a viewer cannot push, cannot address
-      // anything, and cannot reach a single one of the corpus handlers.
+      // Note what is still absent: a viewer cannot push, cannot name a
+      // destination, and cannot reach a single one of the corpus handlers.
       //
       // Silent: a viewer has no UI in which to show a protocol error, and a
       // reply would tell a prober which names exist.
-      const MODULE_MAY_SEND = new Set(['av_hello', 'av_state_report']);
+      const MODULE_MAY_SEND = new Set(['av_hello', 'av_state_report', 'av_return']);
       if (socket.data.role === 'module' && !MODULE_MAY_SEND.has(type)) return;
       // Activity clock for the idle reaper. client_log is deliberately
       // excluded: a tab forwarding console noise is not a user doing
@@ -1592,6 +1597,18 @@ io.on('connection', async (socket) => {
           asked++;
         }
         if (asked) console.log(`[BD] av_pull -> asked ${asked} viewer(s) for ${socket.data.userId}`);
+        return;
+      }
+
+      // "The user pressed the way-back button." Relayed as a bare signal — note
+      // that nothing from msg is forwarded, so there is no field through which
+      // a viewer could suggest a destination.
+      if (type === 'av_return') {
+        if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
+        const owner = sessions.get(socket.data.moduleFor);
+        if (!owner) return;
+        owner.emit('msg', { type: 'av_return' });
+        console.log(`[BD] av_return -> ${socket.data.moduleFor}`);
         return;
       }
 

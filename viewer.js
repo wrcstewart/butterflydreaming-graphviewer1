@@ -11892,6 +11892,26 @@ async function init() {
       handleBuddyCardAck(msg);
     } else if (msg.type === 'chat_ready') {
       handleChatReady();
+    } else if (msg.type === 'av_return') {
+      // The viewer's way-back button. BD decides the destination — the node it
+      // believes the viewer is on — so the viewer cannot steer navigation.
+      //
+      // Raising this window is attempted but not relied on: browsers largely
+      // refuse to bring another window forward on a page's say-so, and when
+      // BD and the viewer sit side by side a successful raise looks like
+      // nothing anyway. Landing on the right NODE is the part that shows.
+      try { window.focus(); } catch (_) {}
+      if (avNodeId) {
+        const n = cy.getElementById(avNodeId);
+        if (n && n.length) {
+          jumpToNode(n);
+          console.log('[AV] return: opened ' + avNodeId);
+        } else {
+          console.log('[AV] return: node ' + avNodeId + ' is not on the graph');
+        }
+      } else {
+        console.log('[AV] return: no node recorded for the viewer');
+      }
     } else if (msg.type === 'av_state_report') {
       applyAVStateReport(msg);
     } else if (msg.type === 'cluster_rel_saved' || msg.type === 'cluster_rel_deleted') {

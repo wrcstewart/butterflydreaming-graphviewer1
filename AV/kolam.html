@@ -55,14 +55,14 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: GREEN (the viewer now tracks
-     WHICH node it is showing, not the one it was launched from).
-     Next rotation = blue. */
+     change to a cached AV file. 2026-09-17: BLUE (the way-back button now
+     returns BD to the node, not just raises the window).
+     Next rotation = red. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #27ae60;              /* CANARY — green (was red) */
+    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -198,15 +198,43 @@
     } catch (_) { /* keep the default label */ }
 
     backBtn.addEventListener('click', function () {
+      const roomForBoth = backBtn.textContent === 'ButterflyDreaming';
+
+      // 1. Ask BD to come back to this node.
+      //
+      // This is the part that actually shows. Raising another window is
+      // largely refused by browsers on a page's say-so, and where BD and the
+      // viewer sit side by side a successful raise looks identical to nothing
+      // happening — which is exactly how this button was reported: "nothing
+      // happens when I press it". It may well have been raising all along.
+      //
+      // NO PAYLOAD. BD decides where to go, from the node it believes this
+      // viewer is on. The viewer says that a person asked to go back; it does
+      // not say where back is.
+      let told = false;
+      try {
+        const sock = window.__avSocket;
+        if (sock && sock.connected) { sock.emit('msg', { type: 'av_return' }); told = true; }
+      } catch (_) {}
+
+      // 2. Best-effort raise. Kept because it costs nothing and works in some
+      //    browsers; never depended on.
       let raised = false;
       try {
         if (window.opener && !window.opener.closed) { window.opener.focus(); raised = true; }
       } catch (_) {}
-      // Close only when the viewer is in the way — the phone case. On a desktop
-      // the two windows sit side by side and closing the one you are working
-      // with, every time you glance at the controls, would be absurd.
-      const roomForBoth = backBtn.textContent === 'ButterflyDreaming';
+
+      // 3. Close only when the viewer is in the way — the phone case. On a
+      //    desktop the two windows sit side by side and closing the one you are
+      //    working with, every time you glance at the controls, would be absurd.
       if (!roomForBoth || !raised) { try { window.close(); } catch (_) {} }
+
+      // 4. Say what happened. A button whose whole effect may be invisible
+      //    must not also be silent.
+      if (roomForBoth) {
+        say(told ? 'ButterflyDreaming is on this node'
+                 : 'cannot reach ButterflyDreaming', !told);
+      }
     });
 
     window.__avSocket = BD_AV.connect({
