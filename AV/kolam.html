@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: GREEN (the viewer watches its own
-     connection and says when it is cut off). Next rotation = blue. */
+     change to a cached AV file. 2026-09-17: BLUE (a viewer whose token is
+     spent asks BD for another). Next rotation = red. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #27ae60;              /* CANARY — green (was red) */
+    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -289,8 +289,12 @@
         try { status.title = JSON.stringify(h, null, 1); } catch (_) {}
       },
 
+      // Tells the shim which kind of replacement token to ask BD for.
+      moduleId: 'bd_V_Kolam',
+
       onState: function (state, info) {
         if (state === 'live')       say('live');
+        else if (state === 'renewing')   say('reconnecting to ButterflyDreaming…');
         else if (state === 'connecting') say('connecting…');
         else if (state === 'no-token')   say('opened without a session — open this from ButterflyDreaming', true);
         else if (state === 'refused') {
@@ -298,8 +302,11 @@
           // past the 60s recovery window every retry is re-checked against a
           // token that was consumed at first connect, so it can never succeed.
           // Say what to do rather than what went wrong.
+          // Only reached once renewal has been tried and failed, or is
+          // impossible (no opener — a viewer reopened from history, or a
+          // third-party one). Then the honest answer is to launch a new one.
           say(info && info.afterGoodConnection
-                ? 'contact lost for good — press View in ButterflyDreaming for a fresh viewer'
+                ? 'lost contact — press View in ButterflyDreaming for a fresh viewer'
                 : 'BD refused the session: ' + ((info && info.reason) || ''), true);
         }
         else if (state === 'lost')       say('connection lost — ' + ((info && info.reason) || '') +

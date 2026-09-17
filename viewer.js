@@ -564,6 +564,56 @@ function applyAVStateReport(msg) {
   } catch (_) {}
 }
 
+// ── Re-issuing a token to a viewer whose own has been spent (2026-09-17) ────
+//
+// An MST is single-use, so a viewer that drops for longer than the server's
+// 60-second recovery window can never reconnect: every retry re-runs the
+// handshake against a token that no longer exists. Observed as a viewer and a
+// BD both drawing happily, out of sync, silently out of contact, after 45
+// minutes.
+//
+// The viewer asks us for another. Only BD can mint one, which is unchanged —
+// this is a request, not the viewer helping itself.
+//
+// Three things narrow it, and all three matter:
+//   · SAME ORIGIN only. A viewer we served is same-origin; a third-party
+//     viewer is not and will not be answered — for those the honest answer is
+//     still "press View again", and the message says so.
+//   · Only a window WE OPENED. avWindows holds the handles, so a same-origin
+//     page that merely guessed the message shape gets nothing.
+//   · The reply is aimed at our own origin, so it is not readable elsewhere.
+//
+// The token itself is minted by the server exactly as the first one was, with
+// the same TTL and the same single use. Nothing is loosened; the viewer simply
+// gets a new one instead of being stranded with a dead one.
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', async (e) => {
+    if (e.origin !== window.location.origin) return;
+    const d = e && e.data;
+    if (!d || d.type !== 'bd_av_token_request') return;
+
+    let known = false;
+    try {
+      for (const w of avWindows.values()) if (w === e.source) { known = true; break; }
+    } catch (_) {}
+    if (!known) {
+      console.warn('[AV] token asked for by a window BD did not open — refused');
+      return;
+    }
+
+    const moduleId = typeof d.moduleId === 'string' ? d.moduleId : null;
+    if (!window.bdRequestModuleToken) return;
+    const token = await window.bdRequestModuleToken(moduleId);
+    if (!token) { console.warn('[AV] could not mint a replacement token'); return; }
+    try {
+      e.source.postMessage({ type: 'bd_av_token', token }, window.location.origin);
+      console.log('[AV] re-issued a token to the ' + (moduleId || 'untyped') + ' viewer');
+    } catch (err) {
+      console.warn('[AV] could not hand the replacement token over', err);
+    }
+  });
+}
+
 function pushToAV(script, moduleId) {
   try {
     if (typeof script !== 'string' || !script) return;

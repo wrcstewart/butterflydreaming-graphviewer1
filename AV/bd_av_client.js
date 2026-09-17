@@ -73,6 +73,9 @@
     // Optional. Called once a minute with a snapshot of the connection. See
     // the monitor at the foot of connect() for why a viewer needs one.
     const onHealth = typeof o.onHealth === 'function' ? o.onHealth : null;
+    // Which kind of viewer this is. Used when asking BD for a fresh token so
+    // the replacement is minted for the right module type.
+    const moduleId = typeof o.moduleId === 'string' ? o.moduleId : null;
 
     const token = readToken();
     if (!token) {
@@ -137,10 +140,75 @@
     // not only on the minute.
     socket.bdHealth = healthSnapshot;
 
+    // ── Renewing a spent token (2026-09-17) ───────────────────────────────
+    //
+    // The MST is single-use, so a drop longer than the 60s recovery window is
+    // fatal: every retry re-runs the handshake against a token that no longer
+    // exists. The viewer then draws on, perfectly and alone, for ever.
+    //
+    // But BD is usually still there — on a desktop it is the window that
+    // opened this one, and it is SAME ORIGIN, so we can simply ask it for
+    // another. Only BD can mint one; that has not changed. This is the viewer
+    // asking, not helping itself.
+    //
+    // postMessage is aimed AT bdOrigin and replies are accepted only FROM
+    // bdOrigin, so neither the request nor the answer is readable by a page
+    // that happens to be open elsewhere. BD additionally answers only windows
+    // it opened itself.
+    //
+    // Bounded: a few attempts, spaced, then it gives up and says so. A viewer
+    // that silently retries for ever is the failure this whole change exists
+    // to stop repeating in a different form.
+    const RENEW_MAX      = 5;
+    const RENEW_SPACING  = 10 * 1000;
+    let   renewing       = false;
+    let   renewCount     = 0;
+    let   lastRenewAt    = 0;
+
+    function tryRenewToken(why) {
+      if (renewing) return false;
+      if (renewCount >= RENEW_MAX) return false;
+      if (Date.now() - lastRenewAt < RENEW_SPACING) return false;
+      let opener = null;
+      try { opener = root.opener; } catch (_) { opener = null; }
+      if (!opener || opener.closed) return false;
+      renewing    = true;
+      lastRenewAt = Date.now();
+      renewCount += 1;
+      onState('renewing', { why: why, attempt: renewCount });
+      try {
+        opener.postMessage({ type: 'bd_av_token_request', moduleId: moduleId }, bdOrigin);
+      } catch (_) { renewing = false; return false; }
+      setTimeout(function () {
+        if (!renewing) return;
+        renewing = false;
+        onState('refused', { reason: 'ButterflyDreaming did not answer', afterGoodConnection: true });
+      }, 5000);
+      return true;
+    }
+
+    try {
+      root.addEventListener('message', function (e) {
+        if (e.origin !== bdOrigin) return;              // only BD may answer
+        const d = e.data;
+        if (!d || d.type !== 'bd_av_token' || typeof d.token !== 'string') return;
+        renewing = false;
+        try {
+          socket.auth = { token: d.token };             // used on the NEXT attempt
+          if (socket.connected) socket.disconnect();
+          socket.connect();
+          onState('connecting', { bdOrigin: bdOrigin, renewed: true });
+        } catch (_) {}
+      });
+    } catch (_) {}
+
     const healthTimer = setInterval(function () {
       const snap = healthSnapshot();
       try { console.log('[AV health] ' + JSON.stringify(snap)); } catch (_) {}
       if (onHealth) { try { onHealth(snap); } catch (_) {} }
+      // A minute disconnected, having once been connected, is a spent token
+      // until proven otherwise. Try to replace it.
+      if (!snap.connected && snap.everConnected) tryRenewToken('minute check');
     }, 60 * 1000);
     try {
       root.addEventListener('pagehide', function () { clearInterval(healthTimer); });
@@ -167,6 +235,9 @@
       // recovery window lapsed and the handshake is being re-checked against a
       // token that no longer exists. Distinguished from a refusal on the very
       // first attempt, which means the link was already stale when opened.
+      // A refusal after a good connection IS the spent token. Ask BD for
+      // another rather than retrying one that can never work again.
+      if (health.everConnected && tryRenewToken('token refused')) return;
       onState('refused', {
         reason: health.lastError,
         afterGoodConnection: health.everConnected
