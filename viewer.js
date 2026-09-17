@@ -574,7 +574,20 @@ function pushToAV(script, moduleId) {
     // deliver it to a viewer of another type. Derived from the script itself
     // when the caller does not say, so no call site can forget to label one.
     const forType = moduleId || (typeof parseModuleId === 'function' ? parseModuleId(script) : null);
-    ws.emit('msg', { type: 'av_push', moduleId: forType || undefined, payload: { script } });
+    // nodeId travels with EVERY push — 2026-09-17.
+    //
+    // The viewer FOLLOWS BD from node to node, so the id handed over in the
+    // launch URL goes stale the moment it follows. It would then report the
+    // node it was launched from while showing a different one, BD would see a
+    // mismatch and refuse to adopt, and the resync would quietly stop working
+    // after the first change of node. Safe, but silently useless — the worst
+    // kind of wrong. So the viewer is told which node each script belongs to,
+    // and echoes back whichever it last received.
+    ws.emit('msg', {
+      type: 'av_push',
+      moduleId: forType || undefined,
+      payload: { script, nodeId: avNodeId || null }
+    });
   } catch (_) { /* a viewer is an extra, never a reason to break the main path */ }
 }
 

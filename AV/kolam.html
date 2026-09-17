@@ -55,13 +55,14 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-16: RED (the viewer answers BD when
-     asked what it is showing). Next rotation = green. */
+     change to a cached AV file. 2026-09-17: GREEN (the viewer now tracks
+     WHICH node it is showing, not the one it was launched from).
+     Next rotation = blue. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
+    border: 2px solid #27ae60;              /* CANARY — green (was red) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -134,11 +135,13 @@
     // is what lets the viewer answer BD's av_state_request, and it is the ONLY
     // place the drift that happened while BD was asleep is recorded.
     //
-    // nodeId comes from BD in the launch URL and is echoed back untouched, so
-    // BD can verify an answer is about the node it asked about rather than
-    // assuming. The viewer never interprets it.
+    // nodeId identifies WHICH node the script belongs to. It arrives in the
+    // launch URL and is then updated by every push, because this viewer FOLLOWS
+    // BD from node to node — an id fixed at launch would go stale the moment it
+    // did, and BD would reject the answer as being about the wrong node.
+    // Echoed back untouched; the viewer never interprets it.
     let liveScript = null;
-    const launchNodeId = new URLSearchParams(location.search).get('n');
+    let showingNodeId = new URLSearchParams(location.search).get('n');
 
     window.addEventListener('message', function (e) {
       const d = e && e.data;
@@ -218,6 +221,7 @@
         // the same text the editor and the standalone use.
         const script = (payload && payload.script) || (typeof payload === 'string' ? payload : null);
         if (!script) return;
+        if (payload && typeof payload.nodeId === 'string') showingNodeId = payload.nodeId;
         post(script);
         // Real content has arrived — reveal. Until now the module has been
         // showing its own default behind a hidden frame.
@@ -228,7 +232,7 @@
       // Solicited only — BD asks, we answer. Null until the renderer has
       // actually drawn something, which is the honest answer at that point.
       onStateRequest: function () {
-        return liveScript ? { script: liveScript, nodeId: launchNodeId } : null;
+        return liveScript ? { script: liveScript, nodeId: showingNodeId } : null;
       },
 
       onState: function (state, info) {
