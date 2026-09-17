@@ -5313,9 +5313,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   function openNodeAsTap(node, opts) {
     if (!node || !node.length) return;
     markReadNode(node, cy);
-    if (opts && opts.fresh && readingState && readingState.nodeId === node.id()) {
-      readingState = null;
-    }
+    if (opts && opts.fresh) armFreshOpen(node);
     advanceOrNavigate(node);
   }
 
@@ -6937,6 +6935,34 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   function setSendBtn(el) { sendBtnEl = el; updateSendBtn(); }
 
+  // Make a re-arrival at a node BD is ALREADY on behave like a first arrival.
+  //
+  // 2026-09-17 — two pieces of state conspire to make "go back to this node"
+  // do nothing at all:
+  //
+  //   readingState         advanceOrNavigate is a one-gesture toggle, so on a
+  //                        node it already names, with chunks exhausted, it
+  //                        deliberately returns having done nothing.
+  //   lastAutoPlayerNodeId having auto-engaged Player for node X once, it
+  //                        never engages for X again. So even a fresh card
+  //                        left the user on a graph with no player.
+  //
+  // Both are correct for what they guard — a finger tapping the same node
+  // twice, and repeated updateSendBtn calls dragging someone back into Player
+  // after they chose Nodes. Both are wrong for an EXPLICIT request to show a
+  // node: the way-back button, or a tap on a module node while out of Player.
+  //
+  // Cleared HERE, at the moment of the request, and NOT when Player is left.
+  // Clearing on exit was the first thing I tried and it is a trap: with
+  // readingState still naming the node, the very next updateSendBtn would see
+  // a fresh landing and auto-engage Player again, dragging the user straight
+  // back in — the exact thing the guard exists to prevent.
+  function armFreshOpen(node) {
+    if (!node || !node.length) return;
+    if (readingState && readingState.nodeId === node.id()) readingState = null;
+    lastAutoPlayerNodeId = null;
+  }
+
   // Auto-Player bookkeeping (2026-08-09, reworked 2026-08-19). The original
   // `prevHasModule` was a single sticky boolean, and that was the bug: once a
   // module script reached the top Current card — exactly what the ↓ arrow does
@@ -8451,6 +8477,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // would leave the flag armed to eat the next legitimate save.
     skipNextSave = routeActive;
     exitRouteView();
+    // Tapping a MODULE node while not in Player means "bring the player back",
+    // and advanceOrNavigate would otherwise no-op because readingState still
+    // names this node from before Local was pressed. Same distinction the
+    // way-back button needed: a toggle is right for a finger returning to a
+    // node it is already reading, wrong for a gesture that means "show me
+    // this". Narrowed to module nodes out of Player so ordinary tap-again
+    // behaviour everywhere else is untouched.
+    if (!document.body.classList.contains('player-active') &&
+        /^%%bd_module\s/m.test(node.data('text') || '')) {
+      armFreshOpen(node);
+    }
     advanceOrNavigate(node);
   });
 
