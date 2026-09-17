@@ -11967,6 +11967,21 @@ async function init() {
       // BD and the viewer sit side by side a successful raise looks like
       // nothing anyway. Landing on the right NODE is the part that shows.
       try { window.focus(); } catch (_) {}
+      // Take the viewer's state BEFORE opening the node, so the open reads it.
+      //
+      // loadModuleForNode consults explorationByNode on its way in, so seeding
+      // the cache first means the node opens ALREADY at the viewer's state.
+      // Doing it the other way round would open at BD's stale state and then
+      // correct it — a visible jump back and forth, and on a phone over
+      // Cloudflare a slow one.
+      //
+      // BD picks the node; the viewer only supplied the values. Merging
+      // happens in loadModuleForNode, values-only onto the saved text, so a
+      // viewer still cannot introduce a directive or touch the score block.
+      if (typeof msg.script === 'string' && msg.script && avNodeId) {
+        explorationByNode.set(avNodeId, msg.script);
+        console.log('[AV] return: took the viewer\'s state for ' + avNodeId);
+      }
       if (avNodeId) {
         const n = cy.getElementById(avNodeId);
         if (n && n.length) {

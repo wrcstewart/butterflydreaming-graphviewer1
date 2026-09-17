@@ -1532,11 +1532,16 @@ io.on('connection', async (socket) => {
       //   av_state_report  solicited ONLY: BD asks, the viewer answers. A
       //                    viewer that sends one unbidden is merely ignored by
       //                    BD, which is not listening except after a request.
-      //   av_return        "the user pressed the way-back button". CARRIES NO
-      //                    PAYLOAD, deliberately: BD decides where to go, from
-      //                    the node IT believes the viewer is on. So a viewer
-      //                    can say that a person asked to come back, and
-      //                    cannot say where to.
+      //   av_return        "the user pressed the way-back button", and what
+      //                    the viewer was showing when they did. It may carry
+      //                    a SCRIPT and nothing else — no destination. So a
+      //                    viewer can say what it had, and still cannot say
+      //                    where BD should go: BD decides that, from the node
+      //                    IT believes the viewer is on.
+      //
+      //                    The script rides along because on a phone the
+      //                    viewer CLOSES itself on the way back, so there is
+      //                    nobody left to ask afterwards.
       //
       // Note what is still absent: a viewer cannot push, cannot name a
       // destination, and cannot reach a single one of the corpus handlers.
@@ -1600,9 +1605,10 @@ io.on('connection', async (socket) => {
         return;
       }
 
-      // "The user pressed the way-back button." Relayed as a bare signal — note
-      // that nothing from msg is forwarded, so there is no field through which
-      // a viewer could suggest a destination.
+      // "The user pressed the way-back button", plus what the viewer was
+      // showing. ONLY the script is forwarded — every other field is dropped,
+      // so there remains no channel through which a viewer could suggest a
+      // destination. It says what it had; BD decides where that applies.
       if (type === 'av_return') {
         if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
         const owner = sessions.get(socket.data.moduleFor);
@@ -1616,8 +1622,10 @@ io.on('connection', async (socket) => {
         if (owner.disconnected) {
           console.log(`[BD] av_return: session ${socket.data.moduleFor} is registered but disconnected`);
         }
-        owner.emit('msg', { type: 'av_return' });
-        console.log(`[BD] av_return -> ${socket.data.moduleFor}`);
+        const script = typeof msg.script === 'string' ? msg.script : null;
+        owner.emit('msg', { type: 'av_return', script });
+        console.log(`[BD] av_return -> ${socket.data.moduleFor}` +
+                    (script ? ` (with state, ${script.length} chars)` : ' (no state)'));
         return;
       }
 

@@ -55,14 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: BLUE (the way-back button now
-     returns BD to the node, not just raises the window).
-     Next rotation = red. */
+     change to a cached AV file. 2026-09-17: RED (the viewer hands its state
+     to BD on the way back — it is about to close). Next rotation = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
+    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -211,10 +210,22 @@
       // NO PAYLOAD. BD decides where to go, from the node it believes this
       // viewer is on. The viewer says that a person asked to go back; it does
       // not say where back is.
+      // The live script goes WITH the request. On a phone this window closes
+      // a few lines below, so there is nobody left for BD to ask afterwards —
+      // and BD has been backgrounded and throttled the whole time you were
+      // looking at this, so its own idea of the state is however stale the
+      // suspension made it. This is the only moment the drift that happened
+      // here can be handed over.
+      //
+      // No destination: BD decides which node this applies to. The server
+      // forwards the script and drops every other field.
       let told = false;
       try {
         const sock = window.__avSocket;
-        if (sock && sock.connected) { sock.emit('msg', { type: 'av_return' }); told = true; }
+        if (sock && sock.connected) {
+          sock.emit('msg', { type: 'av_return', script: liveScript || undefined });
+          told = true;
+        }
       } catch (_) {}
 
       // 2. Best-effort raise. Kept because it costs nothing and works in some
