@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: RED (the monitor survives an
-     ordinary update instead of vanishing). Next rotation = green. */
+     change to a cached AV file. 2026-09-17: GREEN (a resend is not a change;
+     monitor readable at .8 while debugging). Next rotation = blue. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
+    border: 2px solid #27ae60;              /* CANARY — green (was red) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -80,7 +80,10 @@
      fade: a monitor you cannot see is not a monitor, and this one vanished the
      first time a stepper was moved because an ordinary update re-rendered the
      strip as the bare word "live". */
-  #status.health { opacity: .5; }
+  /* 0.8 while this is being watched. Drop it back once the connection
+     question is settled — the strip is meant to be quiet, not invisible, and
+     at .5 it was reported as hard to read. */
+  #status.health { opacity: .8; }
   #status.problem { color: #d98a8a; opacity: 1; }
 </style>
 </head>
@@ -180,7 +183,9 @@
     // through it. Transient messages (connecting, renewing, refused) still use
     // say(); the monitor re-asserts itself afterwards.
     let lastHealth   = null;   // the minute snapshot, for the tooltip
-    let lastUpdateAt = null;
+    let lastUpdateAt = null;   // last time the script actually DIFFERED
+    let lastScript   = null;   // what it was, so a resend can be recognised
+    let resends      = 0;
     // Connectivity is tracked HERE rather than read from lastHealth, for two
     // reasons: the snapshot is up to a minute old, and waiting a minute to
     // show anything would leave the strip blank exactly when a viewer is being
@@ -205,7 +210,12 @@
       status.textContent = 'live · ' + age;
       status.classList.remove('live', 'problem');
       status.classList.add('health');
-      if (lastHealth) { try { status.title = JSON.stringify(lastHealth, null, 1); } catch (_) {} }
+      if (lastHealth) {
+        try {
+          status.title = JSON.stringify(
+            Object.assign({}, lastHealth, { resendsIgnored: resends }), null, 1);
+        } catch (_) {}
+      }
       return true;
     }
 
@@ -317,9 +327,26 @@
         // Real content has arrived — reveal. Until now the module has been
         // showing its own default behind a hidden frame.
         frame.classList.remove('waiting');
-        lastUpdateAt = Date.now();
-        // Re-render the monitor rather than overwriting it with a bare "live",
-        // which is what made it disappear on the first stepper change.
+
+        // An arriving update is not necessarily a CHANGE — 2026-09-17.
+        //
+        // The shim re-sends av_hello on visibilitychange, and BD answers with
+        // whatever it currently holds. So a monitor waking from sleep, or a
+        // tab being switched to, produces an av_update carrying exactly the
+        // script already on screen. Counting those made the strip report
+        // "last change 4s ago" when nothing had been touched for an hour,
+        // which is how this was noticed: changes "much more recent than any
+        // changes I have made, other than the screen going live".
+        //
+        // The monitor is meant to answer "is BD still talking to me and is it
+        // saying anything new". A resend answers the first and not the second,
+        // so it is counted separately and does not move the clock.
+        if (script !== lastScript) {
+          lastScript   = script;
+          lastUpdateAt = Date.now();
+        } else {
+          resends += 1;
+        }
         if (!showHealth()) say('live');
       },
 
