@@ -6,6 +6,43 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-16 → 2026-09-17 — BD and the viewer reconcile, and the renderer gets a voice
+
+**The renderer stopped being blind.** `visual_module.html` runs in an iframe, so
+its console and uncaught errors reached nobody — and `render()` catches its own
+exceptions, making a throw silent twice over. Three bugs in this area had been
+debugged without ever seeing what the renderer thought was happening. It now
+forwards to BD and so to the server log. The very next press found the fault
+that two rounds of reasoning had missed.
+
+**The Down button was delivering a script with the L-system removed.**
+`getCardText` was `body.textContent`, but a chunk card's body is several block
+divs and textContent joins them with no separator — welding the tap-hint onto
+`%%bd_]` so the score block never closed and the renderer threw for want of an
+axiom. `readChunkBody`, the inverse the Save path already used, was the fix.
+The same lesson as September's Sv incident: a renderer needs its inverse beside
+it.
+
+**The angle became a full turn.** Three definitions of its range disagreed —
+input, render clamp and drift wrap — so drift walked 270 degrees that all drew
+identically as 90, and at high drift the pattern visibly froze in under three
+minutes. Now one definition, 0..359, wrapping. `angle_minutes` is a visible
+stepper again, because the script records it and the user had no way to set it.
+
+**BD and the viewer now reconcile state**, in three parts: an exploration cache
+so wandering off no longer destroys the steppers; one viewer per module type,
+so a Kolam script can never reach a music viewer; and the viewer handing its
+state back — carried *with* the return, because on a phone the way-back button
+closes the viewer and there is nobody left to ask afterwards.
+
+**The way-back button grew up.** It only raised the window, which on a desktop
+looks identical to doing nothing. It now opens the node — card and Player — the
+way a tap does, and clears the two guards (`readingState`,
+`lastAutoPlayerNodeId`) that made a return to a node BD was already on a silent
+no-op.
+
+---
+
 ## 2026-09-14 → 2026-09-15 — Ancillary Viewers, and closing three write holes
 
 > **Gap notice.** The entry below this one is dated 2026-07-24. This file was

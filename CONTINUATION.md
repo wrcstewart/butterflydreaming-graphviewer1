@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08, updated 2026-09-12 and 2026-09-15
+# Continuation note — 2026-09-08, updated 2026-09-12, 09-15 and 09-17
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -129,6 +129,77 @@ them.** BD's is `#copy-link-btn`'s border (`style.css`), the AV's is `#back`'s
 (`AV/kolam.html`). They are deliberately out of step. **The media modules have
 no canary host at all**, which is why renderer changes also bump
 `AV/kolam.html`'s `?v=` — currently `?v=9`.
+
+---
+
+## 1c. Where it stands on 2026-09-17
+
+Still `remote-graph-view`, all pushed, working tree clean.
+
+**BD and the AV now reconcile state.** Three mechanisms, built in this order
+and all verified:
+
+1. **Exploration cache** — wandering off and returning no longer destroys the
+   explored steppers. Per node, in memory, VALUES merged onto the node's saved
+   text. Needs no viewer and no network; fixes the desktop case on its own.
+2. **One viewer per module TYPE** — the token carries the module id and
+   `av_push` filters on it server-side, so a Kolam script cannot reach a music
+   viewer. `avWindows` is a Map now, not a single handle.
+3. **The viewer hands its state back** — carried WITH `av_return`, because on a
+   phone the way-back button closes the viewer and there is nobody left to ask
+   afterwards.
+
+**Confirmed working by the author:** the Down button, the angle cycle, Local →
+node → Player, and the iOS round trip. The exploration cache is confirmed on
+laptop.
+
+### If something in this area misbehaves, read the log FIRST
+
+`/private/tmp/bd_server.log` now carries far more than it did. As of 09-16 the
+**renderer is no longer blind** — `visual_module.html` forwards its console and
+uncaught errors as `[module] …`. That single change found the Down-button bug
+in one press after two rounds of reasoning had missed it.
+
+Lines worth knowing:
+
+    [module] script in: N chars, 14 directives {...}   what the renderer GOT
+    [module] render error: <message>                    it throws silently otherwise
+    [Copy Up] writing N chars into: <card>              which card was written
+    [View] reading from: <card>                         which card was read
+    [BD] restored exploration for <node>                the cache fired
+    [AV] return: took the viewer's state for <node>     the phone hand-over
+    [BD] av_return -> <user> (with state, N chars)      server side of it
+    [BD] av_return from a viewer whose session ... gone the orphan case
+    [bg] BD hidden N s — timers x/y (z% of real time)   how asleep BD was
+
+### Three traps that cost time here, all now in the code as comments
+
+- **A BUILT card must be READ BACK, not flattened.** `getCardText` was
+  `body.textContent`; a chunk body is several block divs and textContent joins
+  them with NO separator, welding the hint onto `%%bd_]` so the score block
+  never closed. `readChunkBody` is the inverse and already existed. This is the
+  Sv lesson from September repeating.
+- **`advanceOrNavigate` is a TOGGLE.** Clearing `readingState` +
+  `lastAutoPlayerNodeId` must happen on the REQUEST (`armFreshOpen`), never on
+  leaving Player — clearing on exit makes the next `updateSendBtn` drag the
+  user straight back into Player.
+- **`jumpToNode` is not a tap.** A tap is `markReadNode` then
+  `advanceOrNavigate`; that pair is `openNodeAsTap`.
+
+### Still open
+
+- **Curation UI end-to-end test** — unchanged since 09-15 and still the one
+  unverified thing. Sv / Wr / the cluster editor have not been clicked since
+  the client began sending a code on three messages that never carried one.
+- **`[bg]` probe has never been read.** One phone round trip would give the
+  real number for how throttled BD is while backgrounded.
+- **`V_Kolam/preview.html` has diverged four ways** from the live renderer
+  (angle 5..90, no angle_minutes, step capped at 200, colour shown as the
+  exponent). A shared link renders differently there. Standalones are frozen,
+  so unfreezing one is the author's call.
+- **No viewer page for ABC or Fractal**, so the per-type rule is built but not
+  visible — a second window has nothing to open.
+- **QR / cross-device viewer** — designed, entirely BD-side, not built.
 
 ---
 

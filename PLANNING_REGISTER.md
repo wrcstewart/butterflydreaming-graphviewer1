@@ -256,6 +256,16 @@ Not a schedule — a list of what has been designed and not built.
 | Ink promotion stage 2 | `ink_promotion_plan.md` | Walk every view under the achromatic default. |
 | `MEMORY.md` index discipline | — | The index hit 29 KB against a ~24 KB load limit on 2026-09-12 and was being truncated. Trimmed to 15 KB by moving detail into topic files. **Keep entries under ~230 chars.** |
 
+## Added 2026-09-17
+
+| item | where | note |
+|---|---|---|
+| **Down button fixed** | `viewer.js` | **BUILT** (`b8f0b6e`). `getCardText` flattened a BUILT card with `textContent`, welding the tap-hint onto `%%bd_]` so the score block never closed and the renderer threw for want of an axiom. `readChunkBody` is the inverse and already existed. Sv's September lesson repeating. |
+| **The renderer forwards its console** | `V_Kolam/`, `viewer.js` | **BUILT** (`2f64c03`). It was in an iframe and reached nobody; `render()` swallows its own exceptions. Now `[module] …` in the server log. Needed `bd_module_log` in the wrapper's `RELAY_UP` — the same whitelist trap as `bd_av_state`. |
+| **Angle is a full turn, angle_minutes is a stepper** | `V_Kolam/visual_module.html` | **BUILT** (`bad75d4`, `cd86dae`). Three disagreeing definitions of the range meant drift walked 270 degrees all drawn as 90. One definition now, 0..359 wrapping, stepper wraps too. Low angles with `angle_minutes` are the interesting region, not a dead spot. |
+| **Way-back button opens the node** | `viewer.js`, `AV/` | **BUILT** (`691e080`, `47481c8`, `511c237`, `5902c6a`). It only raised the window — indistinguishable from nothing on a desktop. Now `av_return` (no destination) → `openNodeAsTap` → card + Player. `armFreshOpen` clears `readingState` + `lastAutoPlayerNodeId`, **on the request, never on Player exit**. |
+| **The viewer hands state over on the way back** | `server.js`, `AV/` | **BUILT + VERIFIED ON iOS** (`4b48caf`). On a phone the button closes the viewer, so asking later cannot work. `av_return` may carry a script and never a destination; BD seeds the cache before opening so the node opens already correct. |
+
 ## Added 2026-09-16
 
 | item | where | note |
