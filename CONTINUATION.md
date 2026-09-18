@@ -240,6 +240,29 @@ block of `PLANNING_REGISTER.md`.
 **Verified on desktop only.** iOS is where the angle division and the hand-back
 actually matter, and it has not been tried.
 
+### The eight fixes that followed, and the two lessons worth carrying
+
+Testing the migration produced eight fixes in a day. Two are worth knowing
+before touching any of this again:
+
+**Fix the WRITER, not the reader.** `avLastPushed` had two writers — a real
+push, and a listener that only records. Correcting what READ it achieved
+nothing while the other writer still poisoned it, and the symptom simply moved
+platform and looked like a new bug. If a variable's name and its value disagree,
+find everything that assigns it.
+
+**A timer rescheduled AFTER its work has a systematic rate bias.** The drift
+clock did `setTimeout(tick, interval)` at the END of the tick, so the period was
+`render time + interval`. A bigger canvas draws slower and therefore ticks
+slower, for ever — BD and a viewer ran at genuinely different RATES, about 25
+arcminutes apart over 20 minutes. Schedule from when the tick was DUE. This
+pattern will be in any other animation loop in the codebase.
+
+And one diagnostic habit that paid: *"subsequent pressing view always takes AV
+back to the SAME position"* identified a FROZEN value, where "it jumps
+backwards" alone would not have. Ask what shape the error has, not just its
+direction.
+
 ---
 
 ## 2. Start here, in this order

@@ -39,6 +39,44 @@ Finally, a half-typed script is held back rather than sent, because the
 renderer fills an unparseable value from its own default — so deleting a digit
 used to send the figure to the default instead of leaving it where it was.
 
+**Eight follow-up fixes came out of testing it**, and they divide cleanly.
+
+Four were the wrong thing being treated as the truth. `av_hello` was answered
+with the module's live state rather than the script — the only route left once
+`auto` was unticked, which is why it showed on a phone and not a desktop: the
+shim re-asks whenever the page becomes visible, and a phone switches tabs
+constantly. Then `avLastPushed` turned out to have **two writers**, so its name
+meant "the last script sent" while its value meant "the last thing the module
+said" — which had silently defeated the previous fix and made the symptom look
+like a new bug on a different platform. Re-ticking `auto` made the script
+follow the steppers rather than the reverse, losing whatever had been typed
+while it was off. And the viewer had been gated on `auto` by a regression of
+mine: that box governs the card↔module coupling and nothing else, because a
+viewer follows the script unconditionally.
+
+Four were timing. A returning viewer threw away an edited card, because the
+return forced a fresh one; pressing View doesn't change BD's mode, so coming
+straight back now does nothing at all. A defence added that morning to ignore
+BD's stale angle turned out to discard deliberate angle changes too, and was
+removed along with the reason it existed.
+
+**The real one was the drift clock.** The next tick was scheduled *after* the
+render, so the period was `render time + interval` — a systematic bias rather
+than jitter. A bigger canvas costs more to draw and therefore ticks slower, for
+ever, so BD's module and the viewer's square canvas genuinely ran at different
+rates. Over 20 minutes at a 6ms and a 22ms render that is 11,321 ticks against
+9,837, about 25 arcminutes apart and still growing. Scheduling from when each
+tick was *due* gives 12,000 and 12,000, and needs no measurement or feedback
+between the two.
+
+Last, a resync was sending a frozen angle, since angle-only drift frames are
+deliberately suppressed. The user's observation settled it: *"subsequent
+pressing view always takes AV back to the same position"* — a rate error would
+land somewhere different each time, so landing on one fixed place meant a
+frozen value. A resync now takes every parameter from the script and the angle
+from BD's live figure, that being the one moment where BD's angle is the right
+answer.
+
 ---
 
 ## 2026-09-16 → 2026-09-17 — BD and the viewer reconcile, and the renderer gets a voice
