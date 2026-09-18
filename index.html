@@ -78,6 +78,16 @@
          so the script-exchange controls sit next to the mode switch. -->
     <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
     <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
+    <!-- 2026-09-18 — auto-echo. Ticked, every stepper change is written
+         straight into the focused card, so the SCRIPT keeps up with the
+         controls without pressing ↑ each time.
+         Unticked by default: it overwrites the card, and a control that
+         rewrites your text should be asked for rather than assumed.
+         Positioned with the arrows by positionExtendPanel, not by CSS. -->
+    <label id="auto-echo" title="Echo every stepper change into the card's script (same as pressing ↑ each time)">
+      <input type="checkbox" id="auto-echo-box">
+      <span>auto</span>
+    </label>
     <!-- 2026-08-14 — radio group promoted to top row (position:fixed, yellow
          background). All three radios always visible. Player disabled until
          top card contains a %%bd_module directive. 2026-08-15 — Edit is now

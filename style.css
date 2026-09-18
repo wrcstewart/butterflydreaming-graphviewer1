@@ -1101,8 +1101,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-17: RED (BD re-issues a token to a viewer whose own is spent).
-   Next rotation = green.
+   2026-09-18: GREEN (the down arrow moved 50% lower; an `auto` tick box
+   echoes stepper changes into the script). Next rotation = blue.
 
    NB the block that used to sit here said "2026-09-11: GREEN, next = blue"
    while the border below painted RED — it had been left behind through two
@@ -1117,7 +1117,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1178,6 +1178,7 @@ body:not(.player-active) #copy-up-btn {
    per-button by positionExtendPanel to the canvas top. z-index above the iframe
    (1) and History pane (2). The control bar keeps its space for pairing/edit. */
 @media (max-width: 767px) {
+  body.player-active #auto-echo,
   body.player-active #copy-up-btn,
   body.player-active #copy-down-btn {
     position: fixed;
@@ -1190,6 +1191,34 @@ body:not(.player-active) #copy-up-btn {
     z-index: 7;
   }
 }
+/* 2026-09-18 — auto-echo tick box, under the ↓ arrow.
+   Checkbox above, the word "auto" below it, because the column is one
+   button wide and there is no room beside. Hidden with the arrows when
+   Player is not active; `left`/`top` are stamped by positionExtendPanel from
+   the module's live column rect, exactly as the arrows are. */
+#auto-echo {
+  display: none;
+  position: fixed;
+  z-index: 7;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font: 9px/1 sans-serif;
+  color: #c9a227;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+body.player-active #auto-echo { display: flex; }
+#auto-echo input {
+  /* 16px minimum or iOS zooms the page on focus; also an easier target than
+     the browser default on a phone. */
+  width: 16px; height: 16px; margin: 0;
+  accent-color: #c9a227;
+  cursor: pointer;
+}
+
 /* 2026-08-09 — arrows moved left by one button-width per user request.
    Previously: copy-down-btn took margin-left: auto and view-mode-toggle
    margin-left: 0, so both stuck together on the right. Now arrows sit

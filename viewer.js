@@ -10106,6 +10106,7 @@ async function init() {
             // band positionCyEl reserves to the RIGHT of the iframe (768+).
             const cUp   = document.getElementById('copy-up-btn');
             const cDown = document.getElementById('copy-down-btn');
+            const cAuto = document.getElementById('auto-echo');
             const cpEl  = innerDoc && innerDoc.querySelector('.control-panel');
             if (cUp && cDown && cpEl) {
               const cpRect = cpEl.getBoundingClientRect();
@@ -10117,13 +10118,31 @@ async function init() {
               // 3px, not 6 — the arrows read as belonging to the column.
               const x = fitsInside ? Math.round(colLeftVp - bw - 3)
                                    : Math.round(colRightVp + 4);
-              [[cUp, 0], [cDown, 26]].forEach(([b, dy]) => {
+              // 2026-09-18 — the ↓ sits 39px below the ↑, was 26.
+              //
+              // +50% on the user's request: the two arrows do opposite things
+              // — ↓ overwrites the MODULE from the card, ↑ overwrites the CARD
+              // from the module — so the cost of hitting the wrong one is
+              // losing whichever side you had just got right. A gap you have
+              // to aim across is worth more than the pixels it costs.
+              const DOWN_DY = 39;
+              // The tick box hangs below the ↓, measured rather than guessed so
+              // it still clears the button if the arrows are ever resized.
+              const btnH    = Math.ceil(cDown.getBoundingClientRect().height) || 24;
+              const rows    = [[cUp, 0], [cDown, DOWN_DY]];
+              if (cAuto) rows.push([cAuto, DOWN_DY + btnH + 6]);
+              rows.forEach(([b, dy]) => {
                 b.style.position = 'fixed';
                 b.style.left     = x + 'px';
                 b.style.right    = 'auto';
                 b.style.top      = Math.round(canvasTopVp + dy) + 'px';
                 b.style.zIndex   = '7';
               });
+              // The tick box is narrower than a button; centre it under them.
+              if (cAuto) {
+                const aw = Math.ceil(cAuto.getBoundingClientRect().width) || bw;
+                cAuto.style.left = Math.round(x + (bw - aw) / 2) + 'px';
+              }
             }
           }
         }
@@ -11299,6 +11318,42 @@ async function init() {
       console.log('[Copy Up] writing ' + d.script.length + ' chars into: ' +
                   describeCardBody(body));
       setCardText(body, d.script);
+    });
+
+    // ── auto: the script keeps up with the steppers (2026-09-18) ──────────
+    //
+    // Ticked, every stepper change is written straight into the focused card —
+    // the same result as pressing ↑ each time, without the press. The aim is
+    // to let the SCRIPT be the thing that is true: it is the only form that
+    // can be shared, saved and collaged, so a control state that exists only
+    // inside the module is a state you cannot do anything with.
+    //
+    // Unticked by default, and deliberately so: this OVERWRITES the card, and
+    // a control that rewrites your text should be asked for rather than
+    // assumed.
+    //
+    // DRIFT FRAMES ARE SKIPPED, and that is what makes this usable at all.
+    // The renderer announces on every render, which during drift is five to
+    // ten times a second — writing the card at that rate would make it
+    // unreadable and unselectable, and is exactly the reason the drift
+    // announcement was given its own message type rather than reusing
+    // BD_UPDATE. The fromDrift flag added for the viewer answers this question
+    // too: a drift tick is the clock moving, not the user changing anything.
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'bd_av_state') return;
+      if (d.fromDrift) return;                       // the clock, not an edit
+      const box = document.getElementById('auto-echo-box');
+      if (!box || !box.checked) return;
+      if (typeof d.text !== 'string' || !d.text) return;
+      const body = getFocusedCardBody();
+      if (!body) return;
+      // Never overwrite text someone is in the middle of typing. Ticking the
+      // box asks for the module to drive the card, not for the card to fight
+      // the keyboard.
+      if (document.activeElement === body) return;
+      if (getCardText(body) === d.text) return;      // already says this
+      setCardText(body, d.text);
     });
 
     // 2026-08-09 — BD-level bake/save info dialog. Renders in BD's DOM
