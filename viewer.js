@@ -11176,21 +11176,9 @@ async function init() {
       }
       return body.textContent;
     }
-    // keepCaret: the card may now be rewritten while the caret is parked in it
-    // (see autoWrite). Losing the caret to the top on every stepper move would
-    // be its own bug, so put it back where it was.
-    function setCardText(body, text, opts) {
-      const keep = !!(opts && opts.keepCaret) && document.activeElement === body;
-      let selStart = null, selEnd = null;
-      if (keep && body.tagName === 'TEXTAREA') {
-        try { selStart = body.selectionStart; selEnd = body.selectionEnd; } catch (_) {}
-      }
+    function setCardText(body, text) {
       if (body.tagName === 'TEXTAREA') body.value = text;
       else                              body.textContent = text;
-      if (keep && body.tagName === 'TEXTAREA' && selStart != null) {
-        const cap = body.value.length;
-        try { body.setSelectionRange(Math.min(selStart, cap), Math.min(selEnd, cap)); } catch (_) {}
-      }
       body.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
@@ -11411,29 +11399,37 @@ async function init() {
       pushToAV(text);
     }
 
-    // Milliseconds of quiet after the last REAL keystroke before the module is
-    // allowed to write the card again. Longer than the 600ms edit debounce, so
-    // the edit reaches the module before anything writes over it.
-    const TYPING_QUIET_MS = 1200;
-    let lastTypedAt = 0;
 
+    // Two jobs, and only ONE of them has to wait for the keyboard.
+    //
+    // 2026-09-18, third attempt at this guard, and the first two were wrong in
+    // opposite directions because both treated it as a single decision:
+    //
+    //   v1  skip everything while the card has focus. The caret STAYS in the
+    //       card after you stop typing, so sync died permanently after any
+    //       manual edit.
+    //   v2  write anyway once typing paused, restoring the caret. Fine for a
+    //       textarea; useless for a contentEditable card body, where replacing
+    //       textContent destroys every child node and the caret collapses to
+    //       the start — "the cursor jumps almost immediately to the beginning".
+    //
+    // The two jobs are: RECORD AND PUSH the script, and REDRAW the card.
+    // Recording is data and must never stop, whatever the caret is doing.
+    // Redrawing is presentation and must never happen under a live cursor.
+    // Separating them makes both easy and removes the trade entirely: the
+    // viewer and the exploration record stay live while you type, and the card
+    // catches up the moment you are done with it.
     function autoWrite(text, fromDrift) {
-      const body = getFocusedCardBody();
-      if (!body) return;
-      // Do not fight the keyboard — but "is someone TYPING" is the question,
-      // not "is the caret in this box".
-      //
-      // 2026-09-18: this was `document.activeElement === body`, and that was
-      // wrong in a way that only showed up after a manual edit: the caret
-      // STAYS in the card when you stop typing, so the guard never lifted.
-      // Auto-echo was blocked for good — stepper changes stopped reaching the
-      // script and the drifting angle_minutes stopped being recorded, with
-      // nothing to show why. Clicking elsewhere was the only cure, and nobody
-      // would guess it.
-      if (Date.now() - lastTypedAt < TYPING_QUIET_MS) return;
-      if (getCardText(body) !== text) setCardText(body, text, { keepCaret: true });
+      // 1. Data. Unconditional.
       autoLastWriteAt = Date.now();
       pushScriptToAV(text, fromDrift);
+
+      // 2. Presentation. Only when nobody is in the box.
+      const body = getFocusedCardBody();
+      if (!body) return;
+      if (document.activeElement === body) return;   // never under the cursor
+      if (getCardText(body) === text) return;
+      setCardText(body, text);
     }
 
     function autoClearPending() {
@@ -11500,7 +11496,30 @@ async function init() {
       const el = e && e.target;
       if (!el || !el.classList || !el.classList.contains('card-body')) return;
       if (!document.body.classList.contains('player-active')) return;
-      // A REAL keystroke only. setCardText dispatches a synthetic input event
+      // Leaving the card is when it can safely catch up.
+    //
+    // While the caret is in it the card is deliberately not redrawn, so it can
+    // fall behind whatever the steppers have been doing. Without this it would
+    // stay behind until the module happened to announce again — immediately if
+    // drift is running, but possibly never if it is not, which would look
+    // exactly like the sync being broken again.
+    document.addEventListener('focusout', (e) => {
+      const el = e && e.target;
+      if (!el || !el.classList || !el.classList.contains('card-body')) return;
+      const box = document.getElementById('auto-echo-box');
+      if (!box || !box.checked) return;
+      // A frame, so activeElement has settled — during focusout it is still
+      // the element being left, and getFocusedCardBody would hand it back.
+      requestAnimationFrame(() => {
+        if (typeof avLastState !== 'string' || !avLastState) return;
+        const body = getFocusedCardBody();
+        if (!body || document.activeElement === body) return;
+        if (getCardText(body) === avLastState) return;
+        setCardText(body, avLastState);
+      });
+    });
+
+    // A REAL keystroke only. setCardText dispatches a synthetic input event
       // so the rest of BD notices a programmatic write — and every auto-echo
       // goes through it, including drift ones. Without this test each of those
       // would come back round here as a "hand edit", be pushed with
@@ -11508,7 +11527,6 @@ async function init() {
       // keeps a viewer smooth. isTrusted is false on a constructed Event and
       // true on a genuine one, which is exactly the distinction needed.
       if (!e.isTrusted) return;
-      lastTypedAt = Date.now();
       if (handEditTimer) clearTimeout(handEditTimer);
       handEditTimer = setTimeout(() => {
         handEditTimer = null;
