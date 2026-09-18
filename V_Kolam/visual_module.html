@@ -913,6 +913,24 @@
       return table[depth] ?? 200;
     }
 
+    // ── The drift clock runs on WALL TIME, not on "when the last one finished"
+    //
+    // 2026-09-18. The next tick used to be scheduled after the render, so the
+    // real period was `render time + interval`. That is a SYSTEMATIC bias, not
+    // jitter: a bigger canvas costs more to draw and therefore ticks slower,
+    // for ever. BD's module and a viewer's square canvas are different sizes,
+    // so the two ran at genuinely different rates and drew apart all session —
+    // which is what a second press of View was having to collapse.
+    //
+    // Scheduling from the INTENDED time removes it at the cause. Both sides
+    // now advance at the same rate however much each costs to draw, and no
+    // measurement, no channel between them and no tuning is needed — which a
+    // feedback loop slowing the faster one would have required, and could
+    // oscillate.
+    //
+    // driftNextDue is the wall-clock moment the NEXT tick is owed.
+    let driftNextDue = 0;
+
     function manageDriftInterval() {
       const drift = parseInt(angleDriftSlider.value, 10);
       if (drift === 0) {
@@ -921,6 +939,7 @@
           driftInterval = null;
         }
       } else if (driftInterval === null) {
+        driftNextDue = Date.now() + driftIntervalMs();
         driftInterval = setTimeout(driftTick, driftIntervalMs());
       }
     }
@@ -979,8 +998,20 @@
         angle_seconds: secs
       });
 
-      // Overwrite the now-fired (stale) handle with the next tick
-      driftInterval = setTimeout(driftTick, driftIntervalMs());
+      // Overwrite the now-fired (stale) handle with the next tick, timed from
+      // when it was DUE rather than from now. Anything the render cost is
+      // absorbed here instead of being added to every period.
+      const interval = driftIntervalMs();
+      driftNextDue += interval;
+      // Too far behind to catch up honestly — a slow machine, or a tab that
+      // was suspended and has just come back. Give up the backlog rather than
+      // fire a burst of ticks trying to earn it back: a spiral of catch-up
+      // renders on a phone waking from sleep would be worse than the lost
+      // time, and a View press is the way back into step anyway.
+      if (Date.now() - driftNextDue > interval * 5) {
+        driftNextDue = Date.now() + interval;
+      }
+      driftInterval = setTimeout(driftTick, Math.max(0, driftNextDue - Date.now()));
     }
 
     // Manage timeout whenever the drift slider moves

@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-18: RED (an arriving script is applied
-     WHOLE — angle changes work again). Next rotation = green. */
+     change to a cached AV file. 2026-09-18: GREEN (the drift clock runs on
+     wall time, so BD and the viewer keep the same rate). Next rotation = blue. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
+    border: 2px solid #27ae60;              /* CANARY — green (was red) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -134,7 +134,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to visual_module.html.
-    frame.src = '/bd_V_Kolam/visual_module.html?v=13';
+    frame.src = '/bd_V_Kolam/visual_module.html?v=14';
 
     // ── What this viewer is currently showing (2026-09-16) ────────────────
     //
