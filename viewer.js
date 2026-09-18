@@ -409,10 +409,10 @@ const AV_ANGLE_LINES = /^%%bd_angle(?:_minutes|_seconds)?[ \t]+.*$/gm;
 function avWithoutAngle(text) {
   return text.replace(AV_ANGLE_LINES, '');
 }
-function avDriftRunning(text) {
-  const m = /^%%bd_angle_drift[ \t]+(-?[\d.]+)/m.exec(text);
-  return !!m && parseFloat(m[1]) !== 0;
-}
+// (avDriftRunning lived here until 2026-09-18. It read the drift rate out of a
+// script so this listener could INFER whether a frame came from the timer. The
+// renderer labels frames now, and the push moved to pushScriptToAV, so nothing
+// asked any more — removed rather than left lying about looking useful.)
 let avSuppressed = 0;
 
 // ── How fast does BD run when it is NOT on screen? (2026-09-16) ─────────────
@@ -477,49 +477,33 @@ if (typeof window !== 'undefined') {
     if (!d || d.type !== 'bd_av_state') return;
     const text = d.text;
     if (typeof text !== 'string') return;
+    // The module's live announcement. Recorded, never pushed.
+    //
+    // 2026-09-18 phase 2 — the module no longer pushes to a viewer directly.
+    // THE SCRIPT DOES: what reaches a viewer is what the card holds, so what
+    // you see there is what you would share, save or collage. The push happens
+    // in the auto-echo block, right after the card is written.
+    //
+    // This listener therefore only RECORDS. It must not touch avLastPushed —
+    // that name means "the last script actually sent to a viewer", and it is
+    // what answerAVStateRequest replies with. Writing the module's figure into
+    // it made the two variables hold the same kind of thing, so pressing View
+    // a second time re-sent the MODULE's state to an already-open viewer:
+    // "on desktop subsequent presses of View produce weird effects, very much
+    // the wrong values". Only pushToAV sets it now.
     avLastState = text;
     if (avNodeId) explorationByNode.set(avNodeId, text);   // remember where we got to
     if (document.hidden && bgHiddenAt) bgFrames += 1;      // background-rate probe
-    if (text === avLastPushed) return;
 
-    // Forward EVERY real parameter change, and only decline the drift timer's
-    // own angle steps — which the viewer computes for itself.
-    //
-    // 2026-09-16 — the renderer now LABELS the frame (fromDrift), so this is a
-    // fact rather than an inference. The previous version inferred it from a
-    // text diff, and that was wrong in a way worth remembering: an angle-only
-    // change made by a PERSON while drift was running — a stepper nudge, or a
-    // script arriving via the Down button — is textually identical to a drift
-    // tick, so it was silently dropped and the viewer never saw it.
-    //
-    // The diff is kept as a fallback for one case only: an OLD cached renderer
-    // that predates the flag and sends no fromDrift at all. Without it such a
-    // renderer would push every drift frame again and the iOS backward-jump
-    // would return until its cache cleared.
-    const labelled = typeof d.fromDrift === 'boolean';
-    const isDriftFrame = labelled
-      ? d.fromDrift
-      : (avLastPushed && avDriftRunning(text) &&
-         avWithoutAngle(text) === avWithoutAngle(avLastPushed));
-
-    if (isDriftFrame) {
+    // Drift frames are counted only. The suppression that used to matter here
+    // now lives in pushScriptToAV, where the push is; this is left because the
+    // count is a useful thing to see in the log.
+    if (d.fromDrift) {
       avSuppressed += 1;
       if (avSuppressed % 200 === 0) {
-        console.log('[AV] drift frames left to the viewer: ' + avSuppressed +
-                    (labelled ? '' : ' (inferred — renderer sends no fromDrift)'));
+        console.log('[AV] drift frames left to the viewer: ' + avSuppressed);
       }
-      return;
     }
-    // 2026-09-18 phase 2 — the module no longer pushes to a viewer directly.
-    // THE SCRIPT DOES. What reaches a viewer is what the card holds, so what
-    // you see there is what you would share, save or collage; a control state
-    // that lives only inside the module is one you cannot do anything with.
-    //
-    // The push now happens in the auto-echo block, right after the card is
-    // written. avLastPushed is still maintained here so a viewer that asks for
-    // state mid-session is answered with the module's live figure rather than
-    // whatever the card last happened to receive.
-    avLastPushed = text;
   });
 }
 
