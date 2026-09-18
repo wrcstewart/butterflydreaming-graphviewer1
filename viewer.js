@@ -11176,9 +11176,21 @@ async function init() {
       }
       return body.textContent;
     }
-    function setCardText(body, text) {
+    // keepCaret: the card may now be rewritten while the caret is parked in it
+    // (see autoWrite). Losing the caret to the top on every stepper move would
+    // be its own bug, so put it back where it was.
+    function setCardText(body, text, opts) {
+      const keep = !!(opts && opts.keepCaret) && document.activeElement === body;
+      let selStart = null, selEnd = null;
+      if (keep && body.tagName === 'TEXTAREA') {
+        try { selStart = body.selectionStart; selEnd = body.selectionEnd; } catch (_) {}
+      }
       if (body.tagName === 'TEXTAREA') body.value = text;
       else                              body.textContent = text;
+      if (keep && body.tagName === 'TEXTAREA' && selStart != null) {
+        const cap = body.value.length;
+        try { body.setSelectionRange(Math.min(selStart, cap), Math.min(selEnd, cap)); } catch (_) {}
+      }
       body.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
@@ -11399,14 +11411,27 @@ async function init() {
       pushToAV(text);
     }
 
+    // Milliseconds of quiet after the last REAL keystroke before the module is
+    // allowed to write the card again. Longer than the 600ms edit debounce, so
+    // the edit reaches the module before anything writes over it.
+    const TYPING_QUIET_MS = 1200;
+    let lastTypedAt = 0;
+
     function autoWrite(text, fromDrift) {
       const body = getFocusedCardBody();
       if (!body) return;
-      // Never overwrite text someone is in the middle of typing. Ticking the
-      // box asks for the module to drive the card, not for the card to fight
-      // the keyboard.
-      if (document.activeElement === body) return;
-      if (getCardText(body) !== text) setCardText(body, text);
+      // Do not fight the keyboard — but "is someone TYPING" is the question,
+      // not "is the caret in this box".
+      //
+      // 2026-09-18: this was `document.activeElement === body`, and that was
+      // wrong in a way that only showed up after a manual edit: the caret
+      // STAYS in the card when you stop typing, so the guard never lifted.
+      // Auto-echo was blocked for good — stepper changes stopped reaching the
+      // script and the drifting angle_minutes stopped being recorded, with
+      // nothing to show why. Clicking elsewhere was the only cure, and nobody
+      // would guess it.
+      if (Date.now() - lastTypedAt < TYPING_QUIET_MS) return;
+      if (getCardText(body) !== text) setCardText(body, text, { keepCaret: true });
       autoLastWriteAt = Date.now();
       pushScriptToAV(text, fromDrift);
     }
@@ -11483,6 +11508,7 @@ async function init() {
       // keeps a viewer smooth. isTrusted is false on a constructed Event and
       // true on a genuine one, which is exactly the distinction needed.
       if (!e.isTrusted) return;
+      lastTypedAt = Date.now();
       if (handEditTimer) clearTimeout(handEditTimer);
       handEditTimer = setTimeout(() => {
         handEditTimer = null;
@@ -11490,6 +11516,14 @@ async function init() {
         if (!body) return;
         const text = getCardText(body);
         if (!text) return;
+        // Refuse to hand the module a card with no directives in it. Every
+        // control would fall back to its default — drift to 0, so the figure
+        // would simply stop — which is a lot of damage to do on the way
+        // through an edit that momentarily has nothing in it.
+        if (!/^%%bd_\w+/m.test(text)) {
+          console.log('[auto] card has no %%bd_ directives — not sent to the module');
+          return;
+        }
         const box = document.getElementById('auto-echo-box');
         if (box && box.checked && iframeEl2 && iframeEl2.contentWindow) {
           try {
