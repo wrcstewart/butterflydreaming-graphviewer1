@@ -11446,9 +11446,30 @@ async function init() {
       }
     });
 
-    // A card edited BY HAND reaches the viewer as well, which the module-direct
-    // push could never do — the module knew nothing about it. Debounced, so a
-    // viewer is not driven a character at a time while a script is being typed.
+    // ── A hand-edited card drives BOTH the module and the viewer ──────────
+    //
+    // 2026-09-18. Editing the script changed the viewer but not BD's own
+    // steppers, which left the card telling the truth to one of them and not
+    // the other. So the same text now goes to the module as well — which is
+    // precisely what the ↓ button does, performed for you.
+    //
+    // Done locally rather than by asking the viewer to send it back: routing
+    // your own steppers through another window is a round trip to nowhere, and
+    // would not work at all with no viewer open.
+    //
+    // Gated on `auto`, like the opposite direction, so the tick box has ONE
+    // meaning that covers both: the card and the module are the same thing.
+    // Unticked restores the manual world, where ↑ and ↓ are the only ways
+    // across and each is a deliberate press.
+    //
+    // Safe against the loop it looks like it should cause. The module may
+    // NORMALISE what it is given — applyControlDirectives rewrites every
+    // directive it owns — so the text it announces back can differ from what
+    // was typed. That announcement runs through autoWrite, which declines to
+    // write while the card has focus, so nothing fights the keyboard; the
+    // canonical form lands once you click away. And the write it eventually
+    // makes dispatches a SYNTHETIC input event, which the isTrusted test below
+    // ignores, so it cannot come back round as a fresh edit.
     let handEditTimer = null;
     document.addEventListener('input', (e) => {
       const el = e && e.target;
@@ -11466,7 +11487,16 @@ async function init() {
       handEditTimer = setTimeout(() => {
         handEditTimer = null;
         const body = getFocusedCardBody();
-        if (body) pushScriptToAV(getCardText(body), false);
+        if (!body) return;
+        const text = getCardText(body);
+        if (!text) return;
+        const box = document.getElementById('auto-echo-box');
+        if (box && box.checked && iframeEl2 && iframeEl2.contentWindow) {
+          try {
+            iframeEl2.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+          } catch (_) {}
+        }
+        pushScriptToAV(text, false);
       }, 600);
     });
 
