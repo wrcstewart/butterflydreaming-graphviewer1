@@ -11534,12 +11534,38 @@ async function init() {
         if (!body) return;
         const text = getCardText(body);
         if (!text) return;
-        // Refuse to hand the module a card with no directives in it. Every
-        // control would fall back to its default — drift to 0, so the figure
-        // would simply stop — which is a lot of damage to do on the way
-        // through an edit that momentarily has nothing in it.
+        // ── A half-typed script is not a script ──────────────────────────
+        //
+        // Refuse a card with no directives at all, and refuse one where a
+        // directive has lost its VALUE — the state you pass through the
+        // instant you delete a digit.
+        //
+        // Both matter for the same reason. The renderer fills a missing or
+        // unparseable value from its own hardcoded default
+        // (safeParseNumber(directives.symmetry, 8) and friends), which is
+        // right for a script arriving cold and wrong for one being edited: it
+        // makes the figure jump to the DEFAULT mid-keystroke instead of
+        // holding still. Reported as "the temporary value you see seems based
+        // on the default script rather than simply maintaining the current".
+        //
+        // Holding the send back IS the fix. The module goes on drawing what it
+        // already has — which is exactly "maintaining the current" — and the
+        // finished value arrives a moment later like any other edit.
+        //
+        // A PARTIAL number is fine and deliberately allowed: typing 1 on the
+        // way to 16 is a real value and should render. Only the valueless
+        // state is held.
+        //
+        // BARE_LEGAL are the directives that correctly carry no value, so they
+        // are not mistaken for a value that has been deleted.
+        const BARE_LEGAL = /^%%bd_(center|hint|chunk)[ \t]*$/;
         if (!/^%%bd_\w+/m.test(text)) {
           console.log('[auto] card has no %%bd_ directives — not sent to the module');
+          return;
+        }
+        if (text.split('\n').some((line) =>
+              /^%%bd_\w+[ \t]*$/.test(line) && !BARE_LEGAL.test(line))) {
+          console.log('[auto] a directive has no value yet — holding the current figure');
           return;
         }
         const box = document.getElementById('auto-echo-box');
