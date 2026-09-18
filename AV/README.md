@@ -169,6 +169,25 @@ back to the frozen standalone, so the button always does something.
 (The button was called **Jump** until 2026-09-15, when it stopped jumping
 anywhere: BD stays put and the viewer opens beside it.)
 
+## What BD sends you is the SCRIPT (2026-09-18)
+
+BD used to push whatever its module was announcing. It now pushes **the card** —
+the script a user could share, save or collage. Two things follow for you:
+
+**A script edited by hand reaches you**, which it never did before. Expect
+updates that did not come from a control being moved.
+
+**The drifting angle is NOT sent while drift is running**, even though the
+script BD holds contains it. You run the same renderer from the same script, so
+you are already advancing the angle yourself — BD's value would only be an
+older copy of the one you just computed, and on a phone BD is a background tab,
+so it can be many seconds old. **BD records the angle; you compute it.**
+Everything else — symmetry, colour, step, the drift RATE, and the angle
+whenever drift is OFF — arrives normally.
+
+If you need the two reconciled, that happens when the user returns to BD: your
+`onStateRequest` answer, or the state carried on `av_return`, is what BD adopts.
+
 ## One viewer per module TYPE (2026-09-16)
 
 Your token carries the module type it was minted for, stamped on the socket at

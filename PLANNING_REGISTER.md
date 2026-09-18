@@ -256,6 +256,20 @@ Not a schedule — a list of what has been designed and not built.
 | Ink promotion stage 2 | `ink_promotion_plan.md` | Walk every view under the achromatic default. |
 | `MEMORY.md` index discipline | — | The index hit 29 KB against a ~24 KB load limit on 2026-09-12 and was being truncated. Trimmed to 15 KB by moving detail into topic files. **Keep entries under ~230 chars.** |
 
+## Added 2026-09-18 — the script becomes the source of truth
+
+Author's reason, recorded because it governs the rest: *"only the script is
+flexible enough to combine sharing / saving / collaging"*.
+
+| item | where | note |
+|---|---|---|
+| **BD pushes the CARD, not the module** | `viewer.js` | **BUILT** (`849c34e`). What a viewer shows is now what the script says — the same text that is shared, saved or collaged. A card edited BY HAND reaches the viewer too, which the module-direct push could never do. |
+| **`auto` tick box, two-way, on by default** | `index.html`, `style.css`, `viewer.js` | **BUILT** (`a5dec2d`, `001f595`, `849c34e`). ONE meaning covering both directions: the card and the module are the same thing. Unticked, the card stops tracking the steppers and so does the viewer — the honest meaning of the decision, not a regression, which is why ticked is the default. The ↓ also moved 50% lower: the two arrows do opposite things, so hitting the wrong one costs whichever side you had just got right. |
+| **The drifting angle is RECORDED but not pushed** | `viewer.js` | **BUILT** (`76d3434`). It determines the picture more than any other parameter, so the script must hold it. It is still not sent to a viewer while drift runs: the viewer computes it from the same script, and pushing ours snapped it backwards on a phone (the 09-16 fault). **The script records; the viewer computes.** Throttled to 1/s with a trailing write so a drift stopped mid-interval records where it stopped. |
+| **Half-typed scripts are held back** | `viewer.js` | **BUILT** (`2d24488`). The renderer fills an unparseable value from a hardcoded default, so deleting a digit sent the figure to the DEFAULT instead of holding still. Fixed in BD, not the renderer — the renderer cannot tell a cold script from a live edit, and BD knows the card is being typed in. |
+| **Recording vs redrawing** | `viewer.js` | **BUILT after three attempts** (`27a48d6`, `fe874f5`). Recording is data and must never stop; redrawing is presentation and must never land under a live cursor. v1 blocked on focus and killed sync permanently after any edit; v2 wrote anyway and reset the caret on contentEditable. The lesson is in `project_script_source_of_truth.md`. |
+| **iOS testing of all of the above** | — | **PENDING.** Verified on desktop only. The phone is where the angle/viewer division and the hand-back actually matter. |
+
 ## Added 2026-09-17
 
 | item | where | note |

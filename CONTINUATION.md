@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08, updated 2026-09-12, 09-15 and 09-17
+# Continuation note — 2026-09-08, updated 2026-09-12, 09-15, 09-17 and 09-18
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -200,6 +200,45 @@ Lines worth knowing:
 - **No viewer page for ABC or Fractal**, so the per-type rule is built but not
   visible — a second window has nothing to open.
 - **QR / cross-device viewer** — designed, entirely BD-side, not built.
+
+---
+
+## 1d. 2026-09-18 — the script is the source of truth
+
+The author's reason, which governs everything in this section: *"only the
+script is flexible enough to combine sharing / saving / collaging"*.
+
+BD no longer pushes its module's live state to a viewer. **It pushes the
+card.** An `auto` tick box (under the ↓, which moved 50% lower) makes the card
+and the module one thing in BOTH directions, and is ticked by default. Unticked,
+↑ and ↓ are the only ways across — that is the honest meaning of the decision,
+not a bug.
+
+**The one distinction to hold on to:** the drifting angle is RECORDED in the
+script but NOT pushed to a viewer while drift runs. The viewer computes it from
+the same script; BD's copy is older, and on a phone much older. The script
+records, the viewer computes, and they reconcile when the user returns to BD.
+Anyone "fixing" this by pushing the angle will reintroduce the iOS
+backward-jump of 09-16.
+
+**The lesson that cost three attempts**, and which applies to anything else that
+writes into a card: recording the script is DATA and must never stop; redrawing
+the card is PRESENTATION and must never land under a live cursor. Blocking on
+focus kills sync permanently, because the caret stays in the card after typing
+stops. Writing anyway and restoring the caret works on a textarea and destroys
+it on a contentEditable body.
+
+Two traps now commented at their sites: `setCardText` dispatches a SYNTHETIC
+input event, so `e.isTrusted` is what separates a programmatic write from a
+keystroke; and the renderer's default-fallback is right for a cold script and
+wrong for a live edit, which is why BD holds back a card with a valueless
+directive rather than letting the figure jump to the default mid-keystroke.
+
+Full detail: `project_script_source_of_truth.md` in memory, and the 2026-09-18
+block of `PLANNING_REGISTER.md`.
+
+**Verified on desktop only.** iOS is where the angle division and the hand-back
+actually matter, and it has not been tried.
 
 ---
 

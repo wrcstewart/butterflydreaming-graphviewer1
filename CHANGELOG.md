@@ -6,6 +6,41 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-18 — the script becomes the source of truth
+
+A direction rather than a fix: *"only the script is flexible enough to combine
+sharing / saving / collaging"*. So BD stopped pushing the module's live state to
+a viewer and started pushing **the card**. What a viewer shows is now what the
+script says — the same text you would share, save or collage — and a script
+edited by hand reaches both the module and the viewer, which the old path could
+never do.
+
+An `auto` tick box, on by default, makes the card and the module one thing in
+both directions: stepper changes are written into the script, and edits to the
+script move the steppers. Unticked, ↑ and ↓ are the only ways across. The ↓
+moved 50% lower at the same time — the two arrows do opposite things, so hitting
+the wrong one costs whichever side you had just got right.
+
+**The drifting angle is now recorded in the script but still not pushed to a
+viewer.** Those turned out to be different questions: the viewer runs the same
+renderer and computes the angle itself, so sending ours only overwrote its
+smooth value with an older one — the iOS backward-jump. The script records; the
+viewer computes; the two reconcile when you come back.
+
+The awkward part took three attempts, and the lesson is worth keeping:
+**recording the script is data and must never stop, while redrawing the card is
+presentation and must never land under a live cursor.** Treating that as one
+decision failed twice — first by blocking on focus, which killed sync
+permanently after any edit because the caret stays put; then by writing anyway
+and resetting the cursor to the top of a contentEditable card. Separating them
+made both easy.
+
+Finally, a half-typed script is held back rather than sent, because the
+renderer fills an unparseable value from its own default — so deleting a digit
+used to send the figure to the default instead of leaving it where it was.
+
+---
+
 ## 2026-09-16 → 2026-09-17 — BD and the viewer reconcile, and the renderer gets a voice
 
 **The renderer stopped being blind.** `visual_module.html` runs in an iframe, so
