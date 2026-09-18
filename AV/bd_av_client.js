@@ -247,19 +247,34 @@
     socket.on('disconnect', function (reason) {
       health.drops += 1;
       health.connectedAt = null;
+      droppedWhileAway = true;      // so the next return to the foreground re-asks
       onState('lost', { reason, drops: health.drops });
     });
 
-    // Re-ask when the page comes back to the foreground.
+    // Re-ask when the page comes back to the foreground — but ONLY if the
+    // socket dropped while it was away.
     //
-    // iOS suspends background tabs and drops their sockets, and leaving a
-    // viewer there means switching tabs rather than closing it — so a viewer
-    // returns to the foreground still showing whatever it last rendered, having
-    // missed everything sent meanwhile. Asking again costs one message.
+    // iOS suspends background tabs and drops their sockets, so a viewer can
+    // return to the foreground having missed everything sent meanwhile. That
+    // is what this is for, and a drop is exactly the condition under which it
+    // can happen: while the socket held, nothing was missed.
+    //
+    // 2026-09-18 — it used to ask on EVERY return to the foreground, and an
+    // answer is a whole script including the angle. On a phone, where this
+    // viewer is a tab the user switches to constantly, that reset the angle
+    // again and again. The defence built against it (keeping our own angle on
+    // any incoming script) was too blunt and threw away DELIBERATE angle
+    // changes with the stale ones — so the cause is removed instead of
+    // defended against.
+    //
+    // 'connect' asks unconditionally, which covers every reconnection.
+    var droppedWhileAway = false;
     try {
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'visible') return;
         if (!socket.connected) return;          // 'connect' will ask for us
+        if (!droppedWhileAway) return;          // nothing was missed
+        droppedWhileAway = false;
         try { socket.emit('msg', { type: 'av_hello' }); } catch (_) {}
       });
     } catch (_) {}
