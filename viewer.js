@@ -11511,7 +11511,76 @@ async function init() {
       const el = e && e.target;
       if (!el || !el.classList || !el.classList.contains('card-body')) return;
       if (!document.body.classList.contains('player-active')) return;
-      // Leaving the card is when it can safely catch up.
+      // ── The card drives the module and the viewer ─────────────────────────
+    //
+    // One implementation, two callers: a hand edit (debounced), and re-ticking
+    // `auto` after it has been off. Both mean the same thing — the script is
+    // what is true now, make everything else agree with it — so they must not
+    // be allowed to drift apart in what they check.
+    //
+    // A HALF-TYPED SCRIPT IS NOT A SCRIPT. Refuse a card with no directives at
+    // all, and refuse one where a directive has lost its VALUE — the state you
+    // pass through the instant you delete a digit. The renderer fills a missing
+    // or unparseable value from its own hardcoded default
+    // (safeParseNumber(directives.symmetry, 8) and friends), which is right for
+    // a script arriving cold and wrong for one being edited: it makes the
+    // figure jump to the DEFAULT mid-keystroke instead of holding still.
+    // Holding the send back IS the fix — the module goes on drawing what it
+    // already has, and the finished value arrives a moment later.
+    //
+    // A PARTIAL number is deliberately allowed: typing 1 on the way to 16 is a
+    // real value and should render. Only the valueless state is held.
+    // BARE_LEGAL are the directives that correctly carry no value, so they are
+    // not mistaken for one that has been deleted.
+    const BARE_LEGAL = /^%%bd_(center|hint|chunk)[ \t]*$/;
+
+    function sendCardToModule(reason) {
+      const box = document.getElementById('auto-echo-box');
+      if (!box || !box.checked) return;
+      const body = getFocusedCardBody();
+      if (!body) return;
+      const text = getCardText(body);
+      if (!text) return;
+      if (!/^%%bd_\w+/m.test(text)) {
+        console.log('[auto] card has no %%bd_ directives — not sent to the module');
+        return;
+      }
+      if (text.split('\n').some((line) =>
+            /^%%bd_\w+[ \t]*$/.test(line) && !BARE_LEGAL.test(line))) {
+        console.log('[auto] a directive has no value yet — holding the current figure');
+        return;
+      }
+      if (iframeEl2 && iframeEl2.contentWindow) {
+        try {
+          iframeEl2.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+          console.log('[auto] card -> module (' + reason + ')');
+        } catch (_) {}
+      }
+      pushScriptToAV(text, false);
+    }
+
+    // Re-ticking `auto` makes the STEPPERS follow the script, not the other way
+    // round.
+    //
+    // 2026-09-18. Re-ticking did nothing, so the next announcement from the
+    // module wrote the steppers into the card and whatever had been typed while
+    // the box was off was quietly lost. Wrong way round: the box says the two
+    // are one thing again, and the script is the one that is true — it is the
+    // form that can be shared, saved and collaged, and the only one the user
+    // has actually been editing.
+    //
+    // Unticking deliberately does nothing. They diverge from that moment, which
+    // is what unticking is for.
+    {
+      const box = document.getElementById('auto-echo-box');
+      if (box) {
+        box.addEventListener('change', () => {
+          if (box.checked) sendCardToModule('re-ticked');
+        });
+      }
+    }
+
+    // Leaving the card is when it can safely catch up.
     //
     // While the caret is in it the card is deliberately not redrawn, so it can
     // fall behind whatever the steppers have been doing. Without this it would
@@ -11545,51 +11614,7 @@ async function init() {
       if (handEditTimer) clearTimeout(handEditTimer);
       handEditTimer = setTimeout(() => {
         handEditTimer = null;
-        const body = getFocusedCardBody();
-        if (!body) return;
-        const text = getCardText(body);
-        if (!text) return;
-        // ── A half-typed script is not a script ──────────────────────────
-        //
-        // Refuse a card with no directives at all, and refuse one where a
-        // directive has lost its VALUE — the state you pass through the
-        // instant you delete a digit.
-        //
-        // Both matter for the same reason. The renderer fills a missing or
-        // unparseable value from its own hardcoded default
-        // (safeParseNumber(directives.symmetry, 8) and friends), which is
-        // right for a script arriving cold and wrong for one being edited: it
-        // makes the figure jump to the DEFAULT mid-keystroke instead of
-        // holding still. Reported as "the temporary value you see seems based
-        // on the default script rather than simply maintaining the current".
-        //
-        // Holding the send back IS the fix. The module goes on drawing what it
-        // already has — which is exactly "maintaining the current" — and the
-        // finished value arrives a moment later like any other edit.
-        //
-        // A PARTIAL number is fine and deliberately allowed: typing 1 on the
-        // way to 16 is a real value and should render. Only the valueless
-        // state is held.
-        //
-        // BARE_LEGAL are the directives that correctly carry no value, so they
-        // are not mistaken for a value that has been deleted.
-        const BARE_LEGAL = /^%%bd_(center|hint|chunk)[ \t]*$/;
-        if (!/^%%bd_\w+/m.test(text)) {
-          console.log('[auto] card has no %%bd_ directives — not sent to the module');
-          return;
-        }
-        if (text.split('\n').some((line) =>
-              /^%%bd_\w+[ \t]*$/.test(line) && !BARE_LEGAL.test(line))) {
-          console.log('[auto] a directive has no value yet — holding the current figure');
-          return;
-        }
-        const box = document.getElementById('auto-echo-box');
-        if (box && box.checked && iframeEl2 && iframeEl2.contentWindow) {
-          try {
-            iframeEl2.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
-          } catch (_) {}
-        }
-        pushScriptToAV(text, false);
+        sendCardToModule('edit');
       }, 600);
     });
 
