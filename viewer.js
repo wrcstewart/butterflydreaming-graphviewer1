@@ -11332,28 +11332,77 @@ async function init() {
     // a control that rewrites your text should be asked for rather than
     // assumed.
     //
-    // DRIFT FRAMES ARE SKIPPED, and that is what makes this usable at all.
-    // The renderer announces on every render, which during drift is five to
-    // ten times a second — writing the card at that rate would make it
-    // unreadable and unselectable, and is exactly the reason the drift
-    // announcement was given its own message type rather than reusing
-    // BD_UPDATE. The fromDrift flag added for the viewer answers this question
-    // too: a drift tick is the clock moving, not the user changing anything.
-    window.addEventListener('message', (e) => {
-      const d = e && e.data;
-      if (!d || d.type !== 'bd_av_state') return;
-      if (d.fromDrift) return;                       // the clock, not an edit
-      const box = document.getElementById('auto-echo-box');
-      if (!box || !box.checked) return;
-      if (typeof d.text !== 'string' || !d.text) return;
+    // DRIFT IS INCLUDED, and THROTTLED — 2026-09-18.
+    //
+    // The drifting angle determines the picture more than any other parameter,
+    // so a script that omits it does not describe what is on screen, and the
+    // whole point of this is that the script be the thing that is true.
+    //
+    // It was skipped for one reason — write frequency, not relevance. The
+    // renderer announces on every render, five to ten times a second. But the
+    // SCRIPT does not change nearly that often: angle_seconds is deliberately
+    // not written out, so the text only moves when the minutes roll over.
+    // Measured, at depth 1-3: drift 1 changes it every 6s, drift 5 every 1.2s,
+    // and only drift 10 and above exceed once a second (drift 100 reaches 17/s).
+    //
+    // So a throttle rather than a veto: at most one drift-driven write a
+    // second, with the last one always landing via the trailing timer, so
+    // stopping the drift leaves the script holding where it actually stopped.
+    // Low drift is unaffected — its natural rate is already slower than the
+    // limit.
+    //
+    // A non-drift change — a stepper moved by hand — still writes at once and
+    // clears any pending drift write, because it is newer.
+    const AUTO_DRIFT_MIN_MS = 1000;
+    let autoLastWriteAt  = 0;
+    let autoPendingText  = null;
+    let autoPendingTimer = null;
+
+    function autoWrite(text) {
       const body = getFocusedCardBody();
       if (!body) return;
       // Never overwrite text someone is in the middle of typing. Ticking the
       // box asks for the module to drive the card, not for the card to fight
       // the keyboard.
       if (document.activeElement === body) return;
-      if (getCardText(body) === d.text) return;      // already says this
-      setCardText(body, d.text);
+      if (getCardText(body) === text) return;        // already says this
+      setCardText(body, text);
+      autoLastWriteAt = Date.now();
+    }
+
+    function autoClearPending() {
+      if (autoPendingTimer) { clearTimeout(autoPendingTimer); autoPendingTimer = null; }
+      autoPendingText = null;
+    }
+
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'bd_av_state') return;
+      const box = document.getElementById('auto-echo-box');
+      if (!box || !box.checked) { autoClearPending(); return; }
+      if (typeof d.text !== 'string' || !d.text) return;
+
+      if (!d.fromDrift) {                            // a hand on a stepper
+        autoClearPending();
+        autoWrite(d.text);
+        return;
+      }
+
+      const since = Date.now() - autoLastWriteAt;
+      if (since >= AUTO_DRIFT_MIN_MS) { autoWrite(d.text); return; }
+
+      // Too soon. Hold the newest and make sure it lands — without this the
+      // final position of a drift that stops mid-interval would never reach
+      // the script, which is the one value most worth having.
+      autoPendingText = d.text;
+      if (!autoPendingTimer) {
+        autoPendingTimer = setTimeout(() => {
+          autoPendingTimer = null;
+          const t = autoPendingText;
+          autoPendingText = null;
+          if (t && box.checked) autoWrite(t);
+        }, AUTO_DRIFT_MIN_MS - since);
+      }
     });
 
     // 2026-08-09 — BD-level bake/save info dialog. Renders in BD's DOM
