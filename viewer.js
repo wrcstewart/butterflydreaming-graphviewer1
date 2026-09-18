@@ -306,7 +306,22 @@ function answerAVStateRequest() {
   //
   // avLastState survives only as the answer of last resort, for a viewer that
   // connects before anything has ever been pushed.
-  const current = avLastPushed || avLastState;
+  // The script for every parameter, BD's LIVE angle for the angle.
+  //
+  // This is a RESYNC — pressing View with a viewer already open, or a viewer
+  // reconnecting after a drop — and its whole purpose is to make the viewer
+  // agree with BD as it is now. avLastPushed is the right answer for every
+  // parameter and the wrong one for the angle: angle-only drift changes are
+  // suppressed on the way out, so its angle is from the last change that was
+  // not the angle, which during a long drift is minutes old. Sending it made
+  // the viewer jump a long way back, which is what a second press of View was
+  // doing.
+  //
+  // Now that both clocks run on wall time the two angles are close, so this
+  // correction should be small — and it is still a correction rather than a
+  // guess, because it is BD's own figure.
+  const script  = avLastPushed || avLastState;
+  const current = avLastState ? avWithAngleFrom(script, avLastState) : script;
   if (typeof current === 'string' && current) {
     pushToAV(current);
     return;
@@ -408,6 +423,26 @@ function mergeExploredValues(savedText, exploredText) {
 const AV_ANGLE_LINES = /^%%bd_angle(?:_minutes|_seconds)?[ \t]+.*$/gm;
 function avWithoutAngle(text) {
   return text.replace(AV_ANGLE_LINES, '');
+}
+
+// Take `base` — the script, which is the source of truth for every parameter —
+// and put BD's CURRENT angle into it. Only where base already has that
+// directive, so this can never introduce one.
+//
+// 2026-09-18. Needed because the two are deliberately maintained at different
+// freshnesses: the script is what a viewer is sent, but its angle is
+// intentionally stale, since angle-only drift changes are suppressed and the
+// viewer computes its own. That is right for the running stream and wrong for
+// a RESYNC, where the whole point is "make the viewer agree with BD now".
+function avWithAngleFrom(base, source) {
+  if (typeof base !== 'string' || typeof source !== 'string') return base;
+  let out = base;
+  ['angle', 'angle_minutes'].forEach((name) => {
+    const re = new RegExp('^%%bd_' + name + '[ \t]+.*$', 'm');
+    const mine = re.exec(source);
+    if (mine && re.test(out)) out = out.replace(re, mine[0]);
+  });
+  return out;
 }
 // (avDriftRunning lived here until 2026-09-18. It read the drift rate out of a
 // script so this listener could INFER whether a frame came from the timer. The
