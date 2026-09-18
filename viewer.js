@@ -288,10 +288,25 @@ const avWindows = new Map();   // moduleId -> window handle
 // timer is what removes the seconds of DEFAULT figure a viewer used to show on
 // every trip — it knows when it is ready, and nobody else does.
 function answerAVStateRequest() {
-  // Answer with the FRESHEST state, not the last one pushed. During drift most
-  // frames are deliberately not pushed (see below), so avLastPushed can be
-  // seconds behind — and a viewer joining mid-drift should start in phase.
-  const current = avLastState || avLastPushed;
+  // Answer with THE SCRIPT — the last thing actually pushed — not with the
+  // module's live announcement.
+  //
+  // 2026-09-18. This preferred avLastState (the module's freshest frame) from
+  // 09-16, so that a viewer joining mid-drift started in phase. That reasoning
+  // predates the script becoming the source of truth, and under the new
+  // arrangement it is a hole straight through it: with `auto` UNTICKED nothing
+  // else pushes, so this was the ONLY route left — and it was feeding the
+  // viewer the steppers.
+  //
+  // It showed up on iOS and not on a desktop, which is the giveaway. The shim
+  // re-sends av_hello on visibilitychange, and on a phone the viewer is a TAB
+  // the user switches to constantly; beside BD on a desktop it hardly ever
+  // goes hidden. So the same wrong answer was being given all along and only
+  // the phone asked the question often enough to show it.
+  //
+  // avLastState survives only as the answer of last resort, for a viewer that
+  // connects before anything has ever been pushed.
+  const current = avLastPushed || avLastState;
   if (typeof current === 'string' && current) {
     pushToAV(current);
     return;

@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-17: GREEN (a resend is not a change;
-     monitor readable at .8 while debugging). Next rotation = blue. */
+     change to a cached AV file. 2026-09-18: BLUE (the viewer keeps its own
+     angle while drifting, whatever a whole script says). Next rotation = red. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #27ae60;              /* CANARY — green (was red) */
+    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -155,6 +155,32 @@
       const d = e && e.data;
       if (d && d.type === 'bd_av_state' && typeof d.text === 'string') liveScript = d.text;
     });
+
+    // ── The script decides everything except where the angle has got to ───
+    //
+    // 2026-09-18. BD records the drifting angle in the script but does not push
+    // it during drift, because this viewer computes it. That holds for the
+    // ordinary stream — but an ANSWER to av_hello is a whole script, angle and
+    // all, and the shim re-asks on every visibilitychange. On a phone, where
+    // this viewer is a tab the user keeps switching to, that meant being reset
+    // to BD's older angle again and again.
+    //
+    // So an arriving script supplies everything except the angle, and only
+    // while drift is actually running: with drift off the angle is a value
+    // someone set deliberately and must be obeyed. Same rule as BD's, from the
+    // other end — the script records, the viewer computes.
+    function keepOurAngle(incoming) {
+      if (!liveScript) return incoming;                       // nothing of ours yet
+      const drift = /^%%bd_angle_drift[ \t]+(-?[\d.]+)/m.exec(incoming);
+      if (!drift || parseFloat(drift[1]) === 0) return incoming;
+      let out = incoming;
+      ['angle', 'angle_minutes'].forEach(function (name) {
+        const mine = new RegExp('^%%bd_' + name + '[ \\t]+.*$', 'm').exec(liveScript);
+        if (!mine) return;
+        out = out.replace(new RegExp('^%%bd_' + name + '[ \\t]+.*$', 'm'), mine[0]);
+      });
+      return out;
+    }
 
     function post(script) {
       if (!moduleReady) { pending = script; return; }
@@ -323,7 +349,7 @@
         const script = (payload && payload.script) || (typeof payload === 'string' ? payload : null);
         if (!script) return;
         if (payload && typeof payload.nodeId === 'string') showingNodeId = payload.nodeId;
-        post(script);
+        post(keepOurAngle(script));
         // Real content has arrived — reveal. Until now the module has been
         // showing its own default behind a hidden frame.
         frame.classList.remove('waiting');
