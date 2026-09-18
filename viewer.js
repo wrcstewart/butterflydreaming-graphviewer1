@@ -12365,10 +12365,31 @@ async function init() {
       if (avNodeId) {
         const n = cy.getElementById(avNodeId);
         if (n && n.length) {
-          // fresh: the button must always show the node, even if BD was
-          // already reading it. It is a request, not a toggle.
-          openNodeAsTap(n, { fresh: true });
-          console.log('[AV] return: opened ' + avNodeId);
+          // Is BD already showing this node in the Player?
+          //
+          // Pressing View does not change BD's mode, so coming straight back
+          // usually finds it exactly as it was left — right node, right card,
+          // Player already up. There is nothing to do but be looked at.
+          //
+          // 2026-09-18: it re-opened regardless, and `fresh` clears
+          // readingState, so advanceOrNavigate built a NEW card from the
+          // node's stored text — pushing the edited one down into history and
+          // showing the node's script instead. With `auto` unticked, where the
+          // card is the thing the user has been editing, that threw their work
+          // away. Reported as "behaving PARTIALLY like a new click".
+          //
+          // `fresh` is still right for what it was added for: BD wandered off,
+          // or left the Player with Local, and a re-arrival really does need a
+          // card and the Player re-engaged.
+          const readingIt = (typeof getLastReadNodeId === 'function') &&
+                            getLastReadNodeId() === avNodeId;
+          const inPlayer  = document.body.classList.contains('player-active');
+          if (readingIt && inPlayer) {
+            console.log('[AV] return: already showing ' + avNodeId + ' — left as it is');
+          } else {
+            openNodeAsTap(n, { fresh: true });
+            console.log('[AV] return: opened ' + avNodeId);
+          }
         } else {
           console.log('[AV] return: node ' + avNodeId + ' is not on the graph');
         }
