@@ -495,8 +495,16 @@ if (typeof window !== 'undefined') {
       }
       return;
     }
+    // 2026-09-18 phase 2 — the module no longer pushes to a viewer directly.
+    // THE SCRIPT DOES. What reaches a viewer is what the card holds, so what
+    // you see there is what you would share, save or collage; a control state
+    // that lives only inside the module is one you cannot do anything with.
+    //
+    // The push now happens in the auto-echo block, right after the card is
+    // written. avLastPushed is still maintained here so a viewer that asks for
+    // state mid-session is answered with the module's live figure rather than
+    // whatever the card last happened to receive.
     avLastPushed = text;
-    pushToAV(text);
   });
 }
 
@@ -11358,16 +11366,49 @@ async function init() {
     let autoPendingText  = null;
     let autoPendingTimer = null;
 
-    function autoWrite(text) {
+    // ── The script is what reaches a viewer (2026-09-18, phase 2) ─────────
+    //
+    // BD used to push the MODULE's announcement straight to a viewer. Now the
+    // card is pushed, so a viewer shows what the script says — the same text
+    // that gets shared, saved or collaged. A control state that exists only
+    // inside the module is one you cannot do anything with.
+    //
+    // THE ANGLE IS STILL HELD BACK WHILE DRIFT RUNS, and that is deliberate
+    // rather than an oversight in the new arrangement. The viewer runs the
+    // same renderer from the same script, so it is already advancing the angle
+    // itself; sending ours can only overwrite its smooth value with our older
+    // one. On a desktop both run at full speed and it is invisible; on a phone
+    // BD is a BACKGROUND tab, throttled or suspended, so our angle is stale
+    // and every push snapped the viewer backwards — the fault fixed on 09-16.
+    // Recording the angle in the SCRIPT (which is what changed today) and
+    // sending it to a viewer that computes it anyway are different questions,
+    // and only the first one needed answering.
+    //
+    // Everything else — symmetry, colour, step, the drift RATE itself, and the
+    // angle whenever drift is off — goes straight through.
+    let lastScriptPushed = null;
+
+    function pushScriptToAV(text, fromDrift) {
+      if (typeof text !== 'string' || !text) return;
+      if (text === lastScriptPushed) return;
+      if (fromDrift && lastScriptPushed &&
+          avWithoutAngle(text) === avWithoutAngle(lastScriptPushed)) {
+        return;                                      // the viewer's own clock
+      }
+      lastScriptPushed = text;
+      pushToAV(text);
+    }
+
+    function autoWrite(text, fromDrift) {
       const body = getFocusedCardBody();
       if (!body) return;
       // Never overwrite text someone is in the middle of typing. Ticking the
       // box asks for the module to drive the card, not for the card to fight
       // the keyboard.
       if (document.activeElement === body) return;
-      if (getCardText(body) === text) return;        // already says this
-      setCardText(body, text);
+      if (getCardText(body) !== text) setCardText(body, text);
       autoLastWriteAt = Date.now();
+      pushScriptToAV(text, fromDrift);
     }
 
     function autoClearPending() {
@@ -11384,12 +11425,12 @@ async function init() {
 
       if (!d.fromDrift) {                            // a hand on a stepper
         autoClearPending();
-        autoWrite(d.text);
+        autoWrite(d.text, false);
         return;
       }
 
       const since = Date.now() - autoLastWriteAt;
-      if (since >= AUTO_DRIFT_MIN_MS) { autoWrite(d.text); return; }
+      if (since >= AUTO_DRIFT_MIN_MS) { autoWrite(d.text, true); return; }
 
       // Too soon. Hold the newest and make sure it lands — without this the
       // final position of a drift that stops mid-interval would never reach
@@ -11400,9 +11441,33 @@ async function init() {
           autoPendingTimer = null;
           const t = autoPendingText;
           autoPendingText = null;
-          if (t && box.checked) autoWrite(t);
+          if (t && box.checked) autoWrite(t, true);
         }, AUTO_DRIFT_MIN_MS - since);
       }
+    });
+
+    // A card edited BY HAND reaches the viewer as well, which the module-direct
+    // push could never do — the module knew nothing about it. Debounced, so a
+    // viewer is not driven a character at a time while a script is being typed.
+    let handEditTimer = null;
+    document.addEventListener('input', (e) => {
+      const el = e && e.target;
+      if (!el || !el.classList || !el.classList.contains('card-body')) return;
+      if (!document.body.classList.contains('player-active')) return;
+      // A REAL keystroke only. setCardText dispatches a synthetic input event
+      // so the rest of BD notices a programmatic write — and every auto-echo
+      // goes through it, including drift ones. Without this test each of those
+      // would come back round here as a "hand edit", be pushed with
+      // fromDrift:false, and sail straight past the angle suppression that
+      // keeps a viewer smooth. isTrusted is false on a constructed Event and
+      // true on a genuine one, which is exactly the distinction needed.
+      if (!e.isTrusted) return;
+      if (handEditTimer) clearTimeout(handEditTimer);
+      handEditTimer = setTimeout(() => {
+        handEditTimer = null;
+        const body = getFocusedCardBody();
+        if (body) pushScriptToAV(getCardText(body), false);
+      }, 600);
     });
 
     // 2026-08-09 — BD-level bake/save info dialog. Renders in BD's DOM
