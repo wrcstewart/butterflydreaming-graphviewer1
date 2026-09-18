@@ -177,6 +177,10 @@ the script a user could share, save or collage. Two things follow for you:
 **A script edited by hand reaches you**, which it never did before. Expect
 updates that did not come from a control being moved.
 
+**You follow the script unconditionally.** BD has a control that decouples its
+own steppers from the card; it does not decouple YOU. If the script changes,
+you are told, however BD's own controls happen to be behaving.
+
 **The drifting angle is NOT sent while drift is running**, even though the
 script BD holds contains it. You run the same renderer from the same script, so
 you are already advancing the angle yourself — BD's value would only be an

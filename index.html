@@ -82,12 +82,14 @@
          ways: every stepper change is written into the script (no ↑ needed),
          and an edit to the script moves the steppers (no ↓ needed).
          TICKED by default as of 2026-09-18 phase 2, when the script became
-         what BD pushes to a viewer. Unticked, the card stops tracking the
-         steppers and so does the viewer — which is the honest meaning of
-         "the script is the source of truth", but is not what anyone wants
-         as a starting point.
+         what BD pushes to a viewer.
+
+         SCOPE: this governs the CARD-to-STEPPERS coupling and nothing else.
+         A viewer is a view OF THE SCRIPT and follows it whether the box is
+         ticked or not — briefly getting that wrong made the viewer stop
+         updating altogether while unticked.
          Positioned with the arrows by positionExtendPanel, not by CSS. -->
-    <label id="auto-echo" title="Keep the card and the module in step, both ways: stepper changes are written into the script, and edits to the script move the steppers. Unticked, use ↑ and ↓.">
+    <label id="auto-echo" title="Keep the card and the steppers in step, both ways: stepper changes are written into the script, and edits to the script move the steppers. Unticked, use ↑ and ↓ — the viewer follows the script either way.">
       <input type="checkbox" id="auto-echo-box" checked>
       <span>auto</span>
     </label>

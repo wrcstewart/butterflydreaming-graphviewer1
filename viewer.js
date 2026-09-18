@@ -11511,7 +11511,7 @@ async function init() {
       const el = e && e.target;
       if (!el || !el.classList || !el.classList.contains('card-body')) return;
       if (!document.body.classList.contains('player-active')) return;
-      // ── The card drives the module and the viewer ─────────────────────────
+      // ── Publishing the card: always to the viewer, to the module if coupled ─
     //
     // One implementation, two callers: a hand edit (debounced), and re-ticking
     // `auto` after it has been off. Both mean the same thing — the script is
@@ -11534,9 +11534,7 @@ async function init() {
     // not mistaken for one that has been deleted.
     const BARE_LEGAL = /^%%bd_(center|hint|chunk)[ \t]*$/;
 
-    function sendCardToModule(reason) {
-      const box = document.getElementById('auto-echo-box');
-      if (!box || !box.checked) return;
+    function publishCard(reason) {
       const body = getFocusedCardBody();
       if (!body) return;
       const text = getCardText(body);
@@ -11550,13 +11548,28 @@ async function init() {
         console.log('[auto] a directive has no value yet — holding the current figure');
         return;
       }
-      if (iframeEl2 && iframeEl2.contentWindow) {
+      // THE VIEWER ALWAYS FOLLOWS THE SCRIPT. Not optional, and not what the
+      // tick box is about.
+      //
+      // 2026-09-18: the box.checked test used to sit at the top of this
+      // function, which gated this push as well — so with `auto` off the
+      // viewer stopped updating from the script entirely. That was a
+      // regression I introduced while factoring the hand-edit path out, and it
+      // came from a modelling error worth naming: `auto` governs the
+      // CARD-to-MODULE coupling and nothing else. A viewer is a view OF THE
+      // SCRIPT; if the script changes, it changes.
+      pushScriptToAV(text, false);
+
+      // The module, on the other hand, is coupled only while the box is
+      // ticked. Unticked is exactly the request to let the steppers and the
+      // script go their own ways.
+      const box = document.getElementById('auto-echo-box');
+      if (box && box.checked && iframeEl2 && iframeEl2.contentWindow) {
         try {
           iframeEl2.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
           console.log('[auto] card -> module (' + reason + ')');
         } catch (_) {}
       }
-      pushScriptToAV(text, false);
     }
 
     // Re-ticking `auto` makes the STEPPERS follow the script, not the other way
@@ -11575,7 +11588,7 @@ async function init() {
       const box = document.getElementById('auto-echo-box');
       if (box) {
         box.addEventListener('change', () => {
-          if (box.checked) sendCardToModule('re-ticked');
+          if (box.checked) publishCard('re-ticked');
         });
       }
     }
@@ -11614,7 +11627,7 @@ async function init() {
       if (handEditTimer) clearTimeout(handEditTimer);
       handEditTimer = setTimeout(() => {
         handEditTimer = null;
-        sendCardToModule('edit');
+        publishCard('edit');
       }, 600);
     });
 
