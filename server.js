@@ -1129,43 +1129,24 @@ const pendingPurges = new Map();  // userId → timer handle
 // Not built here, deliberately: any notion of WRITE permission. A module socket
 // is identified, not privileged. Pair-and-save is gated on the curation code and
 // stays that way.
-const MODULE_TOKEN_TTL_MS = 2 * 60 * 1000;   // generous: covers a slow page load
-const moduleTokens = new Map();              // token → { userId, issuedAt }
-
-// 2026-09-16 — the token now carries the MODULE TYPE as well as the user.
+// ── The relay lives in bd_relay.js, and is SHIPPABLE ────────────────────────
 //
-// A viewer is bound to a kind of thing: a Kolam viewer cannot render a tune.
-// Once a second viewer of a different type can be open, av_push has to know
-// which one a script is for — see the delivery loop, which used to fan out to
-// every viewer the user had open and would have handed an L-system score to a
-// music player.
+// Everything BD needs in order to drive a viewer on another device — token
+// mint and consume, the handshake, and the six message types — was extracted
+// on 2026-09-19 into a module that carries no trace of BD: no Memgraph, no
+// corpus, no graph, no pairing, no curation.
 //
-// This narrows delivery WITHIN one user's own viewers. It grants BD no new
-// reach: everything is still scoped to moduleFor, so a BD client still cannot
-// address another user's viewer, and still has no field in which to try.
-function mintModuleToken(userId, moduleId) {
-  const token = crypto.randomUUID();
-  moduleTokens.set(token, { userId, moduleId: moduleId || null, issuedAt: Date.now() });
-  return token;
-}
-
-// Returns { userId, moduleId }, or null. Consumes the token on success.
-function consumeModuleToken(token) {
-  const rec = moduleTokens.get(token);
-  if (!rec) return null;
-  moduleTokens.delete(token);                       // single use
-  if (Date.now() - rec.issuedAt > MODULE_TOKEN_TTL_MS) return null;
-  return { userId: rec.userId, moduleId: rec.moduleId };
-}
-
-// Sweep expired tokens. Small map, generous interval — this is hygiene, not a
-// hot path, and consumeModuleToken re-checks the age anyway.
-setInterval(() => {
-  const now = Date.now();
-  for (const [t, rec] of moduleTokens) {
-    if (now - rec.issuedAt > MODULE_TOKEN_TTL_MS) moduleTokens.delete(t);
-  }
-}, 60 * 1000).unref?.();
+// A module rather than a copy, and that is the point. A third party building
+// their own controller and viewer needs a rendezvous, because two browsers on
+// different devices cannot reach each other. We can hand them one — but this
+// repository has watched two copies of music_module.html diverge, and the
+// frozen Kolam standalone has drifted four ways from the live renderer. So
+// there is ONE implementation with two entry points: this server calls into
+// it, and a ten-line rx.js runs it standalone. What we publish is what we run.
+const bdRelay = require('./bd_relay');
+const MODULE_TOKEN_TTL_MS = bdRelay.MODULE_TOKEN_TTL_MS;
+const relay = bdRelay.createRelay();
+const relayLog = (line) => console.log('[BD] ' + line);
 
 
 
@@ -1432,19 +1413,9 @@ function serializeRecord(rec) {
 // not pass through here — which is what lets a single-use token survive a
 // dropped connection inside the recovery window without being reissued.
 io.use((socket, next) => {
-  const token = socket.handshake && socket.handshake.auth && socket.handshake.auth.token;
-  if (!token) return next();                     // ordinary client
-  const claim = consumeModuleToken(token);
-  if (!claim) {
-    console.warn(`[BD] MST refused (unknown or expired) from origin ${socket.handshake.headers.origin || '?'}`);
-    return next(new Error('module_token_invalid'));
-  }
-  socket.data.role         = 'module';
-  socket.data.moduleFor    = claim.userId;       // the BD session that launched it
-  socket.data.moduleType   = claim.moduleId;     // which KIND of viewer this is
-  console.log(`[BD] Module socket accepted for ${claim.userId} (${claim.moduleId || 'untyped'}) ` +
-              `from origin ${socket.handshake.headers.origin || '?'}`);
-  next();
+  const verdict = bdRelay.handshake(relay, socket, relayLog);
+  if (verdict === 'refused') return next(new Error('module_token_invalid'));
+  next();                                        // 'client' or 'viewer'
 });
 
 // --- Socket.IO connection handler (2026-07-13 migration from raw ws) ---
@@ -1524,42 +1495,6 @@ io.on('connection', async (socket) => {
     try {
       type = msg && msg.type;
 
-      // ── What a MODULE socket is allowed to say ───────────────────────────
-      //
-      // A module socket is one that presented an AV token in its handshake. It
-      // is otherwise an ordinary socket: the connection handler gives EVERY
-      // socket a userId and registers it in `sessions`, so without this guard a
-      // viewer — or anything that got hold of a token, or with cors.origin '*'
-      // anything at all — reaches every handler below exactly as a BD client
-      // does.
-      //
-      // The allowlist is deliberately short. An AV is a presentation surface:
-      // it renders what BD sends, says "I am ready", and — since 2026-09-16 —
-      // ANSWERS WHEN ASKED. Adding a message type here is a decision about
-      // what a viewer may DO, and is made deliberately rather than inherited.
-      //
-      //   av_hello         unsolicited, but says nothing except "I exist"
-      //   av_state_report  solicited ONLY: BD asks, the viewer answers. A
-      //                    viewer that sends one unbidden is merely ignored by
-      //                    BD, which is not listening except after a request.
-      //   av_return        "the user pressed the way-back button", and what
-      //                    the viewer was showing when they did. It may carry
-      //                    a SCRIPT and nothing else — no destination. So a
-      //                    viewer can say what it had, and still cannot say
-      //                    where BD should go: BD decides that, from the node
-      //                    IT believes the viewer is on.
-      //
-      //                    The script rides along because on a phone the
-      //                    viewer CLOSES itself on the way back, so there is
-      //                    nobody left to ask afterwards.
-      //
-      // Note what is still absent: a viewer cannot push, cannot name a
-      // destination, and cannot reach a single one of the corpus handlers.
-      //
-      // Silent: a viewer has no UI in which to show a protocol error, and a
-      // reply would tell a prober which names exist.
-      const MODULE_MAY_SEND = new Set(['av_hello', 'av_state_report', 'av_return']);
-      if (socket.data.role === 'module' && !MODULE_MAY_SEND.has(type)) return;
       // Activity clock for the idle reaper. client_log is deliberately
       // excluded: a tab forwarding console noise is not a user doing
       // anything, and counting it would keep an abandoned tab alive forever
@@ -1571,150 +1506,17 @@ io.on('connection', async (socket) => {
       // the operator can watch a mobile client's runtime from the same
       // terminal that shows the server logs, no cable to DevTools
       // required.
-      // --- MDP: AV -> BD "send me the current state" (2026-09-15) ----------
+      // ── The relay's own messages, handled by bd_relay.js ─────────────────
       //
-      // A viewer that has just connected has nothing to show. Previously BD
-      // guessed, pushing on a timer after opening the window — which meant the
-      // viewer sat on the module's DEFAULT figure until a guess landed, and
-      // showed the wrong image for seconds on every trip.
+      // The viewer allowlist, the token mint and all six av_* types live in
+      // that module now — the same file rx.js runs standalone. It returns true
+      // once it has dealt with a message, so everything BD-specific below is
+      // reached only when this was not a relay message.
       //
-      // So the viewer asks. It knows exactly when it is ready; nobody else
-      // does. The server forwards the request to the BD session that launched
-      // it — again without either side naming the other.
-      if (type === 'av_hello') {
-        if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
-        const owner = sessions.get(socket.data.moduleFor);
-        if (owner) {
-          owner.emit('msg', { type: 'av_request_state' });
-          console.log(`[BD] av_hello -> asked ${socket.data.moduleFor} for state`);
-        }
-        return;
-      }
-
-      // --- MDP: BD -> AV "what are you showing?" (2026-09-16) -------------
-      //
-      // The one thing a viewer knows that BD cannot. On a phone you see BD or
-      // the viewer, never both, so opening the viewer backgrounds BD and the
-      // OS throttles or suspends it. The viewer goes on drifting; BD does not.
-      // When BD comes back, the viewer is the only record of where the
-      // exploration actually got to.
-      //
-      // Addressed the same way everything else is — implicitly, by moduleFor,
-      // narrowed by type. BD names no recipient.
-      if (type === 'av_pull') {
-        if (!socket.data.userId) return;
-        const want = typeof msg.moduleId === 'string' ? msg.moduleId : null;
-        let asked = 0;
-        for (const [, s] of io.sockets.sockets) {
-          if (!s.data || s.data.role !== 'module' || s.data.moduleFor !== socket.data.userId) continue;
-          if (want && s.data.moduleType && s.data.moduleType !== want) continue;
-          s.emit('msg', { type: 'av_state_request' });
-          asked++;
-        }
-        if (asked) console.log(`[BD] av_pull -> asked ${asked} viewer(s) for ${socket.data.userId}`);
-        return;
-      }
-
-      // "The user pressed the way-back button", plus what the viewer was
-      // showing. ONLY the script is forwarded — every other field is dropped,
-      // so there remains no channel through which a viewer could suggest a
-      // destination. It says what it had; BD decides where that applies.
-      if (type === 'av_return') {
-        if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
-        const owner = sessions.get(socket.data.moduleFor);
-        // Say so. A viewer whose BD session has gone looks, from the viewer,
-        // exactly like a button that does nothing — and this returned in
-        // silence, so the one place that KNEW said nothing.
-        if (!owner) {
-          console.log(`[BD] av_return from a viewer whose session ${socket.data.moduleFor} is gone`);
-          return;
-        }
-        if (owner.disconnected) {
-          console.log(`[BD] av_return: session ${socket.data.moduleFor} is registered but disconnected`);
-        }
-        const script = typeof msg.script === 'string' ? msg.script : null;
-        owner.emit('msg', { type: 'av_return', script });
-        console.log(`[BD] av_return -> ${socket.data.moduleFor}` +
-                    (script ? ` (with state, ${script.length} chars)` : ' (no state)'));
-        return;
-      }
-
-      // The answer, travelling back to the session that launched the viewer.
-      // socket.data.moduleFor is the ONLY address involved: a viewer cannot
-      // name a destination, so it cannot report state at anyone else.
-      if (type === 'av_state_report') {
-        if (socket.data.role !== 'module' || !socket.data.moduleFor) return;
-        const owner = sessions.get(socket.data.moduleFor);
-        if (!owner) {
-          console.log(`[BD] av_state_report dropped: session ${socket.data.moduleFor} is gone`);
-          return;
-        }
-        owner.emit('msg', {
-          type:     'av_state_report',
-          moduleId: socket.data.moduleType || null,   // from the TOKEN, not the viewer
-          nodeId:   typeof msg.nodeId === 'string' ? msg.nodeId : null,
-          script:   typeof msg.script === 'string' ? msg.script : null
-        });
-        console.log(`[BD] av_state_report -> ${socket.data.moduleFor}`);
-        return;
-      }
-
-      // --- MDP: BD -> AV push (2026-09-14) --------------------------------
-      //
-      // The Module Data Protocol, in its smallest useful form. An Ancillary
-      // Viewer (AV) is a presentation surface: BD holds the state, the AV
-      // renders it. So the only message that matters is one-way, BD to AV.
-      //
-      // Addressing is implicit and deliberately so. A module socket carries
-      // socket.data.moduleFor = the userId that minted its token, so BD never
-      // names a recipient: it pushes, and the server delivers to every AV
-      // launched by THIS session. A BD client therefore cannot address another
-      // user's viewer even by accident — there is no field in which to try.
-      //
-      // No acknowledgement, no return channel. An AV that wants to talk back
-      // would need a message type of its own and a decision about what an AV is
-      // allowed to say; deliberately not invented here.
-      if (type === 'av_push') {
-        if (!socket.data.userId) return;
-        // msg.moduleId names the KIND of viewer this script is for. A viewer
-        // whose type differs is skipped: a Kolam script must never reach a
-        // music player, which is what happened when this loop delivered to
-        // every module socket the user had open.
-        //
-        // Filtered HERE rather than in each viewer, because a third-party
-        // author should not have to implement "ignore what is not mine"
-        // correctly in order to avoid rendering someone else's payload. An
-        // untyped push (or an untyped socket) still matches everything, so a
-        // viewer opened before this existed keeps working.
-        const want = typeof msg.moduleId === 'string' ? msg.moduleId : null;
-        let delivered = 0, skipped = 0;
-        for (const [, s] of io.sockets.sockets) {
-          if (!s.data || s.data.role !== 'module' || s.data.moduleFor !== socket.data.userId) continue;
-          if (want && s.data.moduleType && s.data.moduleType !== want) { skipped++; continue; }
-          s.emit('msg', { type: 'av_update', payload: msg.payload ?? null });
-          delivered++;
-        }
-        if (skipped) console.log(`[BD] av_push: ${skipped} viewer(s) of another type skipped`);
-        // Quiet when there is no viewer open — that is the normal case, not an
-        // error, and logging it would drown the console during ordinary use.
-        if (delivered) console.log(`[BD] av_push -> ${delivered} viewer(s) for ${socket.data.userId}`);
-        return;
-      }
-
-      // BD asks for a token to hand to a module it is about to open.
-      // Answered only for a socket that already has a userId — i.e. a real BD
-      // session — so a token cannot be obtained by an anonymous connection.
-      if (type === 'mint_module_token') {
-        if (!socket.data.userId) {
-          socket.emit('msg', { type: 'module_token', token: null, reason: 'no_session' });
-          return;
-        }
-        const moduleId = typeof msg.moduleId === 'string' ? msg.moduleId : null;
-        const token = mintModuleToken(socket.data.userId, moduleId);
-        console.log(`[BD] MST minted for ${socket.data.userId} (${moduleId || 'untyped'})`);
-        socket.emit('msg', { type: 'module_token', token, ttl_ms: MODULE_TOKEN_TTL_MS });
-        return;
-      }
+      // BD passes its OWN sessions map, which it already keeps for pairing. A
+      // standalone relay uses the one it makes for itself, and that map is the
+      // only thing the relay borrows from its host.
+      if (bdRelay.handleMessage(relay, io, sessions, socket, msg, relayLog)) return;
 
       if (msg.type === 'client_log') {
         const uid = socket.data.userId || '???';
