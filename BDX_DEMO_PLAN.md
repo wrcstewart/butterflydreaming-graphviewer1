@@ -1,6 +1,6 @@
 # BDX / AVX / RX — an independent demo of the module architecture
 
-**Status 2026-09-19: BUILT AND WORKING.** Repo
+**Status 2026-09-19: BUILT AND WORKING IN ALL THREE BROWSERS.** Repo
 <https://github.com/wrcstewart/bdx-demo>, pages at
 <https://wrcstewart.github.io/bdx-demo/>. Verified end to end with the
 published pages driving a viewer through a relay running locally — the claim
@@ -212,15 +212,89 @@ devices through RX; then BDX pointed at a *different* RX via `?rx=`.
 - A demo that does not work on click is not convincing, so tier 1 hosting is
   worth having even though tier 3 (`node rx.js`) is what proves the argument.
 
+## 8a. What testing found, and what it cost
+
+Everything below was found by the author driving the real pages. None of it was
+found by the probes, which speak raw Socket.IO and bypass the page code
+entirely — worth remembering when the next thing is "verified".
+
+**Three rounds lost to a silent failure.** Symptom: "no relay", with a relay log
+that was completely EMPTY — the browser had never attempted a socket. Cause:
+the page had been loaded without `?rx=`, because a reload drops a query string.
+The reason it took three rounds is the one this project keeps re-learning: the
+drawing comes from an iframe and works whether or not the page's own script is
+alive, so a dead page, a waiting page and a working page look identical.
+
+Fixed by, in order of value: the page **narrates its connection** to the console
+(`[bdx] requesting… / client loaded / connected`); the relay is **typed into a
+box and kept in localStorage** rather than living in a query string; and **RX
+serves the pages itself**, so local setup is one command on one origin.
+
+**The stepper→script direction was dead**, and it was my own superseded fix
+carried into new code. `writePanel` tested `document.activeElement === script` —
+the guard BD outgrew on 09-18. Two things made it permanent rather than
+awkward: the caret stays in the panel after typing, AND the renderer's stepper
+buttons call `preventDefault` on pointerdown so clicking one does not move focus
+to the iframe either. Once the script had been edited, the panel never updated
+again.
+
+**The same fault has two right answers**, decided by what the element is. BD's
+panel is a contentEditable div, where rewriting destroys the caret — so BD had
+to separate recording from redrawing. BDX's panel is a TEXTAREA, where the
+selection can be saved and restored, so the simpler "has anyone typed in the
+last 1200ms" guard is correct here and would have been wrong there. Do not
+"harmonise" them.
+
+**Safari is the strict one, and earned its keep.** An https page reaching an
+http relay is mixed content. Chrome and Firefox make an exception for
+`localhost`; Safari does not and blocks it outright, which looks exactly like
+the relay being down. **A deployed relay needs TLS for this reason** — it is
+not a nicety, and §6 treats it as mandatory.
+
+**Do not offer a control that cannot fix the fault being reported.** The relay
+box appeared in the mixed-content case, where nothing typed into it could ever
+work — anything is still an http relay reached from an https page. A box that
+looks like the answer costs more than no box at all. It now offers a LINK to
+the page the relay itself serves, which is one of the only two real remedies.
+
 ## 9. Decisions outstanding
 
 - **Buy the KVM1 and run §6**, then set `DEFAULT_RX` in both pages and push.
+  This is the next action, and it unblocks §9a.
 - Whether `bdx-demo` is the right public name. It says what it proves rather
   than what it does; `kolam-live` would say the opposite. Cheap to change now,
   awkward once linked to.
 - Whether to add a QR / short-code path for cross-device pairing. Designed in
   `AV/README.md`, entirely controller-side, NOT built. Deliberately out of scope
   for this demo: the multi-device transport is a separate job.
+
+## 9a. Next, after the VPS: "Send to another device"
+
+The author's idea, and the cheapest useful form of the QR design: BDX shows the
+AVX URL in a text box with a copy button, so it can be pasted onto another
+device. **It needs no new protocol** — mint a token, build the URL, display it.
+
+A second BUTTON beside View, not a radio: both do the same thing and differ
+only in what becomes of the token — one opens a window here, the other hands
+you the link. A radio would imply View changes behaviour.
+
+Three things it must get right:
+
+- **Mint on the press, never in advance.** Single use, two-minute life. A box
+  shown continuously is a dead link that looks usable.
+- **One URL, one viewer.** A second device needs a second press; say so.
+- **THE URL MUST NAME A HOST THE OTHER DEVICE CAN REACH.** This is the trap:
+  served from `localhost:8081`, the URL means *the other device itself*. It
+  must use a reachable origin — the deployed relay, or a LAN address — or say
+  plainly that it only works on this machine.
+
+**Deliberately after the VPS**, because it is barely testable before: the phone
+needs to reach both the pages and the relay, and the hosted pages plus a local
+http relay fail for the same mixed-content reason Safari demonstrated.
+
+**And it is what would finally prove the premise.** Everything tested so far is
+two windows on ONE MACHINE — the case that does not need a relay at all.
+Cross-device is the only thing RX exists for, and it has never been done.
 
 ## 10. The one thing not to get wrong
 
