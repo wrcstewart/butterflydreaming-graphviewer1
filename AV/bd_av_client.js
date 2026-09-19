@@ -52,7 +52,13 @@
   }
 
   /*
-   * connect({ bdOrigin, onUpdate, onState })
+   * connect({ bdOrigin, controllerOrigin, moduleId, onUpdate, onState,
+   *           onStateRequest, onHealth })
+   *
+   *   bdOrigin          where the RELAY is.
+   *   controllerOrigin  where the window that opened you is, when that differs
+   *                     — it does whenever the relay is hosted separately.
+   *                     Only this origin may issue you a replacement token.
    *
    *   onUpdate(payload)  — called every time BD pushes new state.
    *   onState(state,info)— lifecycle: 'connecting' | 'live' | 'no-token'
@@ -73,9 +79,20 @@
     // Optional. Called once a minute with a snapshot of the connection. See
     // the monitor at the foot of connect() for why a viewer needs one.
     const onHealth = typeof o.onHealth === 'function' ? o.onHealth : null;
-    // Which kind of viewer this is. Used when asking BD for a fresh token so
-    // the replacement is minted for the right module type.
+    // Which kind of viewer this is. Used when asking for a fresh token so the
+    // replacement is minted for the right module type.
     const moduleId = typeof o.moduleId === 'string' ? o.moduleId : null;
+    // The origin of the window that OPENED this viewer: who a replacement
+    // token is asked of, and the only origin an answer is accepted from.
+    //
+    // 2026-09-19 — this used to be bdOrigin, and in ButterflyDreaming the
+    // relay and the opener are the same window, so nothing showed. They are
+    // NOT the same in general: a controller may drive a viewer through a relay
+    // hosted somewhere else entirely, which is exactly what the BDX/AVX/RX
+    // demo does. The request would then be aimed at the relay's origin, which
+    // never sees it, and renewal would fail silently on a page that looked
+    // perfectly well.
+    const controllerOrigin = typeof o.controllerOrigin === 'string' ? o.controllerOrigin : bdOrigin;
 
     const token = readToken();
     if (!token) {
@@ -177,7 +194,7 @@
       renewCount += 1;
       onState('renewing', { why: why, attempt: renewCount });
       try {
-        opener.postMessage({ type: 'bd_av_token_request', moduleId: moduleId }, bdOrigin);
+        opener.postMessage({ type: 'bd_av_token_request', moduleId: moduleId }, controllerOrigin);
       } catch (_) { renewing = false; return false; }
       setTimeout(function () {
         if (!renewing) return;
@@ -189,7 +206,7 @@
 
     try {
       root.addEventListener('message', function (e) {
-        if (e.origin !== bdOrigin) return;              // only BD may answer
+        if (e.origin !== controllerOrigin) return;      // only the controller may answer
         const d = e.data;
         if (!d || d.type !== 'bd_av_token' || typeof d.token !== 'string') return;
         renewing = false;

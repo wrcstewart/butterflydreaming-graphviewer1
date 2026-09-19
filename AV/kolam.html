@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-18: GREEN (the drift clock runs on
-     wall time, so BD and the viewer keep the same rate). Next rotation = blue. */
+     change to a cached AV file. 2026-09-19: BLUE (the shim can now be told
+     the controller's origin separately from the relay's). Next rotation = red. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #27ae60;              /* CANARY — green (was red) */
+    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
