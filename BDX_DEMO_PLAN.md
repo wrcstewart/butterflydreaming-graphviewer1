@@ -1,6 +1,15 @@
 # BDX / AVX / RX — an independent demo of the module architecture
 
-**Status: planned 2026-09-19, part 1 built (`bf70980`).**
+**Status 2026-09-19: BUILT AND WORKING.** Repo
+<https://github.com/wrcstewart/bdx-demo>, pages at
+<https://wrcstewart.github.io/bdx-demo/>. Verified end to end with the
+published pages driving a viewer through a relay running locally — the claim
+demonstrated. Remaining: deploy RX (§6) and point the pages at it.
+
+It also found a real bug in BD's own shim, which is a fair argument for having
+built it: `controllerOrigin` (`540dd8a`). A viewer asked its opener for a
+replacement token and aimed the request at the RELAY's origin — invisible in
+BD, where the relay and the opener are the same window.
 Written down before building because the reasoning matters more than the code,
 and the code is easy to rebuild from it.
 
@@ -78,18 +87,111 @@ colour shown as the exponent). A published copy rots.
   source and the date. A copy that announces itself is survivable; one that
   pretends to be original is not.
 
-## 6. Hosting
+## 6. Hosting — decided 2026-09-19: a Hostinger KVM1
+
+A small VPS rather than a free PaaS. Hetzner was the value pick and was not
+available; **Hostinger KVM1** keeps billing and DNS with the existing account,
+and is ample — RX is one Node process using tens of megabytes.
+
+**NOT the existing Hostinger VPS**, which runs the Discourse forum. Discourse
+owns 80/443 through its own containerised nginx, so adding a proxy there means
+changing a working forum's request path for the sake of a 103-line service.
+Not worth the risk; a second machine is a few pounds a month.
+
+### Setting it up, when the machine exists
+
+Written now so it is not reconstructed later. `rx.butterflydreaming.org` is the
+natural name; the DNS is already at Hostinger.
+
+    # 1. DNS: an A record  rx.butterflydreaming.org -> the VPS IP
+
+    # 2. Node 20 (Ubuntu)
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs nginx
+    node -v
+
+    # 3. The relay
+    sudo git clone https://github.com/wrcstewart/bdx-demo /opt/rx
+    cd /opt/rx && sudo npm install --omit=dev
+
+    # 4. Run it as a service, on LOOPBACK only — nginx is the front door
+    sudo tee /etc/systemd/system/rx.service >/dev/null <<'UNIT'
+    [Unit]
+    Description=RX relay
+    After=network.target
+    [Service]
+    WorkingDirectory=/opt/rx
+    Environment=PORT=8081
+    ExecStart=/usr/bin/node rx.js
+    Restart=always
+    User=www-data
+    [Install]
+    WantedBy=multi-user.target
+    UNIT
+    sudo systemctl enable --now rx && sudo systemctl status rx
+
+    # 5. nginx. THE UPGRADE HEADERS ARE THE PART PEOPLE MISS — without them
+    #    the polling handshake works, the WebSocket upgrade fails, and the
+    #    symptom is "it works but it is slow", which is hard to attribute.
+    sudo tee /etc/nginx/sites-available/rx >/dev/null <<'CONF'
+    server {
+      listen 80;
+      server_name rx.butterflydreaming.org;
+      location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 7d;      # a socket may be idle a long time
+      }
+    }
+    CONF
+    sudo ln -s /etc/nginx/sites-available/rx /etc/nginx/sites-enabled/
+    sudo nginx -t && sudo systemctl reload nginx
+
+    # 6. TLS. The pages are on HTTPS (GitHub Pages), so the relay MUST be too
+    #    or the browser blocks it as mixed content.
+    sudo apt-get install -y certbot python3-certbot-nginx
+    sudo certbot --nginx -d rx.butterflydreaming.org
+
+    # 7. Check
+    curl https://rx.butterflydreaming.org/health
+
+Then set `DEFAULT_RX` in `bdx.html` and `avx.html` to that origin and push, and
+the published pages work on click.
+
+**Why TLS is not optional here:** the pages are served over HTTPS, and a browser
+will not let an HTTPS page open a plain `ws://` socket. Testing against
+`http://localhost` works only because browsers make a special exception for
+localhost.
+
+## 6a. How the pages find a relay
 
 - **BDX + AVX**: GitHub Pages. Static, free, always up.
-- **RX**: GitHub Pages CANNOT host it — it is a server. A free Node host is the
-  assumption (decided 2026-09-19). RX is written for one: `process.env.PORT`,
-  a health route, no filesystem state, one dependency.
-- **`?rx=<url>`** on both pages, so the *published* pages work against any
-  relay — ours, theirs, or `localhost` — without forking anything.
-- The demo defaults to our hosted RX so a stranger clicking the link sees it
-  work. The AVX health strip already fails honestly ("NO CONTACT…") when the
-  relay is unreachable, which is the right behaviour for a demo that may be
-  pointed at a sleeping free-tier host.
+  Live at <https://wrcstewart.github.io/bdx-demo/>.
+- **RX**: GitHub Pages CANNOT host it — it is a server.
+- **In order of preference**: `?rx=<origin>` on the URL, then whatever was last
+  typed into the relay box (localStorage), then `localhost:8081` if the page is
+  itself on localhost, then the compiled-in `DEFAULT_RX`.
+- **A relay box in the header**, shown only when there is none. A query string
+  is a poor place for a setting every reload needs: losing it produced a page
+  that drew perfectly, said nothing, and had never created a socket. Three
+  rounds of debugging went into learning that.
+- **RX also serves the pages** when they sit beside it, so `npm start` is the
+  whole of local setup — one command, one origin, nothing to line up. A second
+  static server on a second port was a step that could go wrong, and when it
+  did the symptom was "no relay", which sounds like the relay's fault.
+
+## 6b. Alternatives considered, and why not
+
+- **Render free** — works, and `render.yaml` is still in the repo. Sleeps after
+  ~15 min and takes ~50s to wake. Fine for a demo shown live, poor for a link
+  posted and forgotten.
+- **Hetzner CX22 (~€4)** — the value pick. Not available when needed.
+- **The existing Hostinger VPS** — rejected: it runs Discourse, which owns
+  80/443 through its own nginx.
 
 ## 7. Testing
 
@@ -104,7 +206,7 @@ devices through RX; then BDX pointed at a *different* RX via `?rx=`.
 
 ## 8. Decisions taken
 
-- RX assumes a **free Node host** (2026-09-19).
+- **Hostinger KVM1**, a machine of its own (2026-09-19). Not the forum's VPS.
 - The relay ships as a **module**, not a copy.
 - The demo **defaults to our RX**, with `?rx=` to override.
 - A demo that does not work on click is not convincing, so tier 1 hosting is
@@ -112,9 +214,10 @@ devices through RX; then BDX pointed at a *different* RX via `?rx=`.
 
 ## 9. Decisions outstanding
 
-- **Creating the public GitHub repo** — outward-facing, needs an explicit yes.
-  Name not chosen. `bdx-demo`? `bd_module_demo`?
-- **Which free host**, and the deploy walkthrough, wanted later.
+- **Buy the KVM1 and run §6**, then set `DEFAULT_RX` in both pages and push.
+- Whether `bdx-demo` is the right public name. It says what it proves rather
+  than what it does; `kolam-live` would say the opposite. Cheap to change now,
+  awkward once linked to.
 - Whether to add a QR / short-code path for cross-device pairing. Designed in
   `AV/README.md`, entirely controller-side, NOT built. Deliberately out of scope
   for this demo: the multi-device transport is a separate job.
