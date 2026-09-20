@@ -309,8 +309,23 @@ device you send to**, and the failure will look like the other device's fault.
   `?rx=` is a redirection or a repair, never the address, because it is
   **sticky**: it is written to `localStorage` on arrival and outranks
   `DEFAULT_RX` for that browser from then on. Handing someone a `?rx=` link
-  changes their browser permanently. The way back is to pass the default
-  explicitly, or clear site data.
+  changes their browser.
+- **But it can no longer strand anyone** (2026-09-20). Three rules, none of
+  which anyone needs to know about:
+  - **Storing the default forgets instead of pinning.** `?rx=` naming the
+    address the page would have chosen anyway CLEARS the setting — so the
+    obvious repair leaves the browser following the default rather than nailed
+    to today's address, which would need repairing again when the relay moves.
+  - **A `default` button appears** in the header whenever a non-default relay
+    is in use, and forgets it. Its absence says nothing is overridden.
+  - **A stale stored relay heals itself**: it does not answer, the page falls
+    back once, names the host that failed, and drops the setting. A relay in
+    the CURRENT url is never healed — that is a present-tense instruction and
+    must fail loudly. Only a setting made in another tab can go stale.
+
+  Verified by extracting the resolution block verbatim and running eight cases
+  (fresh, stale localhost, repair URL on dirty and clean browsers, third-party
+  relay both ways, local dev).
 - **BDX's header names the relay it reached and the transport** —
   `relay: rx.virtualfictions.uk (websocket)`. This is the only cheap way to
   tell "your relay" from "mine", and a WebSocket from a silent fallback to
