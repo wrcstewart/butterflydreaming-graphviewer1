@@ -305,6 +305,19 @@ device you send to**, and the failure will look like the other device's fault.
 - **In order of preference**: `?rx=<origin>` on the URL, then whatever was last
   typed into the relay box (localStorage), then `localhost:8081` if the page is
   itself on localhost, then the compiled-in `DEFAULT_RX`.
+- **The URL to publish is the bare one** — `https://wrcstewart.github.io/bdx-demo/`.
+  `?rx=` is a redirection or a repair, never the address, because it is
+  **sticky**: it is written to `localStorage` on arrival and outranks
+  `DEFAULT_RX` for that browser from then on. Handing someone a `?rx=` link
+  changes their browser permanently. The way back is to pass the default
+  explicitly, or clear site data.
+- **BDX's header names the relay it reached and the transport** —
+  `relay: rx.virtualfictions.uk (websocket)`. This is the only cheap way to
+  tell "your relay" from "mine", and a WebSocket from a silent fallback to
+  long-polling.
+- **AVX is immune to the sticky setting**: its relay comes only from `?rx=` in
+  the launch URL, with no stored fallback, because a viewer opened anywhere
+  must be told where home is every time.
 - **A relay box in the header**, shown only when there is none. A query string
   is a poor place for a setting every reload needs: losing it produced a page
   that drew perfectly, said nothing, and had never created a socket. Three
