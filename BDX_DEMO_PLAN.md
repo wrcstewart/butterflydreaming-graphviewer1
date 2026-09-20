@@ -190,6 +190,76 @@ will not let an HTTPS page open a plain `ws://` socket. Testing against
 `http://localhost` works only because browsers make a special exception for
 localhost.
 
+## 6c. DEPLOYMENT IN PROGRESS — 2026-09-20
+
+**Decision changed: RX goes on the EXISTING Hostinger VPS beside Discourse**,
+not a second machine. It saves a whole subscription, and the earlier caution
+was about the wrong thing.
+
+**The risk was never the install — it was the INGRESS.** Node, a clone and a
+service on 8081 touch nothing Discourse owns. What was dangerous was taking
+port 80 from Discourse's container for certbot, which means editing
+`containers/app.yml`, rebuilding, and moving TLS. A **cloudflared tunnel needs
+none of that**: it dials OUT and holds the connection open, so no port is
+opened, no nginx exists, no certificate is issued on the box, and Discourse's
+request path is never touched. Cloudflare terminates TLS, which also kills the
+Safari mixed-content problem.
+
+**Hostname is `rx.virtualfictions.uk`, NOT rx.butterflydreaming.org.** Only
+`virtualfictions.uk` is on Cloudflare nameservers; `butterflydreaming.org` is
+on Hostinger's (dns-parking). A tunnel requires the zone to be on Cloudflare.
+It also sits beside `graph.virtualfictions.uk`, which is how BD already
+reaches the world.
+
+### The machine, surveyed before touching it
+
+    2 cores · 7.8 GB RAM · 96 GB disk at 15% · Ubuntu 24.04.4
+    Discourse `app` container up 4 months, owning 80/443 via docker-proxy
+    no swap, no Node, no cloudflared, no host nginx, ufw inactive
+    monarx-agent on 127.0.0.1:65529 — Hostinger's own agent, left alone
+
+### Done
+
+- **2 GB swap.** There was none, and a box with none OOM-kills rather than
+  slowing down.
+- **Node v20.20.2.** Installed only — NO blanket `apt upgrade`, which is the
+  one command that could disturb Docker.
+- **`/opt/rx`**, cloned, `npm ci --omit=dev`, 20 packages, 6 MB.
+- **`rx.service`**, hardened: `www-data`, `ProtectSystem=strict`,
+  `PrivateTmp`, `NoNewPrivileges`, writes only to `/opt/rx`.
+- **Bound to 127.0.0.1**, verified unreachable from outside.
+- **cloudflared installed**, not yet authorised.
+
+### NOT done, deliberately
+
+**`ufw` is NOT enabled**, against the generic §6. `ufw` and Docker interact
+badly — Docker writes its own iptables rules, and enabling a firewall on a
+Discourse box either breaks published ports or gives false confidence. It is
+also unnecessary: the tunnel opens nothing.
+
+### Found and fixed at the source: RX_HOST
+
+`rx.js` called `server.listen(PORT)` with no host, so on a public IP it
+listened on EVERY interface. Nothing was exposed — confirmed, the provider
+filters non-standard ports inbound — but that is luck, not design. `RX_HOST`
+now exists and is documented; the service sets it to `127.0.0.1`.
+
+### Remaining — needs the author at a browser
+
+1. `cloudflared tunnel login` → it prints a URL, the author opens it and
+   picks `virtualfictions.uk`. **The link times out in minutes, so do not
+   start this until they are at the keyboard.**
+2. `cloudflared tunnel create rx` and route `rx.virtualfictions.uk` to it.
+3. Install cloudflared as a service.
+4. Verify `https://rx.virtualfictions.uk/health`.
+5. Set `DEFAULT_RX` in `bdx.html` and `avx.html`, push, confirm the hosted
+   demo works on click — INCLUDING Safari, which this is what finally fixes.
+
+**Alternative to step 1** if a browser flow is awkward: create the tunnel in
+the Cloudflare dashboard instead and use the token —
+`cloudflared service install <token>`. Same result, and the dashboard works
+from a phone.
+
 ## 6a. How the pages find a relay
 
 - **BDX + AVX**: GitHub Pages. Static, free, always up.
