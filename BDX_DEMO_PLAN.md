@@ -426,7 +426,7 @@ the page the relay itself serves, which is one of the only two real remedies.
   `AV/README.md`, entirely controller-side, NOT built. Deliberately out of scope
   for this demo: the multi-device transport is a separate job.
 
-## 9a. Next, after the VPS: "Send to another device"
+## 9a. "Send to another device" — BUILT 2026-09-20
 
 The author's idea, and the cheapest useful form of the QR design: BDX shows the
 AVX URL in a text box with a copy button, so it can be pasted onto another
@@ -453,6 +453,45 @@ http relay fail for the same mixed-content reason Safari demonstrated.
 **And it is what would finally prove the premise.** Everything tested so far is
 two windows on ONE MACHINE — the case that does not need a relay at all.
 Cross-device is the only thing RX exists for, and it has never been done.
+
+### Built — what it does, and what was decided along the way
+
+Shipped as **`copy view URL`**, one button beside View. All three requirements
+above are met, and the localhost refusal checks BOTH the page origin and the
+relay (seven cases tested; a LAN address is allowed).
+
+- **A button, not the tick box first proposed.** A tick box is a persistent
+  setting for a one-shot act: ticked, you get a link, then must remember to
+  untick before the next local view — and hiding View behind it puts the
+  primary action inside a mode.
+- **TTL 2 → 3 minutes**, in `bd_relay.js`, which is byte-identical to BD's by
+  design — so the constant cannot be forked without forking the file, and BD
+  gets the same three minutes. Two covered a slow page load, all View ever
+  needed; three covers a hand-off to a phone. It stays short because the token
+  IS the credential and travels through clipboards that keep things for years.
+  The page's countdown reads the relay's `ttl_ms` rather than a copied number.
+- **The Safari clipboard trap, which is the window.open trap again.** A
+  clipboard write after an `await` is refused — the gesture is over. So the
+  clipboard is handed the *promise* during the gesture (`ClipboardItem` with a
+  promise value) and it resolves when the token lands; then `writeText`; then
+  the visible box with its own copy button, which is a fresh gesture and always
+  works. Three paths, because a copy that silently does nothing is worse than
+  no button.
+- **Universal Clipboard makes this the cheapest cross-device test** — copy on
+  the laptop, paste on the phone, no email. That is why the copy button came
+  before the QR code.
+- **Many viewers already work**, and needed no change: `bd_relay.js` fans an
+  `av_push` out to every socket whose `moduleFor` matches the session. One
+  controller, several screens. Each still needs its own press, tokens being
+  single-use.
+- **A viewer arriving closes the panel** and says so — the confirmation the
+  hand-off worked, when the other device is across the room.
+
+The launch URL is **156 characters**, well inside anything a QR code would
+need, so the QR remains a straightforward addition rather than a redesign.
+
+**STILL NOT DONE: the actual cross-device test.** The button exists; nothing
+has yet driven a phone.
 
 ## 10. The one thing not to get wrong
 
