@@ -490,8 +490,37 @@ relay (seven cases tested; a LAN address is allowed).
 The launch URL is **156 characters**, well inside anything a QR code would
 need, so the QR remains a straightforward addition rather than a redesign.
 
-**STILL NOT DONE: the actual cross-device test.** The button exists; nothing
-has yet driven a phone.
+### DONE 2026-09-20 — a phone was driven from a laptop
+
+The first thing in this project ever to cross two devices, and the only case
+the relay exists for. Reported working.
+
+### KNOWN LIMIT, found in the same session: a remote viewer cannot survive a
+### drop longer than 60 seconds
+
+Not new, and not caused by the send button — it is the **45-minute silent
+desync** already described at `bd_av_client.js:120`, reached by a second road.
+
+The chain: the token is **single-use**, spent at first connect.
+`connectionStateRecovery` covers a 60-second gap with `skipMiddlewares`, so a
+brief drop is invisible. **Past that window a reconnect is a FRESH connection**,
+the handshake middleware runs, the token is already spent — and every retry is
+refused `module_token_invalid`, for ever.
+
+A viewer opened by **View** recovers: `tryRenewToken` asks its opener for a new
+token over `postMessage`. **A viewer opened from a pasted link has no opener**
+(`bd_av_client.js:191-193` returns false immediately), so it cannot. On a phone,
+locking the screen for a minute is enough to reach this.
+
+**The fix is a rolling token, and it needs a protocol addition**: while the
+viewer is connected, the controller sends it a SPARE token over the existing
+socket; the viewer holds it and presents it on the next reconnect, then is sent
+another. This keeps single-use tokens — the property worth keeping — while
+removing the dependence on an opener that a remote viewer never had.
+
+Until then the honest behaviour is to SAY so on the viewer rather than sit
+retrying: "this link has expired — get a new one from the controller."
+
 
 ## 10. The one thing not to get wrong
 
