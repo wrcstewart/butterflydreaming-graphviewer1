@@ -521,6 +521,29 @@ removing the dependence on an opener that a remote viewer never had.
 Until then the honest behaviour is to SAY so on the viewer rather than sit
 retrying: "this link has expired — get a new one from the controller."
 
+### QR code — BUILT 2026-09-20
+
+Drawn beside the link on the same press. `qrcode-generator 1.4.4` (MIT) is
+**vendored, not CDN-loaded** — this demo has no external dependencies at all,
+even socket.io coming from the relay, and that is worth keeping in something
+meant to prove third parties can build on this. Fetched lazily on first press,
+so a View-only visitor never pays the 57 KB. `rx.js`'s `SERVABLE` whitelist had
+to learn the filename; a file not named there is a 404 with no other symptom.
+
+**Verify an encoder by DECODING it, never by comparing matrices.** A matrix
+comparison has too many free parameters to be a test: the first attempt
+"failed" 28 of 30 cases against segno, and the comparison was what was wrong —
+segno defaults to **Micro QR**, a different symbol type, and mask choice is a
+free choice besides. Encoding 25 strings and reading them back with OpenCV's
+detector settled it in one run.
+
+**Integer pixels per module, and enough of them.** The first arithmetic floored
+to 2 px/module — a 122 px code. Software decoders read that happily; a phone
+camera at an angle on a glossy screen is a different proposition. Now 4.
+
+**The canvas paints its own white quiet zone.** A QR on a dark page with no
+light margin is unreadable, and it looks perfectly fine while being so.
+
 
 ## 10. The one thing not to get wrong
 
