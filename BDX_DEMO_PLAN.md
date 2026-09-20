@@ -512,14 +512,36 @@ token over `postMessage`. **A viewer opened from a pasted link has no opener**
 (`bd_av_client.js:191-193` returns false immediately), so it cannot. On a phone,
 locking the screen for a minute is enough to reach this.
 
+**BUILT 2026-09-20 — see below. A keepalive was considered and rejected**: iOS
+suspends JS timers when the page is not visible, so a heartbeat stops working
+at exactly the moment it would be needed, and the socket is torn down anyway.
+
 **The fix is a rolling token, and it needs a protocol addition**: while the
 viewer is connected, the controller sends it a SPARE token over the existing
 socket; the viewer holds it and presents it on the next reconnect, then is sent
 another. This keeps single-use tokens — the property worth keeping — while
 removing the dependence on an opener that a remote viewer never had.
 
-Until then the honest behaviour is to SAY so on the viewer rather than sit
-retrying: "this link has expired — get a new one from the controller."
+### Built 2026-09-20
+
+`av_spare_token` in `bd_relay.js`, fanned out like `av_push` — implicit
+addressing, and NOT in `VIEWER_MAY_SEND`, so a viewer cannot forge one. The
+controller arms a viewer when it announces itself, and re-arms whenever one
+returns.
+
+**The spare is kept in `sessionStorage`**, which the reported symptom forces:
+returning to a page iOS discarded is a FRESH DOCUMENT with the same URL, and a
+spare held in a variable would have died with the page it was meant to save.
+Reading one spends it, so a refused spare cannot become an infinite retry.
+
+**Two diagnostics, because the two failures need opposite fixes**: `boots` >1
+says the page was RELOADED (nothing to recover, the 60-second window is beside
+the point); `recovered` says the session genuinely was restored. AVX shows them
+as "armed" and "reloaded xN" — in the strip, not a tooltip, which cannot be
+read on a phone.
+
+Proven against a live relay: spare delivered, old token refused, spare
+accepted, a push delivered after the return, and a viewer forging one ignored.
 
 ### QR code — BUILT 2026-09-20
 
