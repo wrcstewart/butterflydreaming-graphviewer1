@@ -98,23 +98,46 @@ owns 80/443 through its own containerised nginx, so adding a proxy there means
 changing a working forum's request path for the sake of a 103-line service.
 Not worth the risk; a second machine is a few pounds a month.
 
+### Confirmed 2026-09-20
+
+| | |
+|---|---|
+| plan | **KVM2** — 2 cores, 8 GB, 1000 GB NVMe, 8 TB. Chosen over KVM1 for the second core, which makes it usable as a build machine rather than only a host. RX itself does not need it: **measured at 67 MB resident and 0% CPU idle after 21 hours**, with 5.7 MB of dependencies. |
+| OS | Ubuntu 24.04 LTS |
+| hostname | **rx.butterflydreaming.org** |
+| certbot email | wrcstewart@yahoo.co.uk |
+| access | key-only. The Mac's existing `~/.ssh/id_ed25519` public half is added at creation, so no password is ever handled. |
+
+**DNS state before the work:** `rx.butterflydreaming.org` does not resolve.
+`butterflydreaming.org` points at GitHub Pages (185.199.108-111.153) for the
+landing page — adding an A record for the `rx` subdomain does not disturb it.
+
 ### Setting it up, when the machine exists
 
-Written now so it is not reconstructed later. `rx.butterflydreaming.org` is the
-natural name; the DNS is already at Hostinger.
+Written now so it is not reconstructed later.
 
     # 1. DNS: an A record  rx.butterflydreaming.org -> the VPS IP
 
-    # 2. Node 20 (Ubuntu)
+    # 2. A swap file and a firewall, before anything else.
+    #    Swap because a box with none OOM-KILLS rather than slowing down, and
+    #    that is an unpleasant way to discover a leak in a later experiment.
+    sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+    sudo mkswap /swapfile && sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    sudo ufw allow OpenSSH && sudo ufw allow 80 && sudo ufw allow 443
+    sudo ufw --force enable
+    sudo apt-get update && sudo apt-get install -y unattended-upgrades
+
+    # 3. Node 20 (Ubuntu)
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt-get install -y nodejs nginx
     node -v
 
-    # 3. The relay
+    # 4. The relay
     sudo git clone https://github.com/wrcstewart/bdx-demo /opt/rx
     cd /opt/rx && sudo npm install --omit=dev
 
-    # 4. Run it as a service, on LOOPBACK only — nginx is the front door
+    # 5. Run it as a service, on LOOPBACK only — nginx is the front door
     sudo tee /etc/systemd/system/rx.service >/dev/null <<'UNIT'
     [Unit]
     Description=RX relay
@@ -130,7 +153,7 @@ natural name; the DNS is already at Hostinger.
     UNIT
     sudo systemctl enable --now rx && sudo systemctl status rx
 
-    # 5. nginx. THE UPGRADE HEADERS ARE THE PART PEOPLE MISS — without them
+    # 6. nginx. THE UPGRADE HEADERS ARE THE PART PEOPLE MISS — without them
     #    the polling handshake works, the WebSocket upgrade fails, and the
     #    symptom is "it works but it is slow", which is hard to attribute.
     sudo tee /etc/nginx/sites-available/rx >/dev/null <<'CONF'
@@ -151,12 +174,12 @@ natural name; the DNS is already at Hostinger.
     sudo ln -s /etc/nginx/sites-available/rx /etc/nginx/sites-enabled/
     sudo nginx -t && sudo systemctl reload nginx
 
-    # 6. TLS. The pages are on HTTPS (GitHub Pages), so the relay MUST be too
+    # 7. TLS. The pages are on HTTPS (GitHub Pages), so the relay MUST be too
     #    or the browser blocks it as mixed content.
     sudo apt-get install -y certbot python3-certbot-nginx
     sudo certbot --nginx -d rx.butterflydreaming.org
 
-    # 7. Check
+    # 8. Check
     curl https://rx.butterflydreaming.org/health
 
 Then set `DEFAULT_RX` in `bdx.html` and `avx.html` to that origin and push, and
