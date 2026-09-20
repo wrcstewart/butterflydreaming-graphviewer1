@@ -260,6 +260,43 @@ the Cloudflare dashboard instead and use the token —
 `cloudflared service install <token>`. Same result, and the dashboard works
 from a phone.
 
+### DONE — verified 2026-09-20
+
+All five steps above are complete. Live at `https://rx.virtualfictions.uk`.
+
+**WebSocket crosses the tunnel.** Proven, not assumed: a raw Engine.IO v4
+client spoke `wss://rx.virtualfictions.uk/socket.io/?EIO=4&transport=websocket`
+— no polling, no upgrade — and got the open packet back, while `/health` held
+`"transports":{"websocket":1}`. So the tunnel forwards a real WebSocket and
+nothing silently degrades to long-polling. `curl`'s HTTP/2 400 on an upgrade
+attempt is NOT evidence either way: curl offers an HTTP/2 connection, where
+the HTTP/1.1 Upgrade mechanism does not exist. Test with a WebSocket client.
+
+### What `/health` counts, and why zero is usually right
+
+`sessions` counts sockets that have completed the Socket.IO **namespace**
+connect — the `40` packet, not the HTTP handshake. Between the two it reports
+zero, correctly. It is live, never cached: watch `uptime_s` climb.
+
+**A relay reporting `sessions:0` while the demo plainly works means the demo
+is on a DIFFERENT relay.** This happened, and cost a round of debugging aimed
+at the wrong component. Two ways in:
+
+- The page is served from localhost, so it targets `localhost:8081` by design.
+- **`STORED_RX`** — a `?rx=` typed once lives in `localStorage`, per browser,
+  and **outranks `DEFAULT_RX` for ever after**. The PUBLIC page will keep
+  talking to a relay on the developer's own desk, looking perfect.
+
+Checking `/health` from another browser cannot reveal either: a different
+browser has a different `localStorage` and was never the thing connected. The
+fix is that **BDX's header now names the host it reached**, beside the
+transport — `relay: rx.virtualfictions.uk (websocket)`. It was already in the
+`title` attribute, which is a tooltip: invisible on a phone, unread on a
+desktop by anyone not already suspicious.
+
+This bites hardest on §9a: a stored `localhost` URL **cannot be reached by the
+device you send to**, and the failure will look like the other device's fault.
+
 ## 6a. How the pages find a relay
 
 - **BDX + AVX**: GitHub Pages. Static, free, always up.
