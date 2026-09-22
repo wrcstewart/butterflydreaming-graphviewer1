@@ -304,6 +304,37 @@ list, so View would break with it.
 
 ---
 
+## Added 2026-09-22 — the collage plan
+
+### `CollagePlanStarted_2026-09-22.md` — Design only, discussed and agreed
+
+Two phases: **text_media + UX alteration** (text nodes as module scripts, three
+modes to two, `_p_` control marking, merge from history, a collage module),
+then **shared editing**. The sequencing is deliberate: the merge semantics ARE
+the data structure, and a format that has reached the corpus cannot be revised
+cheaply.
+
+`_p_` was chosen over a `%%bd_ui` declaration line **on length** — 24 chars for
+eight controls against ~70 — which is the constraint that binds, given the
+659-char ceiling measured in `DeepLinking.md`. Module blocks provide the
+namespace, so no qualified names are needed.
+
+Four rules in the doc, all evidence-based rather than anticipated:
+
+| rule | why |
+|---|---|
+| The writer must reconstruct the form it read | `setDirectiveValue` (`visual_module.html:713`) builds `%%bd_${name}` from the STRIPPED name — one stepper press would leave both `%%bd_p_symmetry 8` and `%%bd_symmetry 9` in the script. Exists today, waiting. |
+| A script with no `_p_` keeps current behaviour | Auto-population already exists (`visual_module.html:331`). Makes the format self-describing and removes the corpus migration entirely. |
+| Two-phase deploy, receivers first | Old consumers do not strip `_p_` and would render at defaults, silently. `DeepLinking.md`'s existing procedure applies unchanged. |
+| Truncated labels can collide | `colour_speed` / `colour_scale` truncate alike. Accepted, recorded. |
+
+**Open, and needed before code:** what occupies the screen in Create (Player
+shows the iframe, Edit shows `cy`, and Merge needs history reachable); what a
+module block's closing looks like; whether a merged script carries a format
+version.
+
+---
+
 ## What is genuinely open, in one place
 
 Not a schedule — a list of what has been designed and not built.
@@ -325,6 +356,8 @@ Not a schedule — a list of what has been designed and not built.
 | ~~BD/BDX alignment (4 items)~~ | Added 2026-09-22, above | **DONE 2026-09-22.** Untested in a browser: nobody has pressed Device. |
 | `MODULE_ORIGINS` dead code | `server.js:1038` | Enforce it or delete it. The comment claims a protection that is not there. |
 | Short typed code for a viewer | Added 2026-09-22, above | The one hand-off option needing a protocol addition. For headsets. |
+| Collage: `_p_`, modes, merge | `CollagePlanStarted_2026-09-22.md` | Agreed in discussion, nothing built. RULE 1 is a bug that exists NOW. |
+| Create-mode layout | same doc | Player and Edit show opposite things; Merge needs both. Needs a layout answer before code. |
 
 ---
 

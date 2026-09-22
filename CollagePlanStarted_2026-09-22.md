@@ -1,0 +1,203 @@
+# Collage plan — started 2026-09-22
+
+Two phases of work, agreed in discussion:
+
+1. **text_media and UX alteration** — text nodes become module scripts, the
+   three radio modes become two, controls auto-populate, scripts merge, and a
+   collage module binds them.
+2. **Shared editing** — collaboration and saving, *after* the data structure is
+   settled.
+
+The sequencing is deliberate and it is the right way round: **the merge
+semantics ARE the data structure.** Steppers and modes are presentation and can
+be revised cheaply. A script format that has reached the corpus cannot.
+
+---
+
+## 1. `_p_` — marking a directive that carries a user control
+
+`%%bd_p_symmetry 8` means "symmetry, and give it a control". The parser strips
+`_p_` and proceeds; the directive's meaning is unchanged. Only the part after
+`_p_` appears in the control's label, truncated if it must be.
+
+### Why this form, and not a declaration line
+
+A `%%bd_ui symmetry, angle, stroke` line was proposed and rejected **on
+length**, which is the constraint that actually binds here. For eight controls:
+
+| | cost |
+|---|---|
+| `_p_` on eight directives | **24 chars** |
+| a `%%bd_ui` line naming eight | ~70 chars, and it repeats every name |
+
+`DeepLinking.md` measured the ceiling: **659 characters** for plain text
+scanned by Apple's data detector, and a real link is already ~650. Three
+characters per control is affordable; seventy is not. The `%%bd_ui` form would
+also have needed its own namespacing rules once two modules both carry
+`opacity`.
+
+### Why namespacing is not a problem
+
+**Scripts always read between a module header and its closing, presented
+sequentially.** The block is the namespace: `opacity` inside the Kolam block is
+Kolam's. No qualified names, no scoping rules, no language design — which was
+the explicit design goal and is worth holding to.
+
+### What it is NOT
+
+**`_p_` does not mean "this is a parameter".** A directive whose control is
+hidden must still be read and applied — the whole point is to reduce the number
+of controls *while maintaining the script values*. So:
+
+- **content vs parameter** stays where it already is: **structural**. Content
+  lives in a bracket block (`%%bd_score [ … %%bd_]`); parameters are single
+  lines. Both existing modules already obey this — `music_module.html:776`
+  strips every single-line `%%bd_` directive to recover plain `.abc`, and the
+  Kolam axiom and rules live inside `%%bd_score`.
+- **`_p_` means "expose a control"**, and nothing else.
+
+---
+
+## 2. Rules the implementation must follow
+
+### RULE 1 — the writer must reconstruct the form it read
+
+**This is the first bug this feature will have, and it exists today.**
+`setDirectiveValue()` (`V_Kolam/visual_module.html:713`) rebuilds the line from
+the *stripped* name:
+
+```
+script has:   %%bd_p_symmetry 8
+parse gives:  name = "symmetry"
+write builds: %%bd_symmetry        ← does not match, `replaced` stays false
+result:       a SECOND line is inserted before %%bd_score [
+```
+
+One press of a stepper would leave `%%bd_p_symmetry 8` *and* `%%bd_symmetry 9`
+in the same script: duplicated directive, stale marker, and a control that may
+read either. **The parse must carry the marker with the directive, and every
+write path must put it back.** Same class of fault as the `Sv` round-trip —
+*a renderer needs its inverse beside it*.
+
+### RULE 2 — a script with no `_p_` anywhere keeps the current behaviour
+
+Auto-population is **not new**: `visual_module.html:331` already gives *every
+numeric-arg `%%bd_` directive* a stepper, labelled by the name after `%%bd_`.
+
+So make the rule self-describing and skip the migration entirely:
+
+- **any `_p_` present** → explicit marking; only marked directives get controls.
+- **none present** → legacy script; fall back to "numeric ⇒ stepper".
+
+Every saved node, every shared link and every frozen standalone script then
+keeps working untouched, and new content opts in by being written that way.
+No corpus migration, no format version flag needed for this step.
+
+### RULE 3 — two-phase deploy, receivers first
+
+**Old consumers do not strip `_p_`.** The frozen standalones, the BDX copy on
+GitHub Pages and any third-party module would read `%%bd_p_symmetry` as a
+directive named `p_symmetry`, miss it, and render at defaults — **silently**,
+which is this project's recurring failure mode.
+
+`DeepLinking.md` already states the procedure and it applies unchanged: ship
+the **receivers** first as a no-op, poll the live URLs until every one serves
+the new code, and only then let anything emit `_p_`. Reverse order breaks every
+existing link.
+
+Note `bd_relay.js` is byte-identical between BD and the demo and
+`renderer.html` is a tracked copy refreshed by `sync_from_bd.sh`, so the
+renderer change propagates to BDX in one step — but GitHub Pages deploys on its
+own schedule, which is exactly what the two-phase rule is for.
+
+### RULE 4 — truncated labels can collide
+
+The label is the name after `_p_`, truncated to fit. Two directives sharing a
+prefix — `colour_speed` and `colour_scale` — truncate to the same string and
+become indistinguishable. Accepted for now; worth remembering when it happens,
+because it will look like a rendering bug rather than a naming one. The
+`colour_speed` readout was fixed once already by showing the directive's own
+*value* rather than a mangled name.
+
+---
+
+## 3. Modes: three become two
+
+| now | becomes |
+|---|---|
+| Nodes | **Read** |
+| Player + Edit | **Create** |
+
+**Fewer mode boundaries is a correctness argument, not just a tidiness one.**
+2026-09-22's card-overwrite bug existed precisely because leaving Player *hid*
+the module without unloading it and the echo did not know which mode it was in.
+Every boundary is a place for that class of fault.
+
+**Open question — what occupies the screen in Create?** Player shows the iframe
+and hides `cy`; Edit does the reverse. Create needs the module visible *and*
+the history panel reachable (Merge is a click in history). On a phone that is
+tight. This needs a layout answer before it needs code, or the sub-toggle that
+appears will be a third mode wearing a disguise.
+
+---
+
+## 4. Text nodes as module scripts
+
+Text nodes become media-module scripts and may carry `%%bd_` directives.
+Invisible in Read; in Create the panel shows the script — initially very simple,
+perhaps just a module directive, a text block, and an opacity to test with.
+
+### The risk that matters
+
+**Read hides the directives. If anything writes back what Read shows, the
+directives are gone** — and that is `Sv` at corpus scale: the rendered card was
+round-tripped to the DB and destroyed `%%bd_center` markup. Two rules follow:
+
+- **Read is a pure projection with no write path.**
+- **`getCardText` must read the source, never the rendering.** This has already
+  bitten once, when the tap-hint was welded onto `%%bd_]` and `score` stopped
+  parsing.
+
+### Do not migrate the corpus
+
+**Treat the absence of `%%bd_module` as "this is text".** Thousands of existing
+nodes are then already valid scripts, nothing needs converting, and Create adds
+directives only when someone actually wants them.
+
+---
+
+## 5. Merge, and the collage module
+
+The workflow, in the author's words: *create using a single module, then recover
+your creations or text-node work from the history and merge it into the top
+panel — whereupon you can remove `_p_` directives if you wish, or edit an
+optionally-included collage module that binds them.*
+
+- **Merge** = a click on a script in the history panel + a **Merge** button.
+- The merged script is the module blocks, **sequential**.
+- Controls after a merge default to **all** of them; reducing is deleting `_p_`
+  markers, which leaves the values in place.
+- A **collage module** may be included by default, carrying its own directives
+  for relative placement of the text, music and graphics it binds.
+
+### Still to decide
+
+- What the closing of a module block looks like, and whether a merged script
+  needs a format version from the start. `DeepLinking.md`'s own conclusion —
+  *version the format from day one, the exact lesson of the `name` field* — was
+  written about a change far smaller than this one.
+- Whether the collage module's placement directives are themselves `_p_`-marked
+  (they are parameters, and would want controls).
+- What happens to two identical module blocks in one merged script.
+
+---
+
+## 6. What was checked, not assumed, while writing this
+
+- Auto-population already exists — `visual_module.html:331`.
+- Content/parameter is already structural — `music_module.html:776`,
+  `visual_module.html:597`.
+- The directive parser is `/^%%bd_([A-Za-z_]+)[ \t]+(.*)$/` (`viewer.js:380`),
+  so `p_symmetry` parses as a *different directive* unless stripped.
+- The write-back path builds `%%bd_${name}` from the stripped name —
+  `visual_module.html:713`. This is RULE 1.
