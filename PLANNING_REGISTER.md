@@ -239,12 +239,18 @@ origin, and **WebSocket crosses that tunnel**. So BD needs none of the
 apparatus BDX needed — no `?rx=`, no substitutable relay, no mixed content —
 because BD serves the pages *and* is the relay, over https throughout.
 
+**ALL FOUR BUILT 2026-09-22.** BD's server was restarted to pick up the relay
+handler (it had been running since Sep 19, and `av_spare_token` landed Sep 20 —
+sender and client without the middle site, the failure this project has
+documented before). Proven against BD's own relay: spare delivered, spent token
+refused, spare accepted.
+
 | # | item | status | note |
 |---|---|---|---|
-| 1 | `av_spare_token` sent by `viewer.js` | **the real gap** | The relay carries it and `bd_av_client.js` already stores and spends it; BD never sends one. BD's viewers have an opener and renew through it, so this has never shown — but a viewer opened from a *pasted link* has no opener, and on a phone that is the ordinary case. Needed whether or not the rest is built. |
-| 2 | `qrcode.js` vendored into BD | not started | MIT, 57 KB, lazy-loaded on first press. Verified by decoding, not by matrix comparison — see `BDX_DEMO_PLAN.md`. |
-| 3 | "send to device" button + dialog | not started | Beside View. Mint on the press; single-use, three minutes; countdown from the relay's own `ttl_ms`. Refuse on localhost, where the link means the other device itself. |
-| 4 | Safari clipboard pattern | portable as-is | A write after the mint's round trip is refused — the gesture is over. Hand the clipboard the *promise* during the press, then `writeText`, then a visible copy button. |
+| 1 | `av_spare_token` sent by `viewer.js` | **BUILT** | The relay carries it and `bd_av_client.js` already stores and spends it; BD never sends one. BD's viewers have an opener and renew through it, so this has never shown — but a viewer opened from a *pasted link* has no opener, and on a phone that is the ordinary case. Needed whether or not the rest is built. |
+| 2 | `qrcode.js` vendored into BD | **BUILT** | MIT, 57 KB, lazy-loaded on first press. Verified by decoding, not by matrix comparison — see `BDX_DEMO_PLAN.md`. |
+| 3 | "Device" button + dialog | **BUILT** | Beside View. Mint on the press; single-use, three minutes; countdown from the relay's own `ttl_ms`. Refuse on localhost, where the link means the other device itself. |
+| 4 | Safari clipboard pattern | **BUILT** | A write after the mint's round trip is refused — the gesture is over. Hand the clipboard the *promise* during the press, then `writeText`, then a visible copy button. |
 
 **Design note for (3): leave room for a short typed code.** The QR is one
 delivery, not the mechanism. A VR headset is exactly the device this exists for
@@ -252,6 +258,15 @@ delivery, not the mechanism. A VR headset is exactly the device this exists for
 150-character URL. A six-character code typed into the viewer would suit it,
 and is the one option needing a **protocol addition**, so the dialog should be
 laid out to accept it later rather than be retrofitted.
+
+**Still to verify by hand:** nobody has pressed **Device** in a browser. The
+relay half is proven by test; the button, dialog, QR and clipboard are not.
+
+**Also found, and left alone:** BD's startup log says
+`*** GRACE PERIOD 10s — DEVELOPMENT VALUE, restore to 65000 for real use ***`.
+That is a development setting on a host that is on the public internet, and it
+shortens the window in which a dropped pairing survives. Not changed here
+because it is a behaviour decision, not a bug.
 
 **Found on the way, unrelated to the feature:** `MODULE_ORIGINS`
 (`server.js:1038`) is **dead code** — declared, referenced nowhere, while
@@ -282,7 +297,7 @@ Not a schedule — a list of what has been designed and not built.
 | Blue Node ring seam | `blue_node_spec.md` | Colour problem, not geometry. |
 | Delete stale BARE layout hints | `cc-hint-system-spec.md` | 166 edges (162 DESCENDS_FROM, 3 CLUSTER_REL, 1 CONTAINS). They route views down the wrong `runLayout` branch — three incidents so far. The Cluster reader already ignores them; deleting is a data change. |
 | Selection rule for capped neighbourhoods | brief §5 | Curation/ethics question. Affects 15 of 105 clusters. |
-| BD/BDX alignment (4 items) | Added 2026-09-22, above | (1) is the only real gap and is needed regardless. |
+| ~~BD/BDX alignment (4 items)~~ | Added 2026-09-22, above | **DONE 2026-09-22.** Untested in a browser: nobody has pressed Device. |
 | `MODULE_ORIGINS` dead code | `server.js:1038` | Enforce it or delete it. The comment claims a protection that is not there. |
 | Short typed code for a viewer | Added 2026-09-22, above | The one hand-off option needing a protocol addition. For headsets. |
 

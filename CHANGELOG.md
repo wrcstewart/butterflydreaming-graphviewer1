@@ -6,6 +6,41 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-22 (later) — BD catches up with the demo
+
+Four things the BDX/AVX/RX demo grew last week, brought back into BD, which is
+where they were always meant to end up. `bd_relay.js` was already byte-identical
+between the two and `bd_av_client.js` a tracked copy, so the gap was only ever
+the **controller** half.
+
+**BD now arms its viewers with a spare token.** A module token is single-use and
+spent at first connect; a drop longer than the sixty-second recovery window
+makes the reconnection a fresh one, and the spent token is refused for ever.
+Viewers BD opened have always recovered by asking their opener — which stops
+working the moment a viewer arrives from a pasted link or a QR code, and on a
+phone that is the ordinary case. BD hands one over while the line is up, and
+re-arms whenever a viewer returns.
+
+**A "Device" button beside View**, with a dialog carrying a QR code and the
+link. Minted on the press, single-use, three minutes, with the countdown read
+from the relay rather than copied into the page. It refuses on `localhost`,
+where the link would mean the other device itself.
+
+Two traps worth recording. The **Safari clipboard** refusal is the `window.open`
+refusal this file already documents three times — a write after an `await`
+arrives too late to count as a gesture — so the clipboard is handed the
+*promise* during the press. And `requestModuleToken` lives inside
+`setupInteractions` while the new code runs inside `init()`: **different
+scopes**, so the bare call would have been a `ReferenceError` on the first
+press. `window.bdRequestModuleToken` is what that handle was exposed for.
+
+**The server was restarted**, having been up since Sep 19 while
+`av_spare_token` landed on Sep 20 — sender and client with no handler between
+them, which is exactly the "a relayed message needs three sites" failure
+already in these notes.
+
+---
+
 ## 2026-09-22 — a hidden module kept redrawing the card
 
 Reported from BD: after looking at Kolam in Player, switching to the **Edit**
