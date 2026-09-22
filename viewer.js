@@ -12082,7 +12082,13 @@ async function init() {
       if (syncNoteTimer) clearTimeout(syncNoteTimer);
       syncNoteTimer = setTimeout(() => { el.hidden = true; syncNoteTimer = null; }, 2000);
     }
-    window.bdFlashSyncNote = flashSyncNote;   // so it can be exercised without a viewer
+    // NOT a convenience — the way across. The av_return dispatcher is a
+    // nesting level out from here, so it cannot see this declaration. I
+    // checked the scope with a crude backwards search for an indent-0
+    // function header, which reported "both inside init()" and was useless:
+    // both ARE inside init, at different depths, and depth is the whole
+    // question. Compare indentation, or export deliberately.
+    window.bdFlashSyncNote = flashSyncNote;
 
     // ── "Device": the same viewer, somewhere that is not this machine ────
     //
@@ -12649,7 +12655,13 @@ async function init() {
       // thing, and from another device it is all the sender would otherwise
       // ever know. At this end the node changes under you with nothing
       // explaining why. Two seconds beside View answers both.
-      flashSyncNote();
+      // Through the window handle. The note is declared inside a nested block
+      // of init(); this dispatcher is a level out, and a function declared in
+      // a block is not visible outside it. The direct call was a
+      // ReferenceError — and because it threw here, BEFORE the lines below,
+      // it took the whole av_return path with it: no note, no navigation,
+      // nothing. That is what "no sync appearing" actually was.
+      if (typeof window.bdFlashSyncNote === 'function') window.bdFlashSyncNote();
       // Take the viewer's state BEFORE opening the node, so the open reads it.
       //
       // loadModuleForNode consults explorationByNode on its way in, so seeding
