@@ -11458,7 +11458,22 @@ async function init() {
       autoLastWriteAt = Date.now();
       pushScriptToAV(text, fromDrift);
 
-      // 2. Presentation. Only when nobody is in the box.
+      // 2. Presentation. Only when nobody is in the box — and only while the
+      //    module is the thing on screen.
+      //
+      // Leaving Player mode HIDES the iframe; it does not unload it
+      // (setViewMode, 'player-active'). So a module goes on drifting and goes
+      // on announcing from behind the graph, and this listener went on
+      // redrawing "the focused card" with it. In Edit mode that card is
+      // whichever node you just opened: its text appeared, and about a second
+      // later — AUTO_DRIFT_MIN_MS, the drift echo interval — the old Kolam
+      // script landed on top of it.
+      //
+      // The card is only the module's card while the module is showing. The
+      // file already draws the line this fix needs: recording is data and must
+      // never stop, redrawing is presentation and must not happen where it
+      // does not belong. A hidden module has nothing to present.
+      if (!document.body.classList.contains('player-active')) return;
       const body = getFocusedCardBody();
       if (!body) return;
       if (document.activeElement === body) return;   // never under the cursor
