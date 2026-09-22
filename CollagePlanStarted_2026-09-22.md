@@ -110,6 +110,17 @@ Note `bd_relay.js` is byte-identical between BD and the demo and
 renderer change propagates to BDX in one step — but GitHub Pages deploys on its
 own schedule, which is exactly what the two-phase rule is for.
 
+### RULE 3a — the frozen standalones are OUT (decided 2026-09-22)
+
+`V_Kolam/preview.html` parses directives itself and has already diverged four
+ways from the live renderer. It will **not** be taught to strip `_p_`.
+
+The consequence, stated so it is not discovered: **a `_p_` script opened in a
+standalone loses its parameters and renders at defaults.** Frozen does not have
+to mean maintained, but it does have to mean decided — and the decision is that
+new scripts are not for the standalones. The same applies to any third-party
+module built against the old convention.
+
 ### RULE 4 — truncated labels can collide
 
 The label is the name after `_p_`, truncated to fit. Two directives sharing a
@@ -189,6 +200,49 @@ optionally-included collage module that binds them.*
 - Whether the collage module's placement directives are themselves `_p_`-marked
   (they are parameters, and would want controls).
 - What happens to two identical module blocks in one merged script.
+
+---
+
+## PHASE 0 — DONE 2026-09-22
+
+**Mark-blind matching, shipped before any script carries a mark.** This is
+RULE 3 applied inside BD rather than only to deployed copies, and it is the
+step the plan as first sketched would have skipped.
+
+The reason it goes first: `AV_ANGLE_LINES` (`viewer.js:427`) and its BDX twin
+name the angle triple **literally**. Had a script gained `%%bd_p_angle` while
+those still read `%%bd_angle`, they would have stopped matching, every drift
+frame would have read as a human change, and all of it would have been pushed
+to the viewer — last week's iOS smoothness work undone, with **no error to
+notice**, only a warmer phone.
+
+Changed, all of them behaviour-preserving while no mark exists:
+
+| site | what it does | change |
+|---|---|---|
+| `viewer.js` `BD_DIRECTIVE_RE` | new shared parser | groups: mark, bare name, value |
+| `viewer.js` `bdNameRe()` | new shared matcher | one named directive, marked or not |
+| `mergeExploredValues` | merges a viewer's values onto saved text | keys by the BARE name; rebuilds with the SAVED line's own mark |
+| `AV_ANGLE_LINES` | drift suppression | `(?:p_)?` |
+| `avWithAngleFrom` | resync | takes the VALUE from source, keeps the FORM found here |
+| `bdx.html` `ANGLE_LINES` | BDX drift suppression | `(?:p_)?` |
+
+**Two rules fell out of writing it**, both about not letting a mark travel:
+
+- An exploration carries **values**. Merging one in must not add or remove a
+  control, so the saved line's own mark wins.
+- A resync copies a **value**, not a line. Copying the whole matched line
+  would carry the source's mark with it — a presentation change smuggled in by
+  a value update.
+
+Verified by extracting the real functions and running 12 cases: legacy scripts
+behave exactly as before; marked scripts behave the same way; mixed marking
+keeps each script's own form; an angle-only difference still compares equal
+(and a real one still differs); and an exploration still cannot introduce a
+directive the node does not have.
+
+**Not done, and deliberately:** nothing emits a mark yet. Phase 1 is the
+renderer (RULE 1), phase 2 is the first script that carries one.
 
 ---
 

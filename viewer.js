@@ -373,27 +373,55 @@ let   avNodeId = null;                 // node whose script the module is showin
 //
 // Single-line directives only. A bracket block (%%bd_score [ … %%bd_]) is
 // structure, not a stepper, and must come from the node.
+// ── Seeing through the _p_ mark (2026-09-22) ────────────────────────────────
+//
+// A directive may be written %%bd_p_<name> to say "give this one a user
+// control". The mark is PRESENTATION: it never changes what the directive
+// means, and a directive whose control is hidden must still be read and
+// applied. So every place that matches a directive BY NAME has to see through
+// it, and every place that rebuilds a line has to put back the form it found.
+//
+// Introduced BEFORE any script carries a mark, deliberately. The alternative —
+// marking scripts first and fixing the matchers afterwards — breaks things
+// that fail silently, AV_ANGLE_LINES worst of all: it names the angle triple
+// literally, and if it stopped matching, every drift frame would read as a
+// human change and be pushed to the viewer. That is last week's iOS smoothness
+// work undone, with no error to notice.
+//
+// Groups: 1 = the mark ('p_' or undefined), 2 = the bare name, 3 = the value.
+const BD_DIRECTIVE_RE = /^%%bd_(p_)?([A-Za-z_]+)[ \t]+(.*)$/;
+
+// One named directive, marked or not. Callers that REPLACE with it must keep
+// the matched line's own prefix — see avWithAngleFrom.
+function bdNameRe(name, flags) {
+  return new RegExp('^%%bd_(?:p_)?' + name + '[ \t]+.*$', flags || 'm');
+}
+
 function mergeExploredValues(savedText, exploredText) {
   if (typeof savedText !== 'string' || typeof exploredText !== 'string') return savedText;
   const values = new Map();
   exploredText.split('\n').forEach((line) => {
-    const m = /^%%bd_([A-Za-z_]+)[ \t]+(.*)$/.exec(line);
+    const m = BD_DIRECTIVE_RE.exec(line);
     if (!m) return;
-    const name = m[1], value = m[2];
+    // Keyed by the BARE name: the two scripts may mark the same directive
+    // differently, and a value is a value either way.
+    const name = m[2], value = m[3];
     if (name === 'module' || value.trim() === '[' || name === ']') return;
     values.set(name, value);
   });
   let changed = 0;
   const out = savedText.split('\n').map((line) => {
-    const m = /^%%bd_([A-Za-z_]+)[ \t]+(.*)$/.exec(line);
+    const m = BD_DIRECTIVE_RE.exec(line);
     if (!m) return line;
-    const name = m[1];
-    if (name === 'module' || m[2].trim() === '[') return line;
+    const mark = m[1] || '', name = m[2];
+    if (name === 'module' || m[3].trim() === '[') return line;
     if (!values.has(name)) return line;
     const next = values.get(name);
-    if (next === m[2]) return line;
+    if (next === m[3]) return line;
     changed += 1;
-    return '%%bd_' + name + ' ' + next;
+    // The SAVED line's own mark, not the explored one's. An exploration
+    // carries values; it must not add or remove a control on the way past.
+    return '%%bd_' + mark + name + ' ' + next;
   }).join('\n');
   return changed ? out : savedText;
 }
@@ -424,7 +452,7 @@ function mergeExploredValues(savedText, exploredText) {
 // A pleasant side effect: it removes 5-10 socket messages a second through
 // Cloudflare for as long as drift runs, which on a phone is radio wake-ups
 // and battery spent to make the picture worse.
-const AV_ANGLE_LINES = /^%%bd_angle(?:_minutes|_seconds)?[ \t]+.*$/gm;
+const AV_ANGLE_LINES = /^%%bd_(?:p_)?angle(?:_minutes|_seconds)?[ \t]+.*$/gm;
 function avWithoutAngle(text) {
   return text.replace(AV_ANGLE_LINES, '');
 }
@@ -442,9 +470,17 @@ function avWithAngleFrom(base, source) {
   if (typeof base !== 'string' || typeof source !== 'string') return base;
   let out = base;
   ['angle', 'angle_minutes'].forEach((name) => {
-    const re = new RegExp('^%%bd_' + name + '[ \t]+.*$', 'm');
+    const re = bdNameRe(name);
     const mine = re.exec(source);
-    if (mine && re.test(out)) out = out.replace(re, mine[0]);
+    if (!mine) return;
+    const here = re.exec(out);
+    if (!here) return;
+    // Take the VALUE from source and keep the FORM found here. Copying the
+    // whole matched line across would carry source's mark with it, so a
+    // resync could silently add or remove a control — a presentation change
+    // smuggled in by a value update.
+    const value = mine[0].replace(/^%%bd_(?:p_)?[A-Za-z_]+[ \t]+/, '');
+    out = out.replace(re, here[0].replace(/[ \t]+.*$/, ' ' + value));
   });
   return out;
 }
