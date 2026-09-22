@@ -12071,6 +12071,19 @@ async function init() {
     //
     // Falls back to the old behaviour whenever a viewer cannot be opened —
     // no session, no token, popup blocked. A press must always do SOMETHING.
+    // A viewer has sent its state back. Shown rather than logged: BD is about
+    // to jump to a node and change the card, and an effect with no stated
+    // cause reads as a glitch.
+    let syncNoteTimer = null;
+    function flashSyncNote() {
+      const el = document.getElementById('av-sync-note');
+      if (!el) return;
+      el.hidden = false;
+      if (syncNoteTimer) clearTimeout(syncNoteTimer);
+      syncNoteTimer = setTimeout(() => { el.hidden = true; syncNoteTimer = null; }, 2000);
+    }
+    window.bdFlashSyncNote = flashSyncNote;   // so it can be exercised without a viewer
+
     // ── "Device": the same viewer, somewhere that is not this machine ────
     //
     // View opens a viewer beside BD and can reach it directly. A phone, a
@@ -12630,6 +12643,13 @@ async function init() {
       // BD and the viewer sit side by side a successful raise looks like
       // nothing anyway. Landing on the right NODE is the part that shows.
       try { window.focus(); } catch (_) {}
+      // Say that it arrived.
+      //
+      // The viewer can only report that it SENT — which is not the same
+      // thing, and from another device it is all the sender would otherwise
+      // ever know. At this end the node changes under you with nothing
+      // explaining why. Two seconds beside View answers both.
+      flashSyncNote();
       // Take the viewer's state BEFORE opening the node, so the open reads it.
       //
       // loadModuleForNode consults explorationByNode on its way in, so seeding

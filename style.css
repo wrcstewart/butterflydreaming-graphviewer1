@@ -1117,7 +1117,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2095,3 +2095,19 @@ body.player-active #bd-invite-panel-viewer { display: block; }
 #device-copy:hover { background: rgba(160, 120, 32, 0.2); color: #fff; }
 #device-ttl { font-size: 12px; color: #9a9a8a; margin-bottom: 12px; }
 #device-ttl.expired { color: #d98a8a; }
+
+
+/* A viewer's Sync landing here (2026-09-22). Sits left of View, says its
+   piece for two seconds and goes. Deliberately quiet: it explains a change
+   the user did not make, which is a different job from asking for attention. */
+#av-sync-note {
+  font-size: 12px;
+  color: #ffd88a;
+  background: rgba(160, 120, 32, 0.18);
+  border: 1px solid #a07820;
+  border-radius: 3px;
+  padding: 3px 8px;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+#av-sync-note[hidden] { display: none; }
