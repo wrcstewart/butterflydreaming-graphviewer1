@@ -340,6 +340,10 @@ function answerAVStateRequest() {
 // five to ten times a second and most frames are identical in text.
 let avLastPushed = null;
 let avLastState  = null;   // freshest announcement, pushed or not
+// What the last token was minted for. Needed because a viewer announcing
+// itself does not say which module it is — the relay's av_request_state
+// carries no id — and a spare must be minted for the same kind of viewer.
+let avLastModuleId = null;
 
 // ── The exploration survives wandering off (2026-09-16) ─────────────────────
 //
@@ -4037,7 +4041,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (!ws || ws.__avStateBound) return;
       ws.__avStateBound = true;
       ws.on('msg', (m) => {
-        if (m && m.type === 'av_request_state') answerAVStateRequest();
+        if (!m || m.type !== 'av_request_state') return;
+        answerAVStateRequest();
+        // A viewer has announced itself, so arm it for a reconnection it will
+        // not be able to ask us about. Staggered for the same reason as in
+        // BDX: mint_module_token has no correlation id, so a reply is taken by
+        // whichever one-shot listener is waiting, and letting the launch
+        // settle first keeps replies from crossing.
+        setTimeout(armViewerWithSpare, 750);
       });
     };
     bind();
@@ -4061,12 +4072,50 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         finish(m.token || null);
       };
       ws.on('msg', onMsg);
+      avLastModuleId = moduleId || null;   // what any later spare is minted for
       ws.emit('msg', { type: 'mint_module_token', moduleId: moduleId || undefined });
       setTimeout(() => finish(null), 4000);   // never hang a module launch
     });
   }
   // Exposed for a module launcher, and so the path can be exercised without one.
   window.bdRequestModuleToken = requestModuleToken;
+
+  // ── Arming a viewer against a drop it cannot recover from (2026-09-22) ───
+  //
+  // A module token is single-use and spent at first connect. The server's
+  // connectionStateRecovery hides a drop under sixty seconds; past that the
+  // reconnection is a FRESH one, the handshake runs again, and the spent token
+  // is refused for ever — the 45-minute silent desync described at
+  // `AV/bd_av_client.js`.
+  //
+  // A viewer BD opened recovers by asking its opener for another token over
+  // postMessage. That has always been enough here, because every BD viewer has
+  // been one BD opened. It stops being enough the moment a viewer is opened
+  // from a pasted link or a QR code — there is no opener to ask — and on a
+  // phone, where switching apps suspends the page and may discard it, that is
+  // the ordinary case rather than the rare one.
+  //
+  // So hand one over while the line is still up. The viewer stores it and says
+  // nothing until the day it needs it; returning on it, it announces itself
+  // again and is handed another, so this re-arms itself.
+  //
+  // Already carried by the relay (`av_spare_token`) and already understood by
+  // the client (`bd_av_client.js`), both of which are shared with the BDX
+  // demo. This is the half that was only ever written there.
+  async function armViewerWithSpare() {
+    const ws = wsRef.current;
+    if (!ws || !ws.connected) return;
+    const token = await requestModuleToken(avLastModuleId || undefined);
+    if (!token) return;
+    const live = wsRef.current;               // a mint takes a round trip
+    if (!live || !live.connected) return;
+    live.emit('msg', {
+      type: 'av_spare_token',
+      moduleId: avLastModuleId || undefined,
+      token
+    });
+    console.log('[AV] viewer armed with a spare token');
+  }
 
 
   async function safeQuery(type, query, params = {}) {
