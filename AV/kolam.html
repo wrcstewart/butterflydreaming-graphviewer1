@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-19: BLUE (the shim can now be told
-     the controller's origin separately from the relay's). Next rotation = red. */
+     change to a cached AV file. 2026-09-22: RED (a viewer on another device
+     no longer offers a way back that is not there). Next rotation = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
+    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -261,16 +261,61 @@
     // margin beside it where BD sits. A phone tab fills the screen, so there is
     // none and BD is hidden behind it. Comparing our own outer width against
     // the screen says which of those we are, without guessing at device class.
+    // ── A viewer on ANOTHER DEVICE has nowhere to go back to ─────────────
+    //
+    // Everything above assumes BD is in this browser: the button closes this
+    // window and raises BD, and the phone case means "BD is the tab behind
+    // this one". Opened from a link or a QR code on a different device, none
+    // of that holds. There is no opener, so no raise; window.close() is
+    // refused for a window the script did not open; and "back to
+    // ButterflyDreaming" names something that is not on this machine. Pressed,
+    // it appeared to do nothing or to kill the page.
+    //
+    // BD says so in the URL rather than leaving it to be guessed: opener is
+    // absent after an ordinary reload too, which would misread a same-browser
+    // viewer as remote.
+    //
+    // The button keeps the half that still works. Telling BD where this viewer
+    // got to travels over the socket and does not care which device this is —
+    // and on a second screen it is the more useful half anyway, since BD
+    // cannot see what you have drifted to here.
+    const IS_DEVICE = (function () {
+      try { return new URLSearchParams(location.search).get('d') === '1'; }
+      catch (_) { return false; }
+    })();
+
     const backBtn = document.getElementById('back');
-    try {
-      const roomForBoth = (window.outerWidth || innerWidth) < screen.availWidth * 0.9;
-      if (roomForBoth) {
-        backBtn.textContent = 'ButterflyDreaming';
-        backBtn.title = 'Raise the ButterflyDreaming window';
-      }
-    } catch (_) { /* keep the default label */ }
+    if (IS_DEVICE) {
+      backBtn.textContent = 'send position';
+      backBtn.title = 'Tell ButterflyDreaming where this viewer has got to';
+    } else {
+      try {
+        const roomForBoth = (window.outerWidth || innerWidth) < screen.availWidth * 0.9;
+        if (roomForBoth) {
+          backBtn.textContent = 'ButterflyDreaming';
+          backBtn.title = 'Raise the ButterflyDreaming window';
+        }
+      } catch (_) { /* keep the default label */ }
+    }
 
     backBtn.addEventListener('click', function () {
+      // On another device: send, say so, and stay. No raise — there is no
+      // window to raise. No close — the browser refuses it for a page it did
+      // not open, and succeeding would be worse, leaving a blank tab and no
+      // BD to have returned to.
+      if (IS_DEVICE) {
+        let sent = false;
+        try {
+          const sock = window.__avSocket;
+          if (sock && sock.connected) {
+            sock.emit('msg', { type: 'av_return', script: liveScript || undefined });
+            sent = true;
+          }
+        } catch (_) {}
+        say(sent ? 'sent to ButterflyDreaming' : 'cannot reach ButterflyDreaming', !sent);
+        return;
+      }
+
       const roomForBoth = backBtn.textContent === 'ButterflyDreaming';
 
       // 1. Ask BD to come back to this node.

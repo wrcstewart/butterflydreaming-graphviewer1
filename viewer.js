@@ -12224,8 +12224,17 @@ async function init() {
         }
         mint(avLastModuleId || undefined).then((token) => {
           if (!token) { hint.textContent = 'BD would not issue a link. Try again.'; return; }
+          // d=1 says "this viewer is on ANOTHER DEVICE", and the viewer
+          // needs telling because it cannot work it out. window.opener is not
+          // the test: a same-browser viewer loses its opener on a reload, and
+          // would then be misread as remote. BD knows which route it used, so
+          // BD says so — and it survives a reload, being in the URL.
+          //
+          // What turns on it: the "← controls" button. It closes this window
+          // and raises BD, which is right when BD is behind it in the same
+          // browser and meaningless on a phone across the room.
           const url = window.location.origin + '/AV/kolam.html?t=' +
-                      encodeURIComponent(token) +
+                      encodeURIComponent(token) + '&d=1' +
                       (avNodeId ? '&n=' + encodeURIComponent(avNodeId) : '');
           hand(url);
           urlEl.value = url;
