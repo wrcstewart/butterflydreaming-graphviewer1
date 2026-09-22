@@ -275,11 +275,23 @@ and such a viewer offers **Sync** rather than a way back that is not there.
   "inside `init()`". Checking by backwards-searching for an indent-0 function
   header cannot see this and will say they match.
 
-**Also found, and left alone:** BD's startup log says
-`*** GRACE PERIOD 10s — DEVELOPMENT VALUE, restore to 65000 for real use ***`.
-That is a development setting on a host that is on the public internet, and it
-shortens the window in which a dropped pairing survives. Not changed here
-because it is a behaviour decision, not a bug.
+**`GRACE_MS` and cross-device — a real interaction, noted 2026-09-22.**
+`server.js:1301` runs at **10s**, and that is DELIBERATE, not an oversight: the
+comment records it as the author's development compromise of 2026-09-12 — long
+enough that a brief blur does not tear a pair down, short enough that a dev
+restart leaves no ghost occupying the pair slot. The production value is 65000,
+chosen to sit just above Socket.IO's 60s `connectionStateRecovery`.
+
+The interaction worth knowing: a purged session takes its viewers with it. A
+viewer's `moduleFor` names a session, and `sessions.get()` returning nothing
+means `av_hello` and `av_return` are dropped — the relay has nobody to deliver
+to. **At 10s a controller that sleeps for eleven seconds orphans a phone
+permanently**, and the spare token does not help: it covers the VIEWER losing
+its connection, not the controller's session being reaped. Cross-device is
+precisely the case where the controller sits unattended.
+
+No code change: `BD_GRACE_MS=65000 node server.js` sets the production value
+without editing anything.
 
 **Found on the way, unrelated to the feature:** `MODULE_ORIGINS`
 (`server.js:1038`) is **dead code** — declared, referenced nowhere, while
