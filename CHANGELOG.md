@@ -6,6 +6,46 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-22 (evening) — Sync, and a bug that ate a whole code path
+
+The Device hand-off works end to end: BD → QR → a phone across the room →
+drift there → **Sync** → BD lands on that node at the phone's position and says
+`synced` beside View for two seconds.
+
+**The viewer's button is honest now.** "← controls" assumed BD was in this
+browser — it closed the window and raised the opener. Opened from a QR code on
+another device there is no opener, `window.close()` is refused for a window the
+script did not open, and "back to ButterflyDreaming" names something that is
+not on that machine. BD marks the launch URL `d=1` (not `window.opener`, which
+an ordinary reload also loses), and on such a viewer the button becomes
+**Sync**: it sends what this viewer is showing and stays put.
+
+**BD acknowledges it**, because a viewer can only report that it SENT, and from
+another device that is all the sender would ever learn — while at the BD end
+the node changes under you with nothing explaining why.
+
+### The bug worth remembering
+
+The note threw a `ReferenceError`, and because it threw at the TOP of the
+`av_return` handler it **took the entire path with it** — no note, no state
+taken, no navigation. Pressing Sync did nothing at all, and "nothing at all" is
+what a throw near the top of a handler looks like.
+
+`flashSyncNote` was declared inside a nested block of `init()`; the dispatcher
+is a level out, and a function declared in a block is not visible outside it. A
+`window` export had been written for exactly this and then removed, because a
+scope check that searched backwards for an indent-0 function header reported
+"both inside `init()`". Both were — at different depths, which is the whole
+question.
+
+**And the log that would have said so had stopped being written.** BD forwards
+the client console to *stdout*; an earlier restart redirected stdout elsewhere,
+so `/private/tmp/bd_server.log` silently froze and two rounds of debugging read
+a dead file. BD is restarted with `>> /private/tmp/bd_server.log` and that is
+now written down as part of how to restart it.
+
+---
+
 ## 2026-09-22 (later) — BD catches up with the demo
 
 Four things the BDX/AVX/RX demo grew last week, brought back into BD, which is

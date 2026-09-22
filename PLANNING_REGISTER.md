@@ -259,8 +259,21 @@ delivery, not the mechanism. A VR headset is exactly the device this exists for
 and is the one option needing a **protocol addition**, so the dialog should be
 laid out to accept it later rather than be retrofitted.
 
-**Still to verify by hand:** nobody has pressed **Device** in a browser. The
-relay half is proven by test; the button, dialog, QR and clipboard are not.
+**VERIFIED BY HAND 2026-09-22.** Device → QR → a phone across the room → drift
+there → Sync → BD lands on the node at the phone's position and says so. The
+viewer's back button was rebuilt for the case: BD marks the launch URL `d=1`
+and such a viewer offers **Sync** rather than a way back that is not there.
+
+**Two process notes from getting there**, both in memory:
+
+- **BD's client-console log is stdout.** Restart it as
+  `node server.js >> /private/tmp/bd_server.log 2>&1`, or the log silently
+  stops growing and the next debugging session reads a dead file. That cost
+  two rounds here.
+- **Block scope is not function scope.** A helper declared in a nested block of
+  `init()` is invisible to a dispatcher one level out, even though both are
+  "inside `init()`". Checking by backwards-searching for an indent-0 function
+  header cannot see this and will say they match.
 
 **Also found, and left alone:** BD's startup log says
 `*** GRACE PERIOD 10s — DEVELOPMENT VALUE, restore to 65000 for real use ***`.
