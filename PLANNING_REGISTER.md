@@ -224,6 +224,46 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-22 — align BD with BDX
+
+**The plan, in order.** BDX/AVX/RX grew four things BD does not have, and the
+two are supposed to be the same architecture. `bd_relay.js` is already
+byte-identical between them and `bd_av_client.js` is a tracked copy, so most of
+the alignment is already structural — what is missing is the **controller**
+half, which lives in `viewer.js` and was only ever written for BDX.
+
+Facts established 2026-09-22, by test rather than assumption: **BD is publicly
+hosted** at `https://graph.virtualfictions.uk` (cloudflared tunnel on this Mac
+to `localhost:8080`, running since May), the AV page is served from the same
+origin, and **WebSocket crosses that tunnel**. So BD needs none of the
+apparatus BDX needed — no `?rx=`, no substitutable relay, no mixed content —
+because BD serves the pages *and* is the relay, over https throughout.
+
+| # | item | status | note |
+|---|---|---|---|
+| 1 | `av_spare_token` sent by `viewer.js` | **the real gap** | The relay carries it and `bd_av_client.js` already stores and spends it; BD never sends one. BD's viewers have an opener and renew through it, so this has never shown — but a viewer opened from a *pasted link* has no opener, and on a phone that is the ordinary case. Needed whether or not the rest is built. |
+| 2 | `qrcode.js` vendored into BD | not started | MIT, 57 KB, lazy-loaded on first press. Verified by decoding, not by matrix comparison — see `BDX_DEMO_PLAN.md`. |
+| 3 | "send to device" button + dialog | not started | Beside View. Mint on the press; single-use, three minutes; countdown from the relay's own `ttl_ms`. Refuse on localhost, where the link means the other device itself. |
+| 4 | Safari clipboard pattern | portable as-is | A write after the mint's round trip is refused — the gesture is over. Hand the clipboard the *promise* during the press, then `writeText`, then a visible copy button. |
+
+**Design note for (3): leave room for a short typed code.** The QR is one
+delivery, not the mechanism. A VR headset is exactly the device this exists for
+— no window handle — and is also the worst at both scanning a QR and typing a
+150-character URL. A six-character code typed into the viewer would suit it,
+and is the one option needing a **protocol addition**, so the dialog should be
+laid out to accept it later rather than be retrofitted.
+
+**Found on the way, unrelated to the feature:** `MODULE_ORIGINS`
+(`server.js:1038`) is **dead code** — declared, referenced nowhere, while
+`cors.origin` is `'*'`. Its comment claims "an explicit ALLOWLIST, not `'*'`",
+which is not true. The real gates (`curationCodeOk()`, `VIEWER_MAY_SEND`) were
+tested and do hold, so this is not an open hole; but it is a comment that would
+licence a bad decision later, and BD is on the public internet. Either enforce
+it or delete it. If enforced, note BD's own public origin is **not** in the
+list, so View would break with it.
+
+---
+
 ## What is genuinely open, in one place
 
 Not a schedule — a list of what has been designed and not built.
@@ -242,6 +282,9 @@ Not a schedule — a list of what has been designed and not built.
 | Blue Node ring seam | `blue_node_spec.md` | Colour problem, not geometry. |
 | Delete stale BARE layout hints | `cc-hint-system-spec.md` | 166 edges (162 DESCENDS_FROM, 3 CLUSTER_REL, 1 CONTAINS). They route views down the wrong `runLayout` branch — three incidents so far. The Cluster reader already ignores them; deleting is a data change. |
 | Selection rule for capped neighbourhoods | brief §5 | Curation/ethics question. Affects 15 of 105 clusters. |
+| BD/BDX alignment (4 items) | Added 2026-09-22, above | (1) is the only real gap and is needed regardless. |
+| `MODULE_ORIGINS` dead code | `server.js:1038` | Enforce it or delete it. The comment claims a protection that is not there. |
+| Short typed code for a viewer | Added 2026-09-22, above | The one hand-off option needing a protocol addition. For headsets. |
 
 ---
 

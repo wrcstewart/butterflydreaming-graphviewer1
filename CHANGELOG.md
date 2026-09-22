@@ -6,6 +6,33 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-22 — a hidden module kept redrawing the card
+
+Reported from BD: after looking at Kolam in Player, switching to the **Edit**
+radio and wandering nodes, a node's text reached the top panel and about a
+second later the old Kolam script pushed it out — *"if at all"*.
+
+**About a second was the whole diagnosis.** That is `AUTO_DRIFT_MIN_MS`, the
+interval at which a drifting module's echo is allowed to write. Leaving Player
+mode **hides** the iframe and does not unload it, so the module went on
+drifting and announcing `bd_av_state` from behind the graph. The auto-echo
+listener went on redrawing *the focused card* with what it heard — and in Edit
+mode the focused card is whichever node you just opened, because
+`getFocusedCardBody()` falls through to the newest card in the stack. Nothing
+tied the card being written to the node the module was showing.
+
+The fix follows a line this code already draws for itself: **recording is data
+and must never stop; redrawing is presentation and must not happen where it
+does not belong.** A hidden module has nothing to present, so the presentation
+half of `autoWrite` is now gated on `player-active`.
+
+**The module is deliberately left running.** Unloading it on leaving Player
+would also have cured the symptom and broken something real: a viewer on
+another device must keep receiving frames while BD sits in Edit. The data half
+is untouched, so it does. The bug was the redraw, not the drift.
+
+---
+
 ## 2026-09-18 — the script becomes the source of truth
 
 A direction rather than a fix: *"only the script is flexible enough to combine
