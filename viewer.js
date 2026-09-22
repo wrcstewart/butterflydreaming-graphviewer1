@@ -4043,6 +4043,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       ws.on('msg', (m) => {
         if (!m || m.type !== 'av_request_state') return;
         answerAVStateRequest();
+        try { window.dispatchEvent(new Event('bd-av-viewer-arrived')); } catch (_) {}
         // A viewer has announced itself, so arm it for a reconnection it will
         // not be able to ask us about. Staggered for the same reason as in
         // BDX: mint_module_token has no correlation id, so a reply is taken by
@@ -12070,6 +12071,196 @@ async function init() {
     //
     // Falls back to the old behaviour whenever a viewer cannot be opened —
     // no session, no token, popup blocked. A press must always do SOMETHING.
+    // ── "Device": the same viewer, somewhere that is not this machine ────
+    //
+    // View opens a viewer beside BD and can reach it directly. A phone, a
+    // tablet, a headset has no window handle between it and BD, which is the
+    // one case the relay exists for.
+    //
+    // Minted on the press and never in advance: a module token is single-use
+    // and lives three minutes, so a code sitting on screen from earlier is a
+    // dead link that looks usable. The countdown reads the RELAY's own
+    // figure rather than a number copied in here, so the two cannot drift.
+    (function wireSendToDevice() {
+      const btn   = document.getElementById('send-to-device-btn');
+      const dlg   = document.getElementById('device-dialog');
+      const urlEl = document.getElementById('device-url');
+      const qrEl  = document.getElementById('device-qr');
+      const ttlEl = document.getElementById('device-ttl');
+      const hint  = document.getElementById('device-hint');
+      const copyB = document.getElementById('device-copy');
+      const close = document.getElementById('device-close');
+      if (!btn || !dlg) return;
+
+      let ttlTimer = null;
+
+      function shut() {
+        dlg.hidden = true;
+        if (ttlTimer) { clearInterval(ttlTimer); ttlTimer = null; }
+        qrEl.classList.remove('on');
+        qrEl.width = qrEl.height = 0;
+        urlEl.value = '';
+      }
+
+      function countdown(ms) {
+        const dies = Date.now() + ms;
+        if (ttlTimer) clearInterval(ttlTimer);
+        const tick = () => {
+          const left = Math.max(0, dies - Date.now());
+          if (left <= 0) {
+            ttlEl.textContent = 'This link has expired — press Device again.';
+            ttlEl.classList.add('expired');
+            clearInterval(ttlTimer); ttlTimer = null;
+            return;
+          }
+          const mm = Math.floor(left / 60000);
+          const ss = Math.floor(left % 60000 / 1000);
+          ttlEl.classList.remove('expired');
+          ttlEl.textContent = 'Expires in ' + mm + ':' + String(ss).padStart(2, '0') +
+                              ' · one device per link.';
+        };
+        tick();
+        ttlTimer = setInterval(tick, 1000);
+      }
+
+      // The encoder is 57 KB and most sessions never press this button, so it
+      // arrives on the first press and not before. Failing to load is not
+      // fatal — the link is on screen and copyable — so it degrades to no QR
+      // rather than to an error nobody can act on.
+      let qrLoading = null;
+      function withQr() {
+        if (typeof qrcode === 'function') return Promise.resolve(true);
+        if (!qrLoading) qrLoading = new Promise((res) => {
+          const el = document.createElement('script');
+          el.src = '/qrcode.js';
+          el.onload  = () => res(typeof qrcode === 'function');
+          el.onerror = () => res(false);
+          document.head.appendChild(el);
+        });
+        return qrLoading;
+      }
+
+      function drawQr(text) {
+        withQr().then((ok) => {
+          if (!ok || urlEl.value !== text) return;     // stale while loading
+          let q;
+          try { q = qrcode(0, 'M'); q.addData(text); q.make(); }
+          catch (err) { console.warn('[AV] qr failed', err); return; }
+          const n = q.getModuleCount(), quiet = 4;
+          // An INTEGER pixels-per-module, and enough of them: a software
+          // decoder reads two happily, a phone camera at an angle on a glossy
+          // screen does not.
+          const scale = Math.max(3, Math.floor(250 / (n + 2 * quiet)));
+          const px = (n + 2 * quiet) * scale;
+          qrEl.width = qrEl.height = px;
+          qrEl.style.width = qrEl.style.height = px + 'px';
+          const g = qrEl.getContext('2d');
+          g.fillStyle = '#fff'; g.fillRect(0, 0, px, px);
+          g.fillStyle = '#000';
+          for (let r = 0; r < n; r++)
+            for (let c = 0; c < n; c++)
+              if (q.isDark(r, c))
+                g.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+          qrEl.classList.add('on');
+        });
+      }
+
+      // Safari refuses a clipboard write that happens after an await, for the
+      // same reason it refuses window.open: the gesture is over by then, and
+      // minting a token is a round trip. The documented way round is to hand
+      // the clipboard the PROMISE during the gesture and let it resolve when
+      // the token lands. Then writeText; then the link on screen with its own
+      // button, which is a fresh gesture and always works. Three paths,
+      // because a copy that silently does nothing is worse than no button.
+      function copyWhenReady(promise) {
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+          try {
+            return navigator.clipboard.write([new ClipboardItem({
+              'text/plain': promise.then((u) => new Blob([u], { type: 'text/plain' }))
+            })]).then(() => true, () => false);
+          } catch (_) { /* fall through */ }
+        }
+        return promise.then((u) => (navigator.clipboard && navigator.clipboard.writeText)
+          ? navigator.clipboard.writeText(u).then(() => true, () => false)
+          : false, () => false);
+      }
+
+      const isLoopback = () => {
+        const h = location.hostname;
+        return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
+      };
+
+      btn.addEventListener('click', () => {
+        // Refused rather than explained afterwards. On localhost the link
+        // means THE OTHER DEVICE ITSELF: it would open, find nothing, and look
+        // like BD's fault. BD is published at graph.virtualfictions.uk, so
+        // this is about which address YOU are using, not whether it is
+        // possible.
+        if (isLoopback()) {
+          alert('You are on localhost, which no other device can reach.\n\n' +
+                'Open BD at its public address first, then press Device.');
+          return;
+        }
+        const ws = wsRef.current;
+        if (!ws || !ws.connected) { alert('Not connected — try again in a moment.'); return; }
+
+        let hand;
+        const urlReady = new Promise((res) => { hand = res; });
+        const copying  = copyWhenReady(urlReady);    // claimed INSIDE the gesture
+
+        hint.textContent = 'Minting a link…';
+        ttlEl.textContent = '';
+        dlg.hidden = false;
+
+        // Through the window handle, NOT directly: requestModuleToken lives
+        // inside setupInteractions and this runs inside init(), which are
+        // different scopes. That is precisely what bdRequestModuleToken was
+        // exposed for, and calling the bare name here would have been a
+        // ReferenceError on the first press.
+        const mint = window.bdRequestModuleToken;
+        if (typeof mint !== 'function') {
+          hint.textContent = 'BD is still starting up — try again in a moment.';
+          return;
+        }
+        mint(avLastModuleId || undefined).then((token) => {
+          if (!token) { hint.textContent = 'BD would not issue a link. Try again.'; return; }
+          const url = window.location.origin + '/AV/kolam.html?t=' +
+                      encodeURIComponent(token) +
+                      (avNodeId ? '&n=' + encodeURIComponent(avNodeId) : '');
+          hand(url);
+          urlEl.value = url;
+          drawQr(url);
+          countdown(3 * 60 * 1000);
+          copying.then((ok) => {
+            copyB.textContent = ok ? 'copy again' : 'copy link';
+            hint.textContent = ok
+              ? 'Copied. Scan the code with the other device, or paste the link there.'
+              : 'Scan the code with the other device, or press copy link.';
+          });
+        });
+      });
+
+      copyB.addEventListener('click', () => {
+        urlEl.focus(); urlEl.select();
+        const v = urlEl.value;
+        if (!v) return;
+        const done = () => { hint.textContent = 'Copied — paste it on the other device.'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(v).then(done, () => {
+            hint.textContent = 'Select the link and copy it by hand.';
+          });
+        } else { try { document.execCommand('copy'); done(); } catch (_) {} }
+      });
+
+      close.addEventListener('click', shut);
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) shut(); });
+      // A viewer arriving is the confirmation the hand-off worked, and is
+      // worth having when the other device is across the room.
+      window.addEventListener('bd-av-viewer-arrived', () => {
+        if (!dlg.hidden) { hint.textContent = 'The other device is connected.'; setTimeout(shut, 1200); }
+      });
+    })();
+
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
       // Opening the viewer window: the CLICK is the gesture.

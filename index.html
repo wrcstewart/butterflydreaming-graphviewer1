@@ -146,6 +146,10 @@
            it, following the module live. "Jump to external player" described
            the retired standalone behaviour, where BD navigated away. -->
       <button id="jump-to-ext-btn"      type="button" title="Open a viewer window beside BD that follows this module live">View</button>
+      <!-- 2026-09-22 — the same viewer, on a DIFFERENT device. View opens one
+           beside BD and can reach it directly; a phone, tablet or headset has
+           no window handle, which is the one case the relay exists for. -->
+      <button id="send-to-device-btn"   type="button" title="Show a link and QR code so another device can watch this module">Device</button>
       <!-- RETIRED 2026-09-15, NOT DELETED. Copies a standalone URL carrying
            the whole payload. Hidden because the panel now offers one thing —
            View — and a second button asking the user to choose between two
@@ -259,6 +263,28 @@
        URL. Kept in the markup rather than deleted: #copy-link-to-ext-btn
        is retired-not-deleted too, and un-hiding it should restore working
        behaviour, dialog included. -->
+  <!-- 2026-09-22 — "Device": a viewer on something that is not this machine.
+       The QR is here because it is the only delivery a phone or a headset can
+       use without typing 100 characters, and it needs room a panel has not
+       got. Minted on the press and never in advance: the token is single-use
+       and lives three minutes, so a code left on screen is a dead link that
+       looks usable. -->
+  <div id="device-dialog" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <p class="modal-heading">Watch on another device</p>
+      <p class="modal-body" id="device-hint">Scan this with the other device, or copy the link.</p>
+      <canvas id="device-qr" width="0" height="0" aria-label="QR code for the viewer link"></canvas>
+      <div id="device-url-row">
+        <input id="device-url" type="text" readonly spellcheck="false">
+        <button id="device-copy" type="button">copy link</button>
+      </div>
+      <p class="modal-body" id="device-ttl"></p>
+      <div class="modal-buttons">
+        <button id="device-close" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="update-script-dialog" class="modal-overlay" hidden>
     <div class="modal-box">
       <p class="modal-heading">Pull latest settings from the module?</p>
