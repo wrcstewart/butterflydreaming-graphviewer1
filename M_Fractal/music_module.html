@@ -1657,23 +1657,23 @@
           storedText = (data.payload && data.payload.text) || '';
           syncSteppersFromScript();
           regenerateAbc();
-          announceState();
         } else if (type === 'bd_script_update') {
           storedText = typeof data.script === 'string' ? data.script : '';
           syncSteppersFromScript();
           regenerateAbc();
-          // Announce after a script arrives too, not only after a stepper
-          // press. The host keeps ONE "freshest announcement" across all
-          // modules, so a module that speaks only when its own controls move
-          // leaves that holding the PREVIOUS module's script for the whole
-          // session — which is how editing a Fractal card came to be
-          // overwritten with Kolam's.
+          // DELIBERATELY SILENT. Announcing here was tried on 2026-09-23 and
+          // reverted within the hour: it loops.
           //
-          // The echo this invites is bounded, not a loop: the host declines a
-          // write when the card already equals the text, so the worst case is
-          // one extra write settling the card on the module's canonical form,
-          // after which the two agree and it stops.
-          announceState();
+          // I reasoned the echo was bounded because the host declines a write
+          // when the card already equals the text. That holds only if what
+          // comes back is IDENTICAL to what went in, and here it is not — the
+          // script is rebuilt from the steppers, so BD writes it to the card,
+          // the card pushes it back, this rebuilds it again, and the two
+          // lengths alternate for ever. Observed at 421/430 chars, flooding
+          // the log and taking the graph down with it.
+          //
+          // Announcing on a STEPPER PRESS is what makes the pull direction
+          // work, and that cannot loop: a person has to press something.
         } else if (type === 'bd_script_request') {
           postToParent({ type: 'bd_script_response', script: currentGrammarScript() });
         } else if (type === 'BD_STOP') {

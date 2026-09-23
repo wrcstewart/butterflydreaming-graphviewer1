@@ -11518,8 +11518,14 @@ async function init() {
         const sibs  = card && card.parentElement ? Array.prototype.slice.call(card.parentElement.children) : [];
         const idx   = card ? sibs.indexOf(card) : -1;
         const kind  = card ? (card.className || '').replace(/\s+/g, '.') : '?';
-        const text  = (body.value != null ? body.value : body.textContent) || '';
-        const mod   = /^%%bd_module\s+(\S+)/m.exec(text);
+        // getCardText, not textContent. textContent concatenates block
+        // elements with NO separator, so this printed
+        // "module=bd_M_Fractal%%bd_axiom" and looked exactly like a script
+        // whose newlines had been eaten — which sent me looking for a
+        // corruption that was not there. A diagnostic that lies costs more
+        // than one that is missing.
+        const text  = (body.value != null ? body.value : getCardText(body)) || '';
+        const mod   = /^%%bd_(?:p_)?module\s+(\S+)/m.exec(text);
         return lastCardRung + ' ' + stack + '[' + idx + '] ' + kind +
                ' len=' + text.length + ' module=' + (mod ? mod[1] : 'NONE');
       } catch (_) { return lastCardRung + ' (undescribable)'; }
