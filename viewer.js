@@ -10312,7 +10312,13 @@ async function init() {
               // The tick box hangs below the ↓, measured rather than guessed so
               // it still clears the button if the arrows are ever resized.
               const btnH    = Math.ceil(cDown.getBoundingClientRect().height) || 24;
+              // Under the ↓, as it has been since 2026-09-18 and as the
+              // author prefers here. NOT beside, which is right for the
+              // dock-slot modules above and wrong applied to this branch:
+              // Kolam's arrows sit in a one-button-wide column hard against
+              // the steppers, and there is nothing to sit beside.
               const rows    = [[cUp, 0], [cDown, DOWN_DY]];
+              if (cAuto) rows.push([cAuto, DOWN_DY + btnH + 6]);
               rows.forEach(([b, dy]) => {
                 b.style.position = 'fixed';
                 b.style.left     = x + 'px';
@@ -10320,26 +10326,10 @@ async function init() {
                 b.style.top      = Math.round(canvasTopVp + dy) + 'px';
                 b.style.zIndex   = '7';
               });
-              // 2026-09-23 — the tick box moves BESIDE the arrows, not below
-              // them. Hanging under the ↓ put it in the arrows' own column,
-              // which is hard against the stepper column, and it fouled the
-              // controls.
-              //
-              // It sits left of the arrows' left end in both layouts.
+              // The tick box is narrower than a button; centre it under them.
               if (cAuto) {
-                const aRect = cAuto.getBoundingClientRect();
-                const aw = Math.ceil(aRect.width)  || bw;
-                const ah = Math.ceil(aRect.height) || 18;
-                cAuto.style.position = 'fixed';
-                cAuto.style.right    = 'auto';
-                cAuto.style.zIndex   = '7';
-                // Always to the LEFT of the arrows' left edge, on the
-                // author's instruction — including when the arrows themselves
-                // sat right of the stepper column.
-                cAuto.style.left = Math.round(x - aw - 6) + 'px';
-                // Centred against the PAIR of arrows rather than either one.
-                cAuto.style.top  = Math.round(canvasTopVp + (DOWN_DY + btnH - ah) / 2) + 'px';
-
+                const aw = Math.ceil(cAuto.getBoundingClientRect().width) || bw;
+                cAuto.style.left = Math.round(x + (bw - aw) / 2) + 'px';
               }
             }
           }
