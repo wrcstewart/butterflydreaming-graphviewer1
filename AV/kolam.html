@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-22: GREEN (Sync, and BD says it
-     arrived). Next rotation = blue. */
+     change to a cached AV file. 2026-09-23: BLUE (the desktop button says
+     Sync too, and the label is no longer state). Next rotation = red. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #27ae60;              /* CANARY — green (was red) */
+    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -285,18 +285,33 @@
     })();
 
     const backBtn = document.getElementById('back');
+
+    // Held in a variable, NOT re-derived from the label at click time.
+    //
+    // The handler below used to read `backBtn.textContent ===
+    // 'ButterflyDreaming'`, which made the WORDING load-bearing: renaming the
+    // button would silently flip that to false and a desktop viewer would
+    // start CLOSING ITSELF instead of raising BD. Wording is presentation and
+    // must never be state — found while making exactly that rename.
+    let roomForBoth = false;
+    try {
+      roomForBoth = (window.outerWidth || innerWidth) < screen.availWidth * 0.9;
+    } catch (_) { /* assume none; the phone behaviour is the safe default */ }
+
     if (IS_DEVICE) {
       backBtn.textContent = 'Sync';
       backBtn.title = 'Send what this viewer is showing back to ButterflyDreaming';
-    } else {
-      try {
-        const roomForBoth = (window.outerWidth || innerWidth) < screen.availWidth * 0.9;
-        if (roomForBoth) {
-          backBtn.textContent = 'ButterflyDreaming';
-          backBtn.title = 'Raise the ButterflyDreaming window';
-        }
-      } catch (_) { /* keep the default label */ }
+    } else if (roomForBoth) {
+      // Desktop: BD is beside us, so this does not take you anywhere. It sends
+      // this viewer's state and asks BD's window to come forward — and the
+      // raise is largely refused by browsers, so the sync is the part that
+      // reliably happens. Name it for what it does.
+      backBtn.textContent = 'Sync';
+      backBtn.title = 'Send this viewer\u2019s state to ButterflyDreaming';
     }
+    // Otherwise the default label stands. On a phone the viewer covers BD and
+    // this button is the only way back to the controls, so that IS what it
+    // gives you.
 
     backBtn.addEventListener('click', function () {
       // On another device: send, say so, and stay. No raise — there is no
@@ -316,7 +331,7 @@
         return;
       }
 
-      const roomForBoth = backBtn.textContent === 'ButterflyDreaming';
+      // roomForBoth is the variable set above — deliberately not the label.
 
       // 1. Ask BD to come back to this node.
       //
