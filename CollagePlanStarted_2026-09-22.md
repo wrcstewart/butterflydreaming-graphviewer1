@@ -246,6 +246,68 @@ renderer (RULE 1), phase 2 is the first script that carries one.
 
 ---
 
+## PHASES 1 AND 2 — DONE 2026-09-23, working
+
+The renderer reads `%%bd_p_<name>`; the control column follows it; BDX's
+default script carries marks and BD's saved nodes do not. Tested by hand: mark
+one directive in a BD script and only that stepper appears, its value applies,
+and pressing it updates the line **in place**.
+
+**RULE 1 was already violated by existing code**, exactly where predicted —
+`setDirectiveValue` built its line from the stripped name. Fixed and covered by
+15 extracted-function tests, including five successive presses leaving one line
+with its mark, and `p_angle` not being mistaken for `angle_minutes`.
+
+### RULE 5 — an authored mark beats a saved one
+
+Learned the hard way, having shipped it the other way round for a morning.
+
+`loadModuleForNode` pushes `mergeExploredValues(savedText, explored)`.
+`savedText` is whatever Memgraph last stored; the edit lives in `explored`. The
+first rule said the **saved** mark wins — reasoning that an exploration carries
+values and should not restyle the controls. True of a *viewer*, and wrong about
+where authoring happens: **the script is the source of truth and it lives in
+the card.** So a hand-edited mark was reverted on every merge and could not be
+authored at all without first saving the node.
+
+Two corollaries, both found by the same test:
+
+- **The explored mark wins outright**, not `saved || explored` — with the
+  fallback the wrong way round a saved mark would survive the user *removing*
+  it, and removing a mark to shed a control is the point of the feature.
+- **A mark change is a change.** The merge short-circuited on the value alone,
+  so adding a `p_` without touching the number was skipped as nothing to do.
+
+**The cost, recorded rather than buried:** a viewer's reported script can now
+change which controls the host shows. It still cannot introduce a directive —
+only lines already present are rewritten — so the blast radius is which
+steppers appear, not what the script contains.
+
+### RULE 6 — a hand on a stepper is a hand off the card
+
+`autoWrite` refuses to redraw a card that has focus. Right for drift; wrong
+after a deliberate control change, because the caret does not move on its own.
+Edit a script, work the steppers, and the echo never returns — v1's failure
+verbatim inside the v3 design meant to have retired it. `fromDrift:false` now
+blurs the card and writes; drift still waits.
+
+**BDX does not share this**, and the reason is worth keeping: its panel is a
+`<textarea>`, so it can use the v2 approach — write anyway, restore the
+selection — which a contentEditable card cannot.
+
+### Still open at this stage
+
+- **Memgraph node scripts are unmarked.** RULE 2 means nothing is broken by
+  that, and marking them is a data change wanting a backup and a deliberate
+  pass. Not done as a side effect.
+- **A typo fails silently.** `%%bd_psymmetry` — the underscore missed — parses
+  as a directive named `psymmetry`, and the real one falls back to its default.
+  Seen in the log during testing, since every keystroke is pushed to the
+  module. Worth a warning eventually.
+- Fractal and ABC are untouched, by decision: finish Kolam and the nodes first.
+
+---
+
 ## 6. What was checked, not assumed, while writing this
 
 - Auto-population already exists — `visual_module.html:331`.

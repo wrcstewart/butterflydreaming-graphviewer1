@@ -6,6 +6,68 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-23 — `_p_`: the script says which controls it wants
+
+First working stage of the collage plan. A directive written
+`%%bd_p_symmetry 8` asks for a user control; the mark is **presentation and
+nothing else**, stripped before the value is looked up, so a marked directive
+means exactly what the unmarked one did and one whose control is hidden still
+applies. Delete a `p_` and the stepper goes while the value stays — which is
+the point, for a collage that merges more controls than anyone wants.
+
+Done in three passes, deliberately: **matching first, meaning second, scripts
+last.**
+
+**Phase 0 — nothing visible.** Every place BD matches a directive by name
+learned to see through a mark. This went first because `AV_ANGLE_LINES` names
+the angle triple literally: had a script gained `%%bd_p_angle` while that still
+read `%%bd_angle`, it would have stopped matching, every drift frame would have
+counted as a human change and been pushed to the viewer — the iOS smoothness
+work undone with **no error to notice**, only a warmer phone.
+
+**Phase 1 — the renderer.** `parseBD` strips and remembers; the control column
+follows what the script marks. `setDirectiveValue` was already wrong for this:
+it built its line from the *stripped* name, so on a marked script nothing
+matched and a second **unmarked** copy of the directive was appended. One
+stepper press would have left both.
+
+**Phase 2 — BDX's default script** carries marks. BD's saved nodes deliberately
+do not: a script with no mark anywhere keeps every control, so there is nothing
+to migrate and nothing already shared changes.
+
+### Two bugs found by testing, both older than the feature
+
+**A mark could not be authored.** `loadModuleForNode` pushes
+`mergeExploredValues(savedText, explored)`, where `savedText` is whatever
+Memgraph last stored — unmarked — and the edit lives in `explored`. The rule
+shipped that morning said the saved mark wins, so every merge reverted the
+edit: 304 characters into the module, 302 straight back out. The rule was
+reasoned about the wrong actor — right that a *viewer* should not restyle the
+host's controls, wrong about where authoring happens, since the script is the
+source of truth and it lives in the card. Compounded by a short-circuit on the
+value alone, so adding a `p_` *without changing the number* — exactly how
+anyone turns a control on — counted as nothing to do.
+
+**The echo stopped for good after any hand edit.** `autoWrite` refuses to
+redraw a card that has focus. Right for drift; wrong after a deliberate control
+change, because **the caret does not move on its own**. Edit a script, work the
+steppers, and nothing echoes ever again — v1's failure verbatim, *"sync died
+permanently after any manual edit"*, alive inside the v3 design meant to have
+retired it. Copy Up appeared to cure it and did not: pressing the button moved
+focus off the card, which was all that was ever needed. `fromDrift:false` now
+takes the caret out and writes.
+
+**The instrument nearly hid the second one.** It logged only when the *reason*
+changed, so the same skip recurred in silence and read as "nothing is
+happening" — the second time in two days that a once-only log has cost a round.
+It reports every fiftieth repeat now.
+
+BDX turned out not to share the fault: its panel is a `<textarea>`, so it uses
+the v2 approach — write anyway, restore the selection — which a contentEditable
+card cannot.
+
+---
+
 ## 2026-09-22 (evening) — Sync, and a bug that ate a whole code path
 
 The Device hand-off works end to end: BD → QR → a phone across the room →
