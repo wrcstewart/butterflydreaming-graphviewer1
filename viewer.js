@@ -10320,27 +10320,7 @@ async function init() {
                            ' | copyPanel ' + cpDesc +
                            ' | iframe y ' + Math.round(outerRect.top) + '..' +
                            Math.round(outerRect.bottom) +
-                           ' | arrowsSlot y ' + Math.round(y) + '..' + Math.round(y + r.height) +
-                           // WHAT IS ON TOP. The copy panel is on screen and
-                           // left of everything we place, so something of BD's
-                           // is painted over it — its frame's bottom edge is
-                           // visible below the cover. These are the elements
-                           // that can sit over the iframe; the one whose rect
-                           // contains the copy panel is the culprit.
-                           ' || ' + ['extend-panel', 'current-panel', 'chat-panel',
-                                     'media-bar', 'action-bar', 'bd-invite-panel-viewer']
-                             .map((id) => {
-                               const el = document.getElementById(id);
-                               if (!el) return id + ':none';
-                               const q = el.getBoundingClientRect();
-                               if (!q.width || !q.height) return id + ':0x0';
-                               const over = q.left < 733 && q.right > 395 &&
-                                            q.top  < 516 && q.bottom > 470;
-                               return id + ':' + Math.round(q.left) + '..' + Math.round(q.right) +
-                                      '/' + Math.round(q.top) + '..' + Math.round(q.bottom) +
-                                      (over ? ' <<OVERLAPS' : '');
-                             }).join(' ') +
-;
+                           ' | arrowsSlot y ' + Math.round(y) + '..' + Math.round(y + r.height);
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
         }
