@@ -10079,6 +10079,7 @@ async function init() {
   // align with abc-pane's top-left corner (offset a few px so the
   // panel sits *beside* it, not on top). Falls back to CSS defaults
   // when the loaded module has no #abc-pane (e.g. V_Kolam).
+  let posWhy = null;   // diagnostic only — see the note in the Kolam branch
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
@@ -10266,6 +10267,19 @@ async function init() {
             const cDown = document.getElementById('copy-down-btn');
             const cAuto = document.getElementById('auto-echo');
             const cpEl  = innerDoc && innerDoc.querySelector('.control-panel');
+            // Temporary instrument, 2026-09-23. The tick box is reported in a
+            // different bar from the arrows on DESKTOP, and I have guessed at
+            // it three times. Either this branch does not run — in which case
+            // all three stay in #action-bar and cannot be in different bars —
+            // or it runs and places them apart. Say which, once per change.
+            if (!cUp || !cDown || !cpEl) {
+              const miss = (!cUp ? 'cUp ' : '') + (!cDown ? 'cDown ' : '') + (!cpEl ? '.control-panel' : '');
+              if (posWhy !== 'skip:' + miss) {
+                posWhy = 'skip:' + miss;
+                console.log('[pos] arrows NOT repositioned, missing: ' + miss +
+                            ' — they stay in the action bar');
+              }
+            }
             if (cUp && cDown && cpEl) {
               const cpRect = cpEl.getBoundingClientRect();
               const bw = Math.ceil(cUp.getBoundingClientRect().width) || 30;
@@ -10314,6 +10328,10 @@ async function init() {
                 cAuto.style.left = Math.round(x - aw - 6) + 'px';
                 // Centred against the PAIR of arrows rather than either one.
                 cAuto.style.top  = Math.round(canvasTopVp + (DOWN_DY + btnH - ah) / 2) + 'px';
+                const line = 'arrows x=' + x + ' w=' + bw + ' | box w=' + aw +
+                             ' left=' + Math.round(x - aw - 6) +
+                             ' | fitsInside=' + fitsInside;
+                if (posWhy !== line) { posWhy = line; console.log('[pos] ' + line); }
               }
             }
           }
