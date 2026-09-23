@@ -400,6 +400,7 @@ function bdNameRe(name, flags) {
 function mergeExploredValues(savedText, exploredText) {
   if (typeof savedText !== 'string' || typeof exploredText !== 'string') return savedText;
   const values = new Map();
+  const exploredMarks = new Map();
   exploredText.split('\n').forEach((line) => {
     const m = BD_DIRECTIVE_RE.exec(line);
     if (!m) return;
@@ -408,6 +409,7 @@ function mergeExploredValues(savedText, exploredText) {
     const name = m[2], value = m[3];
     if (name === 'module' || value.trim() === '[' || name === ']') return;
     values.set(name, value);
+    exploredMarks.set(name, m[1] || '');
   });
   let changed = 0;
   const out = savedText.split('\n').map((line) => {
@@ -417,11 +419,35 @@ function mergeExploredValues(savedText, exploredText) {
     if (name === 'module' || m[3].trim() === '[') return line;
     if (!values.has(name)) return line;
     const next = values.get(name);
-    if (next === m[3]) return line;
+    // A MARK CHANGE IS A CHANGE. This compared values alone, so adding a p_
+    // without touching the number — which is exactly how anyone turns a
+    // control on — was skipped as "nothing to do" and the mark was lost on
+    // every merge.
+    const wasMark = m[1] || '';
+    const nowMark = exploredMarks.get(name) || '';
+    if (next === m[3] && nowMark === wasMark) return line;
     changed += 1;
-    // The SAVED line's own mark, not the explored one's. An exploration
-    // carries values; it must not add or remove a control on the way past.
-    return '%%bd_' + mark + name + ' ' + next;
+    // The EXPLORED line's mark wins — reversed 2026-09-23, having shipped the
+    // other way round that morning.
+    //
+    // The first rule said the saved line's mark wins, reasoning that an
+    // exploration carries values and should not restyle the controls. True of
+    // a viewer, and wrong about where authoring happens: the script IS the
+    // source of truth and it lives in the card, while savedText is whatever
+    // Memgraph last stored. So hand-editing %%bd_symmetry to %%bd_p_symmetry
+    // reached the module, came back through here, and was silently reverted —
+    // 304 chars in, 302 out, on every merge. A mark could never be authored at
+    // all without first saving the node.
+    //
+    // The cost, stated: a viewer's reported script can now change which
+    // controls the host shows. It still cannot introduce a directive — only
+    // lines already present are rewritten — so the blast radius is which
+    // steppers appear, not what the script contains.
+    // Outright, not `saved || explored`: with the fallback the wrong way round
+    // a SAVED mark would survive the user REMOVING it, and removing a mark to
+    // shed a control is the whole point of the feature.
+    const keepMark = nowMark;
+    return '%%bd_' + keepMark + name + ' ' + next;
   }).join('\n');
   return changed ? out : savedText;
 }
