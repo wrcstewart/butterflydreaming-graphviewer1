@@ -11320,11 +11320,50 @@ async function init() {
       if (body.querySelector && body.querySelector('.chunk-text')) {
         return readChunkBody(body);
       }
-      return body.textContent;
+      return readEditableLines(body);
     }
+
+    // ── Lines in, lines out (2026-09-23) ────────────────────────────────────
+    //
+    // `body.textContent = text` puts the whole script in ONE text node with \n
+    // characters in it. On screen that looks right, because the card body is
+    // white-space: pre-wrap. On the CLIPBOARD it is not: a copy offers both
+    // text/plain and text/html, and in HTML a \n is ordinary whitespace, so the
+    // html flavour collapses to a single line. Paste into BD, or anywhere
+    // taking plain text, and it is fine; paste into Notes, which prefers html,
+    // and every directive runs together into one unusable line.
+    //
+    // Reported after the blur fix, and that is why: before it, the card
+    // usually held the structure the USER had typed, which the browser builds
+    // out of real block elements. Writing over it with a flat text node is
+    // what lost the breaks.
+    //
+    // So write real <br> elements, and read them back. Both halves, together —
+    // textContent would join <br>-separated lines with NO separator, which is
+    // the Down-button bug of 2026-09-16 in a new place.
+    function readEditableLines(el) {
+      if (!el || !el.childNodes) return '';
+      let out = '';
+      el.childNodes.forEach((n) => {
+        if (n.nodeType === 3) { out += n.data; return; }             // text
+        if (n.nodeName === 'BR') { out += '\n'; return; }
+        // A block the browser made while someone typed. It starts a line.
+        if (out && !out.endsWith('\n')) out += '\n';
+        out += readEditableLines(n);
+      });
+      return out;
+    }
+
     function setCardText(body, text) {
-      if (body.tagName === 'TEXTAREA') body.value = text;
-      else                              body.textContent = text;
+      if (body.tagName === 'TEXTAREA') { body.value = text; }
+      else {
+        while (body.firstChild) body.removeChild(body.firstChild);
+        const lines = String(text).split('\n');
+        lines.forEach((line, i) => {
+          if (i) body.appendChild(document.createElement('br'));
+          if (line) body.appendChild(document.createTextNode(line));
+        });
+      }
       body.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
