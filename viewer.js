@@ -11565,6 +11565,7 @@ async function init() {
     // Separating them makes both easy and removes the trade entirely: the
     // viewer and the exploration record stay live while you type, and the card
     // catches up the moment you are done with it.
+    let autoWhy = null;   // declared BEFORE its user, not after
     function autoWrite(text, fromDrift) {
       // 1. Data. Unconditional.
       autoLastWriteAt = Date.now();
@@ -11585,11 +11586,17 @@ async function init() {
       // file already draws the line this fix needs: recording is data and must
       // never stop, redrawing is presentation and must not happen where it
       // does not belong. A hidden module has nothing to present.
-      if (!document.body.classList.contains('player-active')) return;
+      // Temporary instrument, 2026-09-23. Reported: the echo does not reach
+      // the card until Copy Up has been pressed once, after which it works.
+      // Four conditions can decline here and all four are silent, so say which
+      // — measuring beats a third guess. Remove once the cause is known.
+      const why = (r) => { if (autoWhy !== r) { autoWhy = r; console.log('[auto] ' + r); } };
+      if (!document.body.classList.contains('player-active')) { why('skip: not player-active'); return; }
       const body = getFocusedCardBody();
-      if (!body) return;
-      if (document.activeElement === body) return;   // never under the cursor
-      if (getCardText(body) === text) return;
+      if (!body) { why('skip: no card body (rung=' + lastCardRung + ')'); return; }
+      if (document.activeElement === body) { why('skip: caret is in the target card'); return; }
+      if (getCardText(body) === text) { why('skip: card already equals the script'); return; }
+      why('writing ' + text.length + ' chars into ' + describeCardBody(body));
       setCardText(body, text);
     }
 
