@@ -49,12 +49,42 @@ for (const level of ['log', 'info', 'warn', 'error']) {
     try { __forwardClientLog(level, args); } catch {}
   };
 }
+// ── Say it ON THE PAGE, not only down the socket (2026-09-23) ─────────────
+//
+// __forwardClientLog BUFFERS until a socket attaches. That is right for
+// ordinary logging and useless for the failure that matters most: a throw
+// before the socket is created leaves the buffer unflushed and the server log
+// silent, so the page is broken and nothing anywhere says why. Exactly that
+// happened today — "no root node, just the system message", and not one line
+// in the log to work from.
+//
+// A banner costs nothing when there is no error and is the only diagnostic
+// available when there is.
+function __showFatal(text) {
+  try {
+    let el = document.getElementById('bd-fatal');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'bd-fatal';
+      el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;' +
+        'background:#3a0d0d;color:#ffd7d7;font:12px/1.4 ui-monospace,monospace;' +
+        'padding:8px 10px;white-space:pre-wrap;max-height:40vh;overflow:auto;' +
+        'border-bottom:2px solid #c0392b';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    el.textContent = String(text).slice(0, 1200);
+  } catch (_) {}
+}
 window.addEventListener('error', ev => {
-  __forwardClientLog('error', [`Uncaught ${(ev.error && ev.error.stack) || ev.message}`]);
+  const msg = `Uncaught ${(ev.error && ev.error.stack) || ev.message}`;
+  __forwardClientLog('error', [msg]);
+  __showFatal(msg);
 });
 window.addEventListener('unhandledrejection', ev => {
   const r = ev.reason;
-  __forwardClientLog('error', [`Unhandled rejection: ${(r && r.stack) || r}`]);
+  const msg = `Unhandled rejection: ${(r && r.stack) || r}`;
+  __forwardClientLog('error', [msg]);
+  __showFatal(msg);
 });
 
 const DWELL_MS   = 200;   // ms before tooltip displays
