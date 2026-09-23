@@ -10296,12 +10296,7 @@ async function init() {
               // which is hard against the stepper column, and it fouled the
               // controls.
               //
-              // Which side depends on where the arrows went. Inside the gap
-              // they sit LEFT of the stepper column, so the box goes further
-              // left, away from it; when there is no room and they are pushed
-              // to the RIGHT of the column, the box goes right for the same
-              // reason. Putting it blindly on one side would park it on top of
-              // the steppers in one of the two layouts.
+              // It sits left of the arrows' left end in both layouts.
               if (cAuto) {
                 const aRect = cAuto.getBoundingClientRect();
                 const aw = Math.ceil(aRect.width)  || bw;
@@ -10309,8 +10304,10 @@ async function init() {
                 cAuto.style.position = 'fixed';
                 cAuto.style.right    = 'auto';
                 cAuto.style.zIndex   = '7';
-                cAuto.style.left = Math.round(fitsInside ? x - aw - 6
-                                                         : x + bw + 6) + 'px';
+                // Always to the LEFT of the arrows' left edge, on the
+                // author's instruction — including when the arrows themselves
+                // sat right of the stepper column.
+                cAuto.style.left = Math.round(x - aw - 6) + 'px';
                 // Centred against the PAIR of arrows rather than either one.
                 cAuto.style.top  = Math.round(canvasTopVp + (DOWN_DY + btnH - ah) / 2) + 'px';
               }
@@ -11650,6 +11647,14 @@ async function init() {
       // Logged when the REASON changes, plus every 50th repeat — the
       // once-per-change form alone hid this very bug: the same skip recurred
       // silently for minutes and looked like nothing happening at all.
+      // Which module a script says it is for. The mark is tolerated here for
+      // the same reason it is everywhere else: %%bd_module is not a control,
+      // but nothing stops a script marking it, and a matcher that missed one
+      // would silently stop guarding.
+      const moduleOf = (t) => {
+        const m = /^%%bd_(?:p_)?module[ \t]+(\S+)/m.exec(String(t || ''));
+        return m ? m[1] : null;
+      };
       const why = (r) => {
         if (autoWhy === r) { autoWhyN += 1; if (autoWhyN % 50) return; }
         else { autoWhy = r; autoWhyN = 0; }
@@ -11676,6 +11681,23 @@ async function init() {
       if (document.activeElement === body) {
         if (fromDrift) { why('skip: caret is in the target card'); return; }
         try { body.blur(); } catch (_) {}
+      }
+      // NEVER put one module's script into another module's card.
+      //
+      // The node check on the pending write was necessary and not sufficient:
+      // avNodeId is set inside loadModuleForNode, while the card is built by
+      // advanceOrNavigate, and between those two a Kolam write still found a
+      // Fractal card with the old node id still current. Reported as the panel
+      // staying stuck on the Kolam script while the Fractal steppers worked.
+      //
+      // This compares what the two scripts SAY they are, so it holds whatever
+      // the order happens to be — and it cannot be defeated by a path nobody
+      // remembered to notify.
+      const have = moduleOf(getCardText(body));
+      const want = moduleOf(text);
+      if (have && want && have !== want) {
+        why('skip: card is a ' + have + ' script, incoming is ' + want);
+        return;
       }
       if (getCardText(body) === text) { why('skip: card already equals the script'); return; }
       why('writing ' + text.length + ' chars into ' + describeCardBody(body));
