@@ -356,7 +356,9 @@ Not a schedule — a list of what has been designed and not built.
 | ~~BD/BDX alignment (4 items)~~ | Added 2026-09-22, above | **DONE 2026-09-22.** Untested in a browser: nobody has pressed Device. |
 | `MODULE_ORIGINS` dead code | `server.js:1038` | Enforce it or delete it. The comment claims a protection that is not there. |
 | Short typed code for a viewer | Added 2026-09-22, above | The one hand-off option needing a protocol addition. For headsets. |
-| Collage: `_p_`, modes, merge | `CollagePlanStarted_2026-09-22.md` | Agreed in discussion, nothing built. RULE 1 is a bug that exists NOW. |
+| Collage: `_p_`, modes, merge | `CollagePlanStarted_2026-09-22.md` | Phases 0-2 BUILT for Kolam + Fractal; nodes 001/002 migrated. Read/Create modes and merge not started. |
+| ABC: `_p_` + announcements | same doc | Three edits — module announces `bd_av_state`, wrapper whitelists it and `bd_module_log` — then the mark pass. |
+| Never announce on a script push | same doc, RULE 7 | Looks safe, loops. A module rebuilds the script, so it never matches what was pushed. |
 | Create-mode layout | same doc | Player and Edit show opposite things; Merge needs both. Needs a layout answer before code. |
 
 ---

@@ -304,7 +304,30 @@ selection — which a contentEditable card cannot.
   as a directive named `psymmetry`, and the real one falls back to its default.
   Seen in the log during testing, since every keystroke is pushed to the
   module. Worth a warning eventually.
-- Fractal and ABC are untouched, by decision: finish Kolam and the nodes first.
+- **Fractal: DONE 2026-09-23.** `auto` works both ways; the module announces
+  `bd_av_state` on a stepper press and forwards its console; its relay wrapper
+  whitelists both. **Still unmarked** — it shows every control, which RULE 2
+  makes correct rather than broken.
+- **ABC: not started.** Its wrapper has neither `bd_av_state` nor
+  `bd_module_log`, and the module announces neither. The same three edits as
+  Fractal, then the `_p_` pass.
+
+### RULE 7 — announce on a HUMAN action, never on a script push
+
+Tried on Fractal 2026-09-23 and reverted within the hour. Announcing from the
+`bd_script_update` handler loops: **the script is rebuilt from the steppers**,
+so what comes back is never identical to what went in, BD's "the card already
+equals the text" guard never fires, and the two ping-pong. Observed alternating
+at 421 and 430 characters until the graph died.
+
+It looks safe, and the commit that added it said so in as many words —
+"bounded, not a loop" — which was a property asserted rather than checked
+against how that module actually behaves. A stepper press cannot loop: a person
+has to press something.
+
+The cost of NOT announcing there is that `avLastState` keeps holding the
+previous module's script. That is handled, and visibly: the module guard
+declines and says which pair it refused.
 
 ---
 
