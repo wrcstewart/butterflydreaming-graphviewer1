@@ -49,7 +49,12 @@
       // THE THIRD SITE, again. This relay is a WHITELIST — sender, whitelist,
       // receiver — and two of the three working is indistinguishable from
       // none of them.
-      'bd_av_state'
+      'bd_av_state',
+      // The module's console, so a fault in there reaches BD's server log
+      // instead of only the iframe's own console — which nobody has open on a
+      // phone. The whitelist is the third site: the module may send these all
+      // it likes and they go nowhere without this line.
+      'bd_module_log'
     ]);
 
     const moduleFrame = document.getElementById('module-frame');

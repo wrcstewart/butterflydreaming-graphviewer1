@@ -10106,6 +10106,7 @@ async function init() {
   // align with abc-pane's top-left corner (offset a few px so the
   // panel sits *beside* it, not on top). Falls back to CSS defaults
   // when the loaded module has no #abc-pane (e.g. V_Kolam).
+  let dockWhy = null;   // last geometry logged, so a resize does not flood
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
@@ -10187,18 +10188,66 @@ async function init() {
           const x = outerRect.left + innerOffsetLeft + r.left;
           const y = outerRect.top  + innerOffsetTop  + r.top;
           const half = Math.max(20, Math.round((r.height - 4) / 2));
-          const dock = (btn, ty, h) => {
+          const dock = (btn, ty, h, w, lx) => {
             if (!btn) return;
             btn.style.position = 'fixed';
-            btn.style.left     = x + 'px';
+            btn.style.left     = lx + 'px';
             btn.style.top      = ty + 'px';
-            btn.style.width    = r.width + 'px';
+            btn.style.width    = w + 'px';
             btn.style.height   = h + 'px';
             btn.style.right    = 'auto';
             btn.style.zIndex   = '7';
           };
-          dock(document.getElementById('copy-up-btn'),   y,             half);
-          dock(document.getElementById('copy-down-btn'), y + half + 4,  half);
+
+          // 2026-09-23 — the bar is laid out right to left, on the author's
+          // instruction, because the right edge is the only fixed thing in it:
+          //
+          //   [Copy Script][Copy abc] … [auto]  (gap)  [↑↓]
+          //                                             ^ right edge of the
+          //                                               stepper box
+          //
+          // The arrows were stretched to the whole slot width, which is wide,
+          // and that pushed everything left over the module's own copy panel —
+          // "two buttons were obscured". A stepper button's width is enough
+          // for an arrow and leaves the rest of the bar for the module.
+          const sbEl  = innerDoc.querySelector('.step-btn');
+          const sbw   = (sbEl && Math.ceil(sbEl.getBoundingClientRect().width)) || 34;
+          const cpEl2 = innerDoc.getElementById('control-panel') ||
+                        innerDoc.querySelector('.control-panel');
+          const cpRight = cpEl2
+            ? outerRect.left + innerOffsetLeft + cpEl2.getBoundingClientRect().right
+            : x + r.width;
+          const ax = Math.round(cpRight - sbw);
+
+          dock(document.getElementById('copy-up-btn'),   y,            half, sbw, ax);
+          dock(document.getElementById('copy-down-btn'), y + half + 4, half, sbw, ax);
+
+          // The tick box sits left of the arrows with a deliberately generous
+          // gap: on a phone these are adjacent targets doing unrelated things,
+          // and the cost of hitting ↓ when you meant `auto` is overwriting the
+          // module from the card.
+          const GAP = 14;
+          const cA = document.getElementById('auto-echo');
+          let boxLeft = null, aw = 0;
+          if (cA) {
+            const aR = cA.getBoundingClientRect();
+            aw = Math.ceil(aR.width) || 30;
+            const ah = Math.ceil(aR.height) || 18;
+            boxLeft = Math.round(ax - aw - GAP);
+            cA.style.position = 'fixed';
+            cA.style.left     = boxLeft + 'px';
+            cA.style.top      = Math.round(y + (r.height - ah) / 2) + 'px';
+            cA.style.right    = 'auto';
+            cA.style.zIndex   = '7';
+          }
+
+          // Numbers, because this bar has now been guessed at several times
+          // and a measurement settles in one line what an impression does not.
+          const dockLine = 'slot x=' + Math.round(x) + ' w=' + Math.round(r.width) +
+                           ' | stepBtn=' + sbw + ' | stepperRight=' + Math.round(cpRight) +
+                           ' | arrows x=' + ax + ' w=' + sbw +
+                           ' | box x=' + boxLeft + ' w=' + aw;
+          if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
           // 2026-09-23 — the auto tick box docks WITH the arrows.
           //

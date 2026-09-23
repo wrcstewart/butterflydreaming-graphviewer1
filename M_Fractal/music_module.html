@@ -423,6 +423,35 @@
 
     // ── Helpers ─────────────────────────────────────────────────────────────
     const postToParent = (msg) => window.parent.postMessage(msg, '*');
+
+    // ── Forward this module's console to the host (2026-09-23) ─────────────
+    //
+    // V_Kolam has done this since 2026-09-17 and it has settled several faults
+    // in a line. Fractal had it not, which is why BD's log has been all Kolam:
+    // a fault in here was invisible unless someone had the iframe's own
+    // console open, and nobody has that on a phone.
+    //
+    // Best-effort and non-fatal by construction — a logger that can break the
+    // thing it is logging is worse than no logger.
+    (function forwardModuleConsole() {
+      const send = (level, args) => {
+        try {
+          const line = Array.prototype.map.call(args, (a) => {
+            if (typeof a === 'string') return a;
+            // An Error JSON.stringifies to "{}" — message and stack are
+            // non-enumerable. Kolam's first attempt logged 506 lines of
+            // "render error: {}", the one fact needed missing from all of them.
+            if (a instanceof Error) return a.message + (a.stack ? ' | ' + a.stack.split('\n')[1] : '');
+            try { return JSON.stringify(a); } catch (_) { return String(a); }
+          }).join(' ');
+          postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
+        } catch (_) {}
+      };
+      ['log', 'warn', 'error'].forEach((level) => {
+        const original = console[level].bind(console);
+        console[level] = function () { send(level, arguments); original.apply(console, arguments); };
+      });
+    })();
     const setStatus = (msg, isErr = false) => {
       // 2026-08-19 — parity with bd_M_ABC: the in-module corner text sits
       // behind the copy panel and is unreadable, so status relays UP to BD's
