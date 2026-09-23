@@ -10273,10 +10273,30 @@ async function init() {
 
           // Numbers, because this bar has now been guessed at several times
           // and a measurement settles in one line what an impression does not.
+          // The module's own copy panel, reported too: it shares the top row
+          // with the arrows slot, and "the copy buttons are not there" could
+          // mean covered, collapsed to nothing, or scrolled out of a clipped
+          // row. Its rect distinguishes all three in one line.
+          const cpanel = innerDoc.querySelector('.copy-panel');
+          let cpDesc = 'none';
+          if (cpanel) {
+            const q = cpanel.getBoundingClientRect();
+            const btns = cpanel.querySelectorAll('button');
+            let bDesc = '';
+            btns.forEach((b) => {
+              const br = b.getBoundingClientRect();
+              bDesc += ' [' + (b.id || '?') + ' ' + Math.round(br.width) + 'x' +
+                       Math.round(br.height) + (b.disabled ? ' disabled' : '') + ']';
+            });
+            cpDesc = Math.round(outerRect.left + innerOffsetLeft + q.left) + '..' +
+                     Math.round(outerRect.left + innerOffsetLeft + q.right) +
+                     ' h=' + Math.round(q.height) + ' btns=' + btns.length + bDesc;
+          }
           const dockLine = 'slot x=' + Math.round(x) + ' w=' + Math.round(r.width) +
                            ' | stepBtn=' + sbw + ' | stepperRight=' + Math.round(cpRight) +
                            ' | arrows x=' + ax + ' w=' + sbw +
-                           ' | box x=' + boxLeft + ' w=' + aw;
+                           ' | box x=' + boxLeft + ' w=' + aw +
+                           ' | copyPanel ' + cpDesc;
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
         }
