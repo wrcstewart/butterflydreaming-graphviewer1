@@ -1237,6 +1237,37 @@
       setStepperValue(name, next);
       if (s.regen) regenerateAbc();
       else         applyParam(name, next);
+      announceState();
+    }
+
+    // ── Telling the host what this module is showing (2026-09-23) ──────────
+    //
+    // The convention V_Kolam already follows, brought here so that BD's `auto`
+    // works in both directions for Fractal. The push half already did — BD
+    // posts bd_script_update and the handler below calls
+    // syncSteppersFromScript — but the PULL half had nothing to listen to:
+    // this module announced BD_READY, BD_STATUS and a bd_script_response when
+    // asked, and never said anything of its own accord. So a stepper press
+    // moved the music and left the script untouched, with `auto` looking
+    // broken when it was merely deaf.
+    //
+    // Announced ONLY from a stepper press, never from regenerateAbc.
+    // regenerateAbc also runs when BD pushes a script in, and announcing there
+    // would echo BD's own text straight back at it — harmless in Kolam, where
+    // what comes back is byte-identical, and a loop here, where the script is
+    // REBUILT from the steppers and may differ cosmetically from what arrived.
+    // Announcing at the point a person actually changed something says the
+    // same thing with none of that risk.
+    //
+    // fromDrift is always false: nothing here animates on its own.
+    function announceState() {
+      try {
+        postToParent({
+          type: 'bd_av_state',
+          text: currentGrammarScript(),
+          fromDrift: false
+        });
+      } catch (_) {}
     }
     controlPanel.addEventListener('pointerdown', (event) => {
       const btn = event.target.closest('.step-btn');
