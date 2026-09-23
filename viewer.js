@@ -10288,15 +10288,24 @@ async function init() {
               bDesc += ' [' + (b.id || '?') + ' ' + Math.round(br.width) + 'x' +
                        Math.round(br.height) + (b.disabled ? ' disabled' : '') + ']';
             });
-            cpDesc = Math.round(outerRect.left + innerOffsetLeft + q.left) + '..' +
+            // VERTICAL too. The first version logged only the x-range, which
+            // measured perfectly while saying nothing about whether the row
+            // is on screen: a copy panel sitting above the iframe's visible
+            // area, or behind BD's own panels, has exactly these numbers.
+            cpDesc = 'x ' + Math.round(outerRect.left + innerOffsetLeft + q.left) + '..' +
                      Math.round(outerRect.left + innerOffsetLeft + q.right) +
-                     ' h=' + Math.round(q.height) + ' btns=' + btns.length + bDesc;
+                     ' y ' + Math.round(outerRect.top + innerOffsetTop + q.top) + '..' +
+                     Math.round(outerRect.top + innerOffsetTop + q.bottom) +
+                     ' btns=' + btns.length + bDesc;
           }
           const dockLine = 'slot x=' + Math.round(x) + ' w=' + Math.round(r.width) +
                            ' | stepBtn=' + sbw + ' | stepperRight=' + Math.round(cpRight) +
                            ' | arrows x=' + ax + ' w=' + sbw +
                            ' | box x=' + boxLeft + ' w=' + aw +
-                           ' | copyPanel ' + cpDesc;
+                           ' | copyPanel ' + cpDesc +
+                           ' | iframe y ' + Math.round(outerRect.top) + '..' +
+                           Math.round(outerRect.bottom) +
+                           ' | arrowsSlot y ' + Math.round(y) + '..' + Math.round(y + r.height);
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
         }
