@@ -11565,7 +11565,7 @@ async function init() {
     // Separating them makes both easy and removes the trade entirely: the
     // viewer and the exploration record stay live while you type, and the card
     // catches up the moment you are done with it.
-    let autoWhy = null;   // declared BEFORE its user, not after
+    let autoWhy = null, autoWhyN = 0;   // declared BEFORE their user, not after
     function autoWrite(text, fromDrift) {
       // 1. Data. Unconditional.
       autoLastWriteAt = Date.now();
@@ -11590,11 +11590,36 @@ async function init() {
       // the card until Copy Up has been pressed once, after which it works.
       // Four conditions can decline here and all four are silent, so say which
       // — measuring beats a third guess. Remove once the cause is known.
-      const why = (r) => { if (autoWhy !== r) { autoWhy = r; console.log('[auto] ' + r); } };
+      // Logged when the REASON changes, plus every 50th repeat — the
+      // once-per-change form alone hid this very bug: the same skip recurred
+      // silently for minutes and looked like nothing happening at all.
+      const why = (r) => {
+        if (autoWhy === r) { autoWhyN += 1; if (autoWhyN % 50) return; }
+        else { autoWhy = r; autoWhyN = 0; }
+        console.log('[auto] ' + r + (autoWhyN ? ' (x' + autoWhyN + ')' : ''));
+      };
       if (!document.body.classList.contains('player-active')) { why('skip: not player-active'); return; }
       const body = getFocusedCardBody();
       if (!body) { why('skip: no card body (rung=' + lastCardRung + ')'); return; }
-      if (document.activeElement === body) { why('skip: caret is in the target card'); return; }
+      // A hand on a stepper is a hand OFF the card.
+      //
+      // The guard below is right for drift — a redraw must not land under a
+      // live cursor — but it was also refusing after a deliberate control
+      // change, and the caret does not move on its own. So editing a script
+      // and then working the steppers echoed nothing, for ever, which is
+      // precisely the v1 failure this design was meant to have left behind:
+      // "sync died permanently after any manual edit".
+      //
+      // Pressing Copy Up appeared to cure it. It did not: the press moved
+      // focus to the BUTTON, and that is all that was ever needed.
+      //
+      // fromDrift:false means a person moved a control. They are demonstrably
+      // not typing in the card at that moment, so take the caret out and
+      // write. Drift keeps the old behaviour and waits.
+      if (document.activeElement === body) {
+        if (fromDrift) { why('skip: caret is in the target card'); return; }
+        try { body.blur(); } catch (_) {}
+      }
       if (getCardText(body) === text) { why('skip: card already equals the script'); return; }
       why('writing ' + text.length + ' chars into ' + describeCardBody(body));
       setCardText(body, text);
