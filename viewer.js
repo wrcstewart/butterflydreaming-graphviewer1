@@ -10324,7 +10324,32 @@ async function init() {
                                return id + ':' + Math.round(q.left) + '..' + Math.round(q.right) +
                                       '/' + Math.round(q.top) + '..' + Math.round(q.bottom) +
                                       (over ? ' <<OVERLAPS' : '');
-                             }).join(' ');
+                             }).join(' ') +
+                           // NOTHING of BD's overlaps, yet only the BOTTOM EDGE
+                           // of the module's top row is visible — so the row is
+                           // clipped from above while our own fixed-position
+                           // arrows, painted over the page rather than inside
+                           // the iframe, stay visible in the same band.
+                           //
+                           // Walk up from the iframe and report every ancestor
+                           // that could do the clipping: its rect and whether it
+                           // hides overflow. The one whose top sits below the
+                           // iframe's top is the clip.
+                           ' || chain ' + (function () {
+                             const out = [];
+                             let el = outerIframe;
+                             for (let i = 0; el && i < 5; i++) {
+                               const q = el.getBoundingClientRect();
+                               const st = getComputedStyle(el);
+                               out.push((el.id || el.tagName) + ' y' + Math.round(q.top) +
+                                        '..' + Math.round(q.bottom) +
+                                        ' ov=' + st.overflowY + ' pos=' + st.position);
+                               el = el.parentElement;
+                             }
+                             const cyq = cyEl && cyEl.getBoundingClientRect();
+                             if (cyq) out.push('#cy y' + Math.round(cyq.top) + '..' + Math.round(cyq.bottom));
+                             return out.join(' > ');
+                           })();
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
         }
