@@ -340,6 +340,27 @@ function answerAVStateRequest() {
 // five to ten times a second and most frames are identical in text.
 let avLastPushed = null;
 let avLastState  = null;   // freshest announcement, pushed or not
+
+// Which module a script says it is for, or null. The mark is tolerated
+// because %%bd_module is not a control and has no business carrying one, but
+// nothing stops a script marking it and a matcher that missed one would
+// quietly stop guarding.
+//
+// 2026-09-23 — this exists because avLastState is module-BLIND. It holds the
+// freshest announcement from whatever module last spoke, and Fractal only
+// speaks on a stepper press, so after editing a Fractal script it still held
+// KOLAM's. Anything writing it somewhere has to ask whether it belongs there.
+function bdModuleOf(text) {
+  const m = /^%%bd_(?:p_)?module[ \t]+(\S+)/m.exec(String(text || ''));
+  return m ? m[1] : null;
+}
+// Two scripts may be exchanged only if they do not name DIFFERENT modules.
+// Unknown on either side is permitted: a card may legitimately hold text with
+// no module line at all, and refusing those would break the ordinary case.
+function bdSameModule(a, b) {
+  const x = bdModuleOf(a), y = bdModuleOf(b);
+  return !x || !y || x === y;
+}
 // What the last token was minted for. Needed because a viewer announcing
 // itself does not say which module it is — the relay's av_request_state
 // carries no id — and a spare must be minted for the same kind of viewer.
@@ -593,7 +614,13 @@ if (typeof window !== 'undefined') {
     // "on desktop subsequent presses of View produce weird effects, very much
     // the wrong values". Only pushToAV sets it now.
     avLastState = text;
-    if (avNodeId) explorationByNode.set(avNodeId, text);   // remember where we got to
+    // Recorded only if it is about the module this node is showing. A stale
+    // frame from the PREVIOUS module arriving after avNodeId has moved on
+    // would otherwise be stored as this node's exploration, and pushed back
+    // into the module the next time the node opened.
+    if (avNodeId && bdSameModule(text, savedByNode.get(avNodeId))) {
+      explorationByNode.set(avNodeId, text);   // remember where we got to
+    }
     if (document.hidden && bgHiddenAt) bgFrames += 1;      // background-rate probe
 
     // Drift frames are counted only. The suppression that used to matter here
@@ -11667,14 +11694,6 @@ async function init() {
       // Logged when the REASON changes, plus every 50th repeat — the
       // once-per-change form alone hid this very bug: the same skip recurred
       // silently for minutes and looked like nothing happening at all.
-      // Which module a script says it is for. The mark is tolerated here for
-      // the same reason it is everywhere else: %%bd_module is not a control,
-      // but nothing stops a script marking it, and a matcher that missed one
-      // would silently stop guarding.
-      const moduleOf = (t) => {
-        const m = /^%%bd_(?:p_)?module[ \t]+(\S+)/m.exec(String(t || ''));
-        return m ? m[1] : null;
-      };
       const why = (r) => {
         if (autoWhy === r) { autoWhyN += 1; if (autoWhyN % 50) return; }
         else { autoWhy = r; autoWhyN = 0; }
@@ -11713,8 +11732,8 @@ async function init() {
       // This compares what the two scripts SAY they are, so it holds whatever
       // the order happens to be — and it cannot be defeated by a path nobody
       // remembered to notify.
-      const have = moduleOf(getCardText(body));
-      const want = moduleOf(text);
+      const have = bdModuleOf(getCardText(body));
+      const want = bdModuleOf(text);
       if (have && want && have !== want) {
         why('skip: card is a ' + have + ' script, incoming is ' + want);
         return;
@@ -11910,6 +11929,16 @@ async function init() {
         if (typeof avLastState !== 'string' || !avLastState) return;
         const body = getFocusedCardBody();
         if (!body || document.activeElement === body) return;
+        // THE REPORTED JUMP. avLastState is whatever module last announced,
+        // and Fractal announces only on a stepper press — so after editing a
+        // Fractal script by hand it still held Kolam's, and leaving the card
+        // wrote Kolam's script over the edit. Refuse to hand a card another
+        // module's script, here as everywhere else.
+        if (!bdSameModule(avLastState, getCardText(body))) {
+          console.log('[auto] focusout: not writing a ' + bdModuleOf(avLastState) +
+                      ' script into a ' + bdModuleOf(getCardText(body)) + ' card');
+          return;
+        }
         if (getCardText(body) === avLastState) return;
         setCardText(body, avLastState);
       });

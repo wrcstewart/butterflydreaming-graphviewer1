@@ -1628,10 +1628,23 @@
           storedText = (data.payload && data.payload.text) || '';
           syncSteppersFromScript();
           regenerateAbc();
+          announceState();
         } else if (type === 'bd_script_update') {
           storedText = typeof data.script === 'string' ? data.script : '';
           syncSteppersFromScript();
           regenerateAbc();
+          // Announce after a script arrives too, not only after a stepper
+          // press. The host keeps ONE "freshest announcement" across all
+          // modules, so a module that speaks only when its own controls move
+          // leaves that holding the PREVIOUS module's script for the whole
+          // session — which is how editing a Fractal card came to be
+          // overwritten with Kolam's.
+          //
+          // The echo this invites is bounded, not a loop: the host declines a
+          // write when the card already equals the text, so the worst case is
+          // one extra write settling the card on the module's canonical form,
+          // after which the two agree and it stops.
+          announceState();
         } else if (type === 'bd_script_request') {
           postToParent({ type: 'bd_script_response', script: currentGrammarScript() });
         } else if (type === 'BD_STOP') {
