@@ -10349,6 +10349,27 @@ async function init() {
                              const cyq = cyEl && cyEl.getBoundingClientRect();
                              if (cyq) out.push('#cy y' + Math.round(cyq.top) + '..' + Math.round(cyq.bottom));
                              return out.join(' > ');
+                           })() +
+                           // The WRAPPER. Fractal sits inside #module-frame,
+                           // inside #visual-iframe, and every coordinate above
+                           // is converted through it — so if the wrapper is
+                           // offset or shorter than its content, the module's
+                           // top row is cut while the arithmetic still reports
+                           // it at a sensible place. The one link never
+                           // measured.
+                           ' || wrapper ' + (function () {
+                             try {
+                               if (!inner) return 'no #module-frame';
+                               const w = inner.getBoundingClientRect();
+                               const od = outerDoc.scrollingElement || outerDoc.body;
+                               const idoc = innerDoc.scrollingElement || innerDoc.body;
+                               return 'y' + Math.round(w.top) + '..' + Math.round(w.bottom) +
+                                      ' h=' + Math.round(w.height) +
+                                      ' outerScroll=' + (od ? od.scrollTop : '?') +
+                                      ' innerScroll=' + (idoc ? idoc.scrollTop : '?') +
+                                      ' innerH=' + (idoc ? idoc.scrollHeight : '?') +
+                                      ' offTop=' + Math.round(innerOffsetTop);
+                             } catch (e) { return 'unreadable: ' + e.message; }
                            })();
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
