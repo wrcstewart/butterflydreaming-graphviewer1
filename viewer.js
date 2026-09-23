@@ -10079,7 +10079,6 @@ async function init() {
   // align with abc-pane's top-left corner (offset a few px so the
   // panel sits *beside* it, not on top). Falls back to CSS defaults
   // when the loaded module has no #abc-pane (e.g. V_Kolam).
-  let posWhy = null;   // diagnostic only — see the note in the Kolam branch
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
@@ -10173,6 +10172,31 @@ async function init() {
           };
           dock(document.getElementById('copy-up-btn'),   y,             half);
           dock(document.getElementById('copy-down-btn'), y + half + 4,  half);
+
+          // 2026-09-23 — the auto tick box docks WITH the arrows.
+          //
+          // It did not, and that is the whole of "it is in the wrong bar
+          // entirely". This path runs for the modules that reserve slots —
+          // ABC and Fractal — and it lifts the arrows out of #action-bar into
+          // the module's own bar, then returns. The tick box stayed behind in
+          // the action bar, so the two ended up in different bars on desktop
+          // whenever the module was one of those two. Kolam reserves no slots,
+          // which is why the same screen looked right there and wrong here.
+          //
+          // Immediately left of the slot, and NOT given the slot's width: the
+          // arrows are stretched to fill it, and a tick box stretched the same
+          // way would be a large empty box with a small tick in it.
+          const cA = document.getElementById('auto-echo');
+          if (cA) {
+            const aR = cA.getBoundingClientRect();
+            const aw = Math.ceil(aR.width)  || 30;
+            const ah = Math.ceil(aR.height) || 18;
+            cA.style.position = 'fixed';
+            cA.style.left     = Math.round(x - aw - 8) + 'px';
+            cA.style.top      = Math.round(y + (r.height - ah) / 2) + 'px';
+            cA.style.right    = 'auto';
+            cA.style.zIndex   = '7';
+          }
         }
         return;
       }
@@ -10267,19 +10291,6 @@ async function init() {
             const cDown = document.getElementById('copy-down-btn');
             const cAuto = document.getElementById('auto-echo');
             const cpEl  = innerDoc && innerDoc.querySelector('.control-panel');
-            // Temporary instrument, 2026-09-23. The tick box is reported in a
-            // different bar from the arrows on DESKTOP, and I have guessed at
-            // it three times. Either this branch does not run — in which case
-            // all three stay in #action-bar and cannot be in different bars —
-            // or it runs and places them apart. Say which, once per change.
-            if (!cUp || !cDown || !cpEl) {
-              const miss = (!cUp ? 'cUp ' : '') + (!cDown ? 'cDown ' : '') + (!cpEl ? '.control-panel' : '');
-              if (posWhy !== 'skip:' + miss) {
-                posWhy = 'skip:' + miss;
-                console.log('[pos] arrows NOT repositioned, missing: ' + miss +
-                            ' — they stay in the action bar');
-              }
-            }
             if (cUp && cDown && cpEl) {
               const cpRect = cpEl.getBoundingClientRect();
               const bw = Math.ceil(cUp.getBoundingClientRect().width) || 30;
@@ -10328,10 +10339,7 @@ async function init() {
                 cAuto.style.left = Math.round(x - aw - 6) + 'px';
                 // Centred against the PAIR of arrows rather than either one.
                 cAuto.style.top  = Math.round(canvasTopVp + (DOWN_DY + btnH - ah) / 2) + 'px';
-                const line = 'arrows x=' + x + ' w=' + bw + ' | box w=' + aw +
-                             ' left=' + Math.round(x - aw - 6) +
-                             ' | fitsInside=' + fitsInside;
-                if (posWhy !== line) { posWhy = line; console.log('[pos] ' + line); }
+
               }
             }
           }
