@@ -10091,7 +10091,11 @@ async function init() {
     // Release any inline geometry we stamp onto BD chrome for module docking
     // (↓↑ arrow position/size, ext-panel width) so leaving a module/Player
     // restores the CSS defaults. Re-applied below when applicable.
-    ['copy-up-btn', 'copy-down-btn'].forEach((id) => {
+    // auto-echo joins the reset: it is stamped position:fixed inline by the
+    // branch below, and without clearing it a box positioned for one layout
+    // keeps those coordinates into the next one — which is how it came to sit
+    // on top of the arrows on desktop.
+    ['copy-up-btn', 'copy-down-btn', 'auto-echo'].forEach((id) => {
       const b = document.getElementById(id);
       if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; b.style.zIndex = ''; }
     });

@@ -76,8 +76,6 @@
     <!-- Copy Down (↓) and Copy Up (↑) hidden until Player mode is active
          (body.player-active). Positioned adjacent to the Nodes/Player radio
          so the script-exchange controls sit next to the mode switch. -->
-    <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
-    <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
     <!-- 2026-09-18 — auto. Ticked, the card and the module stay in step BOTH
          ways: every stepper change is written into the script (no ↑ needed),
          and an edit to the script moves the steppers (no ↓ needed).
@@ -93,6 +91,8 @@
       <input type="checkbox" id="auto-echo-box" checked>
       <span>auto</span>
     </label>
+    <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
+    <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
     <!-- 2026-08-14 — radio group promoted to top row (position:fixed, yellow
          background). All three radios always visible. Player disabled until
          top card contains a %%bd_module directive. 2026-08-15 — Edit is now

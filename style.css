@@ -1101,8 +1101,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-23: RED (one module's script can no longer land in another
-   module's card). Next rotation = green.
+   2026-09-23: GREEN (the auto box sits left of the arrows on desktop).
+   Next rotation = blue.
 
    NB this prose has now been left behind TWICE. It said "2026-09-11: GREEN,
    next = blue" while the border painted RED; then it said "2026-09-19: RED"
@@ -1118,7 +1118,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1192,14 +1192,19 @@ body:not(.player-active) #copy-up-btn {
     z-index: 7;
   }
 }
-/* 2026-09-18 — auto-echo tick box, under the ↓ arrow.
-   Checkbox above, the word "auto" below it, because the column is one
-   button wide and there is no room beside. Hidden with the arrows when
-   Player is not active; `left`/`top` are stamped by positionExtendPanel from
-   the module's live column rect, exactly as the arrows are. */
+/* auto-echo tick box. Checkbox above, the word "auto" below it.
+   2026-09-23 — position: static by DEFAULT, not fixed.
+   It was fixed with `left`/`top` stamped by positionExtendPanel — which is
+   right where that runs, and wrong everywhere else. On desktop with Kolam or
+   Fractal that branch does not run at all, so a fixed box with no offsets
+   fell back to its static position while the arrows stayed in the flow of the
+   action bar, and it landed on top of them.
+   Static, and placed BEFORE the arrows in the markup, it sits to their left
+   in the bar with nothing having to position it. Where the stamping branch
+   does run it sets position:fixed inline, which wins over this. */
 #auto-echo {
   display: none;
-  position: fixed;
+  position: static;
   z-index: 7;
   flex-direction: column;
   align-items: center;
