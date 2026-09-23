@@ -9845,7 +9845,22 @@ async function init() {
       // the breadcrumb clearance. Fractal joined the grid 2026-08-19; add any
       // further grid module to GRID_MODULES above.
       const rr = refEl.getBoundingClientRect();
-      const top = Math.ceil(rr.bottom) + 5;
+      // + TOP_PANEL_H, because #bd-toppanel sits between the anchor and the
+      // canvas and is OPAQUE.
+      //
+      // 2026-09-23 — this said `rr.bottom + 5`, which starts the iframe AT the
+      // anchor, so the module's first 50px lay under that panel. #cy has
+      // always been given `anchorBottom + TOP_PANEL_H` for exactly this
+      // reason; the grid branch was written later and did not inherit it.
+      //
+      // It cost an afternoon because every measurement was RIGHT. The buttons
+      // reported at y 470..516, nothing overlapped them, nothing clipped the
+      // iframe, the wrapper was exactly where it should be — and they were
+      // invisible, because a fixed panel at z-index 6 was painted over the
+      // top of them. BD's own arrows survived in the same band only because
+      // they are z-index 7. document.elementFromPoint named it in one line
+      // after six rounds of arithmetic could not.
+      const top = Math.ceil(rr.bottom) + TOP_PANEL_H + 5;
       iframeEl.style.top    = top + 'px';
       iframeEl.style.left   = Math.round(rr.left)  + 'px';
       iframeEl.style.width  = Math.round(rr.width) + 'px';
@@ -10325,82 +10340,7 @@ async function init() {
                                       '/' + Math.round(q.top) + '..' + Math.round(q.bottom) +
                                       (over ? ' <<OVERLAPS' : '');
                              }).join(' ') +
-                           // NOTHING of BD's overlaps, yet only the BOTTOM EDGE
-                           // of the module's top row is visible — so the row is
-                           // clipped from above while our own fixed-position
-                           // arrows, painted over the page rather than inside
-                           // the iframe, stay visible in the same band.
-                           //
-                           // Walk up from the iframe and report every ancestor
-                           // that could do the clipping: its rect and whether it
-                           // hides overflow. The one whose top sits below the
-                           // iframe's top is the clip.
-                           ' || chain ' + (function () {
-                             const out = [];
-                             let el = outerIframe;
-                             for (let i = 0; el && i < 5; i++) {
-                               const q = el.getBoundingClientRect();
-                               const st = getComputedStyle(el);
-                               out.push((el.id || el.tagName) + ' y' + Math.round(q.top) +
-                                        '..' + Math.round(q.bottom) +
-                                        ' ov=' + st.overflowY + ' pos=' + st.position);
-                               el = el.parentElement;
-                             }
-                             const cyq = cyEl && cyEl.getBoundingClientRect();
-                             if (cyq) out.push('#cy y' + Math.round(cyq.top) + '..' + Math.round(cyq.bottom));
-                             return out.join(' > ');
-                           })() +
-                           // The WRAPPER. Fractal sits inside #module-frame,
-                           // inside #visual-iframe, and every coordinate above
-                           // is converted through it — so if the wrapper is
-                           // offset or shorter than its content, the module's
-                           // top row is cut while the arithmetic still reports
-                           // it at a sensible place. The one link never
-                           // measured.
-                           ' || wrapper ' + (function () {
-                             try {
-                               if (!inner) return 'no #module-frame';
-                               const w = inner.getBoundingClientRect();
-                               const od = outerDoc.scrollingElement || outerDoc.body;
-                               const idoc = innerDoc.scrollingElement || innerDoc.body;
-                               return 'y' + Math.round(w.top) + '..' + Math.round(w.bottom) +
-                                      ' h=' + Math.round(w.height) +
-                                      ' outerScroll=' + (od ? od.scrollTop : '?') +
-                                      ' innerScroll=' + (idoc ? idoc.scrollTop : '?') +
-                                      ' innerH=' + (idoc ? idoc.scrollHeight : '?') +
-                                      ' offTop=' + Math.round(innerOffsetTop);
-                             } catch (e) { return 'unreadable: ' + e.message; }
-                           })() +
-                           // ASK THE BROWSER. Every rect agrees the buttons are
-                           // at x 395..733, y 470..516, nothing overlaps, the
-                           // iframe is not clipped and the wrapper is exactly
-                           // where it should be — and they are not on screen.
-                           // So stop computing and hit-test the point: whatever
-                           // is painted there is named, by name, with no
-                           // inference in between.
-                           ' || at(500,490) ' + (function () {
-                             try {
-                               const top = document.elementFromPoint(500, 490);
-                               const name = (el) => !el ? 'null'
-                                 : (el.tagName + (el.id ? '#' + el.id : '') +
-                                    (el.className && typeof el.className === 'string'
-                                       ? '.' + el.className.trim().split(/\s+/).join('.') : ''));
-                               let s2 = name(top);
-                               // If it is our iframe, the module's own content
-                               // is on top — so ask INSIDE it as well.
-                               if (top === outerIframe) {
-                                 const io2 = outerDoc.elementFromPoint(500 - outerRect.left, 490 - outerRect.top);
-                                 s2 += ' > ' + name(io2);
-                                 if (io2 === inner && innerDoc.elementFromPoint) {
-                                   const i3 = innerDoc.elementFromPoint(
-                                     500 - outerRect.left - innerOffsetLeft,
-                                     490 - outerRect.top  - innerOffsetTop);
-                                   s2 += ' > ' + name(i3);
-                                 }
-                               }
-                               return s2;
-                             } catch (e) { return 'unreadable: ' + e.message; }
-                           })();
+;
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
         }
