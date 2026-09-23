@@ -10370,6 +10370,36 @@ async function init() {
                                       ' innerH=' + (idoc ? idoc.scrollHeight : '?') +
                                       ' offTop=' + Math.round(innerOffsetTop);
                              } catch (e) { return 'unreadable: ' + e.message; }
+                           })() +
+                           // ASK THE BROWSER. Every rect agrees the buttons are
+                           // at x 395..733, y 470..516, nothing overlaps, the
+                           // iframe is not clipped and the wrapper is exactly
+                           // where it should be — and they are not on screen.
+                           // So stop computing and hit-test the point: whatever
+                           // is painted there is named, by name, with no
+                           // inference in between.
+                           ' || at(500,490) ' + (function () {
+                             try {
+                               const top = document.elementFromPoint(500, 490);
+                               const name = (el) => !el ? 'null'
+                                 : (el.tagName + (el.id ? '#' + el.id : '') +
+                                    (el.className && typeof el.className === 'string'
+                                       ? '.' + el.className.trim().split(/\s+/).join('.') : ''));
+                               let s2 = name(top);
+                               // If it is our iframe, the module's own content
+                               // is on top — so ask INSIDE it as well.
+                               if (top === outerIframe) {
+                                 const io2 = outerDoc.elementFromPoint(500 - outerRect.left, 490 - outerRect.top);
+                                 s2 += ' > ' + name(io2);
+                                 if (io2 === inner && innerDoc.elementFromPoint) {
+                                   const i3 = innerDoc.elementFromPoint(
+                                     500 - outerRect.left - innerOffsetLeft,
+                                     490 - outerRect.top  - innerOffsetTop);
+                                   s2 += ' > ' + name(i3);
+                                 }
+                               }
+                               return s2;
+                             } catch (e) { return 'unreadable: ' + e.message; }
                            })();
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
