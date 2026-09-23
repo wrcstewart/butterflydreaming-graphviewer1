@@ -10279,30 +10279,6 @@ async function init() {
                            ' | box x=' + boxLeft + ' w=' + aw;
           if (dockWhy !== dockLine) { dockWhy = dockLine; console.log('[dock] ' + dockLine); }
 
-          // 2026-09-23 — the auto tick box docks WITH the arrows.
-          //
-          // It did not, and that is the whole of "it is in the wrong bar
-          // entirely". This path runs for the modules that reserve slots —
-          // ABC and Fractal — and it lifts the arrows out of #action-bar into
-          // the module's own bar, then returns. The tick box stayed behind in
-          // the action bar, so the two ended up in different bars on desktop
-          // whenever the module was one of those two. Kolam reserves no slots,
-          // which is why the same screen looked right there and wrong here.
-          //
-          // Immediately left of the slot, and NOT given the slot's width: the
-          // arrows are stretched to fill it, and a tick box stretched the same
-          // way would be a large empty box with a small tick in it.
-          const cA = document.getElementById('auto-echo');
-          if (cA) {
-            const aR = cA.getBoundingClientRect();
-            const aw = Math.ceil(aR.width)  || 30;
-            const ah = Math.ceil(aR.height) || 18;
-            cA.style.position = 'fixed';
-            cA.style.left     = Math.round(x - aw - 8) + 'px';
-            cA.style.top      = Math.round(y + (r.height - ah) / 2) + 'px';
-            cA.style.right    = 'auto';
-            cA.style.zIndex   = '7';
-          }
         }
         return;
       }
