@@ -6,6 +6,71 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-23 (evening) — Fractal joins in, and two instruments that lied
+
+**The two Kolam nodes are migrated.** `bd_V_Kolam_001` and `_002` carry ten
+marks each; `module`, `stroke`, `background` and the `score` block deliberately
+carry none, having no control to offer. A full DB backup was taken first, since
+`bd_tool cypher` does not auto-backup the way `write` does.
+
+**Fractal's `auto` works in both directions.** The push half never was broken —
+BD posts `bd_script_update` to whatever iframe is loaded and Fractal already
+answered it. The pull half could not work: the module announced `BD_READY`,
+`BD_STATUS` and a `bd_script_response` when asked, and volunteered nothing. It
+now sends `bd_av_state` on a stepper press.
+
+**Three sites, again.** Adding the sender was not enough: Fractal sits behind a
+relay wrapper whose `RELAY_UP` is a whitelist, and V_Kolam's gained
+`bd_av_state` on 2026-09-14 while Fractal's never did. *Two of three working is
+indistinguishable from none.* Fractal also forwards its console now, so a fault
+in there reaches the server log instead of an iframe console nobody has open.
+
+**Announcing on a script push was tried and reverted within the hour.** It
+loops: the script is rebuilt from the steppers, so what comes back is never
+identical to what went in, and BD's "already equal" guard never fires. Writes
+of 421 and 430 characters alternated without end and took the graph down. The
+commit that introduced it claimed the echo was "bounded, not a loop" — asserted
+rather than checked.
+
+**No module's script can reach another module's card**, by any route. Three
+sites shared one blindness: `autoWrite`, the exploration cache, and a
+`focusout` handler that wrote `avLastState` — the freshest announcement from
+*whatever module last spoke* — into the card you had just left. That is what
+made a hand-edited Fractal script jump back to Kolam's.
+
+**The bar is laid out from the right**: `[Copy Script][Copy abc] … [auto] (gap)
+[↑↓]`, an arrow one stepper-button wide, right-aligned to the stepper box.
+Kolam keeps its own arrangement — arrows beside the stepper column, tick box
+beneath — because it reserves no dock slots and has nothing to sit beside.
+Differing stepper layouts between modules are being kept on purpose for finger
+testing.
+
+### Two instruments lied, and both cost hours
+
+**`node --check` is not a check for this file.** It parses as CommonJS;
+`viewer.js` is an ES module. It passed a duplicate `const`, which stopped the
+whole application — no graph, no socket, no logs, and no error banner either,
+because the banner is installed by the file that would not parse. Checked as a
+module, the line is named at once. `check_module.sh` now exists. The very next
+commit then shipped a second syntax error *that the new tool had reported*,
+because the check and the push went out in one breath.
+
+**Every measurement was right, and all of it was useless.** Fractal's copy
+buttons were invisible while reporting sensible rects, with nothing
+overlapping, nothing clipped and the wrapper exactly where it belonged. Six
+rounds of arithmetic. `document.elementFromPoint(500, 490)` returned
+`DIV#bd-toppanel` — a fixed, opaque 50px bar at z-index 6 — in one line. Grid
+modules positioned the iframe at the anchor itself rather than below that
+panel; `#cy` has always used `anchorBottom + TOP_PANEL_H`, and the grid branch
+was written later and did not inherit it.
+
+**Why it looked impossible:** BD's docked arrows are `position: fixed` at
+z-index 7, so they float *above* the covering panel while the module's own
+content does not. "Our controls appear there and the module's do not" reads as
+a layout-arithmetic problem and is an overlay problem.
+
+---
+
 ## 2026-09-23 — `_p_`: the script says which controls it wants
 
 First working stage of the collage plan. A directive written
