@@ -10284,7 +10284,6 @@ async function init() {
               // it still clears the button if the arrows are ever resized.
               const btnH    = Math.ceil(cDown.getBoundingClientRect().height) || 24;
               const rows    = [[cUp, 0], [cDown, DOWN_DY]];
-              if (cAuto) rows.push([cAuto, DOWN_DY + btnH + 6]);
               rows.forEach(([b, dy]) => {
                 b.style.position = 'fixed';
                 b.style.left     = x + 'px';
@@ -10292,10 +10291,28 @@ async function init() {
                 b.style.top      = Math.round(canvasTopVp + dy) + 'px';
                 b.style.zIndex   = '7';
               });
-              // The tick box is narrower than a button; centre it under them.
+              // 2026-09-23 — the tick box moves BESIDE the arrows, not below
+              // them. Hanging under the ↓ put it in the arrows' own column,
+              // which is hard against the stepper column, and it fouled the
+              // controls.
+              //
+              // Which side depends on where the arrows went. Inside the gap
+              // they sit LEFT of the stepper column, so the box goes further
+              // left, away from it; when there is no room and they are pushed
+              // to the RIGHT of the column, the box goes right for the same
+              // reason. Putting it blindly on one side would park it on top of
+              // the steppers in one of the two layouts.
               if (cAuto) {
-                const aw = Math.ceil(cAuto.getBoundingClientRect().width) || bw;
-                cAuto.style.left = Math.round(x + (bw - aw) / 2) + 'px';
+                const aRect = cAuto.getBoundingClientRect();
+                const aw = Math.ceil(aRect.width)  || bw;
+                const ah = Math.ceil(aRect.height) || 18;
+                cAuto.style.position = 'fixed';
+                cAuto.style.right    = 'auto';
+                cAuto.style.zIndex   = '7';
+                cAuto.style.left = Math.round(fitsInside ? x - aw - 6
+                                                         : x + bw + 6) + 'px';
+                // Centred against the PAIR of arrows rather than either one.
+                cAuto.style.top  = Math.round(canvasTopVp + (DOWN_DY + btnH - ah) / 2) + 'px';
               }
             }
           }
@@ -11549,6 +11566,7 @@ async function init() {
     const AUTO_DRIFT_MIN_MS = 1000;
     let autoLastWriteAt  = 0;
     let autoPendingText  = null;
+    let autoPendingFor   = null;   // the node that pending text belongs to
     let autoPendingTimer = null;
 
     // ── The script is what reaches a viewer (2026-09-18, phase 2) ─────────
@@ -11667,6 +11685,7 @@ async function init() {
     function autoClearPending() {
       if (autoPendingTimer) { clearTimeout(autoPendingTimer); autoPendingTimer = null; }
       autoPendingText = null;
+      autoPendingFor  = null;
     }
 
     window.addEventListener('message', (e) => {
@@ -11688,13 +11707,34 @@ async function init() {
       // Too soon. Hold the newest and make sure it lands — without this the
       // final position of a drift that stops mid-interval would never reach
       // the script, which is the one value most worth having.
+      // WHOSE text this is. A pending write can outlive the node it came
+      // from: navigate Kolam -> Fractal with a drift write in flight and it
+      // lands up to a second later, putting the KOLAM script into the card
+      // that has just been built for the Fractal node.
+      //
+      // And nothing corrects it afterwards, because bd_M_Fractal does not
+      // announce bd_av_state at all — it predates the echo. So the panel stays
+      // stuck on the old script while the new module's steppers work
+      // perfectly, which is exactly how it was reported.
+      //
+      // Validated here rather than cancelled from outside. A cancel has to be
+      // remembered at every place that changes node or module, and the one
+      // that matters is always the one nobody thought of; a write that checks
+      // its own provenance cannot be forgotten.
       autoPendingText = d.text;
+      autoPendingFor  = avNodeId;
       if (!autoPendingTimer) {
         autoPendingTimer = setTimeout(() => {
           autoPendingTimer = null;
-          const t = autoPendingText;
-          autoPendingText = null;
-          if (t && box.checked) autoWrite(t, true);
+          const t = autoPendingText, forNode = autoPendingFor;
+          autoPendingText = null; autoPendingFor = null;
+          if (!t || !box.checked) return;
+          if (forNode !== avNodeId) {
+            console.log('[auto] dropped a drift write for ' + forNode +
+                        ' — the module is on ' + avNodeId + ' now');
+            return;
+          }
+          autoWrite(t, true);
         }, AUTO_DRIFT_MIN_MS - since);
       }
     });
