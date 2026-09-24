@@ -55,13 +55,13 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-23: BLUE (the desktop button says
-     Sync too, and the label is no longer state). Next rotation = red. */
+     change to a cached AV file. 2026-09-24: RED (the viewer loads the module
+     the node actually uses). Next rotation = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
+    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -130,11 +130,39 @@
       }
     });
 
+    // ── WHICH renderer (2026-09-24) ───────────────────────────────────────
+    //
+    // This page hard-coded the Kolam renderer and minted every token against
+    // 'bd_V_Kolam'. So View or Device on a Fractal or ABC node opened a KOLAM
+    // renderer and handed it a music script, which finds no score and draws
+    // nothing — "play it on the other device" had never worked for anything
+    // but Kolam.
+    //
+    // The module is named in the launch URL because it has to be known BEFORE
+    // the iframe loads, and the first script arrives later. Falling back to
+    // Kolam keeps every link issued before today working.
+    //
+    // Loaded DIRECTLY, not through /bd_M_*/index.html — those are relay
+    // wrappers whose whitelists exist to serve BD's Player, and bd_ui_config
+    // is not in any of their RELAY_DOWN sets. Kolam's viewer has always
+    // bypassed its wrapper for the same reason.
+    const AV_RENDERERS = {
+      'bd_V_Kolam':   '/bd_V_Kolam/visual_module.html',
+      'bd_M_ABC':     '/bd_M_ABC/music_module.html',
+      'bd_M_Fractal': '/bd_M_Fractal/music_module.html'
+    };
+    const AV_MODULE = (function () {
+      try {
+        const m = new URLSearchParams(location.search).get('m');
+        return AV_RENDERERS[m] ? m : 'bd_V_Kolam';
+      } catch (_) { return 'bd_V_Kolam'; }
+    })();
+
     // Listener is attached; only now start the renderer loading.
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
-    // change to visual_module.html.
-    frame.src = '/bd_V_Kolam/visual_module.html?v=14';
+    // change to a module.
+    frame.src = AV_RENDERERS[AV_MODULE] + '?v=15';
 
     // ── What this viewer is currently showing (2026-09-16) ────────────────
     //
@@ -436,8 +464,11 @@
         showHealth();
       },
 
-      // Tells the shim which kind of replacement token to ask BD for.
-      moduleId: 'bd_V_Kolam',
+      // Tells the shim which kind of replacement token to ask BD for — and it
+      // matters functionally, not just descriptively: the relay filters a push
+      // by the viewer's module type, so a viewer minted as Kolam would have
+      // every Fractal push SKIPPED and simply sit there showing nothing.
+      moduleId: AV_MODULE,
 
       onState: function (state, info) {
         // 'live' hands the strip back to the monitor if it has anything to

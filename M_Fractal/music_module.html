@@ -73,6 +73,34 @@
     .player-panel { flex-direction: column; align-items: center; justify-content: center; }
     .play-row { display: flex; gap: 8px; }
 
+    /* ── A VIEWER, not a controller (2026-09-24) ─────────────────────────
+       Set by the host via postMessage bd_ui_config { hideControls: true },
+       which BD's Ancillary Viewer and AVX already send — V_Kolam has
+       honoured it since 2026-09-15 and these two ignored it, so a music
+       viewer arrived carrying a full set of steppers.
+
+       That is the wrong division. Parameters are controlled where the
+       script is, on BD or BDX; the point of a viewer is to PLAY on
+       another device. So the stepper column goes, the copy buttons go
+       (authoring belongs with the script), and both dock slots go —
+       they are reserved for BD's own arrows and Extension panel, which
+       no viewer stamps into.
+
+       TRANSPORT STAYS. Play/Stop cannot be delegated: audio needs a user
+       gesture in the document that makes the sound, and a remote press
+       cannot supply one. The output panel stays with it, being what you
+       are there to look at. */
+    body.controls-hidden .copy-panel,
+    body.controls-hidden #control-panel,
+    body.controls-hidden #bd-arrows-slot,
+    body.controls-hidden #bd-ext-slot { display: none; }
+    body.controls-hidden .module-layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas:
+        "player"
+        "output";
+    }
     /* dock-slots — reserved for BD's ↓↑ arrows / Extension panel. Faint frame
        so the reserved area is visible even before BD stamps into it. */
     .dock-slot {
@@ -1698,6 +1726,12 @@
           // work, and that cannot loop: a person has to press something.
         } else if (type === 'bd_script_request') {
           postToParent({ type: 'bd_script_response', script: currentGrammarScript() });
+        } else if (type === 'bd_ui_config') {
+          // The host is supplying the control surface, so this module is a
+          // viewer: hide the steppers and the copy buttons, keep Play/Stop.
+          // See the note beside .controls-hidden in the stylesheet.
+          document.body.classList.toggle('controls-hidden',
+                                         data && data.hideControls === true);
         } else if (type === 'BD_STOP') {
           teardownPlayback();
           playerState = 'stopped'; setStatus('Stopped'); updateControls();

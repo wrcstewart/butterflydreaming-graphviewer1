@@ -12601,8 +12601,12 @@ async function init() {
           // What turns on it: the "← controls" button. It closes this window
           // and raises BD, which is right when BD is behind it in the same
           // browser and meaningless on a phone across the room.
+          // m= names the module, because the viewer must load the right
+          // renderer BEFORE any script reaches it. Without it every viewer
+          // got Kolam, whatever the node was.
           const url = window.location.origin + '/AV/kolam.html?t=' +
                       encodeURIComponent(token) + '&d=1' +
+                      (avLastModuleId ? '&m=' + encodeURIComponent(avLastModuleId) : '') +
                       (avNodeId ? '&n=' + encodeURIComponent(avNodeId) : '');
           hand(url);
           urlEl.value = url;
@@ -12709,11 +12713,20 @@ async function init() {
         }
         if (existing) avWindows.delete(moduleId);   // it was closed; forget it
 
-        // A viewer page exists for Kolam only. Another module type is not an
-        // error and not a fallback-to-standalone either — it simply has no
-        // viewer yet, and says so rather than opening the wrong one.
-        const wantViewer = (moduleId === 'bd_V_Kolam' && window.bdRequestModuleToken);
-        if (moduleId && moduleId !== 'bd_V_Kolam') {
+        // 2026-09-24 — all three modules now have a viewer.
+        //
+        // This read `moduleId === 'bd_V_Kolam'`, so View on a Fractal or ABC
+        // node fell back to the STANDALONE — a full editor with its own
+        // steppers and copy buttons. That is what "the viewers for Fractal and
+        // ABC behave differently" was: they were not viewers.
+        //
+        // The list mirrors AV_RENDERERS in AV/kolam.html. Two lists is one
+        // more than ideal, but the viewer has to choose a renderer before any
+        // script reaches it, and BD has to decide whether to open a viewer at
+        // all before minting — neither can ask the other in time.
+        const AV_VIEWER_MODULES = new Set(['bd_V_Kolam', 'bd_M_ABC', 'bd_M_Fractal']);
+        const wantViewer = (AV_VIEWER_MODULES.has(moduleId) && window.bdRequestModuleToken);
+        if (moduleId && !AV_VIEWER_MODULES.has(moduleId)) {
           console.log('[AV] no viewer page for ' + moduleId + ' yet — falling back to the standalone');
         }
 
@@ -12751,6 +12764,7 @@ async function init() {
           // interprets it.
           const avUrl = window.location.origin + '/AV/kolam.html?t=' +
                         encodeURIComponent(token) +
+                        (moduleId ? '&m=' + encodeURIComponent(moduleId) : '') +
                         (avNodeId ? '&n=' + encodeURIComponent(avNodeId) : '');
           console.log('[AV] opening viewer');
           if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
