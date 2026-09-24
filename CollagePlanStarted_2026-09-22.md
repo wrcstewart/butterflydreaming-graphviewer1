@@ -295,6 +295,33 @@ blurs the card and writes; drift still waits.
 `<textarea>`, so it can use the v2 approach — write anyway, restore the
 selection — which a contentEditable card cannot.
 
+### RULE 8 — a display alias is allowed, on two conditions
+
+Noticed 2026-09-24: Fractal's `scale` stepper reads **`pent`** while the script
+says **`min_pentatonic`**. That is a departure from "the readout shows the
+directive's value", and it is a legitimate one — but only because both of these
+hold, and they are the conditions to insist on anywhere else:
+
+1. **The inverse is DERIVED, not written.** `ENUM_DISPLAY_INV` is built from
+   `ENUM_DISPLAY` by `Object.fromEntries`, so the two cannot drift. `loop` broke
+   the same morning precisely because its display (`'on'`) and its reader
+   (`txt === 'on'`) were independent literals.
+2. **No display token equals a real value.** Scales are `minor, major,
+   min_pentatonic, blues`; the token is `pent`. A token colliding with a real
+   name would shadow it silently.
+
+**The distinction that makes it legitimate:** `pent` is an *abbreviation* of a
+name still spelled out in the script, so the script remains the unambiguous
+record. `off` against `false` was a *second vocabulary* for the same concept,
+with nothing saying they were the same thing. Abbreviate, do not translate.
+
+**Known consequence, accepted:** `SCALE_ALIASES` accepts `pentatonic` and
+`minor_pentatonic`, but the write path always emits the canonical
+`min_pentatonic` — so a script using an old name **rewrites itself on the first
+stepper press**. Benign, and canonicalising is the more useful behaviour, but it
+is a script editing itself and that matters more once scripts are shared and
+collaged.
+
 ### Still open at this stage
 
 - **Memgraph node scripts are unmarked.** RULE 2 means nothing is broken by
