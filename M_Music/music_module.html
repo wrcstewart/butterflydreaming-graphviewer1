@@ -418,6 +418,32 @@
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const postToParent = (msg) => window.parent.postMessage(msg, '*');
+
+    // ── Forward this module's console to the host (2026-09-24) ─────────────
+    //
+    // Best-effort and non-fatal by construction — a logger that can break the
+    // thing it is logging is worse than no logger. Without it a fault in here
+    // is invisible unless someone has the iframe's own console open, and
+    // nobody has that on a phone.
+    (function forwardModuleConsole() {
+      const send = (level, args) => {
+        try {
+          const line = Array.prototype.map.call(args, (a) => {
+            if (typeof a === 'string') return a;
+            // An Error JSON.stringifies to "{}" — message and stack are
+            // non-enumerable. Kolam's first attempt logged 506 lines of
+            // "render error: {}", the one fact needed missing from all of them.
+            if (a instanceof Error) return a.message + (a.stack ? ' | ' + a.stack.split('\n')[1] : '');
+            try { return JSON.stringify(a); } catch (_) { return String(a); }
+          }).join(' ');
+          postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
+        } catch (_) {}
+      };
+      ['log', 'warn', 'error'].forEach((level) => {
+        const original = console[level].bind(console);
+        console[level] = function () { send(level, arguments); original.apply(console, arguments); };
+      });
+    })();
     const setStatus = (msg, isErr = false) => {
       // 2026-08-18 — the in-module corner text was unreadable (behind the
       // Copy Script panel). All status now relays UP to BD's general status
@@ -432,7 +458,10 @@
     };
 
     function formatDisplay(spec, val) {
-      if (spec.isToggle) return val >= 0.5 ? 'on' : 'off';
+      // 'true'/'false', matching the script's `%%bd_loop true`. A control
+      // reading "off" beside a directive reading "false" is a second
+      // vocabulary for one concept — abbreviate, never translate.
+      if (spec.isToggle) return val >= 0.5 ? 'true' : 'false';
       if (spec.step >= 1) return String(Math.round(val));
       if (val < 1) return val.toFixed(2);
       if (val < 10) return val.toFixed(1);
@@ -445,7 +474,11 @@
       const span = controlPanel.querySelector(`.stepper-value[data-name="${name}"]`);
       if (!span) return s.fallback;
       const txt = span.textContent.trim();
-      if (s.isToggle) return txt === 'on' ? 1 : 0;
+      // The INVERSE of formatDisplay, and it moves with it. Left reading
+      // 'on', every read of loop would return 0 the moment the display said
+      // 'true' — the value flipping itself off on the next press, silently.
+      // 'on' still accepted so a panel drawn before this change reads right.
+      if (s.isToggle) return (txt === 'true' || txt === 'on') ? 1 : 0;
       const v = parseFloat(txt);
       return Number.isFinite(v) ? v : s.fallback;
     }
@@ -524,7 +557,12 @@
     function parseBdParams(text) {
       const out = {};
       for (const s of STEPPERS) {
-        const re = new RegExp(`^%%bd_${s.name}\\s+(\\S+)`, 'm');
+        // (?:p_)? — a directive may be written %%bd_p_<name> to ask for a
+        // user control. The mark is presentation and never part of the
+        // identity, so this must see through it. Done BEFORE any script here
+        // carries one: a marked script read by a blind parser renders at
+        // defaults, silently.
+        const re = new RegExp(`^%%bd_(?:p_)?${s.name}\\s+(\\S+)`, 'm');
         const m = text.match(re);
         if (!m) continue;
         if (s.isToggle) out[s.name] = /^(true|1|on)$/i.test(m[1]) ? 1 : 0;
@@ -540,9 +578,16 @@
       let result = text;
       for (const s of STEPPERS) {
         const val = getStepperValue(s.name);
-        const line = `%%bd_${s.name} ${s.isToggle ? (val >= 0.5 ? 'true' : 'false')
+        // RULE 1: put back the form it was read in. Building `%%bd_${s.name}`
+        // unconditionally would fail to match a marked line, fall through to
+        // the else-branch, and append a SECOND unmarked copy — so one stepper
+        // press would leave both in the script.
+        const reMarked = new RegExp(`^%%bd_p_${s.name}\\s+.*$`, 'm');
+        const rePlain  = new RegExp(`^%%bd_${s.name}\\s+.*$`, 'm');
+        const marked   = reMarked.test(result);
+        const re       = marked ? reMarked : rePlain;
+        const line = `%%bd_${marked ? 'p_' : ''}${s.name} ${s.isToggle ? (val >= 0.5 ? 'true' : 'false')
                                                   : (s.step >= 1 ? Math.round(val) : val.toFixed(2))}`;
-        const re = new RegExp(`^%%bd_${s.name}\\s+.*$`, 'm');
         if (re.test(result)) result = result.replace(re, line);
         else {
           const lines = result.split('\n');
@@ -557,7 +602,10 @@
     }
 
     function extractScore(text) {
-      const m = text.match(/^%%bd_score\s*\[\s*\n([\s\S]*?)^%%bd_\]$/m);
+      // A mark on %%bd_score would be wrong — a bracket block is content, not
+      // a control — but nothing stops a script carrying one, and a matcher
+      // that missed it would lose the whole score without a word.
+      const m = text.match(/^%%bd_(?:p_)?score\s*\[\s*\n([\s\S]*?)^%%bd_\]$/m);
       return m ? m[1] : text;
     }
 
@@ -577,6 +625,33 @@
       next = parseFloat(next.toFixed(4));
       if (formatDisplay(s, next) === formatDisplay(s, cur)) return;
       setStepperValue(name, next);
+      announceState();
+    }
+
+    // ── Telling the host what this module is showing (2026-09-24) ──────────
+    //
+    // The convention V_Kolam follows and Fractal gained yesterday, so BD's
+    // `auto` works in both directions here too. The push half already did —
+    // BD posts bd_script_update and the handler below answers it — but the
+    // PULL half had nothing to listen to: this module announced BD_READY,
+    // BD_STATUS and a bd_script_response when asked, and nothing of its own
+    // accord. A stepper press changed the sound and left the script untouched.
+    //
+    // RULE 7 — announced ONLY from a human action, never from the
+    // bd_script_update handler. A module rebuilds the script from its
+    // steppers, so what comes back is never identical to what was pushed, the
+    // host's "already equal" guard never fires, and the two ping-pong until
+    // the page dies. That was tried on Fractal and reverted within the hour.
+    //
+    // fromDrift is always false: nothing here animates on its own.
+    function announceState() {
+      try {
+        postToParent({
+          type: 'bd_av_state',
+          text: encodeBdParams(storedText || ''),
+          fromDrift: false
+        });
+      } catch (_) {}
     }
 
     controlPanel.addEventListener('pointerdown', (event) => {

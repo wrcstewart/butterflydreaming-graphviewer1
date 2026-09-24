@@ -1101,8 +1101,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-24: GREEN (Fractal reads and writes _p_; loop says true/false).
-   Next rotation = blue.
+   2026-09-24: BLUE (ABC joins: reads and writes _p_, announces its state,
+   forwards its console). Next rotation = red.
 
    NB this prose has now been left behind TWICE. It said "2026-09-11: GREEN,
    next = blue" while the border painted RED; then it said "2026-09-19: RED"
@@ -1118,7 +1118,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

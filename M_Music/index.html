@@ -40,7 +40,14 @@
       'BD_ERROR',
       'BD_MEDIA_BLOB',                // module → BD: bake-to-mp3 payload
       'BD_MODULE_COPY_LINK_REQUEST',  // module → BD: build a Copy Link URL
-      'BD_STATUS'                     // module → BD: general status-pane text
+      'BD_STATUS',                    // module → BD: general status-pane text
+      // 2026-09-24 — THE THIRD SITE. This relay is a whitelist, so the module
+      // may send these all it likes and they go nowhere without these two
+      // lines. Adding the sender and forgetting the whitelist is exactly what
+      // made Fractal's `auto` do nothing yesterday, with no error anywhere to
+      // say why.
+      'bd_av_state',                  // module → BD: its live script, so `auto` can follow
+      'bd_module_log'                 // module → BD: its console, into the server log
     ]);
 
     const moduleFrame = document.getElementById('module-frame');
