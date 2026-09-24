@@ -463,7 +463,13 @@
     };
 
     function formatDisplay(spec, val) {
-      if (spec.isToggle) return val >= 0.5 ? 'on' : 'off';
+      // 2026-09-24 — 'true'/'false', not 'on'/'off'. The readout must say what
+      // the DIRECTIVE says: the script carries `%%bd_loop false`, and a
+      // control reading "off" beside it invites the reader to wonder whether
+      // they are the same thing. Kolam's colour_speed was corrected the same
+      // way — show the directive's own value rather than a second vocabulary
+      // for it.
+      if (spec.isToggle) return val >= 0.5 ? 'true' : 'false';
       if (spec.isEnum) {
         const v = spec.values[Math.round(val)] || spec.values[0];
         return ENUM_DISPLAY[v] || v;
@@ -479,7 +485,13 @@
       const span = controlPanel.querySelector(`.stepper-value[data-name="${name}"]`);
       if (!span) return s.fallback;
       const txt = span.textContent.trim();
-      if (s.isToggle) return txt === 'on' ? 1 : 0;
+      // The INVERSE of formatDisplay, and it has to move with it. This read
+      // `txt === 'on'`, so the moment the readout began saying 'true' every
+      // read of loop returned 0 — the value would have flipped itself off on
+      // the next stepper press, silently. A renderer needs its inverse beside
+      // it; 'on' is accepted too, so a panel rendered before this change is
+      // still read correctly.
+      if (s.isToggle) return (txt === 'true' || txt === 'on') ? 1 : 0;
       if (s.isEnum) return s.values.indexOf(ENUM_DISPLAY_INV[txt] || txt);
       const v = parseFloat(txt);
       return Number.isFinite(v) ? v : s.fallback;
@@ -528,21 +540,21 @@
         offset2:          30,
         offset3:          60
       };
-      const axiomM = text.match(/^%%bd_axiom\s+(\S+)/m);
+      const axiomM = text.match(/^%%bd_(?:p_)?axiom\s+(\S+)/m);
       if (axiomM) g.axiom = axiomM[1];
       // rules: multiple '%%bd_rule <sym>: <expansion>' lines
-      const ruleRe = /^%%bd_rule\s+(\S)\s*:\s*(.+?)\s*$/gm;
+      const ruleRe = /^%%bd_(?:p_)?rule\s+(\S)\s*:\s*(.+?)\s*$/gm;
       const foundRules = {};
       let m;
       while ((m = ruleRe.exec(text)) !== null) {
         foundRules[m[1]] = m[2];
       }
       if (Object.keys(foundRules).length) g.rules = foundRules;
-      const iterM = text.match(/^%%bd_iterations\s+(\d+)/m);
+      const iterM = text.match(/^%%bd_(?:p_)?iterations\s+(\d+)/m);
       if (iterM) g.iterations = Math.max(5, Math.min(20, parseInt(iterM[1], 10)));
-      const angleM = text.match(/^%%bd_angle\s+([\d.]+)/m);
+      const angleM = text.match(/^%%bd_(?:p_)?angle\s+([\d.]+)/m);
       if (angleM) g.angle = parseFloat(angleM[1]);
-      const scaleM = text.match(/^%%bd_scale\s+(\w+)/m);
+      const scaleM = text.match(/^%%bd_(?:p_)?scale\s+(\w+)/m);
       if (scaleM) {
         const raw = scaleM[1];
         const resolved = SCALES[raw] ? raw : SCALE_ALIASES[raw];
@@ -555,7 +567,7 @@
       // must be in [33, 96] so the top/bottom of the walk lands on the
       // outermost piano keys and no further. Loosened v-2026-08-08 from
       // the earlier extra-safe clamp that was cutting C,, back to C,.
-      const rootM = text.match(/^%%bd_root\s+([A-G][#b]?|\d+)((?:,+|'+)?)/m);
+      const rootM = text.match(/^%%bd_(?:p_)?root\s+([A-G][#b]?|\d+)((?:,+|'+)?)/m);
       if (rootM) {
         const r = rootM[1];
         if (/^\d+$/.test(r)) g.root = Math.max(0, Math.min(11, parseInt(r, 10)));
@@ -572,31 +584,31 @@
         const octMax = Math.floor((96 - baseMidi) / 12);
         g.rootOctave = Math.max(octMin, Math.min(octMax, octShift));
       }
-      const ssM = text.match(/^%%bd_step_seconds\s+([\d.]+)/m);
+      const ssM = text.match(/^%%bd_(?:p_)?step_seconds\s+([\d.]+)/m);
       if (ssM) g.stepSeconds = Math.max(0.05, parseFloat(ssM[1]));
-      const vtM = text.match(/^%%bd_vertical_time\s+([\d.]+)/m);
+      const vtM = text.match(/^%%bd_(?:p_)?vertical_time\s+([\d.]+)/m);
       if (vtM) g.verticalTime = Math.max(0, parseFloat(vtM[1]));
       // Effect directives (same names + shape as bd_M_ABC for cross-module
       // paste compatibility).
-      const rwM = text.match(/^%%bd_reverb_wet\s+([\d.]+)/m);
+      const rwM = text.match(/^%%bd_(?:p_)?reverb_wet\s+([\d.]+)/m);
       if (rwM) g.reverbWet = parseFloat(rwM[1]);
-      const rdM = text.match(/^%%bd_reverb_decay\s+([\d.]+)/m);
+      const rdM = text.match(/^%%bd_(?:p_)?reverb_decay\s+([\d.]+)/m);
       if (rdM) g.reverbDecay = parseFloat(rdM[1]);
-      const vfM = text.match(/^%%bd_vibrato_frequency\s+([\d.]+)/m);
+      const vfM = text.match(/^%%bd_(?:p_)?vibrato_frequency\s+([\d.]+)/m);
       if (vfM) g.vibratoFrequency = parseFloat(vfM[1]);
-      const vdM = text.match(/^%%bd_vibrato_depth\s+([\d.]+)/m);
+      const vdM = text.match(/^%%bd_(?:p_)?vibrato_depth\s+([\d.]+)/m);
       if (vdM) g.vibratoDepth = parseFloat(vdM[1]);
-      const cwM = text.match(/^%%bd_chorus_wet\s+([\d.]+)/m);
+      const cwM = text.match(/^%%bd_(?:p_)?chorus_wet\s+([\d.]+)/m);
       if (cwM) g.chorusWet = parseFloat(cwM[1]);
-      const cdM = text.match(/^%%bd_chorus_depth\s+([\d.]+)/m);
+      const cdM = text.match(/^%%bd_(?:p_)?chorus_depth\s+([\d.]+)/m);
       if (cdM) g.chorusDepth = parseFloat(cdM[1]);
-      const lpM = text.match(/^%%bd_loop\s+(true|false|on|off|1|0)/mi);
+      const lpM = text.match(/^%%bd_(?:p_)?loop\s+(true|false|on|off|1|0)/mi);
       if (lpM) g.loop = /^(true|on|1)$/i.test(lpM[1]);
-      const lgM = text.match(/^%%bd_loop_gap\s+([\d.]+)/m);
+      const lgM = text.match(/^%%bd_(?:p_)?loop_gap\s+([\d.]+)/m);
       if (lgM) g.loopGap = parseFloat(lgM[1]);
-      const o2M = text.match(/^%%bd_offset2\s+(-?\d+)/m);
+      const o2M = text.match(/^%%bd_(?:p_)?offset2\s+(-?\d+)/m);
       if (o2M) g.offset2 = Math.max(0, parseInt(o2M[1], 10));
-      const o3M = text.match(/^%%bd_offset3\s+(-?\d+)/m);
+      const o3M = text.match(/^%%bd_(?:p_)?offset3\s+(-?\d+)/m);
       if (o3M) g.offset3 = Math.max(0, parseInt(o3M[1], 10));
       return g;
     }
@@ -1414,8 +1426,18 @@
       setters.offset2 = String(parsedForOctave.offset2);
       setters.offset3 = String(parsedForOctave.offset3);
       for (const [key, val] of Object.entries(setters)) {
-        const re = new RegExp(`^%%bd_${key}\\s+.*$`, 'm');
-        const line = `%%bd_${key} ${val}`;
+        // RULE 1 of the collage plan: put back the form it was read in.
+        //
+        // This built `^%%bd_${key}` and wrote `%%bd_${key} ${val}`, so on a
+        // script carrying %%bd_p_iterations nothing matched, the else-branch
+        // fired, and a SECOND unmarked copy was appended. One stepper press
+        // would have left both lines, with the control reading whichever the
+        // parser reached first.
+        const reMarked = new RegExp(`^%%bd_p_${key}\\s+.*$`, 'm');
+        const rePlain  = new RegExp(`^%%bd_${key}\\s+.*$`, 'm');
+        const re   = reMarked.test(text) ? reMarked : rePlain;
+        const mark = reMarked.test(text) ? 'p_' : '';
+        const line = `%%bd_${mark}${key} ${val}`;
         if (re.test(text)) text = text.replace(re, line);
         else {
           const lines = text.split('\n');
