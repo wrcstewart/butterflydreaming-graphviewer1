@@ -1980,17 +1980,68 @@ function fitPadding(cy, maxPad) {
 // %%bd_ai_read [ and %%bd_]. No whitespace added or stripped. Known limitation
 // — bracket content containing the literal substrings "[", "]", or "%%bd_]"
 // is not supported.
+// 2026-09-25 — the block is written on THREE LINES, like every other one.
+//
+// It used to be inline: `%%bd_ai_read [content%%bd_]`, all on one line, with
+// the closer following the content directly. The TOKEN was right — `%%bd_]`
+// is what closes a %%bd_score block too, and it carries the `%%bd_` prefix
+// because every directive line starts with one, so a closer can never be
+// confused with prose that happens to begin with `]`.
+//
+// The SHAPE was the anomaly. A score block puts `%%bd_]` on its own line and
+// every module parser closes only on a line whose trim is exactly that. Hand
+// an inline block to one of those and it reads the opener as an ordinary
+// single-line directive — the value is `[content` rather than `[` — so the
+// NOTE is truncated to its first line and the remainder dropped in silence.
+//
+// (Measured, having first guessed otherwise: what survives is the score. I
+// expected the parser to enter bracket state and swallow everything after,
+// and it does not, because the value is not exactly `[`. The damage is to the
+// curator's note, not to the module's content — smaller than I said, and
+// still worth removing.)
+//
+// Nothing uses it yet (zero nodes), which makes now the only cheap moment.
+// Merge is what would have exposed it: that is the operation which puts a text
+// node's curator notes into the same script as a module's directives, and then
+// a line-based parser meets a shape it cannot read.
+//
+// The READERS accept both, so a block hand-written inline still works and
+// anything already stored keeps loading.
+const BOT_BLOCK_RE = /%%bd_ai_read[ \t]*\[[ \t]*\n?([\s\S]*?)\n?[ \t]*%%bd_\]/g;
+
 function normalizeBotBlocks(text) {
   if (typeof text !== 'string') return text;
-  return text.replace(/\[([^\[\]]*)\]/g, '%%bd_ai_read [$1%%bd_]');
+  // A match containing a directive is NOT a curator note — leave it alone.
+  //
+  // 2026-09-25, and this is older than the line-shape change above. The
+  // pattern `[ … ]` happily spans a whole score block, because `%%bd_]` ends
+  // in `]`: given
+  //
+  //     %%bd_score [
+  //     axiom: F+F
+  //     %%bd_]
+  //
+  // it matched from the `[` on the first line to the `]` on the last and
+  // rewrote the lot as a bot block — "%%bd_score %%bd_ai_read [" with a
+  // severed closer below it. The score was destroyed on save, in silence.
+  //
+  // Latent so far only because this path is the nav-node panel and module
+  // scripts have not travelled through it. Merge is precisely what would
+  // have introduced them to each other.
+  //
+  // Conservative on purpose: a note that genuinely mentions "%%bd_" is left
+  // unconverted, which loses a marking, where the other way round loses a
+  // score. Found by a test written to check something else.
+  return text.replace(/\[([^\[\]]*)\]/g, (m, inner) =>
+    /%%bd_/.test(inner) ? m : '%%bd_ai_read [\n' + inner + '\n%%bd_]');
 }
 function unnormalizeBotBlocks(text) {
   if (typeof text !== 'string') return text;
-  return text.replace(/%%bd_ai_read \[([\s\S]*?)%%bd_\]/g, '[$1]');
+  return text.replace(BOT_BLOCK_RE, (m, inner) => '[' + inner + ']');
 }
 function stripBotBlocks(text) {
   if (typeof text !== 'string') return text;
-  return text.replace(/%%bd_ai_read \[[\s\S]*?%%bd_\]/g, '');
+  return text.replace(BOT_BLOCK_RE, '');
 }
 
 function setSystemText(content, meta) {
