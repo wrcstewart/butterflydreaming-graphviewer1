@@ -1001,28 +1001,27 @@ function splitNodeChunks(text) {
   // Multiline flag needed; escape carefully. Empty chunks (marker at start/end
   // or double-marker) are filtered out.
   const parts = text.split(/^%%bd_chunk[ \t]*$/m).map(s => s.trim()).filter(s => s.length > 0);
-  return parts.map(extractChunkHint);
+  // 2026-09-25 — %%bd_hint retired. The shape {body} is kept because every
+  // caller reads .body; what has gone is the .hint half.
+  return parts.map(s => ({ body: s }));
 }
 
-// Pull the `%%bd_hint <text>` directive out of a chunk (if present) and
-// return { body, hint }. The directive line is one-line: everything after
-// `%%bd_hint ` up to end of line becomes the hint. Anywhere in the chunk;
-// removed from the body when found. If absent, hint is null and the caller
-// falls back to the default auto-hint (Tap for next / Tap once more / No
-// further descendants).
-function extractChunkHint(chunk) {
-  // `%%bd_hint <text>` → hint = <text>
-  // `%%bd_hint` (no body) → hint = '' (empty string, signals "suppress
-  //   the auto-hint here" — used on content chunks like poem stanzas
-  //   where the tap-hint would be misleading)
-  // no directive       → hint = null (caller falls back to getChunkHint)
-  const match = chunk.match(/^%%bd_hint(?:[ \t]+(.+))?[ \t]*$/m);
-  if (!match) return { body: chunk.trim(), hint: null };
-  const hint = match[1] ? match[1].trim() : '';
-  const body = chunk.replace(match[0], '').replace(/\n{3,}/g, '\n\n').trim();
-  return { body, hint };
-}
-
+// %%bd_hint RETIRED 2026-09-25. extractChunkHint lived here.
+//
+// It did two jobs distinguished only by whether a body followed the word:
+// override the automatic hint, or (bare) suppress it. The suppression half had
+// never worked — extractChunkHint returned '' for it and both call sites read
+// `chunk.hint || getChunkHint(...)`, where '' is falsy and falls straight
+// through to the hint it was asking to silence. Invisible only because
+// UNIFIED_FOCUS makes most automatic hints empty anyway; it showed on the one
+// dead-end node, where CHUNK_HINT_NO_MORE is returned unconditionally — a poem
+// stanza, which is exactly the case the comment said it was written for.
+//
+// Of the six nodes using it, four were bare suppressions doing nothing, one
+// duplicated a sentence already in Root's prose, and the last held an
+// instruction that now reads better as the end of Settling's paragraph.
+//
+// The AUTOMATIC hints are a separate mechanism and remain: getChunkHint below.
 // Does tapping through this node's last chunk lead to a meaningful expand?
 //   Cluster        → has any CONTAINS_CLUSTER connection (gateway TextNode)
 //   TextNode       → has any CHILD connection (further verses)
@@ -1188,8 +1187,10 @@ if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.as
 // Same lesson as the Sv bug: every representation needs its own deliberate
 // conversion, and the failure mode of skipping one is silent.
 //
-// Directives are not words. `%%bd_center` and `%%bd_hint` are layout, and
-// `<<yellow>>…<</>>` is a colour — read aloud they are noise. `%%bd_module` is
+// Directives are not words. `%%bd_center` is layout and `<<yellow>>…<</>>` is
+// a colour — read aloud they are noise. (`%%bd_hint` was here too until it was
+// retired on 2026-09-25; the catch-all below never named them individually
+// anyway, which is why nothing had to change when it went.) `%%bd_module` is
 // worse: everything after it is a SCRIPT, so it is a hard stop rather than a
 // line filter. Reading a Kolam program aloud would be alarming, not merely
 // useless.
@@ -6699,7 +6700,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const c0Card = insertNodeChunkAsCard(
         isBootCard ? (ARRIVED_VIA_LINK ? ROOT_ARRIVAL_MESSAGE : ROOT_BOOT_MESSAGE)
                   : c0.body,
-        isBootCard ? '' : (c0.hint || getChunkHint(isLast, nav, node, isRoot)),
+        isBootCard ? '' : getChunkHint(isLast, nav, node, isRoot),
         node, 0);
       if (introWillShow) speechSuppressed = false;
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
@@ -6771,7 +6772,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const cn = readingState.chunks[nextIdx];
     const cnCard = insertNodeChunkAsCard(
       cn.body,
-      cn.hint || getChunkHint(isLast, readingState.hasDescendants, node, isRoot),
+      getChunkHint(isLast, readingState.hasDescendants, node, isRoot),
       node,
       nextIdx
     );
@@ -8872,10 +8873,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   // Sv (Save) — persist text edits from chunk cards of the currently-read
   // node to the DB via edit_node_text. Reads back the DOM content of each
-  // chunk card (.chunk-text + .chunk-hint children), falls back to the
-  // original chunk data in readingState for chunks the user hasn't yet
-  // displayed. Reassembles the full text with %%bd_chunk between chunks
-  // and %%bd_hint <text> before each chunk's marker.
+  // chunk card (.chunk-text children), falls back to the original chunk data
+  // in readingState for chunks the user hasn't yet displayed. Reassembles the
+  // full text with %%bd_chunk between chunks.
+  //
+  // 2026-09-25 — it used to write %%bd_hint back as well. That directive is
+  // retired, and re-emitting it here would have put it back into the corpus
+  // one saved node at a time.
   document.getElementById('dev-save').addEventListener('click', () => {
     if (!readingState || !readingState.nodeId) { devStatus('tap a node first'); return; }
     const code = document.getElementById('dev-code').value.trim();
@@ -8893,25 +8897,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const parts = [];
     for (let i = 0; i < readingState.chunks.length; i++) {
       const cardRef = cardsByIdx[i];
-      let body, hint;
-      if (cardRef && cardRef.body) {
-        // Live DOM read — user may have edited these.
-        const hintEl = cardRef.body.querySelector('.chunk-hint');
-        body = readChunkBody(cardRef.body);
-        hint = hintEl ? serialiseHighlights(hintEl).trim() : null;
-        // Only preserve author-supplied hints; strip auto-injected fallbacks
-        // that we don't want round-tripped back into the DB as if authored.
-        if (hint === CHUNK_HINT_MORE || hint === CHUNK_HINT_NAVIGATE || hint === CHUNK_HINT_NO_MORE) {
-          hint = readingState.chunks[i].hint || null;
-        }
-      } else {
-        const original = readingState.chunks[i];
-        body = original.body;
-        hint = original.hint;
-      }
-      let piece = body;
-      if (hint) piece += (piece ? '\n' : '') + `%%bd_hint ${hint}`;
-      parts.push(piece);
+      // 2026-09-25 — the .chunk-hint div is read no longer, and no %%bd_hint
+      // is written back. It used to reconstruct an authored hint from the DOM,
+      // carefully skipping the three automatic strings so a fallback was not
+      // saved as if someone had written it. With the directive retired there
+      // is nothing to reconstruct, and re-emitting whatever sat in that div
+      // would quietly put the directive back into the corpus one node at a
+      // time — a retirement that un-retires itself.
+      parts.push(cardRef && cardRef.body
+        ? readChunkBody(cardRef.body)          // live read — the user may have edited
+        : readingState.chunks[i].body);
     }
     const text = parts.join('\n%%bd_chunk\n');
 
