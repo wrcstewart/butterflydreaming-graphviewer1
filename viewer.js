@@ -2009,6 +2009,27 @@ function fitPadding(cy, maxPad) {
 // anything already stored keeps loading.
 const BOT_BLOCK_RE = /%%bd_ai_read[ \t]*\[[ \t]*\n?([\s\S]*?)\n?[ \t]*%%bd_\]/g;
 
+// What the curator TYPES: [[ … ]], doubled deliberately.
+//
+// 2026-09-25 — single brackets were the original convention and could not be
+// made safe. ABC notation writes a chord as [CEA], so a score saved through
+// this path had its chords rewritten as bot blocks; the score was destroyed
+// in silence. Anchoring a note to whole lines would have dodged that, but it
+// makes the rule POSITIONAL — a note is a note because of where it sits — and
+// forbids an inline aside. Doubling makes it explicit instead: a note is a
+// note because you typed two brackets. [CEA] can never be mistaken for one.
+//
+// The DOUBLING IS FOR AUTHORING ONLY. What gets stored is the ordinary
+// single-bracket block, %%bd_ai_read [ … %%bd_], because the ambiguity being
+// solved exists in prose sitting next to notation and not in stored text,
+// which already carries the %%bd_ai_read prefix. A %%bd_]] closer would also
+// break every module parser — they close a bracket block only on a line whose
+// trim is exactly %%bd_], so a doubled closer would never close and the parser
+// would swallow the rest of the script.
+//
+// Known limitation, as before: note content containing "]]" is not supported.
+const BOT_AUTHOR_RE = /\[\[([\s\S]*?)\]\]/g;
+
 function normalizeBotBlocks(text) {
   if (typeof text !== 'string') return text;
   // A match containing a directive is NOT a curator note — leave it alone.
@@ -2032,12 +2053,13 @@ function normalizeBotBlocks(text) {
   // Conservative on purpose: a note that genuinely mentions "%%bd_" is left
   // unconverted, which loses a marking, where the other way round loses a
   // score. Found by a test written to check something else.
-  return text.replace(/\[([^\[\]]*)\]/g, (m, inner) =>
-    /%%bd_/.test(inner) ? m : '%%bd_ai_read [\n' + inner + '\n%%bd_]');
+  return text.replace(BOT_AUTHOR_RE, (m, inner) =>
+    /%%bd_/.test(inner) ? m : '%%bd_ai_read [\n' + inner.trim() + '\n%%bd_]');
 }
 function unnormalizeBotBlocks(text) {
   if (typeof text !== 'string') return text;
-  return text.replace(BOT_BLOCK_RE, (m, inner) => '[' + inner + ']');
+  // Back into the doubled form the curator types, closing the round trip.
+  return text.replace(BOT_BLOCK_RE, (m, inner) => '[[' + inner + ']]');
 }
 function stripBotBlocks(text) {
   if (typeof text !== 'string') return text;
@@ -8959,7 +8981,17 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         ? readChunkBody(cardRef.body)          // live read — the user may have edited
         : readingState.chunks[i].body);
     }
-    const text = parts.join('\n%%bd_chunk\n');
+    // normalizeBotBlocks RESTORED here, 2026-09-25.
+    //
+    // It used to run on the default-panel Save, which was retired on
+    // 2026-07-25 when always-on-chat orphaned that button — and the call went
+    // with it. Nothing has produced a bot block since, which is why the corpus
+    // has none and why the display fork has been hiding a form nothing wrote.
+    //
+    // Sv saves ANY node, not just nav nodes, which is exactly why the
+    // authoring convention had to be doubled brackets first: this path meets
+    // ABC scores, and single brackets would have eaten their chords.
+    const text = normalizeBotBlocks(parts.join('\n%%bd_chunk\n'));
 
     const wsNow = wsRef.current;
     if (!wsNow || !wsNow.connected) { devStatus('ws not open'); return; }

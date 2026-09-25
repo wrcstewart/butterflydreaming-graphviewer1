@@ -1,6 +1,25 @@
 # A4x — Bot Context Authoring (`bot_context.md`)
 
-**Status:** Design, not yet built. **Not yet handed to Claude Code.**
+**Status (2026-09-25):** Authoring and the display fork are **BUILT**. Only the
+bot's own context-assembly (§6) remains, which was always a separate document.
+
+**Amendment — the authoring gesture is now DOUBLE brackets `[[ … ]]`.** §2 below
+says single, and that could not be made safe: ABC notation writes a chord as
+`[CEA]`, so a score saved through the node-text path had its chords rewritten
+as bot blocks and destroyed, silently. Doubling makes the signal explicit
+rather than positional — a note is a note because you typed two brackets — and
+`[CEA]` can never be mistaken for one. **Storage is unchanged:** the stored form
+is still the single-bracket `%%bd_ai_read [ … %%bd_]` block of §3, because a
+`%%bd_]]` closer would break every module parser, which closes a bracket block
+only on a line whose trim is exactly `%%bd_]`.
+
+**History worth keeping:** save-path normalisation was built in `af1605b`, then
+lost on 2026-07-25 in `392106d`, when the default-panel Save button it lived on
+was retired as orphaned by always-on-chat. Nothing produced a bot block from
+then until now — which is why the corpus contains none — while the display fork
+went on faithfully hiding a form nothing wrote. It is restored on the **Sv**
+save path, which is why the doubling mattered: Sv saves any node, including the
+music ones.
 **Relates to:** the forthcoming `bdbot` local-AI feature; the nav-node Save flow in `cards_spec.md` §3.6 and the v6 handover; the `bd_` directive grammar in `project_a42_card_stack_design.md`.
 **Scope of this document:** how curator-authored, bot-only context is attached to nav nodes (Root / Entry / Family / Cluster), stored, and shown. It covers **authoring and storage only**. How the bot *assembles* this context at conversation time (graph traversal vs. semantic / vector retrieval) is deliberately **out of scope** here and will be designed after the Memgraph RAG / semantic-graph research.
 
