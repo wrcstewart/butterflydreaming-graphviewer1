@@ -6,6 +6,60 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-25 — one directive retired, another brought back to life
+
+**`%%bd_hint` is gone**, from the code and the corpus. One directive doing two
+jobs distinguished only by whether a body followed the word: override the
+automatic hint, or (bare) suppress it. **The suppression half had never
+worked** — `extractChunkHint` returned `''` and both call sites read
+`chunk.hint || getChunkHint(…)`, where `''` is falsy and falls straight through
+to the hint it was asking to silence. Invisible only because UNIFIED_FOCUS
+makes most automatic hints empty anyway, and visible on exactly one node: a
+dead-end poem stanza, which is the case the original comment said it was
+written for.
+
+Of its six users, four were bare suppressions doing nothing, one duplicated a
+sentence already in Root's prose, and the last held text that now reads better
+as the end of Settling's paragraph. Removed from four code sites including the
+**save path**, which read the hint back out of the DOM and wrote the directive
+in again — left there, the retirement would have undone itself one saved node
+at a time. The automatic hints are a separate mechanism and remain.
+
+**The AI note system works again**, and the story is the instructive part.
+
+Built in `af1605b` and **lost on 2026-07-25** in `392106d`, when the
+default-panel Save button it lived on was retired as orphaned by always-on-chat.
+The normalisation went with the button. Nothing produced a bot block from then
+until now — which is why the corpus has none — while the display fork went on
+faithfully hiding a form nothing wrote.
+
+**I concluded from the current file that it had never been wired. The author
+remembered otherwise and was right.** `git log -S` found the call site and the
+commit that dropped it. A memory of a thing working is better evidence than a
+search of the code as it stands.
+
+Restored on **Sv**, and that forced a change of convention. The old path saved
+only nav nodes; Sv saves **any** node including the music ones, and ABC writes a
+chord as `[CEA]` — single brackets would have rewritten chords as bot blocks and
+destroyed the score in silence. So authoring is **`[[ … ]]`** now: explicit
+rather than positional, a note being a note because you typed two brackets
+rather than because of where it sits. **Storage is unchanged** —
+`%%bd_ai_read [ … %%bd_]`, single-bracketed — because the ambiguity lives in
+prose beside notation, not in text already carrying the prefix, and `%%bd_]]`
+would break every module parser.
+
+### Found by a test written to check something else
+
+`normalizeBotBlocks` matched a bracket span, and that pattern reaches across a
+whole score block because `%%bd_]` ends in `]`. Given a script with a score it
+rewrote from the `[` of `%%bd_score [` to the `]` of the closer, producing
+`%%bd_score %%bd_ai_read [` with a severed closer below. **The score was
+destroyed on save.** Latent only because nothing had called the function for two
+months. The doubled brackets fix it at the root; a guard against converting any
+span containing a directive backs it up.
+
+---
+
 ## 2026-09-23 (evening) — Fractal joins in, and two instruments that lied
 
 **The two Kolam nodes are migrated.** `bd_V_Kolam_001` and `_002` carry ten
