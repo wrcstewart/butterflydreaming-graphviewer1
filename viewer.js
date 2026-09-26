@@ -10161,7 +10161,15 @@ async function init() {
       // node's script card keeps the Current pane. Once only (like
       // gatewayHelperShown) so it doesn't spam on every Player toggle.
       if (!playerHelperShown) {
-        prependSystemCard('Use the up and down arrows to send information between steppers and the script. Use Copy to create a link to an external website - send your pattern to your friends - uses very little data.', { toHistory: true });
+        // 2026-09-26 — rewritten. The old text described the Copy button,
+        // retired on 2026-09-15 when the standalone-URL path was frozen, and
+        // it named the arrows as the only way across — which stopped being
+        // true when `auto` arrived and made the card and the steppers one
+        // thing in both directions.
+        //
+        // "View" capitalised because that is the button's own label; the
+        // wording is otherwise the author's.
+        prependSystemCard('The script controls the pattern and the steppers can synchronise automatically with the script. Or manually through the up down arrows. Press View to better visualise the pattern.', { toHistory: true });
         playerHelperShown = true;
       }
       // 2026-08-18 — re-anchor the iframe now that player-active is set and the
