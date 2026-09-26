@@ -12845,7 +12845,23 @@ async function init() {
                         (moduleId ? '&m=' + encodeURIComponent(moduleId) : '') +
                         (avNodeId ? '&n=' + encodeURIComponent(avNodeId) : '');
           console.log('[AV] opening viewer');
-          if (typeof window.bdStopMedia === 'function') window.bdStopMedia();
+          // 2026-09-26 — BD's media player is NOT stopped here any more.
+          //
+          // The call was right when this button jumped to the STANDALONE: you
+          // were handing over to a page carrying the same state, which could
+          // play the same audio, and leaving a second source running in a tab
+          // with no visible transport was the fault it was written for. That
+          // path still stops the player, a dozen lines above.
+          //
+          // A viewer is not a hand-over. BD stays exactly where it is and the
+          // viewer opens beside it, so silencing BD's player has nothing to do
+          // with opening one — and reported as what it is: "the music cuts out,
+          // which breaks the mood".
+          //
+          // A music viewer cannot start sound on its own — audio needs a
+          // gesture in the document that makes it — so two sources can only
+          // ever happen because someone pressed Play there, having left BD's
+          // player running. That is a choice, and both have a pause button.
           // The window is already ours (claimed in the gesture above); just
           // point it at the viewer. replace() rather than assignment so the
           // blank page does not become a back-stack entry.
