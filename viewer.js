@@ -1252,11 +1252,19 @@ const speakQueue = [];         // generation lands after and must be discarded
 // element.volume is read-only on iOS and would silently do nothing there.
 const MEDIA_BASE_GAIN = 0.7;
 const DUCK_LEVEL = 0.10;
-// 2026-09-26 — 250 -> 750 -> 2000. TWO SECONDS IS A TEST VALUE, set to make
-// the ramp long enough to hear working rather than to sound right. It is far
-// longer than SPEAK_GAP_MS (420), so the music will not return to baseline
-// between sentences at all: expect it to sink once at the start of a passage
-// and stay down. That is the behaviour being checked, not a setting to keep.
+// 2026-09-26 — 250 -> 750 -> 2000, and 2000 KEPT, chosen by ear. It went in
+// as a test value, long enough to hear the ramp working, and sounded right.
+//
+// What it means, and it is a change of behaviour rather than of degree: two
+// seconds is nearly five times SPEAK_GAP_MS (420), so the music CANNOT return
+// to baseline between sentences. It sinks once at the start of a passage,
+// stays there, and rises at the end. The dip-and-recover on every sentence is
+// gone — which was the thing that sounded wrong, and is why deepening the
+// duck never fixed it: the complaint was movement, not level.
+//
+// So SPEAK_GAP_MS no longer affects the music at all. Anything under about
+// two seconds is swallowed by the ramp; changing it now alters only the
+// reading rhythm, which is a cleaner separation than the two had before.
 //
 // The ramp governs BOTH ends:
 // the slide down when a sentence starts and the return when speech stops, so a
@@ -1271,7 +1279,7 @@ const DUCK_LEVEL = 0.10;
 // return to baseline before it is ducked again — it hovers instead of pumping.
 // That may be the improvement or may be too soft; the two constants now
 // interact, where at 250 they did not.
-const DUCK_MS    = 2000;   // TEST VALUE — see the note above
+const DUCK_MS    = 2000;
 let duckSaved = null;      // the user's own volume, while we are holding it down
 let duckTimer = null;
 
