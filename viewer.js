@@ -1252,7 +1252,13 @@ const speakQueue = [];         // generation lands after and must be discarded
 // element.volume is read-only on iOS and would silently do nothing there.
 const MEDIA_BASE_GAIN = 0.7;
 const DUCK_LEVEL = 0.10;
-// 2026-09-26 — 250 -> 750, on the author's ear. The ramp governs BOTH ends:
+// 2026-09-26 — 250 -> 750 -> 2000. TWO SECONDS IS A TEST VALUE, set to make
+// the ramp long enough to hear working rather than to sound right. It is far
+// longer than SPEAK_GAP_MS (420), so the music will not return to baseline
+// between sentences at all: expect it to sink once at the start of a passage
+// and stay down. That is the behaviour being checked, not a setting to keep.
+//
+// The ramp governs BOTH ends:
 // the slide down when a sentence starts and the return when speech stops, so a
 // longer figure makes the music breathe rather than step.
 //
@@ -1265,7 +1271,7 @@ const DUCK_LEVEL = 0.10;
 // return to baseline before it is ducked again — it hovers instead of pumping.
 // That may be the improvement or may be too soft; the two constants now
 // interact, where at 250 they did not.
-const DUCK_MS    = 750;
+const DUCK_MS    = 2000;   // TEST VALUE — see the note above
 let duckSaved = null;      // the user's own volume, while we are holding it down
 let duckTimer = null;
 
