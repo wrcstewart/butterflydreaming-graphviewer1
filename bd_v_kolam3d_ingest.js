@@ -114,6 +114,10 @@ const CONTENT1_TEXT =
   '%%bd_stroke angle\n' +
   '%%bd_p_saturation 100\n' +
   '%%bd_p_lightness 65\n' +
+  // 1 — fully opaque, so the node opens exactly as it did before the
+  // control existed. Unlike step_pitch this is no dead default: 1 is the TOP
+  // of the range, so the first press downward shows something.
+  '%%bd_p_opacity 1\n' +
   '%%bd_background #0a0a0f\n' +
   '%%bd_weight 1.5\n' +
   '%%bd_score [\n' +

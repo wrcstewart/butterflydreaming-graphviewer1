@@ -224,6 +224,15 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-27 — opacity
+
+| item | where | note |
+|---|---|---|
+| **`%%bd_p_opacity`, 0 to 1** | `V_Kolam3D/visual_module.html` | **BUILT.** Seventeenth stepper, twentieths. Worth more here than in the flat module: eight symmetric copies of a folded curve are mostly self-occluding. `depthWrite` follows the transparency — with it left on, the nearest line per pixel hides everything behind it and the figure reads as a solid shell. `transparent` is in three's program cache key, so `needsUpdate` is guarded behind an actual change (this runs 5-10x a second under drift). Material only, so it joins the no-rebuild path. Readout drops the leading zero; measured, all 21 values fit the span and the round trip is float-exact. |
+| **Opacity is NOT in the flat module** | `V_Kolam/` | Deliberate — not asked for, and marginal on a 2D canvas. Verified safe: the flat module reads `opacity` into its directives, has no `CONTROL_FOR` entry so offers no row, and never writes it — so the line survives a round trip there intact and draws opaque. |
+
+---
+
 ## Added 2026-09-27 — hold-repeat
 
 | item | where | note |

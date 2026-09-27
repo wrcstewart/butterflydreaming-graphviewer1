@@ -642,6 +642,27 @@
       <input id="lightness-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="65">
     </div>
 
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="opacity-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="opacity-slider">1</span>
+        <button class="step-btn" type="button" data-target="opacity-slider" data-delta="1">+</button>
+      </div>
+      <label>opacity</label>
+      <!-- 2026-09-27 — 0 to 1, as asked, in twentieths. It earns its place in
+           the 3D module more than it would in the flat one: with eight
+           symmetric copies of a folded curve, the figure is mostly its own
+           occlusion, and turning the lines translucent is how you see into it.
+
+           0 is a legal value and draws nothing. That is one tap from visible,
+           and clamping it to something small would be inventing a range the
+           author did not ask for.
+
+           Material only — no geometry — so it joins the no-rebuild path and
+           sweeps live at any depth. -->
+      <input id="opacity-slider" class="stepper-source" type="number" min="0" max="1" step="0.05" value="1">
+    </div>
+
   </div>
 
   </div>
@@ -742,6 +763,7 @@
     const colourSpeedSlider = document.getElementById('colour-speed-slider');
     const saturationSlider  = document.getElementById('saturation-slider');
     const lightnessSlider   = document.getElementById('lightness-slider');
+    const opacitySlider     = document.getElementById('opacity-slider');
 
     const canvas         = document.getElementById('kolam-canvas');
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
@@ -926,6 +948,9 @@
       colourSpeedSlider.value = String(Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -2), 4));
       saturationSlider.value  = String(Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100));
       lightnessSlider.value   = String(Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100));
+      // Falls back to 1 — fully opaque — so a script that has never heard of
+      // opacity renders exactly as it did before the control existed.
+      opacitySlider.value     = String(Math.min(Math.max(safeParseNumber(directives.opacity, 1), 0), 1));
 
       updateValueDisplays();
     }
@@ -935,7 +960,17 @@
         const targetId = span.dataset.target;
         const input = targetId && document.getElementById(targetId);
         if (!input) return;
-        if (targetId === 'colour-speed-slider') {
+        if (targetId === 'opacity-slider') {
+          // ".05" and ".5" rather than "0.05" and "0.5" — the same number
+          // written shorter, which is RULE 8 (abbreviate, never translate) and
+          // the same trade the colour readout makes below. MEASURED there: the
+          // span holds three Courier characters at 0.7rem, and a fourth
+          // shrinks the text rather than widening the column. 1 stays "1".
+          const n = parseFloat(input.value);
+          span.textContent = Number.isFinite(n)
+            ? String(Math.round(n * 100) / 100).replace(/^0\./, '.')
+            : input.value;
+        } else if (targetId === 'colour-speed-slider') {
           // The hidden input holds the EXPONENT (-2..4); %%bd_colour_speed
           // holds 2^exponent. Showing the directive's own number keeps the
           // readout, the label and the script saying the same thing. The
@@ -1002,7 +1037,8 @@
         cam_distance:  camDistanceSlider.value,
         colour_speed:  formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
         saturation:    saturationSlider.value,
-        lightness:     lightnessSlider.value
+        lightness:     lightnessSlider.value,
+        opacity:       opacitySlider.value
         // angle_seconds / pitch_seconds: internal accumulators, never written.
         // weight: NOT written and NOT read into a control — see
         // LINE_WIDTH_IS_NOT_AVAILABLE. Never naming it here is what leaves an
@@ -1021,7 +1057,7 @@
     // applyPitchScale for why those are the same thing.
     const NO_REBUILD_INPUT_IDS = new Set([
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
-      'step-pitch-slider'
+      'step-pitch-slider', 'opacity-slider'
     ]);
 
     function handleControlChange(ev) {
@@ -1041,6 +1077,7 @@
         camDistanceExplicit = true;
         announce();
         applyPitchScale();
+        applyOpacity();
         placeCamera();
         draw();
         return;
@@ -1055,7 +1092,7 @@
       angleSecondsSlider, pitchSecondsSlider,
       angleDriftSlider, pitchDriftSlider,
       camAzimuthSlider, camElevationSlider, camDistanceSlider,
-      colourSpeedSlider, saturationSlider, lightnessSlider
+      colourSpeedSlider, saturationSlider, lightnessSlider, opacitySlider
     ];
     controlInputs.forEach((input) => { input.addEventListener('input', handleControlChange); });
 
@@ -1079,7 +1116,8 @@
       cam_distance:  camDistanceSlider,
       colour_speed:  colourSpeedSlider,
       saturation:    saturationSlider,
-      lightness:     lightnessSlider
+      lightness:     lightnessSlider,
+      opacity:       opacitySlider
     };
 
     // RULE 2: a script with NO mark anywhere keeps every control shown, so
@@ -1445,6 +1483,31 @@
       if (group) group.scale.set(1, pitchScale(), 1);
     }
 
+    // ── Opacity ───────────────────────────────────────────────────────────
+    //
+    // Material only, so this costs no geometry and sweeps live at any depth.
+    function applyOpacity() {
+      if (!material) return 1;
+      const o = Math.min(Math.max(safeParseNumber(opacitySlider.value, 1), 0), 1);
+      const wantTransparent = o < 1;
+      if (material.transparent !== wantTransparent) {
+        // `transparent` takes part in three's program cache key, so a change to
+        // it needs the material recompiled. Guarded, because this runs on every
+        // render — including five to ten times a second while drift is on — and
+        // needsUpdate every frame would rebuild the shader every frame.
+        material.transparent = wantTransparent;
+        material.needsUpdate = true;
+      }
+      material.opacity = o;
+      // Translucent lines must NOT write depth. With depth writing on, the
+      // nearest line in each pixel hides every line behind it and the figure
+      // reads as a solid shell — which defeats the entire point of reaching for
+      // opacity on a figure that is eight overlapping copies of a folded curve.
+      // Opaque lines write depth as normal.
+      material.depthWrite = !wantTransparent;
+      return o;
+    }
+
     function fitDistance(radius) {
       if (!(radius > 0)) return clampCam(260);
       // Frame a sphere of that radius, with 12% of air round it.
@@ -1673,6 +1736,7 @@
           weight:      Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5),
           saturation:  Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100),
           lightness:   Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100),
+          opacity:     Math.min(Math.max(safeParseNumber(directives.opacity, 1), 0), 1),
           colourSpeed: Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16)
         };
         if (!Number.isFinite(params.colourSpeed) || params.colourSpeed <= 0) params.colourSpeed = 4;
@@ -1712,6 +1776,7 @@
         applySymmetry(params.symmetry);
 
         applyPitchScale();
+        applyOpacity();
 
         if (!camDistanceExplicit) {
           // An upper bound on the scaled figure's radius, which is what

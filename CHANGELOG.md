@@ -6,6 +6,38 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-27 — opacity on the 3D kolam
+
+**`%%bd_p_opacity`**, 0 to 1 in twentieths, a seventeenth stepper on
+`bd_V_Kolam3D`. It earns its place in the 3D module far more than it would in
+the flat one: with eight symmetric copies of a folded curve the figure is mostly
+its own occlusion, and turning the lines translucent is how you see into it.
+
+Two details that are the whole of whether it works.
+
+**Translucent lines must not write depth.** With depth writing left on, the
+nearest line in each pixel hides every line behind it, and the figure reads as a
+solid shell — which defeats the entire reason for reaching for opacity here.
+`depthWrite` follows the transparency, and opaque lines write depth as normal.
+
+**`transparent` takes part in three's program cache key**, so changing it needs
+the material recompiled. That is guarded behind an actual change, because
+`applyOpacity` runs on every render — five to ten times a second while drift is
+on — and an unguarded `needsUpdate` would rebuild the shader every frame.
+
+Material only, so it costs no geometry and joins `step_pitch` and the camera on
+the no-rebuild path: it sweeps live at any depth. The readout drops the leading
+zero — `.05`, `.5`, `1` — which is RULE 8 (abbreviate, never translate) and the
+same trade the colour readout already makes; MEASURED, all 21 values fit the
+three-character span without shrinking, and the 20-press round trip from 1 to 0
+and back is exact with no float drift.
+
+The flat module is deliberately untouched. It reads `opacity` into its
+directives, offers no row for it, and never rewrites it — so a 3D script keeps
+the line intact through a round trip there and simply draws opaque.
+
+---
+
 ## 2026-09-27 — a stepper you could not hold
 
 Reported as "ok for a single click but when held down they work too fast", and
