@@ -6,6 +6,48 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-27 — a stepper you could not hold
+
+Reported as "ok for a single click but when held down they work too fast", and
+MEASURED before anything was touched. Two faults, in BOTH Kolam renderers:
+
+**A small range had no brake at all.** `repeatMagnitude` floored the repeat at
+one step per 60 ms tick — 16.7 a second — and returned early under the comment
+*"below one step, the control is already quick enough — leave it alone"*.
+Leaving it alone was the bug. `depth` is four wide, so a held button crossed its
+**entire range in 0.24 s**; `colour_speed` in 0.36 s; `symmetry` in 0.90 s. The
+code could not express "slower than one step per tick", so it never tried — and
+the comment recorded that limit as though it were a property. Which is the
+lesson: *a floor you cannot go below is not the same as a floor you don't need.*
+
+**And 2500 ms to cross a range was brisk for the wide ones too** — 360 degrees
+of `angle` in two and a half seconds flies past what you aimed at.
+
+Both go away once the magnitude is allowed to be **fractional**: the caller
+accumulates it and steps only when a whole step has built up, so the
+range-derived rate governs small ranges as well instead of being clamped away by
+them. The floor became a TIME — one step per `START_STEP_MS` — rather than one
+step per tick. Traverse 2500 → 7000 ms, ramp 900 → 1400.
+
+Measured, holding the button, before → after:
+
+| control | range | first 0.5 s | full sweep |
+|---|---|---|---|
+| `depth` | 4 | — → 2 | 0.24 s → 1.08 s |
+| `colour_speed` | 6 | — → 2 | 0.36 s → 1.56 s |
+| `symmetry` | 15 | 9 → 2 | 0.90 s → 3.90 s |
+| `pitch` | 359 | 29 → 6 | 2.82 s → 7.68 s |
+| `step` | 9890 | 1200 → 300 | 3.18 s → 7.56 s |
+
+("—" means the control hit its end before half a second was up.)
+
+Fixed in **both** `V_Kolam` and `V_Kolam3D`, which carry the same block — the
+3D file's header promises the shared parts are identical, and fixing one would
+have made that false. The two music modules use an older repeat and are
+untouched.
+
+---
+
 ## 2026-09-27 — the kolam in three dimensions
 
 **`bd_V_Kolam3D`**, a new visual module, hung off **Graphics as a Cluster of

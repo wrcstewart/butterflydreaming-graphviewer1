@@ -224,6 +224,15 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-27 — hold-repeat
+
+| item | where | note |
+|---|---|---|
+| **A held stepper ran away** | `V_Kolam/`, `V_Kolam3D/` | **BUILT.** Two faults. (1) A small range had NO BRAKE: the repeat floored at one step per 60ms tick and returned early saying such controls were "already quick enough", so `depth` crossed its entire 4-wide range in **0.24s**. The code could not express "slower than one step per tick" and the comment recorded that limit as a property. (2) A 2500ms traverse was brisk for wide ranges too. Fixed by letting the magnitude go FRACTIONAL and accumulating in the caller, so the range-derived rate governs small ranges as well; the floor is now a TIME (one step per `START_STEP_MS`) not one step per tick. Traverse 7000ms, ramp 1400ms. Measured before/after in the changelog. |
+| **The two Kolam modules share this block and must stay identical** | `V_Kolam/`, `V_Kolam3D/` | The 3D file's header states the parser, stepper machinery and drift clock are the 2D file's verbatim. Fixing only the module that was complained about would have quietly made that false. A check compares the two blocks with comments stripped. The MUSIC modules use an older repeat and were not touched. |
+
+---
+
 ## Added 2026-09-27 — the 3D kolam
 
 | item | where | note |

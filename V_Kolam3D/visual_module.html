@@ -1137,31 +1137,66 @@
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    // The repeat rate is derived FROM THE RANGE, so holding a button crosses
-    // any control in about FULL_TRAVERSE_MS and the fifteen steppers cannot be
-    // tuned inconsistently. Small ranges work out below one step per tick and
-    // clamp back to their own step, so they are untouched by construction.
-    const REPEAT_MS        = 60;
-    const HOLD_MS          = 400;
-    const FULL_TRAVERSE_MS = 2500;
-    const RAMP_MS          = 900;
+    // Hold-repeat. The rate is derived FROM THE RANGE, so whatever the control,
+    // holding the button crosses it in about FULL_TRAVERSE_MS — self-scaling, so
+    // it needs no revisiting when a range changes and it cannot be set
+    // inconsistently across sixteen steppers.
+    //
+    // 2026-09-27, reported as "ok for a single click but they work too fast when
+    // held down". Two faults, both MEASURED before anything was touched:
+    //
+    //   1. A SMALL range had NO BRAKE AT ALL. repeatMagnitude floored at one
+    //      step per tick — 16.7 a second — and returned early under the comment
+    //      "below one step, the control is already quick enough — leave it
+    //      alone". Leaving it alone was the bug: `depth` is four wide, so a held
+    //      button crossed its ENTIRE range in 0.24s, `colour_speed` in 0.36s,
+    //      `symmetry` in 0.90s. The code could not express "slower than one step
+    //      per tick", so it never tried — and the comment recorded that as a
+    //      property rather than a limit.
+    //   2. FULL_TRAVERSE_MS 2500 was brisk for the big ranges too. 360 degrees
+    //      of angle in two and a half seconds flies past what you aimed at.
+    //
+    // Both go away once the magnitude is allowed to be FRACTIONAL: the caller
+    // accumulates it and steps only when a whole step has built up, so the
+    // range-derived rate governs small ranges as well instead of being clamped
+    // away by them. The floor is now a TIME — one step per START_STEP_MS — not
+    // one step per tick.
+    //
+    // MEASURED after: every control moves between 1 and 5 units in the first
+    // half-second of repeating; a wide range sweeps end to end in ~7.5s; depth
+    // takes 1.1s for its four steps.
+    const REPEAT_MS        = 60;    // gap between repeats while held
+    const HOLD_MS          = 400;   // press-and-hold before repeating starts
+    const START_STEP_MS    = 260;   // at the START of a hold, one step per this
+    const FULL_TRAVERSE_MS = 7000;  // target time to cross a whole range
+    const RAMP_MS          = 1400;  // time to reach full speed
 
+    // May return LESS than one step — the caller accumulates. Deliberately NOT
+    // rounded to the control's grid in here: rounding a fractional magnitude up
+    // to a whole step is precisely the floor this exists to remove.
     function repeatMagnitude(input, ticks) {
       const step = parseFloat(input.step) || 1;
       const min  = parseFloat(input.min);
       const max  = parseFloat(input.max);
-      if (!Number.isFinite(min) || !Number.isFinite(max)) return step;
-      const fastest = (max - min) / (FULL_TRAVERSE_MS / REPEAT_MS);
-      if (fastest <= step) return step;
+      // Slowest the repeat ever runs: one step per START_STEP_MS.
+      const slowest = step * (REPEAT_MS / START_STEP_MS);
+      // Fastest: whatever crosses the whole range in FULL_TRAVERSE_MS, but never
+      // slower than the floor — which is what gives a tiny range a constant,
+      // readable rate instead of a flicker.
+      const fastest = (Number.isFinite(min) && Number.isFinite(max))
+        ? Math.max(slowest, (max - min) / (FULL_TRAVERSE_MS / REPEAT_MS))
+        : slowest;
+      // Ramps in, so a short hold is still fine adjustment. A single tap never
+      // accelerates at all, because it never enters the repeat.
       const ramp = Math.min(1, (ticks * REPEAT_MS) / RAMP_MS);
-      const mag  = step + (fastest - step) * ramp;
-      return Math.max(step, Math.round(mag / step) * step);
+      return slowest + (fastest - slowest) * ramp;
     }
 
     document.querySelectorAll('.step-btn').forEach((btn) => {
       let holdTimer   = null;
       let repeatTimer = null;
       let repeatTicks = 0;
+      let repeatCarry = 0;
 
       const doStep = (magnitude) => {
         const input = document.getElementById(btn.dataset.target);
@@ -1175,13 +1210,23 @@
         ev.preventDefault();
         try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
         repeatTicks = 0;
+        repeatCarry = 0;
         doStep();
         holdTimer = setTimeout(() => {
           repeatTimer = setInterval(() => {
             const input = document.getElementById(btn.dataset.target);
             if (!input) return;
-            doStep(repeatMagnitude(input, repeatTicks));
+            const step = parseFloat(input.step) || 1;
+            // repeatMagnitude may be a FRACTION of a step. Accumulate it and
+            // move only when a whole step has built up — that is what lets a
+            // four-wide control repeat slower than one step per tick.
+            repeatCarry += repeatMagnitude(input, repeatTicks);
             repeatTicks += 1;
+            if (repeatCarry >= step) {
+              const whole = Math.floor(repeatCarry / step) * step;
+              repeatCarry = Math.max(0, repeatCarry - whole);
+              doStep(whole);
+            }
           }, REPEAT_MS);
         }, HOLD_MS);
       };
@@ -1190,6 +1235,7 @@
         if (holdTimer)   { clearTimeout(holdTimer);   holdTimer   = null; }
         if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
         repeatTicks = 0;
+        repeatCarry = 0;
       };
 
       btn.addEventListener('pointerdown',   start);
