@@ -586,13 +586,56 @@
         <button class="step-btn" type="button" data-target="cam-elevation-slider" data-delta="1">+</button>
       </div>
       <label>cam_elevation</label>
-      <!-- NOT cyclic. Stepping past the pole would flip the azimuth by 180
-           degrees without the azimuth control moving, so two different numbers
-           would name one view and the script could not round-trip. The poles
-           themselves are legal and safe: the up vector is taken from the
-           sphere's own north tangent, which is defined AT 90 (see placeCamera).
-           90 looks straight down and gives the 2D kolam exactly. -->
-      <input id="cam-elevation-slider" class="stepper-source" type="number" min="-90" max="90" step="1" value="60">
+      <!-- 2026-09-27 — the FULL TURN, -180..179, and CYCLIC. It was -90..90
+           with a note saying it must not wrap because "stepping past the pole
+           would flip the azimuth by 180 degrees without the azimuth control
+           moving, so two different numbers would name one view".
+           THAT NOTE WAS WRONG, and it was wrong about code that had already
+           been written to avoid the problem it described. It is true of a naive
+           up vector of world +Y; it is not true of the sphere's north tangent,
+           which is what placeCamera uses. CHECKED rather than reasoned about:
+           across all 360 whole degrees the up vector stays unit length and its
+           dot product with the view direction is 0 to twelve places — including
+           AT the poles — no two elevations in -180..179 give the same position
+           and up, and every one-degree step moves the camera exactly 0.01745 of
+           the radius, so there is no jump going over the top.
+
+           The range stops at 179 rather than 180 because 180 and -180 are the
+           SAME view (verified identical), and one picture must not have two
+           spellings or a script cannot round-trip. Same discipline as angle,
+           where 360 is never stored. So the span is 360 and + at 179 comes
+           round to -180.
+
+           Cyclic also because it has to be: cam_elevation_speed rotates through
+           it continuously, and a clamp would simply stop the rotation dead at
+           the end. -->
+      <input id="cam-elevation-slider" class="stepper-source" type="number" min="-180" max="179" step="1" value="60" data-wrap="1">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-elevation-speed-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="cam-elevation-speed-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-elevation-speed-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_elevation_speed</label>
+      <!-- Auto-rotate: DEGREES PER SECOND through cam_elevation, so the figure
+           tumbles over its own poles. 0 is off. 1 is a turn in six minutes, 60
+           a turn in six seconds.
+
+           Called _speed and deliberately NOT _drift, even though angle_drift and
+           pitch_drift are the module's other automatic movements. Their unit is
+           ARCSECONDS PER TICK, and at the top of that range the camera would
+           take twenty-one minutes to come round once — useless here. A control
+           that shares a family name must share the family's unit, so this one
+           takes a different name rather than a second meaning for "drift".
+
+           It has its own clock at 20 a second, not the drift timer's: that one
+           is throttled by DEPTH (a whole second per tick at depth 5) because
+           every tick of it rebuilds the geometry. A camera move rebuilds
+           nothing, so it can be smooth at any depth — which is the entire
+           reason the no-rebuild path exists. -->
+      <input id="cam-elevation-speed-slider" class="stepper-source" type="number" min="0" max="60" step="1" value="0">
     </div>
 
     <div class="control-row">
@@ -755,6 +798,13 @@
 
     const camAzimuthSlider   = document.getElementById('cam-azimuth-slider');
     const camElevationSlider = document.getElementById('cam-elevation-slider');
+    const camElevationSpeedSlider = document.getElementById('cam-elevation-speed-slider');
+    // Elevation is a full turn like the others, but centred on 0 rather than
+    // starting there, so it wraps into [-180, 180) and not [0, 360).
+    const ELEV_MIN = parseFloat(camElevationSlider.min) || -180;
+    function wrapElevation(deg) {
+      return ELEV_MIN + ((((deg - ELEV_MIN) % 360) + 360) % 360);
+    }
     const camDistanceSlider  = document.getElementById('cam-distance-slider');
     const CAM_DIST_MIN = parseFloat(camDistanceSlider.min) || 20;
     const CAM_DIST_MAX = parseFloat(camDistanceSlider.max) || 9900;
@@ -795,6 +845,20 @@
     // 1362 world units, so no single default can serve them.
     let camDistanceExplicit = false;
     let haveGeometry = false;
+
+    // ── Auto-rotate state ─────────────────────────────────────────────────
+    // camElevationExact is the SMOOTH elevation, a float, live only while the
+    // spin is running. The script records whole degrees — 20 script rewrites a
+    // second for a number read back to half a degree would be noise on the wire
+    // — so the drawing follows the float and the record follows the integer,
+    // exactly as angle_seconds already does against angle_minutes.
+    const CAM_SPIN_MS  = 50;    // 20 a second; a camera move costs no geometry
+    const CAM_WRITE_MS = 200;   // how often the script is rewritten + announced
+    let camSpinTimer      = null;
+    let camSpinNextDue    = 0;
+    let camSpinLastWrite  = 0;
+    let camElevationExact = null;   // null = follow the slider
+    let camElevationWritten = null; // the integer this module last put in the script
 
     const setStatus = (msg) => { statusEl.textContent = msg; };
 
@@ -933,7 +997,19 @@
       pitchDriftSlider.value = String(Math.min(Math.max(safeParseInt(directives.pitch_drift, 0), 0), 100));
 
       camAzimuthSlider.value   = String(wrapAngle(safeParseNumber(directives.cam_azimuth, 0)));
-      camElevationSlider.value = String(Math.min(Math.max(safeParseNumber(directives.cam_elevation, 60), -90), 90));
+      camElevationSlider.value = String(wrapElevation(safeParseNumber(directives.cam_elevation, 60)));
+      // If the script's elevation is NOT the integer this module last wrote,
+      // something outside the spin moved it — a push from BD, or a hand on the
+      // stepper — so the smooth accumulator must follow it rather than carry on
+      // from its own running total. Without this guard the angle-drift render,
+      // which reaches setControlValues five times a second, would reseed the
+      // float from a rounded degree on every frame and quantise the rotation.
+      if (camElevationWritten === null ||
+          safeParseNumber(directives.cam_elevation, NaN) !== camElevationWritten) {
+        camElevationExact = null;
+      }
+      camElevationSpeedSlider.value = String(Math.min(Math.max(
+        safeParseNumber(directives.cam_elevation_speed, 0), 0), 60));
       // Guarded, unlike every other control above. An unguarded default here
       // would overwrite the auto-framed distance on EVERY render, so the first
       // stepper press would snap the camera back and the auto-fit would look
@@ -943,6 +1019,7 @@
       }
 
       manageDriftInterval();
+      manageCamSpin();
 
       const colourSpeedValueParsed = Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16);
       colourSpeedSlider.value = String(Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -2), 4));
@@ -1034,6 +1111,7 @@
         pitch_drift:   pitchDriftSlider.value,
         cam_azimuth:   camAzimuthSlider.value,
         cam_elevation: camElevationSlider.value,
+        cam_elevation_speed: camElevationSpeedSlider.value,
         cam_distance:  camDistanceSlider.value,
         colour_speed:  formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
         saturation:    saturationSlider.value,
@@ -1057,7 +1135,7 @@
     // applyPitchScale for why those are the same thing.
     const NO_REBUILD_INPUT_IDS = new Set([
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
-      'step-pitch-slider', 'opacity-slider'
+      'step-pitch-slider', 'opacity-slider', 'cam-elevation-speed-slider'
     ]);
 
     function handleControlChange(ev) {
@@ -1078,6 +1156,12 @@
         announce();
         applyPitchScale();
         applyOpacity();
+        if (id === 'cam-elevation-slider' && camElevationExact !== null) {
+          // A hand on the stepper wins: restart the smooth accumulator where
+          // the finger put it, rather than let the rotation snap back to its
+          // own running total on the next tick.
+          camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+        }
         placeCamera();
         draw();
         return;
@@ -1091,7 +1175,7 @@
       angleMinutesSlider, pitchMinutesSlider,
       angleSecondsSlider, pitchSecondsSlider,
       angleDriftSlider, pitchDriftSlider,
-      camAzimuthSlider, camElevationSlider, camDistanceSlider,
+      camAzimuthSlider, camElevationSlider, camElevationSpeedSlider, camDistanceSlider,
       colourSpeedSlider, saturationSlider, lightnessSlider, opacitySlider
     ];
     controlInputs.forEach((input) => { input.addEventListener('input', handleControlChange); });
@@ -1113,6 +1197,7 @@
       pitch_drift:   pitchDriftSlider,
       cam_azimuth:   camAzimuthSlider,
       cam_elevation: camElevationSlider,
+      cam_elevation_speed: camElevationSpeedSlider,
       cam_distance:  camDistanceSlider,
       colour_speed:  colourSpeedSlider,
       saturation:    saturationSlider,
@@ -1428,7 +1513,12 @@
     function placeCamera() {
       if (!camera) return;
       const az = wrapAngle(safeParseNumber(camAzimuthSlider.value, 0)) * DEG;
-      const el = Math.min(Math.max(safeParseNumber(camElevationSlider.value, 60), -90), 90) * DEG;
+      // The float while the rotation is running, the slider otherwise. The
+      // slider holds whole degrees, so drawing from it would step the camera a
+      // degree at a time however fast the clock ticked.
+      const el = wrapElevation(camSpinTimer !== null && camElevationExact !== null
+        ? camElevationExact
+        : safeParseNumber(camElevationSlider.value, 60)) * DEG;
       const d  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
       const ce = Math.cos(el), se = Math.sin(el);
       const ca = Math.cos(az), sa = Math.sin(az);
@@ -1507,6 +1597,86 @@
       material.depthWrite = !wantTransparent;
       return o;
     }
+
+    // ── Auto-rotate ───────────────────────────────────────────────────────
+    //
+    // Its own clock, NOT the drift timer's. That one is throttled by depth — a
+    // full second per tick at depth 5 — because every tick of it rebuilds the
+    // geometry. A camera move rebuilds nothing, so this one runs at 20 a second
+    // whatever the depth, and the rotation is as smooth at depth 5 as at 1.
+    function manageCamSpin() {
+      const speed = safeParseNumber(camElevationSpeedSlider.value, 0);
+      if (!(speed > 0)) {
+        if (camSpinTimer !== null) { clearTimeout(camSpinTimer); camSpinTimer = null; }
+        // Hand the whole degrees back to the slider, so the script, the readout
+        // and the picture all agree the moment the rotation stops. Rounded
+        // BEFORE wrapping: rounding 179.6 gives 180, which is off the end.
+        if (camElevationExact !== null) {
+          camElevationSlider.value = String(wrapElevation(Math.round(camElevationExact)));
+          camElevationExact = null;
+          updateValueDisplays();
+          placeCamera();
+          draw();
+        }
+        return;
+      }
+      if (camSpinTimer === null) {
+        camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+        camSpinLastWrite  = Date.now();
+        camSpinNextDue    = Date.now() + CAM_SPIN_MS;
+        camSpinTimer      = setTimeout(camSpinTick, CAM_SPIN_MS);
+      }
+    }
+
+    function camSpinTick() {
+      // Do NOT null camSpinTimer here — manageCamSpin checks it to avoid
+      // double-scheduling. The stale handle is overwritten at the end.
+      const speed = safeParseNumber(camElevationSpeedSlider.value, 0);
+      if (!(speed > 0)) { camSpinTimer = null; return; }
+      if (camElevationExact === null) {
+        camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+      }
+
+      camElevationExact = wrapElevation(camElevationExact + speed * (CAM_SPIN_MS / 1000));
+
+      // Every tick draws. This is the whole point of a 50ms clock, and it costs
+      // a matrix and a draw call.
+      placeCamera();
+      draw();
+
+      // The script is rewritten far less often than the picture is drawn. At any
+      // useful speed the whole degree changes several times a second, and
+      // rewriting and announcing on each one would put twenty messages a second
+      // on the wire for a value only ever read back to half a degree.
+      const now = Date.now();
+      if (now - camSpinLastWrite >= CAM_WRITE_MS) {
+        camSpinLastWrite = now;
+        const whole = wrapElevation(Math.round(camElevationExact));
+        if (String(whole) !== camElevationSlider.value) {
+          camElevationSlider.value = String(whole);
+          camElevationWritten = whole;
+          updateValueDisplays();
+          if (storedText) {
+            storedText = applyControlDirectives(storedText);
+            // Labelled as drift, because that is exactly what it is: a timer
+            // moved it, not a person, and a viewer is computing the same
+            // rotation from the same script. RULE 7 — and the reason BD can
+            // decline to forward it rather than snapping the viewer backwards.
+            renderingFromDrift = true;
+            try { announce(); } finally { renderingFromDrift = false; }
+          }
+        }
+      }
+
+      // Timed from when the tick was DUE, not from now — the same wall-clock
+      // scheduling the drift timer needs, and for the same reason: anything the
+      // draw costs must be absorbed here instead of added to every period.
+      camSpinNextDue += CAM_SPIN_MS;
+      if (Date.now() - camSpinNextDue > CAM_SPIN_MS * 5) camSpinNextDue = Date.now() + CAM_SPIN_MS;
+      camSpinTimer = setTimeout(camSpinTick, Math.max(0, camSpinNextDue - Date.now()));
+    }
+
+    camElevationSpeedSlider.addEventListener('input', manageCamSpin);
 
     function fitDistance(radius) {
       if (!(radius > 0)) return clampCam(260);
@@ -1914,6 +2084,8 @@
           }
           case 'BD_STOP':
             if (driftInterval !== null) { clearTimeout(driftInterval); driftInterval = null; }
+            if (camSpinTimer !== null) { clearTimeout(camSpinTimer); camSpinTimer = null; }
+            camElevationExact = null;
             if (group) { while (group.children.length) group.remove(group.children[0]); }
             draw();
             setStatus('Stopped');

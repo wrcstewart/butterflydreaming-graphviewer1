@@ -6,6 +6,62 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-27 — the camera goes all the way round, and turns itself
+
+**`cam_elevation` opens to the full turn**, −180..179, cyclic. It was −90..90
+under a note of mine saying it must not wrap because *"stepping past the pole
+would flip the azimuth by 180 degrees without the azimuth control moving, so two
+different numbers would name one view"*.
+
+**That note was wrong, and it was wrong about code already written to avoid the
+problem it described.** It is true of a naive up vector of world +Y. It is not
+true of the sphere's north tangent, which is what `placeCamera` has used from
+the first commit — the up vector I put there specifically so the poles would not
+degenerate, and then wrote a comment forbidding the range that needs them.
+CHECKED rather than reasoned about a second time: across all 360 whole degrees
+the up vector stays unit length and its dot product with the view direction is
+zero to twelve places, *including at the poles*; no two elevations in −180..179
+give the same position and up; and every one-degree step moves the camera exactly
+0.01745 of the radius, so there is no jump going over the top. It stops at 179
+because 180 and −180 are verifiably the same view, and one picture must not have
+two spellings — the same discipline as `angle`, where 360 is never stored.
+
+**`cam_elevation_speed`** turns it: degrees per second, 0 off, 1 a turn in six
+minutes, 60 a turn in six seconds. MEASURED, not estimated.
+
+Called `_speed` and deliberately **not** `_drift`. `angle_drift` and
+`pitch_drift` are the module's other automatic movements, and their unit is
+arcseconds per tick — at the top of *that* range the camera would take
+twenty-one minutes to come round once. A control that borrows a family's name
+must borrow its unit, so this one takes a different name rather than giving
+"drift" a second meaning.
+
+**It has its own clock at 20 a second, not the drift timer's.** That timer is
+throttled by DEPTH — a whole second per tick at depth 5 — because every tick of
+it rebuilds the geometry. A camera move rebuilds nothing, so this rotation is as
+smooth at depth 5 as at depth 1, which is exactly what the no-rebuild path was
+built for.
+
+The drawing follows a float; the script records whole degrees, rewritten at most
+five times a second rather than twenty. Same division as `angle_seconds` against
+`angle_minutes`, and for the same reason: twenty script rewrites a second for a
+number read back to half a degree is noise on the wire. The announcement is
+labelled as drift (RULE 7), because a timer moved it and a viewer is computing
+the same rotation from the same script.
+
+Three guards that each fix a real way this could go wrong: a hand on the
+elevation stepper reseeds the smooth accumulator, so the rotation does not snap
+back to its own running total; a script value that differs from the integer this
+module last wrote also reseeds it, or the angle-drift render reaching
+`setControlValues` five times a second would quantise the rotation to whole
+degrees; and stopping hands the rounded degrees back to the slider so the
+script, the readout and the picture agree the moment it stops.
+
+Azimuth has no speed control yet — one more row if a turntable is wanted as well
+as a tumble.
+
+---
+
 ## 2026-09-27 — opacity on the 3D kolam
 
 **`%%bd_p_opacity`**, 0 to 1 in twentieths, a seventeenth stepper on

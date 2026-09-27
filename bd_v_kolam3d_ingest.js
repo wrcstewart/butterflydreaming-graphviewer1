@@ -109,6 +109,10 @@ const CONTENT1_TEXT =
   '%%bd_p_pitch_drift 0\n' +
   '%%bd_p_cam_azimuth 0\n' +
   '%%bd_p_cam_elevation 60\n' +
+  // 0 — the auto-rotate off. Stepping up starts it, so this is no dead
+  // default: 0 is the bottom of the range and the first press moves the eye.
+  // 1 is a turn in six minutes, 60 a turn in six seconds (both MEASURED).
+  '%%bd_p_cam_elevation_speed 0\n' +
   '%%bd_p_cam_distance 280\n' +
   '%%bd_p_colour_speed 4\n' +
   '%%bd_stroke angle\n' +

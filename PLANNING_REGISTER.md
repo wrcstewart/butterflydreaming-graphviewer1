@@ -224,6 +224,16 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-27 — camera range and auto-rotate
+
+| item | where | note |
+|---|---|---|
+| **`cam_elevation` is the full turn, cyclic** | `V_Kolam3D/visual_module.html` | **BUILT.** −180..179, wrapping. It was −90..90 under a comment of MINE claiming the poles would flip the azimuth and break round-tripping. That comment was wrong about code written to avoid exactly that: the up vector is the sphere's north tangent, not world +Y. VERIFIED across all 360 degrees — up stays unit, up·view is 0 to twelve places at the poles included, no two elevations give the same view, every 1° step moves the camera 0.01745 of the radius with no jump over the top. Stops at 179 because 180 ≡ −180 and one picture must not have two spellings. |
+| **`cam_elevation_speed` — auto-rotate** | `V_Kolam3D/visual_module.html` | **BUILT.** Degrees per second: 0 off, 1 = a turn in 6 min, 60 = 6 s. NOT called `_drift`, because drift means arcseconds per tick in this module and at that unit's maximum the camera would need 21 minutes for one turn — a control borrowing a family name must borrow its unit. **Its own clock at 20 Hz, not the drift timer's**, which is depth-throttled to 1 Hz at depth 5 because it rebuilds geometry; a camera move rebuilds nothing, so the rotation is smooth at every depth. Drawing follows a float, the script records whole degrees at ≤5 writes/s, announced as drift (RULE 7). |
+| **No azimuth speed yet** | — | **OPEN, one row.** A turntable is the more usual auto-rotate than a pole-to-pole tumble; only elevation was asked for. Same mechanism, so it is a stepper plus three lines. |
+
+---
+
 ## Added 2026-09-27 — opacity
 
 | item | where | note |
