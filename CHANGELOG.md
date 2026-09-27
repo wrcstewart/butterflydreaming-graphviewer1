@@ -25,9 +25,14 @@ direction at elevation 90, so `lookAt` degenerates there — and elevation 90 is
 not a corner case in this module, it is the view the invariant is stated at.
 
 **`+` turns the turtle by `angle` about its up axis AND by `pitch` about its
-left.** Pitch is a far more sensitive control than it looks: MEASURED, one
-degree of pitch on the default figure takes the maximum |y| from 0 to 343 world
-units, because the turn compounds at every one of 512 steps.
+left.** Pitch compounds at every one of 512 steps, so it bites far harder than
+a single degree suggests: MEASURED, **five** degrees takes the default figure's
+maximum |y| from 0 to 343 world units against an in-plane radius of 97. One
+degree gives 75 — a shallow dome, and the value the stored node now opens at.
+
+(An earlier draft of this entry, and of the commit message, said ONE degree gave
+343. That was the five-degree row of the same table. It mattered: `step_pitch`'s
+default in the node was chosen from it and was ten times too small.)
 
 That showed up in the first test, and the answer is **`%%bd_step_pitch`** — the
 turtle's step length in the new dimension, in the same units as `%%bd_step`.
@@ -46,6 +51,22 @@ precision. Two things fall out. Sweeping the control **rebuilds nothing**, so
 the figure inflates under your finger even at depth 5. And it has to go on the
 group, ABOVE the symmetry children, because a rotation about y commutes with a
 scale in y — which is also why the module's base plane is the horizontal one.
+
+**The column runs in pairs.** Every quantity that exists in both planes sits
+next to its counterpart — `step`/`step_pitch`, `angle`/`pitch`,
+`angle_minutes`/`pitch_minutes`, `angle_drift`/`pitch_drift` — so "what is the
+pitch equivalent of this" is answered by the row underneath rather than by
+scrolling. The script's directives are in the same order, because the script IS
+the card the user reads. Order is presentation only: `parseBD` is order-blind
+and `setDirectiveValue` replaces in place.
+
+**The node opens at `pitch 1`.** At pitch 0 the turtle never leaves the plane,
+so `step_pitch` has no out-of-plane extent to scale and reads as a dead
+control — which is how it was first reported, and correct behaviour badly
+chosen. One degree is a shallow dome. The module's *parse* fallback stays 0
+though, and the two differ on purpose: a script that never mentions pitch was
+written for the flat module and must render flat here rather than be quietly
+given a shape its author did not ask for.
 
 **Camera steppers** `cam_azimuth` / `cam_elevation` / `cam_distance`, because a
 3D figure you cannot walk round is a flat picture with extra cost. `cam_`

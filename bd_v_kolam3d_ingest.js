@@ -52,28 +52,41 @@ const content1Uuid = crypto.randomUUID();
 const GATEWAY_TEXT =
   'Kolam in three dimensions. The same L-system turtle as the Kolam module, ' +
   'given a second plane: + turns it by angle about its up axis and by pitch ' +
-  'about its left, so a pitch of zero draws the flat kolam exactly and a pitch ' +
-  'of one degree lifts the whole figure into a shell — the turn compounds at ' +
-  'every one of five hundred steps. step_pitch is how far that lift carries: ' +
-  "it scales the figure's extent out of the plane, so a small value against " +
-  'step makes pitch a dial rather than a switch. It has nothing to work on ' +
-  'until pitch is non-zero — at pitch 0 the turtle never leaves the plane, so ' +
-  'there is no depth to scale and the stepper is correctly inert. Raise pitch ' +
-  'first. Three further steppers place the eye: ' +
-  'cam_azimuth, cam_elevation and cam_distance. At elevation 90 you are looking ' +
-  'straight down, and what you see is the two-dimensional kolam.\n\n' +
-  'Drawn with three.js on the graphics card, which is what makes the symmetry ' +
-  'affordable: the figure is built once as a single shape and stamped eight ' +
-  'times by the card, where the flat module strokes every segment by hand.';
+  'about its left, so a pitch of zero draws the flat kolam exactly, and the ' +
+  'turn compounds at every one of five hundred steps — one degree lifts the ' +
+  'figure into a shallow dome, five degrees into a deep shell. step_pitch is ' +
+  'how far that lift carries: it scales the figure\'s extent out of the ' +
+  'plane, and it is the counterpart of step, which is why it sits beside it. ' +
+  'At pitch 0 there is no depth to scale and step_pitch is correctly inert, ' +
+  'so this node opens at pitch 1 and both are live. Three further steppers ' +
+  'place the eye: cam_azimuth, cam_elevation and cam_distance. At elevation ' +
+  '90 you are looking straight down, and what you see is the two-dimensional ' +
+  'kolam.\n\nThe column runs in pairs: every quantity that exists in both ' +
+  'planes sits next to its counterpart — step and step_pitch, angle and ' +
+  'pitch, and so on down to the drifts.\n\nDrawn with three.js on the ' +
+  'graphics card, which is what makes the symmetry affordable: the figure is ' +
+  'built once as a single shape and stamped eight times by the card, where ' +
+  'the flat module strokes every segment by hand.';
 
-// The default script. bd_V_Kolam_001's values, kept deliberately, plus the 3D
-// directives — so the first thing this node draws is the FAMILIAR figure, lying
-// flat and seen from above the horizon, and raising pitch is what shows the
-// module is doing anything new.
+// The default script. bd_V_Kolam_001's flat values kept where they apply, plus
+// the 3D ones.
 //
-// cam_distance 260: MEASURED. This figure's radius about the origin is 97.2
-// world units, and framing a sphere of that radius at a 50-degree field of view
-// with 12% of air round it needs 258.
+// pitch 1, NOT 0 (revised 2026-09-27 after the first test). At pitch 0 the
+// turtle never leaves the plane, so step_pitch has nothing to scale and reads
+// as a dead control — which is how it was first reported. One degree is a
+// shallow dome: MEASURED, 75 world units of lift against an in-plane radius of
+// 97, so both new controls do something the moment the node opens.
+//
+// step_pitch 25 against step 50 — half. An earlier value of 5 was chosen from a
+// measurement that turned out to be of FIVE degrees of pitch, not one (343
+// units, not 75); at one degree that left a lift of 7 on a radius of 97, which
+// looks flat. Half gives 37, a visible dome with room to sweep both ways.
+// (The MODULE's fallback when a script omits step_pitch is different and also
+// right: it falls back to `step`, i.e. isotropic, the only default that cannot
+// change a figure written before today.)
+//
+// cam_distance 280: MEASURED. Framing a sphere of hypot(97, 37) at a 50-degree
+// field of view with 12% of air round it needs 276.
 //
 // %%bd_weight is UNMARKED (no p_) because this module has no weight stepper —
 // core WebGL ignores line width. The line is kept so the value survives a trip
@@ -82,24 +95,21 @@ const CONTENT1_TEXT =
   '%%bd_module bd_V_Kolam3D\n' +
   '%%bd_p_symmetry 8\n' +
   '%%bd_p_depth 2\n' +
+  // PAIRED ORDER, matching the stepper column: every quantity that exists in
+  // both planes sits next to its counterpart. Order is presentation only —
+  // parseBD is order-blind and setDirectiveValue replaces in place — but the
+  // script IS the card the user reads, so it should read the way the column does.
   '%%bd_p_step 50\n' +
-  // Deliberately NOT equal to step. step_pitch is the turtle's step length
-  // in the NEW dimension, and pitch compounds over 512 turns — at parity,
-  // one degree of pitch throws the figure 343 world units out of a plane
-  // whose own radius is 97. A fifth of step makes pitch a dial rather than
-  // a switch. (The MODULE's fallback when a script omits step_pitch is the
-  // opposite, and also right: it falls back to `step`, i.e. isotropic, which
-  // is the only default that cannot change a figure written before today.)
-  '%%bd_p_step_pitch 5\n' +
+  '%%bd_p_step_pitch 25\n' +
   '%%bd_p_angle 90\n' +
+  '%%bd_p_pitch 1\n' +
   '%%bd_p_angle_minutes 0\n' +
-  '%%bd_p_angle_drift 10\n' +
-  '%%bd_p_pitch 0\n' +
   '%%bd_p_pitch_minutes 0\n' +
+  '%%bd_p_angle_drift 10\n' +
   '%%bd_p_pitch_drift 0\n' +
   '%%bd_p_cam_azimuth 0\n' +
   '%%bd_p_cam_elevation 60\n' +
-  '%%bd_p_cam_distance 260\n' +
+  '%%bd_p_cam_distance 280\n' +
   '%%bd_p_colour_speed 4\n' +
   '%%bd_stroke angle\n' +
   '%%bd_p_saturation 100\n' +

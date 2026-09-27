@@ -483,6 +483,12 @@
              data-coarse-above="1000" data-coarse-step="100" value="50">
     </div>
 
+    <!-- 2026-09-27 — PAIRED ORDER. Every quantity that exists in both planes
+         sits next to its counterpart: step/step_pitch above, then angle/pitch,
+         angle_minutes/pitch_minutes, angle_drift/pitch_drift. The column is
+         read as six pairs rather than two families, so the question "what is
+         the pitch equivalent of this" is answered by the row underneath
+         instead of by scrolling. -->
     <div class="control-row">
       <div class="stepper">
         <button class="step-btn" type="button" data-target="angle-slider" data-delta="-1">−</button>
@@ -495,6 +501,28 @@
 
     <div class="control-row">
       <div class="stepper">
+        <button class="step-btn" type="button" data-target="pitch-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="pitch-slider">1</span>
+        <button class="step-btn" type="button" data-target="pitch-slider" data-delta="1">+</button>
+      </div>
+      <label>pitch</label>
+      <!-- Initialises to 1, not 0 (2026-09-27). At pitch 0 the turtle never
+           leaves the plane, so step_pitch has no out-of-plane extent to scale
+           and reads as a dead control — which is exactly how it was first
+           reported. One degree is a shallow dome: MEASURED, it lifts the
+           default figure 75 world units against an in-plane radius of 97, so
+           sweeping step_pitch across its range is plainly visible.
+
+           This is the MARKUP default, seen before any script arrives. The
+           PARSE fallback in setControlValues stays 0, deliberately: a script
+           that never mentions pitch is a script written for the flat module,
+           and it must render flat here rather than be quietly given a shape
+           its author did not ask for. -->
+      <input id="pitch-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="1" data-wrap="1">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
         <button class="step-btn" type="button" data-target="angle-minutes-slider" data-delta="-1">−</button>
         <span class="stepper-value" data-target="angle-minutes-slider">0</span>
         <button class="step-btn" type="button" data-target="angle-minutes-slider" data-delta="1">+</button>
@@ -503,7 +531,15 @@
       <input id="angle-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
     </div>
 
-    <input id="angle-seconds-slider" type="hidden" value="0">
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="pitch-minutes-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="pitch-minutes-slider">0</span>
+        <button class="step-btn" type="button" data-target="pitch-minutes-slider" data-delta="1">+</button>
+      </div>
+      <label>pitch_minutes</label>
+      <input id="pitch-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
+    </div>
 
     <div class="control-row">
       <div class="stepper">
@@ -517,28 +553,6 @@
 
     <div class="control-row">
       <div class="stepper">
-        <button class="step-btn" type="button" data-target="pitch-slider" data-delta="-1">−</button>
-        <span class="stepper-value" data-target="pitch-slider">0</span>
-        <button class="step-btn" type="button" data-target="pitch-slider" data-delta="1">+</button>
-      </div>
-      <label>pitch</label>
-      <input id="pitch-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="0" data-wrap="1">
-    </div>
-
-    <div class="control-row">
-      <div class="stepper">
-        <button class="step-btn" type="button" data-target="pitch-minutes-slider" data-delta="-1">−</button>
-        <span class="stepper-value" data-target="pitch-minutes-slider">0</span>
-        <button class="step-btn" type="button" data-target="pitch-minutes-slider" data-delta="1">+</button>
-      </div>
-      <label>pitch_minutes</label>
-      <input id="pitch-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
-    </div>
-
-    <input id="pitch-seconds-slider" type="hidden" value="0">
-
-    <div class="control-row">
-      <div class="stepper">
         <button class="step-btn" type="button" data-target="pitch-drift-slider" data-delta="-1">−</button>
         <span class="stepper-value" data-target="pitch-drift-slider">0</span>
         <button class="step-btn" type="button" data-target="pitch-drift-slider" data-delta="1">+</button>
@@ -546,6 +560,13 @@
       <label>pitch_drift</label>
       <input id="pitch-drift-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="0">
     </div>
+
+    <!-- Both seconds accumulators, together, below the pair they belong to.
+         They are sub-arcminute drift totals with controls and deliberately NO
+         directive, so they are not in CONTROL_FOR and cannot be hidden by a
+         marking decision they have no way to express. -->
+    <input id="angle-seconds-slider" type="hidden" value="0">
+    <input id="pitch-seconds-slider" type="hidden" value="0">
 
     <div class="control-row">
       <div class="stepper">
@@ -700,14 +721,15 @@
     const STEP_PITCH_MAX = parseFloat(stepPitchSlider.max) || 9900;
     const clampStepPitch = (v) => Math.min(Math.max(v, STEP_PITCH_MIN), STEP_PITCH_MAX);
 
+    // Paired, in the order the column shows them: every quantity beside its
+    // counterpart in the other plane.
     const angleSlider        = document.getElementById('angle-slider');
-    const angleMinutesSlider = document.getElementById('angle-minutes-slider');
-    const angleSecondsSlider = document.getElementById('angle-seconds-slider');
-    const angleDriftSlider   = document.getElementById('angle-drift-slider');
-
     const pitchSlider        = document.getElementById('pitch-slider');
+    const angleMinutesSlider = document.getElementById('angle-minutes-slider');
     const pitchMinutesSlider = document.getElementById('pitch-minutes-slider');
+    const angleSecondsSlider = document.getElementById('angle-seconds-slider');
     const pitchSecondsSlider = document.getElementById('pitch-seconds-slider');
+    const angleDriftSlider   = document.getElementById('angle-drift-slider');
     const pitchDriftSlider   = document.getElementById('pitch-drift-slider');
 
     const camAzimuthSlider   = document.getElementById('cam-azimuth-slider');
@@ -866,7 +888,14 @@
         safeParseNumber(directives.step_pitch, safeParseNumber(stepSlider.value, 50))));
 
       angleSlider.value        = String(Math.min(Math.max(safeParseNumber(directives.angle, 90), ANGLE_MIN), ANGLE_MAX));
+      // Falls back to 0, while the MARKUP initialises the stepper to 1. The
+      // two differ on purpose — see the note on the pitch input. A script that
+      // never mentions pitch was written for the flat module and renders flat.
+      pitchSlider.value        = String(Math.min(Math.max(safeParseNumber(directives.pitch, 0), ANGLE_MIN), ANGLE_MAX));
+
       angleMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_minutes, 0), 0), 59));
+      pitchMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.pitch_minutes, 0), 0), 59));
+
       // angle_seconds / pitch_seconds are internal-only: sub-arcminute drift
       // accumulators that are never written to the script. Only touch them if
       // a directive explicitly supplied one, or the running total is lost on
@@ -874,13 +903,11 @@
       if (directives.angle_seconds !== undefined) {
         angleSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_seconds, 0), 0), 59));
       }
-      angleDriftSlider.value = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 100));
-
-      pitchSlider.value        = String(Math.min(Math.max(safeParseNumber(directives.pitch, 0), ANGLE_MIN), ANGLE_MAX));
-      pitchMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.pitch_minutes, 0), 0), 59));
       if (directives.pitch_seconds !== undefined) {
         pitchSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.pitch_seconds, 0), 0), 59));
       }
+
+      angleDriftSlider.value = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 100));
       pitchDriftSlider.value = String(Math.min(Math.max(safeParseInt(directives.pitch_drift, 0), 0), 100));
 
       camAzimuthSlider.value   = String(wrapAngle(safeParseNumber(directives.cam_azimuth, 0)));
@@ -965,10 +992,10 @@
         step:          stepSlider.value,
         step_pitch:    stepPitchSlider.value,
         angle:         angleSlider.value,
-        angle_minutes: angleMinutesSlider.value,
-        angle_drift:   angleDriftSlider.value,
         pitch:         pitchSlider.value,
+        angle_minutes: angleMinutesSlider.value,
         pitch_minutes: pitchMinutesSlider.value,
+        angle_drift:   angleDriftSlider.value,
         pitch_drift:   pitchDriftSlider.value,
         cam_azimuth:   camAzimuthSlider.value,
         cam_elevation: camElevationSlider.value,
@@ -1023,8 +1050,10 @@
 
     const controlInputs = [
       symmetrySelect, depthSelect, stepSlider, stepPitchSlider,
-      angleSlider, angleMinutesSlider, angleSecondsSlider, angleDriftSlider,
-      pitchSlider, pitchMinutesSlider, pitchSecondsSlider, pitchDriftSlider,
+      angleSlider, pitchSlider,
+      angleMinutesSlider, pitchMinutesSlider,
+      angleSecondsSlider, pitchSecondsSlider,
+      angleDriftSlider, pitchDriftSlider,
       camAzimuthSlider, camElevationSlider, camDistanceSlider,
       colourSpeedSlider, saturationSlider, lightnessSlider
     ];
@@ -1040,10 +1069,10 @@
       step:          stepSlider,
       step_pitch:    stepPitchSlider,
       angle:         angleSlider,
-      angle_minutes: angleMinutesSlider,
-      angle_drift:   angleDriftSlider,
       pitch:         pitchSlider,
+      angle_minutes: angleMinutesSlider,
       pitch_minutes: pitchMinutesSlider,
+      angle_drift:   angleDriftSlider,
       pitch_drift:   pitchDriftSlider,
       cam_azimuth:   camAzimuthSlider,
       cam_elevation: camElevationSlider,
