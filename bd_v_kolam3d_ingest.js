@@ -78,6 +78,14 @@ const CONTENT1_TEXT =
   '%%bd_p_symmetry 8\n' +
   '%%bd_p_depth 2\n' +
   '%%bd_p_step 50\n' +
+  // Deliberately NOT equal to step. step_pitch is the turtle's step length
+  // in the NEW dimension, and pitch compounds over 512 turns — at parity,
+  // one degree of pitch throws the figure 343 world units out of a plane
+  // whose own radius is 97. A fifth of step makes pitch a dial rather than
+  // a switch. (The MODULE's fallback when a script omits step_pitch is the
+  // opposite, and also right: it falls back to `step`, i.e. isotropic, which
+  // is the only default that cannot change a figure written before today.)
+  '%%bd_p_step_pitch 5\n' +
   '%%bd_p_angle 90\n' +
   '%%bd_p_angle_minutes 0\n' +
   '%%bd_p_angle_drift 10\n' +

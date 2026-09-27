@@ -27,8 +27,25 @@ not a corner case in this module, it is the view the invariant is stated at.
 **`+` turns the turtle by `angle` about its up axis AND by `pitch` about its
 left.** Pitch is a far more sensitive control than it looks: MEASURED, one
 degree of pitch on the default figure takes the maximum |y| from 0 to 343 world
-units, because the turn compounds at every one of 512 steps. `pitch_minutes`
-is not a nicety.
+units, because the turn compounds at every one of 512 steps.
+
+That showed up in the first test, and the answer is **`%%bd_step_pitch`** — the
+turtle's step length in the new dimension, in the same units as `%%bd_step`.
+Equal means isotropic; a fifth means the same pitch lifts the figure a fifth as
+far; 0 means flat whatever the pitch says. It is what makes pitch a dial
+instead of a switch, and it sits beside `step` rather than beside `pitch`
+because it is a length and the two are read together.
+
+It is applied as **`group.scale.y`, and that is exactly equivalent to scaling
+the y of every individual move** — not an approximation of it. Every position
+is a sum of moves, so scaling each move's y scales the sum's y, and the bezier
+is affine in its control points. CHECKED rather than asserted: the module's
+output y-scaled after the walk against an independent turtle that scales during
+it, five settings including ratios 0 and 2.5, agreement to `Float32Array`
+precision. Two things fall out. Sweeping the control **rebuilds nothing**, so
+the figure inflates under your finger even at depth 5. And it has to go on the
+group, ABOVE the symmetry children, because a rotation about y commutes with a
+scale in y — which is also why the module's base plane is the horizontal one.
 
 **Camera steppers** `cam_azimuth` / `cam_elevation` / `cam_distance`, because a
 3D figure you cannot walk round is a flat picture with extra cost. `cam_`
