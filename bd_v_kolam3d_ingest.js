@@ -54,7 +54,12 @@ const GATEWAY_TEXT =
   'given a second plane: + turns it by angle about its up axis and by pitch ' +
   'about its left, so a pitch of zero draws the flat kolam exactly and a pitch ' +
   'of one degree lifts the whole figure into a shell — the turn compounds at ' +
-  'every one of five hundred steps. Three further steppers place the eye: ' +
+  'every one of five hundred steps. step_pitch is how far that lift carries: ' +
+  "it scales the figure's extent out of the plane, so a small value against " +
+  'step makes pitch a dial rather than a switch. It has nothing to work on ' +
+  'until pitch is non-zero — at pitch 0 the turtle never leaves the plane, so ' +
+  'there is no depth to scale and the stepper is correctly inert. Raise pitch ' +
+  'first. Three further steppers place the eye: ' +
   'cam_azimuth, cam_elevation and cam_distance. At elevation 90 you are looking ' +
   'straight down, and what you see is the two-dimensional kolam.\n\n' +
   'Drawn with three.js on the graphics card, which is what makes the symmetry ' +
