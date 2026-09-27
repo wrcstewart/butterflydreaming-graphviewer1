@@ -6,6 +6,58 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-27 — the viewer was being sent the sender's clock
+
+Reported as "the AV viewer makes small jerks of elevation every one or two
+seconds". The server log named it: **10,200 drift frames correctly declined, and
+an `av_push` going out beside every card write anyway.**
+
+`pushScriptToAV` suppresses a drift frame when it differs from the last push
+*only in the angle*, because the receiver computes the angle for itself from the
+same script. The comparison stripped `AV_ANGLE_LINES` — which named the angle
+triple **literally**. A frame whose only difference was `cam_elevation` therefore
+read as a human change and was pushed, and the viewer's smooth rotation snapped
+back to a value up to a second stale.
+
+**The comment sitting above that regex had already said this would happen**: *"it
+names the angle triple literally, and if it stopped matching, every drift frame
+would read as a human change and be pushed to the viewer. That is last week's iOS
+smoothness work undone, with no error to notice."* It was right. What it did not
+say was that ADDING A CLOCK has the same effect as the regex breaking, and that
+is the lesson worth keeping: a matcher that lists the members of a category is a
+matcher that must be edited whenever the category grows.
+
+`AV_ANGLE_LINES` is now `AV_CLOCK_LINES` — every directive a receiver advances
+from its own clock: the angle triple, **the pitch triple, and `cam_elevation`**.
+Pitch was leaking in exactly the same way and had simply not been noticed,
+because the stored node ships `pitch_drift` at 0.
+
+**The angle case is what hid it.** Angle drift is slow, so a one-second-stale
+angle lands almost where the viewer already was. A camera turning at 20 degrees a
+second is twenty degrees out, and you can see that.
+
+The rates are deliberately NOT in the set — `angle_drift`, `pitch_drift` and
+`cam_elevation_speed` are human controls, and a change to one MUST reach the
+viewer or it keeps turning at the old rate for ever. That distinction is
+structural rather than careful: `cam_elevation` is followed by whitespace in the
+pattern, so `cam_elevation_speed` cannot match it, and `pitch` cannot match
+`pitch_drift` or `step_pitch`. Checked over 31 cases, every one correct, plus the
+real comparison: two spin frames compare equal, a change of speed or distance
+still differs.
+
+`avWithAngleFrom` became `avWithClockDrivenFrom` and carries all five values, so
+a **resync** still makes the viewer agree — which is what makes the phase offset
+between two independent clocks tolerable rather than a defect.
+
+Two ordering fixes in the module alongside. Stopping the rotation hands the
+smooth degrees back to the slider, so it now happens BEFORE the script is
+rebuilt — called from `handleControlChange` rather than its own listener, so the
+order is stated rather than left to registration order — and the hand-back is
+skipped if a script has set the slider since, because then the script is the
+authority.
+
+---
+
 ## 2026-09-27 — the camera goes all the way round, and turns itself
 
 **`cam_elevation` opens to the full turn**, −180..179, cyclic. It was −90..90

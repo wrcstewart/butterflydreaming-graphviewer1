@@ -1139,9 +1139,17 @@
     ]);
 
     function handleControlChange(ev) {
+      const id = ev && ev.target && ev.target.id;
+      // Start or stop the rotation BEFORE the script is rebuilt. Stopping hands
+      // the smooth degrees back to the slider, and if that happened after
+      // applyControlDirectives had already read the slider, the script would
+      // keep the value from before the hand-back — the picture and the record
+      // disagreeing until something else happened to write. Called from here
+      // rather than from its own 'input' listener so the order is stated rather
+      // than left to whichever listener was registered first.
+      if (id === 'cam-elevation-speed-slider') manageCamSpin();
       updateValueDisplays();
       if (!storedText) return;
-      const id = ev && ev.target && ev.target.id;
       const updatedText = applyControlDirectives(storedText);
       if (NO_REBUILD_INPUT_IDS.has(id) && haveGeometry) {
         // The drawing is already on the GPU; looking at it from somewhere else
@@ -1612,7 +1620,13 @@
         // and the picture all agree the moment the rotation stops. Rounded
         // BEFORE wrapping: rounding 179.6 gives 180, which is off the end.
         if (camElevationExact !== null) {
-          camElevationSlider.value = String(wrapElevation(Math.round(camElevationExact)));
+          // Only if the slider still holds the integer THIS module wrote. If a
+          // script has set it since — arriving with the speed already at 0 —
+          // the script is the authority and the running total is simply dropped.
+          if (camElevationWritten === null ||
+              safeParseNumber(camElevationSlider.value, NaN) === camElevationWritten) {
+            camElevationSlider.value = String(wrapElevation(Math.round(camElevationExact)));
+          }
           camElevationExact = null;
           updateValueDisplays();
           placeCamera();
@@ -1675,8 +1689,6 @@
       if (Date.now() - camSpinNextDue > CAM_SPIN_MS * 5) camSpinNextDue = Date.now() + CAM_SPIN_MS;
       camSpinTimer = setTimeout(camSpinTick, Math.max(0, camSpinNextDue - Date.now()));
     }
-
-    camElevationSpeedSlider.addEventListener('input', manageCamSpin);
 
     function fitDistance(radius) {
       if (!(radius > 0)) return clampCam(260);

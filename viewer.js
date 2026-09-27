@@ -351,7 +351,7 @@ function answerAVStateRequest() {
   // correction should be small — and it is still a correction rather than a
   // guess, because it is BD's own figure.
   const script  = avLastPushed || avLastState;
-  const current = avLastState ? avWithAngleFrom(script, avLastState) : script;
+  const current = avLastState ? avWithClockDrivenFrom(script, avLastState) : script;
   if (typeof current === 'string' && current) {
     pushToAV(current);
     return;
@@ -434,16 +434,18 @@ let   avNodeId = null;                 // node whose script the module is showin
 //
 // Introduced BEFORE any script carries a mark, deliberately. The alternative —
 // marking scripts first and fixing the matchers afterwards — breaks things
-// that fail silently, AV_ANGLE_LINES worst of all: it names the angle triple
-// literally, and if it stopped matching, every drift frame would read as a
-// human change and be pushed to the viewer. That is last week's iOS smoothness
+// that fail silently, AV_CLOCK_LINES worst of all: it names the clock-driven
+// directives literally, and if one of them stopped matching, every drift frame
+// carrying it would read as a human change and be pushed to the viewer.
+// (2026-09-27: that is no longer hypothetical — see the note on AV_CLOCK_LINES.
+// Adding a clock to a module means adding its directive THERE.) That is last week's iOS smoothness
 // work undone, with no error to notice.
 //
 // Groups: 1 = the mark ('p_' or undefined), 2 = the bare name, 3 = the value.
 const BD_DIRECTIVE_RE = /^%%bd_(p_)?([A-Za-z_]+)[ \t]+(.*)$/;
 
 // One named directive, marked or not. Callers that REPLACE with it must keep
-// the matched line's own prefix — see avWithAngleFrom.
+// the matched line's own prefix — see avWithClockDrivenFrom.
 function bdNameRe(name, flags) {
   return new RegExp('^%%bd_(?:p_)?' + name + '[ \t]+.*$', flags || 'm');
 }
@@ -529,9 +531,37 @@ function mergeExploredValues(savedText, exploredText) {
 // A pleasant side effect: it removes 5-10 socket messages a second through
 // Cloudflare for as long as drift runs, which on a phone is radio wake-ups
 // and battery spent to make the picture worse.
-const AV_ANGLE_LINES = /^%%bd_(?:p_)?angle(?:_minutes|_seconds)?[ \t]+.*$/gm;
-function avWithoutAngle(text) {
-  return text.replace(AV_ANGLE_LINES, '');
+// Every directive a RECEIVER advances from its OWN clock, given the same script.
+// A drift frame that differs only in these is the sender's clock talking, and
+// pushing it makes the viewer jump backwards to a value up to a second stale.
+//
+// 2026-09-27 — this was AV_ANGLE_LINES and named the angle triple alone. It was
+// right when angle drift was the only automatic movement in BD, and the comment
+// above it even said the failure mode out loud: "if it stopped matching, every
+// drift frame would read as a human change and be pushed to the viewer". That is
+// exactly what then happened, twice over, when the 3D module arrived with two
+// more clocks — reported as "the AV viewer makes small jerks of elevation every
+// one or two seconds". The log showed 10,200 drift frames correctly declined and
+// an av_push going out beside every card write anyway: the camera elevation
+// differed, so the comparison said "a person did this".
+//
+// The angle case hid it. Angle drift is slow, so a one-second-stale angle lands
+// almost where the viewer already was. A camera turning at 20 degrees a second
+// is 20 degrees out, and you can see it.
+//
+// pitch is here for the same reason and was leaking too, unnoticed only because
+// the stored node ships pitch_drift at 0.
+//
+// THE SPEEDS AND RATES ARE NOT HERE, deliberately — angle_drift, pitch_drift and
+// cam_elevation_speed are human controls, and changing one MUST reach the
+// viewer or it would keep turning at the old rate for ever. The regex relies on
+// that distinction being structural: `cam_elevation` is followed by whitespace
+// here, so `cam_elevation_speed` cannot match it, and `pitch` likewise cannot
+// match `pitch_drift` or `step_pitch`.
+const AV_CLOCK_LINES =
+  /^%%bd_(?:p_)?(?:angle(?:_minutes|_seconds)?|pitch(?:_minutes|_seconds)?|cam_elevation)[ \t]+.*$/gm;
+function avWithoutClockDriven(text) {
+  return text.replace(AV_CLOCK_LINES, '');
 }
 
 // Take `base` — the script, which is the source of truth for every parameter —
@@ -543,10 +573,15 @@ function avWithoutAngle(text) {
 // intentionally stale, since angle-only drift changes are suppressed and the
 // viewer computes its own. That is right for the running stream and wrong for
 // a RESYNC, where the whole point is "make the viewer agree with BD now".
-function avWithAngleFrom(base, source) {
+function avWithClockDrivenFrom(base, source) {
   if (typeof base !== 'string' || typeof source !== 'string') return base;
   let out = base;
-  ['angle', 'angle_minutes'].forEach((name) => {
+  // The same list as AV_CLOCK_LINES, minus the seconds accumulators, which are
+  // module-internal and never appear in a script. A resync exists to make the
+  // viewer agree with BD NOW, so every deliberately-stale value has to travel —
+  // and if one were left out of this list it would be the single parameter a
+  // resync could not fix, which is the worst possible thing for it to be.
+  ['angle', 'angle_minutes', 'pitch', 'pitch_minutes', 'cam_elevation'].forEach((name) => {
     const re = bdNameRe(name);
     const mine = re.exec(source);
     if (!mine) return;
@@ -11865,7 +11900,7 @@ async function init() {
       if (typeof text !== 'string' || !text) return;
       if (text === lastScriptPushed) return;
       if (fromDrift && lastScriptPushed &&
-          avWithoutAngle(text) === avWithoutAngle(lastScriptPushed)) {
+          avWithoutClockDriven(text) === avWithoutClockDriven(lastScriptPushed)) {
         return;                                      // the viewer's own clock
       }
       lastScriptPushed = text;
@@ -12174,7 +12209,7 @@ async function init() {
       // so the rest of BD notices a programmatic write — and every auto-echo
       // goes through it, including drift ones. Without this test each of those
       // would come back round here as a "hand edit", be pushed with
-      // fromDrift:false, and sail straight past the angle suppression that
+      // fromDrift:false, and sail straight past the clock-driven suppression that
       // keeps a viewer smooth. isTrusted is false on a constructed Event and
       // true on a genuine one, which is exactly the distinction needed.
       if (!e.isTrusted) return;

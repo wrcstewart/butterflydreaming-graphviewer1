@@ -224,6 +224,17 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-27 — the viewer and the sender's clock
+
+| item | where | note |
+|---|---|---|
+| **A drift frame differing only in pitch or cam_elevation was pushed to the viewer** | `viewer.js` | **FIXED.** `pushScriptToAV` declines a drift frame that differs from the last push only in a value the receiver computes itself — but the comparison stripped `AV_ANGLE_LINES`, which named the angle triple LITERALLY. So the camera rotation was pushed, and the viewer snapped back to a value up to a second stale: "small jerks of elevation every one or two seconds". Now `AV_CLOCK_LINES`: angle triple + pitch triple + `cam_elevation`. Pitch was leaking identically and unnoticed because the node ships `pitch_drift 0`. Rates are deliberately excluded and the exclusion is structural, not careful. 31 cases checked. |
+| **A matcher that lists a category must be edited when the category grows** | `viewer.js` | The comment above that regex had already predicted the exact failure — "if it stopped matching, every drift frame would read as a human change and be pushed". What it missed is that ADDING A CLOCK does the same damage as the regex breaking. Note now says so, and says where to edit. |
+| **`avWithClockDrivenFrom` carries all five values** | `viewer.js` | A resync exists to make the viewer agree with BD NOW. It copied only angle and angle_minutes; a value left out would have been the one parameter a resync could not fix. That resync is what makes the phase offset between two independent clocks tolerable. |
+| **Two independent clocks hold a phase offset** | — | **ACCEPTED, with the same standing as angle drift.** BD and the viewer each compute the rotation from `cam_elevation_speed`, starting at different moments, so they can show different elevations. Sync is the way back into step. |
+
+---
+
 ## Added 2026-09-27 — camera range and auto-rotate
 
 | item | where | note |
