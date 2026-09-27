@@ -170,6 +170,24 @@ app.use('/bd_V_Kolam', express.static('./V_Kolam', {
   }
 }));
 
+// bd_V_Kolam3D — the three-dimensional kolam (2026-09-27). A SIBLING of
+// V_Kolam, not a variant of it: same %%bd_ script, different renderer, its own
+// Cluster off Graphics. Served path /bd_V_Kolam3D/ maps to on-disk V_Kolam3D/,
+// the same served-path / on-disk-dir split as every other module here.
+//
+// The no-cache on HTML matters more for this one than for most: it pulls
+// three.js from a CDN, and a browser-cached wrapper against a fresh module (or
+// the reverse) is the kind of mismatch that reads as a library failure.
+app.use('/bd_V_Kolam3D', express.static('./V_Kolam3D', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 // bd_M_ABC music module bundle. Served path /bd_M_ABC/ maps to on-disk
 // M_Music/ directory, matching the V_Kolam served-path / on-disk-dir split.
 app.use('/bd_M_ABC', express.static('./M_Music', {

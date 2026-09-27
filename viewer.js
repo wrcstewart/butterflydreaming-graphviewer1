@@ -2493,6 +2493,14 @@ const MODULES = {
     embedded:   '/bd_V_Kolam/index.html',
     standalone: 'https://wrcstewart.github.io/bd_V_Kolam/preview.html',
   },
+  // 2026-09-27. No `standalone`, deliberately: the three standalone repos are
+  // RETIRED (their READMEs say so), the deep-link URL length made them
+  // unworkable as a sharing route, and BD is the controller now. getStandaloneUrl
+  // returns null for this module, which is the honest answer — a link to a
+  // standalone that does not exist would be worse than no link.
+  'bd_V_Kolam3D': {
+    embedded:   '/bd_V_Kolam3D/index.html',
+  },
   'bd_M_ABC': {
     embedded:   '/bd_M_ABC/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_ABC/preview.html',
@@ -12388,6 +12396,15 @@ async function init() {
       // legacy cases.
       const moduleId  = parseModuleId(payload.script) || 'bd_V_Kolam';
       const baseUrl   = getStandaloneUrl(moduleId) || getStandaloneUrl('bd_V_Kolam');
+      // 2026-09-27 — bd_V_Kolam3D has no standalone (they are retired), so a
+      // 3D script copied through this button goes to the 2D player, which will
+      // draw it WITHOUT the pitch or the camera. The fallback is kept because
+      // a dead button is worse than a degraded one, but it is no longer silent:
+      // this is the log line that explains a link that came back flat.
+      if (!getStandaloneUrl(moduleId)) {
+        console.warn('[external link] ' + moduleId + ' has no standalone; sending to ' +
+                     baseUrl + ' — directives it does not know will be ignored');
+      }
       // Prefer the compact JSP form where the wire table can express the whole
       // script; buildJspUrl returns null when it cannot, and we fall back.
       const jsp = buildJspUrl(baseUrl, payload.script, payload.node_url, moduleId);
@@ -12837,7 +12854,7 @@ async function init() {
         // more than ideal, but the viewer has to choose a renderer before any
         // script reaches it, and BD has to decide whether to open a viewer at
         // all before minting — neither can ask the other in time.
-        const AV_VIEWER_MODULES = new Set(['bd_V_Kolam', 'bd_M_ABC', 'bd_M_Fractal']);
+        const AV_VIEWER_MODULES = new Set(['bd_V_Kolam', 'bd_V_Kolam3D', 'bd_M_ABC', 'bd_M_Fractal']);
         const wantViewer = (AV_VIEWER_MODULES.has(moduleId) && window.bdRequestModuleToken);
         if (moduleId && !AV_VIEWER_MODULES.has(moduleId)) {
           console.log('[AV] no viewer page for ' + moduleId + ' yet — falling back to the standalone');

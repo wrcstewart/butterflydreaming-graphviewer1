@@ -132,6 +132,32 @@ because it will look like a rendering bug rather than a naming one. The
 
 ---
 
+### RULE 4a — a new module ships as a receiver from day one (2026-09-27)
+
+RULE 3's two-phase order — receivers before writers — is about *migrating* a
+module that already exists. A module written after the rules simply obeys them
+on its first commit, and `bd_V_Kolam3D` does: mark-blind parser, RULE-1 writer,
+RULE-2 fallback, RULE-7 announcement. There is no phase to sequence.
+
+What that module adds to the picture is a case RULE 4 did not cover. Its labels
+do NOT truncate — `.control-row label` has no `overflow`/`text-overflow`, so a
+long name **wraps** — which makes the collision RULE 4 describes impossible
+there rather than merely unlikely. 13 characters is the one-line limit (set by
+`angle_minutes`); `cam_elevation` and `pitch_minutes` both fit inside it. So
+RULE 4 is a property of the *stylesheet*, not of the naming scheme: a module
+whose labels wrap is exempt, and grouping a family of controls by a shared
+**prefix** (`cam_azimuth`, `cam_elevation`, `cam_distance`) is safe there and
+would not have been under truncation.
+
+One departure worth recording, because it is a decision and not an oversight:
+`bd_V_Kolam3D` has **no control for `%%bd_weight`** even though the directive is
+read and passed through. Core WebGL ignores line width. The mark is a request
+for a control, and a module may decline it when it cannot honour one — which is
+better than the alternative reading, that every `_p_` obliges a knob and some
+knobs may do nothing.
+
+---
+
 ## 3. Modes: three become two
 
 | now | becomes |

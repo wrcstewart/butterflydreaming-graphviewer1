@@ -6,6 +6,83 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-27 — the kolam in three dimensions
+
+**`bd_V_Kolam3D`**, a new visual module, hung off **Graphics as a Cluster of
+its own** and not under Kolam. It is a sibling, not a variant: the same `%%bd_`
+script, a different renderer, two angles instead of one and a camera to place.
+
+**The invariant it is built around:** at `%%bd_pitch 0` and
+`%%bd_cam_elevation 90` it draws exactly what V_Kolam draws — the same
+segments, the same hues. VERIFIED numerically against the 2D turtle across five
+parameter settings including 65,536 segments: worst deviation **6.1e-5 world
+units on a figure of radius 1362**, which is `Float32Array` storage precision
+and not the arithmetic. Three sign conventions exist only to keep that true and
+each is commented where it is chosen — the yaw applied as −a, the bulge along
+−L rather than the up vector, and the camera up taken from the sphere's north
+tangent. That last one matters twice over: world +Y is parallel to the view
+direction at elevation 90, so `lookAt` degenerates there — and elevation 90 is
+not a corner case in this module, it is the view the invariant is stated at.
+
+**`+` turns the turtle by `angle` about its up axis AND by `pitch` about its
+left.** Pitch is a far more sensitive control than it looks: MEASURED, one
+degree of pitch on the default figure takes the maximum |y| from 0 to 343 world
+units, because the turn compounds at every one of 512 steps. `pitch_minutes`
+is not a nicety.
+
+**Camera steppers** `cam_azimuth` / `cam_elevation` / `cam_distance`, because a
+3D figure you cannot walk round is a flat picture with extra cost. `cam_`
+leads all three names so they group in the column, and the labels **wrap rather
+than truncate** — 13 characters is the one-line limit, set by `angle_minutes`,
+and all three fit. Moving the camera takes a **fast path that rebuilds no
+geometry**: the drawing is already on the card, and an orbit button that paid
+for an L-system rewrite plus a quarter-million-segment turtle walk per press
+would be a camera wish rather than a camera control.
+
+**`cam_distance` auto-frames on first render when the script does not name
+it.** Not a flourish: the four stored Kolam settings have radii from 97 to 1362
+world units, so no fixed default can serve them, and a camera inside the
+geometry shows *nothing* — the worst possible first impression of a new module.
+The auto-fit is deliberately NOT announced and NOT written into the script
+(**RULE 7**: a human action, never a script push — announcing on a push is what
+once took the graph down in a 421/430-character loop). The value enters the
+script the first time a person moves any control.
+
+**three.js 0.160.0 from jsdelivr, pinned**, because BD's bytes go over a
+Cloudflare tunnel and ~600 KB of library is the client's to fetch. The UMD
+build, so no import map. Colour management is switched **off** so `setHSL`
+means what `hsl()` means on a 2D canvas — otherwise the same script would
+render visibly different hues in the two modules, and a figure tuned by eye in
+one must not shift when it moves to the other.
+
+**No `weight` stepper**, and that is the honest answer rather than a gap: core
+WebGL ignores line width on every platform that matters. A knob wired to
+nothing is worse than no knob. `%%bd_weight` is left untouched in the script so
+a figure keeps its stroke width on the way back to the flat module. Real
+thickness needs `Line2` from three's `examples/jsm` — ES modules, an import
+map and three more fetches. A fair next step, but not a silent one.
+
+Symmetry is **one geometry stamped N times** — the Nth copy is a matrix and a
+draw call. The 2D module stamps a rasterised bitmap, and the honest equivalent
+here would have been N copies of the whole buffer. Curve tessellation falls
+with depth (6 samples at depth 2 down to 1 at depth 5) because the F count
+rises as 8^(depth+1), and at depth 5 the effective step is 0.49 world units —
+the bulge on half a unit is under a pixel.
+
+Two whitelist gaps in the new wrapper were closed rather than copied forward
+from the 2D one: `bd_ui_config` down, and **`BD_ERROR` up** — for a module that
+depends on a CDN, "the library did not load" is the one sentence that must
+never be silent. It is said on screen too, in a different colour from
+"waiting", because a dead module must not look like a slow one.
+
+Graph: Cluster `Kolam3D` under Graphics, gateway `bd_V_Kolam3D`, content
+`bd_V_Kolam3D_001`. The ingest's `DESCENDS_FROM` runs **parent → child**, the
+opposite way round from `bd_m_fractal_ingest.js`; both directions are live in
+the graph, and the one Graphics already uses for Kolam was checked before
+writing rather than assumed.
+
+---
+
 ## 2026-09-25 — one directive retired, another brought back to life
 
 **`%%bd_hint` is gone**, from the code and the corpus. One directive doing two

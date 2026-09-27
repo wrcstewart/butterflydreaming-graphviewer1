@@ -224,6 +224,19 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-27 — the 3D kolam
+
+| item | where | note |
+|---|---|---|
+| **`bd_V_Kolam3D` — kolam in three dimensions** | `V_Kolam3D/`, `server.js`, `viewer.js`, `AV/kolam.html` | **BUILT.** A SIBLING of Kolam, a Cluster off Graphics — same `%%bd_` script, different renderer. `+` turns by `angle` about the turtle's up axis AND by `pitch` about its left, so **pitch 0 at cam_elevation 90 reproduces the 2D figure exactly**: VERIFIED numerically over five settings, worst deviation 6.1e-5 world units on a radius of 1362, which is `Float32Array` precision and not the arithmetic. three.js 0.160.0 UMD from jsdelivr, pinned, colour management OFF so `setHSL` matches a 2D canvas. |
+| **Camera steppers** | `V_Kolam3D/visual_module.html` | **BUILT.** `cam_azimuth` / `cam_elevation` / `cam_distance`, on a fast path that rebuilds no geometry — the drawing is on the card, so looking at it from elsewhere is a matrix. `cam_distance` **auto-frames on first render** when the script does not name it, because the stored Kolam settings have radii from 97 to 1362 and a camera inside the geometry shows nothing. The auto-fit is not announced (RULE 7) and enters the script on the first human control change. |
+| **Pitch compounds — the control is far finer than it looks** | — | MEASURED: one degree of pitch takes the default figure's max \|y\| from 0 to 343 world units, because the turn applies at every one of 512 steps. `pitch_minutes` is load-bearing, not a nicety. |
+| **No `weight` stepper in 3D** | `V_Kolam3D/visual_module.html` | **DELIBERATE, and an OPEN item if thickness is wanted.** Core WebGL ignores line width, so a weight control would be wired to nothing. `%%bd_weight` is passed through untouched so a figure keeps it on the way back to the flat module. Real thickness = `Line2` / `LineMaterial` from `examples/jsm`: ES modules, an import map, three more CDN fetches. Not silent work. |
+| **The 3D wrapper closes two whitelist gaps the 2D one has** | `V_Kolam3D/index.html` | `bd_ui_config` in `RELAY_DOWN` and **`BD_ERROR` in `RELAY_UP`**. The second is specific to this module: it depends on a CDN, and "the library did not load" is the one sentence that must never stop at a relay. Said on screen too, in a different colour from "waiting" — a dead module must not look like a slow one. |
+| **iOS / phone testing of Kolam3D** | — | **PENDING.** Verified on this machine only. WebGL context loss on a backgrounded tab is the specific thing to watch; the 2D canvas has no equivalent failure. |
+
+---
+
 ## Added 2026-09-22 — align BD with BDX
 
 **The plan, in order.** BDX/AVX/RX grew four things BD does not have, and the

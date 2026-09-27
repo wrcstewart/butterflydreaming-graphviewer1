@@ -1,0 +1,86 @@
+<!-- ButterflyDreaming Visual Module 3D — index.html — A42 iframe wrapper -->
+<!-- Loaded by the graphviewer's #visual-iframe at /bd_V_Kolam3D/. Thin wrapper
+     around visual_module.html: relays bd_script_* postMessages between the
+     grandparent viewer and the inner module iframe.
+
+     A RELAYED MESSAGE NEEDS THREE SITES: the sender, the relay whitelist, and
+     the receiver. Two of the three fails SILENTLY — the relay logs a delivery,
+     the handler is fine, and nothing happens. That has cost a day twice
+     (bd_av_state 2026-09-14, bd_module_log 2026-09-16), both times at exactly
+     the two Set literals below. Adding a message type means editing this file. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Visual Module 3D</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #0a0a0f;
+      overflow: hidden;
+    }
+    #module-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="module-frame"
+          src="visual_module.html"
+          title="ButterflyDreaming Visual Module 3D">
+  </iframe>
+
+  <script>
+    'use strict';
+
+    // Two-way postMessage relay:
+    //   grandparent (viewer) ↔ this iframe (index.html) ↔ inner iframe (visual_module.html)
+
+    // bd_ui_config is here and is NOT in the 2D wrapper's set (2026-09-27).
+    // That module is only ever asked to hide its controls by a viewer, and a
+    // viewer loads visual_module.html directly with no wrapper in between — so
+    // the gap has never shown. It is a gap all the same, and leaving it in a
+    // new file to match an old one would be copying a bug forward.
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update',
+                                'bd_ui_config', 'BD_STOP']);
+
+    // BD_ERROR is here and is NOT in the 2D wrapper's set, for a reason
+    // specific to this module: it depends on three.js arriving from a CDN, and
+    // the one thing that must never be silent is "the library did not load".
+    // Without BD_ERROR in this whitelist that sentence would stop at the
+    // wrapper and BD would show an empty square with no explanation.
+    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY',
+                                'bd_av_state', 'bd_module_log', 'BD_ERROR']);
+
+    const moduleFrame = document.getElementById('module-frame');
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      // Message from inner module iframe → forward up to viewer.
+      if (event.source === moduleFrame.contentWindow) {
+        if (RELAY_UP.has(data.type)) {
+          window.parent.postMessage(data, '*');
+        }
+        return;
+      }
+
+      // Message from grandparent viewer → forward down to inner module.
+      if (event.source === window.parent && RELAY_DOWN.has(data.type)) {
+        moduleFrame.contentWindow.postMessage(data, '*');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1732 @@
+<!-- ButterflyDreaming Visual Module (3D) — V_Kolam3D/visual_module.html — BD Protocol v0.1 -->
+<!--
+  bd_V_Kolam3D, 2026-09-27. A kolam in three dimensions, hung off Graphics
+  as a Cluster of its own — NOT under Kolam. It is a sibling, not a variant:
+  it reads and writes the same %%bd_ script, but it is a different renderer
+  with two angles instead of one and a camera to place.
+
+  THE INVARIANT: with %%bd_pitch 0 and %%bd_cam_elevation 90, this module
+  draws exactly what V_Kolam draws — the same segments, the same hues. Every
+  sign convention in here (the yaw applied as −a, the bulge along −L, the
+  camera up taken from the sphere's north tangent) exists to keep that true,
+  and each is commented where it is chosen. It is what lets a stored figure
+  move between the two modules without changing.
+
+  Everything above the "3D-only additions" marker in the stylesheet, and the
+  parser, the stepper machinery and the drift clock in the script, are
+  V_Kolam/visual_module.html's — deliberately identical, so the two present
+  the same control surface and BD's positionExtendPanel measurements hold
+  for both. Fix the shared parts THERE and copy down.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Visual Module 3D</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;                  /* A42 §42.9 — module fills its iframe */
+    }
+    body {
+      background: #0a0a0f;
+      color: #e8e8e0;
+      font-family: Georgia, 'Times New Roman', serif;
+      display: flex;
+      flex-direction: column;
+      gap: 0;                            /* no gap — every pixel goes to the canvas */
+      padding: 0;                        /* was 0.6rem — reclaim ~20px each side (A42) */
+      box-sizing: border-box;
+    }
+
+    /* Status overlays the top-left corner instead of consuming a full row.
+       Pointer-events: none so it never blocks a canvas or spinner click. */
+    #status {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      z-index: 10;
+      font-size: 0.7rem;
+      font-style: italic;
+      color: #9e9e90;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      background: rgba(10, 10, 15, 0.6);
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      padding: 0.45rem 1.1rem;
+      text-transform: uppercase;
+    }
+
+    button:hover {
+      background: #1a2a28;
+    }
+
+    button:active {
+      background: #243f3b;
+    }
+
+    /* A42 fix (user report 2026-07-01) — canvas takes the full available
+       height and matches its width to it (square), spinners fill whatever
+       horizontal room is left and wrap. Previous grid layout was giving the
+       controls column a fixed 170px and starving the canvas of both padding
+       and honest height math.
+       In a very wide-and-short iframe (e.g. 1574×150 when the chat panel
+       is open) this yields canvas 150×150 with spinners in a ~1400px-wide
+       band wrapping into a couple of rows. */
+    .module-layout {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      gap: 0;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .canvas-wrapper {
+      flex: 1 1 auto;                    /* takes whatever remains after the panel */
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      /* Landscape (default): right-align the square canvas within its wrapper
+         so it sits snug against the left edge of the control-panel.
+         Previously center-aligned, leaving a large empty gap between the
+         canvas and the column on desktop/laptop. Overridden to center in
+         the portrait media query below. */
+      justify-content: flex-end;
+      align-items: center;
+      /* 2026-08-19 — 44px band between canvas and stepper column, the home for
+         BD's ↓↑ arrows. The small layout gets the same band for free from the
+         canvas's translateX; without this the canvas is flush against the
+         column in landscape and the arrows land on the graphic. */
+      padding-right: 44px;
+      /* 2026-08-19 — and 52px below it for BD's Extension strip, matching the
+         reserve the small layout has always had. Without it the canvas fills
+         the wrapper down to the iframe's bottom edge, the strip has nowhere to
+         sit, and positionExtendPanel's breadcrumb clamp pulls it up ONTO the
+         graphic (it needs 44: 34 strip + 6 gap + 4 clearance).
+         The canvas is height-limited on desktop, so this costs ~52px of square
+         in both dimensions — deliberate, and the same trade the small layout
+         makes for free (it is width-limited there). */
+      padding-bottom: 52px;
+    }
+
+    /* Small iframe (mobile) — 2026-08-05 v13. Kolam-specific gutter for BD's
+       extend panel (which sits at bottom-left of viewport, ~84 px wide).
+       Was previously a global iframe left-reserve in positionCyEl (v8) but
+       that shifted every module including music_module unnecessarily. Now
+       Kolam handles it via a padding-left on the flex layout — canvas +
+       control-panel shift right by 88 px, extend panel sits in the gutter.
+       Music module has its own portrait rules and doesn't need this. */
+    @media (max-width: 500px) {
+      /* 2026-08-17 — keep the 88px band so the canvas holds its former (small)
+         size + position; the Extension bar sits UNDER the canvas (BD
+         positionExtendPanel .under-canvas). Drop the canvas to the BOTTOM
+         (align-items: flex-end) with a padding-bottom that reserves room for
+         the Extension bar just beneath it — so the bar lands just above the
+         breadcrumbs and the canvas sits just above the bar. */
+      .module-layout { padding-left: 88px; }
+      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px;
+                        padding-right: 0; }   /* small layout makes its own band
+                                                 via the canvas translateX */
+      /* 2026-08-17 — shift canvas 15% + 20px left to free room between it and
+         the stepper column for BD's ↓↑ arrows. The Extension bar follows (BD
+         centres it on the live canvas rect). */
+      .canvas-wrapper canvas { transform: translateX(calc(-15% - 20px)); }
+      .control-panel {
+        flex: 0 0 108px !important;
+        padding: 6px 4px;
+        /* 2026-08-17 — bright amber so the stepper panel reads as its own
+           block, set off from the ↓↑ arrows to its left. !important because the
+           BASE .control-panel rule below (equal specificity, later in source)
+           was overriding this — which is why earlier attempts showed no tint
+           (same reason the flex above needs !important). */
+        background: rgba(75, 54, 0, 0.9) !important;
+      }
+      .control-row { width: 100px; }
+    }
+
+    /* Default (landscape) control panel — fixed 220 px column on the right.
+       Fixed width prevents the canvas from squeezing the panel to zero when
+       the iframe is nearly square (as in the preview harness).
+       Portrait media query above overrides to a bottom band.
+       The <canvas> keeps itself square via its own aspect-ratio + max-*. */
+    .control-panel {
+      /* 2026-08-19 — 220 → 130. A control-row is 94px; with the panel's
+         padding, border and a scrollbar it needs ~122. The 220 was defensive
+         (stop the canvas squeezing the panel to zero in the preview harness)
+         and left ~90px dead, which is what made the column look twice the
+         width it needs. */
+      flex: 0 0 130px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;             /* controls hug the left edge, − on the left */
+      gap: 2px;                            /* 2026-07-12 -50% from 4 px for MM3 density */
+      /* 2026-08-19 — amber at EVERY width, not just the small layout, so the
+         stepper block reads as its own thing and the arrows' relationship to
+         it is visible at a glance. */
+      background: rgba(75, 54, 0, 0.9);
+      border: 1px solid rgba(74, 155, 142, 0.2);
+      padding: 6px 8px;
+      border-radius: 0.4rem;
+      min-height: 0;
+      min-width: 0;
+      overflow-y: auto;
+    }
+
+    /* Control cell — one stepper (or select) above, label immediately below.
+       Small margin-bottom separates each button-label pair from the next.
+       Media-module convention 2026-07-02. */
+    /* A control the script did not ask for. `hidden` alone loses to the
+       display rule below, so it is stated explicitly. */
+    .control-row[hidden] { display: none !important; }
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;                            /* 2026-07-12 -50% from 2 px */
+      flex: 0 0 auto;
+      width: 94px;                         /* 2026-08-17 — with 34px buttons, centres sit ~60px apart (was 70) → ~15% closer */
+      margin-bottom: 3px;                  /* 2026-07-12 -50% from 6 px */
+    }
+
+    .control-row label {
+      font-size: 0.7rem;
+      letter-spacing: 0.02em;
+      color: #4a9b8e;
+      text-align: center;
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;      /* no iOS magnifier / text-select on long-press */
+    }
+
+    /* Stepper: [−] [value] [+] row. Buttons flex fixed-width, value spans middle. */
+    .stepper {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 2px;                            /* 2026-07-12 -50%-ish from 3 px */
+    }
+
+    .step-btn {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
+      padding: 0;
+      width: 34px;                             /* 2026-08-17 — +30% (was 26) for easier mobile taps */
+      height: 34px;                            /* 2026-08-17 — +30% (was 26) */
+      line-height: 1;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      border-radius: 3px;
+      flex: 0 0 auto;
+      touch-action: manipulation;              /* kill iOS double-tap zoom on rapid taps */
+      user-select: none;
+      -webkit-user-select: none;               /* older iOS Safari — text-select on long press */
+      -webkit-touch-callout: none;             /* suppress long-press callout / magnifier */
+      -webkit-tap-highlight-color: transparent;/* no grey flash halo */
+    }
+
+    .step-btn:hover  { background: #1a2a28; }
+    .step-btn:active { background: #243f3b; }
+    .step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Four characters ("1.0k") in a span measured to fit three. Shrinking the
+       text is the cheaper trade: widening .control-row would move every
+       stepper's centre and undo the tap-target spacing set on 2026-08-17. */
+    .stepper-value--wide { font-size: 0.56rem; letter-spacing: -0.02em; }
+    .stepper-value {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.7rem;                       /* 2026-08-17 — was 0.78; narrower value span (bigger buttons + closer centres) still fits "100" */
+      color: #e8e8e0;
+      background: #0f0f18;
+      border: 1px solid #2a2a3a;
+      padding: 1px;                            /* 2026-08-17 — was 2px, reclaim width for the 3-char readout */
+      border-radius: 3px;
+      min-width: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    /* Hidden source input backing each stepper — kept in the DOM so existing
+       JS can still read/write .value, min, max, step. */
+    .stepper-source {
+      display: none;
+    }
+
+    /* Set by the host harness via postMessage bd_ui_config { hideControls: true }.
+       Preview.html supplies its own outer stepper column; hiding the internal
+       one lets the canvas take the whole iframe width. */
+    body.controls-hidden .control-panel { display: none; }
+    body.controls-hidden .canvas-wrapper { flex: 1 1 auto; }
+
+    /* 2026-09-15 — controls-hidden means the HOST supplies the control surface
+       and nothing of ours is on screen, so the gutters the small layout
+       reserves (88px left for the host's arrows, 52px bottom for its band) are
+       reserving space for things that are not there. On a phone that cost
+       about 15% of the width and pushed the figure off-centre. Reclaim it and
+       centre, but ONLY in this mode: BD's embedded player and the standalones
+       still need those gutters. */
+    /* And undo the small layout's canvas nudge. It shifts the canvas
+       translateX(calc(-15% - 20px)) to free a band for BD's ↓↑ arrows beside
+       the stepper column — 84.5px at a 430px width, measured. With no arrows
+       and no column, that band is empty screen and the figure hangs off the
+       left edge. This was the whole of the "square is over to the left". */
+    body.controls-hidden .canvas-wrapper canvas { transform: none; }
+    body.controls-hidden .module-layout  { padding-left: 0; padding-right: 0; }
+    body.controls-hidden .canvas-wrapper {
+      justify-content: center;
+      align-items: center;
+      padding-bottom: 0;
+      padding-right: 0;
+    }
+
+    /* Selects retain their native appearance for iOS/mobile compatibility. */
+    .control-panel select {
+      width: 100%;
+      background: #0f0f18;
+      color: #e8e8e0;
+      border: 1px solid #2a2a3a;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.9rem;          /* ≥16px logical to avoid iOS auto-zoom on focus */
+      padding: 4px;
+      accent-color: #4a9b8e;
+      outline: none;
+    }
+
+    .control-panel select:focus {
+      border-color: #4a9b8e;
+    }
+
+    canvas {
+      border: 1px solid #4a9b8e;
+      border-opacity: 0.3;
+      display: block;
+      /* A42 §42.9 — fit inside wrapper without overflowing either axis */
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1 / 1;
+    }
+
+    /* ── 3D-only additions ───────────────────────────────────────────────────
+       Everything above this line is V_Kolam/visual_module.html's stylesheet
+       verbatim (2026-09-27), so the two modules present an identical control
+       surface and BD's positionExtendPanel measurements hold for both. Edit
+       the shared part THERE and copy down; only 3D-specific rules belong
+       below.                                                               */
+
+    /* The waiting message can no longer be PAINTED. The 2D module writes
+       "Waiting for script..." with ctx.fillText, and a WebGL canvas has no
+       fillText — so it becomes a DOM overlay. Which is the better thing
+       anyway: it is selectable, it scales with the browser's text size, and
+       it is also where a missing-CDN failure is announced. */
+    #waiting {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      text-align: center;
+      font-style: italic;
+      font-size: 1.05rem;
+      color: #9e9e90;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #waiting[hidden] { display: none !important; }
+    /* A CDN that did not answer is not a "waiting" state — it is a dead
+       module, and it must not look like a slow one. */
+    #waiting.fatal { color: #e0b0b0; font-style: normal; pointer-events: auto; }
+    /* #waiting is positioned against the canvas wrapper, not the viewport, so
+       the message stays centred on the SQUARE rather than on the whole iframe
+       (the wrapper is the only box that tracks the canvas at every width). */
+    .canvas-wrapper { position: relative; }
+    /* The fatal message is two sentences on two lines. */
+    #waiting { white-space: pre-line; }
+  </style>
+</head>
+<body>
+
+  <!-- Errors reach here via setStatus; starts empty, as in the 2D module. -->
+  <div id="status"></div>
+
+  <div class="module-layout">
+
+  <div class="canvas-wrapper">
+    <canvas id="kolam-canvas"></canvas>
+    <div id="waiting">Waiting for script…</div>
+  </div>
+
+  <div class="control-panel">
+    <!-- Media-module control convention (2026-07-02): buttons above, the
+         directive's own name below, verbatim.
+
+         2026-09-27 — the 3D column, and what differs from the 2D one:
+
+         · pitch / pitch_minutes / pitch_drift are NEW, and they mirror
+           angle / angle_minutes / angle_drift exactly. pitch is the SECOND
+           plane: `+` turns the turtle by `angle` about its up axis AND by
+           `pitch` about its left axis, `-` by the negatives of both. So
+           pitch 0 leaves the turtle in one plane and draws the 2D figure,
+           segment for segment — which is the property the whole module is
+           built around and the reason the default is 0.
+
+         · cam_azimuth / cam_elevation / cam_distance place the camera. A 3D
+           figure you cannot walk round is a flat picture with extra cost, so
+           these are not an extra: they are what makes the module worth having.
+           `cam_` comes first in all three names so they sort and read as one
+           group in the column. The labels WRAP rather than truncate (there is
+           no text-overflow on .control-row label) — 13 characters is the
+           one-line limit, set by angle_minutes, and all three fit inside it.
+
+         · there is NO weight stepper, and that is deliberate. See the note on
+           LINE_WIDTH_IS_NOT_AVAILABLE in the script below: core WebGL ignores
+           line width on every platform that matters, so a weight control here
+           would be a knob wired to nothing. %%bd_weight is left untouched in
+           the script so a figure can still travel between the 2D and the 3D
+           module without losing it. -->
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="symmetry-select" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="symmetry-select">8</span>
+        <button class="step-btn" type="button" data-target="symmetry-select" data-delta="1">+</button>
+      </div>
+      <label>symmetry</label>
+      <input id="symmetry-select" class="stepper-source" type="number" min="1" max="16" step="1" value="8">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="depth-select" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="depth-select">2</span>
+        <button class="step-btn" type="button" data-target="depth-select" data-delta="1">+</button>
+      </div>
+      <label>depth</label>
+      <input id="depth-select" class="stepper-source" type="number" min="1" max="5" step="1" value="2">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="step-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="step-slider">50</span>
+        <button class="step-btn" type="button" data-target="step-slider" data-delta="1">+</button>
+      </div>
+      <label>step</label>
+      <input id="step-slider" class="stepper-source" type="number" min="10" max="9900" step="1"
+             data-coarse-above="1000" data-coarse-step="100" value="50">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="angle-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="angle-slider">90</span>
+        <button class="step-btn" type="button" data-target="angle-slider" data-delta="1">+</button>
+      </div>
+      <label>angle</label>
+      <input id="angle-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="90" data-wrap="1">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="angle-minutes-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="angle-minutes-slider">0</span>
+        <button class="step-btn" type="button" data-target="angle-minutes-slider" data-delta="1">+</button>
+      </div>
+      <label>angle_minutes</label>
+      <input id="angle-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
+    </div>
+
+    <input id="angle-seconds-slider" type="hidden" value="0">
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="angle-drift-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="angle-drift-slider">0</span>
+        <button class="step-btn" type="button" data-target="angle-drift-slider" data-delta="1">+</button>
+      </div>
+      <label>angle_drift</label>
+      <input id="angle-drift-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="0">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="pitch-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="pitch-slider">0</span>
+        <button class="step-btn" type="button" data-target="pitch-slider" data-delta="1">+</button>
+      </div>
+      <label>pitch</label>
+      <input id="pitch-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="0" data-wrap="1">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="pitch-minutes-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="pitch-minutes-slider">0</span>
+        <button class="step-btn" type="button" data-target="pitch-minutes-slider" data-delta="1">+</button>
+      </div>
+      <label>pitch_minutes</label>
+      <input id="pitch-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
+    </div>
+
+    <input id="pitch-seconds-slider" type="hidden" value="0">
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="pitch-drift-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="pitch-drift-slider">0</span>
+        <button class="step-btn" type="button" data-target="pitch-drift-slider" data-delta="1">+</button>
+      </div>
+      <label>pitch_drift</label>
+      <input id="pitch-drift-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="0">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-azimuth-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="cam-azimuth-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-azimuth-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_azimuth</label>
+      <!-- Cyclic, like angle: going round the figure has no far edge. -->
+      <input id="cam-azimuth-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="0" data-wrap="1">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-elevation-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="cam-elevation-slider">60</span>
+        <button class="step-btn" type="button" data-target="cam-elevation-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_elevation</label>
+      <!-- NOT cyclic. Stepping past the pole would flip the azimuth by 180
+           degrees without the azimuth control moving, so two different numbers
+           would name one view and the script could not round-trip. The poles
+           themselves are legal and safe: the up vector is taken from the
+           sphere's own north tangent, which is defined AT 90 (see placeCamera).
+           90 looks straight down and gives the 2D kolam exactly. -->
+      <input id="cam-elevation-slider" class="stepper-source" type="number" min="-90" max="90" step="1" value="60">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-distance-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="cam-distance-slider">260</span>
+        <button class="step-btn" type="button" data-target="cam-distance-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_distance</label>
+      <!-- World units — the same units the turtle steps in, so it is a real
+           distance and not a percentage of anything. It needs the full range
+           because the figure's own size does: MEASURED across the four stored
+           Kolam settings, the radius about the origin runs 97 (depth 2) to
+           1362 (depth 3, angle 68) — a factor of fourteen. Hence also the
+           coarse step above 1000, borrowed from `step`. -->
+      <input id="cam-distance-slider" class="stepper-source" type="number" min="20" max="9900" step="1"
+             data-coarse-above="1000" data-coarse-step="100" value="260">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="colour-speed-slider">4</span>
+        <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="1">+</button>
+      </div>
+      <label>colour_speed</label>
+      <input id="colour-speed-slider" class="stepper-source" type="number" min="-2" max="4" step="1" value="2">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="saturation-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="saturation-slider">100</span>
+        <button class="step-btn" type="button" data-target="saturation-slider" data-delta="1">+</button>
+      </div>
+      <label>saturation</label>
+      <input id="saturation-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="100">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="lightness-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="lightness-slider">65</span>
+        <button class="step-btn" type="button" data-target="lightness-slider" data-delta="1">+</button>
+      </div>
+      <label>lightness</label>
+      <input id="lightness-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="65">
+    </div>
+
+  </div>
+
+  </div>
+
+  <!-- Both libraries come from a CDN, and that is a deliberate choice, not a
+       convenience: BD is served from this machine through a Cloudflare tunnel,
+       so every byte we host is a byte over that tunnel. three.js is ~600 KB.
+       The client fetches it from jsdelivr's edge instead, and the version is
+       PINNED — an unpinned "latest" would let someone else's release break a
+       stored figure without a commit here.
+
+       three.min.js at 0.160.0 is the UMD build: it defines window.THREE and
+       needs no import map, which is why the pin is that file and not
+       three.module.js. VERIFIED 2026-09-27: HTTP/2 200 and a UMD preamble.
+
+       A CDN that does not answer is handled explicitly further down — the
+       module says so on screen rather than showing an empty square. -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lindenmayer/dist/lindenmayer.browser.js"></script>
+
+  <script>
+    'use strict';
+
+    // ── The renderer must not be blind ───────────────────────────────────
+    // Installed FIRST, before anything that can throw. In the 2D module this
+    // block sits at the bottom, which is fine there because nothing above it
+    // can fail; here the two CDN scripts can, and a module that cannot say
+    // "three.js never arrived" is a black square with no explanation.
+    const postToParent = (message) => { window.parent.postMessage(message, '*'); };
+    (function forwardModuleConsole() {
+      const send = (level, args) => {
+        try {
+          const line = Array.prototype.map.call(args, (a) => {
+            if (typeof a === 'string') return a;
+            // An Error JSON.stringifies to "{}" — message and stack are
+            // non-enumerable. 506 lines of "render error: {}" is how that was
+            // learned in the 2D module.
+            if (a instanceof Error) return a.message + (a.stack ? ' | ' + a.stack.split('\n')[1] : '');
+            try { return JSON.stringify(a); } catch (_) { return String(a); }
+          }).join(' ');
+          postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
+        } catch (_) {}
+      };
+      ['log', 'warn', 'error'].forEach((level) => {
+        const original = console[level].bind(console);
+        console[level] = function () { send(level, arguments); original.apply(console, arguments); };
+      });
+      window.addEventListener('error', (e) => {
+        send('error', ['uncaught: ' + (e && e.message) + ' @ ' + (e && e.lineno)]);
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        send('error', ['unhandled rejection: ' + (e && e.reason && (e.reason.message || e.reason))]);
+      });
+    })();
+
+    // Did the CDN answer? Read ONCE, here, so every later check is a boolean
+    // and not a fresh `typeof` that could be true in one place and false in
+    // another after a slow script finally arrives.
+    const HAVE_THREE   = (typeof THREE   !== 'undefined');
+    const HAVE_LSYSTEM = (typeof LSystem !== 'undefined');
+
+    // ── Element refs ──────────────────────────────────────────────────────
+    const statusEl       = document.getElementById('status');
+    const waitingEl      = document.getElementById('waiting');
+    const symmetrySelect = document.getElementById('symmetry-select');
+    const depthSelect    = document.getElementById('depth-select');
+    const stepSlider     = document.getElementById('step-slider');
+    // ONE ceiling per control, read from the input's own max attribute — the
+    // 2D module's lesson, where the attribute was raised to 9900 and two
+    // hard-coded 999s pulled every render back.
+    const STEP_MIN = parseFloat(stepSlider.min) || 10;
+    const STEP_MAX = parseFloat(stepSlider.max) || 9900;
+    const clampStep = (v) => Math.min(Math.max(v, STEP_MIN), STEP_MAX);
+
+    const angleSlider        = document.getElementById('angle-slider');
+    const angleMinutesSlider = document.getElementById('angle-minutes-slider');
+    const angleSecondsSlider = document.getElementById('angle-seconds-slider');
+    const angleDriftSlider   = document.getElementById('angle-drift-slider');
+
+    const pitchSlider        = document.getElementById('pitch-slider');
+    const pitchMinutesSlider = document.getElementById('pitch-minutes-slider');
+    const pitchSecondsSlider = document.getElementById('pitch-seconds-slider');
+    const pitchDriftSlider   = document.getElementById('pitch-drift-slider');
+
+    const camAzimuthSlider   = document.getElementById('cam-azimuth-slider');
+    const camElevationSlider = document.getElementById('cam-elevation-slider');
+    const camDistanceSlider  = document.getElementById('cam-distance-slider');
+    const CAM_DIST_MIN = parseFloat(camDistanceSlider.min) || 20;
+    const CAM_DIST_MAX = parseFloat(camDistanceSlider.max) || 9900;
+    const clampCam = (v) => Math.min(Math.max(v, CAM_DIST_MIN), CAM_DIST_MAX);
+
+    const colourSpeedSlider = document.getElementById('colour-speed-slider');
+    const saturationSlider  = document.getElementById('saturation-slider');
+    const lightnessSlider   = document.getElementById('lightness-slider');
+
+    const canvas         = document.getElementById('kolam-canvas');
+    const canvasWrapper  = document.querySelector('.canvas-wrapper');
+    const controlPanel   = document.querySelector('.control-panel');
+    const moduleLayout   = document.querySelector('.module-layout');
+
+    // ── Angles ────────────────────────────────────────────────────────────
+    // [0, 360): a full turn. 360 is never STORED, because 360 and 0 are the
+    // same figure and one picture must not have two spellings. Shared by
+    // angle, pitch and cam_azimuth — all three are bearings.
+    const ANGLE_MIN  = 0;
+    const ANGLE_MAX  = 360;            // exclusive — the wrap point, not a value
+    const ANGLE_SPAN = ANGLE_MAX - ANGLE_MIN;
+    function wrapAngle(deg) {
+      return ANGLE_MIN + ((((deg - ANGLE_MIN) % ANGLE_SPAN) + ANGLE_SPAN) % ANGLE_SPAN);
+    }
+    const DEG = Math.PI / 180;
+
+    // ── Module state ──────────────────────────────────────────────────────
+    let storedText    = '';
+    let lastError     = null;
+    let driftInterval = null;
+    let renderingFromDrift = false;
+    // Has anything AUTHORITATIVE set the camera distance — a script directive,
+    // or a person's finger? Until it has, the module frames the figure itself,
+    // because a 3D scene whose camera is inside the geometry shows literally
+    // nothing, and "nothing" is the worst first impression a new module can
+    // make. MEASURED: the four stored Kolam settings have radii from 97 to
+    // 1362 world units, so no single default can serve them.
+    let camDistanceExplicit = false;
+    let haveGeometry = false;
+
+    const setStatus = (msg) => { statusEl.textContent = msg; };
+
+    function showWaiting(msg, fatal) {
+      if (!waitingEl) return;
+      waitingEl.textContent = msg;
+      waitingEl.classList.toggle('fatal', !!fatal);
+      waitingEl.hidden = false;
+    }
+    function hideWaiting() {
+      if (!waitingEl) return;
+      waitingEl.hidden = true;
+      waitingEl.classList.remove('fatal');
+    }
+
+    function alignStepperTop() {
+      if (!controlPanel || !moduleLayout) return;
+      if (window.innerWidth > 500) { controlPanel.style.marginTop = ''; return; }
+      const offset = Math.max(0, Math.round(
+        canvas.getBoundingClientRect().top - moduleLayout.getBoundingClientRect().top
+      ));
+      controlPanel.style.marginTop = offset + 'px';
+    }
+
+    // ── %%bd_ Parser ──────────────────────────────────────────────────────
+    // Identical to the 2D module's, and it has to stay that way: the same
+    // script travels between them. %%bd_p_<name> marks a directive as wanting
+    // a control; the mark is PRESENTATION ONLY, so it is stripped here and the
+    // bare name is the key. Which names carried one is remembered on a
+    // non-enumerable property so everything that walks the directives is
+    // unaffected.
+    const BD_MARK = 'p_';
+    function parseBD(text) {
+      const directives = {};
+      const marked = new Set();
+      const lines = text.split('\n');
+      let state = 'text';
+      let currentDirective = null;
+      let currentLines = [];
+
+      for (const line of lines) {
+        if (state === 'text') {
+          if (line.startsWith('%%bd_')) {
+            const spaceIdx = line.indexOf(' ');
+            if (spaceIdx === -1) continue;
+            let name = line.slice(5, spaceIdx);
+            if (name.startsWith(BD_MARK)) {
+              name = name.slice(BD_MARK.length);
+              marked.add(name);
+            }
+            const value = line.slice(spaceIdx + 1).trim();
+            if (value === '[') {
+              currentDirective = name;
+              currentLines = [];
+              state = 'bracket';
+            } else {
+              directives[name] = value;
+            }
+          }
+        } else if (state === 'bracket') {
+          if (line.trim() === '%%bd_]') {
+            directives[currentDirective] = currentLines.join('\n');
+            state = 'text';
+          } else {
+            currentLines.push(line);
+          }
+        }
+      }
+      Object.defineProperty(directives, '__marked', { value: marked, enumerable: false });
+      return directives;
+    }
+
+    function parseScore(scoreText) {
+      const result = { axiom: '', productions: {} };
+      for (const line of scoreText.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        if (trimmed.startsWith('axiom:')) {
+          result.axiom = trimmed.slice(6).trim();
+        } else {
+          const colonIdx = trimmed.indexOf(':');
+          if (colonIdx !== -1) {
+            result.productions[trimmed.slice(0, colonIdx).trim()] = trimmed.slice(colonIdx + 1).trim();
+          }
+        }
+      }
+      return result;
+    }
+
+    function safeParseNumber(value, fallback) {
+      const n = parseFloat(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+    function safeParseInt(value, fallback) {
+      const n = parseInt(value, 10);
+      return Number.isFinite(n) ? n : fallback;
+    }
+    function formatDirectiveNumber(value) {
+      if (!Number.isFinite(value)) return String(value);
+      return (Math.round(value * 100) / 100).toString();
+    }
+
+    function setControlValues(directives) {
+      if (!symmetrySelect) return;
+      symmetrySelect.value = String(Math.min(Math.max(safeParseInt(directives.symmetry, 8), 1), 16));
+      depthSelect.value    = String(Math.min(Math.max(safeParseInt(directives.depth, 2), 1), 5));
+      stepSlider.value     = String(clampStep(safeParseNumber(directives.step, 50)));
+
+      angleSlider.value        = String(Math.min(Math.max(safeParseNumber(directives.angle, 90), ANGLE_MIN), ANGLE_MAX));
+      angleMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_minutes, 0), 0), 59));
+      // angle_seconds / pitch_seconds are internal-only: sub-arcminute drift
+      // accumulators that are never written to the script. Only touch them if
+      // a directive explicitly supplied one, or the running total is lost on
+      // every render and the drift stutters back to a whole arcminute.
+      if (directives.angle_seconds !== undefined) {
+        angleSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.angle_seconds, 0), 0), 59));
+      }
+      angleDriftSlider.value = String(Math.min(Math.max(safeParseInt(directives.angle_drift, 0), 0), 100));
+
+      pitchSlider.value        = String(Math.min(Math.max(safeParseNumber(directives.pitch, 0), ANGLE_MIN), ANGLE_MAX));
+      pitchMinutesSlider.value = String(Math.min(Math.max(safeParseNumber(directives.pitch_minutes, 0), 0), 59));
+      if (directives.pitch_seconds !== undefined) {
+        pitchSecondsSlider.value = String(Math.min(Math.max(safeParseNumber(directives.pitch_seconds, 0), 0), 59));
+      }
+      pitchDriftSlider.value = String(Math.min(Math.max(safeParseInt(directives.pitch_drift, 0), 0), 100));
+
+      camAzimuthSlider.value   = String(wrapAngle(safeParseNumber(directives.cam_azimuth, 0)));
+      camElevationSlider.value = String(Math.min(Math.max(safeParseNumber(directives.cam_elevation, 60), -90), 90));
+      // Guarded, unlike every other control above. An unguarded default here
+      // would overwrite the auto-framed distance on EVERY render, so the first
+      // stepper press would snap the camera back and the auto-fit would look
+      // like a bug rather than a default.
+      if (directives.cam_distance !== undefined) {
+        camDistanceSlider.value = String(clampCam(safeParseNumber(directives.cam_distance, 260)));
+      }
+
+      manageDriftInterval();
+
+      const colourSpeedValueParsed = Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16);
+      colourSpeedSlider.value = String(Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -2), 4));
+      saturationSlider.value  = String(Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100));
+      lightnessSlider.value   = String(Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100));
+
+      updateValueDisplays();
+    }
+
+    function updateValueDisplays() {
+      document.querySelectorAll('.stepper-value').forEach((span) => {
+        const targetId = span.dataset.target;
+        const input = targetId && document.getElementById(targetId);
+        if (!input) return;
+        if (targetId === 'colour-speed-slider') {
+          // The hidden input holds the EXPONENT (-2..4); %%bd_colour_speed
+          // holds 2^exponent. Showing the directive's own number keeps the
+          // readout, the label and the script saying the same thing. The
+          // leading zero goes for width only (".25" is the same number as
+          // "0.25"), which is RULE 8: abbreviate, never translate.
+          const exp = parseFloat(input.value);
+          span.textContent = Number.isFinite(exp)
+            ? formatDirectiveNumber(2 ** exp).replace(/^0\./, '.')
+            : input.value;
+        } else {
+          // 1000 and above read as 1.0k … 9.9k — step and cam_distance both
+          // reach it. Nothing parses these spans back (the steppers read the
+          // hidden input), so the abbreviation has no inverse to keep in step.
+          const n = parseFloat(input.value);
+          span.textContent = (Number.isFinite(n) && n >= 1000)
+            ? (n / 1000).toFixed(1) + 'k'
+            : input.value;
+        }
+        span.classList.toggle('stepper-value--wide', span.textContent.length > 3);
+      });
+    }
+
+    // RULE 1: the writer reconstructs the form it read. A script carrying
+    // %%bd_p_pitch must come back carrying %%bd_p_pitch — building the plain
+    // form from the stripped name is what once inserted a SECOND unmarked copy
+    // of a directive below the marked one.
+    function setDirectiveValue(nodeText, name, value) {
+      const lines  = nodeText.split('\n');
+      const plain  = `%%bd_${name}`;
+      const marked = `%%bd_${BD_MARK}${name}`;
+      let replaced = false;
+      const updated = lines.map((line) => {
+        // Marked first: `%%bd_p_angle ` also starts with `%%bd_p_angle`, but
+        // `%%bd_angle ` does not, so this order is unambiguous.
+        if (line.startsWith(`${marked} `)) { replaced = true; return `${marked} ${value}`; }
+        if (line.startsWith(`${plain} `))  { replaced = true; return `${plain} ${value}`;  }
+        return line;
+      });
+      if (!replaced) {
+        const insertAt = updated.findIndex((line) => line.trim() === '%%bd_score [');
+        // Added UNMARKED. Offering a control the author never asked for would
+        // be a presentation decision taken by a value update, which is the
+        // thing RULE 1 exists to stop.
+        updated.splice(insertAt === -1 ? updated.length : insertAt, 0, `${plain} ${value}`);
+      }
+      return updated.join('\n');
+    }
+
+    function applyControlDirectives(nodeText) {
+      let text = nodeText;
+      const controlValues = {
+        symmetry:      symmetrySelect.value,
+        depth:         depthSelect.value,
+        step:          stepSlider.value,
+        angle:         angleSlider.value,
+        angle_minutes: angleMinutesSlider.value,
+        angle_drift:   angleDriftSlider.value,
+        pitch:         pitchSlider.value,
+        pitch_minutes: pitchMinutesSlider.value,
+        pitch_drift:   pitchDriftSlider.value,
+        cam_azimuth:   camAzimuthSlider.value,
+        cam_elevation: camElevationSlider.value,
+        cam_distance:  camDistanceSlider.value,
+        colour_speed:  formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
+        saturation:    saturationSlider.value,
+        lightness:     lightnessSlider.value
+        // angle_seconds / pitch_seconds: internal accumulators, never written.
+        // weight: NOT written and NOT read into a control — see
+        // LINE_WIDTH_IS_NOT_AVAILABLE. Never naming it here is what leaves an
+        // existing %%bd_weight line untouched, so a figure keeps its stroke
+        // width when it goes back to the 2D module.
+      };
+      for (const [name, value] of Object.entries(controlValues)) {
+        text = setDirectiveValue(text, name, value);
+      }
+      return text;
+    }
+
+    // Moving the camera changes no geometry, so it must not pay for any.
+    const CAMERA_INPUT_IDS = new Set(['cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider']);
+
+    function handleControlChange(ev) {
+      updateValueDisplays();
+      if (!storedText) return;
+      const id = ev && ev.target && ev.target.id;
+      const updatedText = applyControlDirectives(storedText);
+      if (CAMERA_INPUT_IDS.has(id) && haveGeometry) {
+        // The drawing is already on the GPU; looking at it from somewhere else
+        // is a matrix. Rebuilding would cost the L-system rewrite plus the
+        // turtle walk — a quarter of a million segments at depth 5 — on every
+        // press of an orbit button, which is the difference between a camera
+        // control and a camera wish.
+        storedText = updatedText;
+        camDistanceExplicit = true;      // a hand on the control is authority
+        announce();
+        placeCamera();
+        draw();
+        return;
+      }
+      render(updatedText);
+    }
+
+    const controlInputs = [
+      symmetrySelect, depthSelect, stepSlider,
+      angleSlider, angleMinutesSlider, angleSecondsSlider, angleDriftSlider,
+      pitchSlider, pitchMinutesSlider, pitchSecondsSlider, pitchDriftSlider,
+      camAzimuthSlider, camElevationSlider, camDistanceSlider,
+      colourSpeedSlider, saturationSlider, lightnessSlider
+    ];
+    controlInputs.forEach((input) => { input.addEventListener('input', handleControlChange); });
+
+    // ── Which controls a script asks for ──────────────────────────────────
+    // angle_seconds and pitch_seconds have controls and deliberately NO
+    // directive, so they are absent here and can never be hidden by a marking
+    // decision they have no way to express.
+    const CONTROL_FOR = {
+      symmetry:      symmetrySelect,
+      depth:         depthSelect,
+      step:          stepSlider,
+      angle:         angleSlider,
+      angle_minutes: angleMinutesSlider,
+      angle_drift:   angleDriftSlider,
+      pitch:         pitchSlider,
+      pitch_minutes: pitchMinutesSlider,
+      pitch_drift:   pitchDriftSlider,
+      cam_azimuth:   camAzimuthSlider,
+      cam_elevation: camElevationSlider,
+      cam_distance:  camDistanceSlider,
+      colour_speed:  colourSpeedSlider,
+      saturation:    saturationSlider,
+      lightness:     lightnessSlider
+    };
+
+    // RULE 2: a script with NO mark anywhere keeps every control shown, so
+    // nothing already written, saved or shared changes. Once a script marks
+    // anything it is taken to mean what it says.
+    function applyControlVisibility(marked) {
+      const anyMarked = marked && marked.size > 0;
+      for (const [name, input] of Object.entries(CONTROL_FOR)) {
+        const row = input.closest('.control-row');
+        if (!row) continue;
+        row.hidden = anyMarked && !marked.has(name);
+      }
+    }
+
+    // ── Stepper (+/−) buttons ─────────────────────────────────────────────
+    // Verbatim from the 2D module: the hidden source input owns min/max/step,
+    // the buttons read those attributes, clamp, and dispatch a native 'input'
+    // event so handleControlChange fires unchanged.
+    function tapStep(input, cur, delta) {
+      const step   = parseFloat(input.step) || 1;
+      const above  = parseFloat(input.dataset.coarseAbove);
+      const coarse = parseFloat(input.dataset.coarseStep);
+      if (!Number.isFinite(above) || !Number.isFinite(coarse)) return step;
+      // The boundary is crossed at FINE resolution in both directions, or
+      // stepping down from 1000 would land on 900 and 999 would be a value you
+      // could pass but never return to.
+      const inCoarse = delta > 0 ? cur >= above : cur > above;
+      return inCoarse ? coarse : step;
+    }
+
+    function stepControl(input, delta, magnitude) {
+      const min  = parseFloat(input.min);
+      const max  = parseFloat(input.max);
+      const step = parseFloat(input.step) || 1;
+      const cur  = parseFloat(input.value);
+      if (!Number.isFinite(cur)) return;
+      const tap  = tapStep(input, cur, delta);
+      const move = Number.isFinite(magnitude) && magnitude > 0 ? magnitude : tap;
+      let next = cur + delta * move;
+      // data-wrap marks a CYCLIC control. angle, pitch and cam_azimuth are all
+      // bearings: 360 degrees is a turn, not a ceiling. cam_elevation is NOT
+      // one — see the note in the markup.
+      if (input.dataset.wrap && Number.isFinite(min) && Number.isFinite(max)) {
+        const span = (max - min) + step;          // max is inclusive, so 0..359 spans 360
+        next = min + ((((next - min) % span) + span) % span);
+      } else {
+        if (Number.isFinite(min)) next = Math.max(min, next);
+        if (Number.isFinite(max)) next = Math.min(max, next);
+      }
+      if (Number.isFinite(tap) && tap > 0) next = Math.round(next / tap) * tap;
+      next = parseFloat(next.toFixed(4));
+      const strVal = String(next);
+      if (input.value === strVal) return;      // hit min/max — no-op
+      input.value = strVal;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // The repeat rate is derived FROM THE RANGE, so holding a button crosses
+    // any control in about FULL_TRAVERSE_MS and the fifteen steppers cannot be
+    // tuned inconsistently. Small ranges work out below one step per tick and
+    // clamp back to their own step, so they are untouched by construction.
+    const REPEAT_MS        = 60;
+    const HOLD_MS          = 400;
+    const FULL_TRAVERSE_MS = 2500;
+    const RAMP_MS          = 900;
+
+    function repeatMagnitude(input, ticks) {
+      const step = parseFloat(input.step) || 1;
+      const min  = parseFloat(input.min);
+      const max  = parseFloat(input.max);
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return step;
+      const fastest = (max - min) / (FULL_TRAVERSE_MS / REPEAT_MS);
+      if (fastest <= step) return step;
+      const ramp = Math.min(1, (ticks * REPEAT_MS) / RAMP_MS);
+      const mag  = step + (fastest - step) * ramp;
+      return Math.max(step, Math.round(mag / step) * step);
+    }
+
+    document.querySelectorAll('.step-btn').forEach((btn) => {
+      let holdTimer   = null;
+      let repeatTimer = null;
+      let repeatTicks = 0;
+
+      const doStep = (magnitude) => {
+        const input = document.getElementById(btn.dataset.target);
+        const delta = parseFloat(btn.dataset.delta);
+        if (!input || input.disabled) return;
+        stepControl(input, delta, magnitude);
+      };
+
+      const start = (ev) => {
+        if (btn.disabled) return;
+        ev.preventDefault();
+        try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
+        repeatTicks = 0;
+        doStep();
+        holdTimer = setTimeout(() => {
+          repeatTimer = setInterval(() => {
+            const input = document.getElementById(btn.dataset.target);
+            if (!input) return;
+            doStep(repeatMagnitude(input, repeatTicks));
+            repeatTicks += 1;
+          }, REPEAT_MS);
+        }, HOLD_MS);
+      };
+
+      const stop = () => {
+        if (holdTimer)   { clearTimeout(holdTimer);   holdTimer   = null; }
+        if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+        repeatTicks = 0;
+      };
+
+      btn.addEventListener('pointerdown',   start);
+      btn.addEventListener('pointerup',     stop);
+      btn.addEventListener('pointercancel', stop);
+      btn.addEventListener('pointerleave',  stop);
+    });
+
+    // ── Drift automation ──────────────────────────────────────────────────
+    // ONE timer carries BOTH angles. They are independent parameters with
+    // independent rates, but a second timer would give them two clocks that
+    // drift apart and two renders per tick for one picture.
+    function driftIntervalMs() {
+      const table = { 1: 100, 2: 100, 3: 100, 4: 200, 5: 1000 };
+      return table[parseInt(depthSelect.value, 10)] ?? 200;
+    }
+
+    // The clock runs on WALL TIME. Scheduling the next tick after the render
+    // makes the real period `render time + interval`, which is a SYSTEMATIC
+    // bias and not jitter: a bigger canvas draws slower and therefore drifts
+    // slower, for ever — so BD's module and a viewer's square drew apart all
+    // session. driftNextDue is the moment the NEXT tick is owed.
+    let driftNextDue = 0;
+
+    function driftRunning() {
+      return parseInt(angleDriftSlider.value, 10) > 0 ||
+             parseInt(pitchDriftSlider.value, 10) > 0;
+    }
+
+    function manageDriftInterval() {
+      if (!driftRunning()) {
+        if (driftInterval !== null) { clearTimeout(driftInterval); driftInterval = null; }
+      } else if (driftInterval === null) {
+        driftNextDue = Date.now() + driftIntervalMs();
+        driftInterval = setTimeout(driftTick, driftIntervalMs());
+      }
+    }
+
+    // Carry seconds → minutes → degrees for one angle. Returns the new triple.
+    function advanceAngle(degs, mins, secs, drift) {
+      secs += drift;
+      mins += Math.floor(secs / 60);
+      secs  = secs % 60;
+      degs += Math.floor(mins / 60);
+      mins  = mins % 60;
+      return { degs: wrapAngle(degs), mins: mins, secs: secs };
+    }
+
+    function driftTick() {
+      // Do NOT null driftInterval here — manageDriftInterval (reached via
+      // render → setControlValues) checks it to avoid double-scheduling. The
+      // stale handle is overwritten at the end once we know whether to go on.
+      if (!driftRunning()) { driftInterval = null; return; }
+
+      const a = advanceAngle(
+        parseInt(angleSlider.value, 10), parseInt(angleMinutesSlider.value, 10),
+        parseInt(angleSecondsSlider.value, 10), parseInt(angleDriftSlider.value, 10) || 0);
+      const p = advanceAngle(
+        parseInt(pitchSlider.value, 10), parseInt(pitchMinutesSlider.value, 10),
+        parseInt(pitchSecondsSlider.value, 10), parseInt(pitchDriftSlider.value, 10) || 0);
+
+      angleSlider.value        = String(a.degs);
+      angleMinutesSlider.value = String(a.mins);
+      angleSecondsSlider.value = String(a.secs);
+      pitchSlider.value        = String(p.degs);
+      pitchMinutesSlider.value = String(p.mins);
+      pitchSecondsSlider.value = String(p.secs);
+
+      updateValueDisplays();
+
+      if (storedText) {
+        // render() reads this to label the bd_av_state it sends, so BD can
+        // tell "the timer moved the angle" from "someone changed a parameter"
+        // and decline to forward the former to a viewer computing it itself.
+        // render() is synchronous, so the flag cannot outlive the call;
+        // try/finally anyway, because a throw must not leave every later
+        // frame wearing the label.
+        renderingFromDrift = true;
+        try { render(applyControlDirectives(storedText)); } finally { renderingFromDrift = false; }
+      }
+
+      postToParent({
+        type: 'bd_state_update',
+        angle: a.degs, angle_minutes: a.mins, angle_seconds: a.secs,
+        pitch: p.degs, pitch_minutes: p.mins, pitch_seconds: p.secs
+      });
+
+      const interval = driftIntervalMs();
+      driftNextDue += interval;
+      // Too far behind to catch up honestly — a slow machine, or a tab that
+      // has just woken. Give up the backlog rather than fire a burst: a spiral
+      // of catch-up renders on a waking phone is worse than the lost time.
+      if (Date.now() - driftNextDue > interval * 5) driftNextDue = Date.now() + interval;
+      driftInterval = setTimeout(driftTick, Math.max(0, driftNextDue - Date.now()));
+    }
+
+    angleDriftSlider.addEventListener('input', manageDriftInterval);
+    pitchDriftSlider.addEventListener('input', manageDriftInterval);
+
+    // ── The scene ─────────────────────────────────────────────────────────
+    const CAM_FOV = 50;
+    let renderer = null, scene = null, camera = null, group = null;
+    let geometry = null, material = null;
+
+    // LINE_WIDTH_IS_NOT_AVAILABLE
+    //
+    // Core WebGL ignores gl.lineWidth above 1.0 on every platform that
+    // matters, so LineBasicMaterial.linewidth does nothing on the machines
+    // this will actually run on. That is why there is no `weight` stepper in
+    // this module: a control wired to nothing is worse than no control, and
+    // this user cannot use hue alone to compensate for a stroke that will not
+    // thicken.
+    //
+    // It IS set below, because it costs nothing and a few platforms honour it.
+    // Real thickness needs Line2 / LineMaterial from three's examples/jsm,
+    // which are ES modules and would mean an import map and three more CDN
+    // fetches — a fair next step, but not a silent one.
+    function initThree() {
+      if (!HAVE_THREE || renderer) return;
+      // Colour management OFF so setHSL(h, s, l) means exactly what
+      // hsl(h, s%, l%) means on a 2D canvas. three r152+ treats vertex colours
+      // as linear-sRGB and converts on output, which would render the same
+      // script visibly different from the 2D module — and a figure tuned by
+      // eye in one must not change hue when it moves to the other.
+      if (THREE.ColorManagement) THREE.ColorManagement.enabled = false;
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      scene    = new THREE.Scene();
+      scene.background = new THREE.Color('#0a0a0f');
+      camera   = new THREE.PerspectiveCamera(CAM_FOV, 1, 1, 100000);
+      group    = new THREE.Group();
+      scene.add(group);
+      material = new THREE.LineBasicMaterial({ vertexColors: true });
+    }
+
+    function updateCanvasSize() {
+      // Square, as in the 2D module: the smaller of the wrapper's two
+      // dimensions, so it never overflows the iframe in either axis.
+      const w = canvasWrapper.clientWidth;
+      const h = canvasWrapper.clientHeight;
+      const size = Math.floor(h > 0 ? Math.min(w, h) : w);
+      if (size > 0 && renderer) {
+        // setSize writes the drawing buffer at size × pixelRatio and the CSS
+        // box at size px — both, which is what keeps a retina square sharp
+        // without the element outgrowing its wrapper.
+        renderer.setSize(size, size);
+        if (camera) { camera.aspect = 1; camera.updateProjectionMatrix(); }
+      }
+      alignStepperTop();
+    }
+
+    function placeCamera() {
+      if (!camera) return;
+      const az = wrapAngle(safeParseNumber(camAzimuthSlider.value, 0)) * DEG;
+      const el = Math.min(Math.max(safeParseNumber(camElevationSlider.value, 60), -90), 90) * DEG;
+      const d  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
+      const ce = Math.cos(el), se = Math.sin(el);
+      const ca = Math.cos(az), sa = Math.sin(az);
+      camera.position.set(d * ce * sa, d * se, d * ce * ca);
+      // The up vector is the sphere's NORTH TANGENT, not world +Y. World +Y is
+      // parallel to the view direction at the poles, where lookAt degenerates
+      // — and elevation 90 is not a corner case in this module, it is the view
+      // that reproduces the 2D kolam, so it has to be the most reliable value
+      // in the range rather than the one that breaks.
+      //
+      // At elevation 90 this gives up = (0, 0, -1), putting world +X to screen
+      // right and world +Z to screen DOWN — the 2D canvas's own axes. That is
+      // what makes a pitch-0 figure seen from directly above the same drawing
+      // as the 2D module's, and not a mirror image of it.
+      camera.up.set(-se * sa, ce, -se * ca);
+      camera.lookAt(0, 0, 0);
+      // Depth range follows the distance, so precision does not fall away when
+      // the camera pulls back to 9900.
+      camera.near = Math.max(0.1, d / 1000);
+      camera.far  = d * 20 + 1000;
+      camera.updateProjectionMatrix();
+    }
+
+    function fitDistance(radius) {
+      if (!(radius > 0)) return clampCam(260);
+      // Frame a sphere of that radius, with 12% of air round it.
+      return clampCam(Math.round((radius / Math.sin((CAM_FOV / 2) * DEG)) * 1.12));
+    }
+
+    function curveSegments(depth) {
+      // The 2D module draws each F as ONE quadratic bezier and the canvas
+      // rasterises the curve for free. A GPU takes line SEGMENTS, so the curve
+      // has to be tessellated, and every extra sample multiplies a vertex
+      // count that is already 8^(depth+1) for the stored scores.
+      //
+      // MEASURED F counts for the default rule: depth 2 = 512, depth 3 = 4096,
+      // depth 4 = 32768, depth 5 = 262144. So sampling falls as the figure
+      // grows, which costs nothing visible: at depth 5 the effective step is
+      // 0.49 world units and the bulge on half a unit is under a pixel.
+      if (depth <= 2) return 6;
+      if (depth === 3) return 4;
+      if (depth === 4) return 2;
+      return 1;
+    }
+
+    // ── The 3D turtle ─────────────────────────────────────────────────────
+    // Basis: heading H, up U (the yaw axis), left L (the pitch axis).
+    //
+    // `+` turns by `angle` about U **and** by `pitch` about L; `-` by the
+    // negatives of both. With pitch 0 nothing ever rotates about L, so U stays
+    // world +Y, H stays in the XZ plane, and the figure is the 2D drawing laid
+    // flat on the ground — which is the property this whole module is built
+    // around. 2D (x, y) maps to 3D (x, 0, y).
+    function buildTurtle(seq, params) {
+      const seg  = curveSegments(params.depth);
+      let fCount = 0;
+      for (let i = 0; i < seq.length; i++) if (seq[i] === 'F') fCount++;
+      const total     = fCount * seg;
+      const positions = new Float32Array(total * 6);
+      const colors    = new Float32Array(total * 6);
+      let w = 0;                                   // write cursor into both
+
+      const pos  = new THREE.Vector3(0, 0, 0);
+      const H    = new THREE.Vector3(1, 0, 0);     // heading: 2D angle 0
+      const U    = new THREE.Vector3(0, 1, 0);     // up: the yaw axis
+      const L    = new THREE.Vector3(0, 0, -1);    // left = U × H
+      // Scratch, reused — a Vector3 per segment at a quarter of a million
+      // segments is a quarter of a million allocations.
+      const q    = new THREE.Quaternion();
+      const next = new THREE.Vector3();
+      const ctrl = new THREE.Vector3();
+      const p    = new THREE.Vector3();
+      const prev = new THREE.Vector3();
+      const col  = new THREE.Color();
+
+      // The hue follows the accumulated YAW in degrees, exactly as the 2D
+      // module's hue follows state.angle — so the same script gives the same
+      // colours. Kept as a scalar because a basis cannot be hue-mapped.
+      let yawDeg = 0;
+      let radius = 0;
+
+      const stack = [];
+      const yawRad   = params.effectiveAngle * DEG;
+      const pitchRad = params.effectivePitch * DEG;
+      const cs  = params.colourSpeed;
+      const sat = params.saturation / 100;
+      const lit = params.lightness / 100;
+      const span = 360 * cs;
+
+      // Rotating (1,0,0) about +Y by θ gives (cos θ, 0, −sin θ), and the 2D
+      // heading is (cos a, 0, sin a) — so the yaw is applied as −a. That sign
+      // is what makes a top-down view match the 2D figure rather than mirror
+      // it, and the reason it is written out rather than guessed at.
+      const turn = (deltaYaw, deltaPitch) => {
+        if (deltaYaw) {
+          q.setFromAxisAngle(U, -deltaYaw);
+          H.applyQuaternion(q); L.applyQuaternion(q);
+        }
+        if (deltaPitch) {
+          // Negated so that a POSITIVE pitch lifts the heading upward, which
+          // is what "pitch" says. Unnegated it dives.
+          q.setFromAxisAngle(L, -deltaPitch);
+          H.applyQuaternion(q); U.applyQuaternion(q);
+        }
+        H.normalize(); U.normalize(); L.normalize();
+      };
+
+      for (let i = 0; i < seq.length; i++) {
+        const symbol = seq[i];
+        if (symbol === 'F') {
+          next.copy(pos).addScaledVector(H, params.effectiveStep);
+          // The bulge. 2D offsets the bezier control point by rad + π/2, which
+          // in the mapped basis is −L, NOT U: at pitch 0 the drawing plane is
+          // XZ and L lies in it while U is the plane's normal, so bulging
+          // along U would push the curve out of the plane and the pitch-0
+          // figure would stop matching the 2D one.
+          ctrl.copy(pos).add(next).multiplyScalar(0.5)
+              .addScaledVector(L, -params.effectiveStep * 0.3);
+
+          const hue = (((yawDeg % span) + span) % span) / cs;
+          col.setHSL(hue / 360, sat, lit);
+
+          prev.copy(pos);
+          for (let k = 1; k <= seg; k++) {
+            const t = k / seg, u = 1 - t;
+            // Quadratic bezier pos → ctrl → next.
+            p.set(
+              u * u * pos.x + 2 * u * t * ctrl.x + t * t * next.x,
+              u * u * pos.y + 2 * u * t * ctrl.y + t * t * next.y,
+              u * u * pos.z + 2 * u * t * ctrl.z + t * t * next.z
+            );
+            positions[w]     = prev.x; positions[w + 1] = prev.y; positions[w + 2] = prev.z;
+            positions[w + 3] = p.x;    positions[w + 4] = p.y;    positions[w + 5] = p.z;
+            colors[w]     = col.r; colors[w + 1] = col.g; colors[w + 2] = col.b;
+            colors[w + 3] = col.r; colors[w + 4] = col.g; colors[w + 5] = col.b;
+            w += 6;
+            const r = p.length();
+            if (r > radius) radius = r;
+            prev.copy(p);
+          }
+          pos.copy(next);
+        } else if (symbol === 'f') {
+          pos.addScaledVector(H, params.effectiveStep);
+        } else if (symbol === '+') {
+          turn(yawRad, pitchRad);
+          yawDeg += params.effectiveAngle;
+        } else if (symbol === '-') {
+          turn(-yawRad, -pitchRad);
+          yawDeg -= params.effectiveAngle;
+        } else if (symbol === '[') {
+          stack.push({
+            pos: pos.clone(), H: H.clone(), U: U.clone(), L: L.clone(), yawDeg: yawDeg
+          });
+        } else if (symbol === ']') {
+          const s = stack.pop();
+          if (s) { pos.copy(s.pos); H.copy(s.H); U.copy(s.U); L.copy(s.L); yawDeg = s.yawDeg; }
+        } else if (symbol === '|') {
+          turn(Math.PI, 0);
+          yawDeg += 180;
+        }
+      }
+
+      // `w` can fall short of the buffer if the sequence held fewer F's than
+      // counted — it cannot, but a short buffer would draw a line to the
+      // origin, so the arrays are trimmed rather than trusted.
+      return {
+        positions: w === positions.length ? positions : positions.subarray(0, w),
+        colors:    w === colors.length    ? colors    : colors.subarray(0, w),
+        radius:    radius
+      };
+    }
+
+    function applySymmetry(n) {
+      if (!group || !geometry) return;
+      while (group.children.length > n) group.remove(group.children[group.children.length - 1]);
+      // ONE geometry, N objects. This is why the 3D version can afford
+      // symmetry at all: the 2D module stamps a rasterised bitmap N times, and
+      // the honest equivalent here would be N copies of a quarter of a million
+      // segments. Sharing the buffer makes the Nth copy a matrix and a draw
+      // call. Nothing is ever disposed from a child, because they all point at
+      // the same buffer — render() disposes it, once.
+      while (group.children.length < n) group.add(new THREE.LineSegments(geometry, material));
+      const sector = (2 * Math.PI) / n;
+      group.children.forEach((child, i) => {
+        child.geometry = geometry;
+        child.material = material;
+        // About Y — the axis perpendicular to the base plane, which is the
+        // same axis the 2D module rotates about when it spins the offscreen
+        // canvas around its centre.
+        child.rotation.set(0, i * sector, 0);
+      });
+    }
+
+    function draw() {
+      if (renderer && scene && camera) renderer.render(scene, camera);
+    }
+
+    function announce() {
+      // RULE 7: on a human action, never on a script push. render() is reached
+      // both ways, so fromDrift is the label that lets BD forward a real
+      // parameter change to a viewer while declining the drift timer's own
+      // angle steps, which the viewer is computing for itself.
+      try { postToParent({ type: 'bd_av_state', text: storedText, fromDrift: renderingFromDrift }); } catch (_) {}
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────
+    function render(nodeText) {
+      try {
+        setStatus('Rendering…');
+        storedText = nodeText;
+        // The script says which controls it wants. Done before the draw so the
+        // column is right by the time anything is on screen.
+        try { applyControlVisibility(parseBD(nodeText).__marked); } catch (_) {}
+        announce();
+
+        if (typeof nodeText !== 'string') {
+          console.error('visual_module3d: render() expected text string, got:', nodeText);
+          throw new Error('No valid text provided in BD_INIT payload');
+        }
+        if (!HAVE_THREE)   throw new Error('three.js did not load from the CDN');
+        if (!HAVE_LSYSTEM) throw new Error('lindenmayer did not load from the CDN');
+
+        const directives = parseBD(nodeText);
+        const scoreRaw = directives.score;
+        if (!scoreRaw) throw new Error('No score found in node text');
+        const score = parseScore(scoreRaw);
+        if (!score.axiom) throw new Error('No axiom found in score');
+
+        // A script that names the distance is authority, and the module stops
+        // framing for itself from then on.
+        if (directives.cam_distance !== undefined) camDistanceExplicit = true;
+
+        const params = {
+          symmetry:    Math.min(Math.max(safeParseInt(directives.symmetry, 8), 1), 16),
+          depth:       Math.min(Math.max(safeParseInt(directives.depth, 2), 1), 5),
+          step:        clampStep(safeParseNumber(directives.step, 50)),
+          angle:       Math.min(Math.max(safeParseNumber(directives.angle, 90), ANGLE_MIN), ANGLE_MAX),
+          pitch:       Math.min(Math.max(safeParseNumber(directives.pitch, 0), ANGLE_MIN), ANGLE_MAX),
+          background:  directives.background || '#0a0a0f',
+          // Read but not controlled — see LINE_WIDTH_IS_NOT_AVAILABLE.
+          weight:      Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5),
+          saturation:  Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100),
+          lightness:   Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100),
+          colourSpeed: Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16)
+        };
+        if (!Number.isFinite(params.colourSpeed) || params.colourSpeed <= 0) params.colourSpeed = 4;
+
+        // Minutes come from the script; seconds are read LIVE from the hidden
+        // input so drift moves the picture every tick and not only when the
+        // arcminute carries.
+        params.effectiveAngle = params.angle
+          + (safeParseNumber(directives.angle_minutes, 0) / 60)
+          + (safeParseNumber(angleSecondsSlider.value, 0) / 3600);
+        params.effectivePitch = params.pitch
+          + (safeParseNumber(directives.pitch_minutes, 0) / 60)
+          + (safeParseNumber(pitchSecondsSlider.value, 0) / 3600);
+        params.effectiveStep = params.step / Math.pow(3, Math.max(0, params.depth - 1));
+
+        initThree();
+        updateCanvasSize();
+        scene.background = new THREE.Color(params.background);
+        material.linewidth = params.weight;
+
+        const lsystem = new LSystem({ axiom: score.axiom, productions: score.productions });
+        lsystem.iterate(params.depth);
+        const seq = lsystem.getString();
+        if (!seq) throw new Error('L-system produced no output');
+
+        setControlValues(directives);
+
+        const built = buildTurtle(seq, params);
+        // Dispose BEFORE dropping the reference. A BufferGeometry holds GPU
+        // buffers that the garbage collector cannot reach, so a module left
+        // drifting for an hour at five renders a second would leak all of it.
+        if (geometry) geometry.dispose();
+        geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(built.positions, 3));
+        geometry.setAttribute('color',    new THREE.BufferAttribute(built.colors, 3));
+        haveGeometry = true;
+        applySymmetry(params.symmetry);
+
+        if (!camDistanceExplicit) {
+          camDistanceSlider.value = String(fitDistance(built.radius));
+          updateValueDisplays();
+          // Deliberately NOT announced and NOT written into storedText. An
+          // auto-fit is not a human action, and announcing on a script push is
+          // what once took the graph down in a 421/430-character loop. The
+          // value enters the script the first time a person moves any control,
+          // which is when applyControlDirectives next runs.
+        }
+        placeCamera();
+        draw();
+
+        setStatus('');
+        lastError = null;
+
+      } catch (err) {
+        lastError = err.message;
+        setStatus(`Error: ${err.message}`);
+        postToParent({ type: 'BD_ERROR', payload: { message: err.message } });
+        console.error('render error:', err);
+      }
+    }
+
+    // ── Waiting state (A42 §42.4) ─────────────────────────────────────────
+    let waitingForFirstScript = true;
+
+    function disableControls() {
+      document.querySelectorAll('.control-panel input, .control-panel select, .control-panel .step-btn')
+        .forEach(el => { el.disabled = true; });
+    }
+    function enableControls() {
+      document.querySelectorAll('.control-panel input, .control-panel select, .control-panel .step-btn')
+        .forEach(el => { el.disabled = false; });
+    }
+
+    function showWaitingState() {
+      if (!waitingForFirstScript) return;
+      initThree();
+      updateCanvasSize();
+      draw();                       // paints the background, nothing else
+      showWaiting('Waiting for script…', false);
+      // Same diagnostic as the 2D module: it tells us whether the wrapper
+      // (layout) or the canvas (JS sizing) is the constraint, which is how the
+      // "canvas only 40% of iframe depth" bug was found.
+      setStatus(`Waiting… body ${document.body.clientWidth}×${document.body.clientHeight}` +
+                `  wrap ${canvasWrapper.clientWidth}×${canvasWrapper.clientHeight}` +
+                `  canvas ${canvas.width}×${canvas.height}`);
+    }
+
+    function renderFromScript(scriptText) {
+      if (waitingForFirstScript) {
+        waitingForFirstScript = false;
+        hideWaiting();
+        enableControls();
+      }
+      // Only script ARRIVALS are logged, never the drift timer's renders —
+      // those fire five to ten times a second and would drown the log.
+      try {
+        const d = parseBD(scriptText);
+        const keys = Object.keys(d);
+        console.log('[module3d] script in: ' + scriptText.length + ' chars, ' +
+          keys.length + ' directives' +
+          (keys.length
+            ? ' {' + keys.map(k => k + '=' + String(d[k]).slice(0, 24)).join(' ') + '}'
+            : '  <-- NONE PARSED; every value will be a default'));
+      } catch (err) {
+        console.error('[module3d] could not parse the incoming script: ' + err.message);
+      }
+      render(scriptText);
+    }
+
+    // ── Boot ──────────────────────────────────────────────────────────────
+    disableControls();
+    updateValueDisplays();
+
+    if (!HAVE_THREE || !HAVE_LSYSTEM) {
+      // A dead module must not look like a slow one.
+      const missing = [!HAVE_THREE && 'three.js', !HAVE_LSYSTEM && 'lindenmayer']
+        .filter(Boolean).join(' and ');
+      showWaiting('Cannot draw: ' + missing + ' did not load.\nCheck the connection and reload.', true);
+      setStatus('Error: ' + missing + ' missing');
+      console.error('[module3d] ' + missing + ' did not load — the module cannot render');
+      try { postToParent({ type: 'BD_ERROR', payload: { message: missing + ' did not load from the CDN' } }); } catch (_) {}
+    } else {
+      // Deferred until layout has flushed, or the wrapper's clientWidth can
+      // still be 0 and the canvas lands at its default size.
+      requestAnimationFrame(() => requestAnimationFrame(showWaitingState));
+    }
+
+    // A resize needs no new geometry — it is in WORLD space, not canvas space,
+    // which the 2D module cannot say (its turtle starts at canvas.width / 2, so
+    // every resize there is a full re-render). Here it is a viewport and a
+    // projection matrix.
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => {
+        if (waitingForFirstScript) { showWaitingState(); return; }
+        updateCanvasSize();
+        placeCamera();
+        draw();
+      });
+      ro.observe(canvasWrapper);
+    }
+    window.addEventListener('resize', () => {
+      if (waitingForFirstScript) { showWaitingState(); return; }
+      updateCanvasSize();
+      placeCamera();
+      draw();
+    });
+
+    // ── Message Handlers ──────────────────────────────────────────────────
+    // A42 protocol names are bd_script_*. Legacy BD_INIT / BD_REQUEST_UPDATE
+    // kept as aliases so the reference harness still works.
+    window.addEventListener('message', (event) => {
+      try {
+        const { type, payload, script } = event.data;
+        switch (type) {
+          case 'bd_script_update': {
+            renderFromScript(typeof script === 'string' ? script : '');
+            break;
+          }
+          case 'bd_script_request': {
+            window.parent.postMessage({ type: 'bd_script_response', script: storedText }, '*');
+            break;
+          }
+
+          case 'BD_INIT': {
+            const rawText = payload && payload.text;
+            renderFromScript(typeof rawText === 'string' ? rawText : rawText == null ? '' : String(rawText));
+            break;
+          }
+          case 'BD_STOP':
+            if (driftInterval !== null) { clearTimeout(driftInterval); driftInterval = null; }
+            if (group) { while (group.children.length) group.remove(group.children[0]); }
+            draw();
+            setStatus('Stopped');
+            break;
+          case 'BD_REQUEST_UPDATE':
+            postToParent({ type: 'BD_UPDATE', payload: { text: storedText } });
+            break;
+
+          // The host supplies an outer control surface, so hide ours. The
+          // renderer and the canvas stay fully functional — this is what an
+          // AV/AVX viewer sends, and the reason a viewer has no steppers.
+          case 'bd_ui_config': {
+            document.body.classList.toggle('controls-hidden', event.data && event.data.hideControls === true);
+            updateCanvasSize();
+            placeCamera();
+            draw();
+            break;
+          }
+
+          // MM2 (2026-07-11) — set a single directive without rewriting the
+          // whole script. Writes the hidden input and dispatches 'input', so
+          // the normal handleControlChange path runs unchanged.
+          //
+          // Names map to input ids by convention: pitch_drift →
+          // #pitch-drift-slider, cam_azimuth → #cam-azimuth-slider. The
+          // `-select` fallback is new here: symmetry and depth are the two
+          // controls whose ids end -select, and in the 2D module
+          // bd_param_update silently cannot reach either.
+          case 'bd_param_update': {
+            const name  = event.data && event.data.name;
+            const value = event.data && event.data.value;
+            if (typeof name !== 'string') break;
+            const kebab = name.replace(/_/g, '-');
+            const input = document.getElementById(kebab + '-slider')
+                       || document.getElementById(kebab + '-select')
+                       || document.getElementById(name);
+            if (input) {
+              input.value = String(value);
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            break;
+          }
+
+          default:
+            break;
+        }
+      } catch (err) {
+        console.error('visual_module3d: error handling postMessage', err);
+      }
+    });
+
+    postToParent({ type: 'BD_READY' });
+  </script>
+
+</body>
+</html>
