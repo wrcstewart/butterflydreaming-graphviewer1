@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08, updated 2026-09-12, 09-15, 09-17 and 09-18
+# Continuation note — 2026-09-08, updated 09-12, 09-15, 09-17, 09-18 and 09-28
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -14,7 +14,7 @@ remembered.
 still the stable viewer.
 
     git branch --show-current      # expect: remote-graph-view
-    git log -1 --oneline           # expect: 947e4a2 or later (17 commits past 1f58147)
+    git log -1 --oneline           # expect: 3ca5646 or later (2026-09-28)
 
 Everything below is on that branch and pushed. Merging to `main` is a deliberate
 act still to be taken — see §5.
@@ -265,6 +265,73 @@ direction.
 
 ---
 
+## 1e. 2026-09-19 → 09-28 — a third module, and a rendering decision
+
+Ten days, and §1d's "the script is the source of truth" held throughout — every
+piece below is built on it rather than around it.
+
+**BDX/AVX finished and aligned with BD.** The relay setting made foolproof (a
+persisted setting that can outlive what it points at must be able to
+un-persist itself; storing the DEFAULT is a pin, not a no-op). Spare tokens
+fanned out, a Device dialog with a QR, `copy view URL`, Sync labelling, and a
+statement of purpose on the page. **The three standalone repos are retired in
+their READMEs** — the URL length ceiling is why, and BD is the controller now.
+
+**`%%bd_hint` retired** from the code and the corpus — one directive doing two
+jobs, of which the suppression half had never worked. **The AI note system was
+restored** on `[[ … ]]`, after the author remembered it working and `git log -S`
+proved it had been built in `af1605b` and lost in `392106d`. A memory of a
+feature working is evidence.
+
+**`_p_` control marking** carried across Kolam, Fractal and ABC with all four
+nodes migrated, and **the viewers aligned**: Fractal and ABC had been shipping
+full editors where Kolam shipped a viewer. They now all obey
+`bd_ui_config { hideControls }` — control of parameters happens on BD or BDX;
+the point of a viewer is to play the thing on another device.
+
+**`bd_V_Kolam3D` — the kolam in three dimensions.** A new Cluster `Kolam3D` off
+**Graphics**, not under Kolam: a sibling, not a variant. Same `%%bd_` script, a
+different renderer, two angles instead of one and a camera to place. three.js
+0.160.0 UMD from a CDN, pinned.
+
+Its invariant, and the thing to check before touching any sign in the turtle:
+**at `pitch 0` and `cam_elevation 90` it draws exactly what the flat module
+draws**, verified numerically to `Float32Array` precision. It then grew
+`step_pitch` (the step length in the new dimension, applied as `group.scale.y`,
+which is exactly — not approximately — scaling the y of every move), `opacity`,
+a `cam_elevation` opened to the full turn, and `cam_elevation_speed` to rotate
+it on its own 20 Hz clock.
+
+**Three faults worth remembering from building it**, because each was a comment
+of mine being wrong about code I had already written:
+
+- `cam_elevation` was clamped to ±90 under a note saying the poles would break
+  round-tripping. True of a naive up vector; **not** true of the sphere's north
+  tangent, which `placeCamera` had used from the first commit.
+- `AV_ANGLE_LINES` named the angle triple **literally**, so when the 3D module
+  added two more clocks their drift frames read as human changes and were pushed
+  to the viewer — "small jerks of elevation every one or two seconds". The
+  comment above it had predicted that exact failure; what it missed is that
+  **adding a member to the category does the same damage as the matcher
+  breaking.** Now `AV_CLOCK_LINES`.
+- The hold-repeat floored at one step per tick and called small ranges "already
+  quick enough", so `depth` crossed its whole range in **0.24s**. A floor you
+  cannot go below is not the same as a floor you do not need.
+
+**RULE 9** (in the collage plan): a module's default script carries no directive
+it cannot act on. `%%bd_weight` and `%%bd_stroke` came out of the 3D node —
+dead text in a card a person reads.
+
+**And a standing decision, 2026-09-28: visual modules render through three.js.**
+Not because 3D is better, but because a 2D canvas has no WebXR route at all
+while a three.js scene is a session flag away from a headset. **Read
+`ThreeJS_and_VR_2026-09-28.md`** — it carries the measured scoping, two
+requirements the intended experience imposes (never move the camera; smoothness
+beats fidelity), and **the collage fork: several iframes versus one shared
+scene, which has to be chosen before the collage is built.**
+
+---
+
 ## 2. Start here, in this order
 
 0. **`BD_SYSTEM_OVERVIEW.md`** — the master description of the system as built.
@@ -275,6 +342,9 @@ direction.
 2. **`PLANNING_REGISTER.md`** — how far each design is actually built.
 3. **`MEMORY_SNAPSHOT.md`** — mirror of the out-of-git memory directory, written
    by `sync_memory_snapshot.sh` via a Stop hook. Never hand-edit it.
+4. **`ThreeJS_and_VR_2026-09-28.md`** — read before ANY graphics work, and
+   before building the collage. Carries the standing rendering decision and the
+   fork that is cheap now and expensive later.
 
 ---
 
@@ -349,6 +419,9 @@ Two positions already settled, so do not reopen them:
 | **Merge to `main`** | 226 commits. A deliberate act, kept separate from the visual default flip. |
 | **`BD_GRACE_MS`** | Still 5000, a development value. 65000 before real use. |
 | **Recording the author's wife** | Planned within ~2 weeks. See `voice_training_pipeline.md` §7 — the espeak trap on contemplative vocabulary is the thing to check first. |
+| **THE COLLAGE FORK** | Added 09-28. Several iframes each with a canvas, or one scene holding several objects. `ThreeJS_and_VR_2026-09-28.md` §7. **Settle before building the collage**, not after. |
+| **Retire `bd_V_Kolam`?** | The 3D module is a *measured* superset of it. The one real loss is `weight` — core WebGL ignores line width. Two stored nodes would need migrating. |
+| **Kolam3D on a phone or headset** | Verified on this machine only. WebGL context loss on a backgrounded tab is the specific thing to watch; the 2D canvas has no equivalent. |
 
 ---
 
