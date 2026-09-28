@@ -642,6 +642,51 @@ does exactly that, and is the model for the rest.
 
 ---
 
+## 8d. Glasses — the horizon, and what does NOT transfer
+
+Asked 2026-09-28, closing the fact-gathering: how do the flat-browser and
+immersive halves work out on *specs*, which is where the research push is?
+
+**The good news: §5C is the portable architecture, not a Quest-shaped
+compromise.** WebXR ships in Chrome 79+, Edge, Opera, Samsung Internet, the
+Quest browser and Safari on visionOS. **Android XR** is the vehicle — Samsung's
+Galaxy XR headset shipped late 2025 as the first device, and **Xreal's Project
+Aura AR glasses launch globally on it during 2026**, with more makers following.
+Android XR means Chrome, and Chrome means WebXR. An ordinary page that hands off
+to an immersive session is the standard model everywhere. Nothing to change.
+
+**The bad news is that the optics INVERT.**
+
+AR glasses are **additive displays**. Waveguides and birdbaths *add* light to
+what you already see; they cannot render black. Black is transparent.
+
+| | on a headset | on additive glasses |
+|---|---|---|
+| `%%bd_background #0a0a0f` | a black ground | **does not exist** — your room is the ground |
+| BD's amber-on-black interface | fine in a flat panel | **worse** — low contrast over a lit room, washes out in daylight |
+| the kolam: bright lines on near-black | glare on Fresnel (§8b) | **better** — glowing lines hanging in space, no visible ground |
+
+**So additive displays suit the artwork and hurt the interface — the exact
+inverse of the Quest**, where the interface is fine and the artwork suffers from
+glare.
+
+**A connection worth keeping:** `?ink=1` — transparent bodies, identity carried
+in the label — is **closer to an AR-ready theme than the default dark one is**.
+If glasses ever become a target, that is the ancestor to build from.
+
+**Two reasons not to wait for them.** Field of view is far smaller — roughly
+45-55° against the Quest 3's 110° — so an immersive figure would be a *window*
+rather than a surround, undercutting the presence the whole piece rests on. And
+WebXR maturity on glasses trails headsets. **Glasses are the horizon, not the
+target.**
+
+**The free hedge**, in the spirit of §8c: keep the figure legible as **lines in
+space** rather than as lines on a black ground. It costs nothing, because it
+already is — near-black is very nearly transparent. Do not let anything come to
+*depend* on the background being there.
+
+---
+
 ## 9. Open, in one place
 
 | question | notes |
@@ -655,6 +700,8 @@ does exactly that, and is the model for the rest.
 | **Scale directive (§3b)** | Table, room, or building. A design decision, not a constant. |
 | **WebGL context ceiling** | Measure on desktop Safari, iOS Safari, Quest. |
 | **`Line2` (§6)** | Worth it for VR; the ESM/import-map cost is known and real. |
+| **Does anything DEPEND on the black background? (§8d)** | The free hedge for additive AR displays, where black is transparent. Keep the figure legible as lines in space. Costs nothing today. |
+| **An AR theme, if glasses ever matter (§8d)** | `?ink=1` is the closer ancestor than the dark default. Not now — FOV and WebXR maturity both trail headsets. |
 | **Does Piper run in the Quest browser? (§8b)** | Compute, not storage. Decides whether the headset carries the voice or only receives audio. |
 | **Does Whisper / `getUserMedia` work there too? (§5a)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. |
 
