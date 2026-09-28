@@ -670,15 +670,56 @@ what you already see; they cannot render black. Black is transparent.
 inverse of the Quest**, where the interface is fine and the artwork suffers from
 glare.
 
+### …except that you can DIM the room, which largely answers it
+
+Asked immediately after the above, and it revises it. **Electrochromic dimming
+is standard on the relevant glasses, and it is graded.** XREAL Aura — the
+Android XR device launching this year — has **5 levels**, described exactly as
+wanted: fully black for VR, fully transparent for AR, manual or automatic.
+Viture's Beast has **9 levels** with auto-transparency. Magic Leap 2 already
+does **segmented** dimming — 5,000 independently dimmable zones, >300:1
+contrast, 8ms response — though that is an enterprise device. CES 2026 showed
+faster films coming.
+
+So the black-background problem above is largely answered: dim the room and
+`%%bd_background` becomes approximately real again, and the amber-on-black
+interface regains its contrast.
+
+*Honest caveat:* dimming gives a **dark grey, not black**. "Fully black" is
+marketing; the one device with a published figure manages >300:1 and consumer
+global dimming will be less. In a dim room — which this piece wants anyway —
+close enough.
+
+### The dial that a headset cannot offer
+
+The important part is not the contrast fix. **Dimming is a continuous dial
+between the two delivery modes of §5:**
+
+| dimming | mode |
+|---|---|
+| fully transparent | **§5A facilitated** — the participant stays visually present in the room, the facilitator is *visible to them*, open-ear audio, grounded |
+| fully dimmed | **§5C solo immersion** |
+
+And it is adjustable **during** a session. A facilitator could bring someone
+gently out of immersion by raising transparency rather than by taking a headset
+off their face. For arts therapy and peer counselling that is a real therapeutic
+affordance — and **a headset cannot offer it**: a Quest is binary, and its
+passthrough is camera-mediated rather than optical, so "seeing the room" is
+still a screen.
+
+**That reframes glasses for BD.** Not merely the horizon, but potentially the
+*better eventual target* — for reasons specific to what the system is FOR,
+rather than for graphics.
+
 **A connection worth keeping:** `?ink=1` — transparent bodies, identity carried
 in the label — is **closer to an AR-ready theme than the default dark one is**.
-If glasses ever become a target, that is the ancestor to build from.
+If glasses become a target, that is the ancestor to build from.
 
-**Two reasons not to wait for them.** Field of view is far smaller — roughly
-45-55° against the Quest 3's 110° — so an immersive figure would be a *window*
-rather than a surround, undercutting the presence the whole piece rests on. And
-WebXR maturity on glasses trails headsets. **Glasses are the horizon, not the
-target.**
+**The counterweights still stand.** Field of view is far smaller — roughly
+45-58° against the Quest 3's 110° — so an immersive figure is a *window* rather
+than a surround, undercutting the presence the piece rests on. And WebXR
+maturity on glasses trails headsets. **Still the horizon — but now worth
+designing toward rather than merely tolerating.**
 
 **The free hedge**, in the spirit of §8c: keep the figure legible as **lines in
 space** rather than as lines on a black ground. It costs nothing, because it
@@ -702,6 +743,7 @@ already is — near-black is very nearly transparent. Do not let anything come t
 | **`Line2` (§6)** | Worth it for VR; the ESM/import-map cost is known and real. |
 | **Does anything DEPEND on the black background? (§8d)** | The free hedge for additive AR displays, where black is transparent. Keep the figure legible as lines in space. Costs nothing today. |
 | **An AR theme, if glasses ever matter (§8d)** | `?ink=1` is the closer ancestor than the dark default. Not now — FOV and WebXR maturity both trail headsets. |
+| **Immersion as a DIAL, not a switch (§8d)** | Electrochromic dimming makes depth-of-immersion continuous and adjustable mid-session — a facilitator can raise transparency instead of removing a headset. A therapeutic affordance no headset can offer, and the strongest argument for glasses as an eventual target. |
 | **Does Piper run in the Quest browser? (§8b)** | Compute, not storage. Decides whether the headset carries the voice or only receives audio. |
 | **Does Whisper / `getUserMedia` work there too? (§5a)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. |
 
