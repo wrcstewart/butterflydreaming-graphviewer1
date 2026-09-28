@@ -721,6 +721,47 @@ than a surround, undercutting the presence the piece rests on. And WebXR
 maturity on glasses trails headsets. **Still the horizon — but now worth
 designing toward rather than merely tolerating.**
 
+### TWO DIVERGENT TRAJECTORIES (Meta Connect, 23-24 September 2026)
+
+Checked because Meta had just held its conference. One announcement matters, and
+**its name invites exactly the wrong reading.**
+
+**Meta VR Glasses** — ~100g (5x lighter than Quest 3), magnesium frames,
+**pancake lenses**, a **5K display with full-colour PASSTHROUGH**, processing
+moved to a tethered puck (Snapdragon Reality Elite) holding battery and storage.
+Runs all Quest games. **Spring 2027, $1,300.**
+
+**These are VR glasses, NOT AR glasses.** Full-colour *passthrough* means an
+opaque display in a spectacle form factor: the room arrives through cameras,
+exactly as on a Quest. **So the dimming dial above does NOT apply to this
+device.** The therapeutic affordance belongs to the *optical* see-through
+category — Xreal, Viture, Magic Leap, Android XR — and Meta announced nothing in
+that lane.
+
+Which is the structural fact to carry:
+
+| trajectory | what it is | does the §8d dial apply? |
+|---|---|---|
+| **Meta** | opaque VR, made smaller and lighter | **No** — camera passthrough is still a screen |
+| **Android XR / Xreal / Viture / ML2** | optical see-through, made better | **Yes** — this is where the dial lives |
+
+**BD's dial argument attaches to the second trajectory, not to Meta's.**
+
+If the Meta device ships as described it would suit BD well — 5K and pancake at
+100g address thin-line legibility and long-session comfort directly, and
+"runs all Quest games" implies Horizon OS and therefore the Quest browser and
+WebXR. *Flagged as inference:* Engadget explicitly notes no OS or browser detail
+was given. And "5K" is ambiguous — Quest 3's "4K+" is 4128 COMBINED, so 5K
+likely means ~2500 per eye: a bump, not a transformation.
+
+**It changes nothing about buying now** — Spring 2027 and $1,300 against a
+Quest 3 available today. §8b stands.
+
+(Also from Connect, neither a BD platform: **Ray-Ban Display** widened
+availability, now €899 in France, but it is a small heads-up display rather than
+a canvas; and **Ray-Ban Meta Audio**, camera-free at $349, has no display at
+all.)
+
 **The free hedge**, in the spirit of §8c: keep the figure legible as **lines in
 space** rather than as lines on a black ground. It costs nothing, because it
 already is — near-black is very nearly transparent. Do not let anything come to
@@ -743,6 +784,7 @@ already is — near-black is very nearly transparent. Do not let anything come t
 | **`Line2` (§6)** | Worth it for VR; the ESM/import-map cost is known and real. |
 | **Does anything DEPEND on the black background? (§8d)** | The free hedge for additive AR displays, where black is transparent. Keep the figure legible as lines in space. Costs nothing today. |
 | **An AR theme, if glasses ever matter (§8d)** | `?ink=1` is the closer ancestor than the dark default. Not now — FOV and WebXR maturity both trail headsets. |
+| **Which trajectory to watch (§8d)** | Meta is making opaque VR smaller (VR Glasses, spring 2027); Android XR and the glasses makers are making optical see-through better. **BD's dial argument attaches to the second.** Watch that lane, not Meta's. |
 | **Immersion as a DIAL, not a switch (§8d)** | Electrochromic dimming makes depth-of-immersion continuous and adjustable mid-session — a facilitator can raise transparency instead of removing a headset. A therapeutic affordance no headset can offer, and the strongest argument for glasses as an eventual target. |
 | **Does Piper run in the Quest browser? (§8b)** | Compute, not storage. Decides whether the headset carries the voice or only receives audio. |
 | **Does Whisper / `getUserMedia` work there too? (§5a)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. |
