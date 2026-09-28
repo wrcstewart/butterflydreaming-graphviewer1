@@ -6,6 +6,33 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-27 — RULE 9: no dead directives in a default script
+
+A directive a module cannot act on is **dead text in a card a person reads**.
+The script is not a private config file; it is the thing shown, edited, copied
+and collaged, so every line in it should be a line that does something.
+
+`bd_V_Kolam3D_001` shipped two that were not. `%%bd_weight` was read but applied
+to `material.linewidth`, which core WebGL ignores. `%%bd_stroke` was **not read
+at all** — the 3D renderer always takes its hue from the yaw, where the flat
+module uses `stroke` to decide whether it does. Both gone; the node is 479
+characters from 513, and all twenty remaining directives are ones the module
+acts on.
+
+What makes that safe rather than merely tidy is that **nothing is lost, and it
+was checked rather than assumed**: absent, the flat module defaults `stroke` to
+`angle` and the 3D module defaults `weight` to 1.5 — in both cases precisely the
+values the removed lines carried. "The module ignores it" and "removing it
+changes nothing" are not the same statement, and only the second licenses a
+removal.
+
+And the rule governs the DEFAULT script a module ships — not what a module may
+strip from a script that already has one. A figure given a weight in the flat
+module still keeps it through the 3D module, because that protection comes from
+the 3D module never *rewriting* `weight`, which is untouched.
+
+---
+
 ## 2026-09-27 — the viewer was being sent the sender's clock
 
 Reported as "the AV viewer makes small jerks of elevation every one or two

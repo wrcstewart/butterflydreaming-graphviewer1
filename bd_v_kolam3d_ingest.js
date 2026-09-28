@@ -88,9 +88,19 @@ const GATEWAY_TEXT =
 // cam_distance 280: MEASURED. Framing a sphere of hypot(97, 37) at a 50-degree
 // field of view with 12% of air round it needs 276.
 //
-// %%bd_weight is UNMARKED (no p_) because this module has no weight stepper —
-// core WebGL ignores line width. The line is kept so the value survives a trip
-// to the flat module and back.
+// NO %%bd_weight AND NO %%bd_stroke, and their absence is the decision.
+//
+// A directive this module cannot act on is dead text in a card the user reads.
+// weight is read here but applied to material.linewidth, which core WebGL
+// ignores; stroke is not read at all, because the 3D renderer always takes its
+// hue from the yaw. Neither was doing anything.
+//
+// Nothing is lost by leaving them out, which is what makes it safe rather than
+// merely tidy: absent, the flat module defaults stroke to 'angle' and this one
+// defaults weight to 1.5 — in both cases the very value the lines used to
+// carry. And a figure that HAS been given a weight elsewhere still keeps it,
+// because that protection comes from this module never REWRITING the directive,
+// which is untouched. The default script not carrying one is a separate thing.
 const CONTENT1_TEXT =
   '%%bd_module bd_V_Kolam3D\n' +
   '%%bd_p_symmetry 8\n' +
@@ -115,7 +125,6 @@ const CONTENT1_TEXT =
   '%%bd_p_cam_elevation_speed 0\n' +
   '%%bd_p_cam_distance 280\n' +
   '%%bd_p_colour_speed 4\n' +
-  '%%bd_stroke angle\n' +
   '%%bd_p_saturation 100\n' +
   '%%bd_p_lightness 65\n' +
   // 1 — fully opaque, so the node opens exactly as it did before the
@@ -123,7 +132,6 @@ const CONTENT1_TEXT =
   // of the range, so the first press downward shows something.
   '%%bd_p_opacity 1\n' +
   '%%bd_background #0a0a0f\n' +
-  '%%bd_weight 1.5\n' +
   '%%bd_score [\n' +
   'axiom: F+F+F+F+F+F+F+F\n' +
   'F: F+F-F-F+F+F+F-F\n' +

@@ -150,11 +150,47 @@ whose labels wrap is exempt, and grouping a family of controls by a shared
 would not have been under truncation.
 
 One departure worth recording, because it is a decision and not an oversight:
-`bd_V_Kolam3D` has **no control for `%%bd_weight`** even though the directive is
-read and passed through. Core WebGL ignores line width. The mark is a request
-for a control, and a module may decline it when it cannot honour one — which is
-better than the alternative reading, that every `_p_` obliges a knob and some
-knobs may do nothing.
+`bd_V_Kolam3D` has **no control for `%%bd_weight`**. Core WebGL ignores line
+width. The mark is a request for a control, and a module may decline it when it
+cannot honour one — which is better than the alternative reading, that every
+`_p_` obliges a knob and some knobs may do nothing.
+
+That raised the next question, and RULE 9 is the answer to it.
+
+---
+
+### RULE 9 — a module's default script carries no directive it cannot act on (2026-09-27)
+
+A directive a module cannot act on is **dead text in a card a person reads**.
+The script is not a private config file; it is the thing shown, edited, copied
+and collaged, so every line in it should be a line that does something.
+
+`bd_V_Kolam3D_001` shipped two that did not:
+
+- `%%bd_weight` — read, but applied to `material.linewidth`, which core WebGL
+  ignores.
+- `%%bd_stroke` — **not read at all**. The 3D renderer always takes its hue from
+  the yaw; the flat module uses `stroke` to decide whether it does.
+
+Both removed. Every directive left in that node is one the module acts on.
+
+**What makes it safe rather than merely tidy** is that nothing is lost. Absent,
+the flat module defaults `stroke` to `angle` and the 3D module defaults `weight`
+to 1.5 — in both cases precisely the value the removed lines carried. Check that
+before removing a line, because "the module ignores it" and "removing it changes
+nothing" are not the same statement.
+
+**And note what this rule is NOT.** It governs the DEFAULT script a module
+ships. It does not license a module to strip a directive it does not understand
+from a script that already has one — that is RULE 1's territory, and a figure
+given a weight in the flat module must keep it on a trip through the 3D one. The
+protection there comes from the 3D module never *rewriting* `weight`, which is
+unchanged. The two are independent: what a module WRITES and what its default
+script CARRIES are different decisions.
+
+A useful consequence for the collage: if a directive is absent from every script
+of a module, and that module neither reads nor writes it, it has left the
+vocabulary for that module without anyone having to declare a retirement.
 
 ---
 

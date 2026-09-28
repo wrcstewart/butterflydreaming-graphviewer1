@@ -224,6 +224,16 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-27 — RULE 9, dead directives
+
+| item | where | note |
+|---|---|---|
+| **RULE 9: a module's default script carries no directive it cannot act on** | `CollagePlanStarted_2026-09-22.md` | The script is not a private config file — it is the card a person reads, edits, copies and collages, so every line should do something. `bd_V_Kolam3D_001` shipped `%%bd_weight` (read, but applied to a WebGL property that is ignored) and `%%bd_stroke` (**not read at all** — the 3D renderer always takes its hue from the yaw). Both removed; all 20 remaining directives are live. |
+| **Safe because nothing is lost — checked, not assumed** | — | Absent, the flat module defaults `stroke` to `angle` and the 3D module defaults `weight` to 1.5: exactly the values the removed lines carried. "The module ignores it" and "removing it changes nothing" are different statements, and the second is the one that licenses removal. |
+| **What a module WRITES and what its default script CARRIES are separate** | — | RULE 9 does not license stripping a directive from a script that has one. A figure given a weight in the flat module keeps it through the 3D one, because that module never *rewrites* `weight` — unchanged by this. |
+
+---
+
 ## Added 2026-09-27 — the viewer and the sender's clock
 
 | item | where | note |
