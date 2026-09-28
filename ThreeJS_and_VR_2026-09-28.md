@@ -152,7 +152,60 @@ That inverts the usual instinct and should be written into whatever ships.
 
 ---
 
-## 5. The larger question: what the headset has to carry
+## 5. Two delivery shapes — and a third that dissolves the choice
+
+Raised 2026-09-28: either BD runs on a phone or laptop and the Quest runs the AV
+viewer, or BD itself runs on the Quest and you navigate the node graph in there.
+
+There is a third, and it is probably the answer.
+
+### C. BD on the Quest as a FLAT page; only the module goes immersive
+
+The standard WebXR arrangement: an ordinary 2D page with an Enter VR button. BD
+runs in the Quest's browser window — a large virtual monitor — you navigate the
+graph on a flat screen as you should, press Enter VR, and the **module's scene**
+takes over the headset. BD's DOM is gone while you are in there. Exit returns you
+to the page.
+
+**Cheaper than the viewer route**, because BD's player already hosts the module
+in an iframe on the same origin: no token, no socket, no relay, just the
+postMessage that exists. The AV path needs the connection to survive a worn
+headset, which is the untested risk; this path has no connection to lose.
+
+**The audio settles it.** Speech is Piper, client-side, in BD. With BD on a
+laptop and the Quest as viewer, the spoken poetics come out of the **laptop**.
+For the voice to reach the headset the viewer would have to synthesise it there
+— the same Quest-compute unknown as §8b — or audio would have to be streamed,
+which does not exist. With BD on the Quest there is one device, one audio
+context, and pattern, music and voice are coherent by construction.
+
+### A. BD elsewhere, Quest as AV viewer — the FACILITATED mode
+
+Not a fallback. A facilitator drives the script while a participant is immersed,
+and BD already has the whole pairing apparatus for exactly two people in
+conversation — which is what the system is *for*. Keep it.
+
+**A and C are not competing.** They are the solo mode and the facilitated mode,
+and **both run the identical module** — the only difference is whether the
+script arrives over a socket or from the page underneath. Nothing has to be
+chosen between them.
+
+### B. Porting BD's own UI into 3D — avoid
+
+The graph, the cards and the chat rendered in VR. BD is text-heavy by design (a
+corpus of literature), and reading prose in a headset is worse than reading it
+on a screen. The flat browser window gives the graph at no cost and without that
+loss.
+
+### The dependency to verify first
+
+C rests on **an iframe being able to request an immersive session, with the
+session presenting only that context**. Believed correct and standard, but not
+verified here, and C is built on it. The §8 test answers it.
+
+---
+
+## 5a. What the headset has to carry
 
 Right now BD plays the music and the viewer shows the graphics **on another
 device**. Pattern, music and spoken poetics *together* means the headset carries
@@ -249,7 +302,11 @@ at it as a flat 2D page. No code at all, and it answers the three real unknowns:
 1. does the headset reach BD, and does the socket hold while worn;
 2. how the current 1-pixel lines read at that pixel density (i.e. how urgent §6
    really is);
-3. whether the frame rate is anywhere near acceptable before stereo doubles it.
+3. whether the frame rate is anywhere near acceptable before stereo doubles it;
+4. **whether BD's own graph is usable in that browser window** — which decides
+   whether §5C is real;
+5. **whether Enter VR from inside the module iframe behaves** — the one
+   dependency §5C rests on.
 
 ---
 
@@ -293,7 +350,8 @@ decide whether the headset carries the voice or only receives audio.
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
 | **Retire `bd_V_Kolam`?** | The 3D module is a *measured* superset. Costs: `weight` (§6), and the canvas rasterises a bezier for free where three tessellates it. Two stored nodes would need migrating. |
-| **Does the headset carry music and voice (§5)?** | Decides whether "VR viewer" is a weekend or a project. |
+| **Delivery shape (§5)** | Leaning C — BD flat in the Quest browser, module immersive. A (facilitated, two people) stays alongside it; both run the same module. Depends on the iframe/immersive-session question. |
+| **Does the headset carry music and voice (§5a)?** | Under §5C it must, because there is only one device. That makes the Piper question (§8b) load-bearing rather than optional. |
 | **Depth / drift policy inside a session (§3)** | Cap depth, slow drift, or move the L-system off the main thread. |
 | **Scale directive (§3b)** | Table, room, or building. A design decision, not a constant. |
 | **WebGL context ceiling** | Measure on desktop Safari, iOS Safari, Quest. |
