@@ -447,6 +447,25 @@ sold with the small drive. **Take the Quest 3 anyway.** The 512 GB is money with
 no return here, and it is the price of the lenses in the lineup on offer; for
 this work the optics are not part of the toolchain, they are part of the piece.
 
+**"Infinite Display" is Meta's brand name for that optical stack** — the panels
+plus the pancake lenses — not a display technology despite the name. Pancake
+lenses bounce light several times inside a stack of reflective and polarising
+layers instead of letting it travel straight through, which folds the optical
+path into ~40% less depth. Meta's own figures for it: **~25% sharper in the
+centre of the field, ~70% sharper in the PERIPHERY**, with "significantly less
+stray or scattered light artifacts".
+
+Those two numbers are the two arguments below, in the manufacturer's own words.
+The peripheral figure being nearly three times the central one *is* the
+sweet-spot fix — you look around with your eyes rather than pointing your head,
+which is exactly the reading motion §5C's flat panel demands. And "less stray or
+scattered light" is the god-ray point.
+
+(One real cost of pancake optics, relevant to the battery question: they are
+**light-inefficient**. The folded path through polarisers discards most of the
+panel's output, so the display must be driven much harder — part of why runtime
+is what it is.)
+
 The decisive reason is sharper than the general one. **Fresnel lenses produce
 god rays — radial glare streaks — on bright content against dark backgrounds.**
 BD is amber on black and the kolam is bright hue-cycling lines on `#0a0a0f`:
