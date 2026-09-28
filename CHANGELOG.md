@@ -55,6 +55,59 @@ Also recorded: which headset, and why storage is the wrong axis — browser WebX
 installs nothing, so 128 GB is ample and the money belongs in resolution and
 optics, which are exactly what 1-pixel lines care about.
 
+
+### And then the fact-gathering, over the rest of the day
+
+The decision was the start of it. The document grew into the whole enquiry, and
+the parts worth knowing without reading it:
+
+**Three delivery shapes, not two** (§5). Either BD runs elsewhere with the
+headset as viewer, or BD runs *on* the headset with the graph navigated in VR —
+and there is a third that dissolves the choice: **BD as an ordinary flat page in
+the headset browser, with only the module going immersive.** That is the
+standard WebXR arrangement, it is cheapest (same-origin iframe, no token, no
+socket, no relay), and **the audio settles it** — Piper is client-side, so with
+BD on a laptop the spoken poetics come out of the laptop. The AV viewer is not
+superseded: it is the *facilitated* mode, and both shapes run the identical
+module.
+
+**Which headset, and why storage is the wrong axis** (§8b). Browser WebXR
+installs nothing. The recommendation ended up resting on **glare and field of
+view** — 96° against 110° — and explicitly **not** on text legibility, because a
+1.2x pinch closes that gap on either device. Two of my own arguments were
+corrected in the course of getting there.
+
+**Designing against hardware that improves slowly** (§8c), which produced the
+most portable rule in the document: **a 1-pixel line gets WORSE as hardware
+improves**, because higher pixel density means it subtends less angle. Anything
+sized in pixels shrinks as the tech gets better. **Size things in angle or world
+units.**
+
+**Glasses** (§8d). Additive displays cannot render black, so `%%bd_background`
+stops existing — which *hurts the interface and helps the artwork*, the exact
+inverse of a headset. Then a question that revised it: you **can** dim the room,
+in 5 or 9 graded levels on current devices. And the important part is not the
+contrast fix — **dimming makes depth-of-immersion a continuous dial, adjustable
+mid-session.** A facilitator can raise transparency rather than take a headset
+off someone's face. For arts therapy that is a real affordance, and **no headset
+can offer it.**
+
+Checked against **Meta Connect 2026** (23-24 September), which named the thing
+that would otherwise mislead: **Meta VR Glasses are not AR glasses.**
+Full-colour passthrough is still camera-mediated, so the dial does not apply to
+them. Two divergent trajectories — Meta making opaque VR smaller, Android XR and
+the glasses makers making optical see-through better. **BD's argument attaches
+to the second.**
+
+Also recorded along the way: the audio paths out of the headset and the mic
+gotcha (inline mics over the 3.5mm jack are not supported, so there is no wired
+fallback for `sr_editor.html`), and **RULE 9** in the collage plan — a module's
+default script carries no directive it cannot act on, which took `%%bd_weight`
+and `%%bd_stroke` out of the 3D node.
+
+**§9 of the document is the authoritative open list for the area** — fifteen
+items — and §7, the collage fork, is the one that has to be settled before the
+collage is built.
 ---
 
 ## 2026-09-27 — RULE 9: no dead directives in a default script

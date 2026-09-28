@@ -324,11 +324,21 @@ dead text in a card a person reads.
 
 **And a standing decision, 2026-09-28: visual modules render through three.js.**
 Not because 3D is better, but because a 2D canvas has no WebXR route at all
-while a three.js scene is a session flag away from a headset. **Read
-`ThreeJS_and_VR_2026-09-28.md`** — it carries the measured scoping, two
-requirements the intended experience imposes (never move the camera; smoothness
-beats fidelity), and **the collage fork: several iframes versus one shared
-scene, which has to be chosen before the collage is built.**
+while a three.js scene is a session flag away from a headset.
+
+**Read `ThreeJS_and_VR_2026-09-28.md` before any graphics or XR work.** It grew
+into the whole fact-gathering: the measured scoping and estimate; two
+requirements the intended experience imposes (**never move the camera** —
+a comfort property, not plumbing; and smoothness beats fidelity); **three
+delivery shapes**, of which BD-flat-in-the-headset-browser with only the module
+immersive is cheapest and the only one where the audio coheres, while the AV
+viewer remains the *facilitated* mode; audio paths and a mic gotcha; which
+headset to buy and why storage is the wrong axis; how to design against hardware
+that improves slowly (**size things in angle, not pixels**); glasses, the
+dimming dial no headset can offer, and the two divergent trajectories after Meta
+Connect 2026. **§9 is the authoritative open list for the area — fifteen items —
+and §7 is the collage fork, which has to be chosen before the collage is
+built.**
 
 ---
 
