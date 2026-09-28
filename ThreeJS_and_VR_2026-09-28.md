@@ -346,7 +346,21 @@ at it as a flat 2D page. No code at all, and it answers the three real unknowns:
    dependency §5C rests on;
 6. **how BD's own text reads at 16px (cards), 12.8px (helper cards) and 10px
    (node labels)** — the three sizes that matter, in that order of importance.
-   The 8-11px chrome can be ignored: knowing where a button is beats reading it.
+   The 8-11px chrome can be ignored: knowing where a button is beats reading it;
+7. **whether cytoscape's pinch-zoom and drag-pan actually reach the page**
+   through a controller ray and through hand tracking. **This is a dependency,
+   not a nicety.** The §8b conclusion that node labels do not differentiate the
+   headsets rests entirely on "a 1.2x pinch closes the gap" — if those gestures
+   do not work cleanly in that browser, the mitigation evaporates and the labels
+   matter again. `userZoomingEnabled` and `userPanningEnabled` are both true and
+   `maxZoom` is 8, so the page is willing; the question is the input path.
+
+   Note while testing that **head movement does NOT scroll the flat panel** — it
+   is a window, not a gaze-following viewport. Panning a zoomed graph is a drag.
+   Enlarging or nearing the panel is the only thing that makes looking around
+   reveal more, and only for content that already fits the page. The immersive
+   scene is the opposite case, where looking around IS the navigation — which is
+   why §3a's camera steppers must move the world and not the eye.
 
 ---
 
