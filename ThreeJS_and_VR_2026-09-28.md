@@ -416,9 +416,31 @@ text, the 10px cytoscape node label:
 | Quest 3 | 2064 x 2208 | ~25 PPD | **10.4 px** |
 | a laptop | — | ~45 PPD | 18.8 px |
 
-Roughly 10 rendered pixels of glyph height is the floor for legibility, so 8.3
-is below it and 10.4 is just above. ("4K+ Infinite Display" decodes as 4128 px
-across BOTH eyes — 2064 each — not 4K per eye.)
+("4K+ Infinite Display" decodes as 4128 px across BOTH eyes — 2064 each — not
+4K per eye.)
+
+**But that row largely dissolves, and the correction matters.** Worked through
+properly, the number that decides legibility is **x-height**, about half the em:
+
+| | node label (10px) | SubFamily (6.8px) |
+|---|---|---|
+| Quest 3S | 4.2px x-height — *word-SHAPE recognition only* | 2.8px — **gone** |
+| Quest 3 | 5.2px — *readable, effortful* | 3.5px — shape only |
+| a laptop | 9.4px — comfortable | 6.4px — effortful |
+
+So on a 3S you would recognise `bd_V_Kolam_001` by its shape once you knew it,
+and could not read a name you had not seen. That is "guessing". **But the zoom
+needed to close it is 1.2x on a 3S and 1.0x on a 3** — against a `maxZoom` of 8,
+plus a resizable, movable window as a second lever on the same arithmetic.
+
+**The labels are therefore NOT a real differentiator between the two headsets,
+and weighting them was a mistake.** A small pinch erases the gap. What has no
+user-side lever at all is the GLARE: Fresnel god-rays on bright-on-black are
+optics, and no amount of zooming or resizing touches them. The recommendation
+stands, on that one reason rather than two.
+
+(Shaky input: the CSS-pixels-per-degree figure depends on panel placement, and
+x-height varies by typeface. Test item 6 settles it in a minute.)
 
 Same chipset either way, so nothing in the depth or smoothness policy changes.
 
