@@ -291,6 +291,37 @@ The consolation is that spatial audio then comes nearly free and is very much on
 theme: a WebAudio `PannerNode` inside an XR session puts the sound where the
 figure is.
 
+### How the sound actually gets out, and the mic
+
+Four output paths: **built-in speakers** (stereo, in the strap arms, spatial
+audio, zero latency), **3.5mm jack** (left side, virtually zero delay),
+**USB-C wired**, and **Bluetooth 5.2 LE** — supported but with noticeable
+latency. The low-latency wireless option is a 2.4GHz USB-C dongle, not BT.
+
+**Wired 3.5mm for the solo piece** — no latency, isolation, better bass.
+
+**But the built-in speakers may be the RIGHT answer for §5A rather than the
+compromise.** They are open-ear: the participant stays aware of the room and a
+facilitator can speak to them without the headset coming off. In arts therapy
+and peer counselling that is a presence and safety property, not an audio-quality
+one. If the facilitated mode is the delivery shape, open-ear is a feature.
+
+**Bluetooth latency, honestly:** for a drifting figure with ambient music and
+nothing tightly synced, 100-300ms is imperceptible and would not matter. Where
+it bites is BD's tap-a-node-and-it-speaks interaction, where the delay stacks on
+Piper's synthesis time. Mode-dependent; wired sidesteps it.
+
+**The mic, with a gotcha worth knowing before buying earbuds:** there is a
+built-in array and it is fine for voice, but **headset mics over the 3.5mm jack
+are NOT supported** — inline-mic earbuds will not work as a mic, you stay on the
+built-in one. Do not buy earbuds for their microphone.
+
+**And this is not hypothetical:** `sr_editor.html` runs Whisper base.en via
+transformers.js with AudioWorklet direct-PCM capture. On the Quest that means
+the built-in mic through `getUserMedia` — two unknowns of exactly the same shape
+as the Piper one (§8b): whether `getUserMedia` behaves in that browser, and
+whether Whisper runs acceptably on a mobile chipset. Test the two together.
+
 This question and the collage fork in §7 are the same question wearing different
 clothes. Both are "how do several media share one surface".
 
@@ -625,6 +656,7 @@ does exactly that, and is the model for the rest.
 | **WebGL context ceiling** | Measure on desktop Safari, iOS Safari, Quest. |
 | **`Line2` (§6)** | Worth it for VR; the ESM/import-map cost is known and real. |
 | **Does Piper run in the Quest browser? (§8b)** | Compute, not storage. Decides whether the headset carries the voice or only receives audio. |
+| **Does Whisper / `getUserMedia` work there too? (§5a)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. |
 
 ---
 
