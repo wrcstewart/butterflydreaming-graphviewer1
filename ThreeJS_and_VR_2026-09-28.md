@@ -435,6 +435,71 @@ decide whether the headset carries the voice or only receives audio.
 
 ---
 
+## 8c. Designing against hardware that improves slowly
+
+> *"I'm designing on the assumption that the tech will gradually improve —
+> though this is going very slowly for VR."* — 2026-09-28
+
+Accurate, and the reason matters because it separates what will improve from
+what will not.
+
+**The wall is not panel manufacture.** Angular resolution costs its SQUARE in
+rendering, doubled for stereo, on a battery. Approximate history and arithmetic:
+
+| | ~PPD |
+|---|---|
+| Quest 1 (2019) | 14 |
+| Quest 2 (2020) | 20 |
+| Quest 3 (2023) | 25 |
+| a laptop screen | 45 |
+| "retina" for VR | 60 |
+
+25% in three years on the mainstream line. Parity with a laptop needs **1.8x
+linear = 3.2x the pixels**; 60 PPD needs **5.8x**. Hence foveated rendering as
+the route out rather than bigger displays, and hence progress that arrives in
+lumps.
+
+**What to assume, then:**
+
+| improves | does not, on any timescale worth designing around |
+|---|---|
+| GPU throughput — depth 4 and 5 become comfortable | text in a headset matching text on a screen |
+| foveated rendering maturity | lens glare on bright-on-black (optics physics — mitigated, not solved) |
+| angular resolution, slowly | |
+
+### The rule that falls out: specify size in ANGLE, not pixels
+
+**A 1-pixel line gets WORSE as hardware improves.** As PPD rises a 1px line
+subtends less angle — finer, shimmerier, more aliased. Betting on better
+hardware to rescue hairlines is backwards; it makes them thinner.
+
+So anything sized in pixels *shrinks* as the tech improves, and anything sized
+in angle or world units stays correct at 20 PPD and at 60. This is an argument
+for `Line2` (§6) that does not depend on today's numbers at all. The same logic
+says BD's 16px card text is safe — it scales with browser zoom — while the 6.8px
+node label is not.
+
+### The architecture already hedges this
+
+§5C keeps the reading interface in a **flat panel**, where browser zoom is a
+user-side lever entirely independent of hardware, and puts only the pattern in
+the immersion. VR is *already* good at what the piece needs — scale, presence,
+spatial audio — and bad at what the interface needs. The design routes around
+the weakness instead of waiting for it to close.
+
+And the three.js decision (§1) is the right shape for a bet on uncertain tech:
+**cheap to hold.** If VR stays slow for another five years, nothing is lost —
+three.js renders perfectly well on a flat screen.
+
+### The guard
+
+Designing for future hardware can quietly mean shipping something poor now. Keep
+it good at TODAY's numbers and treat improvement as upside rather than a
+dependency. §4's "depth 3 entirely smooth beats depth 5 that stutters" already
+does exactly that, and is the model for the rest.
+
+---
+
 ## 9. Open, in one place
 
 | question | notes |
