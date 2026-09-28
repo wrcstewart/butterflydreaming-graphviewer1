@@ -721,6 +721,37 @@ than a surround, undercutting the presence the piece rests on. And WebXR
 maturity on glasses trails headsets. **Still the horizon — but now worth
 designing toward rather than merely tolerating.**
 
+### So will glasses eventually do everything a Quest 3 does, minus FOV?
+
+Asked 2026-09-28. Broadly yes, but not quite — and one of the differences runs
+the opposite way from "newer will be better".
+
+| | versus a Quest 3 | |
+|---|---|---|
+| **field of view** | ~45-58° against 110° | **worse** — a window, not a surround |
+| **black** | dark grey even fully dimmed (>300:1 on the one published figure) | **different** — and arguably suits the figure, which becomes glowing lines in space |
+| **sustained compute** | less thermal headroom in a lighter body | **WORSE, and this is the non-obvious one** |
+| **angular resolution** | ~1080p over ~50° works out above ~25 PPD | **BETTER** — text may read better than in a headset |
+| **the dimming dial** | — | **a capability the headset does not have at all** |
+
+**The compute row is the one to take seriously.** The whole point of glasses is
+small and light, and small and light means less thermal headroom — therefore
+less *sustained* compute. This piece is precisely the sustained kind: a twenty
+minute continuous session is the worst case for thermal throttling, where a
+game's bursty load is the best. So everything already in question on a Quest —
+Piper (§8b), Whisper (§5a), and the drift timer's geometry rebuild at depth 4-5
+(§3) — gets **harder** on a lighter device, not easier. Meta's VR Glasses put
+the compute on a tethered puck for exactly this reason.
+
+**The resolution row is the pleasant surprise**, and it would answer §5's node
+label question outright: fewer pixels over a much smaller field gives higher
+angular density than a headset. Verify on any specific model, but the arithmetic
+points the right way.
+
+**So it is not "Quest 3 minus FOV".** It is a different trade — smaller window,
+greyer black, less sustained compute, sharper text — **plus one thing the
+headset cannot do in any form.**
+
 ### TWO DIVERGENT TRAJECTORIES (Meta Connect, 23-24 September 2026)
 
 Checked because Meta had just held its conference. One announcement matters, and
