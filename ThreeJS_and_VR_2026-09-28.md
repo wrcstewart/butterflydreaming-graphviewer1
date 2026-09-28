@@ -371,10 +371,27 @@ this work. Across models the differences are exactly the ones §6 cares about:
 - chipset and RAM matter far less, because this is a browser page drawing lines,
   not a native game.
 
-So: cheapest storage, best optics and resolution affordable. *(Model specifics
-are as of a 2026 knowledge cutoff and lineups move — worth confirming current
-models before buying. The reasoning, that storage is irrelevant and resolution
-is not, does not move.)*
+So: cheapest storage, best optics and resolution affordable.
+
+**The optics split is pancake versus Fresnel, and it is the one to weight above
+raw resolution** — they usually come together anyway. Fresnel lenses have a
+SWEET SPOT: sharp where you are looking, degrading toward the edges, so you keep
+your head pointed at whatever you want to read instead of moving your eyes.
+Pancake largely removes that. **That matters more here than it would for a
+game**, because §5C means reading a text-heavy interface in a flat panel —
+looking *around* a page — and because when the kolam fills the field of view,
+edge clarity is where the pattern's outer reaches live.
+
+As of a May-2026 cutoff the line was **Quest 3** (pancake, ~2064x2208 per eye)
+and **Quest 3S** (Quest 3's chipset, Quest 2's Fresnel optics and lower
+resolution). Lineups move and model names date badly, so check the current spec
+sheet — but these criteria do not date, in this order for this use:
+
+1. **lens type — pancake, not Fresnel**
+2. per-eye resolution
+3. refresh rate — 90 Hz or better, because the piece is continuous and §4 says
+   smoothness beats fidelity
+4. storage — whatever is cheapest
 
 **One genuine unknown, and it is compute rather than storage:** whether Piper
 speech synthesis runs acceptably in the Quest browser. It is WASM plus a neural
