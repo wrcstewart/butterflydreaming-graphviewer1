@@ -239,6 +239,15 @@ directives only when someone actually wants them.
 
 ---
 
+> **2026-09-28 — a fork inside this section, opened elsewhere.** Visual modules
+> now render through three.js by standing decision, which makes a second shape
+> possible for a collage: ONE scene holding several objects, rather than several
+> iframes side by side. That is the only version that means anything in a
+> headset — but it would mean modules exporting geometry rather than pixels, and
+> the iframe contract is what lets a stranger write a BD module at all. The
+> comparison, the middle path, and what to measure first are in
+> `ThreeJS_and_VR_2026-09-28.md` §7. **Choose before building this section.**
+
 ## 5. Merge, and the collage module
 
 The workflow, in the author's words: *create using a single module, then recover

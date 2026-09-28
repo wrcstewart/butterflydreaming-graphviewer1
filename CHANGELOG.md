@@ -6,6 +6,57 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-28 — graphics render through three.js, and the road to VR
+
+**A standing decision, recorded rather than left in a conversation:** no new
+visual module is built on a 2D canvas. The reason is narrow and is not "3D is
+better" — a canvas renderer has **no VR route at all** short of a rewrite, while
+a three.js scene is a session flag, an animation loop and a change of camera
+ownership away from a headset. The option is cheap only if taken before the code
+exists.
+
+Written up in **`ThreeJS_and_VR_2026-09-28.md`**, with the scoping measured
+rather than estimated: `VRButton.js` is 4.5 KB and imports nothing, so it works
+with the UMD three already loaded; BD answers over https through the tunnel, so
+a headset can reach it; the viewer says "NO CONTACT" on a dropped socket but
+**never stops the renderer**, so losing the connection mid-piece means "no new
+parameters", not "it stops". Half a day to something you can look at in a
+headset; two to three days on top for it to be good.
+
+**Two things the AIM turns from preferences into requirements.** The intended
+use is a long, continuous, attended piece of pattern, music and spoken poetics —
+which, as the author pointed out, makes the "put it down for coffee" failure
+much less relevant than I had weighted it. The same framing raises two others:
+
+- **Never move the camera.** Continuous VR with an auto-rotating viewpoint is
+  the textbook cause of sickness. `cam_elevation_speed` must tumble the *figure*
+  in front of a stationary viewer. Same code either way; it is a safety property,
+  not plumbing.
+- **Sustained smoothness beats fidelity.** In a continuous piece a hitch is the
+  whole thing broken — and the drift timer's whole-buffer rebuild is precisely a
+  periodic hitch. Depth 3 entirely smooth serves this better than depth 5 that
+  stutters, which inverts the usual instinct.
+
+**And the larger question, which is not XR plumbing at all:** pattern, music and
+voice *together* means the headset carries all three, so a VR viewer is a viewer
+hosting several modules — not `bd_V_Kolam3D` with a session flag. Half a day
+gets the pattern into the headset, silent.
+
+**The fork the document exists for.** If visuals are three.js, a collage could be
+one scene holding several objects instead of several iframes — the only version
+that means anything in a headset, where a collage is a space you stand in. But
+the iframe + postMessage contract is what lets a stranger write a BD module, and
+is the whole argument BDX exists to make. Neither is obviously right; a middle
+path (keep the iframe contract, add an optional geometry output) does not force
+the choice today. Cross-referenced from the collage plan, which must not be built
+past §5 until it is settled.
+
+Also recorded: which headset, and why storage is the wrong axis — browser WebXR
+installs nothing, so 128 GB is ample and the money belongs in resolution and
+optics, which are exactly what 1-pixel lines care about.
+
+---
+
 ## 2026-09-27 — RULE 9: no dead directives in a default script
 
 A directive a module cannot act on is **dead text in a card a person reads**.
