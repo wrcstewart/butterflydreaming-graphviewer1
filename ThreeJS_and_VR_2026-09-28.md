@@ -393,6 +393,40 @@ sheet — but these criteria do not date, in this order for this use:
    smoothness beats fidelity
 4. storage — whatever is cheapest
 
+**In practice the lineup does not let you follow 4 (2026-09-28).** The available
+choice was *Quest 3S at 128 GB* or *Quest 3 at 512 GB* — the good optics are not
+sold with the small drive. **Take the Quest 3 anyway.** The 512 GB is money with
+no return here, and it is the price of the lenses in the lineup on offer; for
+this work the optics are not part of the toolchain, they are part of the piece.
+
+The decisive reason is sharper than the general one. **Fresnel lenses produce
+god rays — radial glare streaks — on bright content against dark backgrounds.**
+BD is amber on black and the kolam is bright hue-cycling lines on `#0a0a0f`:
+close to the worst possible content for Fresnel. And because the author reads by
+luminance rather than hue (see the `user_colour_vision` memory), glare that
+smears bright content across dark areas costs more here than it would most
+people. On a 3S the palette would be fighting the optics.
+
+The numbers agree, less dramatically. MEASURED against BD's smallest *essential*
+text, the 10px cytoscape node label:
+
+| | per eye | angular density | 10px label renders as |
+|---|---|---|---|
+| Quest 3S | 1832 x 1920 | ~20 PPD | **8.3 px** |
+| Quest 3 | 2064 x 2208 | ~25 PPD | **10.4 px** |
+| a laptop | — | ~45 PPD | 18.8 px |
+
+Roughly 10 rendered pixels of glyph height is the floor for legibility, so 8.3
+is below it and 10.4 is just above. ("4K+ Infinite Display" decodes as 4128 px
+across BOTH eyes — 2064 each — not 4K per eye.)
+
+Same chipset either way, so nothing in the depth or smoothness policy changes.
+
+The one case for the 3S: if this stays exploratory and budget binds. There is
+even a silver lining — develop against the worse optics and nothing will ever
+flatter you. But on the stated aim of a transformative experience, the glare is
+not a development inconvenience, it is a defect in the work.
+
 **One genuine unknown, and it is compute rather than storage:** whether Piper
 speech synthesis runs acceptably in the Quest browser. It is WASM plus a neural
 model on a mobile-class CPU, and BD's rule is that every high-data presentation
