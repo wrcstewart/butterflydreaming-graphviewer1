@@ -197,6 +197,43 @@ corpus of literature), and reading prose in a headset is worse than reading it
 on a screen. The flat browser window gives the graph at no cost and without that
 loss.
 
+### Is BD's own UI legible in that window? — a test item, not a blocker
+
+Raised 2026-09-28, and worth being precise about rather than alarmed by. MEASURED
+in `style.css` and `viewer.js`:
+
+| what | size | verdict |
+|---|---|---|
+| `.card-body` — **the literature itself** | **16px** | the largest text in the system, and the thing a participant actually reads. Fine. |
+| `.card.system .card-body` — helper / remote cards | 12.8px | carries instructions. Mid-risk. |
+| utility chrome — send, new card, copy link, pair status, media bar, dev status, user count | **8-11px** | *"most of the really small text on the buttons is not completely essential"* — agreed. A person learns where a button IS; they do not re-read its label each time. |
+| **cytoscape node labels** | **10px**, and **6.8px** for SubFamily | **the one that is not chrome.** This is DATA, not affordance: you can learn a button's position, you cannot memorise the names of a corpus. |
+
+**But the node labels already carry their own mitigation:** the graph zooms, and
+`maxZoom` is **8**, `userZoomingEnabled: true`. A 10px label at 2x is a 20px
+label. So it costs more pinching than on a laptop and nothing else.
+
+Which narrows the fix enormously if one is wanted at all. It is **not** a `?vr=1`
+UI overhaul — that was an over-call. It is one or two numbers in the cytoscape
+style, and only if the test says so.
+
+The other half of the argument is the author's:
+
+> *"XR users are going to be more resourceful in finding out how to navigate the
+> system — hopefully!!"*
+
+Reasonable for the author and for an experimenter. Worth revisiting **if VR ever
+becomes a delivery route for participants** rather than a way of making the work,
+because BD's audience is arts therapy and peer counselling and does not select
+for that. Not a concern today.
+
+Contrast, for completeness, is the healthy half: the amber palette runs 15:1
+against the black ground and `#cccccc` 13:1. Two are marginal — `#a07820` at
+5.2:1 and `#8d7900` (the local-gold mark) at 4.87:1. Both clear the 4.5
+threshold on a monitor, but a headset LCD has raised blacks and lens scatter, so
+delivered contrast is lower than the computed figure. Those two grey out first,
+and the fix is luminance, not hue.
+
 ### The dependency to verify first
 
 C rests on **an iframe being able to request an immersive session, with the
@@ -306,7 +343,10 @@ at it as a flat 2D page. No code at all, and it answers the three real unknowns:
 4. **whether BD's own graph is usable in that browser window** — which decides
    whether §5C is real;
 5. **whether Enter VR from inside the module iframe behaves** — the one
-   dependency §5C rests on.
+   dependency §5C rests on;
+6. **how BD's own text reads at 16px (cards), 12.8px (helper cards) and 10px
+   (node labels)** — the three sizes that matter, in that order of importance.
+   The 8-11px chrome can be ignored: knowing where a button is beats reading it.
 
 ---
 
@@ -350,6 +390,7 @@ decide whether the headset carries the voice or only receives audio.
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
 | **Retire `bd_V_Kolam`?** | The 3D module is a *measured* superset. Costs: `weight` (§6), and the canvas rasterises a bezier for free where three tessellates it. Two stored nodes would need migrating. |
+| **Is BD's UI legible in the flat window? (§5)** | A TEST ITEM, not a blocker — the earlier framing over-called it. The reading path is 16px; the sub-11px items are chrome whose position a user learns. The only real risk is the 10px / 6.8px node labels, and the graph already zooms to 8x. If a fix is needed it is one or two cytoscape numbers. |
 | **Delivery shape (§5)** | Leaning C — BD flat in the Quest browser, module immersive. A (facilitated, two people) stays alongside it; both run the same module. Depends on the iframe/immersive-session question. |
 | **Does the headset carry music and voice (§5a)?** | Under §5C it must, because there is only one device. That makes the Piper question (§8b) load-bearing rather than optional. |
 | **Depth / drift policy inside a session (§3)** | Cap depth, slow drift, or move the L-system off the main thread. |
