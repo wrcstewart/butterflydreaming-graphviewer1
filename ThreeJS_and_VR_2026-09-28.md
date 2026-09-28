@@ -197,6 +197,40 @@ corpus of literature), and reading prose in a headset is worse than reading it
 on a screen. The flat browser window gives the graph at no cost and without that
 loss.
 
+**Is there a 3D graph to port TO?** Asked 2026-09-28, for completeness. Two
+parts, and the answer is clean both ways.
+
+**cytoscape.js is 2D only** — no 3D version exists; it renders to a 2D canvas.
+BD loads `cytoscape@3` + `cytoscape-fcose` from unpkg, and that is the whole
+graph stack. three.js is currently nowhere on the BD page itself; it lives only
+inside the Kolam3D module's iframe.
+
+**The natural 3D graph library IS three.js-based** — `3d-force-graph` wraps
+three.js directly and has VR and AR sibling builds. So a 3D graph would sit
+*inside* the standing decision rather than against it. That is the tidy half.
+
+**Four reasons to decline it for NAVIGATION anyway**, none of them taste:
+
+1. 3D node-link diagrams generally **underperform** 2D for topology tasks —
+   occlusion and depth ambiguity cost more than the extra dimension buys.
+2. **Label legibility gets worse**, not better: labels at varying depths,
+   foreshortened, occluded by nearer nodes. BD's 10px labels are already the
+   marginal thing (§5, §8b) and this is the wrong direction for them.
+3. **BD's layout carries meaning designed in 2D** — cluster views, `seq` grids,
+   fcose relative-placement constraints, ink mode, blue-node halos, node shapes
+   doing achromatic work. Much of that has no 3D equivalent; it is simply lost.
+4. It is a large rewrite of the most mature part of the system.
+
+**Where a 3D graph COULD earn its place is elsewhere:** not as the navigation,
+but as a **presentational object** — the corpus as a thing you stand inside, or
+an element in a collage. A different proposition from replacing the viewer, and
+a good fit for the transformative piece. Held as an idea, not a plan.
+
+(Flagged rather than asserted: there has been work on a WebGL renderer for
+cytoscape.js. It would help performance at scale but would not make it 3D, so it
+changes none of the above — worth a check only if graph performance ever becomes
+the binding constraint.)
+
 ### Is BD's own UI legible in that window? — a test item, not a blocker
 
 Raised 2026-09-28, and worth being precise about rather than alarmed by. MEASURED
