@@ -477,11 +477,33 @@ people. On a 3S the palette would be fighting the optics.
 The numbers agree, less dramatically. MEASURED against BD's smallest *essential*
 text, the 10px cytoscape node label:
 
-| | per eye | angular density | 10px label renders as |
-|---|---|---|---|
-| Quest 3S | 1832 x 1920 | ~20 PPD | **8.3 px** |
-| Quest 3 | 2064 x 2208 | ~25 PPD | **10.4 px** |
-| a laptop | — | ~45 PPD | 18.8 px |
+| | lenses | per eye | field of view | ~centre PPD | 10px label |
+|---|---|---|---|---|---|
+| Quest 3S | **Fresnel** | 1832 x 1920 | **96°** | ~20 | 8.3 px |
+| Quest 3 | pancake | 2064 x 2208 | **110°** | ~25 | 10.4 px |
+| a laptop | — | — | — | ~45 | 18.8 px |
+
+**The 3S does not have the Infinite Display stack at all** — confirmed, not
+inferred. It is physically thicker as a result, because Fresnel needs the air
+gap that folding the light path removes. Road to VR's summary is the crisp one:
+the 3S is *"effectively a Quest 2 upgraded with colour passthrough cameras, the
+Quest 3's controllers and a much better processor… but not notably improved
+optical quality."* **New chipset, old optics.**
+
+**The FIELD OF VIEW is a third reason, and the most on-target of the three.**
+96° against 110° is noticeably less of the world in view, and this piece is
+built on immersion and presence with the figure meant to surround the viewer.
+Glare and resolution bear on legibility; FOV bears on the work itself.
+
+*Honest nuance that trims one of the arguments:* crudely dividing panel width by
+field of view gives near-parity — 1832/96 ≈ 19 against 2064/110 ≈ 19. The quoted
+PPD figures are CENTRE-of-field measurements, and the gap between those two ways
+of counting is exactly what the lens stack does: pancake optics distribute
+pixels better across the field, which is why Meta's periphery figure (~70%) is
+so much larger than its centre one (~25%). So the label comparison below
+probably overstates the 3S's disadvantage on text — consistent with the
+correction already recorded there: **the labels are not the differentiator. The
+glare and the field of view are.**
 
 ("4K+ Infinite Display" decodes as 4128 px across BOTH eyes — 2064 each — not
 4K per eye.)
