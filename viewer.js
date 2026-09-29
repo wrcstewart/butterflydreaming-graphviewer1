@@ -2739,13 +2739,32 @@ function shortText(text, wordCount) {
 //      "Kolam_1" instead of its parent work ("Visual Tests").
 //   3. source_text present → first 4 words of source_text.
 //   4. Fallback → first 4 words of text.
+// bd_V_Kolam_001 -> Kolam_001. The bd_X_ prefix is TAXONOMY: identical across
+// every node of a module, so it says nothing about which node you are on — and
+// it is the first thing to eat the width, leaving cytoscape's ellipsis (which
+// cuts the END) to swallow the sequence number, which is the only part that
+// distinguishes one node from the next.
+//
+// MEASURED: a breadcrumb chip is 59px at 8px, about 14 characters, and
+// `bd_V_Kolam_001` is exactly 14 — hence `bd_V_Kolam_0…`. Stripped, the longest
+// current name is `Kolam3D_001` at 11, which fits with room to spare. The main
+// canvas was never the problem: 113px at 10px is about 21 characters.
+//
+// Only the LABEL changes. `name` is untouched, so `%%bd_module`, parseModuleId,
+// the AV module id and every id-keyed lookup are unaffected — and TextNodes
+// carry no display_name in the database, so this is purely a rendering choice.
+const BD_NAME_PREFIX_RE = /^bd_[A-Za-z0-9]+_(?=[A-Za-z])/;
+function stripBdPrefix(name) {
+  return String(name == null ? '' : name).replace(BD_NAME_PREFIX_RE, '');
+}
+
 function getTextNodeLabel(props) {
-  if (props.gateway) return props.source_text || shortText(props.text, 4);
+  if (props.gateway) return stripBdPrefix(props.source_text) || shortText(props.text, 4);
   if (props.seq !== undefined && props.seq !== null && props.title) {
     return `${props.seq}: ${props.title}`;
   }
-  if (props.name) return props.name;
-  if (props.source_text) return shortText(props.source_text, 4);
+  if (props.name) return stripBdPrefix(props.name);
+  if (props.source_text) return shortText(stripBdPrefix(props.source_text), 4);
   return shortText(props.text, 4);
 }
 
@@ -6539,8 +6558,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // BEFORE measuring. Measuring first would let a two-line name slip under
     // the limit and reach the chip with its newline intact.
     const str = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
-    return str.length <= CHIP_LABEL_MAX ? str
-         : str.slice(0, CHIP_LABEL_MAX - 1).trimEnd() + '\u2026';
+    if (str.length <= CHIP_LABEL_MAX) return str;
+    // A name ending in a sequence number is read from the RIGHT — the number is
+    // what tells one node from the next — so cut the front and keep the tail.
+    // Everything else (Order/Chaos, a work's title) reads from the left and is
+    // cut the usual way.
+    if (/_\d+$/.test(str)) {
+      return '\u2026' + str.slice(-(CHIP_LABEL_MAX - 1));
+    }
+    return str.slice(0, CHIP_LABEL_MAX - 1).trimEnd() + '\u2026';
   }
 
   // --- buddyCy chip trail ---
