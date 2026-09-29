@@ -1001,8 +1001,29 @@ function setModuleLayout(on) {
 function setViewMode(mode) {
   if      (mode === 'nodes')  { bdViewMode = 'browse'; bdModuleLayout = false; }
   else if (mode === 'edit')   { bdViewMode = 'create'; bdModuleLayout = false; }
-  else if (mode === 'player') { bdModuleLayout = true; }        // mode untouched
-  else if (mode === 'browse' || mode === 'create') { bdViewMode = mode; }
+  // 'player' now means BOTH — the module surface is Create's, so the alias
+  // matches what the auto-transition does. Leaving the mode alone here would
+  // recreate browse + module, the state Browse is defined not to have.
+  else if (mode === 'player') { bdViewMode = 'create'; bdModuleLayout = true; }
+  // 2026-09-29, revised the same day after testing. Browse is the GRAPH,
+  // always — selecting it clears the module layout.
+  //
+  // The first cut kept the mode and the layout fully independent, which read
+  // well on paper and left a hole in practice: on a module node, Browse kept
+  // the module on screen, so the radio stopped being the way back to the graph
+  // that it has always been, and the only escape was #back-btn. That is step 3
+  // of the plan arriving uninvited.
+  //
+  // It is also the honest label. Until Browse can show a module BARE (step 2,
+  // `hideControls`), a module on screen means the module's own steppers are on
+  // screen — which is Create's surface. So a module node belongs in Create for
+  // now, and the auto-transition says so by switching the mode.
+  //
+  // At step 2 this inverts: Browse gains the bare module, the radio stops being
+  // an escape, and the back button becomes the way out. That is exactly why
+  // step 3 is scheduled after step 2 and not before.
+  else if (mode === 'browse') { bdViewMode = 'browse'; bdModuleLayout = false; }
+  else if (mode === 'create') { bdViewMode = 'create'; }
   else return;
   // Keep the radio showing the truth, so no caller has to set .checked too.
   const r = document.querySelector('#view-mode-toggle input[value="' + bdViewMode + '"]');
@@ -7481,8 +7502,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const landedOnModuleNode = nodeHasModule && moduleNodeId !== lastAutoPlayerNodeId;
       const pastedIntoTopCard  = !nodeHasModule && cardHasModule && !prevCardHasModule;
       if ((landedOnModuleNode || pastedIntoTopCard) && !moduleLayoutActive()) {
-        console.log('[auto-player] module layout for',
+        console.log('[auto-create] module layout for',
                     moduleNodeId ? ('node ' + moduleNodeId) : 'pasted script');
+        // Switches the MODE as well as the layout, because what appears is the
+        // module's own stepper surface and that is Create. Safe against
+        // bouncing: lastAutoPlayerNodeId is set below, so pressing Browse to
+        // get back to the graph does not re-trigger while you stay on the node.
+        setViewMode('create');
         setModuleLayout(true);
       }
       // Remember what we acted on. Reading a NON-module node clears the key, so
@@ -13686,6 +13712,8 @@ async function init() {
     //    path if same module, src swap + BD_READY otherwise).
     //    Non-module deep links stay in Nodes mode — no Player flash.
     if (isModuleTarget) {
+      // Same pair as the auto-transition: the module surface is Create's.
+      setViewMode('create');
       setModuleLayout(true);
     }
 

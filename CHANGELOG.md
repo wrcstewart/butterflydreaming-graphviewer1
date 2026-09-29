@@ -58,6 +58,27 @@ means both body classes are set at once, which never happened before. How the
 compose controls sit over the module needs looking at. If it is wrong, one line
 suppresses them there.
 
+**Revised within the hour, on the author's testing.** The first cut made mode and
+layout fully independent. That reads well and left a hole: on a module node,
+pressing Browse kept the module on screen, so the radio stopped being the way
+back to the graph that it has always been, and the only escape was `#back-btn` —
+step 3 arriving uninvited. The author spotted it from the other direction,
+asking whether a module node should not put you in Create, since that is where
+the steppers are going to live. Both point the same way.
+
+So **Browse is the graph, always** — selecting it clears the module layout — and
+**landing on a module node switches the mode to Create**, not just the layout.
+Until Browse can show a module bare (step 2), a module on screen means the
+module's own steppers are on screen, and that is Create's surface. The label is
+honest now rather than after step 2.
+
+The invariant that falls out is checkable and checked: **`browse` + module layout
+is unreachable by any route**, across every alias and every path.
+
+At step 2 this inverts — Browse gains the bare module, the radio stops being an
+escape, and the back button becomes the way out. Which is exactly why step 3 is
+scheduled after step 2.
+
 Next, in order: Browse plays the module with `hideControls` (the layout problem),
 then `Local` as a back button. §3 of the collage plan carries both.
 

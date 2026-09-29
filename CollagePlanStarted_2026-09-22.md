@@ -236,9 +236,24 @@ section was written about: the 09-22 card overwrite happened because leaving
 Player *hid* the module without unloading it and the echo did not know which mode
 it was in. With no leaving, there is nothing to be wrong about.
 
-The auto-transition changes character with it: it stops being a **mode change**
-and becomes a **layout consequence**. One less place where "which mode am I in"
-can be wrong.
+**Revised after testing, the same day.** The first cut made mode and layout
+fully independent, which reads well and left a hole: on a module node, pressing
+Browse kept the module on screen, so **the radio stopped being the way back to
+the graph that it has always been** and the only escape was `#back-btn` — step 3
+arriving uninvited.
+
+So: **Browse is the GRAPH, always.** Selecting it clears the module layout. And
+**landing on a module node switches the MODE to Create**, not just the layout,
+because until Browse can show a module *bare* (step 2), a module on screen means
+the module's own steppers are on screen — and that is Create's surface. The
+label is then honest now rather than after step 2.
+
+The invariant that falls out, and it is checkable: **`browse` + module layout is
+unreachable by any route.** Verified against every alias and every path.
+
+At step 2 this inverts. Browse gains the bare module, the radio stops being an
+escape, and the back button becomes the way out — which is precisely why step 3
+is scheduled after step 2 and not before.
 
 ### What that forces, and it cannot be deferred
 
