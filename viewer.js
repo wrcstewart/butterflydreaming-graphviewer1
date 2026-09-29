@@ -7594,7 +7594,41 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
       // The View button is offered whenever a module is in play, in EITHER
       // mode — it is how Browse reaches the work without giving up the graph.
+      const hadModuleClass = document.body.classList.contains('module-node');
       document.body.classList.toggle('module-node', hasModule);
+
+      // 2026-09-29 — ONE-SHOT GEOMETRY PROBE for the Jump Bar.
+      //
+      // Reported on iOS: View and Device sit beside Local instead of at the
+      // right edge, though `margin-left: auto` on #jb-right is the correct tool
+      // and the nesting is right. margin-left:auto only pushes when there IS
+      // free space, so the question is whether the bar overflows — and this
+      // file's own history says not to answer that by arithmetic. Six rounds of
+      // correct measurements on the invisible copy buttons were settled by one
+      // call to elementFromPoint; the rule since is MEASURE, DON'T MODEL.
+      //
+      // Fires only on the false -> true edge, so it costs nothing while
+      // browsing and cannot flood the log.
+      if (hasModule && !hadModuleClass) {
+        try {
+          const bar = document.getElementById('bd-toppanel');
+          const right = document.getElementById('jb-right');
+          if (bar && right) {
+            const kids = [...bar.children]
+              .filter(el => getComputedStyle(el).display !== 'none')
+              .map(el => el.id + ':' + Math.round(el.getBoundingClientRect().width))
+              .join(' ');
+            const br = bar.getBoundingClientRect(), rr = right.getBoundingClientRect();
+            console.log('[JB] bar w=' + Math.round(br.width) +
+                        ' scrollW=' + bar.scrollWidth +
+                        (bar.scrollWidth > Math.ceil(br.width) ? ' OVERFLOWS' : ' fits') +
+                        ' | jb-right left=' + Math.round(rr.left - br.left) +
+                        ' w=' + Math.round(rr.width) +
+                        ' gapToEdge=' + Math.round(br.right - rr.right) +
+                        ' | visible: ' + kids);
+          }
+        } catch (_) {}
+      }
       // Remember what we acted on. Reading a NON-module node clears the key, so
       // coming back to a module node counts as a fresh landing.
       lastAutoPlayerNodeId = nodeHasModule ? moduleNodeId : null;

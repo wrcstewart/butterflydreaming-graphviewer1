@@ -55,13 +55,14 @@
   /* CANARY host for the viewer. The AV is cached separately from BD and on a
      different origin's rules, so BD's canary says nothing about which viewer
      you are looking at. Same rotation, same meaning: blue -> red -> green per
-     change to a cached AV file. 2026-09-29: BLUE (opacity on the flat Kolam too,
-     and both step in hundredths; cache-buster v22 -> v23). Next = red. */
+     change to a cached AV file. 2026-09-29b: RED (opacity on the flat Kolam too,
+     and both step in hundredths; cache-buster v23 -> v24; and the way-back button says what it does).
+     Next = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
+    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -97,7 +98,7 @@
        The src is set from JS, after the listener is attached. -->
   <iframe id="frame" class="waiting" title="Kolam"></iframe>
   <!-- Label set in JS: it differs by device. See the comment at the handler. -->
-  <button id="back" type="button" title="Back to ButterflyDreaming">← controls</button>
+  <button id="back" type="button" title="Back to ButterflyDreaming">← Return to Node</button>
   <div id="status">connecting…</div>
 
   <!-- Socket.IO's client, served by BD itself. Loading it from BD ties startup
@@ -167,7 +168,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to a module.
-    frame.src = AV_RENDERERS[AV_MODULE] + '?v=23';
+    frame.src = AV_RENDERERS[AV_MODULE] + '?v=24';
 
     // ── What this viewer is currently showing (2026-09-16) ────────────────
     //
@@ -331,20 +332,33 @@
       roomForBoth = (window.outerWidth || innerWidth) < screen.availWidth * 0.9;
     } catch (_) { /* assume none; the phone behaviour is the safe default */ }
 
+    // 2026-09-29 — SPLIT ON THE RIGHT AXIS, and "controls" retired.
+    //
+    // This chose between two words using roomForBoth, which is a LAYOUT fact,
+    // while the two words describe different ACTIONS. Whenever the viewer has
+    // an opener the click does the same thing — puts BD on this node, carrying
+    // the state — so that is what the button now says in every such case.
+    //
+    // "controls" is gone because it named a destination that no longer exists:
+    // Browse has no controls to return to, and a View pressed from Browse
+    // should come back to Browse.
+    //
+    // IS_DEVICE is the one case where NOTHING returns. On a phone or headset
+    // you stay where you are and only the state travels, so "Sync" is exactly
+    // right there and "Return" would be a lie. THAT is the real axis: does
+    // anything come back, or does only the state?
     if (IS_DEVICE) {
       backBtn.textContent = 'Sync';
       backBtn.title = 'Send what this viewer is showing back to ButterflyDreaming';
-    } else if (roomForBoth) {
-      // Desktop: BD is beside us, so this does not take you anywhere. It sends
-      // this viewer's state and asks BD's window to come forward — and the
-      // raise is largely refused by browsers, so the sync is the part that
-      // reliably happens. Name it for what it does.
-      backBtn.textContent = 'Sync';
-      backBtn.title = 'Send this viewer\u2019s state to ButterflyDreaming';
+    } else {
+      backBtn.textContent = '\u2190 Return to Node';
+      // The title still tells the two apart, because what HAPPENS differs even
+      // though what you are asking for does not: beside BD nothing moves but
+      // BD; covering BD, this window closes behind you.
+      backBtn.title = roomForBoth
+        ? 'Put ButterflyDreaming on this node, carrying what this viewer shows'
+        : 'Close this viewer and return to the node in ButterflyDreaming';
     }
-    // Otherwise the default label stands. On a phone the viewer covers BD and
-    // this button is the only way back to the controls, so that IS what it
-    // gives you.
 
     backBtn.addEventListener('click', function () {
       // On another device: send, say so, and stay. No raise — there is no
