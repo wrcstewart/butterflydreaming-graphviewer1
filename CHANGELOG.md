@@ -6,6 +6,63 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-29 — three view modes become two
+
+**Browse | Create.** Nodes becomes Browse; Player and Edit become Create. Done
+**for the collage**, in the author's words — *"iteration towards a user
+comprehensible create a Collage structure"* — because three modes, two of which
+differ only in whether two buttons are visible, cannot be explained to someone
+who did not build the system.
+
+**Player was never a mode. It was a LAYOUT.** That is the whole change. Whether
+the module shows is decided by the **node**, and rides underneath whichever mode
+is selected. You never "leave Player" — you navigate away from a module node.
+Which is the fault this was written against: the 09-22 card overwrite happened
+because leaving Player *hid* the module without unloading it and the echo did
+not know which mode it was in. With no leaving, there is nothing to be wrong
+about. The auto-transition changes character with it — it is a **layout
+consequence** now, not a mode change.
+
+**`edit-active` had to become orthogonal to `player-active`, and this could not
+be deferred.** `setViewMode` said so in its own comment: *"'nodes' or 'edit' —
+both keep cy visible + hide iframe"*, while `player` hides `cy`. **The two modes
+being merged were the two with opposite layouts**, and the two body classes were
+mutually exclusive by construction. A straight rename would have left a module
+node with no route to the compose controls, since the Edit radio was the only
+one. Now Create sets its furniture whichever layout the node chose.
+
+**Two traps, one of which the codebase had already documented.**
+
+`updateSendBtn` — which decides whether a module is in play — **is not inside
+`init()`**, and the `bd:force-nodes-mode` listener exists solely to bridge the
+two scopes, saying so in its own comment. Declaring the new state inside `init()`
+would have been a `ReferenceError` from there and a TDZ error from anything in
+`init()` running earlier. So the state and both setters live at **module scope**,
+and `applyView` — which touches `cyEl`, `visualIframe`, `loadModuleForNode` —
+stays in `init()`, reached through one event.
+
+And `applyView` now runs on a plain mode toggle, so the player **entry** actions
+(the helper card, `loadModuleForNode`) are guarded to the transition. Without
+that, switching Browse ↔ Create while on a module node would have reloaded and
+flashed the module for no reason.
+
+**Legacy names are mapped, not renamed at every site** — `'nodes'`, `'player'`
+and `'edit'` still arrive from deep links and half a dozen callers, so the change
+cannot break a path by missing one. Verified by driving the state machine in
+isolation: eleven transitions, all correct, including the two that matter —
+**Back from a module node keeps you in Create**, and switching mode while on a
+module node keeps the module on screen.
+
+**One thing needs eyes, and it is the new state:** Create *and* the module layout
+means both body classes are set at once, which never happened before. How the
+compose controls sit over the module needs looking at. If it is wrong, one line
+suppresses them there.
+
+Next, in order: Browse plays the module with `hideControls` (the layout problem),
+then `Local` as a back button. §3 of the collage plan carries both.
+
+---
+
 ## 2026-09-29 — opacity on both Kolams, in hundredths
 
 **`%%bd_p_opacity` on the flat module too.** It was added to the 3D one first,

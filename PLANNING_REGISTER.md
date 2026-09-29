@@ -224,6 +224,19 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-29 — three view modes become two
+
+| item | where | note |
+|---|---|---|
+| **Browse \| Create — step 1 of 3** | `viewer.js`, `index.html`, `CollagePlanStarted_2026-09-22.md` §3 | **BUILT.** Nodes→Browse; Player+Edit→Create. Done FOR THE COLLAGE: three modes cannot be explained to someone who did not build the system. **Player was never a mode, it was a layout** — the NODE decides whether the module shows, and it rides under either mode. The auto-transition becomes a layout consequence rather than a mode change, which removes the boundary the 09-22 card overwrite lived on. |
+| **`edit-active` orthogonal to `player-active`** | `viewer.js` | Could not be deferred: the two modes being merged had OPPOSITE layouts and the two classes were mutually exclusive, so a straight rename would have left a module node with no route to the compose controls. |
+| **State at MODULE scope, applyView in `init()`** | `viewer.js` | `updateSendBtn` is not inside `init()` — the `bd:force-nodes-mode` listener exists only to bridge those scopes and says so. Declaring the new state in `init()` would have been a ReferenceError from there. Bridged by one `bd:view-apply` event. |
+| **Both body classes set at once is a NEW state** | — | **NEEDS EYES.** How the compose controls sit over the module layout has never been seen. One line suppresses them there if it is wrong. |
+| **Step 2: Browse plays the module with `hideControls`** | `CollagePlanStarted_2026-09-22.md` §3 | **NOT STARTED.** The mechanism exists and is proven in the AV viewer; this is a LAYOUT problem. It is also what makes the name "Create" honest, since until then a module node still lands you there automatically. |
+| **Step 3: `Local` as a back button** | `CollagePlanStarted_2026-09-22.md` §3 | **NOT STARTED**, deliberately. One clean job: reaching the graph while on a module node in Create. Note `#back-btn` already does exactly this and now keeps the mode. |
+
+---
+
 ## Added 2026-09-28 — STANDING DECISION: graphics render through three.js
 
 | item | where | note |

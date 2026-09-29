@@ -198,7 +198,7 @@ vocabulary for that module without anyone having to declare a retirement.
 
 | now | becomes |
 |---|---|
-| Nodes | **Read** |
+| Nodes | **Browse** |
 | Player + Edit | **Create** |
 
 **Fewer mode boundaries is a correctness argument, not just a tidiness one.**
@@ -206,11 +206,86 @@ vocabulary for that module without anyone having to declare a retirement.
 the module without unloading it and the echo did not know which mode it was in.
 Every boundary is a place for that class of fault.
 
-**Open question — what occupies the screen in Create?** Player shows the iframe
-and hides `cy`; Edit does the reverse. Create needs the module visible *and*
-the history panel reachable (Merge is a click in history). On a phone that is
-tight. This needs a layout answer before it needs code, or the sub-toggle that
-appears will be a third mode wearing a disguise.
+**Renamed 2026-09-29: Read becomes BROWSE.** Same thing; the author's word.
+
+### Why this is being done, in the author's words (2026-09-29)
+
+> *"that is the reason for doing this change — iteration towards a user
+> comprehensible create a Collage structure"*
+
+**Not tidiness. A prerequisite.** The collage has to be explicable to someone who
+did not build it, and three modes — two of which differ only in whether two
+buttons are visible — cannot be explained. Everything below is in service of
+that, which is also the test for any later argument about it: does it make the
+collage easier to describe?
+
+### The open question, ANSWERED (2026-09-29)
+
+It was: *what occupies the screen in Create? Player shows the iframe and hides
+`cy`; Edit does the reverse.*
+
+**The answer is that the question was the wrong shape.** Create does not choose a
+layout — **the NODE does.** On a node carrying a module script the module shows;
+on any other node the graph and the card show. The mode does not decide what is
+on screen; it decides what TOOLS are on screen.
+
+That is not a rename of the boundary, it removes it. **The module stops being a
+mode you are IN and becomes a property of the node you are ON.** You never "leave
+Player" — you navigate away from a module node. Which is exactly the fault this
+section was written about: the 09-22 card overwrite happened because leaving
+Player *hid* the module without unloading it and the echo did not know which mode
+it was in. With no leaving, there is nothing to be wrong about.
+
+The auto-transition changes character with it: it stops being a **mode change**
+and becomes a **layout consequence**. One less place where "which mode am I in"
+can be wrong.
+
+### What that forces, and it cannot be deferred
+
+`setViewMode` today reads, in its own comment: *"'nodes' or 'edit' — both keep cy
+visible + hide iframe"*, while `player` hides `cy` and shows the iframe. **The two
+modes being merged are the two with opposite layouts**, and `player-active` and
+`edit-active` are mutually exclusive by construction.
+
+So a straight rename would REGRESS: on a module node, Create would give the
+player layout and no editing furniture, and the Edit radio is today the only way
+to reach the compose controls for such a node.
+
+**Therefore `edit-active` must become orthogonal to `player-active`.** Create sets
+the furniture whichever layout the node has chosen. That is a small change — the
+player branch stops clearing `edit-active` — and it is the right long-term shape
+regardless.
+
+*The one thing that cannot be checked without eyes:* **both classes set at once
+is a new state.** How the compose controls sit over the module layout needs
+looking at. If it is wrong, one line suppresses them there and the hole waits for
+the back button instead.
+
+### The order, agreed 2026-09-29
+
+1. **Radio 3 → 2**, with the layout chosen by the node and `edit-active`
+   orthogonal. *(This step.)*
+2. **Browse plays the module with `hideControls`** — the module visible but
+   bare, card replaced by a description and an invitation to press Create. The
+   mechanism already exists and is proven in the AV viewer; this is a LAYOUT
+   problem, not a new mechanism. It is also what makes the name "Create" honest,
+   since until then a module node still lands you there automatically.
+3. **`Local` as a back button**, labelled `Local:Browse` / `Local:Create` so both
+   ends know the mode. Deferred deliberately, and it now has one clean job:
+   **reaching the graph while on a module node in Create.** A nameable missing
+   action rather than a vague gap.
+
+**Still open after all three**, and it is this section's original worry: Create
+needs the module visible *and* the history panel reachable, because Merge is a
+click in history. On a phone that is tight. The back button answers "how do I
+leave", not "how do I reach history while making". **If a sub-toggle appears to
+solve that, it is the third mode returning in disguise.**
+
+**Not to be done:** making the curation code the mode switch. The code already
+separates `editModeUnlocked` (you proved the code — a capability) from
+`editModeActive` (a mode), deliberately. Merging them would trap a curator in
+Create, unable to browse without clearing their code. Create is the making
+SURFACE; writing to the corpus stays gated server-side by `curationCodeOk()`.
 
 ---
 

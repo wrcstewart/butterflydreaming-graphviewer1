@@ -100,9 +100,17 @@
          auto-activated by Pair button press; only cancelled by clicking a
          different radio (not by Unpair). -->
     <span id="view-mode-toggle">
-      <label><input type="radio" name="view-mode" value="nodes" checked> Nodes</label>
-      <label><input type="radio" name="view-mode" value="player" disabled> Player</label>
-      <label><input type="radio" name="view-mode" value="edit"> Edit</label>
+      <!-- 2026-09-29 — THREE MODES BECOME TWO. Player has gone, and not by
+           being removed: it was never a mode, it was a LAYOUT. Whether the
+           module shows is decided by the NODE, and rides underneath whichever
+           of these two is selected. Browse is the old Nodes; Create is the old
+           Edit, and on a module node it is also the old Player.
+
+           The reason is the collage: three modes, two of which differ only in
+           whether two buttons are visible, cannot be explained to someone who
+           did not build the system. See CollagePlanStarted_2026-09-22.md §3. -->
+      <label><input type="radio" name="view-mode" value="browse" checked> Browse</label>
+      <label><input type="radio" name="view-mode" value="create"> Create</label>
       <!-- 2026-09-02 — speech, stage 0. A checkbox rather than a radio: it is not
            a view MODE, it rides alongside whichever one is selected. Ticking it
            is also the user gesture iOS requires before audio may play, so the

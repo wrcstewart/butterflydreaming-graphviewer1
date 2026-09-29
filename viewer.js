@@ -956,6 +956,60 @@ const EDGE_COLOURS = {
   DESCENDS_FROM: '#444444',
 };
 
+// ── Modes: three become two (2026-09-29) ──────────────────────────────────
+//
+// The RADIO is now browse | create. The module layout is NOT a mode: it is
+// decided by the NODE and rides underneath whichever mode is selected. So you
+// never "leave Player" — you navigate away from a module node, which is the
+// whole point (CollagePlanStarted_2026-09-22.md §3). The 09-22 card overwrite
+// happened because leaving Player hid the module without unloading it and the
+// echo did not know which mode it was in; with no leaving, there is nothing to
+// be wrong about.
+//
+// edit-active is ORTHOGONAL to player-active now. It has to be: Player and Edit
+// had opposite layouts and were mutually exclusive, so merging them without
+// this would leave a module node with no route to the compose controls — the
+// Edit radio was the only one.
+//
+// AT MODULE SCOPE, DELIBERATELY. The state and these two setters are read by
+// updateSendBtn, which is NOT inside init() — the existing comment on the
+// bd:force-nodes-mode listener says so in as many words, and that listener
+// exists only to bridge the two scopes. Declaring them in init() would have
+// been a ReferenceError from updateSendBtn and a TDZ error from anything in
+// init() running before the declaration. applyView stays in init(), because it
+// touches cyEl / visualIframe / positionCyEl / loadModuleForNode, and is
+// reached through one event.
+let bdViewMode     = 'browse';   // the radio
+let bdModuleLayout = false;      // is the module iframe showing
+
+function moduleLayoutActive() { return bdModuleLayout; }
+
+function requestViewApply() {
+  document.dispatchEvent(new CustomEvent('bd:view-apply'));
+}
+
+function setModuleLayout(on) {
+  const next = !!on;
+  if (next === bdModuleLayout) return;     // updateSendBtn calls this often
+  bdModuleLayout = next;
+  requestViewApply();
+}
+
+// Legacy names still arrive from deep links and half a dozen call sites.
+// MAPPED rather than renamed at every site, so this change cannot break a path
+// by missing one.
+function setViewMode(mode) {
+  if      (mode === 'nodes')  { bdViewMode = 'browse'; bdModuleLayout = false; }
+  else if (mode === 'edit')   { bdViewMode = 'create'; bdModuleLayout = false; }
+  else if (mode === 'player') { bdModuleLayout = true; }        // mode untouched
+  else if (mode === 'browse' || mode === 'create') { bdViewMode = mode; }
+  else return;
+  // Keep the radio showing the truth, so no caller has to set .checked too.
+  const r = document.querySelector('#view-mode-toggle input[value="' + bdViewMode + '"]');
+  if (r && !r.checked) r.checked = true;
+  requestViewApply();
+}
+
 let editModeUnlocked      = false;
 let editModeActive        = false;
 let editSelectedClusterId  = null;
@@ -7390,9 +7444,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // If either path finds a %%bd_module directive, show + enable Player.
     // If neither, hide + disable; if we're currently in Player mode when
     // the module disappears, force back to Nodes via bd:force-nodes-mode.
-    const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
-    const playerLabel = playerRadio ? playerRadio.closest('label') : null;
-    if (playerRadio && playerLabel) {
+    // 2026-09-29 — this drove a Player RADIO until the modes became two. It
+    // now drives the LAYOUT directly and leaves the mode alone, which is the
+    // whole change: arriving at a module node is a layout consequence, not a
+    // mode switch. setModuleLayout early-returns when nothing changed, and
+    // this function runs often, so the repetition costs nothing.
+    {
       const MODULE_RE = /^%%bd_module\s+\S+/m;
       // Two independent sources, kept apart so the auto-switch can key off the
       // node while the enable/disable state still honours a pasted script.
@@ -7407,15 +7464,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         }
       }
       const hasModule = cardHasModule || nodeHasModule;
-      playerRadio.disabled = !hasModule;
-      // 2026-08-14 — Player label always visible now (part of the yellow
-      // top-row radio group alongside Nodes + Edit). Only the disabled
-      // attribute is contextual; visibility isn't. Clicking the disabled
-      // radio will surface an explanatory message (TBD).
-      if (!hasModule && playerRadio.checked) {
-        const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
-        if (nodesRadio) nodesRadio.checked = true;
-        playerRadio.checked = false;
+      // The module went away while its layout was showing — drop back to the
+      // graph, keeping whatever mode the user is in.
+      if (!hasModule && moduleLayoutActive()) {
         document.dispatchEvent(new CustomEvent('bd:force-nodes-mode'));
       }
       // Auto-switch to Player when a module script "lands". Two ways:
@@ -7429,11 +7480,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // updateSendBtn calls can't drag the user back into Player.
       const landedOnModuleNode = nodeHasModule && moduleNodeId !== lastAutoPlayerNodeId;
       const pastedIntoTopCard  = !nodeHasModule && cardHasModule && !prevCardHasModule;
-      if ((landedOnModuleNode || pastedIntoTopCard) && !playerRadio.checked) {
-        console.log('[auto-player] engaging Player for',
+      if ((landedOnModuleNode || pastedIntoTopCard) && !moduleLayoutActive()) {
+        console.log('[auto-player] module layout for',
                     moduleNodeId ? ('node ' + moduleNodeId) : 'pasted script');
-        playerRadio.checked = true;
-        playerRadio.dispatchEvent(new Event('change'));
+        setModuleLayout(true);
       }
       // Remember what we acted on. Reading a NON-module node clears the key, so
       // coming back to a module node counts as a fresh landing.
@@ -10187,7 +10237,27 @@ async function init() {
   // 2026-08-17 — one-shot helper card on first Player entry (see below).
   let playerHelperShown = false;
 
-  function setViewMode(mode) {
+  document.addEventListener('bd:view-apply', () => applyView());
+
+  function applyEditFurniture() {
+    const wasEdit = document.body.classList.contains('edit-active');
+    const isEdit  = (bdViewMode === 'create');
+    document.body.classList.toggle('edit-active', isEdit);
+    if (isEdit && !wasEdit) {
+      document.dispatchEvent(new CustomEvent('bd:edit-mode-enter'));
+    }
+  }
+
+  // Which layout was on screen last time, so the ENTRY actions fire on a
+  // transition and not on every apply. applyView now runs on a plain mode
+  // toggle too, and without this, switching Browse <-> Create while on a
+  // module node would re-run loadModuleForNode and flash the module.
+  let lastAppliedLayout = null;
+
+  function applyView() {
+    const mode = bdModuleLayout ? 'player' : bdViewMode;
+    const enteringLayout = (mode === 'player') !== (lastAppliedLayout === 'player');
+    lastAppliedLayout = (mode === 'player') ? 'player' : 'graph';
     if (mode === 'player') {
       // Refresh the iframe rect from #cy in case anything shifted since the
       // last chat toggle (window resize, etc.). Then swap visibility.
@@ -10197,13 +10267,15 @@ async function init() {
       // MM3 (2026-07-12) — body class so CSS can gate the invite panel
       // on Player mode. Hidden by default; visible while player-active.
       document.body.classList.add('player-active');
-      document.body.classList.remove('edit-active');
+      // NOT cleared any more — see the note above. Create keeps its compose
+      // controls whichever layout the node has chosen.
+      applyEditFurniture();
       reflowCardsForMode();   // 2026-08-17 — leave the single-pane merge if coming from Nodes
       // 2026-08-17 — first Player entry this session: drop a Helper card into
       // HISTORY (toHistory) explaining the ↓↑ arrows and the Copy button, so the
       // node's script card keeps the Current pane. Once only (like
       // gatewayHelperShown) so it doesn't spam on every Player toggle.
-      if (!playerHelperShown) {
+      if (enteringLayout && !playerHelperShown) {
         // 2026-09-26 — rewritten. The old text described the Copy button,
         // retired on 2026-09-15 when the standalone-URL path was frozen, and
         // it named the arrows as the only way across — which stopped being
@@ -10225,32 +10297,26 @@ async function init() {
       // MM1.6 Strategy B — on entering Player mode, load the current node's
       // module so the user sees the visual immediately without having to
       // press Copy Down.
-      const nodeId = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
-                     (typeof getActiveNodeId    === 'function' && getActiveNodeId());
-      if (nodeId) loadModuleForNode(nodeId);
+      // Entry only. Reloading the module on a mode toggle would flash it, and
+      // the module is already showing the right script — the mode changed, not
+      // the node.
+      if (enteringLayout) {
+        const nodeId = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
+                       (typeof getActiveNodeId    === 'function' && getActiveNodeId());
+        if (nodeId) loadModuleForNode(nodeId);
+      }
       // 2026-08-09 — position the extend panel now and again after a
       // paint so we catch the iframe layout stabilising.
       positionExtendPanel();
       requestAnimationFrame(() => positionExtendPanel());
     } else {
-      // 'nodes' or 'edit' — both keep cy visible + hide iframe. The only
-      // difference is body.edit-active, which CSS uses to surface the
-      // compose controls (Send + New) that belong to Edit mode. Toggled
-      // rather than blindly added/removed so 'nodes' explicitly clears it
-      // (and 'edit' explicitly sets it).
+      // The graph layout: cy visible, iframe hidden. Both modes use it — the
+      // only difference is body.edit-active, which CSS uses to surface the
+      // compose controls (Send + New) that belong to Create.
       cyEl.classList.remove('hidden');
       if (visualIframe) visualIframe.classList.remove('active');
       document.body.classList.remove('player-active');
-      const wasEdit = document.body.classList.contains('edit-active');
-      document.body.classList.toggle('edit-active', mode === 'edit');
-      // 2026-08-15 — first entry into Edit mode kicks off Whisper model
-      // download in the background so the first mic press doesn't pay a
-      // ~2 s cold-start. Fire-and-forget: async, non-blocking, idempotent
-      // (subsequent enters return immediately if the pipeline is loaded).
-      // Listeners in the SR wire-up further down in init() pick this up.
-      if (mode === 'edit' && !wasEdit) {
-        document.dispatchEvent(new CustomEvent('bd:edit-mode-enter'));
-      }
+      applyEditFurniture();
       // 2026-08-17 — merge/split the card panes for the new mode, then re-anchor
       // #cy: Nodes hides History + collapses the bar, so #cy's top moves up.
       reflowCardsForMode();
@@ -10723,11 +10789,7 @@ async function init() {
     // User's spec: Pair-and-Edit are entered together; Edit stays on after
     // Unpair; only the radios exit Edit. Idempotent if Edit is already
     // selected.
-    const editRadio = document.querySelector('#view-mode-toggle input[value="edit"]');
-    if (editRadio && !editRadio.checked) {
-      editRadio.checked = true;
-      setViewMode('edit');
-    }
+    setViewMode('create');
   }
 
   // A42 §42.3 — Nodes/Player radio change handler.
@@ -11577,19 +11639,15 @@ async function init() {
   const backBtnEl = document.getElementById('back-btn');
   if (backBtnEl) {
     backBtnEl.addEventListener('click', () => {
-      if (document.body.classList.contains('player-active')) {
-        const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
-        if (nodesRadio) nodesRadio.checked = true;
-        setViewMode('nodes');
-      }
+      // 2026-09-29 — drops the module layout and KEEPS the mode, so Back
+      // from a module node in Create lands in the graph still in Create.
+      if (moduleLayoutActive()) setModuleLayout(false);
     });
   }
   youCy.on('tap', 'node', evt => {
     if (evt.target.data('type') !== 'root') return;
-    if (!document.body.classList.contains('player-active')) return;
-    const nodesRadio = document.querySelector('#view-mode-toggle input[value="nodes"]');
-    if (nodesRadio) nodesRadio.checked = true;
-    setViewMode('nodes');
+    if (!moduleLayoutActive()) return;
+    setModuleLayout(false);
   });
 
   // #cy top is pinned earlier — before cytoscape constructs — so init fits
@@ -13307,12 +13365,14 @@ async function init() {
   // updateSendBtn on top-card content (2026-07-17) — starts hidden
   // + disabled in the HTML, becomes visible only when a %%bd_module
   // directive appears in the top card.
-  const nodesRadioBoot = document.querySelector('#view-mode-toggle input[value="nodes"]');
-  if (nodesRadioBoot) nodesRadioBoot.disabled = false;
+  const browseRadioBoot = document.querySelector('#view-mode-toggle input[value="browse"]');
+  if (browseRadioBoot) browseRadioBoot.disabled = false;
   // Listen for the bd:force-nodes-mode event that updateSendBtn
   // dispatches when the top card loses its module while Player is
   // active — setViewMode is in this scope, updateSendBtn isn't.
-  document.addEventListener('bd:force-nodes-mode', () => setViewMode('nodes'));
+  // 2026-09-29 — clears the LAYOUT and keeps the mode. It used to force the
+  // whole way back to Nodes, which now would also throw away Create.
+  document.addEventListener('bd:force-nodes-mode', () => setModuleLayout(false));
   const copyDownBtnBoot = document.getElementById('copy-down-btn');
   if (copyDownBtnBoot) copyDownBtnBoot.disabled = false;
   ws.emit('msg', { type: 'enter_chat' });
@@ -13626,13 +13686,7 @@ async function init() {
     //    path if same module, src swap + BD_READY otherwise).
     //    Non-module deep links stay in Nodes mode — no Player flash.
     if (isModuleTarget) {
-      const playerRadio = document.querySelector('#view-mode-toggle input[value="player"]');
-      const nodesRadio  = document.querySelector('#view-mode-toggle input[value="nodes"]');
-      if (playerRadio && !playerRadio.disabled) {
-        playerRadio.checked = true;
-        if (nodesRadio) nodesRadio.checked = false;
-        setViewMode('player');
-      }
+      setModuleLayout(true);
     }
 
     // 7. Re-fit the graph. enterNode shows the neighbourhood but nothing in
