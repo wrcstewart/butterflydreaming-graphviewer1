@@ -54,6 +54,26 @@ mode — and the mode you pressed View *from* is restored on the way back, becau
 `armFreshOpen` clears `lastAutoPlayerNodeId` so a return counts as a fresh
 landing and would otherwise raise the module in Create.
 
+**And one thing this broke, found on the first test: View opened an empty
+viewer.** The log named it in a line — `[View] reading from: … len=14
+module=NONE`, the card holding the 14-character fallback name — and then no
+`av_push` at all.
+
+A viewer is fed by `pushScriptToAV`, which until today was only ever reached
+from `autoWrite` — that is, **from the module announcing**. Invisible while View
+could only be pressed in Player, where a module was always loaded and announcing
+and `avLastPushed` was permanently warm. Pressed from Browse there is no module
+loaded, nothing announces, nothing pushes: the viewer connected, asked
+`av_hello`, and `answerAVStateRequest` found `avLastPushed || avLastState` both
+null. A viewer with no script draws nothing.
+
+**The dependency was implicit, which is why moving View exposed it.** Now the
+View press seeds the script itself, from `payload.script` — already the right
+text, because `buildExternalWebsiteUrl` falls back to the NODE when the card
+carries no module, which in Browse it never does. `pushToAV` sets `avLastPushed`
+before it looks at the socket, so the seed survives the viewer not having
+connected yet and the `av_hello` answer carries it.
+
 **Two things outstanding.** The five module nodes now show only their name and
 each wants a line of prose — a small task, and a good one, since it forces "what
 is this piece?". And the View button is exposed but still positioned for the

@@ -13061,6 +13061,28 @@ async function init() {
         // viewer ever connecting".
         const w = wantViewer ? openViewerWindow() : null;
 
+        // 2026-09-29 — SEED THE VIEWER'S SCRIPT HERE.
+        //
+        // A viewer is fed by pushScriptToAV, which until today was only ever
+        // reached from autoWrite — i.e. from the module ANNOUNCING. That was
+        // invisible while View could only be pressed in Player, where a module
+        // was always loaded and announcing, so avLastPushed was permanently
+        // warm. Pressed from Browse there is no module loaded, nothing
+        // announces, nothing pushes: the viewer connected, asked av_hello, and
+        // answerAVStateRequest had `avLastPushed || avLastState` — both null.
+        // A viewer with no script draws nothing, which is exactly what was
+        // reported.
+        //
+        // payload.script is the right text and already correct: it comes from
+        // buildExternalWebsiteUrl, which falls back to the NODE when the card
+        // carries no module — and in Browse the card holds prose. pushToAV sets
+        // avLastPushed before it looks at the socket, so this is recorded even
+        // though the viewer has not connected yet, and the av_hello answer
+        // carries it.
+        if (wantViewer && payload && payload.script) {
+          pushScriptToAV(payload.script, false);
+        }
+
         (async () => {
           // The ternary short-circuits when there is no window, so the no-viewer
           // fallback below never awaits — it is still inside the gesture and can
