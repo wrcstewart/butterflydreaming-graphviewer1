@@ -6,6 +6,40 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-29 — opacity on both Kolams, in hundredths
+
+**`%%bd_p_opacity` on the flat module too.** It was added to the 3D one first,
+where eight overlapping copies of a folded curve make the figure mostly its own
+occlusion; on a 2D canvas it is a gentler effect but the same control, and
+having the same script read the same in both modules is worth more than the
+asymmetry was.
+
+Applied as `globalAlpha` **on the offscreen context only** — the one the path is
+drawn to. That gives both kinds of blending at once: strokes overlapping *within*
+the figure blend, and the translucent bitmap stamped N times by `applySymmetry`
+blends *across* the copies. Which is what the 3D module's material opacity does,
+so the two agree. The main context is deliberately untouched, because it carries
+the background fill and the border, which must stay opaque — and it already
+drives `globalAlpha` itself for that border.
+
+**Both step in hundredths now**, 0.05 → 0.01. Verified against each module's own
+`stepControl`: exactly 100 presses from 1 to 0 and 100 back, **no float tails and
+no readout over three characters** — the leading zero is dropped, so `.99`, `.5`,
+`1`. A held button crosses the range in 7.6s, because the hold-repeat rate is
+derived from the range rather than set per control, so a hundredfold finer grain
+needed no tuning at all.
+
+Marked in both stored Kolam nodes, because they already carry marks and RULE 2
+would otherwise have given the new control no row.
+
+**And a pre-existing mismatch surfaced while checking that.** `%%bd_p_weight` sat
+at the end of both scripts while the column has it between `colour_speed` and
+`saturation`. Moved. All three Kolam nodes now read exactly as their module's
+column does, which is the ordering principle asked for on 09-27 applied to the
+flat module as well.
+
+---
+
 ## 2026-09-28 — graphics render through three.js, and the road to VR
 
 **A standing decision, recorded rather than left in a conversation:** no new

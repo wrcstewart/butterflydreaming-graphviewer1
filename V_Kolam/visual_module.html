@@ -465,6 +465,30 @@
       <input id="lightness-slider" class="stepper-source" type="number" min="0" max="100" step="1" value="65">
     </div>
 
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="opacity-slider" data-delta="-1">−</button>
+        <span class="stepper-value" data-target="opacity-slider">1</span>
+        <button class="step-btn" type="button" data-target="opacity-slider" data-delta="1">+</button>
+      </div>
+      <label>opacity</label>
+      <!-- 2026-09-29 — brought over from the 3D module, where it was added first.
+           Applied as globalAlpha on the OFFSCREEN context, which is the one the
+           path is drawn to. That gives both kinds of blending at once: strokes
+           overlapping WITHIN the figure blend, and the translucent bitmap
+           stamped N times by applySymmetry blends ACROSS the copies. Which is
+           what the 3D module's material opacity does, so the same script reads
+           the same in both.
+
+           The main context is deliberately untouched — it carries the
+           background fill and the border, which must stay opaque, and it
+           already drives globalAlpha itself for that border.
+
+           step 0.01: a hundred positions, and the hold-repeat crosses the range
+           in ~7s because its rate is derived from the range rather than set. -->
+      <input id="opacity-slider" class="stepper-source" type="number" min="0" max="1" step="0.01" value="1">
+    </div>
+
   </div>
 
   </div>
@@ -527,6 +551,7 @@
     const weightSlider   = document.getElementById('weight-slider');
     const saturationSlider = document.getElementById('saturation-slider');
     const lightnessSlider  = document.getElementById('lightness-slider');
+    const opacitySlider    = document.getElementById('opacity-slider');
     const canvas         = document.getElementById('kolam-canvas');
     const ctx            = canvas.getContext('2d');
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
@@ -693,6 +718,9 @@
       weightSlider.value = String(Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5));
       saturationSlider.value = String(Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100));
       lightnessSlider.value = String(Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100));
+      // Falls back to 1 — fully opaque — so a script that has never heard of
+      // opacity renders exactly as it did before the control existed.
+      opacitySlider.value = String(Math.min(Math.max(safeParseNumber(directives.opacity, 1), 0), 1));
 
       // Update value displays
       updateValueDisplays();
@@ -708,7 +736,16 @@
         const targetId = span.dataset.target;
         const input = targetId && document.getElementById(targetId);
         if (!input) return;
-        if (targetId === 'colour-speed-slider') {
+        if (targetId === 'opacity-slider') {
+          // ".05" and ".5" rather than "0.05" and "0.5" — the same number
+          // written shorter (RULE 8), the same trade the colour readout below
+          // makes. 1 stays "1". Three Courier characters fit the span; four
+          // shrink the text rather than widen the column.
+          const n = parseFloat(input.value);
+          span.textContent = Number.isFinite(n)
+            ? String(Math.round(n * 100) / 100).replace(/^0\./, '.')
+            : input.value;
+        } else if (targetId === 'colour-speed-slider') {
           // Show the DIRECTIVE's value, so the readout, the label and the
           // script all say the same number. The hidden input holds the
           // exponent (-2..4); %%bd_colour_speed holds 2^exponent, i.e. one of
@@ -813,7 +850,8 @@
         colour_speed: formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
         weight: weightSlider.value,
         saturation: saturationSlider.value,
-        lightness: lightnessSlider.value
+        lightness: lightnessSlider.value,
+        opacity: opacitySlider.value
       };
       for (const [name, value] of Object.entries(controlValues)) {
         text = setDirectiveValue(text, name, value);
@@ -839,7 +877,8 @@
       colourSpeedSlider,
       weightSlider,
       saturationSlider,
-      lightnessSlider
+      lightnessSlider,
+      opacitySlider
     ];
 
     controlInputs.forEach((input) => {
@@ -862,7 +901,8 @@
       colour_speed:  colourSpeedSlider,
       weight:        weightSlider,
       saturation:    saturationSlider,
-      lightness:     lightnessSlider
+      lightness:     lightnessSlider,
+      opacity:       opacitySlider
     };
 
     // RULE 2: a script with NO mark anywhere keeps the behaviour it has today
@@ -1215,6 +1255,11 @@
       ctx.lineWidth = params.weight;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      // This ctx is the OFFSCREEN one — see the note on the opacity control.
+      // Setting it here and nowhere else keeps the background and the border
+      // opaque, and lets the path blend both within the figure and across the
+      // symmetry copies.
+      ctx.globalAlpha = Math.min(Math.max(safeParseNumber(params.opacity, 1), 0), 1);
 
       for (const symbol of lsystemResult) {
         switch (symbol) {
@@ -1371,6 +1416,7 @@
           weight:     Math.min(Math.max(safeParseNumber(directives.weight, 1.5), 0.5), 5),
           saturation: Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100),
           lightness:  Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100),
+          opacity:    Math.min(Math.max(safeParseNumber(directives.opacity, 1), 0), 1),
           colourSpeed: Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16)
         };
 
