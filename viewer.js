@@ -981,6 +981,8 @@ const EDGE_COLOURS = {
 // reached through one event.
 let bdViewMode     = 'browse';   // the radio
 let bdModuleLayout = false;      // is the module iframe showing
+let bdNodeHasModule = false;     // does the node in play carry a module script
+let bdModeBeforeView = null;     // the mode View was pressed from — see av_return
 
 function moduleLayoutActive() { return bdModuleLayout; }
 
@@ -1023,7 +1025,9 @@ function setViewMode(mode) {
   // an escape, and the back button becomes the way out. That is exactly why
   // step 3 is scheduled after step 2 and not before.
   else if (mode === 'browse') { bdViewMode = 'browse'; bdModuleLayout = false; }
-  else if (mode === 'create') { bdViewMode = 'create'; }
+  // Pressing Create while standing on a module node brings the module up. The
+  // node decides the layout; the mode decides whether the layout is offered.
+  else if (mode === 'create') { bdViewMode = 'create'; bdModuleLayout = bdNodeHasModule; }
   else return;
   // Keep the radio showing the truth, so no caller has to set .checked too.
   const r = document.querySelector('#view-mode-toggle input[value="' + bdViewMode + '"]');
@@ -1104,6 +1108,45 @@ function clusterEditActive() { return CLUSTER_ASSIGN && editModeActive; }
 const CHUNK_HINT_MORE     = 'Tap for next message from me.';
 const CHUNK_HINT_NAVIGATE = 'Tap once more to see connected nodes.';
 const CHUNK_HINT_NO_MORE  = 'There are not yet further descendants.';
+
+// ── Browse shows the PROSE; Create shows the whole script (2026-09-29) ──
+//
+// Everything outside the %%bd_ directives is the node's prose, and that is what
+// Browse displays — for EVERY node, not just module ones. Which is what makes
+// "BD is pure text in Browse" true by construction rather than by special-casing
+// modules, and it quietly settles §4 of the collage plan: it stops mattering
+// where a directive lives, because Browse never shows one.
+//
+// Chosen over GENERATING a description from the script. Authored prose can say
+// what a piece is rather than enumerate its parameters, and it needs no
+// describer kept in step with the directives — which would have been a second
+// vocabulary for the same facts.
+//
+// THIS STRIP HAS NO INVERSE. You cannot rebuild %%bd_score from prose. So
+// nothing may ever write a Browse card back to a node: that is the Sv bug
+// exactly ("Sv round-tripped the RENDERED card back to the DB and destroyed
+// %%bd_center markup: a renderer needs its INVERSE beside it"), and the Down
+// button repeated it by flattening a built card with textContent. The two live
+// write paths are guarded — autoWrite's redraw already requires player-active,
+// and dev-save now refuses outside Create — but any NEW writer must check.
+const BD_BLOCK_OPEN_RE = /^%%bd_(?:p_)?[A-Za-z_]+[ \t]+\[[ \t]*$/;
+const BD_BLOCK_CLOSE_RE = /^%%bd_\][ \t]*$/;
+const BD_LINE_RE        = /^%%bd_/;
+
+function nodeProse(text) {
+  if (!text || typeof text !== 'string') return '';
+  const out = [];
+  let inBlock = false;
+  for (const line of text.split('\n')) {
+    if (inBlock) { if (BD_BLOCK_CLOSE_RE.test(line)) inBlock = false; continue; }
+    // The block form first: its opener is also a plain directive line, and
+    // leaving the body behind would put the axiom and rules on screen.
+    if (BD_BLOCK_OPEN_RE.test(line)) { inBlock = true; continue; }
+    if (BD_LINE_RE.test(line)) continue;
+    out.push(line);
+  }
+  return out.join('\n').trim();
+}
 
 function splitNodeChunks(text) {
   if (!text || typeof text !== 'string') return [];
@@ -6872,7 +6915,15 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       }
       // Reaching Conversations is what unlocks Pair — see updateBackBtn.
       if (type === 'Entry' && node.data('name') === 'Conversations') pairUnlocked = true;
-      const rawText = node.data('text') || '';
+      // 2026-09-29 — Browse shows the PROSE, Create shows the whole script.
+      // Every node, not just module ones: it is what makes "BD is pure text in
+      // Browse" true by construction. A node that is nothing BUT directives —
+      // every module node today — falls back to its name, so the card is never
+      // blank while the View button offers the work itself.
+      const fullText = node.data('text') || '';
+      const rawText  = (bdViewMode === 'create')
+        ? fullText
+        : (nodeProse(fullText) || node.data('name') || node.data('label') || '');
       const chunks = splitNodeChunks(rawText);   // → [{body, hint}, …]
       const desc   = hasNavDescendants(node);
       // `nav` drives the tap AND the hint together, so a childless cluster
@@ -7501,16 +7552,23 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // updateSendBtn calls can't drag the user back into Player.
       const landedOnModuleNode = nodeHasModule && moduleNodeId !== lastAutoPlayerNodeId;
       const pastedIntoTopCard  = !nodeHasModule && cardHasModule && !prevCardHasModule;
-      if ((landedOnModuleNode || pastedIntoTopCard) && !moduleLayoutActive()) {
+      // 2026-09-29 — no longer switches the MODE. Browse is where a collage is
+      // read, and a tap on a module node hijacking the screen is the opposite
+      // of browsing. So the module appears when you are in Create and not
+      // before; Browse offers the View button instead and stays text.
+      //
+      // bdNodeHasModule is remembered so that PRESSING Create while standing on
+      // a module node brings the module up — the mode change consults it.
+      bdNodeHasModule = hasModule;
+      if ((landedOnModuleNode || pastedIntoTopCard) && !moduleLayoutActive()
+          && bdViewMode === 'create') {
         console.log('[auto-create] module layout for',
                     moduleNodeId ? ('node ' + moduleNodeId) : 'pasted script');
-        // Switches the MODE as well as the layout, because what appears is the
-        // module's own stepper surface and that is Create. Safe against
-        // bouncing: lastAutoPlayerNodeId is set below, so pressing Browse to
-        // get back to the graph does not re-trigger while you stay on the node.
-        setViewMode('create');
         setModuleLayout(true);
       }
+      // The View button is offered whenever a module is in play, in EITHER
+      // mode — it is how Browse reaches the work without giving up the graph.
+      document.body.classList.toggle('module-node', hasModule);
       // Remember what we acted on. Reading a NON-module node clears the key, so
       // coming back to a module node counts as a fresh landing.
       lastAutoPlayerNodeId = nodeHasModule ? moduleNodeId : null;
@@ -9112,6 +9170,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     const name = node.data('name');
     if (!name) { devStatus('node has no name'); return; }
 
+    // 2026-09-29 — Sv reads the CARDS and writes them to the node. In Browse
+    // those cards hold prose with every directive stripped, and THE STRIP HAS
+    // NO INVERSE — saving would destroy the whole script. This is the Sv bug
+    // it already caused once ("a renderer needs its INVERSE beside it") and the
+    // Down button's flattening a second time, so it is refused rather than
+    // guessed at.
+    if (bdViewMode !== 'create') {
+      devStatus('switch to Create before saving — Browse cards have no directives');
+      return;
+    }
     const cardsByIdx = readingState.cardsByIdx || {};
     const parts = [];
     for (let i = 0; i < readingState.chunks.length; i++) {
@@ -12891,6 +12959,12 @@ async function init() {
       });
     })();
 
+    // 2026-09-29 — remember which mode View was pressed FROM, so coming back
+    // restores it. BD never changes mode while the viewer is open (it is a
+    // separate window), but the way back re-opens the node through
+    // armFreshOpen, which clears lastAutoPlayerNodeId so the node counts as a
+    // fresh landing — and in Create that would raise the module layout. This
+    // is a restore, not a decision.
     const jumpToBtn = document.getElementById('jump-to-ext-btn');
     if (jumpToBtn) {
       // Opening the viewer window: the CLICK is the gesture.
@@ -12940,6 +13014,7 @@ async function init() {
       }
 
       jumpToBtn.addEventListener('click', () => {
+        bdModeBeforeView = bdViewMode;   // restored by av_return
         // ── Synchronous section. Do not introduce an await above window.open. ──
 
         const { url, payload } = buildExternalWebsiteUrl();
@@ -13277,6 +13352,10 @@ async function init() {
       // BD and the viewer sit side by side a successful raise looks like
       // nothing anyway. Landing on the right NODE is the part that shows.
       try { window.focus(); } catch (_) {}
+      // Restore the mode View was pressed from. Without this the fresh-open
+      // below re-lands you on the module node and, in Create, raises the module
+      // layout — so a View pressed from Browse would come back to Create.
+      if (bdModeBeforeView) { setViewMode(bdModeBeforeView); bdModeBeforeView = null; }
       // Say that it arrived.
       //
       // The viewer can only report that it SENT — which is not the same

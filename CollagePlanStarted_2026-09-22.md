@@ -280,15 +280,69 @@ the back button instead.
 
 1. **Radio 3 → 2**, with the layout chosen by the node and `edit-active`
    orthogonal. *(This step.)*
-2. **Browse plays the module with `hideControls`** — the module visible but
-   bare, card replaced by a description and an invitation to press Create. The
-   mechanism already exists and is proven in the AV viewer; this is a LAYOUT
-   problem, not a new mechanism. It is also what makes the name "Create" honest,
-   since until then a module node still lands you there automatically.
+2. **Browse is TEXT; Create is media.** *(BUILT 2026-09-29 — and it went a
+   different way than planned, for a better reason.)*
+
+   The plan was for Browse to play the module *bare*. The author's argument
+   against: **Browse eventually shows a COLLAGE, not one work**, and a module
+   inline competes for the room that collage needs. The earlier options all
+   quietly assumed Browse displays one node at a time, and that assumption
+   expires. So Browse does not raise the module at all — it stays text and
+   offers **View**, which reaches the work through the viewer that already
+   exists, on this screen or another.
+
+   And a second argument from the author, which is the one to keep: it **keeps
+   BD itself pure text in Browse**, which is worth more for comprehensibility
+   than immediacy is.
+
+   **The rule that came out of it is bigger than module nodes.** Browse shows
+   the node's PROSE — everything outside the `%%bd_` directives — for EVERY
+   node. Create shows the whole script. So "BD is pure text in Browse" is true
+   by construction rather than by special-casing modules.
+
+   Chosen over GENERATING a description from the script: authored prose says
+   what a piece IS rather than enumerating its parameters, and it needs no
+   describer kept in step with the directives — which would have been a second
+   vocabulary for the same facts. A node that is nothing but directives falls
+   back to its **name**.
+
+   **This largely dissolves §4.** It stops mattering where a directive lives,
+   because Browse never shows one. What remains of that section is a different
+   question — whether a text node's *content* should feed a module — and it is
+   no longer entangled with this one.
+
+   **THE STRIP HAS NO INVERSE, and that is the danger.** You cannot rebuild
+   `%%bd_score` from prose, so anything writing a Browse card back to a node
+   destroys the script. That is the Sv bug exactly, and the Down button repeated
+   it. `autoWrite`'s redraw was already guarded by `player-active`; **`Sv` now
+   refuses outside Create**, because it is gated on the curation code and not on
+   the mode, so a curator could have reached it. Any NEW writer must check.
+
+   *Still to do:* the five module nodes are pure directives and now show only
+   their name. Each wants a line of prose — a small task, and a good one, since
+   it forces "what is this piece?", which is the question a collage is made of.
+
+   *Provisional:* the View button is exposed wherever a module is in play, but
+   it is still positioned for the player layout's right-hand band, so in Browse
+   it sits over the graph's edge. Agreed home is the Local/Remote row — that row
+   becomes **where things go**: Local is me, Remote is them, View is another
+   screen. Done once it can be seen rather than guessed.
 3. **`Local` as a back button**, labelled `Local:Browse` / `Local:Create` so both
    ends know the mode. Deferred deliberately, and it now has one clean job:
    **reaching the graph while on a module node in Create.** A nameable missing
-   action rather than a vague gap.
+   action rather than a vague gap. *(Step 2 did not create the escape hole after
+   all — Browse still clears the module layout, so the radio remains a way out.
+   This is now a convenience rather than a necessity.)*
+
+   **On the labels: SHOW the mode, do not SYNC it.** The question arose whether
+   local and remote must both be in Create. They must not — the asymmetric case
+   is the valuable one: **facilitator in Create, participant in Browse**, one
+   making and adjusting while the other receives the work without the furniture.
+   That is the same shape as the dimming dial in
+   `ThreeJS_and_VR_2026-09-28.md` §8d: depth of involvement as a dial, not a
+   switch. And what actually needs protecting is protected elsewhere — writing
+   to the graph needs partner agreement by the consent model. Mode is not the
+   gate; agreement is. The label is a cheaper answer than negotiation.
 
 **Still open after all three**, and it is this section's original worry: Create
 needs the module visible *and* the history panel reachable, because Merge is a

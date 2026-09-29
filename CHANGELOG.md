@@ -6,6 +6,63 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-29 — Browse is text, Create is media
+
+Step 2 of the mode work, and it went a different way than planned for a better
+reason. The plan had Browse playing the module *bare*. The author's argument
+against it: **Browse eventually shows a COLLAGE, not one work**, and a module
+inline competes for exactly the room a collage needs. Every earlier option
+quietly assumed Browse displays one node at a time, and that assumption expires.
+
+So Browse does not raise the module at all. It stays text and offers **View**,
+which reaches the work through the viewer that already exists. Which also, in
+the author's words, **keeps BD itself pure text in Browse** — worth more for
+comprehensibility than immediacy is.
+
+**The rule that came out of it is bigger than module nodes.** Browse shows the
+node's **prose** — everything outside the `%%bd_` directives — for **every**
+node; Create shows the whole script. "BD is pure text in Browse" is then true by
+construction rather than by special-casing modules.
+
+Chosen over *generating* a description from the script, which was the earlier
+idea and the author's correction is the better one: authored prose says what a
+piece **is** rather than enumerating its parameters, and it needs no describer
+kept in step with the directives — which would have been a second vocabulary for
+the same facts. A node that is nothing but directives falls back to its **name**.
+
+**It also largely dissolves §4 of the collage plan**, which had been parked. It
+stops mattering where a directive lives, because Browse never shows one. What
+remains of that section is a genuinely different question — whether a text
+node's *content* should feed a module — and it is no longer entangled with this.
+
+**THE STRIP HAS NO INVERSE, and that is the whole danger.** You cannot rebuild
+`%%bd_score` from prose, so anything that writes a Browse card back to a node
+destroys the script. That is the Sv bug exactly — *"a renderer needs its INVERSE
+beside it"* — and the Down button repeated it by flattening a built card. Both
+live writers were checked: `autoWrite`'s redraw is already guarded by
+`player-active` (the 09-22 fix, for the same reason), and **`Sv` now refuses
+outside Create**, because it is gated on the curation code rather than the mode
+and a curator could have reached it from Browse.
+
+The strip handles the block form (`%%bd_score [ … %%bd_]`), not just single
+lines, or the axiom and rules would have been left on screen. Run against the
+corpus: of the six nodes carrying directives, the one with prose keeps it intact
+and the five pure-directive module nodes empty to their fallback.
+
+Also: the auto-switch is gone — a tap on a module node no longer changes your
+mode — and the mode you pressed View *from* is restored on the way back, because
+`armFreshOpen` clears `lastAutoPlayerNodeId` so a return counts as a fresh
+landing and would otherwise raise the module in Create.
+
+**Two things outstanding.** The five module nodes now show only their name and
+each wants a line of prose — a small task, and a good one, since it forces "what
+is this piece?". And the View button is exposed but still positioned for the
+player layout's right-hand band, so in Browse it sits over the graph's edge; its
+agreed home is the Local/Remote row, which becomes *where things go* — Local is
+me, Remote is them, View is another screen.
+
+---
+
 ## 2026-09-29 — three view modes become two
 
 **Browse | Create.** Nodes becomes Browse; Player and Edit become Create. Done
