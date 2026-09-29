@@ -84,7 +84,7 @@ html, body {
   align-items: center;
   gap: 8px;
   z-index: 10;
-  font-size: 11px;
+  font-size: 10px;
   font-family: sans-serif;
 }
 @media (max-width: 767px) {
@@ -100,7 +100,7 @@ html, body {
   border: 1px solid #a07820;
   border-radius: 4px;
   color: #1a1a20;
-  font-size: 14px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   padding: 3px 10px;                    /* slight bump so Pair reads at parity with Back's 4px 12px */
@@ -156,6 +156,17 @@ html, body {
   color: #1a1a20;
 }
 
+/* 2026-09-29 — the top row's labels dropped to 10px, from 11-14px, to make room
+   as this row takes on more: the View button, and eventually the Local:Browse /
+   Local:Create labelling.
+
+   10px is the smallest SENSIBLE, not the smallest possible. At the usual ~0.5
+   x-height ratio that is ~5px of glyph, which is the readable-but-effortful
+   threshold measured for the headset work (ThreeJS_and_VR_2026-09-28.md §8b);
+   below it you are recognising a word by its shape rather than reading it. The
+   file's existing floor is 8-9px on #copy-link-to-ext-btn, so there is room —
+   but not much, and not free: this author reads by luminance rather than hue,
+   so size carries more of the load here than it would elsewhere. */
 #back-btn {
   display: none;
   position: fixed;
@@ -178,7 +189,7 @@ html, body {
   /* Was 18px/700 for a lone arrow. A label needs to be readable without the
      button growing into #pair-control, so: smaller, still bold, clipped at a
      width that suits the 13-char cap truncateChipLabel applies. */
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
   max-width: 40vw;
   white-space: nowrap;
@@ -209,7 +220,7 @@ html, body {
   border: 2px solid rgba(255,255,255,0.8);   /* REMOTE — the one with something to say */
   border-radius: 6px;
   color: #1a1a20;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
   max-width: 40vw;
   white-space: nowrap;
@@ -235,7 +246,7 @@ html, body {
   border: 3px solid rgba(255,255,255,1);     /* COMMON — thicker AND opaque, as a snap is */
   border-radius: 6px;
   color: #1a1a20;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
   max-width: 40vw;
   white-space: nowrap;
@@ -325,7 +336,7 @@ html, body {
   margin-top: 4px;
   max-width: 30vw;
   color: #aaa;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.2;
   text-align: right;
 }
@@ -1101,8 +1112,8 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-29e: GREEN (View from Browse seeds the viewer's script — nothing was
-   announcing, so the viewer drew nothing). Next rotation = blue.
+   2026-09-29f: BLUE (top-row labels to 10px, making room for what that row is
+   taking on). Next rotation = red.
 
    NB this prose has now been left behind TWICE. It said "2026-09-11: GREEN,
    next = blue" while the border painted RED; then it said "2026-09-19: RED"
@@ -1118,7 +1129,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1262,7 +1273,7 @@ body.player-active #auto-echo { display: flex; }
   padding: 2px 8px;
   color: #1a1a20;                        /* dark text on yellow */
   font-family: sans-serif;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
 }
 /* MUST stay after the rule above: a media query carries no extra specificity,
@@ -2062,7 +2073,7 @@ body.module-node   #bd-invite-panel-viewer { display: block; }
 }
 /* The download note lives where the Pair button will later sit: the message
    itself must stay readable, so progress cannot go in the reading panel. */
-#pair-status { font-size: 13px; color: #9a9aa4; }
+#pair-status { font-size: 10px; color: #9a9aa4; }
 
 
 
