@@ -146,31 +146,14 @@
        (body.player-active toggled by setViewMode). Sits in the 220 px band
        reserved on the right of #visual-iframe by positionCyEl. Buttons
        placeholder; wiring follows in a later commit. -->
+  <!-- 2026-09-29 — EMPTIED, not deleted. Its three live controls moved to the
+       Jump Bar; what is left is two captions that labelled them. Kept so
+       positionExtendPanel and the modules' dock slots still have the element
+       they were written against, and hidden in CSS rather than removed, which
+       is this file's habit with retired things. -->
   <aside id="bd-invite-panel-viewer">
     <p id="bd-invite-text-viewer">Extension</p>
     <div id="bd-invite-actions-viewer">
-      <!-- "View", not "Jump" (2026-09-15). The button no longer JUMPS
-           anywhere: BD stays exactly where it is and a viewer opens beside
-           it, following the module live. "Jump to external player" described
-           the retired standalone behaviour, where BD navigated away. -->
-      <!-- 2026-09-22 — a viewer pressing Sync lands silently otherwise: the
-           node changes under you with nothing saying why, and the person who
-           pressed it, on another device, learns only that it was SENT. Left
-           of View because that is where the eye already is. -->
-      <span id="av-sync-note" hidden>synced</span>
-      <button id="jump-to-ext-btn"      type="button" title="Open a viewer window beside BD that follows this module live">View</button>
-      <!-- 2026-09-22 — the same viewer, on a DIFFERENT device. View opens one
-           beside BD and can reach it directly; a phone, tablet or headset has
-           no window handle, which is the one case the relay exists for. -->
-      <button id="send-to-device-btn"   type="button" title="Show a link and QR code so another device can watch this module">Device</button>
-      <!-- RETIRED 2026-09-15, NOT DELETED. Copies a standalone URL carrying
-           the whole payload. Hidden because the panel now offers one thing —
-           View — and a second button asking the user to choose between two
-           transports is the choice we made FOR them when standalones were
-           frozen. The handler in viewer.js is deliberately left wired: drop
-           the `hidden` attribute and the button works again, unchanged, if
-           the standalone-url idea is ever restarted. -->
-      <button id="copy-link-to-ext-btn" type="button" hidden title="Copy an external-player link (with current script + node context) to the clipboard">Copy external url</button>
     </div>
     <!-- Was "External Website". The View button opens BD's OWN Ancillary
          Viewer on this origin, not a third-party site — the old caption now
@@ -235,6 +218,42 @@
          name nodes and earn their labels, this one names nothing. Hidden until
          there is something to clear. -->
     <button id="clear-merge-btn" type="button" title="Clear your partner's merged view">✕</button>
+
+    <!-- 2026-09-29 — View and Device moved here from #bd-invite-panel-viewer.
+         The JB is where things GO: Local is me, Remote is them, Green is where I
+         followed them to, and these two are another screen — beside BD, or on a
+         different device entirely. They belong together.
+
+         They had to move because Browse no longer raises the module, so the
+         panel that used to carry them — docked into the 220px band beside the
+         iframe — is not on screen when you need them. Right-aligned in a
+         wrapper rather than by a margin on the first button, because the sync
+         note is `hidden` most of the time and a margin on a hidden element
+         aligns nothing. -->
+    <div id="jb-right">
+      <!-- "View", not "Jump" (2026-09-15). The button no longer JUMPS
+           anywhere: BD stays exactly where it is and a viewer opens beside
+           it, following the module live. "Jump to external player" described
+           the retired standalone behaviour, where BD navigated away. -->
+      <!-- 2026-09-22 — a viewer pressing Sync lands silently otherwise: the
+           node changes under you with nothing saying why, and the person who
+           pressed it, on another device, learns only that it was SENT. Left
+           of View because that is where the eye already is. -->
+      <span id="av-sync-note" hidden>synced</span>
+      <button id="jump-to-ext-btn"      type="button" title="Open a viewer window beside BD that follows this module live">View</button>
+      <!-- 2026-09-22 — the same viewer, on a DIFFERENT device. View opens one
+           beside BD and can reach it directly; a phone, tablet or headset has
+           no window handle, which is the one case the relay exists for. -->
+      <button id="send-to-device-btn"   type="button" title="Show a link and QR code so another device can watch this module">Device</button>
+      <!-- RETIRED 2026-09-15, NOT DELETED. Copies a standalone URL carrying
+           the whole payload. Hidden because the panel now offers one thing —
+           View — and a second button asking the user to choose between two
+           transports is the choice we made FOR them when standalones were
+           frozen. The handler in viewer.js is deliberately left wired: drop
+           the `hidden` attribute and the button works again, unchanged, if
+           the standalone-url idea is ever restarted. -->
+      <button id="copy-link-to-ext-btn" type="button" hidden title="Copy an external-player link (with current script + node context) to the clipboard">Copy external url</button>
+    </div>
   </div>
   <div id="pair-control">
     <!-- 2026-09-01 — starts hidden AND disabled, like the Player radio above.

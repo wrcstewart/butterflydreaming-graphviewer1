@@ -10497,6 +10497,11 @@ async function init() {
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
+    // 2026-09-29 — the panel is empty and hidden: View and Device moved to the
+    // Jump Bar. Positioning it would be measuring and moving nothing, several
+    // times a frame during a drift. Bail rather than delete, so the dock-slot
+    // machinery survives intact if this panel is ever given contents again.
+    if (getComputedStyle(panel).display === 'none') return;
     // 2026-08-17 — release any inline geometry we grew for the Kolam player
     // (History-pane height, ↓↑ arrow tops); the Kolam branch below re-applies
     // each call when applicable (mobile Player). Cleared here so leaving Kolam/

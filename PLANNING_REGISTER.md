@@ -224,6 +224,19 @@ acting on any of it.
 
 ---
 
+## TIDY UPS LATER
+
+Deferred deliberately. Each is mechanical, each is a rename rather than a
+behaviour change, and each is better done on its own than folded into work that
+also changes what the code does.
+
+| item | where | note |
+|---|---|---|
+| **`#bd-toppanel` → `#bd-jumpbar`** | `index.html`, `style.css`, `viewer.js` | The bar is agreed to be the **Jump Bar (JB)** — every control in it takes you somewhere: Local to your own position, Remote to your partner's, Green to the ones you followed them to, and now View to another screen. "Top panel" named it for sitting at the top of the CANVAS, but it is BELOW both reading panes, so the name misleads in conversation and in comments. One mechanical pass. |
+| **The identifiers that say "merge" all mean "route"** | `viewer.js`, `index.html`, `style.css` | `clear-merge-btn`, `clearMergedView`, `mergedRemoteIds`, `applyMergedView` are leftovers from a wholesale-merge design that **was scaled back and never shipped**. What is live: their view is stored and never drawn, a shared node is only SIGNALLED when already in yours, and what can be drawn is a **route** to them. **These names actively mislead** — they led an assistant to describe the system as merging graphs, and the author had to correct it. Rename to route-* and the code says what it does. Bigger than the one above, and worth doing alone. |
+
+---
+
 ## Added 2026-09-29 — three view modes become two
 
 | item | where | note |

@@ -6,6 +6,53 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-29 — View and Device move into the Jump Bar
+
+**The bar with Local, Remote and Green in it is now called the Jump Bar (JB)**,
+because every control in it takes you somewhere. Its id is still
+`#bd-toppanel`, which is misleading — it sits at the top of the CANVAS but below
+both reading panes — and the rename is filed under TIDY UPS LATER with the other
+mechanical one.
+
+**View and Device moved there**, right-aligned, from `#bd-invite-panel-viewer`.
+They had to: Browse no longer raises the module, so the panel that carried them
+— docked into the 220px band beside the iframe — is not on screen when you need
+them. And they belong with the others: Local is me, Remote is them, Green is
+where I followed them to, and these two are another screen, beside BD or on a
+different device.
+
+Right-aligned by `margin-left: auto` on a **wrapper** rather than on the first
+button, because `#av-sync-note` is `hidden` most of the time and a margin on a
+hidden element aligns nothing.
+
+Shown on `body.module-node`, set from the same test that decides a module
+exists, so the button cannot appear for a node it would do nothing on — and in
+**both** modes, since Browse needs it to reach the work at all and Create still
+needs it to reach another device.
+
+`#jump-to-ext-btn` carried `width: 50px` and `white-space: normal` from its old
+home in a narrow panel, where a wrapped two-line label was right; in a row it
+sizes to its text and stays on one line.
+
+**The panel is emptied, not deleted** — hidden in CSS, with its two captions
+left, so `positionExtendPanel` and the modules' dock-slot machinery still find
+what they were written against. `positionExtendPanel` now bails on a hidden
+panel rather than measuring and moving nothing several times a frame during a
+drift.
+
+**One consequence to look at:** those dock slots in the music modules now
+receive nothing. Visible in Fractal and ABC, and worth deciding whether the
+slots still earn their place in those layouts.
+
+Also filed under **TIDY UPS LATER**: `#bd-toppanel` → `#bd-jumpbar`, and the
+identifiers that say "merge" but mean "route" — `clear-merge-btn`,
+`clearMergedView`, `mergedRemoteIds`, `applyMergedView`, all leftovers from a
+wholesale-merge design that was scaled back and never shipped. Those names led
+me to describe the system as merging partners' graphs, which it does not: a
+shared node is only SIGNALLED when it is already in your own view.
+
+---
+
 ## 2026-09-29 — Browse is text, Create is media
 
 Step 2 of the mode work, and it went a different way than planned for a better
