@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08, updated 09-12, 09-15, 09-17, 09-18 and 09-28
+# Continuation note — 2026-09-08, updated 09-12, 09-15, 09-17, 09-18, 09-28 and 09-29
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -14,7 +14,7 @@ remembered.
 still the stable viewer.
 
     git branch --show-current      # expect: remote-graph-view
-    git log -1 --oneline           # expect: 3ca5646 or later (2026-09-28)
+    git log -1 --oneline           # expect: 50da4d5 or later (2026-09-29)
 
 Everything below is on that branch and pushed. Merging to `main` is a deliberate
 act still to be taken — see §5.
@@ -339,6 +339,95 @@ dimming dial no headset can offer, and the two divergent trajectories after Meta
 Connect 2026. **§9 is the authoritative open list for the area — fifteen items —
 and §7 is the collage fork, which has to be chosen before the collage is
 built.**
+
+---
+
+## 1f. 2026-09-29 — the modes become two, and WHERE TO PICK UP
+
+### ⇒ START HERE TOMORROW
+
+**One measurement is waiting, and the next step follows from it.**
+
+On iOS, View and Device sit beside Local in the Jump Bar instead of at the right
+edge. `margin-left: auto` on `#jb-right` is the correct tool and the nesting is
+verified, so the only explanation left is that the bar has no free space — i.e.
+it overflows. **A one-shot probe is already in the code**: it fires on the
+false→true edge of `body.module-node` and logs the bar's width against its
+`scrollWidth`, `#jb-right`'s offset and its gap to the right edge, and every
+visible child's width.
+
+    Open BD on the iPhone → tap a module node → read `[JB]` in
+    /private/tmp/bd_server.log
+
+That line names the cause. Deliberately NOT fixed by arithmetic first: six
+rounds of correct measurements on the invisible copy buttons were settled by one
+call to `elementFromPoint`, and the rule since is **measure, don't model**.
+
+Also untested on a phone: the two view modes themselves, the prose card, and the
+AV button's new label.
+
+### What changed today
+
+**Three view modes became two: Browse | Create.** The reason is the collage —
+*"iteration towards a user comprehensible create a Collage structure"* — because
+three modes, two of which differ only in whether two buttons show, cannot be
+explained to someone who did not build the system.
+
+**Player was never a mode; it was a LAYOUT.** The NODE decides whether the
+module shows. That removes the boundary the 09-22 card overwrite lived on: you
+never "leave Player", you navigate away from a module node. `edit-active` had to
+become orthogonal to `player-active` — the two modes being merged had opposite
+layouts — and the state had to live at MODULE scope, because `updateSendBtn` is
+not inside `init()` (the `bd:force-nodes-mode` listener exists solely to bridge
+those scopes and says so).
+
+**Browse is TEXT; Create is media.** Browse shows the node's PROSE — everything
+outside the `%%bd_` directives — for EVERY node. It does not raise the module at
+all: it offers **View** instead, because Browse eventually shows a COLLAGE, not
+one work, and a module inline competes for exactly that room. A node that is
+only directives falls back to its **name**.
+
+⚠ **THE STRIP HAS NO INVERSE.** You cannot rebuild `%%bd_score` from prose, so
+anything writing a Browse card back to a node destroys the script — the Sv bug
+exactly. `autoWrite`'s redraw was already guarded by `player-active`; **`Sv` now
+refuses outside Create**. Any NEW writer must check.
+
+**The Jump Bar (JB).** The bar holding Local, Remote and Green — id still
+`#bd-toppanel`, which misleads. **View and Device moved into it**, right-aligned,
+out of `#bd-invite-panel-viewer`, which is now emptied and hidden. Top-row labels
+dropped to 10px. Node labels lost the `bd_X_` taxonomy prefix so the sequence
+number survives (`Kolam_001`, not `bd_V_Kolam_0…`).
+
+**The AV way-back button** says `← Return to Node`, except on a separate device
+where it stays `Sync` — the real axis being whether anything comes back or only
+the state.
+
+**Also:** opacity on the flat Kolam as well as the 3D one, both stepping in
+hundredths; `bd_V_Kolam_001`'s script set to the author's values; and RULE 9 —
+a module's default script carries no directive it cannot act on.
+
+### Outstanding, besides the measurement
+
+- **The five module nodes show only their name.** Each wants a line of prose.
+  A good task: it forces "what is this piece?", the question a collage is made of.
+- **The music modules' dock slots now receive nothing**, since the panel they
+  docked is empty. Visible in Fractal and ABC; decide whether they still earn
+  their place.
+- **TIDY UPS LATER** in `PLANNING_REGISTER.md`: `#bd-toppanel` → `#bd-jumpbar`,
+  and the identifiers saying "merge" that mean "route".
+- **Step 3 of the mode work**: `Local` as a back button, labelled
+  `Local:Browse` / `Local:Create`. Not urgent — Browse still clears the module
+  layout, so the radio remains a way out. **Show the mode, do not SYNC it**: the
+  asymmetric case (facilitator in Create, participant in Browse) is the valuable
+  one.
+
+### One correction worth carrying
+
+**BD does NOT merge a partner's graph into yours.** Their view is stored and
+never drawn; a shared node is only SIGNALLED when it is already in yours. Every
+identifier saying "merge" — `clear-merge-btn`, `clearMergedView`,
+`mergedRemoteIds`, `applyMergedView` — is a leftover from a design that was
+scaled back, and they misled me into telling the author otherwise.
 
 ---
 
