@@ -6,6 +6,43 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-30 — Hardy loses its stanza labels, and Speak gets its own pill
+
+**All 14 `Stanza n` lines removed from the Thomas Hardy poems.** They are
+apparatus, not poem: the chunking already *is* the stanza division, so the label
+restated in words what the structure says, and it was the first thing a reader
+met on every card. It matters more since 09-29, because **Browse shows the
+node's prose** — and a stanza label is exactly the sort of line that reads as
+content when it is really scaffolding. Written up in
+`hardy_stanza_labels_2026-09-30.md`, including the one judgement call: seq 16 of
+"Your Last Drive" carried `Stanzas 3 and 4`, which was not the named form and
+was removed anyway, because one orphan label would be stranger than all of them.
+
+**Speak became its own pill**, after two attempts that are worth the note.
+
+A `margin-left` did nothing visible, and the reason was the useful part:
+`#view-mode-toggle` **was** the gold pill, and Speak sat inside it — so moving it
+along just made the block wider. There was nothing for a gap to appear in.
+
+So `#view-mode-toggle` is now a bare positioned ROW holding two pills: the
+Browse/Create pair, and Speak. Everything that *placed* the control stayed;
+everything that *painted* it moved onto the pills. The radios are still
+descendants, so every existing selector still matches.
+
+Then the two pills were not the same height — the radio pill's inner `<label>`s
+each add 2px of vertical padding for their tap zone, while `#speak-control` IS
+the label and takes the pill's padding instead. Fixed with `align-items:
+stretch` on the row rather than a height on either pill, so they match by
+construction rather than by a number that would drift the next time either one's
+padding changed.
+
+And a specificity trap caught on the way: `#view-mode-toggle label` is 0,1,1
+against `#speak-control`'s 0,1,0, so the label rule's padding would have won and
+the Speak pill would have sat visibly tighter than its neighbour. The pill rules
+are scoped through the row for that reason, not for tidiness.
+
+---
+
 ## 2026-09-30 — the card follows the mode
 
 Two faults reported, which look unrelated and are the same one:

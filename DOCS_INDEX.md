@@ -114,6 +114,7 @@ Their value now is explaining *why the wording reads as it does*.
 | **nav_instructions_2026-09-01.md** | Brought navigation copy in line with one-tap. |
 | **conversations_restore_2026-09-01.md** | Restored a line that Sv stripped by round-tripping the rendered card into the DB. |
 | **conversations_colon_2026-09-04.md** | "the Local: button" → "the Local button". |
+| **hardy_stanza_labels_2026-09-30.md** | Removed the bare `Stanza n` line from all 14 Hardy poem chunks — apparatus, not poem, and the chunking already IS the stanza division. Matters more now Browse shows the prose. |
 | **conversations_typos_2026-09-04.md** | Three typos that also affected the spoken reading. |
 | **root_boot_split_2026-09-05.md** | Root's welcome moved to the tap card (`ROOT_BOOT_MESSAGE`). |
 | **root_orientation_2026-09-05.md** | Added a closing sentence that works both read and heard. |

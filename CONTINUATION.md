@@ -362,8 +362,9 @@ narrower phone that overflows, `margin-left: auto` has nothing to consume, and
 the original symptom returns. **The probe is deliberately left in** to catch
 that the first time anyone pairs on a phone.
 
-Still untested on a phone: the two view modes, the prose card, the View fix, and
-the AV button's new label.
+**Desktop is confirmed working** (2026-09-30) — the two modes, the prose card,
+and the card-follows-the-mode fix. **Still untested on a phone:** the two view
+modes, the prose card, the View fix, and the AV button's new label.
 
 ### What changed today
 
