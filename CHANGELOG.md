@@ -50,7 +50,8 @@ pause at. One false positive was closed on the evidence: a module *script* is a
 stack of short lines and read as verse on every measure, so `%%bd_` is never
 verse.
 
-**Verse is also read 15% more slowly**, which is what the author asked for and
+**Verse is also read more slowly** — 15% at first, reduced to **8%** by ear the
+same day — which is what the author asked for and
 what the detector now makes possible. The scale rides with each queued utterance
 rather than sitting in a global, so a second passage queued behind the first
 keeps its own pace.

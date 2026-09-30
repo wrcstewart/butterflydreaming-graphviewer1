@@ -1583,8 +1583,9 @@ const SPEAK_GAP_MS = 420;
 // 180ms against 420: enough to hear the line turn, not enough to sound like a
 // full stop. Tune by ear against SPEAK_LENGTH_SCALE like its neighbour.
 const SPEAK_LINE_GAP_MS = 180;
-// Verse is read more slowly than prose. 15% on top of the existing scale.
-const SPEAK_VERSE_SCALE = SPEAK_LENGTH_SCALE * 1.15;
+// Verse is read more slowly than prose. 8% on top of the existing scale —
+// 15% first, reduced by ear on 2026-09-30.
+const SPEAK_VERSE_SCALE = SPEAK_LENGTH_SCALE * 1.08;
 
 // ── Is this passage VERSE? ──────────────────────────────────────────────
 //
