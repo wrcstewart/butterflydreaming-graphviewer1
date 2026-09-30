@@ -1159,8 +1159,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
-   2026-09-30b: GREEN (the mode refresh uses renderChunkBody — there are TWO
-   functions named setCardText and I reached the wrong one). Next = blue.
+   2026-09-30c: BLUE (20px of air before the Speak box). Next rotation = red.
 
    NB this prose has now been left behind TWICE. It said "2026-09-11: GREEN,
    next = blue" while the border painted RED; then it said "2026-09-19: RED"
@@ -1176,7 +1175,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1357,6 +1356,19 @@ body.player-active #auto-echo { display: flex; }
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* 2026-09-30 — 20px of air before Speak, so it reads as its own control rather
+   than a third option in the Browse/Create pair. It is not a view MODE: it
+   rides alongside whichever one is selected, and sitting flush against them
+   said otherwise.
+
+   A margin rather than a move, so the box keeps its size and the pill simply
+   grows by 20. On top of the container's own 8px gap, so the visible space is
+   28 — say the word if it should be 20 in total.
+
+   :has() is already relied on in the rule below, so no markup change is needed
+   to name this one label. */
+#view-mode-toggle label:has(#speak-toggle) { margin-left: 20px; }
+
 #view-mode-toggle label:has(input:disabled) {
   opacity: 0.55;
   cursor: not-allowed;
