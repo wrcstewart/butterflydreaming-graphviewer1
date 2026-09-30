@@ -6,6 +6,61 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-30 — verse gets its line-end pause
+
+Reported: the Tao Te Ching, Zhuangzi and Grimm's read well; Hardy and Whitman do
+not. The diagnosis was right — **a line break invokes a short pause when a person
+reads verse, and here it produced nothing.** espeak turns `,` and `.` into pause
+*phonemes*, which is why prose works; a newline is only whitespace.
+
+**The mechanism already existed.** `SPEAK_GAP_MS = 420` is an explicit gap
+between utterances, so a verse line only had to *become* an utterance — with a
+shorter gap than a sentence gets. `splitUtterances` now splits verse at line ends
+as well as sentence ends and returns `{ text, gap }`, where **the gap follows the
+punctuation the fragment ends with**: `. ! ?` gets the full 420ms, anything else
+— a comma, a colon, a verse line with no punctuation — gets 180ms. That improves
+prose too: an over-long sentence broken at the 400-character cap used to take a
+full stop's pause mid-clause.
+
+**The detector, and where the author's proposal had to be corrected.** The
+suggestion was capitalised line starts, the traditional convention. MEASURED
+across the corpus first, and it is not sufficient:
+
+| | capitalised | mean line |
+|---|---|---|
+| Thomas Hardy | 100% | 38 |
+| Leaves of Grass | 100% | 59 |
+| **Poems of Du Fu** | **33%** | 42 |
+
+Du Fu is a modern translation that does not capitalise every line, so the capital
+rule alone would have missed two thirds of its line breaks — and it is poetry the
+pause is wanted in. Whitman's long lines defeat a length rule just as squarely.
+**Together they cover each other's blind spot**, which is why both are in
+`looksLikeVerse` rather than one.
+
+The ceiling matters as much as either test: the thing to exclude is hard-wrapped
+**prose**, which sits near a fixed width and breaks mid-sentence in lower case. A
+mean below 70 rules it out whatever its capitals do, and keeps the module
+gateways (mean ~400) out with it.
+
+Checked against every node: **0 of 167 prose nodes read as verse**; Hardy 14 of
+19, Whitman 10 of 12, Du Fu 4 of 6 — the misses in each being exactly the
+section-title and gateway nodes, which are single-line and carry no line break to
+pause at. One false positive was closed on the evidence: a module *script* is a
+stack of short lines and read as verse on every measure, so `%%bd_` is never
+verse.
+
+**Verse is also read 15% more slowly**, which is what the author asked for and
+what the detector now makes possible. The scale rides with each queued utterance
+rather than sitting in a global, so a second passage queued behind the first
+keeps its own pace.
+
+Known exception, accepted: verse that is both long-lined *and* uncapitalised —
+e e cummings, much modern free verse — reads as prose. One rule cannot have
+everything, and being wrong towards prose is the quieter failure.
+
+---
+
 ## 2026-09-30 — Hardy loses its stanza labels, and Speak gets its own pill
 
 **All 14 `Stanza n` lines removed from the Thomas Hardy poems.** They are

@@ -1572,6 +1572,68 @@ const SPEAK_LENGTH_SCALE = 1 / 0.7;
 // about what an unhurried reader leaves at a full stop; it wants tuning by ear
 // against SPEAK_LENGTH_SCALE, since a slower delivery asks for a longer pause.
 const SPEAK_GAP_MS = 420;
+// 2026-09-30 — a LINE end is not a sentence end.
+//
+// Reported: the Tao Te Ching, Zhuangzi and Grimm's read well; Hardy and Whitman
+// do not, because a verse line break invokes a short pause when a person reads
+// and nothing at all here. espeak turns `,` and `.` into pause phonemes, which
+// is why prose works — a newline is only whitespace, so it produces silence of
+// zero length.
+//
+// 180ms against 420: enough to hear the line turn, not enough to sound like a
+// full stop. Tune by ear against SPEAK_LENGTH_SCALE like its neighbour.
+const SPEAK_LINE_GAP_MS = 180;
+// Verse is read more slowly than prose. 15% on top of the existing scale.
+const SPEAK_VERSE_SCALE = SPEAK_LENGTH_SCALE * 1.15;
+
+// ── Is this passage VERSE? ──────────────────────────────────────────────
+//
+// The author proposed capitalised line starts, which is the traditional
+// convention. MEASURED across the corpus before building on it, and it is not
+// sufficient on its own:
+//
+//   Thomas Hardy      100% capitalised   mean line 38
+//   Leaves of Grass   100% capitalised   mean line 59
+//   Poems of Du Fu     33% capitalised   mean line 42
+//
+// Du Fu is a modern translation that does not capitalise every line, so the
+// capital rule alone would miss two thirds of its line breaks — and it is
+// poetry the pause is wanted in. Whitman's long lines defeat a length rule just
+// as squarely. TOGETHER they cover each other's blind spot, which is why both
+// are here rather than one.
+//
+// The ceiling matters as much as either: hard-wrapped PROSE is the thing this
+// has to exclude, and it sits near a fixed wrap width with lines that start
+// mid-sentence in lower case. A mean below 70 rules it out whatever its
+// capitals do, which also keeps the module gateways (mean ~400) out.
+//
+// Single-line nodes never reach this — there is no line break to pause at. In
+// this corpus that is every prose work: Tao Te Ching, Zhuangzi and Grimm's hold
+// ZERO newlines between them.
+//
+// Known exception, accepted: verse that is both long-lined and uncapitalised —
+// e e cummings and much modern free verse — reads as prose. One rule cannot
+// have everything, and being wrong towards prose is the quieter failure.
+function looksLikeVerse(text) {
+  if (typeof text !== 'string') return false;
+  // A module SCRIPT is a stack of short lines and reads as verse on every
+  // measure — MEASURED: all four module nodes came out as verse before this
+  // guard. Nobody is likely to speak one, but "%%bd_ is never verse" is one
+  // line and true.
+  if (text.indexOf('%%bd_') !== -1) return false;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return false;
+  const mean = lines.reduce((a, l) => a + l.length, 0) / lines.length;
+  if (mean >= 70) return false;                       // wrapped prose, or a gateway
+  if (mean < 55) return true;                         // short lines: Hardy, Du Fu
+  // 55-70: long-lined, so it must earn it on capitals — Whitman.
+  const after = lines.slice(1);
+  const caps = after.filter(l => {
+    const m = l.match(/^["\u201c\u2018'(\[\u2014\u2013\s]*(.)/);
+    return m && m[1] === m[1].toUpperCase() && m[1] !== m[1].toLowerCase();
+  }).length;
+  return after.length > 0 && caps / after.length >= 0.7;
+}
 const SPEAK_MODEL_MB = 60;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
@@ -1598,21 +1660,34 @@ let speakAhead   = null;        // { text, promise } — one utterance in advanc
 // Now each part keeps its own trailing punctuation, and the cap is high enough
 // that this sentence is not split at all. The cap exists only to keep VITS from
 // being handed one enormous tensor — 3.6 kB froze a tab, 400 is nowhere near it.
-function splitUtterances(text, maxLen = 400) {
+// 2026-09-30 — returns { text, gap } now, not a bare string, and splits VERSE
+// at line ends as well as sentence ends.
+//
+// The gap follows the punctuation the fragment ENDS with, which is the whole
+// rule: a fragment closing on . ! ? gets the full SPEAK_GAP_MS, anything else —
+// a comma, a colon, or a verse line with no punctuation at all — gets the
+// shorter SPEAK_LINE_GAP_MS. That improves prose too: an over-long sentence
+// broken at the 400-char cap used to take a full stop's pause mid-clause.
+function splitUtterances(text, { verse = false, maxLen = 400 } = {}) {
   const out = [];
-  for (const s of (text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text])) {
+  const gapFor = (frag) => /[.!?]["'\u201d\u2019)\]]*$/.test(frag) ? SPEAK_GAP_MS : SPEAK_LINE_GAP_MS;
+  const units = verse ? text.split('\n') : [text];
+  for (const unit of units) {
+  for (const s of (unit.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [unit])) {
     const trimmed = s.trim();
     if (!trimmed) continue;
-    if (trimmed.length <= maxLen) { out.push(trimmed); continue; }
+    if (trimmed.length <= maxLen) { out.push({ text: trimmed, gap: gapFor(trimmed) }); continue; }
     // Keep the delimiter attached to the chunk it closes, so a fragment ends
     // with its own punctuation rather than with nothing.
     const parts = trimmed.match(/[^;:,]+[;:,]?\s*/g) || [trimmed];
     let buf = '';
     for (const part of parts) {
-      if ((buf + part).trim().length > maxLen && buf) { out.push(buf.trim()); buf = part; }
-      else buf += part;
+      if ((buf + part).trim().length > maxLen && buf) {
+        out.push({ text: buf.trim(), gap: gapFor(buf.trim()) }); buf = part;
+      } else buf += part;
     }
-    if (buf.trim()) out.push(buf.trim());
+    if (buf.trim()) out.push({ text: buf.trim(), gap: gapFor(buf.trim()) });
+  }
   }
   return out;
 }
@@ -1640,10 +1715,10 @@ async function speakReady() {
   return speakSynth;
 }
 
-function synthOne(text) {
+function synthOne(text, scale) {
   return speakReady().then(fn =>
     fn({ voiceId: SPEAK_VOICE, text, lexicon: speakLexicon || {},
-         lengthScale: SPEAK_LENGTH_SCALE }));
+         lengthScale: scale != null ? scale : SPEAK_LENGTH_SCALE }));
 }
 
 // 2026-09-04 — ONE audio element, and the clip is loaded only when wanted.
@@ -1666,12 +1741,12 @@ function speakElement() {
 }
 
 // Synthesise ahead; do NOT touch an audio element until the clip is wanted.
-function prepareUtterance(text) {
+function prepareUtterance(text, scale) {
   // 2026-09-04 — one sentence failing and then recovering is the signature of
   // the catch path below: the error is swallowed and playNextSpeech moves on.
   // Without naming the utterance, an intermittent failure is unattributable.
   const synthT0 = performance.now();
-  return synthOne(text).then(res => {
+  return synthOne(text, scale).then(res => {
     const ms = Math.round(performance.now() - synthT0);
     if (ms > 900) console.log('[BD] slow synth ' + ms + 'ms — ' + JSON.stringify(text.slice(0, 46)));
     return res;
@@ -1696,9 +1771,9 @@ function playNextSpeech() {
   // A pause before one particular sentence has three possible causes — the
   // prefetch missing, inference being slow for that text, or the gap simply
   // feeling long — and they are indistinguishable by ear.
-  const prefetched = !!(speakAhead && speakAhead.text === next);
+  const prefetched = !!(speakAhead && speakAhead.text === next.text);
   const waitT0 = performance.now();
-  const p = prefetched ? speakAhead.promise : prepareUtterance(next);
+  const p = prefetched ? speakAhead.promise : prepareUtterance(next.text, next.scale);
   speakAhead = null;
 
   p.then(({ blob }) => {
@@ -1722,7 +1797,8 @@ function playNextSpeech() {
     // moment for it.
     el.onplaying = () => {
       el.onplaying = null;
-      if (speakQueue.length) speakAhead = { text: speakQueue[0], promise: prepareUtterance(speakQueue[0]) };
+      if (speakQueue.length) speakAhead = { text: speakQueue[0].text,
+                                            promise: prepareUtterance(speakQueue[0].text, speakQueue[0].scale) };
     };
     const done = (ev) => {
       if (ev && ev.type === 'error') {
@@ -1734,11 +1810,12 @@ function playNextSpeech() {
       // Safe against a tap during the gap: speak() calls playNextSpeech
       // immediately, and when this timer fires speakBusy is true again so it
       // returns without starting a second utterance.
-      setTimeout(playNextSpeech, SPEAK_GAP_MS);
+      // The gap this fragment asked for — a line end is shorter than a full stop.
+      setTimeout(playNextSpeech, next.gap != null ? next.gap : SPEAK_GAP_MS);
     };
     el.onended = done;
     el.onerror = done;
-    el.onstalled = () => console.warn('[BD] audio STALLED on: ' + JSON.stringify(next.slice(0, 60)));
+    el.onstalled = () => console.warn('[BD] audio STALLED on: ' + JSON.stringify(next.text.slice(0, 60)));
     el.onwaiting = () => console.warn('[BD] audio WAITING on: ' + JSON.stringify(next.slice(0, 60)));
     return el.play();
   })
@@ -1989,7 +2066,17 @@ function speak(raw, { interrupt = false } = {}) {
   // Queue utterances, not the whole passage: reading starts on the first
   // sentence instead of after the last, and memory stays flat however long the
   // text is.
-  for (const u of splitUtterances(text)) speakQueue.push(u);
+  // Verse is decided ONCE for the passage, from the text as a whole — a single
+  // line carries no evidence either way, so deciding per utterance could not
+  // work. The scale rides with each item because a second passage may be queued
+  // behind this one and must keep its own pace.
+  const verse = looksLikeVerse(text);
+  const scale = verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE;
+  if (verse) console.log('[speak] verse: line gaps ' + SPEAK_LINE_GAP_MS +
+                         'ms, scale ' + scale.toFixed(2));
+  for (const u of splitUtterances(text, { verse })) {
+    speakQueue.push({ text: u.text, gap: u.gap, scale });
+  }
   playNextSpeech();
 }
 
