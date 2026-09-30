@@ -296,21 +296,32 @@
     body.controls-hidden .control-panel { display: none; }
     body.controls-hidden .canvas-wrapper { flex: 1 1 auto; }
 
-    /* 2026-09-15 — controls-hidden means the HOST supplies the control surface
-       and nothing of ours is on screen, so the gutters the small layout
-       reserves (88px left for the host's arrows, 52px bottom for its band) are
-       reserving space for things that are not there. On a phone that cost
-       about 15% of the width and pushed the figure off-centre. Reclaim it and
-       centre, but ONLY in this mode: BD's embedded player and the standalones
-       still need those gutters. */
-    /* And undo the small layout's canvas nudge. It shifts the canvas
-       translateX(calc(-15% - 20px)) to free a band for BD's ↓↑ arrows beside
-       the stepper column — 84.5px at a 430px width, measured. With no arrows
-       and no column, that band is empty screen and the figure hangs off the
-       left edge. This was the whole of the "square is over to the left". */
-    body.controls-hidden .canvas-wrapper canvas { transform: none; }
-    body.controls-hidden .module-layout  { padding-left: 0; padding-right: 0; }
-    body.controls-hidden .canvas-wrapper {
+    /* ── The host's chrome, which is a SEPARATE question from the controls ──
+       2026-09-30. These rules were on `controls-hidden`, and the note said "BD's
+       embedded player and the standalones still need those gutters". That was
+       true of the OLD standalones, which drew their own arrows. The new one
+       draws none — and its author reported exactly the symptom the note
+       predicts: "the graphic seems unnecessarily small, a lot of black space
+       around it... it loses black space on the left".
+
+       So the two are split. `controls-hidden` still means "the host supplies
+       the stepper column". `no-host-chrome` means "the host draws NOTHING
+       around this iframe", and it is what releases the gutters:
+
+         88px left   BD's ↓↑ arrows, beside the stepper column
+         52px bottom BD's Extension strip, under the canvas
+         translateX(calc(-15% - 20px))  the small layout's nudge, which frees
+                     that arrow band — 84.5px at a 430px width, measured
+
+       The BOTTOM one is what binds on a phone: at 430x335 the wrapper, 52px of
+       reserve takes the square from 335 to 283. Releasing it is ~18%, and the
+       nudge is the whole of "the figure hangs off the left edge".
+
+       Hiding the controls implies no chrome — a viewer has neither — so
+       controls-hidden still sets both. */
+    body.no-host-chrome .canvas-wrapper canvas { transform: none; }
+    body.no-host-chrome .module-layout  { padding-left: 0; padding-right: 0; }
+    body.no-host-chrome .canvas-wrapper {
       justify-content: center;
       align-items: center;
       padding-bottom: 0;
@@ -2110,7 +2121,16 @@
           // renderer and the canvas stay fully functional — this is what an
           // AV/AVX viewer sends, and the reason a viewer has no steppers.
           case 'bd_ui_config': {
-            document.body.classList.toggle('controls-hidden', event.data && event.data.hideControls === true);
+            const hide = !!(event.data && event.data.hideControls === true);
+            document.body.classList.toggle('controls-hidden', hide);
+            // hostChrome: does the host draw anything AROUND this iframe? BD
+            // does — arrows beside the stepper column, an Extension strip under
+            // the canvas — so the layout reserves 88px and 52px for them. A
+            // standalone draws neither, and that reserve is then simply lost
+            // picture. DEFAULTS TO TRUE, so a host that says nothing keeps BD's
+            // behaviour and nothing already working changes.
+            const chrome = !(event.data && event.data.hostChrome === false);
+            document.body.classList.toggle('no-host-chrome', hide || !chrome);
             updateCanvasSize();
             placeCamera();
             draw();
