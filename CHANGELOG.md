@@ -55,6 +55,18 @@ what the detector now makes possible. The scale rides with each queued utterance
 rather than sitting in a global, so a second passage queued behind the first
 keeps its own pace.
 
+**It threw on the first poem**, and the way I missed it is the part worth
+keeping. Changing the queue from strings to `{ text, gap, scale }` left **four**
+places still calling `next.slice(...)` — the two console warnings, the stalled
+handler and the catch. Three of them are on error paths, so they would have sat
+there silently until something else went wrong.
+
+I had run a check for exactly this and it reported clean, because the filter
+excluded any line containing `next.` — which is every line containing
+`next.slice(`. **A check whose filter excludes the failing pattern proves
+nothing.** The second pass listed every use of the identifier and classified each
+one, which found all four immediately.
+
 Known exception, accepted: verse that is both long-lined *and* uncapitalised —
 e e cummings, much modern free verse — reads as prose. One rule cannot have
 everything, and being wrong towards prose is the quieter failure.

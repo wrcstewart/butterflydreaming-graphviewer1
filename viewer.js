@@ -1780,7 +1780,7 @@ function playNextSpeech() {
     const waited = Math.round(performance.now() - waitT0);
     if (!prefetched || waited > 150) {
       console.log('[BD] speak: ' + (prefetched ? 'prefetched' : 'NOT prefetched') +
-                  ', waited ' + waited + 'ms — ' + JSON.stringify(next.slice(0, 46)));
+                  ', waited ' + waited + 'ms — ' + JSON.stringify(next.text.slice(0, 46)));
     }
     const el = speakElement();
     const url = URL.createObjectURL(blob);
@@ -1802,7 +1802,7 @@ function playNextSpeech() {
     };
     const done = (ev) => {
       if (ev && ev.type === 'error') {
-        console.warn('[BD] playback error on: ' + JSON.stringify(next.slice(0, 60)) +
+        console.warn('[BD] playback error on: ' + JSON.stringify(next.text.slice(0, 60)) +
                      ' — ' + (el.error ? 'code ' + el.error.code : 'unknown'));
       }
       URL.revokeObjectURL(url);
@@ -1816,11 +1816,11 @@ function playNextSpeech() {
     el.onended = done;
     el.onerror = done;
     el.onstalled = () => console.warn('[BD] audio STALLED on: ' + JSON.stringify(next.text.slice(0, 60)));
-    el.onwaiting = () => console.warn('[BD] audio WAITING on: ' + JSON.stringify(next.slice(0, 60)));
+    el.onwaiting = () => console.warn('[BD] audio WAITING on: ' + JSON.stringify(next.text.slice(0, 60)));
     return el.play();
   })
     .catch(err => {
-      console.warn('[BD] speak failed on ' + JSON.stringify(next.slice(0, 60)) +
+      console.warn('[BD] speak failed on ' + JSON.stringify(next.text.slice(0, 60)) +
                    ' — ' + (err && err.message ? err.message : err));
       speakBusy = false;
       playNextSpeech();
