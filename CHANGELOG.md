@@ -6,6 +6,78 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-30 — four standalones, and hostChrome splits off controls-hidden
+
+Each of the four media modules now has its own repository and its own page: a
+module, its script in a box beside it, a **Copy script** button, and a link back
+to butterflydreaming.org. No build step, no bundler, no server.
+
+| module | repo | page |
+|---|---|---|
+| Kolam3D | `ButterflyDreaming-Standalone-Kolam3D` | [/Kolam3D/](https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam3D/) |
+| Kolam | `ButterflyDreaming-Standalone-Kolam` | [/Kolam/](https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam/) |
+| Fractal | `ButterflyDreaming-Standalone-Fractal` | [/Fractal/](https://wrcstewart.github.io/ButterflyDreaming-Standalone-Fractal/) |
+| ABC | `ButterflyDreaming-Standalone-ABC` | [/ABC/](https://wrcstewart.github.io/ButterflyDreaming-Standalone-ABC/) |
+
+Defaults are the corpus nodes themselves — `bd_V_Kolam_001`, `bd_M_Fractal_001`,
+`bd_M_ABC_001` — fetched live from Memgraph when the pages were generated, so
+each opens on a figure or a piece that exists in BD rather than on an invented
+one.
+
+**Deep links are deliberately gone.** The earlier standalones packed the whole
+script into a URL, which cost compression, a wire table of abbreviated keys and a
+length ceiling to measure against — a great deal of apparatus standing between a
+reader and how a module actually works, and the reason this was put off. Copy the
+script; where it goes after that is the reader's business.
+
+### hostChrome, split out of controls-hidden
+
+A module reserves layout for furniture **only BD draws**. The Kolam modules keep
+88px to the left and 52px below for the arrows and the Extension strip; the two
+music modules hold a grid area for each of their two dock slots. A host that
+stamps nothing into that reserve was getting it as lost picture — on a 430x335
+wrapper the Kolam square fell to 283, and the music panel gave a third of its top
+row and a third of its bottom to two empty dashed boxes.
+
+`controls-hidden` could not say this. It means *the host supplies the stepper
+column*, which is a different claim, and the two come apart exactly here: a
+**viewer** wants the chrome released AND the controls gone; a **standalone**
+wants the chrome released and the steppers KEPT. So `hostChrome` is its own flag
+in `bd_ui_config`, defaulting to **true** — a host that says nothing keeps BD's
+behaviour, and nothing already working changed. `hideControls` implies it.
+
+Released, the music layout also lets the stepper column run full height (it is a
+12-row scroller that wanted it) and gives the output panel the width the ext slot
+was holding.
+
+### What generating three pages from one caught
+
+The three were spliced from the Kolam3D template, and the splice carried facts
+that were true only of their origin: *88px to its left and 52px below* (the music
+modules have no such gutters — they have dock slots), *the drift timer ticks
+several times a second* (nothing in a music module drives one), *the module is
+square and sizes itself to its iframe* (a music panel is not square and cannot
+shrink with the width — the transport, the output panel and the stepper column
+all need room whatever the phone is), *fetches three.js from a CDN* (Kolam fetches
+lindenmayer.js; the music modules fetch Tone.js and abcjs), and a script-format
+example naming `bd_V_Kolam3D` in all four READMEs. **A comment is a claim, and
+copying a file copies its claims to somewhere they may not hold.** Each was
+corrected against the module rather than reworded around.
+
+### The Kolam README got the measurement
+
+A kolam is a **closed looped figure on a lattice of dots**, and neither property
+comes from the rewriting rule — both come from the angle, and most angles give
+neither. Measured on the default rule: 45° and 90° close exactly (end-to-start
+gap 0.0000) at every depth tried and for axioms of 3, 4, 6, 8 and 12 `F`s, so
+closure is a property of the rule and not of how far it is grown. A **lattice**
+is the separate condition that `360 ÷ angle` be a whole number — 4 headings at
+90°, but 82 at 68°, where the weave is gone. 60° and 72° sit on a lattice and
+stay open. That is why `angle_minutes` matters: a sixtieth of a degree opens a
+closed figure, and the drift is how you watch a kolam come apart and reassemble.
+
+---
+
 ## 2026-09-30 — verse gets its line-end pause
 
 Reported: the Tao Te Ching, Zhuangzi and Grimm's read well; Hardy and Whitman do

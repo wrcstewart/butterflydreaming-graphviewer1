@@ -548,8 +548,18 @@ flexible enough to combine sharing / saving / collaging"*.
 | **LD / SD / UD data modes** | `module_data_modes.md` | **Design, partly built.** LD needs MST minting + MDP over the socket (not built). SD needs a publish step (not built). UD is built — that is JSP. |
 | **Ancillary Viewer (AV)** | `AV/README.md` | **BUILT 2026-09-14** (`4b1106c`): MST tokens, `av_push` relay, client shim, Kolam reference viewer, Jump repurposed as launcher. Verified end to end. Terminology settled: **AV**, superseding the earlier **AT**. |
 | ~~Ancillary tabs (AT) replace standalones for new work~~ | `external_collage_viewer.md` | **DECIDED 2026-09-14.** A second tab served by BD, for presentation: near-full screen, collage, minimal chrome. Same origin, so `BroadcastChannel` carries an arrangement with **no size limit** — no encoding, no wire table, no deploy lag. |
-| **Standalones FROZEN, not retired** | — | `bd_V_Kolam`, `bd_M_ABC`, `bd_M_Fractal` stay deployed and working; still useful to an experimenter and still a good way to send one node. No new features. **Finish Fractal and ABC first** so all three are left coherent. |
+| ~~Standalones FROZEN, not retired~~ | — | **SUPERSEDED 2026-09-30.** The old three (`bd_V_Kolam`, `bd_M_ABC`, `bd_M_Fractal`) are replaced by four new `ButterflyDreaming-Standalone-*` repos, one per module, rebuilt without the deep-link apparatus. See 2026-09-30 below. |
 | AT controls | `external_collage_viewer.md` | **The open question.** Presentation is the job, so "few" — which few is undecided. Keep the AT (for the BD user) distinct from the external viewer (for a stranger). |
+
+## Added 2026-09-30
+
+| item | where | note |
+|---|---|---|
+| **Four standalone module repos** | `ButterflyDreaming-Standalone-{Kolam3D,Kolam,Fractal,ABC}` | **BUILT and LIVE 2026-09-30** at `wrcstewart.github.io/ButterflyDreaming-Standalone-<name>/`. Module + script box + **Copy script** + a link to butterflydreaming.org. Defaults are the corpus nodes (`bd_V_Kolam_001` etc), fetched from Memgraph at generation time. **Deep links deliberately absent** — that apparatus was the reason the old standalones were frozen. Each vendors its module and refreshes it with `./sync_from_bd.sh`, recording the BD commit in `MODULE_SOURCE.txt`. |
+| **`hostChrome` in `bd_ui_config`** | all four media modules | **BUILT 2026-09-30** (`8ae5581` + the Kolam3D work). Split out of `hideControls`, which meant *the host supplies the stepper column* and could not also mean *the host draws nothing around this iframe*. A viewer wants both; a standalone wants the chrome released and the steppers kept. Defaults to **true**, so nothing already working changed. |
+| **The author's About text** | the four `index.html` files, `<section id="about">` | **NOT WRITTEN — placeholder in place.** Each page carries a short holding paragraph, deliberately short so replacing it is one edit. |
+| **A link from the standalones to a landing page** | the four `index.html` headers | **Points at `butterflydreaming.org`.** If a per-module landing page is wanted later, that is where it goes. |
+| **`V_Kolam/preview.html` drift** | `V_Kolam/` | Still open, and now less pressing: the new Kolam standalone does not use `preview.html` at all. The old `bd_V_Kolam` repo is the only thing still serving it. |
 
 ## Added 2026-09-13
 
