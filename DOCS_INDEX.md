@@ -79,7 +79,7 @@ of unbuilt items.
 | file | date | what is still open |
 |---|---|---|
 | **corner_controls_plan.md** | 08-28 | Resumable work plan for the v0.2 redesign. Much is built; the offer/accept/lapse retirement spans client and server. |
-| **speech_plan.md** | 09-04 | Staged plan for in-browser speech. **Stages 0 and 1 shipped**; the pronunciation lexicon is the live edge. |
+| **speech_plan.md** | 09-04, +09-30 | Staged plan for in-browser speech. **Stages 0 and 1 shipped**; the pronunciation lexicon is the live edge. **Now also carries PROSODY (09-30): verse gets a line-end pause and a slower pace, and the two-test verse detector — the corpus is why one test was not enough.** |
 | **ink_promotion_plan.md** | 09-04 | **Stage 1 done** — achromatic is the default. Stage 2, walking every view, is still worth doing. |
 | **BD_Viewer_Scaling_Brief.md** | 08-23 | Whether the viewer scales. **Planning only, nothing scheduled by intent.** Its `CC analysis` section corrects the brief's own central premise and holds the draft-loss design. |
 | **convergence_node.md** | 06-28 | Paired-discussion convergence node. The *idea* was absorbed into Explore (a GN mark is a "recorded convergence"); this document's own design was never built. |

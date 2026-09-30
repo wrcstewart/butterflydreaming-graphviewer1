@@ -406,6 +406,20 @@ the state.
 hundredths; `bd_V_Kolam_001`'s script set to the author's values; and RULE 9 —
 a module's default script carries no directive it cannot act on.
 
+### Also done 2026-09-30
+
+**Speech prosody — verse reads as verse.** A line break produced no pause
+(espeak makes pause phonemes from `,` and `.`; a newline is only whitespace). A
+verse line is now its own utterance with a 180ms gap against a sentence's 420,
+and verse is read 8% slower. The detector needs **two** tests, and the corpus is
+why: the author proposed capitalised line starts, but **Du Fu is only 33%
+capitalised** while Whitman's lines are long — so it is mean line length OR
+capitalisation, under a mean-70 ceiling that excludes hard-wrapped prose. Full
+account in `speech_plan.md` under PROSODY.
+
+**The Hardy `Stanza n` labels are gone** from all 14 chunks —
+`hardy_stanza_labels_2026-09-30.md`.
+
 ### Outstanding, besides the measurement
 
 - **The five module nodes show only their name.** Each wants a line of prose.

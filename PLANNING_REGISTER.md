@@ -224,6 +224,17 @@ acting on any of it.
 
 ---
 
+## Added 2026-09-30 — speech prosody
+
+| item | where | note |
+|---|---|---|
+| **Verse reads as verse** | `viewer.js`, `speech_plan.md` | **BUILT.** A line break produced no pause: espeak makes pause PHONEMES from `,` and `.`, and a newline is only whitespace. A verse line is now its own utterance — `SPEAK_GAP_MS` already existed — with the gap set by the punctuation the fragment ends with: 420ms for `. ! ?`, 180ms otherwise. Verse also read 8% slower. Improved prose too: an over-long sentence split at the 400-char cap no longer takes a full stop's pause mid-clause. |
+| **The verse detector needs TWO tests** | `viewer.js` `looksLikeVerse` | The author proposed capitalised line starts. MEASURED first: Hardy and Whitman are 100%, but **Du Fu is 33%** — a modern translation, and poetry the pause is wanted in. Whitman's mean line of 59 defeats a length rule equally. So: mean line length OR capitalisation, under a mean-70 ceiling that excludes hard-wrapped prose whatever its capitals do. **0 of 167 prose nodes read as verse.** `%%bd_` is never verse. |
+| **Two verification failures, one rule each** | — | (1) A check for the queue's type change reported clean because its filter excluded the failing pattern — **a filter encodes the assumption under test**. (2) A check ran `splitUtterances` on raw node text, bypassing the normaliser that runs first, so it passed on input the code never receives — **test the path, not a stage of it**. Both in `feedback_verify_the_effect.md`. |
+| **Tuning numbers are guesses at the ear** | `viewer.js` | `SPEAK_LINE_GAP_MS` 180, `SPEAK_VERSE_SCALE` ×1.08, `SPEAK_GAP_MS` 420. One-line changes. |
+
+---
+
 ## TIDY UPS LATER
 
 Deferred deliberately. Each is mechanical, each is a rename rather than a

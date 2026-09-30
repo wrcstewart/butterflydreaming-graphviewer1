@@ -306,6 +306,94 @@ hope about what the training absorbed.**
 
 ---
 
+## PROSODY — verse reads as verse · BUILT 2026-09-30
+
+Reported: the Tao Te Ching, Zhuangzi and Grimm's read well; **Hardy and Whitman
+did not.** The author's diagnosis was right — *"when one reads poetry a new line
+invokes a short pause, and that's not happening."*
+
+**Why.** espeak turns `,` and `.` into pause **phonemes**, which is exactly why
+the prose works. A newline is only whitespace: it produces silence of zero
+length. Nothing was wrong with the voice; the line had no way to end.
+
+**The fix used a mechanism that already existed.** `SPEAK_GAP_MS = 420` is an
+explicit gap between utterances, so a verse line only had to *become* an
+utterance. `splitUtterances` now splits verse at line ends as well as sentence
+ends and returns `{ text, gap }`, with **the gap chosen by the punctuation the
+fragment ends with**:
+
+| fragment ends with | gap |
+|---|---|
+| `. ! ?` (and any closing quote or bracket after) | `SPEAK_GAP_MS` — 420ms |
+| anything else: a comma, a colon, a bare verse line | `SPEAK_LINE_GAP_MS` — 180ms |
+
+That improved prose too: an over-long sentence broken at the 400-character cap
+used to take a full stop's pause mid-clause.
+
+Verse is also read **8%** more slowly (15% first, tuned down by ear the same
+day). The scale rides with each queued utterance rather than in a global, so a
+passage queued behind another keeps its own pace.
+
+### The detector — TWO tests, and the corpus is why
+
+The author proposed **capitalised line starts**, the traditional convention.
+Measured across the corpus before building on it:
+
+| | capitalised | mean line |
+|---|---|---|
+| Thomas Hardy | 100% | 38 |
+| Leaves of Grass | 100% | 59 |
+| **Poems of Du Fu** | **33%** | 42 |
+
+**Du Fu is a modern translation that does not capitalise every line**, so the
+capital rule alone would have missed two thirds of its line breaks — and it is
+poetry the pause is wanted in. The exception is not only e e cummings; it was
+already in the corpus. Whitman's long lines defeat a length rule just as
+squarely.
+
+So `looksLikeVerse` is **mean line length OR capitalisation**, each covering the
+other's blind spot, beneath a **mean-70 ceiling**. The ceiling is what does the
+job the author actually asked for — making the detector safe when the corpus
+stops being clear — because the thing to exclude is **hard-wrapped prose**,
+which sits near a fixed width and breaks mid-sentence in lower case.
+
+Verified against every node: **0 of 167 prose nodes read as verse**; Hardy 14 of
+19, Whitman 10 of 12, Du Fu 4 of 6 — the misses in each being exactly the
+single-line section-title and gateway nodes, which carry no line break to pause
+at. One false positive closed on the evidence: a module *script* is a stack of
+short lines and passed every measure, so **`%%bd_` is never verse**.
+
+**Accepted exception:** verse both long-lined *and* uncapitalised reads as prose.
+One rule cannot have everything, and erring towards prose is the quieter failure.
+
+### Two bugs on the way, and both were verification failures
+
+**Four sites still read the queue item as a string** after it changed from
+`string` to `{ text, gap, scale }` — two warnings, the stalled handler, the
+catch. Three were on error paths and would have stayed silent. I had checked for
+exactly this and the check reported clean, because its filter excluded any line
+containing `next.` — which is every line containing `next.slice(`. **A check
+whose filter excludes the failing pattern proves nothing.**
+
+**A line ending in a dash lost its pause, because `\s` includes `\n`.** The
+normaliser turning spaced hyphens into em-dashes used `/\s+[-–—]\s+/`, so a line
+ending `" —\n"` was replaced with `" — "` — **destroying the line break before
+`splitUtterances` ever saw it.** Four lines in Du Fu. Now horizontal whitespace
+only; measured, the old pattern matched 111 times corpus-wide and the new one
+107, the difference being precisely those four, every one already an em-dash.
+
+That check failed because it ran `splitUtterances` on the **raw node text**,
+bypassing the normaliser that runs before it. **Test the path, not a stage of
+it** — the harness now runs `speechTextFrom → looksLikeVerse → splitUtterances`
+exactly as `speak()` does.
+
+### Numbers that are guesses at the ear, and where they live
+
+`SPEAK_LINE_GAP_MS` 180 · `SPEAK_VERSE_SCALE` ×1.08 · `SPEAK_GAP_MS` 420 —
+all in `viewer.js`, all one-line changes.
+
+---
+
 ## Settled questions
 
 **Mandarin tones: not pursued.** IPA has the notation (Chao letters), and
