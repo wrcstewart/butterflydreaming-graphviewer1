@@ -2780,26 +2780,50 @@ function flattenProps(props) {
 //   standalone — external stand-alone player (target for "Copy Link to")
 // Extendable in-place; when this grows past ~5 modules consider promoting
 // to a JSON manifest served from /api/modules.
+// THREE fields, and the first thing to get straight is that `standalone` and
+// `page` are NOT two names for the same thing (2026-09-30):
+//
+//   embedded    BD's own iframe wrapper, same origin.
+//
+//   standalone  A DEEP-LINK TARGET. buildExternalWebsiteUrl appends
+//               `?data=<base64>` or a JSP form, and the page at the other end
+//               DECODES it and renders the script it was sent. Only the three
+//               older repos can do this, and they are still live and still
+//               working — which is why they are still named here.
+//
+//   page        THE MODULE'S HOME: one of the four 2026-09-30
+//               `ButterflyDreaming-Standalone-*` repos. A place to play with
+//               the module, read its README and copy a script OUT of it.
+//               These read NOTHING from the URL — deep linking was dropped on
+//               purpose, the apparatus being the reason the old ones froze.
+//
+// So do NOT "tidy" this by pointing `standalone` at a `page`. The link would
+// still open, the module would still draw, and the script the user was trying
+// to send would be silently replaced by the page's default — which is the
+// worst failure available here, because nothing anywhere would report it.
 const MODULES = {
   'bd_V_Kolam': {
     embedded:   '/bd_V_Kolam/index.html',
     standalone: 'https://wrcstewart.github.io/bd_V_Kolam/preview.html',
+    page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam/',
   },
-  // 2026-09-27. No `standalone`, deliberately: the three standalone repos are
-  // RETIRED (their READMEs say so), the deep-link URL length made them
-  // unworkable as a sharing route, and BD is the controller now. getStandaloneUrl
-  // returns null for this module, which is the honest answer — a link to a
-  // standalone that does not exist would be worse than no link.
+  // Still no `standalone`, and still deliberately: no page exists that can
+  // receive a 3D script by URL. getStandaloneUrl returns null, which is the
+  // honest answer and is what drives the warning in buildExternalWebsiteUrl.
+  // It does now have a `page` — see the note there.
   'bd_V_Kolam3D': {
     embedded:   '/bd_V_Kolam3D/index.html',
+    page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam3D/',
   },
   'bd_M_ABC': {
     embedded:   '/bd_M_ABC/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_ABC/preview.html',
+    page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-ABC/',
   },
   'bd_M_Fractal': {
     embedded:   '/bd_M_Fractal/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_Fractal/preview.html',
+    page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Fractal/',
   },
 };
 
@@ -2809,6 +2833,11 @@ function getModuleUrl(moduleId) {
 
 function getStandaloneUrl(moduleId) {
   return (MODULES[moduleId] && MODULES[moduleId].standalone) || null;
+}
+
+// The module's own page. Carries no script — see the note on MODULES.
+function getModulePageUrl(moduleId) {
+  return (MODULES[moduleId] && MODULES[moduleId].page) || null;
 }
 
 // Extract the module identifier from a node's text: first line matching
@@ -12829,14 +12858,26 @@ async function init() {
       // legacy cases.
       const moduleId  = parseModuleId(payload.script) || 'bd_V_Kolam';
       const baseUrl   = getStandaloneUrl(moduleId) || getStandaloneUrl('bd_V_Kolam');
-      // 2026-09-27 — bd_V_Kolam3D has no standalone (they are retired), so a
-      // 3D script copied through this button goes to the 2D player, which will
-      // draw it WITHOUT the pitch or the camera. The fallback is kept because
-      // a dead button is worse than a degraded one, but it is no longer silent:
-      // this is the log line that explains a link that came back flat.
+      // 2026-09-27 — bd_V_Kolam3D has no deep-link standalone, so a 3D script
+      // copied through this button goes to the 2D player, which will draw it
+      // WITHOUT the pitch or the camera. The fallback is kept because a dead
+      // button is worse than a degraded one, but it is no longer silent: this
+      // is the log line that explains a link that came back flat.
+      //
+      // 2026-09-30 — the module DOES now have a home page that renders it
+      // properly, it just cannot be sent a script by URL. Naming it here is
+      // the useful half: the script is already on the clipboard route, so a
+      // developer who wants the real thing can open the page and paste.
+      // OPEN DECISION, deliberately not taken here: whether this button should
+      // send a 3D script to the right renderer with the WRONG figure (the page,
+      // on its default) or the wrong renderer with an APPROXIMATION of the
+      // right figure (today's behaviour). Both are lossy; the choice is the
+      // author's, so nothing silently changed.
       if (!getStandaloneUrl(moduleId)) {
-        console.warn('[external link] ' + moduleId + ' has no standalone; sending to ' +
-                     baseUrl + ' — directives it does not know will be ignored');
+        const home = getModulePageUrl(moduleId);
+        console.warn('[external link] ' + moduleId + ' has no deep-link standalone; sending to ' +
+                     baseUrl + ' — directives it does not know will be ignored' +
+                     (home ? ' (its own page, which cannot take a script by URL, is ' + home + ')' : ''));
       }
       // Prefer the compact JSP form where the wire table can express the whole
       // script; buildJspUrl returns null when it cannot, and we fall back.
