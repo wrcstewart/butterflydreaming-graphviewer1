@@ -109,13 +109,18 @@
            The reason is the collage: three modes, two of which differ only in
            whether two buttons are visible, cannot be explained to someone who
            did not build the system. See CollagePlanStarted_2026-09-22.md §3. -->
-      <label><input type="radio" name="view-mode" value="browse" checked> Browse</label>
-      <label><input type="radio" name="view-mode" value="create"> Create</label>
+      <!-- 2026-09-30 — the two radios are wrapped in their own pill so Speak can
+           have one too. A margin alone did nothing visible: Speak sat INSIDE
+           the gold block, so moving it along left nothing to see a gap in. -->
+      <span id="view-mode-pill">
+        <label><input type="radio" name="view-mode" value="browse" checked> Browse</label>
+        <label><input type="radio" name="view-mode" value="create"> Create</label>
+      </span>
       <!-- 2026-09-02 — speech, stage 0. A checkbox rather than a radio: it is not
            a view MODE, it rides alongside whichever one is selected. Ticking it
            is also the user gesture iOS requires before audio may play, so the
            control that turns speech on is the one that unlocks it. -->
-      <label><input type="checkbox" id="speak-toggle"> Speak</label>
+      <label id="speak-control"><input type="checkbox" id="speak-toggle"> Speak</label>
     </span>
   </div>
   <!-- History panel (was the sole chat panel pre-split). Sits BELOW the
