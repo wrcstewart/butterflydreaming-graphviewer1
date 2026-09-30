@@ -6,6 +6,39 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-30 — the card follows the mode
+
+Two faults reported, which look unrelated and are the same one:
+
+- **Fractal and ABC in Create showed only the fallback name**, not the script.
+- **Kolam in Browse kept the script**, instead of reverting to the name.
+
+**The card's CONTENT depends on the mode — Browse shows the prose, Create shows
+the whole script — but the card is built at NAVIGATION time.** Changing the mode
+changed the layout and left whatever was already on screen.
+
+**And Kolam "working" in Create was an accident.** The only thing that had ever
+put a script into that card was the module's own echo — `autoWrite`, once the
+module was up and announcing. A music module has no reason to echo anything
+back, so Fractal and ABC never got one; and an echo that *stops* does not undo
+what it wrote, which is why Browse kept the script. One missing rebuild, wearing
+two faces.
+
+`applyView` now rewrites the card from the NODE at the end of both branches,
+**only when the mode actually changed** — not on a layout change, which would
+rewrite a card the module is about to echo into, and not on every apply, or a
+drift would fight it five times a second.
+
+Three guards worth keeping: `setCardText` calls `updateSendBtn`, which can reach
+`setModuleLayout` and come back, so there is a re-entry flag (and by then
+`lastAppliedMode` already matches, so the recursion cannot start anyway); and if
+the chunk count ever differed between modes the refresh **bails**, because
+adding or removing cards is `advanceOrNavigate`'s job and leaving `readingState`
+describing a card stack that is not on screen would be worse than not
+refreshing. `%%bd_chunk` is retired and in zero nodes, so it is one chunk today.
+
+---
+
 ## 2026-09-29 — View and Device move into the Jump Bar
 
 **The bar with Local, Remote and Green in it is now called the Jump Bar (JB)**,

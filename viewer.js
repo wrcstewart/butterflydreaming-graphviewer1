@@ -10393,6 +10393,7 @@ async function init() {
 
   document.addEventListener('bd:view-apply', () => applyView());
 
+
   function applyEditFurniture() {
     const wasEdit = document.body.classList.contains('edit-active');
     const isEdit  = (bdViewMode === 'create');
@@ -10402,16 +10403,73 @@ async function init() {
     }
   }
 
+  // 2026-09-30 — the card's CONTENT depends on the mode (Browse shows the prose,
+  // Create shows the whole script), but the card is built at NAVIGATION time, so
+  // a mode change left whatever was already on screen.
+  //
+  // It surfaced as two faults that look unrelated and are the same one:
+  //   · Fractal and ABC in Create showed only the fallback NAME, because nothing
+  //     rebuilt the card and a music module has no reason to echo anything back;
+  //   · Kolam in Browse kept the SCRIPT, because the only thing that had ever
+  //     put the script in that card was the module's echo, and an echo that
+  //     stops does not undo what it wrote.
+  //
+  // So Kolam "working" in Create was an accident of that echo, never the rule.
+  // The card is now rewritten from the NODE whenever the mode changes.
+  let refreshingCards = false;
+  function refreshCardsForViewMode() {
+    // setCardText calls updateSendBtn, which can reach setModuleLayout and come
+    // back here. It settles after one pass, but a guard is cheaper than relying
+    // on that.
+    if (refreshingCards) return;
+    if (!readingState || !readingState.nodeId || !readingState.chunks) return;
+    const node = cy.getElementById(readingState.nodeId);
+    if (!node || !node.length) return;
+    const full  = node.data('text') || '';
+    const shown = (bdViewMode === 'create')
+      ? full
+      : (nodeProse(full) || node.data('name') || node.data('label') || '');
+    const chunks = splitNodeChunks(shown);
+    // %%bd_chunk is retired and present in ZERO nodes, so this is one chunk in
+    // practice. If that ever stops being true, refreshing would have to add or
+    // remove CARDS — which is advanceOrNavigate's job — so bail rather than
+    // leave readingState describing a card stack that is not on screen.
+    if (chunks.length !== readingState.chunks.length) {
+      console.warn('[mode] chunk count differs between modes (' +
+                   readingState.chunks.length + ' -> ' + chunks.length +
+                   ') — card not refreshed');
+      return;
+    }
+    refreshingCards = true;
+    try {
+      chunks.forEach((c, i) => {
+        readingState.chunks[i] = c;
+        const card = readingState.cardsByIdx && readingState.cardsByIdx[i];
+        if (card) setCardText(card, c.body);
+      });
+      console.log('[mode] card refreshed for ' + bdViewMode + ': ' +
+                  chunks.map(c => c.body.length).join('+') + ' chars');
+    } finally {
+      refreshingCards = false;
+    }
+  }
+
   // Which layout was on screen last time, so the ENTRY actions fire on a
   // transition and not on every apply. applyView now runs on a plain mode
   // toggle too, and without this, switching Browse <-> Create while on a
   // module node would re-run loadModuleForNode and flash the module.
   let lastAppliedLayout = null;
+  let lastAppliedMode   = null;
 
   function applyView() {
     const mode = bdModuleLayout ? 'player' : bdViewMode;
     const enteringLayout = (mode === 'player') !== (lastAppliedLayout === 'player');
     lastAppliedLayout = (mode === 'player') ? 'player' : 'graph';
+    // Only on a real MODE change. Not on a layout change: entering the module
+    // layout must not rewrite a card the module is about to echo into, and not
+    // on every apply, or a drift would fight the refresh five times a second.
+    const modeChanged = (bdViewMode !== lastAppliedMode);
+    lastAppliedMode = bdViewMode;
     if (mode === 'player') {
       // Refresh the iframe rect from #cy in case anything shifted since the
       // last chat toggle (window resize, etc.). Then swap visibility.
@@ -10485,6 +10543,10 @@ async function init() {
         cy.fit(cy.elements(':visible').not('.parked-mark, .imported-mark'), fitPadding(cy, 40));
       });
     }
+
+    // Both layouts have finished with the DOM by here, so the card is rewritten
+    // once, whichever branch ran — and only when the MODE actually changed.
+    if (modeChanged) refreshCardsForViewMode();
   }
 
   // MM1.6 Strategy B — auto-load a module when the user read-taps a node
