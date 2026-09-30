@@ -344,27 +344,26 @@ built.**
 
 ## 1f. 2026-09-29 — the modes become two, and WHERE TO PICK UP
 
-### ⇒ START HERE TOMORROW
+### ⇒ START HERE
 
-**One measurement is waiting, and the next step follows from it.**
+**The JB alignment question is CLOSED — measured 2026-09-30, nothing to fix.**
 
-On iOS, View and Device sit beside Local in the Jump Bar instead of at the right
-edge. `margin-left: auto` on `#jb-right` is the correct tool and the nesting is
-verified, so the only explanation left is that the bar has no free space — i.e.
-it overflows. **A one-shot probe is already in the code**: it fires on the
-false→true edge of `body.module-node` and logs the bar's width against its
-`scrollWidth`, `#jb-right`'s offset and its gap to the right edge, and every
-visible child's width.
+    [JB] bar w=430 scrollW=430 fits | jb-right left=311 w=111 gapToEdge=8
+         | visible: back-btn:85 jb-right:111
 
-    Open BD on the iPhone → tap a module node → read `[JB]` in
-    /private/tmp/bd_server.log
+`gapToEdge=8` is the bar's own padding, so `margin-left: auto` is working and
+the group sits hard against the right edge. The earlier report was pre-reload —
+a phone holds CSS.
 
-That line names the cause. Deliberately NOT fixed by arithmetic first: six
-rounds of correct measurements on the invisible copy buttons were settled by one
-call to `elementFromPoint`, and the rule since is **measure, don't model**.
+**But only ONE left-hand control was visible** (unpaired). Paired and merged the
+bar carries five: Local, Remote, Green, ✕ and the View/Device group — roughly
+85×3 + 38 + 111 + gaps + padding ≈ **406 of 430**, about 24px spare. On a
+narrower phone that overflows, `margin-left: auto` has nothing to consume, and
+the original symptom returns. **The probe is deliberately left in** to catch
+that the first time anyone pairs on a phone.
 
-Also untested on a phone: the two view modes themselves, the prose card, and the
-AV button's new label.
+Still untested on a phone: the two view modes, the prose card, the View fix, and
+the AV button's new label.
 
 ### What changed today
 
