@@ -6,6 +6,52 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-09-30 — MODULES learns about the new repos, and a canary that was owed
+
+`MODULES` in `viewer.js` gains a **`page`** field naming each module's home
+among the four new `ButterflyDreaming-Standalone-*` repos, and `bd_V_Kolam3D`
+gets its first entry of any kind.
+
+**`page` is not a second name for `standalone`, and the tempting tidy-up is a
+silent data loss.** `standalone` is a *deep-link target*: `buildExternalWebsiteUrl`
+appends `?data=<base64>` or a JSP form, and the page at the other end decodes it
+and renders the script it was sent. The three older repos still do that and are
+**still live** (verified 200). The four new pages read **nothing** from the URL —
+deep linking was dropped on purpose, its apparatus being the reason the old ones
+were frozen. Point `standalone` at a `page` and the link still opens, the module
+still draws, and the user's script is quietly replaced by the page's default,
+with nothing anywhere reporting it. The comment in the table now says this at
+length.
+
+Kolam3D still has no `standalone`, so its external link still goes to the 2D
+player and still comes back flat. The warning now also names the page that
+renders it properly. **Left as an open decision, deliberately:** whether that
+button should instead send a 3D script to the right renderer showing the *wrong*
+figure. Both are lossy, so nothing changed quietly.
+
+### The canary was owed for a commit before this one
+
+`8ae5581` gave both music modules the no-host-chrome mode and rotated nothing,
+on the stated belief that media modules have no canary host. **The comment
+beside `#copy-link-btn` says the opposite in its own words** — the border
+rotates for any file BD serves, "including the media modules … which have no
+canary host of their own". The right reading is *the module has no canary of its
+own, so BD's stands in for it*; the wrong one is *no rotation needed*. The AV's
+`?v=` bump was missed in the same breath and has been applied (v25 → v26, AV
+canary green → blue).
+
+So this rotation covers two commits: BD **red → green**, `viewer.js?v=835`,
+`style.css?v=481`.
+
+### Still undeclared
+
+The four standalone repos are served from GitHub Pages behind a CDN and **none
+of them has a canary**, which is exactly the case the 2026-09-19 rule was
+written for. Flagged, not built — it puts a visible mark on pages that may be
+shown to people. The obvious host in each is the **Copy script** button border.
+
+---
+
 ## 2026-09-30 — four standalones, and hostChrome splits off controls-hidden
 
 Each of the four media modules now has its own repository and its own page: a
