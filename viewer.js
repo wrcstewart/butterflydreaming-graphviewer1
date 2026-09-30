@@ -2003,6 +2003,47 @@ function stopSpeech() {
 }
 
 // Reassemble one card body into chunk source, restoring the %%bd_center split.
+// 2026-09-30 — factored out of the chunk-card builder so it sits beside its
+// INVERSE, readChunkBody below. That pairing is the whole point: this file has
+// twice destroyed a script by reading back a card that was BUILT — Sv flattening
+// %%bd_center, and the Down button welding the hint onto %%bd_]. A renderer
+// whose inverse is somewhere else is how that happens.
+//
+// It moved because refreshCardsForViewMode needed it too: rewriting a chunk card
+// with plain text would replace the .chunk-text divs readChunkBody looks for,
+// and the two would silently stop agreeing.
+function renderChunkBody(body, text, hint) {
+  body.textContent = '';
+  // %%bd_center on its own line splits the chunk: everything before is
+  // left-aligned (default), everything after is centre-aligned. Simple
+  // author-controlled layout knob for call-to-action tails without
+  // needing a whole new chunk. Directive line is stripped.
+  if (text) {
+    const centerRE = /^%%bd_center[ \t]*$/m;
+    const cm = text.match(centerRE);
+    const preText  = cm ? text.slice(0, cm.index).replace(/\s+$/, '') : text;
+    const postText = cm ? text.slice(cm.index + cm[0].length).replace(/^\s+/, '') : '';
+    if (preText) {
+      const el = document.createElement('div');
+      el.className = 'chunk-text';
+      renderTextWithHighlights(el, preText);
+      body.appendChild(el);
+    }
+    if (postText) {
+      const el = document.createElement('div');
+      el.className = 'chunk-text chunk-text--center';
+      renderTextWithHighlights(el, postText);
+      body.appendChild(el);
+    }
+  }
+  if (hint) {
+    const hintEl = document.createElement('div');
+    hintEl.className = 'chunk-hint';
+    renderTextWithHighlights(hintEl, hint);
+    body.appendChild(hintEl);
+  }
+}
+
 function readChunkBody(bodyEl) {
   const parts = bodyEl.querySelectorAll('.chunk-text');
   const pieces = [];
@@ -6873,35 +6914,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     }
 
     const body = card.body;
-    body.textContent = '';
-    // %%bd_center on its own line splits the chunk: everything before is
-    // left-aligned (default), everything after is centre-aligned. Simple
-    // author-controlled layout knob for call-to-action tails without
-    // needing a whole new chunk. Directive line is stripped.
-    if (text) {
-      const centerRE = /^%%bd_center[ \t]*$/m;
-      const cm = text.match(centerRE);
-      const preText  = cm ? text.slice(0, cm.index).replace(/\s+$/, '') : text;
-      const postText = cm ? text.slice(cm.index + cm[0].length).replace(/^\s+/, '') : '';
-      if (preText) {
-        const el = document.createElement('div');
-        el.className = 'chunk-text';
-        renderTextWithHighlights(el, preText);
-        body.appendChild(el);
-      }
-      if (postText) {
-        const el = document.createElement('div');
-        el.className = 'chunk-text chunk-text--center';
-        renderTextWithHighlights(el, postText);
-        body.appendChild(el);
-      }
-    }
-    if (hint) {
-      const hintEl = document.createElement('div');
-      hintEl.className = 'chunk-hint';
-      renderTextWithHighlights(hintEl, hint);
-      body.appendChild(hintEl);
-    }
+    renderChunkBody(body, text, hint);
     card.text = text + (hint ? '\n' + hint : '');
     // Scroll the chat stack to the top so the newly-inserted chunk is in
     // view. Without this, if the user has scrolled down to read a long
@@ -10445,7 +10458,15 @@ async function init() {
       chunks.forEach((c, i) => {
         readingState.chunks[i] = c;
         const card = readingState.cardsByIdx && readingState.cardsByIdx[i];
-        if (card) setCardText(card, c.body);
+        if (!card || !card.body) return;
+        // renderChunkBody, NOT setCardText. There are two functions called
+        // setCardText in this file — one in setupInteractions taking a CARD,
+        // one in init taking a BODY — and from here the init one wins, which is
+        // what threw. But neither is right anyway: a chunk card's body is BUILT
+        // from .chunk-text divs, and writing plain text into it would leave
+        // readChunkBody with nothing to read back.
+        renderChunkBody(card.body, c.body, null);
+        card.text = c.body;
       });
       console.log('[mode] card refreshed for ' + bdViewMode + ': ' +
                   chunks.map(c => c.body.length).join('+') + ' chars');

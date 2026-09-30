@@ -29,6 +29,22 @@ two faces.
 rewrite a card the module is about to echo into, and not on every apply, or a
 drift would fight it five times a second.
 
+**It threw on the first press, and the reason is worth keeping.** There are
+**two functions called `setCardText`** in this file — one in `setupInteractions`
+taking a **card**, one in `init` taking a **body** — and from inside `init` the
+second wins. So a card object went where a DOM element was expected.
+
+But neither was right anyway. **A chunk card's body is BUILT** — `.chunk-text`
+divs, with `.chunk-text--center` for `%%bd_center` — and `readChunkBody` reads it
+back by querying exactly those classes. Writing plain text into it would have
+left the reader with nothing to read, which is the same fault in a new place:
+Sv flattening `%%bd_center`, and the Down button welding the hint onto `%%bd_]`.
+
+So the builder is factored out as **`renderChunkBody`, placed directly beside its
+inverse `readChunkBody` at module scope**, and both the original card builder and
+the mode refresh call it. A renderer whose inverse lives somewhere else is how
+this keeps happening.
+
 Three guards worth keeping: `setCardText` calls `updateSendBtn`, which can reach
 `setModuleLayout` and come back, so there is a re-entry flag (and by then
 `lastAppliedMode` already matches, so the recursion cannot start anyway); and if
