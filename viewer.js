@@ -1364,7 +1364,17 @@ function speechTextFrom(raw) {
   // Whitespace on BOTH sides is required, and that is the whole safety of it:
   // the corpus also holds 223 word-internal hyphens — Kung-ni, Snow-white,
   // Dze-yu — which must stay joined, and a looser pattern would break every one.
-  t = t.replace(/\s+[-–—]\s+/g, ' — ');
+  // 2026-09-30 — HORIZONTAL whitespace only. `\s` includes `\n`, so a line
+  // ending in a spaced dash matched " —\n" and was replaced with " — ",
+  // DESTROYING THE LINE BREAK. Four lines in Du Fu did exactly that, and they
+  // lost their line-end pause because the break was gone before splitUtterances
+  // ever saw it.
+  //
+  // MEASURED: the old pattern matched 111 times across the corpus, the new one
+  // 107 — the difference being precisely those four, every one of which is
+  // ALREADY an em-dash and so needed no conversion. Nothing is lost; a hyphen
+  // at a line end would be, but the corpus holds none.
+  t = t.replace(/[^\S\n]+[-–—][^\S\n]+/g, ' — ');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 

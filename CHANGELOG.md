@@ -68,6 +68,25 @@ excluded any line containing `next.` — which is every line containing
 nothing.** The second pass listed every use of the identifier and classified each
 one, which found all four immediately.
 
+**And a line ending in a dash lost its pause — `\s` includes `\n`.** The
+normaliser that turns spaced hyphens into em-dashes used `/\s+[-–—]\s+/`, so a
+line ending " —\n" matched and was replaced with " — ": **the line break was
+destroyed before `splitUtterances` ever saw it**, and the two lines were spoken
+as one. Four lines in Du Fu, all of them. Fixed by matching horizontal
+whitespace only.
+
+MEASURED before changing it: the old pattern matched 111 times across the
+corpus, the new one 107 — the difference being exactly those four, every one
+already an em-dash and so needing no conversion. Nothing is lost. A plain hyphen
+at a line end would be, and the corpus holds none.
+
+**That is the second verification hole in this one feature**, and the pair make
+a rule. The first filtered out the very lines that were wrong. This one tested
+`splitUtterances` on the RAW node text, bypassing the normaliser that runs
+before it in the real path — so the check passed on input the code never
+receives. **Test the path, not a stage of it.** The end-to-end harness now runs
+`speechTextFrom → looksLikeVerse → splitUtterances` as `speak()` does.
+
 Known exception, accepted: verse that is both long-lined *and* uncapitalised —
 e e cummings, much modern free verse — reads as prose. One rule cannot have
 everything, and being wrong towards prose is the quieter failure.
