@@ -285,9 +285,19 @@
        the stepper column — 84.5px at a 430px width, measured. With no arrows
        and no column, that band is empty screen and the figure hangs off the
        left edge. This was the whole of the "square is over to the left". */
-    body.controls-hidden .canvas-wrapper canvas { transform: none; }
-    body.controls-hidden .module-layout  { padding-left: 0; padding-right: 0; }
-    body.controls-hidden .canvas-wrapper {
+    /* ── 2026-09-30 — the host's chrome is a SEPARATE question from the
+       controls, and these rules moved off `controls-hidden` for it. Same change
+       as V_Kolam3D, same day, same reason: the new standalone draws no arrows
+       and no Extension strip, so the 88px and 52px reserved for BD's are lost
+       picture — and on a phone the BOTTOM one binds, taking the square from 335
+       to 283 at a 430-wide wrapper.
+
+       `controls-hidden` still means "the host supplies the stepper column".
+       `no-host-chrome` means "the host draws NOTHING around this iframe".
+       Hiding the controls implies no chrome, so it sets both. */
+    body.no-host-chrome .canvas-wrapper canvas { transform: none; }
+    body.no-host-chrome .module-layout  { padding-left: 0; padding-right: 0; }
+    body.no-host-chrome .canvas-wrapper {
       justify-content: center;
       align-items: center;
       padding-bottom: 0;
@@ -1667,8 +1677,15 @@
           // supplying an outer control surface. The renderer + canvas stay
           // fully functional — only the built-in stepper column is hidden.
           case 'bd_ui_config': {
-            const hide = event.data && event.data.hideControls === true;
+            const hide = !!(event.data && event.data.hideControls === true);
             document.body.classList.toggle('controls-hidden', hide);
+            // hostChrome: does the host draw anything AROUND this iframe? BD
+            // does — arrows beside the stepper column, an Extension strip under
+            // the canvas — so the layout reserves 88px and 52px for them. A
+            // standalone draws neither. DEFAULTS TO TRUE, so a host that says
+            // nothing keeps BD's behaviour and nothing already working changes.
+            const chrome = !(event.data && event.data.hostChrome === false);
+            document.body.classList.toggle('no-host-chrome', hide || !chrome);
             // Canvas needs a resize kick so it fills the reclaimed space.
             updateCanvasSize();
             if (storedText) render(storedText);

@@ -73,6 +73,31 @@
     .player-panel { flex-direction: column; align-items: center; justify-content: center; }
     .play-row { display: flex; gap: 8px; }
 
+    /* ── no-host-chrome (2026-09-30) ────────────────────────────────────
+       #bd-ext-slot and #bd-arrows-slot are DOCK SLOTS: reserved area BD
+       stamps its ↓↑ arrows and Extension panel into. A host that draws
+       nothing around this iframe — a standalone — never stamps, so the
+       two sit there as empty dashed boxes taking a third of the top row
+       and a third of the bottom one.
+
+       Releasing them lets the stepper column run the full height (it is a
+       12-row scroller that wants it) and gives the output panel the width
+       ext was holding.
+
+       `controls-hidden` means "the host supplies the stepper column";
+       `no-host-chrome` means "the host draws NOTHING around this iframe".
+       Hiding the controls implies no chrome, so it sets both — which is why
+       this block sits ABOVE the controls-hidden one: same specificity, so
+       source order decides, and the viewer's single-column grid must win. */
+    body.no-host-chrome #bd-arrows-slot,
+    body.no-host-chrome #bd-ext-slot { display: none; }
+    body.no-host-chrome .module-layout {
+      grid-template-areas:
+        "copy   copy    steppers"
+        "player player  steppers"
+        "output output  steppers";
+    }
+
     /* ── A VIEWER, not a controller (2026-09-24) ─────────────────────────
        Set by the host via postMessage bd_ui_config { hideControls: true },
        which BD's Ancillary Viewer and AVX already send — V_Kolam has
@@ -1732,6 +1757,14 @@
           // See the note beside .controls-hidden in the stylesheet.
           document.body.classList.toggle('controls-hidden',
                                          data && data.hideControls === true);
+          // hostChrome: does the host draw anything AROUND this iframe? BD
+          // does — it stamps its arrows and Extension panel into the two
+          // dock slots — so the layout reserves a grid area for each. A
+          // standalone draws neither. DEFAULTS TO TRUE, so a host that says
+          // nothing keeps BD's behaviour and nothing already working changes.
+          document.body.classList.toggle('no-host-chrome',
+                                         (data && data.hideControls === true) ||
+                                         (data && data.hostChrome === false));
         } else if (type === 'BD_STOP') {
           teardownPlayback();
           playerState = 'stopped'; setStatus('Stopped'); updateControls();
