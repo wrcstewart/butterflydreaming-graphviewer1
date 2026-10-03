@@ -26,3 +26,5 @@ config.js.bak*
 # M_Music/ ARE tracked, and a blanket *.mp3 would silently skip them if they
 # were ever removed and re-added.
 /*.mp3
+__pycache__/
+.DS_Store

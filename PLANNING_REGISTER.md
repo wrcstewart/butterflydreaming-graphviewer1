@@ -224,6 +224,27 @@ acting on any of it.
 
 ---
 
+## Added 2026-10-03 — the pulse, and eight pads
+
+| item | where | note |
+|---|---|---|
+| **`ch2_level` + `ch2_cents`** | `M_DroneFrac/music_module.html` | **BUILT.** Channel 2's level (−60 dB is a true mute) and interval. Added to diagnose a monotonous high pulse at the grain rate, which turned out to be `CH2_CENTS = 2400`: a grain's SLOT is `grainSize` but its rate comes from `detune`, so at 4× it reads 1.8 s of material while advancing 0.45 s — a **1.35 s jump at every boundary**, `grainSize × (rate − 1)`. **I should have made it a control rather than picking a constant.** |
+| **Why a regular artefact is heard as a fault** | — | The grain clock is `playbackRate/grainSize` and has **nothing to do with the walk** — the trajectory changes each grain's pitch, never when grains fire. So the artefact arrives at a fixed rate: a metronome. **Channel 1 has the same mismatch** (ratio 0.29–3.5 at `detune_span 22`) and is inaudible as a fault *because it is irregular*. Same mechanism, opposite perception. |
+| **The honest limit on fixing it** | — | Removing the jump entirely needs `playbackRate == detuneRatio`, which **re-welds pitch to travel speed** — the thing granular exists to separate. In Tone's implementation: continuous reading OR independent travel, not both. A `ch2_lock` option was offered and not taken. |
+| **Masking was hiding channel 1's range** | — | At `detune_span 22` channel 1 alone roams **−2100..+2200 cents, ~3.6 octaves**, and channel 2 two octaves above the top of that was covering its upper excursions. The author had been hearing a 3.6-octave walk through a two-octave mask. Now `detune_span 10`. |
+| **The metrics cannot measure interest** | — | Spectral flux in a 2 s window: vox pad (**interesting**) **0.449**, J8 pad (**dull**) **0.449**. Identical. Centroid swings within four points. Every number here measures *suitability*. **Recorded twice now** — see the loop-length item above. |
+| **`gtr_pad_Cmaj7`** | `M_DroneFrac/sources/` | Freesound 870087, LAPS-Catalog, CC0. A chord held with a **freeze pedal** — no pick attack, no decay, 0 of 458 windows transient, flat to 2.8 dB over 9.17 s. *A plain strummed chord would have been the worst possible source.* At −2400 the lowest of the eight: 51.4% below C2, centroid 173 Hz. |
+| **`alchemy_gtr_Cmaj7`** | `M_DroneFrac/sources/` | The same file through **Logic's Alchemy**, spectral engine, 78 s of one held note. **Needed NO transposition** — Alchemy had already taken the centroid 553 → 204 Hz, more than two octaves. Measured first, which is the only reason it was not shifted into uselessness. 2.1% below C2 against 51.4% untreated, so a different instrument rather than a version. |
+| **Designer tools and CC0** | `sources/SOURCES.md` | **Processing adds nothing licensable; content does.** Safe in Logic: ChromaVerb, Ensemble, EQ, filters, Alchemy on an imported file. NOT safe: **Space Designer** (convolution — its presets are recordings), Alchemy factory sources, Apple Loops, sampled instruments. **Alchemy's Default preset is settings, not sound** — parameter values are not copyrightable audio. |
+| **`read_any()` — format-agnostic** | `make_sample_pads.py` | **BUILT.** Hand-parsed 24-bit WAV until a Float32 file arrived. Python's `wave` cannot read format 3 **nor WAVE_FORMAT_EXTENSIBLE (0xFFFE), which ffmpeg emits above 16 bits** — so converting first does not help. Now decodes to **raw 32-bit PCM on a pipe**, ffprobe supplying rate and channels. |
+| **`bd_ui_config` → `hostScriptPanel`** | all | **BUILT.** A third flag, each asserting one thing. Deliberately NOT read off `hostChrome`, which is about layout reserve — `controls-hidden` carried two meanings until it was split, and overloading another flag would repeat it. |
+| **BD link at the foot of all five standalones** | `~/bd_standalone_*` | **DONE.** After the paragraph saying what ButterflyDreaming is. Music pages needed that paragraph moved last too. Dead `header a` / `.spacer` rules removed. |
+| **`ch2_lock`** | `M_DroneFrac/` | **NOT BUILT, offered.** Would force `playbackRate = detuneRatio` on channel 2 and remove the jump completely, at the cost of channel 2 ignoring `playback_rate`. |
+| **An output stage for Fractal and ABC** | `M_Fractal/`, `M_Music/` | **STILL NOT BUILT.** The same four controls. |
+| **`page` entry for DroneFrac in `MODULES`** | `viewer.js` | **STILL NOT DONE.** One line. |
+
+---
+
 ## Added 2026-10-02/03 — bd_M_DroneFrac
 
 | item | where | note |
@@ -237,7 +258,7 @@ acting on any of it.
 | **Output stage: volume / bass / treble / balance** | `M_DroneFrac/music_module.html` | **BUILT.** All `_p_`, so a balance against other sound is **written into the script**. `reverb → EQ → pan → volume → limiter`. Bake renders the same four; the spectrum taps after the stage. |
 | **Speech slower again** | `viewer.js` | Effective rate 0.700 → **0.636**, sentence gap 420 → **504 ms**. `SPEAK_LINE_GAP_MS` deliberately left at 180 so a line turn stays audibly shorter than a full stop. |
 | **`page` entry for DroneFrac in `MODULES`** | `viewer.js` | **NOT DONE.** `embedded` only, so BD does not know its standalone page exists. One line. |
-| **Bake / Save wav still untested** | `M_DroneFrac/` | Written and verified against Tone's documented `Tone.Offline` + `ctx.transport` pattern, but **nobody has pressed it.** The least-exercised path in the module. |
+| ~~Bake / Save wav untested~~ | `M_DroneFrac/` | **VERIFIED 2026-10-03** — a `bd_M_DroneFrac.wav` turned up in the author's Downloads. The `Tone.Offline` + `ctx.transport` pattern works. It renders the output stage and both channels, so a saved file matches what was balanced. |
 | **An output stage for Fractal and ABC** | `M_Fractal/`, `M_Music/` | **NOT BUILT.** The same four controls, if balancing against speech proves generally useful. |
 | **A local-file sample load** | `M_DroneFrac/` | **NOT BUILT, and the top item in the module's `AGENTS.md`.** It sidesteps the licensing constraint entirely — nothing bundled, the user supplies the file. Needs care about honesty: a granular drone IS its source file, so a script naming a local sample reproduces nothing elsewhere, and RULE 9 says a module carries no directive it cannot act on. |
 

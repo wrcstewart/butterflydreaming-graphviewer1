@@ -6,6 +6,130 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-03 — eight pads, a monotonous pulse diagnosed, and what the metrics cannot see
+
+### The pulse, which was my bug and is now a control
+
+Reported: "a higher tone that seems to be a steady beat about every 0.5 secs and
+unvarying... it seems to alter with the step length". Muting channel 2 confirmed
+the source. The mechanism, read out of Tone's `GrainPlayer._tick`:
+
+**A grain's time SLOT is `grainSize`, but its playback rate comes from
+`detune`.** At `CH2_CENTS = 2400` the rate is 4, so a 0.45 s grain **reads 1.8 s
+of material** while the read position advances only 0.45 s per tick — every
+boundary is a **1.35 s jump backwards**, repeating at the grain clock. The jump
+is `grainSize × (rate − 1)`.
+
+**Why it sounded MONOTONOUS, which is the diagnostic half.** The grain clock is
+`playbackRate / grainSize` — it has nothing to do with the walk. The trajectory
+changes each grain's *pitch* and never *when grains fire*. So however much the
+music moves, the artefact arrives at a fixed rate: a metronome, not an event.
+**Channel 1 has the same mismatch** whenever the walk is far from zero cents —
+at `detune_span 22` its ratio ranges 0.29 to 3.5 — and it is inaudible as a
+fault precisely because it is irregular, so it reads as texture. Same mechanism,
+opposite perception, entirely because of regularity.
+
+I had raised `CH2_CENTS` from 1200 to 2400 when the author said channel 2 was
+hard to pick out, without working through what that does to the grain/slot
+ratio. **It should have been a control from the start, not a constant I chose.**
+Now `%%bd_p_ch2_level` (−60 dB is a true mute, which is what settled it) and
+`%%bd_p_ch2_cents`.
+
+**The honest limit:** removing the jump entirely requires
+`playbackRate == detuneRatio`, which re-welds pitch to travel speed — the one
+thing granular exists to separate. In Tone's implementation you can have
+continuous reading or independent travel, not both. The author's chosen fix was
+a **fifth (700 cents) with `overlap 0.44`**: the grain then reads 1.5× its slot
+rather than 4×, and the crossfade covers most of what remains.
+
+### The masking discovery, which is the better finding
+
+With channel 2 muted the author noticed "the lower register is playing higher
+more frequently than before". Not imagination: **at `detune_span 22` channel 1
+alone roams −2100 to +2200 cents, about 3.6 octaves**, and channel 2 at a
+constant two octaves above the top of that had been masking its upper
+excursions. Nothing in channel 1 changed; what changed is what was covering it.
+He had been hearing a 3.6-octave walk through a two-octave mask. `detune_span`
+is now 10.
+
+### What the metrics cannot see
+
+Spectral flux inside a 2-second window: the vox pad, which the author found
+*more interesting musically*, measures **0.449**. The J8 pad, which he found
+dull, measures **0.449**. Identical. Their centroid swings differ by four
+points. **Every number available here measures suitability; none measures
+interest.** That is the same wall as the loop-length finding and it is now
+recorded twice.
+
+### Two more pads, both from one guitar chord
+
+**`gtr_pad_Cmaj7`** — Freesound 870087, LAPS-Catalog, CC0. A chord held with a
+**freeze pedal**, which is exactly why it works: no pick attack, no decay, **0
+of 458 windows** transient, flat to 2.8 dB across all 9.17 s. *A plain strummed
+chord would have been the worst possible granular source*, one transient per
+loop pass, and the pedal is what makes it the best. At −2400 it is the lowest of
+the eight: **51.4% below C2, centroid 173 Hz**.
+
+**`alchemy_gtr_Cmaj7`** — the same file through **Logic's Alchemy** on its
+spectral engine, 78 s of one held note. **It needed NO transposition**, unlike
+every other Freesound pad: Alchemy had already dropped the centroid from 553 Hz
+to **204 Hz**, more than the two octaves the others wanted, and shifting again
+would have landed it near 51 Hz. Measured before building, which is the only
+reason it was not ruined. Low by centroid but with almost no deep bass — 2.1%
+below C2 against 51.4% for the untreated pad from the same source, so the two
+are **different instruments rather than versions**.
+
+### The licence question for designer tools
+
+**Processing adds nothing licensable; content does.** CC0 material can go
+through any tool and the result stay CC0, provided the tool contributes
+*processing* rather than *audio*. The line in Logic:
+
+- **safe** — ChromaVerb, Ensemble, Modulation Delay, EQ, filters, Flex,
+  Ringshifter, and **Alchemy resynthesising an imported file**
+- **not safe** — **Space Designer** (convolution; its presets are recordings of
+  real spaces), **Alchemy factory sources**, all Apple Loops, all sampled
+  instruments
+
+**Alchemy's Default preset is not a contribution.** An initialisation patch
+supplies *settings* — filter type, envelope times — and parameter values are not
+copyrightable audio. `cutoff = 12000` is a number, not a recording. Default
+loads no sources, so everything audible came from the imported file. Chain
+confirmed, entry marked CC0.
+
+Precedent worth keeping: **voxlab** made Freesound 625157 by running a vocal
+through HALion, Acustica Ultramarine and MTurboEQ, and released it CC0. Correct,
+and the same reasoning.
+
+### A format-agnostic reader
+
+`make_sample_pads.py` parsed 24-bit integer WAV by hand until a **Float32** file
+arrived. Python's `wave` cannot read format 3 — **nor WAVE_FORMAT_EXTENSIBLE
+(0xFFFE), which is what ffmpeg emits for any depth above 16 bits**, so
+converting to 24-bit first does not help either. `read_any()` now decodes to
+**raw 32-bit PCM on a pipe** and skips headers entirely, with ffprobe supplying
+rate and channels. FLAC, AIFF, 16-bit, float and mp3 all work without a parser
+each.
+
+### Also
+
+- **`bd_ui_config` gains `hostScriptPanel`** — a host that shows the script with
+  its own copy control can say so, and the module hides its Copy Script button.
+  **A flag of its own rather than reading `hostChrome`**, which asserts something
+  about layout reserve: `controls-hidden` was carrying two meanings until it was
+  split on 2026-09-30, and overloading a second flag the same way would be the
+  same mistake twice. Three flags now, each asserting one thing.
+- **The ButterflyDreaming link moved to the foot of all five standalone pages**,
+  after the paragraph saying what ButterflyDreaming is — so a page ends by naming
+  the thing and then pointing at it. The music pages needed their BD paragraph
+  moved last as well. Dead `header a` and `.spacer` rules removed with it.
+- **Bake and Save wav are VERIFIED** — a `bd_M_DroneFrac.wav` turned up in the
+  author's Downloads. That was the last untested path in the module.
+- **An output stage** reached the module the day before and is unchanged:
+  `volume` / `bass` / `treble` / `balance`, all `_p_`.
+
+---
+
 ## 2026-10-02/03 — bd_M_DroneFrac: a granular drone, and a licence that could not be kept
 
 A fifth media module, **`bd_M_DroneFrac`** — `M_DroneFrac/`, served at
