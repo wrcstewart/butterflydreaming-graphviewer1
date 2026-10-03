@@ -212,6 +212,8 @@
      CSS was simply being overridden.
      Trust the hex on the border line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-03d: GREEN (channel 2 gains its own level and interval, to settle
+     whether a high pulse at the grain rate comes from it). Next = blue.
      2026-10-03c: RED (alchemy_gtr_Cmaj7 — the guitar chord through Logic's
      Alchemy, no transposition needed). Next = green.
      2026-10-03b: BLUE (gtr_pad_Cmaj7 added from Freesound 870087 — the lowest
@@ -255,7 +257,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #27ae60 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -372,6 +374,23 @@ const STEPPERS = [
   { name: 'grain_size',        min: 0.02, max: 1,   step: 0.01, fallback: 0.2 },
   { name: 'grain_from_run',    min: 0,    max: 1,   step: 0.05, fallback: 0.4 },
   { name: 'offsetCH2',         min: 0,    max: 60,  step: 1,    fallback: 12 },
+  // ── CHANNEL 2's OWN LEVEL AND INTERVAL (2026-10-03) ────────────────────
+  // Added to diagnose a monotonous high pulse at about the grain rate. The
+  // level lets channel 2 be muted outright (-60 dB) so it can be ruled in or
+  // out by ear; the interval is the likely CAUSE and is now adjustable.
+  //
+  // WHY THE INTERVAL CAUSES IT. GrainPlayer gives each grain a time slot of
+  // grainSize but computes its playback rate from `detune`. At +2400 cents the
+  // rate is 4, so a 0.45 s grain READS 1.8 s of material while the next grain
+  // starts only 0.45 s along the buffer — every boundary is a 1.35 s jump
+  // backwards, repeating at the grain rate. Channel 1, at detune near zero,
+  // has no such mismatch. The pulse is therefore an artefact of a large
+  // interval, not of the material.
+  //
+  // Lower intervals shrink the mismatch proportionally: +1200 reads 2x and
+  // jumps 0.45 s, +700 reads 1.5x and jumps 0.22 s, 0 jumps not at all.
+  { name: 'ch2_level',         min: -60,  max: 6,   step: 1,    fallback: -5 },
+  { name: 'ch2_cents',         min: 0,    max: 2400, step: 100, fallback: 2400 },
   { name: 'overlap',           min: 0,    max: 0.5, step: 0.01, fallback: 0.1 },
   { name: 'playback_rate',     min: 0.1,  max: 2,   step: 0.05, fallback: 1 },
   { name: 'duration',          min: 5,    max: 300, step: 5,    fallback: 60,   regen: true },
@@ -975,8 +994,7 @@ function buildChain() {
   // flatten each other; the upper octave also sits forward of the lower by
   // ear, so matching their gains does not match their presence. One line from
   // being a stepper if it wants balancing.
-  ch2Gain = new Tone.Gain(0).connect(chorus);
-  ch2Gain.gain.value = Math.pow(10, -5 / 20);
+  ch2Gain = new Tone.Gain(Math.pow(10, -5 / 20)).connect(chorus);
 }
 
 function applyLiveParams() {
@@ -1008,6 +1026,10 @@ function applyLiveParams() {
                  eq.high.value = getStepperValue('treble'); }
   if (panner)  { panner.pan.value = getStepperValue('balance'); }
   if (outVol)  { outVol.volume.value = getStepperValue('volume'); }
+  // -60 dB is treated as silence outright rather than a very quiet signal, so
+  // the stepper's bottom end is a real mute for diagnosis.
+  if (ch2Gain) { const db = getStepperValue('ch2_level');
+                 ch2Gain.gain.value = db <= -60 ? 0 : Math.pow(10, db / 20); }
 }
 
 async function loadSample(name) {
@@ -1060,7 +1082,10 @@ async function loadSample(name) {
 // own harmonics and was hard to pick out as a separate voice at all — the
 // upper octave of a pad is already present in the pad. +2400 clears that
 // region and the two read as two.
-const CH2_CENTS = 2400;
+// Replaced by the %%bd_p_ch2_cents control; kept only as the fallback for a
+// script written before that control existed, so such a script still renders
+// as it did.
+const CH2_CENTS_DEFAULT = 2400;
 
 function scheduleTrajectory(transport, pts, read) {
   for (let i = 0; i < pts.length; i++) {
@@ -1076,7 +1101,7 @@ function scheduleTrajectory(transport, pts, read) {
         // as a mistake. Holding the last value lets the two converge.
         const j = Math.min(i + v.offset2, pts.length - 1);
         const q = pts[j];
-        grain2.detune    = q.detune + CH2_CENTS;
+        grain2.detune    = q.detune + (v.ch2 != null ? v.ch2 : CH2_CENTS_DEFAULT);
         grain2.grainSize = grainSizeFor(q, v.base, v.fromRun);
       }
     }, p.time);
@@ -1088,6 +1113,7 @@ const liveGrainRead = () => ({
   base:    getStepperValue('grain_size'),
   fromRun: getStepperValue('grain_from_run'),
   offset2: Math.round(getStepperValue('offsetCH2')),
+  ch2:     getStepperValue('ch2_cents'),
 });
 
 async function startPlayback() {
@@ -1280,6 +1306,7 @@ bakeBtn.addEventListener('click', async () => {
       // Captured once, like the rest: a render must not change because
       // someone moved a stepper while it was rendering.
       offset2: Math.round(getStepperValue('offsetCH2')),
+      ch2cents: getStepperValue('ch2_cents'), ch2level: getStepperValue('ch2_level'),
       volume: getStepperValue('volume'), bass: getStepperValue('bass'),
       treble: getStepperValue('treble'), balance: getStepperValue('balance'),
     };
@@ -1298,7 +1325,7 @@ bakeBtn.addEventListener('click', async () => {
       const vib = new Tone.Vibrato({ frequency: vals.vFreq, depth: vals.vDepth, type: 'sine' }).connect(rev);
       const cho = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: vals.cDepth, wet: vals.cWet }).connect(vib);
       cho.start();
-      const g2 = new Tone.Gain(Math.pow(10, -5 / 20)).connect(cho);
+      const g2 = new Tone.Gain(vals.ch2level <= -60 ? 0 : Math.pow(10, vals.ch2level / 20)).connect(cho);
       const mk = (dest) => new Tone.GrainPlayer({
         url: buffer, loop: true, grainSize: base,
         overlap: vals.overlap, playbackRate: vals.rate,
@@ -1315,7 +1342,7 @@ bakeBtn.addEventListener('click', async () => {
           gp.detune = p.detune;
           gp.grainSize = grainSizeFor(p, base, fromRun);
           const q = trajectory[Math.min(i + vals.offset2, trajectory.length - 1)];
-          gp2.detune = q.detune + CH2_CENTS;
+          gp2.detune = q.detune + vals.ch2cents;
           gp2.grainSize = grainSizeFor(q, base, fromRun);
         }, p.time);
       }
@@ -1423,6 +1450,8 @@ storedText = [
   '%%bd_p_grain_size 0.45',
   '%%bd_p_grain_from_run 0.50',
   '%%bd_p_offsetCH2 60',
+  '%%bd_p_ch2_level -5',
+  '%%bd_p_ch2_cents 2400',
   '%%bd_p_overlap 0.31',
   '%%bd_p_playback_rate 1.00',
   '%%bd_p_duration 60',
