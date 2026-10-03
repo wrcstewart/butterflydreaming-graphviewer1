@@ -22,7 +22,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `j8_pad_Amin9.mp3` | **CC0** | Freesound 624728 by voxlab — see below | **yes** |
 | `aura_pad_Amin.mp3` | **CC0** | Freesound 697998, uploader deleted — **read the caveat** | yes, but see below |
 | `gtr_pad_Cmaj7.mp3` | **CC0** | Freesound 870087 by LAPS-Catalog — see below | **yes** |
-| `alchemy_gtr_Cmaj7.mp3` | **CC0 (derived)** | 870087 through Logic's Alchemy — **chain not yet confirmed** | see below |
+| `alchemy_gtr_Cmaj7.mp3` | **CC0** | 870087 through Logic's Alchemy — chain confirmed | **yes** |
 
 ## The two organ pads
 
@@ -343,10 +343,20 @@ Alchemy's **factory presets and sources** would, being built on Apple's sample
 library. The same line separates ChromaVerb (algorithmic, fine) from Space
 Designer (convolution — its presets are recordings of real spaces).
 
-**STILL TO CONFIRM:** which plug-ins were in the chain. If it was Alchemy's
-spectral engine on the imported file, plus algorithmic effects, this is CC0 and
-clean. If Space Designer or any Alchemy factory source was involved, it is not.
-**Marked unconfirmed until the author says.**
+**CONFIRMED 2026-10-03.** The chain was Alchemy on its **Default preset** with
+the CC0 file imported into **Source A** on the Spectral engine, modulation off.
+
+Default is not a contribution of content: an initialisation patch supplies
+*settings* — filter type, envelope times, which effect slots exist — and
+parameter values are not copyrightable audio. `cutoff = 12000` is a number, not
+a recording. Alchemy's Default loads no sources, so everything audible in the
+bounce came from the imported file.
+
+The two things that would have broken it, and did not apply: a **factory
+source** in slot B, C or D (Apple's sample library), or a **convolution**
+reverb such as Space Designer, whose presets are recordings of real spaces.
+Logic's algorithmic effects — ChromaVerb, Ensemble, Modulation Delay, EQ,
+filters — contribute processing only and are safe in this chain.
 
 | | |
 |---|---|
