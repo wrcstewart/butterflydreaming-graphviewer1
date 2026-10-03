@@ -120,6 +120,25 @@ PADS = [
         voices=[0, 6, -6],
         target=-28.5,
     ),
+    dict(
+        out='alchemy_gtr_Cmaj7',
+        src='alchemy_gtr_Cmaj7.wav',
+        # DERIVED WORK: the author imported Freesound 870087 (CC0) into Logic's
+        # Alchemy on its SPECTRAL engine and bounced 78 s of one held note.
+        # 24-bit/48k, unnormalised, flat to 2.5 dB across the whole file, 0 of
+        # 3899 windows transient. See SOURCES.md for the licence reasoning.
+        #
+        # NO TRANSPOSITION, unlike every other Freesound pad here. Alchemy's
+        # spectral resynthesis ALREADY dropped the centroid from the original's
+        # 553 Hz to 204 Hz — a factor of 2.7, which is more than the two octaves
+        # the other pads needed. Transposing again would put it near 51 Hz,
+        # below the useful range. Measured, not assumed.
+        win=(20.00, 2.50),
+        smooth=1.00,
+        transpose=0,
+        voices=[0, 6, -6],
+        target=-25.0,
+    ),
 ]
 
 # ── ON LOOP LENGTH, WHICH TURNS OUT TO BE A MUSICAL CHOICE ─────────────────

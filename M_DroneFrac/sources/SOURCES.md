@@ -22,6 +22,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `j8_pad_Amin9.mp3` | **CC0** | Freesound 624728 by voxlab — see below | **yes** |
 | `aura_pad_Amin.mp3` | **CC0** | Freesound 697998, uploader deleted — **read the caveat** | yes, but see below |
 | `gtr_pad_Cmaj7.mp3` | **CC0** | Freesound 870087 by LAPS-Catalog — see below | **yes** |
+| `alchemy_gtr_Cmaj7.mp3` | **CC0 (derived)** | 870087 through Logic's Alchemy — **chain not yet confirmed** | see below |
 
 ## The two organ pads
 
@@ -326,6 +327,54 @@ which is what ffmpeg emits for any depth above 16 bits — so converting to
 24-bit first does not help either. `read_any()` now decodes to **raw 32-bit PCM
 on a pipe** and skips headers entirely, with ffprobe supplying rate and channel
 count. FLAC, AIFF, 16-bit, float and mp3 all work now without a parser each.
+
+## alchemy_gtr_Cmaj7 — a derived work, and the licence reasoning
+
+The author imported **Freesound 870087** (CC0, LAPS-Catalog) into **Logic's
+Alchemy** on its **Spectral** engine and bounced 78 s of a single held note:
+24-bit/48 kHz, unnormalised, flat to 2.5 dB across the whole file, **0 of 3899
+windows transient**.
+
+**The licence position.** CC0 means the author waived everything, so the
+material can be processed in any tool and the result licensed freely — the
+constraint is only that **the tool must contribute processing, not content**.
+Alchemy resynthesising *your own imported file* adds nothing licensable;
+Alchemy's **factory presets and sources** would, being built on Apple's sample
+library. The same line separates ChromaVerb (algorithmic, fine) from Space
+Designer (convolution — its presets are recordings of real spaces).
+
+**STILL TO CONFIRM:** which plug-ins were in the chain. If it was Alchemy's
+spectral engine on the imported file, plus algorithmic effects, this is CC0 and
+clean. If Space Designer or any Alchemy factory source was involved, it is not.
+**Marked unconfirmed until the author says.**
+
+| | |
+|---|---|
+| window | 20.00–22.50 s |
+| transpose | **0 — none** |
+| result | centroid **220 Hz** · 2.1% below C2 · RMS −16.6 dB · peak −4.5 dB |
+| loop | 2.5 s, so it recurs ~14 times in the pad |
+
+**No transposition, unlike every other Freesound pad here.** Alchemy's spectral
+resynthesis had already dropped the centroid from the original's **553 Hz to
+204 Hz** — a factor of 2.7, more than the two octaves the other pads needed.
+Transposing again would have landed it near 51 Hz. Measured before building,
+which is the only reason it was not shifted into uselessness.
+
+**It is low by centroid but has little deep bass**: 2.1% below C2 against 51.4%
+for the untreated `gtr_pad_Cmaj7` built from the same source. Alchemy
+concentrated the energy into the midrange rather than extending it downward, so
+the two pads from one guitar chord are genuinely different instruments.
+
+**Did the Logic treatment add movement?** Frame-to-frame spectral flux inside a
+2 s window went from **0.14** in the original to **0.41** in the bounce — three
+times the change, and level with the vox pad's 0.45. So yes, measurably.
+
+**But the metrics cannot tell interesting from dull, and this is worth
+recording.** The vox pad (which the author found interesting) and the J8 pad
+(which he found dull) measure **0.449 and 0.449** — identical flux — and their
+centroid swings differ by only 4 points. Every number available here measures
+*suitability*; none of them measures *interest*. Only listening does.
 
 ## Loop length is a musical choice, not a technical one
 
