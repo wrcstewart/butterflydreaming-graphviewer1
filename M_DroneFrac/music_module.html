@@ -41,6 +41,15 @@
 
      Downstream is the opposite: everything in the effects tail IS a Signal,
      so that is where smooth modulation belongs if it is ever wanted.
+
+     bd_ui_config CARRIES THREE INDEPENDENT FLAGS, all defaulting to BD's own
+     behaviour so a host that says nothing changes nothing:
+       hideControls     the host supplies the stepper column; hide mine
+       hostChrome       the host draws furniture around this iframe (default true)
+       hostScriptPanel  the host shows the script and its own copy control
+     They are deliberately separate. controls-hidden used to mean two of these
+     at once and had to be split; the lesson is that a flag should assert one
+     thing.
 -->
 <head>
 <meta charset="utf-8">
@@ -203,6 +212,8 @@
      CSS was simply being overridden.
      Trust the hex on the border line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-03: GREEN (bd_ui_config gains hostScriptPanel, which hides the
+     module's own Copy Script where the host already has one). Next = blue.
      2026-10-02n: RED (output stage: volume, bass, treble, balance — all _p_ so
      a balance against other sound can be written down). Next = green.
      2026-10-02m: BLUE (new default script set by the author: vox pad, pentatonic,
@@ -239,7 +250,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #27ae60 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -286,6 +297,24 @@
   .control-row label { font-size: 0.58rem; color: var(--dim); text-align: center; }
 
   .copy-row { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+  /* ── host-script-panel (2026-10-03) ───────────────────────────────────
+     The host already shows the script and its own copy control, so this
+     module's Copy Script would be the second button doing one job — and the
+     host's sits beside the text it copies, which is the better place for it.
+     Bake and Save wav stay: those are the module's, and no host can offer
+     them.
+
+     A FLAG OF ITS OWN rather than reading hostChrome. hostChrome means "the
+     host draws nothing AROUND this iframe", which is a statement about layout
+     reserve; whether the host supplies authoring controls is a different
+     claim, and the two happen to coincide only in today's standalones.
+     controls-hidden was carrying two meanings like that until it was split on
+     2026-09-30, and overloading a second flag the same way would be the same
+     mistake twice.
+
+     DEFAULTS TO FALSE, so BD and any host that says nothing keeps the button
+     and nothing already working changes. */
+  body.host-script-panel #copy-script-btn { display: none; }
   #status:empty { display: none; }
   #status { font-size: 0.6rem; color: var(--dim); }
 </style>
@@ -1356,6 +1385,11 @@ window.addEventListener('message', (event) => {
       // nothing keeps BD's behaviour and nothing working changes.
       document.body.classList.toggle('no-host-chrome',
         data.hideControls === true || data.hostChrome === false);
+      // hostScriptPanel: does the host show the script with its own copy
+      // control? Then this module's Copy Script is redundant. Defaults to
+      // false — see the note beside .host-script-panel.
+      document.body.classList.toggle('host-script-panel',
+        data.hostScriptPanel === true);
     } else if (type === 'BD_STOP') {
       stopPlayback();
     }
