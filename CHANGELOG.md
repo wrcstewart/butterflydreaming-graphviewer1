@@ -6,6 +6,172 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-02/03 — bd_M_DroneFrac: a granular drone, and a licence that could not be kept
+
+A fifth media module, **`bd_M_DroneFrac`** — `M_DroneFrac/`, served at
+`/bd_M_DroneFrac/`, Cluster **Drone** under Music, content node
+`bd_M_DroneFrac_001`. Published standalone at
+[/DroneFrac/](https://wrcstewart.github.io/ButterflyDreaming-Standalone-DroneFrac/).
+
+**What it is.** A sustained sample never stops sounding; it is chopped into
+grains and an L-system walk steers them — the walk's height sets their pitch,
+the length of its horizontal runs sets their size. **Two independent
+destinations from one walk**, which is the reason it exists: `bd_M_Fractal`
+walks the same kind of turtle but funnels everything through an ABC score, where
+duration and pitch arrive welded together. There is no notation here to collapse
+them. A second channel reads the same walk at an offset two octaves up, so at
+any moment you hear two places in one walk — a chord the grammar builds from
+itself. Export is **.wav only**: no interchange format for a granular patch
+exists, and MIDI carries notes, of which this has none.
+
+**No LFOs, and that is a finding not an omission.** `GrainPlayer`'s `detune`,
+`grainSize`, `overlap` and `playbackRate` are **plain numbers in Tone 14, not
+Signals** — the docs read as though you can connect to them and the source says
+otherwise. They are read when a grain FIRES, so the effective modulation rate is
+`1/grainSize`, five a second at the default. The trajectory is therefore
+SCHEDULED rather than connected, and for drone-speed movement five steps a
+second is far finer than the ear resolves. The author's question — "why do we
+need the LFOs, is it because the drone will sound stepped?" — was the right one:
+they were a carry-over from a synth design and were dropped.
+
+### The licence incident, which is the part worth remembering
+
+Two pads came from **Sample Focus**. Its Standard Licence grants a royalty-free
+right to use a sound *"as part of a new creative work"* but prohibits making it
+available *"in a complete, archived, downloadable, or readily extractable
+format"*, prohibits redistribution as part of a sample pack, and is
+**non-transferable**.
+
+Serving the file from BD is exactly that. **Verified publicly downloadable** at
+`graph.virtualfictions.uk/bd_M_DroneFrac/sources/...`, HTTP 200, full file,
+through the live Cloudflare tunnel. Moved out of the served tree immediately —
+the repo root is `express.static`'d as well as the module route, so there is no
+safe folder inside the checkout; they now live at `~/bd_private_samples/`.
+
+**And BD publishes CC0, which cannot be claimed over someone else's work.** That
+is the more serious half: a false licence statement invites downstream users to
+redistribute in reliance on it. Nothing ever reached GitHub.
+
+**"Royalty-free" is about ROYALTIES.** It says nothing about whether you may
+pass the file on. The question to ask a sample library is whether the SAMPLE may
+be redistributed, not whether music made from it may be — and that is now the
+first item on the candidate checklist in `M_DroneFrac/sources/SOURCES.md`.
+
+### Six CC0 pads, all rebuildable
+
+Three from the [Versilian library](https://github.com/sgossner/VCSL) (CC0, and
+the Renaissance Organ carries an explicit redistribution grant in its own
+`Info.txt`), three from Freesound — two by **voxlab**, one from a deleted
+account which is flagged in `SOURCES.md` as the lowest-confidence entry because
+its description says *"royalty free collection"*, the exact phrase that caused
+the above. `make_organ_pads.sh` and `make_sample_pads.py` ship with the module:
+**a derived work nobody can rebuild is one whose licence cannot be checked.**
+
+**The registration matters more than the octave.** Dropping the organ pads'
+nominal octave twice barely changed what was heard. Measured on one note, share
+of energy at or below C2: **Full 10.9%, 8′ 46.3%, 4′ 2.9%** — "Full" is a
+mixture with upper ranks built in, so most of its energy lives above its nominal
+pitch and moving the fundamental moves little. Also discovered: **VCSL labels
+its files an octave low** (the file called `C1` sounds 65.4 Hz, which is C2).
+
+**Loop length is a musical choice, not a technical one.** The author noticed
+that the vox pad cut from 2.5 s was "more interesting musically" than the J8 cut
+from 16 s — the opposite of what the measurements predicted, the J8 being much
+the steadier source. The reason is repetition: a 5 s loop recurs seven times in
+a 36 s pad and each time the detuned voices stand in a different relation, which
+the ear follows as theme and variation. A 64 s loop is longer than the pad, so
+it is heard once and never recurs. **The seam-free long loop, which cost three
+rounds to arrive at, is musically the weakest of the six. Steadiness measures
+suitability, not interest** — and every candidate had been screened on
+steadiness alone.
+
+### An output stage
+
+`%%bd_p_volume` (−40..+6 dB), `%%bd_p_bass` and `%%bd_p_treble` (±12 dB, shelves
+at 250 Hz and 3 kHz), `%%bd_p_balance` (−1..+1). All `_p_` marked and therefore
+**written into the script**, which is the point: a drone is played *against*
+something — the author was running one under the Tao Te Ching — and a balance
+you cannot write down has to be found again every time.
+
+Order is `reverb → EQ → pan → volume → limiter → out`: EQ before the limiter so
+a boost is caught rather than clipped, volume after the EQ so the fader means
+what it says, limiter last because it is all that stands between grain summing
+and a clipped output. Bake renders the same four, and the spectrum taps after
+the stage.
+
+### Four faults of my own, each instructive
+
+**The crossfade that cost 16 dB.** A 0.6 s self-overlap crossfade, added to cure
+a loop click, left only the overlap window with both voices present — so each
+pad was loud for 0.6 s and 16 dB quieter for 3.7 s, repeating. It went unnoticed
+because **the seam was measured and the envelope was not**. A fix aimed at one
+property must be checked against the others. Removed; 5 ms fades to zero at both
+ends do the job, because a step at the wrap becomes impossible rather than
+unlikely (998 → 8 of 32768).
+
+**And that crossfade WAS the reported symptom.** "Higher frequencies come in
+briefly every few seconds and pop" was those loud 0.6 s windows, not a click at
+all. I diagnosed a splice and treated something else.
+
+**A ratio against a moving baseline will lie to you.** High-band energy
+*relative to the median* reported the crossfade as 15 dB worse when it was 8 dB
+better — smoothing the signal moved the median too.
+
+**Answering BD's poll loops.** `BD_REQUEST_UPDATE` went into the new wrapper's
+`RELAY_DOWN`; the three older wrappers omit it deliberately. BD polls, the
+module announces, BD rewrites the card, the card is pushed back — observed in
+the server log cycling 540 → 544 → 542 → 540 chars several times a second. A
+module announces on a USER ACTION, which cannot loop.
+
+### Two cache lessons, learned twice
+
+**A canary certifies the file it lives in, and nothing else.** Two rounds were
+lost to a fresh page serving stale audio: the canary said current, the sound
+said otherwise, so the natural conclusion was that the edit had failed. Sample
+URLs now carry a **content hash** from the manifest (`?v=<sha>`), which also
+matters for the published copy behind a CDN — the same lesson `AV/kolam.html`
+already encoded for its renderer and which I had not applied to assets.
+
+**A browser cannot read a directory.** The sample dropdown is fed by
+`sources/manifest.json`, generated by `make_manifest.py`. A manifest rather than
+a server endpoint because an endpoint works in BD and fails on GitHub Pages.
+
+### Also
+
+- **`CLUSTER_REL` is what makes a content node reachable.** The new gateway had
+  its three edges right and showed nothing under it; `bd_M_Fractal_001` carries
+  a `CLUSTER_REL` to its cluster and the new node had none. I had compared the
+  gateways and never the content nodes.
+- **`<select>` cannot wear the label font.** iOS Safari zooms the page when a
+  form control under 16px takes focus, and in an iframe that zoom is
+  unrecoverable — so the sample selector sits under the spectrum rather than in
+  the 136px stepper column, but is `%%bd_p_sample` marked so the script still
+  governs it.
+- **A canvas sizing itself from its own rect inside a flex container is a
+  feedback loop.** `drawSpectrum` sets `canvas.width/height`, which are the
+  element's intrinsic size, so with `flex-basis: auto` it asked to be
+  devicePixelRatio times taller every frame — and `.panel`'s inherited
+  `flex-wrap: wrap` then moved the selector into a second column where
+  `overflow: hidden` erased it. Fixed with `flex: 1 1 0` and `nowrap`.
+- **`.panel button` outranks `.step-btn`.** (0,1,1) against (0,1,0), so the
+  generic rule won on min-width, border, background, colour and font-size
+  alike — the stepper buttons never had their intended styling, and three
+  attempts to narrow them changed nothing on screen. Fixed by excluding them
+  from the generic rule rather than fighting it.
+
+### Speech: slower again
+
+`SPEAK_LENGTH_SCALE` × 1.10 (effective rate 0.700 → **0.636**) and
+`SPEAK_GAP_MS` 420 → **504**, both by ear after "it sounds a little rushed".
+Two separate levers — the scale slows the delivery of words, the gap lengthens
+the silence between sentences — and the comment beside `SPEAK_GAP_MS` already
+predicted the coupling. `SPEAK_VERSE_SCALE` is derived, so verse stays 8% slower
+and both move together. **`SPEAK_LINE_GAP_MS` left at 180 on purpose:** the
+report was about sentences, and the value exists to make a line turn audibly
+shorter than a full stop — 180:504 states that more clearly than 180:420.
+
+---
+
 ## 2026-09-30 — MODULES learns about the new repos, and a canary that was owed
 
 `MODULES` in `viewer.js` gains a **`page`** field naming each module's home

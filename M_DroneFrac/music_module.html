@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- bd_M_DroneFrac — a granular drone steered by an L-system.
+     Built 2026-10-01. Tone.js GrainPlayer over one sustained CC0 sample.
+
+     The SHAPE of this module, and why it is not a copy of bd_M_Fractal:
+
+     Fractal emits NOTES. It walks a turtle, writes the walk out as an ABC
+     score, parses that back, and plays the resulting note list. This module
+     emits no notes at all. It walks the same kind of turtle and uses the walk
+     as a TRAJECTORY — a timed sequence of parameter settings on a single
+     grain player that never stops sounding.
+
+     Two consequences follow, and they are the whole design:
+
+     1. NO ABC LAYER. There is nothing to notate: a drone has no notes, and
+        ABC cannot express grain size or overlap. Fractal's text round-trip
+        (turtle → ABC → reparse → notes) is skipped entirely, so nothing is
+        quantised by `lenToken` and nothing is rounded to integer BPM. The
+        trajectory goes straight to the player. Export is .wav, because no
+        interchange format for granular patches exists — SDIF describes
+        analysed sound, not a patch, and every tool's preset format is its
+        own. The SCRIPT is the portable form, as everywhere else here.
+
+     2. THE TWO AXES REACH TWO DESTINATIONS. In Fractal, horizontal runs
+        become durations and vertical movement becomes pitch, but both are
+        funnelled into one ABC stream and arrive welded together. Here
+        y → detune and run length → grainSize, independently, because there
+        is no notation in between to collapse them.
+
+     WHAT GRAINPLAYER WILL AND WILL NOT DO — check before adding modulation.
+     `detune`, `grainSize`, `overlap` and `playbackRate` are PLAIN NUMBERS in
+     Tone 14, not Signals. You cannot connect an LFO to any of them; the docs
+     read as though you can and the source says otherwise. They are read when
+     a grain FIRES, so a write lands at the next grain and the effective
+     modulation rate is 1/grainSize — five a second at the 0.2 default. That
+     is why the trajectory is SCHEDULED rather than connected, and why there
+     are no LFOs in this module: for drone-speed movement five steps a second
+     is far finer than the ear resolves, and the lever if it is ever not is a
+     smaller grainSize, not another oscillator.
+
+     Downstream is the opposite: everything in the effects tail IS a Signal,
+     so that is where smooth modulation belongs if it is ever wanted.
+-->
+<head>
+<meta charset="utf-8">
+<title>bd_M_DroneFrac</title>
+<style>
+  :root { --ink: #e8e8e0; --dim: #9e9e90; --ground: #07070c; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--ground); color: var(--ink);
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+  }
+  body { display: flex; flex-direction: column; }
+
+  /* ── Layout ───────────────────────────────────────────────────────────
+     The KOLAM shape, not the music-panel shape: a visual area on the left
+     and ONE control column on the right. The two existing music modules
+     use a three-column grid with copy/player/output filling the left
+     two-thirds, which assumes nothing visual — fine for them, wrong here.
+     A single column also leaves the left side free to carry an image later,
+     which is what the collage work will want. Until then the spectrum
+     lives there, and it is genuinely useful: the effect of grain size and
+     overlap is far easier to see than to hear at first. */
+  .module-layout {
+    flex: 1;
+    display: grid;
+    /* 150px and it stays there: this column has to land where the other
+       modules' stepper columns land, so BD's furniture lines up across all of
+       them. It is a shared dimension, not a free one — widening it to give
+       the readout room was tried and reverted for exactly that reason. */
+    grid-template-columns: minmax(0, 1fr) 150px;
+    /* minmax(0, 1fr), never 1fr: a grid item's automatic minimum is its
+       CONTENT, so a scrolling stepper column grows past the grid and is
+       clipped rather than scrolling. Fractal shipped with that bug. */
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "visual   steppers"
+      "player   steppers"
+      "output   arrows";
+    gap: 5px;
+    padding: 5px;
+    min-height: 0; min-width: 0;
+    overflow: hidden;
+  }
+  .visual-panel { grid-area: visual; }
+  .player-panel { grid-area: player; }
+  .output-panel { grid-area: output; }
+  #control-panel { grid-area: steppers; overflow-y: auto; }
+  #bd-arrows-slot { grid-area: arrows; }
+
+  .panel {
+    border: 1px solid #fff; border-radius: 4px; padding: 5px;
+    display: flex; flex-wrap: wrap; gap: 5px;
+    align-content: flex-start; min-width: 0; min-height: 0; overflow: hidden;
+  }
+  .visual-panel { padding: 0; border-color: #2a2a3a;
+                  display: flex; flex-direction: column; min-height: 0;
+                  /* nowrap, because .panel sets flex-wrap: wrap for the button
+                     panels and this one must NOT inherit it. In a column
+                     container, wrap moves an item that does not fit into a
+                     SECOND COLUMN — off to the side, where .panel's
+                     overflow: hidden erases it. That is how the sample
+                     selector came to be absent rather than merely clipped. */
+                  flex-wrap: nowrap; }
+  .player-panel { flex-direction: row; align-items: center; justify-content: center; }
+  #control-panel { flex-direction: column; flex-wrap: nowrap; }
+
+  /* dock-slot — reserved for BD's ↓↑ arrows. Faint frame so the reserved
+     area is visible even before BD stamps into it. */
+  .dock-slot { border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px;
+               min-height: 0; min-width: 0; }
+
+  /* ── A VIEWER, not a controller ───────────────────────────────────────
+     bd_ui_config { hideControls: true } — the host supplies the control
+     surface, so the steppers and the authoring buttons go and the TRANSPORT
+     STAYS. Play cannot be delegated: audio needs a user gesture in the
+     document that makes the sound, and a remote press cannot supply one. */
+  body.controls-hidden #control-panel,
+  body.controls-hidden .copy-row,
+  body.controls-hidden #sample-select,
+  body.controls-hidden #bd-arrows-slot { display: none; }
+  body.controls-hidden .module-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "visual" "player" "output";
+  }
+
+  /* ── no-host-chrome ───────────────────────────────────────────────────
+     Comes BEFORE controls-hidden on purpose: same specificity, so source
+     order decides, and the viewer's single-column grid must win. */
+  body.no-host-chrome #bd-arrows-slot { display: none; }
+  body.no-host-chrome .module-layout {
+    grid-template-areas:
+      "visual   steppers"
+      "player   steppers"
+      "output   steppers";
+  }
+
+  /* flex-basis 0, NOT auto. drawSpectrum sets canvas.width/height from the
+     canvas's own measured rect, and those are ATTRIBUTES — the element's
+     intrinsic size. With flex-basis: auto the intrinsic height is the
+     hypothetical main size, so each frame the canvas asked to be
+     devicePixelRatio times taller than the space it had just been given: a
+     feedback loop that squeezed everything below it out of the panel.
+     A basis of 0 makes the height come from flex-grow alone, so the attribute
+     can no longer drive layout. */
+  #spectrum { display: block; flex: 1 1 0; width: 100%; min-height: 0; }
+  /* WHY THIS IS NOT IN THE STEPPER COLUMN.
+     Width is the obvious objection and it is not the binding one. A <select>
+     is a focusable form control, and iOS Safari ZOOMS THE WHOLE PAGE when one
+     under 16px takes focus — inside an iframe that zoom cannot be undone. So
+     this cannot wear the 0.58rem the labels wear; 16px is a floor, not a
+     preference, and 16px will not fit a 136px column beside two buttons.
+     The column could have held a +/- stepper instead, cycling samples like
+     `scale` does, and that was the alternative. It was not taken because a
+     stepper shows ~4 characters and sample names are the one value here that
+     is genuinely a name — "cosmic pad dmin 60bpm" truncated to "cosm" tells
+     you nothing, and a library of twenty would be tedious to cycle.
+     So it sits under the spectrum, which is the widest space the module has,
+     and is marked %%bd_p_sample so the SCRIPT still governs it exactly like
+     the steppers. */
+  #sample-select {
+    /* 0 0 auto — never shrink. The canvas can have whatever is left; the
+       selector is a fixed strip and must not be negotiated away. */
+    flex: 0 0 auto; width: 100%;
+    background: #0d1a18; color: #9fe8d8;
+    border: 0; border-top: 1px solid #2a2a3a; border-radius: 0;
+    font-family: inherit;
+    /* 16px and not a fraction of one: anything smaller and iOS Safari zooms
+       the whole page on focus, which in an iframe is unrecoverable. */
+    font-size: 16px;
+    padding: 5px 6px;
+  }
+
+  /* uniform buttons: white frame, black bg, white font, one size */
+  /* :not(.step-btn) — the steppers are NOT transport buttons and must not
+     inherit this. Without the exclusion this rule (0,1,1) outranks .step-btn
+     (0,1,0) and silently wins on min-width, border, background, colour and
+     font-size alike. Three attempts to narrow the steppers changed nothing
+     on screen because of it. */
+  .panel button:not(.step-btn) {
+    border: 1px solid #fff; background: #000; color: #fff;
+    font-family: inherit; font-size: 0.66rem; line-height: 1.1;
+    padding: 4px 6px; border-radius: 3px;
+    min-width: 54px; min-height: 26px; cursor: pointer; text-align: center;
+    /* The iOS hardening quartet — without these a stepper press selects
+       text, flashes grey, and double-tap zooms the page. */
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+  }
+  .panel button:not(.step-btn):hover:not(:disabled) { background: #1a1a1a; }
+  .panel button:not(.step-btn):disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .big-btn { min-width: 108px; min-height: 52px; font-size: 0.95rem;
+             font-weight: bold; color: #10240f !important; }
+  /* ── CANARY host for bd_M_DroneFrac (declared 2026-10-01) ──────────────────
+     The border of the Play button. Rotates red -> green -> blue on every
+     change to this file, so there is always something to LOOK at to answer
+     "am I seeing my edit or a cached copy" — the question that cost three
+     rounds on the stepper width above, where the file WAS current and the
+     CSS was simply being overridden.
+     Trust the hex on the border line, not this prose: the note has gone
+     stale while the colour rotated on in two other files already.
+     2026-10-02n: RED (output stage: volume, bass, treble, balance — all _p_ so
+     a balance against other sound can be written down). Next = green.
+     2026-10-02m: BLUE (new default script set by the author: vox pad, pentatonic,
+     step_seconds 2, offsetCH2 60, a wet reverb). Next = red.
+     2026-10-02l: GREEN (aura_pad_Amin added from Freesound 697998 — short loop
+     on purpose, repetition being what makes a pad musical). Next = blue.
+     2026-10-02k: RED (j8_pad_Amin9 added from Freesound 624728, CC0, two
+     octaves down — the steadiest source yet and it never loops). Next = green.
+     2026-10-02j: BLUE (vox pad transposed an octave down — at native pitch it
+     had 0.6% of its energy below C2). Next = red.
+     2026-10-02i: GREEN (vox_pad_Dmin7 added from Freesound 625157, CC0; the
+     organ pads' loop crossfade removed — it was costing 16 dB of level).
+     Next = blue.
+     2026-10-02h: RED (loop clicks fixed — each voice now fades to zero at
+     both ends, so the wrap step fell from 998 to 8 of 32768). Next = green.
+     2026-10-02g: BLUE (stopped answering BD's BD_REQUEST_UPDATE poll, which
+     was rewriting the card several times a second). Next = red.
+     2026-10-02f: GREEN (pads rebuilt on the 8' rank, two octaves below the
+     original — the REGISTRATION, not the octave, was what held the pitch up).
+     Next = blue.
+     2026-10-02e: RED (sample URLs now carry a content hash; a rebuilt pad
+     could otherwise be cached indefinitely). Next = green.
+     2026-10-02d: BLUE (all three pads rebuilt an octave lower, from real low
+     notes rather than pitch-shifted; gains re-solved). Next = red.
+     2026-10-02c: GREEN (the sample selector was invisible: a canvas
+     flex-basis feedback loop plus inherited flex-wrap pushed it out of the
+     panel). Next = blue.
+     2026-10-02b: RED (a single raw note added for A/B against the chorded
+     pads).
+     2026-10-02: BLUE (bundled pads replaced with CC0 organ pads built from
+     VCSL; the Sample Focus material could not be redistributed). */
+  .big-btn.play {
+    /* The WHOLE background, not a border: a 2px frame was too easy to miss,
+       which is the one thing a canary must never be. White text because the
+       canary colours are dark and .big-btn's near-black label would be
+       unreadable on them — and luminance, not hue, has to carry it. */
+    background: #c0392b !important;      /* CANARY — red (was blue) */
+    color: #fff !important;
+  }
+  .big-btn.stop { background: #e59b9b !important; }
+  .big-btn:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .control-row { display: flex; flex-direction: column; align-items: stretch;
+                 gap: 1px; margin-bottom: 4px; }
+  .stepper { display: flex; align-items: stretch; gap: 2px; }
+  .step-btn {
+    /* These apply only now that `.panel button` excludes .step-btn — see the
+       note there. min-width: 0 is still needed in its own right, because a
+       min-width beats a flex-basis and 54px would otherwise pin the width
+       whatever basis is written.
+       52px — two off the 54 these were actually rendering at, a pixel at a
+       time. The 26px written here before was never on screen
+       (see the note on .panel button), so shaving pixels off it was shaving
+       pixels off a number nobody had ever seen, and took the buttons to less
+       than half the intended size.
+       Of the 136px between the column's padding and gaps, the pair takes 104
+       and leaves 32 for the readout — about four characters once its own
+       padding and border are taken off. Short values fit; `min_pent` does not.
+       The column cannot grow (see the layout note), so if more are wanted the
+       lever is button size or the readout's own font, not the column. */
+    flex: 0 0 52px; min-width: 0;
+    border: 1px solid #3a4a48; background: #0d1a18;
+    color: #9fe8d8; font-family: inherit; font-size: 0.85rem;
+    border-radius: 3px; cursor: pointer; min-height: 24px;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+  }
+  .step-btn:hover:not(:disabled) { background: #1a2a28; }
+  .step-btn:active:not(:disabled) { background: #243f3b; }
+  /* Enum readouts carry words, not numbers, and words need the extra
+     character that 0.6rem buys in a 26px box. Numbers stay at 0.7rem, where
+     they are more legible and never longer than four digits anyway. */
+  .stepper-value.is-enum { font-size: 0.6rem; }
+  .stepper-value {
+    flex: 1 1 auto; text-align: center; font-size: 0.7rem;
+    background: #05050a; border: 1px solid #2a2a3a; border-radius: 3px;
+    padding: 3px 2px; min-width: 0; overflow: hidden; white-space: nowrap;
+  }
+  /* The directive's own name, under the control. Never a prettier synonym:
+     the label has to be greppable against the script. */
+  .control-row label { font-size: 0.58rem; color: var(--dim); text-align: center; }
+
+  .copy-row { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+  #status:empty { display: none; }
+  #status { font-size: 0.6rem; color: var(--dim); }
+</style>
+</head>
+<body>
+
+<div class="module-layout">
+  <div class="panel visual-panel">
+    <canvas id="spectrum"></canvas>
+    <!-- Wide on purpose: it carries filenames, and it is the one control
+         whose value is a word rather than a number. -->
+    <select id="sample-select" aria-label="Source sample"></select>
+  </div>
+
+  <div class="panel player-panel">
+    <button id="play-btn" class="big-btn play" type="button" disabled>Play</button>
+    <button id="stop-btn" class="big-btn stop" type="button" disabled>Stop</button>
+  </div>
+
+  <div class="panel output-panel">
+    <div class="copy-row">
+      <button id="copy-script-btn" type="button" title="Copy the whole script — grammar and every stepper value">Copy Script</button>
+      <button id="bake-btn" type="button" title="Render offline to WAV" disabled>Bake</button>
+      <button id="save-wav-btn" type="button" title="Save the most recent bake as .wav" disabled>Save wav</button>
+    </div>
+    <span id="status"></span>
+  </div>
+
+  <!-- Rows are built from STEPPERS at boot, so that array stays the single
+       source of order, names and ranges. -->
+  <div class="panel" id="control-panel"></div>
+
+  <!-- BD stamps its ↓↑ arrows here; a standalone sends hostChrome:false and
+       the area is released. -->
+  <div id="bd-arrows-slot" class="dock-slot"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<script>
+'use strict';
+
+// ── Controls ───────────────────────────────────────────────────────────
+// `regen: true` means a change rebuilds the trajectory; anything else is a
+// live audio parameter and takes effect without a rebuild.
+const STEPPERS = [
+  { name: 'iterations',        min: 3,    max: 7,   step: 1,    fallback: 6,    regen: true },
+  { name: 'step_seconds',      min: 0.05, max: 4,   step: 0.05, fallback: 0.5,  regen: true },
+  { name: 'detune_span',       min: 0,    max: 24,  step: 1,    fallback: 12,   regen: true },
+  { name: 'scale',             min: 0,    max: 4,   step: 1,    fallback: 0,    isEnum: true, regen: true },
+  { name: 'grain_size',        min: 0.02, max: 1,   step: 0.01, fallback: 0.2 },
+  { name: 'grain_from_run',    min: 0,    max: 1,   step: 0.05, fallback: 0.4 },
+  { name: 'offsetCH2',         min: 0,    max: 60,  step: 1,    fallback: 12 },
+  { name: 'overlap',           min: 0,    max: 0.5, step: 0.01, fallback: 0.1 },
+  { name: 'playback_rate',     min: 0.1,  max: 2,   step: 0.05, fallback: 1 },
+  { name: 'duration',          min: 5,    max: 300, step: 5,    fallback: 60,   regen: true },
+  { name: 'reverb_wet',        min: 0,    max: 1,   step: 0.05, fallback: 0.45 },
+  { name: 'reverb_decay',      min: 0.1,  max: 20,  step: 0.1,  fallback: 4 },
+  { name: 'vibrato_frequency', min: 0.5,  max: 20,  step: 0.1,  fallback: 3 },
+  { name: 'vibrato_depth',     min: 0,    max: 1,   step: 0.05, fallback: 0.1 },
+  { name: 'chorus_wet',        min: 0,    max: 1,   step: 0.05, fallback: 0.3 },
+  { name: 'chorus_depth',      min: 0,    max: 1,   step: 0.05, fallback: 0.4 },
+  { name: 'loop',              min: 0,    max: 1,   step: 1,    fallback: 1,    isToggle: true },
+  // ── OUTPUT STAGE (2026-10-02) ──────────────────────────────────────────
+  // Marked _p_ and therefore SAVED IN THE SCRIPT, which is the whole point:
+  // these exist so a drone can be balanced against something else — speech,
+  // another module — and the balance kept. A mix setting that cannot be
+  // written down has to be found again every time.
+  //
+  // dB, not a 0..1 fraction, because dB is the unit the ear works in and the
+  // unit anyone reading the script will expect. 0 means unchanged.
+  { name: 'volume',            min: -40,  max: 6,   step: 0.5,  fallback: 0 },
+  { name: 'bass',              min: -12,  max: 12,  step: 0.5,  fallback: 0 },
+  { name: 'treble',            min: -12,  max: 12,  step: 0.5,  fallback: 0 },
+  { name: 'balance',           min: -1,   max: 1,   step: 0.05, fallback: 0 },
+];
+
+const SCALES = {
+  minor:          [0, 2, 3, 5, 7, 8, 10],
+  major:          [0, 2, 4, 5, 7, 9, 11],
+  min_pentatonic: [0, 3, 5, 7, 10],
+  maj_pentatonic: [0, 2, 4, 7, 9],
+  blues:          [0, 3, 5, 6, 7, 10],
+};
+const SCALE_NAMES = Object.keys(SCALES);
+const ENUM_VALUES = { scale: SCALE_NAMES };
+// Display aliases: the canonical name goes in the script, a shorter label
+// fits the narrow cell. Both directions, because a readout needs its inverse.
+// Display aliases exist because the readout is NARROW: about 26px of content
+// once its border and padding are off, which is under four characters at this
+// font. `min_pent` was eight and rendered as "min_", which does not read as a
+// scale at all — it reads as a bug. The canonical name always goes in the
+// script, so these are free to be terse.
+const ENUM_DISPLAY = {
+  minor: 'min', major: 'maj',
+  min_pentatonic: 'minP', maj_pentatonic: 'majP',
+  blues: 'blue',
+};
+const ENUM_DISPLAY_INV = Object.fromEntries(
+  Object.entries(ENUM_DISPLAY).map(([canonical, shown]) => [shown, canonical]));
+
+// The bundled samples, named by a directive so a shared script says which
+// sound it means — a granular drone IS its source file, so a script that did
+// not name it would reproduce nothing. Licence and provenance per file are in
+// sources/SOURCES.md.
+//
+// The real list is fetched from sources/manifest.json, which make_manifest.py
+// generates by scanning the directory. A browser cannot read a directory —
+// there is no API and express.static serves no index — so the listing has to
+// be made ahead of time and fetched as data. A manifest rather than a server
+// endpoint because an endpoint would work in BD and fail in a standalone on
+// GitHub Pages, and the standalone is the point of publishing these at all.
+//
+// This literal is the FALLBACK, for when the fetch fails: opened from file://
+// it will, and the module should still make a sound rather than sit mute.
+let SAMPLES = { vox_pad_dmin7: 'sources/vox_pad_Dmin7.mp3' };
+let SAMPLE_LABELS = { vox_pad_dmin7: 'vox pad dmin7' };
+let DEFAULT_SAMPLE = 'vox_pad_dmin7';
+
+async function loadManifest() {
+  try {
+    const res = await fetch('sources/manifest.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const list = (data && data.samples) || [];
+    if (!list.length) throw new Error('manifest lists no samples');
+    SAMPLES = {}; SAMPLE_LABELS = {};
+    for (const e of list) {
+      // encodeURIComponent on the FILENAME only: the names carry spaces and
+      // capitals, and a raw space in a URL is not fetched. The id never does,
+      // which is why the script names the id and not the file.
+      //
+      // ?v=<content hash> is not decoration. The MP3s are served
+      // `public, max-age=0` locally and from a CDN once published, so without
+      // a versioned URL a rebuilt sample can go on sounding like the old one
+      // indefinitely — with the canary saying the page is current, which makes
+      // you doubt the edit instead of the cache. Cost a round exactly that way
+      // when all three pads were rebuilt an octave lower and sounded identical.
+      SAMPLES[e.id] = 'sources/' + encodeURIComponent(e.file) + (e.v ? '?v=' + e.v : '');
+      SAMPLE_LABELS[e.id] = e.label || e.id;
+    }
+    if (!SAMPLES[DEFAULT_SAMPLE]) DEFAULT_SAMPLE = list[0].id;
+  } catch (err) {
+    console.warn('sample manifest unavailable, using the built-in list: ' + err.message);
+  }
+  buildSampleSelect();
+}
+
+function buildSampleSelect() {
+  const sel = document.getElementById('sample-select');
+  if (!sel) return;
+  const current = (params && params.sample) || DEFAULT_SAMPLE;
+  sel.innerHTML = '';
+  for (const id of Object.keys(SAMPLES)) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = SAMPLE_LABELS[id] || id;
+    if (id === current) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+// Safety caps. Grammar growth is exponential per iteration; without a ceiling
+// a high iteration count asks for billions of symbols and takes the tab with
+// it. Fractal learned this the hard way — the symptom is silence, not an error.
+// Two caps, the same scheme bd_M_Fractal arrived at:
+//   MAX_WALK_CHARS      how many POST-SKIP symbols are worth walking
+//   MAX_TOTAL_EMISSION  hard memory ceiling on skip + walk together
+// Grammar growth is exponential — the default rules carry nine non-terminals,
+// so each iteration multiplies the string about ninefold, and iteration 9
+// would ask for ~108 million symbols. Without a ceiling that is a dead tab,
+// and the symptom is silence rather than an error.
+const MAX_WALK_CHARS     = 300000;
+const MAX_TOTAL_EMISSION = 5000000;
+const MAX_POINTS         = 4000;
+
+const controlPanel = document.getElementById('control-panel');
+
+const statusEl   = document.getElementById('status');
+const playBtn    = document.getElementById('play-btn');
+const stopBtn    = document.getElementById('stop-btn');
+const bakeBtn    = document.getElementById('bake-btn');
+const saveWavBtn = document.getElementById('save-wav-btn');
+const canvas     = document.getElementById('spectrum');
+
+const postToParent = (msg) => { try { window.parent.postMessage(msg, '*'); } catch (_) {} };
+
+// ── Forward this module's console to the host ──────────────────────────
+// Best-effort and non-fatal by construction: a logger that can break the
+// thing it is logging is worse than no logger. An Error JSON.stringifies to
+// "{}" because message and stack are non-enumerable, hence the special case.
+(function forwardModuleConsole() {
+  const send = (level, args) => {
+    try {
+      const line = Array.prototype.map.call(args, (a) => {
+        if (typeof a === 'string') return a;
+        if (a instanceof Error) return a.message + (a.stack ? ' | ' + a.stack.split('\n')[1] : '');
+        try { return JSON.stringify(a); } catch (_) { return String(a); }
+      }).join(' ');
+      postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
+    } catch (_) {}
+  };
+  ['log', 'warn', 'error'].forEach((level) => {
+    const original = console[level].bind(console);
+    console[level] = function () { send(level, arguments); original.apply(console, arguments); };
+  });
+})();
+
+function setStatus(msg, isErr) {
+  statusEl.textContent = isErr ? (msg || '') : '';
+  postToParent({ type: 'BD_STATUS', text: isErr ? (msg || '') : '', isErr: !!isErr });
+}
+
+// ── Stepper rows ───────────────────────────────────────────────────────
+STEPPERS.forEach((s) => {
+  const row = document.createElement('div');
+  row.className = 'control-row';
+  row.dataset.name = s.name;
+  row.innerHTML =
+    '<div class="stepper">' +
+      '<button class="step-btn" type="button" data-name="' + s.name + '" data-delta="-1">−</button>' +
+      '<span class="stepper-value' + (s.isEnum ? ' is-enum' : '') + '" data-name="' +
+        s.name + '">' + formatDisplay(s, s.fallback) + '</span>' +
+      '<button class="step-btn" type="button" data-name="' + s.name + '" data-delta="1">+</button>' +
+    '</div>' +
+    '<label>' + s.name + '</label>';
+  controlPanel.appendChild(row);
+});
+
+function formatDisplay(spec, val) {
+  // 'true'/'false', never 'on'/'off'. The readout must say what the DIRECTIVE
+  // says: the script carries `%%bd_loop true`, and a control reading "on"
+  // beside it invites the reader to wonder whether they are the same thing.
+  if (spec.isToggle) return val >= 0.5 ? 'true' : 'false';
+  if (spec.isEnum) {
+    const v = (ENUM_VALUES[spec.name] || [])[Math.round(val)] || (ENUM_VALUES[spec.name] || [])[0];
+    return ENUM_DISPLAY[v] || v;
+  }
+  if (spec.step >= 1) return String(Math.round(val));
+  if (val < 1)  return val.toFixed(2);
+  if (val < 10) return val.toFixed(2);
+  return String(Math.round(val));
+}
+function getStepperValue(name) {
+  const s = STEPPERS.find((x) => x.name === name);
+  if (!s) return null;
+  const span = controlPanel.querySelector('.stepper-value[data-name="' + name + '"]');
+  if (!span) return s.fallback;
+  const txt = span.textContent.trim();
+  // The INVERSE of formatDisplay, and it has to move with it. Fractal's read
+  // tested `txt === 'on'`, so the moment the readout began saying 'true'
+  // every read of loop returned 0 and the value flipped itself off on the
+  // next press, silently. 'on' is still accepted for the same reason.
+  if (s.isToggle) return (txt === 'true' || txt === 'on') ? 1 : 0;
+  if (s.isEnum) {
+    const vals = ENUM_VALUES[s.name] || [];
+    const idx = vals.indexOf(ENUM_DISPLAY_INV[txt] || txt);
+    return idx >= 0 ? idx : s.fallback;
+  }
+  const v = parseFloat(txt);
+  return Number.isFinite(v) ? v : s.fallback;
+}
+function setStepperValue(name, val) {
+  const s = STEPPERS.find((x) => x.name === name);
+  if (!s) return;
+  let clamped = Math.max(s.min, Math.min(s.max, val));
+  if (s.isToggle) clamped = clamped >= 0.5 ? 1 : 0;
+  const span = controlPanel.querySelector('.stepper-value[data-name="' + name + '"]');
+  if (span) span.textContent = formatDisplay(s, clamped);
+}
+
+// ── Script parsing ─────────────────────────────────────────────────────
+// `(?:p_)?` everywhere: a directive may be written %%bd_p_<name> to ask for
+// a control. The mark is PRESENTATION and never part of the identity, so
+// every read must see through it.
+function parseScript(text) {
+  const g = {
+    axiom: 'X',
+    rules: { X: 'XFYFX+F+YFXFY-F-XFYFX', Y: 'YFXFY-F-XFYFX+F+YFXFY' },
+    angle: 90,
+    sample: DEFAULT_SAMPLE,
+    marked: new Set(),
+  };
+  for (const s of STEPPERS) g[s.name] = s.fallback;
+
+  const lines = (text || '').split('\n');
+  for (const raw of lines) {
+    const line = raw.trim();
+    const m = line.match(/^%%bd_(p_)?([a-z_0-9]+)\s*(.*)$/i);
+    if (!m) continue;
+    const marked = !!m[1];
+    const key = m[2];
+    const val = (m[3] || '').trim();
+    if (marked) g.marked.add(key);
+
+    if (key === 'axiom') { if (val) g.axiom = val; continue; }
+    if (key === 'rule') {
+      const c = val.indexOf(':');
+      if (c > 0) g.rules[val.slice(0, c).trim()] = val.slice(c + 1).trim();
+      continue;
+    }
+    if (key === 'angle')  { const v = parseFloat(val); if (Number.isFinite(v)) g.angle = v; continue; }
+    if (key === 'sample') { if (val && SAMPLES[val]) g.sample = val; continue; }
+
+    const spec = STEPPERS.find((x) => x.name === key);
+    if (!spec) continue;
+    if (spec.isToggle)    { g[key] = /^(true|on|1|yes)$/i.test(val) ? 1 : 0; continue; }
+    if (spec.isEnum) {
+      const vals = ENUM_VALUES[key] || [];
+      const idx = vals.indexOf(val);
+      if (idx >= 0) g[key] = idx;
+      continue;
+    }
+    const v = parseFloat(val);
+    if (Number.isFinite(v)) g[key] = Math.max(spec.min, Math.min(spec.max, v));
+  }
+  return g;
+}
+
+// RULE 2: a script with NO mark anywhere keeps every control shown, so
+// nothing already written, saved or shared changes behaviour. Once a script
+// marks anything it is taken to mean exactly what it says.
+function applyControlVisibility(marked) {
+  const any = marked && marked.size > 0;
+  for (const s of STEPPERS) {
+    const row = controlPanel.querySelector('.control-row[data-name="' + s.name + '"]');
+    if (row) row.hidden = any && !marked.has(s.name);
+  }
+  // The sample selector obeys the same rule even though it is not a stepper:
+  // `sample` is script state like any other, and a script that marks some
+  // directives and not this one is saying it does not want the control.
+  const sel = document.getElementById('sample-select');
+  if (sel) sel.hidden = any && !marked.has('sample');
+}
+
+// RULE 1: the writer must reconstruct the form it READ. A script that arrived
+// carrying %%bd_p_grain_size must go back carrying %%bd_p_grain_size, or
+// merely moving a stepper would silently change which controls appear.
+function currentScript() {
+  let text = storedText || '';
+  const setters = {};
+  for (const s of STEPPERS) {
+    const v = getStepperValue(s.name);
+    if (s.isToggle)      setters[s.name] = v >= 0.5 ? 'true' : 'false';
+    else if (s.isEnum)   setters[s.name] = (ENUM_VALUES[s.name] || [])[Math.round(v)] || '';
+    else if (s.step >= 1) setters[s.name] = String(Math.round(v));
+    else                 setters[s.name] = v.toFixed(2);
+  }
+  // `sample` is not a stepper but it IS script state, and RULE 1 applies to it
+  // the same way: without this the dropdown would change the sound and the
+  // script would go on naming the old file, so Copy Script would hand someone
+  // a drone they had never heard.
+  if (params && params.sample) setters.sample = params.sample;
+  // (the %%bd_p_ / %%bd_ form is preserved by the loop below, same as a stepper)
+  for (const [key, val] of Object.entries(setters)) {
+    const reMarked = new RegExp('^%%bd_p_' + key + '\\s+.*$', 'm');
+    const rePlain  = new RegExp('^%%bd_' + key + '\\s+.*$', 'm');
+    const isMarked = reMarked.test(text);
+    const re   = isMarked ? reMarked : rePlain;
+    const line = '%%bd_' + (isMarked ? 'p_' : '') + key + ' ' + val;
+    if (re.test(text)) { text = text.replace(re, line); continue; }
+    // Absent: insert after the last directive rather than appending at the
+    // end, so a trailing prose paragraph stays below the block.
+    const ls = text.split('\n');
+    let lastBd = -1;
+    for (let i = 0; i < ls.length; i++) if (/^%%bd_/.test(ls[i])) lastBd = i;
+    ls.splice(lastBd + 1, 0, line);
+    text = ls.join('\n');
+  }
+  return text;
+}
+
+// ── L-system ───────────────────────────────────────────────────────────
+// How long iteration N would be, WITHOUT materialising it. Recursion with
+// memoisation on (symbol, remaining-depth). Needed by the skip mechanism:
+// knowing how big iteration N-1 is tells us how many leading symbols of
+// iteration N are material we have already heard.
+function computeExpansionLength(axiom, rules, iterations) {
+  const cache = new Map();
+  function len(sym, depth) {
+    if (depth === 0 || rules[sym] === undefined) return 1;
+    const key = sym + '@' + depth;
+    if (cache.has(key)) return cache.get(key);
+    let total = 0;
+    const rule = rules[sym];
+    for (let i = 0; i < rule.length; i++) total += len(rule[i], depth - 1);
+    cache.set(key, total);
+    return total;
+  }
+  let total = 0;
+  for (const ch of axiom) total += len(ch, iterations);
+  return total;
+}
+
+// Depth-first streaming expansion, ported from bd_M_Fractal. Rewriting is
+// context-free — each symbol's expansion depends only on itself — so iter-N's
+// symbols can be emitted one at a time by DFS without ever materialising an
+// intermediate iteration. Memory is O(iterations) for the stack rather than
+// O(k^iter). An explicit stack, not a generator, to avoid per-yield GC
+// pressure at million-symbol outputs.
+function expandLSystem(axiom, rules, iterations, maxChars) {
+  const parts = [];
+  let truncated = false;
+  const stack = [{ expansion: axiom, index: 0, depth: iterations }];
+  while (stack.length > 0) {
+    if (parts.length >= maxChars) { truncated = true; break; }
+    const frame = stack[stack.length - 1];
+    if (frame.index >= frame.expansion.length) { stack.pop(); continue; }
+    const sym = frame.expansion[frame.index];
+    frame.index++;
+    const rule = rules[sym];
+    if (frame.depth === 0 || rule === undefined) parts.push(sym);
+    else stack.push({ expansion: rule, index: 0, depth: frame.depth - 1 });
+  }
+  return { symbols: parts.join(''), truncated: truncated };
+}
+
+// Turtle: F forward, + turn CCW, - turn CW. Heading in degrees, 0 = east.
+// Only F, + and - reach here; X and Y shape the string and are never walked,
+// which is what makes the grammar two-layered.
+function turtleWalk(symbols, angleDeg) {
+  const segs = [];
+  let x = 0, y = 0, heading = 0;
+  for (let i = 0; i < symbols.length; i++) {
+    const ch = symbols[i];
+    if (ch === 'F') {
+      const rad = heading * Math.PI / 180;
+      const dx = Math.cos(rad), dy = Math.sin(rad);
+      segs.push({ symIdx: i, x1: x, y1: y, isHorizontal: Math.abs(dx) > 0.5 });
+      x += dx; y += dy;
+    } else if (ch === '+') heading = (heading + angleDeg) % 360;
+    else if (ch === '-')   heading = (heading - angleDeg + 360) % 360;
+  }
+  return segs;
+}
+
+// Collapse consecutive same-direction segments into runs. A horizontal run at
+// one height becomes ONE trajectory point whose length is how long to hold it.
+function collapseRuns(segments) {
+  const out = [];
+  let i = 0;
+  while (i < segments.length) {
+    const seg = segments[i];
+    let runLen = 1, j = i + 1;
+    if (seg.isHorizontal) {
+      const y = Math.round(seg.y1);
+      while (j < segments.length && segments[j].isHorizontal
+             && Math.round(segments[j].y1) === y) { runLen++; j++; }
+    } else {
+      while (j < segments.length && !segments[j].isHorizontal) { runLen++; j++; }
+    }
+    out.push({ symIdx: seg.symIdx, x1: seg.x1, y1: seg.y1,
+               isHorizontal: seg.isHorizontal, length: runLen });
+    i = j;
+  }
+  return out;
+}
+
+// Pitch reflection, ported from bd_M_Fractal and the most musically
+// consequential rule in either file. Walk the raw y-deltas as a particle
+// bouncing between walls at ±span. When a step would cross a wall, flip
+// direction and RETRY — the step is bounced back into range rather than
+// consumed, so the effective y never leaves [-span, +span]. Without it a long
+// walk drifts out of audibility; with it, it sings.
+function applyReflection(runs, span) {
+  const out = [];
+  // span 0 is a REACHABLE stepper value and the bounce below cannot survive
+  // it: both walls sit at 0, so every candidate step fails the bounds test,
+  // direction flips for ever and `remaining` never decrements — an infinite
+  // loop that takes the tab, not an error. Zero span means "no pitch
+  // movement", so answer it directly.
+  if (!(span > 0)) {
+    for (const run of runs) {
+      out.push(run.isHorizontal
+        ? { x1: run.x1, y1: 0, isHorizontal: true, length: run.length }
+        : run);
+    }
+    return out;
+  }
+  let prevRawY = null, effY = 0, direction = 1;
+  for (const run of runs) {
+    if (!run.isHorizontal) { out.push(run); continue; }
+    const rawY = Math.round(run.y1);
+    if (prevRawY !== null) {
+      const delta = rawY - prevRawY;
+      if (delta !== 0) {
+        let step = (delta > 0 ? 1 : -1) * direction;
+        let remaining = Math.abs(delta);
+        while (remaining > 0) {
+          const next = effY + step;
+          if (next > span || next < -span) { step = -step; direction = -direction; }
+          else { effY = next; remaining--; }
+        }
+      }
+    } else {
+      // Seed from the raw starting y wrapped into the span, not always 0:
+      // different iterations begin at genuinely different absolute y, so this
+      // is what gives each iteration a distinct opening colour.
+      effY = span > 0 ? (((rawY % span) + span) % span) : 0;
+    }
+    prevRawY = rawY;
+    out.push({ x1: run.x1, y1: effY, isHorizontal: true, length: run.length });
+  }
+  return out;
+}
+
+// ── The trajectory ─────────────────────────────────────────────────────
+// Where this module earns its existence. Two axes, two destinations, nothing
+// in between to collapse them:
+//
+//   y          → detune, quantised to the scale, in CENTS
+//   run length → grainSize, blended by grain_from_run
+//
+// Computed ENTIRELY before playback — like the note list in the other
+// modules, nothing here is derived while sound is happening.
+let trajectory = [];
+let trajectoryInfo = { points: 0, truncated: false, span: 0 };
+
+function buildTrajectory(g) {
+  // THE SKIP MECHANISM, ported from bd_M_Fractal — without it `iterations` is
+  // an inert control. Iteration N's string BEGINS with material that is
+  // effectively iteration N-1's, so taking the first runs of it gives the same
+  // trajectory at every setting: measured 3, 6 and 8 producing byte-identical
+  // output. Skipping the prefix is what makes a higher iteration a DIFFERENT
+  // piece rather than the same opening at greater expense.
+  //
+  // The turtle still walks the prefix — it has to, or the heading and position
+  // would be wrong when the kept material begins — but those segments are
+  // dropped.
+  let iter = Math.round(g.iterations);
+  let skipSymbols = iter > 0 ? computeExpansionLength(g.axiom, g.rules, iter - 1) : 0;
+  // If the prefix alone would blow the symbol ceiling there is nothing left to
+  // keep, so drop the effective iteration until it fits. Silent truncation
+  // here would read as "the module plays nothing".
+  let iterReduced = false;
+  while (iter > 1 && skipSymbols + 2000 > MAX_TOTAL_EMISSION) {
+    iter--;
+    skipSymbols = computeExpansionLength(g.axiom, g.rules, iter - 1);
+    iterReduced = true;
+  }
+  const emitCap = Math.min(skipSymbols + MAX_WALK_CHARS, MAX_TOTAL_EMISSION);
+  const exp  = expandLSystem(g.axiom, g.rules, iter, emitCap);
+  const degrees = SCALES[(ENUM_VALUES.scale || [])[Math.round(g.scale)]] || SCALES.minor;
+
+  // detune_span is in SEMITONES, because that is what the name says — but the
+  // reflection bounces in SCALE DEGREES, and the two are not the same unit.
+  // Walling the bounce at `span` degrees made span 12 reach ±2100 cents, call
+  // it a minor seventeenth, when it had promised an octave. Convert.
+  const wall = Math.max(0, Math.round(g.detune_span / 12 * degrees.length));
+
+  const allSegs = turtleWalk(exp.symbols, g.angle);
+  const firstIdx = allSegs.findIndex((seg) => seg.symIdx >= skipSymbols);
+  const segs = firstIdx >= 0 ? allSegs.slice(firstIdx) : allSegs;
+  const runs = applyReflection(collapseRuns(segs), wall);
+
+  // The longest run in THIS grammar, so grain_from_run spans its full effect
+  // whatever the rules produce. Normalising against a fixed constant made the
+  // control nearly inert: real run lengths here are 2–5, so a hard-coded
+  // ceiling of 8 used only the bottom third of the range.
+  let maxRun = 1;
+  for (const r of runs) if (r.isHorizontal && r.length > maxRun) maxRun = r.length;
+
+  // STOP AT `duration`. Without this the default script built a 7,000-second
+  // trajectory and played the first 60 of it, so iterations 6 and 10 produced
+  // an identical audible result — both truncated at the same cap, and 99% of
+  // the walk was computed and thrown away. The walk now fills the time it has,
+  // and step_seconds is what decides how far through the grammar that reaches.
+  const limit = g.duration;
+  const pts = [];
+  let t = 0;
+  let used = 0, truncated = exp.truncated;
+  let minC = 0, maxC = 0;
+  for (const run of runs) {
+    if (t >= limit) { truncated = true; break; }
+    used++;
+    if (!run.isHorizontal) { t += run.length * g.step_seconds * 0.5; continue; }
+    if (pts.length >= MAX_POINTS) { truncated = true; break; }
+    const yInt   = Math.round(run.y1);
+    const octave = Math.floor(yInt / degrees.length);
+    const degree = ((yInt % degrees.length) + degrees.length) % degrees.length;
+    const cents  = (octave * 12 + degrees[degree]) * 100;
+    if (cents < minC) minC = cents;
+    if (cents > maxC) maxC = cents;
+    pts.push({ time: t, detune: cents, runLength: run.length, maxRun: maxRun });
+    t += run.length * g.step_seconds;
+  }
+  trajectory = pts;
+  trajectoryInfo = {
+    points: pts.length, truncated: truncated,
+    span: Math.round((maxC - minC) / 100), length: t,
+    runs: runs.length, used: used,
+    iter: iter, iterReduced: iterReduced, skipSymbols: skipSymbols,
+    skippedSegments: firstIdx >= 0 ? firstIdx : 0,
+  };
+  return pts;
+}
+
+// grainSize for a point: the base stepper, pushed by how long the run is.
+// grain_from_run 0 leaves grain size entirely to the stepper, which is how a
+// script that has never heard of this parameter must behave.
+function grainSizeFor(point, base, fromRun) {
+  if (!fromRun) return base;
+  // Normalised against the longest run this grammar actually produced, not a
+  // constant — see the note in buildTrajectory.
+  const n = Math.min(1, (point.runLength - 1) / Math.max(1, (point.maxRun || 1) - 1));
+  return base * (1 - fromRun) + (base * (0.3 + 1.7 * n)) * fromRun;
+}
+
+
+// ── Audio ──────────────────────────────────────────────────────────────
+// CHANNEL 2 (2026-10-01) — a second grain player reading the SAME trajectory
+// at a different position, two octaves up. The offset is an INDEX, not a delay,
+// which is bd_M_Fractal's meaning for offset2/offset3: at trajectory point k,
+// channel 2 sounds point k + offsetCH2 at the same instant. So the two voices
+// are not a canon — they are a chord the grammar harmonises with itself, and
+// what you hear at any moment is two places in the same walk at once.
+//
+// offsetCH2 0 is still useful: the channels coincide and it becomes a plain
+// octave doubling.
+let grain = null, grain2 = null, ch2Gain = null;
+let chorus = null, vibrato = null, reverb = null, limiter = null, fft = null;
+let eq = null, panner = null, outVol = null;
+let buffer = null, bufferReady = false;
+let storedText = '';
+let params = null;
+let playing = false;
+let loopTimer = null;
+let lastBake = null;
+
+function buildChain() {
+  // ── THE OUTPUT STAGE SITS LAST, AND THE ORDER IS THE DESIGN ──────────
+  //   ... reverb -> EQ3 -> Panner -> Volume -> Limiter -> destination
+  // EQ before the limiter, so a bass or treble BOOST is caught by the ceiling
+  // rather than clipping; volume after the EQ, so the fader means what it says
+  // whatever the tone controls are doing; limiter last, always, because it is
+  // the only thing standing between grain summing and a clipped output.
+  limiter = new Tone.Limiter(-1).toDestination();
+  outVol  = new Tone.Volume(0).connect(limiter);
+  panner  = new Tone.Panner(0).connect(outVol);
+  // 250 Hz and 3 kHz rather than EQ3's defaults of 400 and 2500: "bass" that
+  // starts at 400 Hz reaches well into the pads' fundamentals and acts as a
+  // level control instead of a tone control.
+  eq = new Tone.EQ3({ low: 0, mid: 0, high: 0,
+                      lowFrequency: 250, highFrequency: 3000 }).connect(panner);
+  // The analyser taps AFTER the output stage, so the display shows what you
+  // actually hear — tone controls included — and before the final ceiling.
+  fft = new Tone.FFT(64);
+  outVol.connect(fft);
+  reverb  = new Tone.Reverb({ decay: 4, wet: 0.45 }).connect(eq);
+  vibrato = new Tone.Vibrato({ frequency: 3, depth: 0.1, type: 'sine' }).connect(reverb);
+  chorus  = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.4, wet: 0.3 }).connect(vibrato);
+  chorus.start();
+  // -5 dB, fixed. Two grain streams at equal level sum into the limiter and
+  // flatten each other; the upper octave also sits forward of the lower by
+  // ear, so matching their gains does not match their presence. One line from
+  // being a stepper if it wants balancing.
+  ch2Gain = new Tone.Gain(0).connect(chorus);
+  ch2Gain.gain.value = Math.pow(10, -5 / 20);
+}
+
+function applyLiveParams() {
+  // Guard the GRAIN lines only. Bailing out of the whole function when the
+  // sample has not loaded yet left the effects tail sitting at buildChain's
+  // defaults, so a script arriving with its own reverb and chorus values was
+  // ignored until someone pressed a stepper.
+  for (const g of [grain, grain2]) {
+    if (!g) continue;
+    g.overlap      = getStepperValue('overlap');
+    g.playbackRate = getStepperValue('playback_rate');
+    g.grainSize    = getStepperValue('grain_size');
+  }
+  if (reverb)  { reverb.wet.value = getStepperValue('reverb_wet');
+                 const d = getStepperValue('reverb_decay');
+                 if (Math.abs(reverb.decay - d) > 0.01) {
+                   reverb.decay = d;
+                   clearTimeout(applyLiveParams._t);
+                   // generate() rebuilds the impulse response and is
+                   // expensive; debounced so holding the stepper does not
+                   // rebuild it on every tick.
+                   applyLiveParams._t = setTimeout(() => { try { reverb.generate(); } catch (_) {} }, 150);
+                 } }
+  if (vibrato) { vibrato.frequency.value = getStepperValue('vibrato_frequency');
+                 vibrato.depth.value     = getStepperValue('vibrato_depth'); }
+  if (chorus)  { chorus.wet.value = getStepperValue('chorus_wet');
+                 chorus.depth     = getStepperValue('chorus_depth'); }
+  if (eq)      { eq.low.value  = getStepperValue('bass');
+                 eq.high.value = getStepperValue('treble'); }
+  if (panner)  { panner.pan.value = getStepperValue('balance'); }
+  if (outVol)  { outVol.volume.value = getStepperValue('volume'); }
+}
+
+async function loadSample(name) {
+  const url = SAMPLES[name] || SAMPLES[DEFAULT_SAMPLE];
+  bufferReady = false;
+  updateControls();
+  try {
+    buffer = await new Tone.ToneAudioBuffer().load(url);
+    if (grain)  { grain.dispose();  grain = null; }
+    if (grain2) { grain2.dispose(); grain2 = null; }
+    const opts = () => ({
+      url: buffer, loop: true,
+      grainSize: getStepperValue('grain_size'),
+      overlap:   getStepperValue('overlap'),
+      playbackRate: getStepperValue('playback_rate'),
+    });
+    grain  = new Tone.GrainPlayer(opts()).connect(chorus);
+    grain2 = new Tone.GrainPlayer(opts()).connect(ch2Gain);
+    bufferReady = true;
+    const sel = document.getElementById('sample-select');
+    if (sel && sel.value !== name) sel.value = name;
+    applyLiveParams();
+    setStatus('');
+  } catch (err) {
+    // A missing sample is the failure mode to be loud about. The sampler
+    // modules taught this: four 404s made Tone.loaded() never resolve and
+    // Play simply stayed disabled with no error anywhere, which reads as a
+    // broken library. Say what is wrong.
+    console.error('sample load failed', err);
+    setStatus('sample ' + name + ' failed to load', true);
+  }
+  updateControls();
+}
+
+// ── Transport scheduling ───────────────────────────────────────────────
+// GrainPlayer's detune and grainSize are PLAIN NUMBERS, not Signals, so the
+// trajectory cannot be CONNECTED — it has to be written at times. Each write
+// lands at the next grain, which is why the effective resolution is
+// 1/grainSize and why nothing here tries to ramp.
+// `read` supplies grain_size and grain_from_run AT FIRE TIME. Capturing them
+// when the trajectory was scheduled made grain_size inert during playback:
+// applyLiveParams set it on the press, and the very next trajectory point —
+// at most one grain later — overwrote it with the value captured at Play.
+// The stepper appeared to do nothing, which is the worst kind of wrong,
+// because the control was there and responding and simply had no effect.
+//
+// Bake passes a FIXED reader instead, because an offline render must not
+// depend on what someone does to the panel while it is rendering.
+// TWO octaves up, not one. At +1200 the second channel sat inside the first's
+// own harmonics and was hard to pick out as a separate voice at all — the
+// upper octave of a pad is already present in the pad. +2400 clears that
+// region and the two read as two.
+const CH2_CENTS = 2400;
+
+function scheduleTrajectory(transport, pts, read) {
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    transport.scheduleOnce((/* time */) => {
+      if (!grain) return;
+      const v = read();
+      grain.detune    = p.detune;
+      grain.grainSize = grainSizeFor(p, v.base, v.fromRun);
+      if (grain2) {
+        // Clamp rather than wrap at the end: wrapping would jump channel 2
+        // back to the opening while channel 1 is still finishing, which reads
+        // as a mistake. Holding the last value lets the two converge.
+        const j = Math.min(i + v.offset2, pts.length - 1);
+        const q = pts[j];
+        grain2.detune    = q.detune + CH2_CENTS;
+        grain2.grainSize = grainSizeFor(q, v.base, v.fromRun);
+      }
+    }, p.time);
+  }
+}
+
+// The live reader: whatever the panel says at the moment the grain fires.
+const liveGrainRead = () => ({
+  base:    getStepperValue('grain_size'),
+  fromRun: getStepperValue('grain_from_run'),
+  offset2: Math.round(getStepperValue('offsetCH2')),
+});
+
+async function startPlayback() {
+  if (!bufferReady || !grain) return;
+  await Tone.start();
+  stopPlayback(true);
+  const dur = getStepperValue('duration');
+  const t = Tone.getTransport();
+  t.cancel(0);
+  t.stop(); t.position = 0;
+  scheduleTrajectory(t, trajectory, liveGrainRead);
+  t.scheduleOnce(() => {
+    if (getStepperValue('loop') >= 0.5) {
+      // Reschedule WITHOUT stopping the grain. Tearing the player down and
+      // restarting it leaves a gap, and a gap in a drone is a click — the one
+      // artefact this whole module is arranged to avoid.
+      loopTimer = setTimeout(() => { relaunchTrajectory(); }, 0);
+    } else {
+      stopPlayback();
+    }
+  }, dur);
+  grain.start();
+  if (grain2) grain2.start();
+  t.start();
+  playing = true;
+  updateControls();
+}
+
+// The loop path: rewind and reschedule while the grain keeps sounding.
+function relaunchTrajectory() {
+  if (!playing || !grain) return;
+  const t = Tone.getTransport();
+  t.cancel(0); t.stop(); t.position = 0;
+  scheduleTrajectory(t, trajectory, liveGrainRead);
+  t.scheduleOnce(() => {
+    if (getStepperValue('loop') >= 0.5) loopTimer = setTimeout(relaunchTrajectory, 0);
+    else stopPlayback();
+  }, getStepperValue('duration'));
+  t.start();
+}
+
+function stopPlayback(quiet) {
+  clearTimeout(loopTimer); loopTimer = null;
+  const t = Tone.getTransport();
+  t.cancel(0); t.stop(); t.position = 0;
+  for (const g of [grain, grain2]) { if (g) { try { g.stop(); } catch (_) {} } }
+  playing = false;
+  if (!quiet) updateControls();
+}
+
+function updateControls() {
+  const ready = bufferReady && trajectory.length > 0;
+  playBtn.disabled = !ready || playing;
+  stopBtn.disabled = !playing;
+  bakeBtn.disabled = !ready;
+  saveWavBtn.disabled = !lastBake;
+}
+
+// ── Spectrum ───────────────────────────────────────────────────────────
+// Tone.FFT is ANALYSIS ONLY — getValue() hands back magnitudes and there is
+// no inverse, so nothing here can feed back into the sound. It is a display,
+// and it earns its place because the effect of grain size and overlap is
+// much easier to see than to hear at first.
+function drawSpectrum() {
+  requestAnimationFrame(drawSpectrum);
+  if (!canvas || !fft) return;
+  const r = canvas.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (canvas.width !== Math.round(r.width * dpr)) {
+    canvas.width  = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const vals = fft.getValue();
+  const n = vals.length;
+  const bw = w / n;
+  for (let i = 0; i < n; i++) {
+    // dB, roughly -100..0. Map to a bar height.
+    const v = Math.max(0, Math.min(1, (vals[i] + 100) / 100));
+    const bh = v * h;
+    // Hue tracks the band so the display reads as a spectrum, but the BAR
+    // HEIGHT carries the information — never hue alone.
+    ctx.fillStyle = 'hsl(' + Math.round(170 + (i / n) * 120) + ', 55%, ' +
+                    Math.round(25 + v * 45) + '%)';
+    ctx.fillRect(i * bw, h - bh, Math.max(1, bw - 1), bh);
+  }
+}
+requestAnimationFrame(drawSpectrum);
+
+// ── Regenerate ─────────────────────────────────────────────────────────
+function regenerate() {
+  try {
+    params = parseScript(storedText);
+    buildTrajectory(params);
+    if (trajectoryInfo.points === 0) {
+      setStatus('grammar produced no horizontal runs — nothing to play', true);
+    } else if (trajectoryInfo.truncated) {
+      setStatus('trajectory capped at ' + trajectoryInfo.points + ' points', true);
+    } else {
+      setStatus('');
+    }
+    updateControls();
+  } catch (err) {
+    console.error('regenerate failed', err);
+    setStatus('grammar error: ' + err.message, true);
+  }
+}
+
+function syncSteppersFromScript() {
+  const g = parseScript(storedText);
+  for (const s of STEPPERS) setStepperValue(s.name, g[s.name]);
+  applyControlVisibility(g.marked);
+  if (!grain || (params && params.sample !== g.sample)) loadSample(g.sample);
+  applyLiveParams();
+}
+
+// ── Stepper presses ────────────────────────────────────────────────────
+controlPanel.addEventListener('click', (e) => {
+  const btn = e.target.closest('.step-btn');
+  if (!btn || btn.disabled) return;
+  const name  = btn.dataset.name;
+  const delta = parseFloat(btn.dataset.delta);
+  const s = STEPPERS.find((x) => x.name === name);
+  if (!s) return;
+  setStepperValue(name, getStepperValue(name) + delta * s.step);
+  storedText = currentScript();
+  if (s.regen) { params = parseScript(storedText); buildTrajectory(params); updateControls(); }
+  applyLiveParams();
+  // Announcing on a STEPPER PRESS is what makes the pull direction work, and
+  // it cannot loop: a person has to press something. Announcing on
+  // bd_script_update instead DOES loop — see the handler below.
+  announce();
+});
+
+function announce() {
+  postToParent({ type: 'bd_av_state', text: storedText, fromDrift: false });
+}
+
+// ── Sample selection ───────────────────────────────────────────────────
+document.getElementById('sample-select').addEventListener('change', (e) => {
+  const id = e.target.value;
+  if (!SAMPLES[id]) return;
+  // STOP FIRST. loadSample disposes the running GrainPlayer and builds a new
+  // one, so without this the transport would go on firing trajectory events at
+  // a player that was never started — silence, while the panel still showed
+  // Stop armed and Play greyed out. Stopping hands it back in the state the
+  // buttons are already describing: Play lit, Stop inactive, one press away.
+  // Deliberately NOT auto-resuming: changing the source is a decision, and a
+  // drone that restarts itself under you is harder to audition.
+  stopPlayback();
+  if (!params) params = parseScript(storedText);
+  params.sample = id;
+  storedText = currentScript();
+  loadSample(id);
+  announce();
+});
+
+// ── Buttons ────────────────────────────────────────────────────────────
+playBtn.addEventListener('click', () => { startPlayback(); });
+stopBtn.addEventListener('click', () => { stopPlayback(); setStatus(''); });
+
+document.getElementById('copy-script-btn').addEventListener('click', async () => {
+  const text = currentScript();
+  try {
+    // Hand the clipboard the write INSIDE the click: a gesture does not
+    // survive an await, and Safari refuses what Chrome allows.
+    await navigator.clipboard.writeText(text);
+    setStatus('');
+  } catch (_) {
+    setStatus('copy failed — clipboard refused', true);
+  }
+});
+
+bakeBtn.addEventListener('click', async () => {
+  if (!buffer || !trajectory.length) return;
+  bakeBtn.disabled = true;
+  setStatus('');
+  try {
+    const dur     = getStepperValue('duration');
+    const base    = getStepperValue('grain_size');
+    const fromRun = getStepperValue('grain_from_run');
+    const vals = {
+      overlap: getStepperValue('overlap'), rate: getStepperValue('playback_rate'),
+      rWet: getStepperValue('reverb_wet'), rDecay: getStepperValue('reverb_decay'),
+      vFreq: getStepperValue('vibrato_frequency'), vDepth: getStepperValue('vibrato_depth'),
+      cWet: getStepperValue('chorus_wet'), cDepth: getStepperValue('chorus_depth'),
+      // Captured once, like the rest: a render must not change because
+      // someone moved a stepper while it was rendering.
+      offset2: Math.round(getStepperValue('offsetCH2')),
+      volume: getStepperValue('volume'), bass: getStepperValue('bass'),
+      treble: getStepperValue('treble'), balance: getStepperValue('balance'),
+    };
+    const tail = Math.max(vals.rDecay, 0.5) + 0.5;
+    const rendered = await Tone.Offline(async (ctx) => {
+      // The SAME output stage as the live chain, in the same order. Without it
+      // Save wav would ignore volume, bass, treble and balance entirely, and
+      // the file would not be the thing you balanced.
+      const lim = new Tone.Limiter(-1).toDestination();
+      const vol = new Tone.Volume(vals.volume).connect(lim);
+      const pan = new Tone.Panner(vals.balance).connect(vol);
+      const eq3 = new Tone.EQ3({ low: vals.bass, mid: 0, high: vals.treble,
+                                 lowFrequency: 250, highFrequency: 3000 }).connect(pan);
+      const rev = new Tone.Reverb({ decay: Math.max(0.1, vals.rDecay), wet: vals.rWet }).connect(eq3);
+      await rev.ready;
+      const vib = new Tone.Vibrato({ frequency: vals.vFreq, depth: vals.vDepth, type: 'sine' }).connect(rev);
+      const cho = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: vals.cDepth, wet: vals.cWet }).connect(vib);
+      cho.start();
+      const g2 = new Tone.Gain(Math.pow(10, -5 / 20)).connect(cho);
+      const mk = (dest) => new Tone.GrainPlayer({
+        url: buffer, loop: true, grainSize: base,
+        overlap: vals.overlap, playbackRate: vals.rate,
+      }).connect(dest);
+      const gp  = mk(cho);
+      const gp2 = mk(g2);
+      // The offline context has its OWN transport — the live one is on a
+      // different context and scheduling against it here renders silence.
+      const t = ctx.transport;
+      for (let i = 0; i < trajectory.length; i++) {
+        const p = trajectory[i];
+        if (p.time > dur) break;
+        t.scheduleOnce(() => {
+          gp.detune = p.detune;
+          gp.grainSize = grainSizeFor(p, base, fromRun);
+          const q = trajectory[Math.min(i + vals.offset2, trajectory.length - 1)];
+          gp2.detune = q.detune + CH2_CENTS;
+          gp2.grainSize = grainSizeFor(q, base, fromRun);
+        }, p.time);
+      }
+      gp.start(0);
+      gp2.start(0);
+      t.start(0);
+    }, dur + tail, 2, Tone.getContext().sampleRate);
+    lastBake = rendered.get ? rendered.get() : rendered;
+    setStatus('');
+    saveWavBtn.disabled = false;
+  } catch (err) {
+    console.error('bake failed', err);
+    setStatus('bake failed: ' + err.message, true);
+  }
+  bakeBtn.disabled = false;
+});
+
+saveWavBtn.addEventListener('click', () => {
+  if (!lastBake) return;
+  const wav = audioBufferToWav(lastBake);
+  const blob = new Blob([wav], { type: 'audio/wav' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bd_M_DroneFrac.wav';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+
+function audioBufferToWav(b) {
+  const numCh = b.numberOfChannels, sr = b.sampleRate, numSamp = b.length;
+  const bps = 2, ba = numCh * bps, br = sr * ba, ds = numSamp * ba, bs = 44 + ds;
+  const out = new Uint8Array(bs); const view = new DataView(out.buffer);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); view.setUint32(4, bs - 8, true); w(8, 'WAVE'); w(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true); view.setUint32(28, br, true); view.setUint16(32, ba, true);
+  view.setUint16(34, 16, true); w(36, 'data'); view.setUint32(40, ds, true);
+  const ch = []; for (let c = 0; c < numCh; c++) ch.push(b.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < numSamp; i++) {
+    for (let c = 0; c < numCh; c++) {
+      let s = Math.max(-1, Math.min(1, ch[c][i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+  }
+  return out;
+}
+
+// ── The host contract ──────────────────────────────────────────────────
+window.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || typeof data.type !== 'string') return;
+  try {
+    const type = data.type;
+    if (type === 'bd_script_update') {
+      storedText = typeof data.script === 'string' ? data.script : '';
+      syncSteppersFromScript();
+      regenerate();
+      // DELIBERATELY SILENT. Announcing here loops: the script is REBUILT
+      // from the steppers, so what comes back is not identical to what went
+      // in, the host's "already equal" guard never fires, and the two
+      // lengths alternate for ever. Fractal was observed flooding at 421/430
+      // chars and taking the graph down with it.
+    } else if (type === 'bd_script_request') {
+      postToParent({ type: 'bd_script_response', script: currentScript() });
+    } else if (type === 'bd_ui_config') {
+      document.body.classList.toggle('controls-hidden', data.hideControls === true);
+      // hostChrome: does the host draw anything AROUND this iframe? BD stamps
+      // its arrows into the dock slot, so the grid reserves an area for it. A
+      // standalone draws nothing. DEFAULTS TO TRUE, so a host that says
+      // nothing keeps BD's behaviour and nothing working changes.
+      document.body.classList.toggle('no-host-chrome',
+        data.hideControls === true || data.hostChrome === false);
+    } else if (type === 'BD_STOP') {
+      stopPlayback();
+    }
+    // BD_REQUEST_UPDATE is NOT handled, on purpose. It is a poll, and
+    // answering a poll with an announce is what drove the card-rewrite loop
+    // above. See the note in index.html's RELAY_DOWN.
+  } catch (err) {
+    console.error('music_module: postMessage error', err);
+    setStatus('Message error: ' + err.message, true);
+  }
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────
+buildChain();
+storedText = [
+  '%%bd_module bd_M_DroneFrac',
+  '%%bd_p_sample vox_pad_dmin7',
+  '%%bd_axiom X',
+  '%%bd_rule X: XFYFX+F+YFXFY-F-XFYFX',
+  '%%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY',
+  '%%bd_angle 90',
+  '%%bd_p_iterations 6',
+  '%%bd_p_step_seconds 2.00',
+  '%%bd_p_detune_span 22',
+  '%%bd_p_scale min_pentatonic',
+  '%%bd_p_grain_size 0.45',
+  '%%bd_p_grain_from_run 0.50',
+  '%%bd_p_offsetCH2 60',
+  '%%bd_p_overlap 0.31',
+  '%%bd_p_playback_rate 1.00',
+  '%%bd_p_duration 60',
+  '%%bd_p_reverb_wet 0.90',
+  '%%bd_p_reverb_decay 4.00',
+  '%%bd_p_vibrato_frequency 3.00',
+  '%%bd_p_vibrato_depth 0.10',
+  '%%bd_p_chorus_wet 0.50',
+  '%%bd_p_chorus_depth 0.65',
+  '%%bd_p_loop true',
+  '%%bd_p_volume 0.00',
+  '%%bd_p_bass 0.00',
+  '%%bd_p_treble 0.00',
+  '%%bd_p_balance 0.00',
+  '',
+].join('\n');
+params = parseScript(storedText);
+buildSampleSelect();
+// Fetch the real list, then re-sync: syncSteppersFromScript decides which
+// sample to load, so it must run AFTER the manifest has replaced the fallback
+// or a script naming a sample only the manifest knows about would be ignored.
+loadManifest().then(() => { syncSteppersFromScript(); regenerate(); });
+syncSteppersFromScript();
+regenerate();
+// Only now: every listener is attached, so nothing the host sends can arrive
+// unheard.
+postToParent({ type: 'BD_READY' });
+</script>
+</body>
+</html>

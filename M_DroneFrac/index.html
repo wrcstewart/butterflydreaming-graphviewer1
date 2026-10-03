@@ -1,0 +1,87 @@
+<!-- BD wrapper for bd_M_DroneFrac (2026-10-01).
+     Same shape as M_Fractal/index.html and M_Music/index.html: a thin relay
+     between BD and the module's own iframe, with an explicit whitelist each
+     way.
+
+     THE WHITELIST IS THE THIRD SITE. A relayed message needs a sender, this
+     list, and a receiver, and two of the three working is indistinguishable
+     from none of them — the Fractal wrapper dropped bd_av_state for weeks and
+     the symptom was simply that a tick box did nothing, with nothing anywhere
+     to say why. Add to BOTH sets when the module learns a new message.
+
+     bd_ui_config is in RELAY_DOWN here and is NOT in the two older music
+     wrappers: without it the module can never be told it is a viewer or that
+     its host draws no chrome, and both settings would silently do nothing. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Grain Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0a0f;
+      overflow: hidden;
+    }
+    #module-frame { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+</head>
+<body>
+  <iframe id="module-frame"
+          src="music_module.html"
+          title="ButterflyDreaming Grain Module">
+  </iframe>
+
+  <script>
+    'use strict';
+
+    // NO 'BD_REQUEST_UPDATE' HERE, and the omission is deliberate — the three
+    // older module wrappers leave it out for the same reason. BD polls with it,
+    // and a module that answers by announcing its script sets up a loop: the
+    // announce makes BD rewrite the focused card, the card is pushed back, the
+    // module announces again. Observed in the server log cycling
+    // 540 -> 544 -> 542 -> 540 chars several times a second, exactly the
+    // failure the comment in V_Kolam's handler warns about.
+    //
+    // A module announces on a USER ACTION. That cannot loop, because a person
+    // has to press something.
+    const RELAY_DOWN = new Set([
+      'bd_script_update', 'bd_script_request', 'bd_param_update',
+      'BD_INIT', 'BD_STOP',
+      'BD_INFO_DIALOG_RESULT',
+      'bd_ui_config'
+    ]);
+    const RELAY_UP = new Set([
+      'BD_READY',
+      'bd_script_response',
+      'bd_param_update',
+      'BD_UPDATE',
+      'BD_ERROR',
+      'BD_MEDIA_BLOB',
+      'BD_MODULE_COPY_LINK_REQUEST',
+      'BD_INFO_DIALOG_REQUEST',
+      'BD_STATUS',
+      'bd_av_state',
+      'bd_module_log'
+    ]);
+
+    const moduleFrame = document.getElementById('module-frame');
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      if (event.source === moduleFrame.contentWindow) {
+        if (RELAY_UP.has(data.type)) window.parent.postMessage(data, '*');
+        return;
+      }
+
+      if (event.source === window.parent && RELAY_DOWN.has(data.type)) {
+        moduleFrame.contentWindow.postMessage(data, '*');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -202,6 +202,24 @@ app.use('/bd_M_ABC', express.static('./M_Music', {
 
 // bd_M_Fractal L-system music module bundle. On-disk M_Fractal/ mirrors the
 // standalone at github.com/wrcstewart/bd_M_Fractal (two-copy convention).
+// 2026-10-01 — the granular drone. Served path /bd_M_DroneFrac/, on-disk M_DroneFrac/,
+// the same split the other modules use. Its sources/ subdirectory rides along,
+// which is how the sample manifest and the .mp3s are reachable.
+app.use('/bd_M_DroneFrac', express.static('./M_DroneFrac', {
+  setHeaders: (res, filePath) => {
+    // .json AND the audio too, not only .html. A rebuilt sample served from
+    // cache while the page is demonstrably current is the most misleading
+    // failure available: the canary says new, the sound says old. The module
+    // also versions its sample URLs by content hash, which is what protects
+    // the published copy behind a CDN; this covers local iteration.
+    if (/\.(html|json|mp3|m4a|wav)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 app.use('/bd_M_Fractal', express.static('./M_Fractal', {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {

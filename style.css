@@ -1159,6 +1159,15 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-02: GREEN (speech 10% slower and a 20% longer sentence pause; the
+   drone module gained an output stage). Next = blue.
+
+   2026-10-01b: RED (the new module is bd_M_DroneFrac, Cluster Drone, after
+   bd_M_Grain was renamed before anything depended on it). Next = green.
+
+   2026-10-01: BLUE (a granular module joins the system — four registries, a
+   static route and a new module under Music).
+
    2026-09-30k: GREEN (both MUSIC modules gained the same no-host-chrome mode,
    releasing their two dock-slot grid areas; and MODULES gained a `page` field
    naming the four new standalone repos). Next rotation = blue.

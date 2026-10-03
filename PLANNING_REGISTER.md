@@ -224,6 +224,25 @@ acting on any of it.
 
 ---
 
+## Added 2026-10-02/03 — bd_M_DroneFrac
+
+| item | where | note |
+|---|---|---|
+| **`bd_M_DroneFrac` — the granular drone** | `M_DroneFrac/` | **BUILT, IN BD, AND PUBLISHED.** Fifth media module. Cluster **Drone** under Music, gateway `bd_M_DroneFrac` (displays as DroneFrac), content `bd_M_DroneFrac_001`. All four registries + static route done. Standalone at `ButterflyDreaming-Standalone-DroneFrac`. An L-system walk steers grains: height → pitch, run length → grain size — **two independent destinations, which is the point** (Fractal's ABC layer welds them). Second channel reads the same walk at an offset, two octaves up. |
+| **`GrainPlayer`'s params are NOT Signals** | Tone 14 | **Established from the source, against the docs.** `detune`, `grainSize`, `overlap`, `playbackRate` are plain numbers, read at grain-fire time, so modulation resolution is `1/grainSize`. Hence a SCHEDULED trajectory and **no LFOs** — at drone speeds five steps a second is finer than the ear resolves. |
+| **Sample Focus material WITHDRAWN** | `~/bd_private_samples/` | **RESOLVED 2026-10-02.** Its licence permits use "as part of a new creative work" but forbids making the sound available in a downloadable format — and it was verified publicly downloadable through the tunnel, HTTP 200, full file. Removed from the served tree (the repo root is `express.static`'d too, so nowhere inside the checkout is safe). **"Royalty-free" is about royalties and says nothing about redistribution.** Local use remains permitted. |
+| **Six CC0 pads, all rebuildable** | `M_DroneFrac/sources/` | 3 from VCSL (explicit redistribution grant in its `Info.txt`), 3 from Freesound. `make_organ_pads.sh` + `make_sample_pads.py` ship with the module. One entry (Freesound 697998, deleted uploader, "royalty free collection" wording) is **flagged lowest-confidence** and is the first to reconsider before any wider publication. |
+| **Registration beats octave** | — | Measured, share of energy ≤C2: Full **10.9%**, 8′ **46.3%**, 4′ 2.9%. "Full" is a mixture, so moving its fundamental moves little of what is heard. Also: **VCSL labels files an octave low** — the file called `C1` sounds C2. |
+| **Loop length is a MUSICAL choice** | `make_sample_pads.py` | **Author's finding.** A short loop recurs often and the detuned voices vary each time — theme and variation. A loop longer than the piece develops nothing. The seam-free 64 s loop is the weakest of the six. **Steadiness measures suitability, not interest**, and every candidate had been screened on steadiness alone. |
+| **Output stage: volume / bass / treble / balance** | `M_DroneFrac/music_module.html` | **BUILT.** All `_p_`, so a balance against other sound is **written into the script**. `reverb → EQ → pan → volume → limiter`. Bake renders the same four; the spectrum taps after the stage. |
+| **Speech slower again** | `viewer.js` | Effective rate 0.700 → **0.636**, sentence gap 420 → **504 ms**. `SPEAK_LINE_GAP_MS` deliberately left at 180 so a line turn stays audibly shorter than a full stop. |
+| **`page` entry for DroneFrac in `MODULES`** | `viewer.js` | **NOT DONE.** `embedded` only, so BD does not know its standalone page exists. One line. |
+| **Bake / Save wav still untested** | `M_DroneFrac/` | Written and verified against Tone's documented `Tone.Offline` + `ctx.transport` pattern, but **nobody has pressed it.** The least-exercised path in the module. |
+| **An output stage for Fractal and ABC** | `M_Fractal/`, `M_Music/` | **NOT BUILT.** The same four controls, if balancing against speech proves generally useful. |
+| **A local-file sample load** | `M_DroneFrac/` | **NOT BUILT, and the top item in the module's `AGENTS.md`.** It sidesteps the licensing constraint entirely — nothing bundled, the user supplies the file. Needs care about honesty: a granular drone IS its source file, so a script naming a local sample reproduces nothing elsewhere, and RULE 9 says a module carries no directive it cannot act on. |
+
+---
+
 ## Added 2026-09-30 — speech prosody
 
 | item | where | note |

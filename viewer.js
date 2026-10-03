@@ -1419,7 +1419,7 @@ const DUCK_LEVEL = 0.10;
 // as a test value, long enough to hear the ramp working, and sounded right.
 //
 // What it means, and it is a change of behaviour rather than of degree: two
-// seconds is nearly five times SPEAK_GAP_MS (420), so the music CANNOT return
+// seconds is nearly four times SPEAK_GAP_MS (504), so the music CANNOT return
 // to baseline between sentences. It sinks once at the start of a passage,
 // stays there, and rises at the end. The dip-and-recover on every sentence is
 // gone — which was the thing that sounded wrong, and is why deepening the
@@ -1438,7 +1438,7 @@ const DUCK_LEVEL = 0.10;
 // a burst of it over the sentence) and the 60ms applyMediaBase.
 //
 // Worth knowing if this wants tuning again: at 750 the ramp is longer than
-// SPEAK_GAP_MS (420), so between two sentences the music no longer has time to
+// SPEAK_GAP_MS (504), so between two sentences the music no longer has time to
 // return to baseline before it is ducked again — it hovers instead of pumping.
 // That may be the improvement or may be too soft; the two constants now
 // interact, where at 250 they did not.
@@ -1569,7 +1569,11 @@ const SPEAK_VOICE = (() => {
 // own timing parameter, not a time-stretch: the delivery changes rather than the
 // audio being slowed after the fact. It also buys synthesis more time to stay
 // ahead of playback, which is a second reason to want it.
-const SPEAK_LENGTH_SCALE = 1 / 0.7;
+// 2026-10-02 — 10% slower again, by ear: "it sounds a little rushed".
+// 1/0.7 = 1.4286 became 1.5714, i.e. an effective rate of 0.636.
+// SPEAK_VERSE_SCALE is derived from this, so verse stays 8% slower than prose
+// and both move together — which is what you want from one dial.
+const SPEAK_LENGTH_SCALE = (1 / 0.7) * 1.10;
 // 2026-09-04 — an explicit gap between utterances.
 //
 // Each sentence is synthesised separately, so the only pause between them was
@@ -1581,7 +1585,12 @@ const SPEAK_LENGTH_SCALE = 1 / 0.7;
 // So the gap is deliberate now rather than a side effect of buffering. 420ms is
 // about what an unhurried reader leaves at a full stop; it wants tuning by ear
 // against SPEAK_LENGTH_SCALE, since a slower delivery asks for a longer pause.
-const SPEAK_GAP_MS = 420;
+// 2026-10-02 — 20% longer, 420 -> 504, for the same report. Note this is NOT
+// just the same change twice: the length scale slows the DELIVERY of words and
+// the gap lengthens the SILENCE between sentences, and "rushed" can be either.
+// The comment above predicted this coupling — a slower delivery asks for a
+// longer pause — so the two moving together is the expected direction.
+const SPEAK_GAP_MS = 504;
 // 2026-09-30 — a LINE end is not a sentence end.
 //
 // Reported: the Tao Te Ching, Zhuangzi and Grimm's read well; Hardy and Whitman
@@ -1592,6 +1601,11 @@ const SPEAK_GAP_MS = 420;
 //
 // 180ms against 420: enough to hear the line turn, not enough to sound like a
 // full stop. Tune by ear against SPEAK_LENGTH_SCALE like its neighbour.
+// LEFT AT 180 on 2026-10-02 while SPEAK_GAP_MS went to 504. The report was that
+// sentences sounded rushed, not lines, and the point of this value is that a
+// line turn is audibly SHORTER than a full stop. Raising both would have kept
+// the ratio and lost the distinction; the gap between them is now 180:504
+// rather than 180:420, which strengthens it.
 const SPEAK_LINE_GAP_MS = 180;
 // Verse is read more slowly than prose. 8% on top of the existing scale —
 // 15% first, reduced by ear on 2026-09-30.
@@ -2824,6 +2838,12 @@ const MODULES = {
     embedded:   '/bd_M_Fractal/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_Fractal/preview.html',
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Fractal/',
+  },
+  // 2026-10-01 — the granular drone. No `standalone` and no `page` yet: it has
+  // neither a deep-link target nor a published repo, and naming one that does
+  // not exist is worse than naming none.
+  'bd_M_DroneFrac': {
+    embedded:   '/bd_M_DroneFrac/index.html',
   },
 };
 
@@ -13335,7 +13355,7 @@ async function init() {
         // more than ideal, but the viewer has to choose a renderer before any
         // script reaches it, and BD has to decide whether to open a viewer at
         // all before minting — neither can ask the other in time.
-        const AV_VIEWER_MODULES = new Set(['bd_V_Kolam', 'bd_V_Kolam3D', 'bd_M_ABC', 'bd_M_Fractal']);
+        const AV_VIEWER_MODULES = new Set(['bd_V_Kolam', 'bd_V_Kolam3D', 'bd_M_ABC', 'bd_M_Fractal', 'bd_M_DroneFrac']);
         const wantViewer = (AV_VIEWER_MODULES.has(moduleId) && window.bdRequestModuleToken);
         if (moduleId && !AV_VIEWER_MODULES.has(moduleId)) {
           console.log('[AV] no viewer page for ' + moduleId + ' yet — falling back to the standalone');
