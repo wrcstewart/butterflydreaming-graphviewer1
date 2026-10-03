@@ -21,6 +21,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `vox_pad_Dmin7.mp3` | **CC0** | Freesound 625157 by voxlab — see below | **yes** |
 | `j8_pad_Amin9.mp3` | **CC0** | Freesound 624728 by voxlab — see below | **yes** |
 | `aura_pad_Amin.mp3` | **CC0** | Freesound 697998, uploader deleted — **read the caveat** | yes, but see below |
+| `gtr_pad_Cmaj7.mp3` | **CC0** | Freesound 870087 by LAPS-Catalog — see below | **yes** |
 
 ## The two organ pads
 
@@ -292,6 +293,40 @@ have become a 16 s loop — long enough to lose the repetition. Halving the wind
 gives an 8 s loop at the lower pitch: **low and recognisable**, which the two
 previous pads each managed only half of.
 
+## gtr_pad_Cmaj7 — the freeze-pedal guitar chord
+
+**Source:** [freesound.org/s/870087/](https://freesound.org/s/870087/) —
+"Sustained G-C maj 7 gtr chord" by **LAPS-Catalog**, **Creative Commons 0**,
+verified on the sound's page. 9.17 s, 48 kHz, **Float32** stereo.
+
+**The best-behaved source in the set.** A guitar chord held with a *freeze
+pedal*, which is exactly why it works: the pedal sustains the chord
+indefinitely, so there is no pick attack and no decay. Measured, **0 of 458
+windows** above 3× the median, and flat to **2.8 dB across all 9.17 s**. A
+plain guitar chord would have been the worst possible granular source — one
+loud transient per loop — and the pedal is what makes it the best.
+
+| | |
+|---|---|
+| window | 2.85–4.85 s |
+| transpose | −2400¢ |
+| result | **51.4% below C2** · centroid **173 Hz** · RMS −20.1 dB · peak −5.7 dB |
+| loop | 8 s, so it recurs 4.5 times in the pad |
+
+**The lowest and darkest of the seven**, and by some margin: over half its
+energy lies at or below C2, against 28% for the organ pads. Two octaves were
+needed despite it already reading 18.9% below C2 at −1200 — a guitar chord
+carries a great deal of upper harmonic, so its energy sits higher than that
+percentage suggests, and its centroid at −1200 was 326 Hz against 205–211 for
+the other synth pads.
+
+**It is also the file that broke the builder.** Float32 WAV cannot be read by
+Python's `wave` module (format 3), and nor can WAVE_FORMAT_EXTENSIBLE (0xFFFE),
+which is what ffmpeg emits for any depth above 16 bits — so converting to
+24-bit first does not help either. `read_any()` now decodes to **raw 32-bit PCM
+on a pipe** and skips headers entirely, with ffprobe supplying rate and channel
+count. FLAC, AIFF, 16-bit, float and mp3 all work now without a parser each.
+
 ## Loop length is a musical choice, not a technical one
 
 The author noticed that the vox pad, cut from a mere 2.5 s, was "more
@@ -314,6 +349,7 @@ recognisable, longer to be ambient and shapeless.
 | organ (all three) | 4.3 s | 8.4 |
 | vox_pad_Dmin7 | 5.0 s | 7.2 |
 | aura_pad_Amin | 8.0 s | 4.5 |
+| gtr_pad_Cmaj7 | 8.0 s | 4.5 |
 | j8_pad_Amin9 | 64 s | **0.6** |
 
 ## The loop click, and how it was actually fixed

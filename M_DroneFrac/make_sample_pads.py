@@ -96,6 +96,30 @@ PADS = [
         voices=[0, 6, -6],
         target=-28.0,
     ),
+    dict(
+        out='gtr_pad_Cmaj7',
+        src='870087__laps-catalog__sustained-g-c-maj-7-gtr-chord.wav',
+        # Freesound 870087, "Sustained G-C maj 7 gtr chord" by LAPS-Catalog,
+        # CC0. A guitar chord held with a FREEZE PEDAL, which is why it has no
+        # pick attack: 0 of 458 windows above 3x the median, and flat to 2.8 dB
+        # across all 9.17 s. The best-behaved source in the set.
+        #
+        # Float32 at 48 kHz — the file that forced read_any() to stop parsing
+        # WAV by hand.
+        #
+        # Short window and two octaves, chosen together as for the aura pad:
+        # low AND recognisable. 2.85 s in is the flattest stretch.
+        win=(2.85, 2.00),
+        smooth=1.00,
+        # -2400 like the J8 and aura pads. At -1200 it measured 18.9% below C2
+        # but a centroid of 326 Hz, against 205-211 for the other two — a
+        # guitar chord carries a lot of upper harmonic, so the energy sits
+        # higher than the percentage below C2 suggests. The 2 s window becomes
+        # an 8 s loop, which is the same recurrence rate as the aura pad.
+        transpose=-2400,
+        voices=[0, 6, -6],
+        target=-28.5,
+    ),
 ]
 
 # ── ON LOOP LENGTH, WHICH TURNS OUT TO BE A MUSICAL CHOICE ─────────────────
@@ -115,27 +139,40 @@ PADS = [
 # interest measure, and `win` is the knob that trades one for the other:
 # roughly 2-5 s to be recognisable, longer to be ambient and shapeless.
 
-def read24(path):
-    w = wave.open(path)
-    n, ch, sw, sr = w.getnframes(), w.getnchannels(), w.getsampwidth(), w.getframerate()
-    assert sw == 3, 'expected 24-bit, got %d bytes/sample' % sw
-    raw = w.readframes(n)
-    chans = [[] for _ in range(ch)]
-    for i in range(0, len(raw), 3 * ch):
-        for c in range(ch):
-            o = i + 3 * c
-            x = raw[o] | (raw[o+1] << 8) | (raw[o+2] << 16)
-            if x & 0x800000:
-                x -= 0x1000000
-            chans[c].append(x / 8388608.0)
-    return chans, sr
+def read_any(path):
+    """Decode ANY audio file ffmpeg can read into float channel lists.
+
+    This parsed 24-bit integer WAV by hand until the first Float32 file
+    arrived (Freesound 870087). Python's own `wave` module cannot read format
+    3 either — nor WAVE_FORMAT_EXTENSIBLE (0xFFFE), which is what ffmpeg emits
+    for any depth above 16 bits, so converting to a 24-bit WAV first does not
+    help.
+
+    So: decode to RAW 32-bit PCM on a pipe and skip headers entirely. ffprobe
+    supplies the rate and channel count. FLAC, AIFF, float, 16-bit, mp3 and
+    anything else ffmpeg handles now work without a parser each.
+    """
+    probe = subprocess.run(
+        ['ffprobe', '-v', 'error', '-select_streams', 'a:0',
+         '-show_entries', 'stream=sample_rate,channels',
+         '-of', 'default=nw=1:nk=1', path],
+        capture_output=True, text=True, check=True).stdout.split()
+    sr, ch = int(probe[0]), int(probe[1])
+    raw = subprocess.run(
+        ['ffmpeg', '-loglevel', 'error', '-i', path,
+         '-f', 's32le', '-acodec', 'pcm_s32le', '-'],
+        capture_output=True, check=True).stdout
+    n = len(raw) // (4 * ch)
+    vals = struct.unpack('<%di' % (n * ch), raw[:n * ch * 4])
+    FULL = 2147483648.0
+    return [[vals[i * ch + c] / FULL for i in range(n)] for c in range(ch)], sr
 
 
 def build(cfg):
     src = os.path.join(SRCDIR, cfg['src'])
     if not os.path.exists(src):
         print('  SKIP %s — source not found' % cfg['out']); return
-    chans, sr = read24(src)
+    chans, sr = read_any(src)
     a = int(cfg['win'][0] * sr)
     b = a + int(cfg['win'][1] * sr)
     seg = [c[a:b] for c in chans]
