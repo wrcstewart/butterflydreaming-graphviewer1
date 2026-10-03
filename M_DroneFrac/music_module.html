@@ -212,6 +212,8 @@
      CSS was simply being overridden.
      Trust the hex on the border line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-03e: BLUE (new default set by the author: the Alchemy guitar pad,
+     ch2 a fifth up at full level, overlap 0.44 — the pulse gone). Next = red.
      2026-10-03d: GREEN (channel 2 gains its own level and interval, to settle
      whether a high pulse at the grain rate comes from it). Next = blue.
      2026-10-03c: RED (alchemy_gtr_Cmaj7 — the guitar chord through Logic's
@@ -257,7 +259,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #27ae60 !important;      /* CANARY — green (was red) */
+    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -453,9 +455,9 @@ const ENUM_DISPLAY_INV = Object.fromEntries(
 //
 // This literal is the FALLBACK, for when the fetch fails: opened from file://
 // it will, and the module should still make a sound rather than sit mute.
-let SAMPLES = { vox_pad_dmin7: 'sources/vox_pad_Dmin7.mp3' };
-let SAMPLE_LABELS = { vox_pad_dmin7: 'vox pad dmin7' };
-let DEFAULT_SAMPLE = 'vox_pad_dmin7';
+let SAMPLES = { alchemy_gtr_cmaj7: 'sources/alchemy_gtr_Cmaj7.mp3' };
+let SAMPLE_LABELS = { alchemy_gtr_cmaj7: 'alchemy gtr cmaj7' };
+let DEFAULT_SAMPLE = 'alchemy_gtr_cmaj7';
 
 async function loadManifest() {
   try {
@@ -1438,21 +1440,21 @@ window.addEventListener('message', (event) => {
 buildChain();
 storedText = [
   '%%bd_module bd_M_DroneFrac',
-  '%%bd_p_sample vox_pad_dmin7',
+  '%%bd_p_sample alchemy_gtr_cmaj7',
   '%%bd_axiom X',
   '%%bd_rule X: XFYFX+F+YFXFY-F-XFYFX',
   '%%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY',
   '%%bd_angle 90',
   '%%bd_p_iterations 6',
   '%%bd_p_step_seconds 2.00',
-  '%%bd_p_detune_span 22',
+  '%%bd_p_detune_span 10',
   '%%bd_p_scale min_pentatonic',
-  '%%bd_p_grain_size 0.45',
+  '%%bd_p_grain_size 0.61',
   '%%bd_p_grain_from_run 0.50',
-  '%%bd_p_offsetCH2 60',
-  '%%bd_p_ch2_level -5',
-  '%%bd_p_ch2_cents 2400',
-  '%%bd_p_overlap 0.31',
+  '%%bd_p_offsetCH2 52',
+  '%%bd_p_ch2_level 0',
+  '%%bd_p_ch2_cents 700',
+  '%%bd_p_overlap 0.44',
   '%%bd_p_playback_rate 1.00',
   '%%bd_p_duration 60',
   '%%bd_p_reverb_wet 0.90',
