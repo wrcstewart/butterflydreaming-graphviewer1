@@ -25,6 +25,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `alchemy_gtr_Cmaj7.mp3` | **CC0** | 870087 through Logic's Alchemy — chain confirmed | **yes** |
 | `gtr_ens_Cmaj7.mp3` | **CC0** | 870087 through Ensemble + ChromaVerb — both algorithmic | **yes** |
 | `paulx_drone.mp3` | **CC0** | Freesound 870087 through PaulXStretch — chain confirmed | **yes** |
+| `synth_pad_A2.mp3` | **CC0 by construction** | synthesised — **no upstream at all** | **yes** |
 
 ## The two organ pads
 
@@ -505,6 +506,60 @@ The caution from the loop-length finding still applies: flux measures movement,
 and movement is not the same as interest. The vox pad and the J8 pad measure
 0.449 and 0.449 and the author can tell them apart instantly. Flux earns its
 keep as a check that movement **survived the 2 s cut**, not as a verdict.
+
+## synth_pad_A2 — generated, so there is no licence question
+
+Made by **`../make_synth_pad.js`** out of nothing but arithmetic: 20
+oscillators from 9 partials on a 110 Hz (A2) root, each partial split into
+detuned copies and each copy given its own slow amplitude drift.
+
+**There is no upstream.** No recording, no author, no chain to confirm, no
+deleted uploader — CC0 by construction, and reproducible from one file. That
+was the author's reason for wanting it ("at least then I understand what's
+happening") and it happens to dissolve the whole provenance problem that
+started this directory.
+
+| | |
+|---|---|
+| source | 20 s, 48 kHz, 24-bit, 20 oscillators |
+| window | the whole 20 s, `smooth=0`, `transpose=0`, one voice |
+| result | centroid **291 Hz** · RMS −18.4 dB · peak −6.3 dB · RMS spread 10.5 dB |
+
+**Three things the ten sampled pads taught, built in from the start:**
+
+**It loops with no seam at all.** Every frequency and every drift rate is
+rounded to an exact multiple of `1/duration`, so each completes a whole number
+of cycles in the file and the end joins the beginning perfectly. Measured step
+at the wrap: **0.0014** against 0.03 for a hard splice. Three rounds were spent
+fighting loop clicks on the sampled pads; synthesis makes them impossible.
+
+**Detuning alone would not have been enough.** Two detuned partials BEAT, which
+moves the amplitude and barely touches the spectrum — as spectral flux that is
+nearly nothing, where the pads worth hearing sit at 0.29 to 0.43. So each
+oscillator also drifts in amplitude at its own rate, and because no two rates
+coincide the spectral balance keeps changing. Result: **centroid swing 189 Hz,
+the highest of any source here**, with flux 0.222 — above the raw guitar chord's
+0.136, below PaulXStretch's 0.430.
+
+**`smooth=0`, and this one nearly went wrong.** The flattening step divides out
+level variation slower than its window, which is right for a recording with a
+swell and *destructive* for a source whose movement IS slow level variation.
+The drift periods are 2.7–14 s; at the usual `smooth=1.0` every one of them
+would have been divided straight out, leaving exactly the static sine stack the
+drift exists to avoid. A generated source is level-controlled by construction
+and needs no flattening.
+
+**One voice, not three**, because the source already contains 20 detuned
+oscillators — tripling it would be beating on top of beating.
+
+### What to turn
+
+`CONFIG` at the top of `make_synth_pad.js`. `partials` is the interesting part:
+ratios need not be integers, and the two inharmonic entries (2.41, 5.13) are
+what stop it sounding like an organ. More `copies` and wider `cents` thicken the
+beating; higher `driftHz` and `driftDepth` give more movement at the cost of
+sounding pulsed. The filename describes the patch, so two attempts never
+collide.
 
 ## Loop length is a musical choice, not a technical one
 

@@ -199,6 +199,35 @@ PADS = [
         voices=[0, 6, -6],
         target=-28.0,
     ),
+    dict(
+        out='synth_pad_A2',
+        src='synth_r110_20s_p9_1-2-3-4-5-6-8-2p41-5p13.wav',
+        # SYNTHESISED by ../make_synth_pad.js — no upstream, no licence to
+        # establish, CC0 by construction. See that file for the design.
+        #
+        # A LONG window and NO flattening, both unlike every sampled pad:
+        #  - the source loops seamlessly by construction (every frequency is a
+        #    multiple of 1/duration), so a long window costs nothing and there
+        #    is no seam to avoid
+        #  - smooth=0 because this source's MOVEMENT is slow level drift, with
+        #    periods of 2.7 to 14 s. Flattening would divide out exactly what
+        #    makes it alive.
+        #
+        # transpose 0: root 110 Hz (A2) and a measured centroid of 273 Hz, so
+        # it is already in the register the author has been asking for.
+        win=(0.00, 20.00),
+        smooth=0,
+        transpose=0,
+        voices=[0],
+        # ONE voice, not three: the source already contains 20 detuned
+        # oscillators, so adding more detuned copies of the whole thing would
+        # be beating on top of beating.
+        #
+        # -22.0 measured, not derived. At -19 the finished pad came out at
+        # -15.4 dB RMS with a -3.3 dB peak — too hot for grain summing — so the
+        # figure was solved from the result like every other gain here.
+        target=-22.0,
+    ),
 ]
 
 # ── ON LOOP LENGTH, WHICH TURNS OUT TO BE A MUSICAL CHOICE ─────────────────
@@ -247,6 +276,24 @@ def read_any(path):
     return [[vals[i * ch + c] / FULL for i in range(n)] for c in range(ch)], sr
 
 
+def _flatten(seg, N, sr, smooth):
+    """Divide out level variation slower than `smooth` seconds."""
+    half = max(1, int(smooth * sr / 2))
+    mono = [sum(ch[i] for ch in seg) / len(seg) for i in range(N)]
+    ps = [0.0] * (N + 1)
+    for i, x in enumerate(mono):
+        ps[i+1] = ps[i] + x * x
+    env = []
+    for i in range(N):
+        lo, hi = max(0, i - half), min(N, i + half)
+        env.append(math.sqrt((ps[hi] - ps[lo]) / (hi - lo)) or 1e-9)
+    mean_env = sum(env) / N
+    for ch in seg:
+        for i in range(N):
+            ch[i] *= mean_env / env[i]
+    return seg
+
+
 def build(cfg):
     src = os.path.join(SRCDIR, cfg['src'])
     if not os.path.exists(src):
@@ -260,19 +307,19 @@ def build(cfg):
     # ── divide out slow level drift ─────────────────────────────────────
     # A centred moving RMS, so the correction does not lag what it corrects.
     # Prefix sums make it O(N) rather than O(N * window).
-    half = int(cfg['smooth'] * sr / 2)
-    mono = [sum(ch[i] for ch in seg) / len(seg) for i in range(N)]
-    ps = [0.0] * (N + 1)
-    for i, x in enumerate(mono):
-        ps[i+1] = ps[i] + x * x
-    env = []
-    for i in range(N):
-        lo, hi = max(0, i - half), min(N, i + half)
-        env.append(math.sqrt((ps[hi] - ps[lo]) / (hi - lo)) or 1e-9)
-    mean_env = sum(env) / N
-    for ch in seg:
-        for i in range(N):
-            ch[i] *= mean_env / env[i]
+    #
+    # smooth=0 SKIPS IT, and that matters for more than tidiness. This step
+    # removes any level variation SLOWER than its window — which is right for a
+    # recording with a swell to flatten, and destructive for a source whose
+    # movement IS slow level variation. The synthesised pad drifts with periods
+    # of 2.7 to 14 s by design; at smooth=1.0 every one of them would be
+    # divided straight out, leaving the static sine stack the drift exists to
+    # avoid. A generated source is already level-controlled by construction and
+    # needs no flattening at all.
+    if cfg['smooth'] <= 0:
+        pass
+    else:
+        seg = _flatten(seg, N, sr, cfg['smooth'])
 
     # ── level, then fades to zero at both ends ──────────────────────────
     rms = math.sqrt(sum(x * x for ch in seg for x in ch) / (N * len(seg)))

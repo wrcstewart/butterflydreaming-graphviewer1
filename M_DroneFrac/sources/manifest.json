@@ -74,6 +74,14 @@
       "seconds": 36.05
     },
     {
+      "id": "synth_pad_a2",
+      "file": "synth_pad_A2.mp3",
+      "v": "f3c77bd17c",
+      "label": "synth pad a2",
+      "bytes": 577245,
+      "seconds": 36.05
+    },
+    {
       "id": "vox_pad_dmin7",
       "file": "vox_pad_Dmin7.mp3",
       "v": "6f09f424a0",
