@@ -139,6 +139,27 @@ PADS = [
         voices=[0, 6, -6],
         target=-25.0,
     ),
+    dict(
+        out='gtr_ens_Cmaj7',
+        src='gtr_ens_verb.wav',
+        # DERIVED WORK: Freesound 870087 (CC0) looped on a Logic audio track
+        # through **Ensemble** (LFO1 1.5 Hz, 3 voices) and **ChromaVerb**, both
+        # ALGORITHMIC — no convolution, no sampled content, so the CC0 holds.
+        # 58 s bounced, 24-bit/48k, unnormalised, 0 of 2899 windows transient.
+        #
+        # The Ensemble did its job: spectral flux inside a 2 s window went from
+        # 0.136 in the raw file to 0.291. The companion `gtr_pad_Cmaj7` is the
+        # same source untreated, so the two are a controlled comparison of what
+        # the processing adds.
+        #
+        # -2400 like its untreated twin: the treatment barely moved the register
+        # (centroid 553 -> 530 Hz), so it needs the same two octaves.
+        win=(19.00, 2.50),
+        smooth=1.00,
+        transpose=-2400,
+        voices=[0, 6, -6],
+        target=-28.0,
+    ),
 ]
 
 # ── ON LOOP LENGTH, WHICH TURNS OUT TO BE A MUSICAL CHOICE ─────────────────

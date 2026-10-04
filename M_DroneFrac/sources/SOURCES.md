@@ -23,6 +23,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `aura_pad_Amin.mp3` | **CC0** | Freesound 697998, uploader deleted — **read the caveat** | yes, but see below |
 | `gtr_pad_Cmaj7.mp3` | **CC0** | Freesound 870087 by LAPS-Catalog — see below | **yes** |
 | `alchemy_gtr_Cmaj7.mp3` | **CC0** | 870087 through Logic's Alchemy — chain confirmed | **yes** |
+| `gtr_ens_Cmaj7.mp3` | **CC0** | 870087 through Ensemble + ChromaVerb — both algorithmic | **yes** |
 
 ## The two organ pads
 
@@ -385,6 +386,52 @@ recording.** The vox pad (which the author found interesting) and the J8 pad
 (which he found dull) measure **0.449 and 0.449** — identical flux — and their
 centroid swings differ by only 4 points. Every number available here measures
 *suitability*; none of them measures *interest*. Only listening does.
+
+## gtr_ens_Cmaj7 — the same chord through Ensemble and ChromaVerb
+
+**Source:** Freesound 870087 (CC0, LAPS-Catalog) looped on a Logic **audio
+track** — no instrument, no MIDI — through **Ensemble** (LFO1 1.5 Hz, LFO2 and
+Random off, 3 voices) and **ChromaVerb**. 58 s bounced, 24-bit/48 kHz,
+unnormalised, **0 of 2899 windows transient**.
+
+**Licence: both plug-ins are ALGORITHMIC.** Ensemble is delay lines and LFOs;
+ChromaVerb synthesises its reverb rather than convolving a recorded impulse
+response. Neither contributes audio of its own, so the CC0 holds. Space
+Designer in the same slot would not have — see the Sample Focus note below for
+why that distinction is load-bearing here.
+
+| | |
+|---|---|
+| window | 19.00–21.50 s, the flattest stretch |
+| transpose | −2400¢ |
+| result | **55.4% below C2** · centroid **162 Hz** · RMS −19.4 dB · peak −5.9 dB |
+| loop | 10 s, so it recurs 3.6 times in the pad |
+
+**The deepest of the nine.** Centroid 162 Hz and more than half its energy at or
+below C2.
+
+**It needed the same two octaves as its untreated twin**, because the treatment
+barely moved the register: centroid 553 → 530 Hz. Ensemble detunes by a few
+cents and ChromaVerb's tail is broadband, so neither shifts the fundamental —
+unlike Alchemy, which dropped the same source to 204 Hz on its own.
+
+### A controlled comparison, which is the useful part
+
+Three pads now come from **one guitar chord**, differing only in treatment:
+
+| pad | treatment | ≤C2 | centroid | flux in 2 s |
+|---|---|---|---|---|
+| `gtr_pad_Cmaj7` | none | 51.4% | 173 Hz | 0.136 |
+| `gtr_ens_Cmaj7` | Ensemble + ChromaVerb | **55.4%** | **162 Hz** | 0.291 |
+| `alchemy_gtr_Cmaj7` | Alchemy, spectral | 2.1% | 220 Hz | 0.407 |
+
+**The Ensemble doubled the flux** — movement measurably survived the 2 s cut,
+which was the thing worth testing. Alchemy tripled it but gutted the bass.
+
+And one metric disagreed with the other, as they keep doing: centroid *swing*
+inside the window FELL from 124 Hz to 89 Hz while flux rose, because the reverb
+smooths the centroid even as it adds frame-to-frame change. Two numbers, opposite
+verdicts, same file. See the note on what the metrics cannot see.
 
 ## Loop length is a musical choice, not a technical one
 
