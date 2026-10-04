@@ -6,6 +6,109 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-04 — eleven pads, and the one with no upstream
+
+### The synthesised pad, which is the best of them
+
+**`make_synth_pad.js`** generates a drone from arithmetic: 20 oscillators from 9
+partials on a 110 Hz root, each partial split into detuned copies and each copy
+given its own slow amplitude drift. The author's reason — *"at least then I
+understand what's happening"* — and his verdict: **"probably the best yet."**
+
+**It has no upstream.** No recording, no author, no chain to confirm, no deleted
+uploader. CC0 by construction and reproducible from one file, which dissolves
+the entire provenance problem that opened this directory ten days ago.
+
+Three things the ten sampled pads taught went in from the start:
+
+**It loops with NO seam.** Every frequency and drift rate is rounded to an exact
+multiple of `1/duration`, so each completes whole cycles in the file and the end
+joins the beginning perfectly. Measured step at the wrap **0.0014** against 0.03
+for a hard splice. Three earlier rounds went on loop clicks; synthesis makes
+them impossible rather than small.
+
+**Detuning alone would NOT have been enough**, and this is the part the
+measurements saved. Two detuned partials BEAT, which moves the amplitude and
+barely touches the spectrum — as flux that is nearly nothing, where the pads
+worth hearing sit at 0.29–0.43. So each oscillator also drifts in amplitude at
+its own rate, and because no two rates coincide the spectral balance keeps
+changing. Result: **centroid swing 189 Hz, the highest of any source here.**
+
+**`smooth=0`, and this nearly went wrong in my own code.** The build's
+flattening step divides out level variation slower than its window — right for a
+recording with a swell to remove, **destructive** for a source whose movement IS
+slow level variation. The drift periods are 2.7–14 s; at the usual `smooth=1.0`
+every one would have been divided straight out, leaving exactly the static sine
+stack the drift exists to avoid. `make_sample_pads.py` now treats `smooth=0` as
+skip, with the reason recorded beside it.
+
+### Which treatment adds the most movement — measured
+
+Four pads now come from **one** CC0 guitar chord (Freesound 870087, held with a
+freeze pedal), differing only in treatment. Spectral flux inside a 2-second
+window:
+
+| treatment | flux | |
+|---|---|---|
+| none | 0.136 | |
+| Logic Ensemble + ChromaVerb | 0.291 | doubled |
+| Logic Alchemy, spectral engine | 0.407 | tripled |
+| **PaulXStretch** | **0.430** | **most** |
+| *vox pad — the author's benchmark for "interesting"* | *0.449* | |
+| synthesised from scratch | 0.222 | but highest centroid swing |
+
+**Smearing a sound across time beats modulating it** — and the winner was the
+free standalone tool, not the £200 DAW's flagship synth, in a fraction of the
+time Alchemy had cost. Worth remembering before reaching for the complicated
+instrument.
+
+### Processed sources want LESS transposition, often none
+
+**Three downward shifts had to be undone**: `gtr_ens_Cmaj7` −2400 → −1200,
+`paulx_drone` −1200 → 0, and `alchemy_gtr_Cmaj7` needed none from the outset.
+
+The rule, stated because it cost three corrections: **reverb tails, spectral
+smear and time-stretching all fill the low and mid range on their own**, so a
+processed source arrives already dark and shifting it then buries it. The organ
+pads' two-octave drop was no precedent — those are single pipe tones with almost
+nothing else in them, which is why they needed help. **Start a processed source
+at 0 and move down only if asked.**
+
+### The pulse was interval × source detail, not interval alone
+
+The author put `ch2_cents` back to **2400** — the value that produced the
+monotonous high pulse — and on the PaulXStretch sample it is fine. The
+arithmetic says why: the boundary jump is still `grain × (rate − 1)` = 1.83 s,
+but **in heavily time-stretched material two points 1.83 s apart are nearly
+identical**, so there is little discontinuity to hear, and `overlap 0.44`
+crossfades 72% of what remains.
+
+So the artefact was never a function of the interval alone — it was the interval
+**against a source with internal detail**. A smeared source tolerates a large
+interval; a sharper one will not. Better understanding than the original
+diagnosis, and it came from the author putting the "broken" setting back.
+
+### Also
+
+- **`gtr_ens_Cmaj7`** — the same chord through Ensemble (LFO1 1.5 Hz, 3 voices)
+  and ChromaVerb, both **algorithmic**, so the CC0 holds where Space Designer
+  would have broken it.
+- **`paulx_drone`** — upstream confirmed as 870087; PaulXStretch contributes no
+  audio of its own.
+- **Bake and Save wav VERIFIED** at last — a `bd_M_DroneFrac.wav` appeared in the
+  author's Downloads. That was the module's one untested path.
+- **The default script** was revised four times by ear, ending on the
+  PaulXStretch drone with channel 2 an octave and a fourth up at **+4 dB** — so
+  the upper voice now leads rather than accompanies.
+- Several hours went on Alchemy, much of it on its interface: a **VA oscillator**
+  sounding instead of the imported file, modulation switched off making knobs
+  inert, and no obvious way to disable an engine. I guessed at its layout
+  repeatedly and was wrong more than once; **Logic's own help is the authority
+  and I should have said so sooner.** What I can contribute is the measurement
+  loop, which is what settled every question that mattered.
+
+---
+
 ## 2026-10-03 — eight pads, a monotonous pulse diagnosed, and what the metrics cannot see
 
 ### The pulse, which was my bug and is now a control

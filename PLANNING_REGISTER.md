@@ -224,6 +224,27 @@ acting on any of it.
 
 ---
 
+## Added 2026-10-04 — eleven pads, and the generated one
+
+| item | where | note |
+|---|---|---|
+| **`make_synth_pad.js` — a generated source** | `M_DroneFrac/` | **BUILT, and the author's favourite of the eleven.** 20 oscillators from 9 partials, each with its own slow amplitude drift. **No upstream at all** — CC0 by construction, reproducible from one file, no chain to confirm. Dissolves the provenance problem this directory opened with. |
+| **Seamless BY CONSTRUCTION** | `make_synth_pad.js` | Every frequency and drift rate is an exact multiple of `1/duration`, so each completes whole cycles and the end joins the beginning. Step at the wrap **0.0014** vs 0.03 for a splice. Three earlier rounds went on loop clicks; synthesis makes them impossible. |
+| **Detuning ≠ movement** | — | Beating moves AMPLITUDE and barely touches the spectrum — near-zero flux. Each oscillator needs its own **drift rate**, and because no two coincide the spectral balance keeps changing: **centroid swing 189 Hz, the highest of any source here.** Designing on detuning alone would have produced a static sine stack. |
+| **`smooth=0`** | `make_sample_pads.py` | **BUILT after nearly going wrong.** The flattening step removes level variation slower than its window — right for a recording with a swell, **destructive** for a source whose movement IS slow level variation. The synth's drift periods are 2.7–14 s and `smooth=1.0` would have erased all of them. |
+| **Which treatment adds most movement** | `sources/SOURCES.md` | Measured on one chord: none 0.136, Ensemble+ChromaVerb 0.291, Alchemy 0.407, **PaulXStretch 0.430**, benchmark 0.449. **Smearing across time beats modulating, and the free standalone tool beat the DAW's flagship synth.** |
+| **Processed sources want LESS transposition** | `make_sample_pads.py` | **Three corrections** before the rule was stated: −2400→−1200, −1200→0, and one that needed none. Reverb tails, spectral smear and time-stretching fill the low/mid range on their own. The organ pads' two-octave drop is no precedent — single pipe tones with nothing else in them. **Start a processed source at 0.** |
+| **The pulse was interval × source DETAIL** | — | `ch2_cents 2400` is fine on the smeared source and was not on the sharper one: the 1.83 s boundary jump lands between two nearly identical points in time-stretched material. The artefact was never the interval alone. Found by the author putting the "broken" setting back. |
+| ~~Bake / Save wav untested~~ | `M_DroneFrac/` | **VERIFIED.** Confirmed again — the module's last untested path is exercised. |
+| **`gtr_ens_Cmaj7`, `paulx_drone`** | `sources/` | Both CC0, chains confirmed. Four pads now come from one freeze-pedal guitar chord, differing only in treatment — a controlled comparison. |
+| **Alchemy** | — | Several hours, much on its interface: a VA oscillator sounding instead of the imported file, modulation off making knobs inert, no obvious engine disable. **I guessed at its layout repeatedly and was wrong more than once.** Logic's own help is the authority; what I contribute is the measurement loop. |
+| **A local-file sample load** | `M_DroneFrac/` | **STILL NOT BUILT** — top item in the module's `AGENTS.md`. Less pressing now that generation sidesteps licensing entirely. |
+| **An output stage for Fractal and ABC** | `M_Fractal/`, `M_Music/` | **STILL NOT BUILT.** |
+| **`page` entry for DroneFrac in `MODULES`** | `viewer.js` | **STILL NOT DONE.** One line. |
+| **`ch2_lock`** | `M_DroneFrac/` | **NOT BUILT, offered and not needed** — the fix was a smaller interval plus more overlap. |
+
+---
+
 ## Added 2026-10-03 — the pulse, and eight pads
 
 | item | where | note |
