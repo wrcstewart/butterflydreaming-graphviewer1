@@ -165,6 +165,30 @@ PADS = [
         voices=[0, 6, -6],
         target=-28.0,
     ),
+    dict(
+        out='paulx_drone',
+        src='paulx_stretch.wav',
+        # DERIVED WORK via **PaulXStretch** — free, standalone, and pure
+        # processing: extreme time-stretching with spectral smear, contributing
+        # no audio of its own, so whatever CC0 goes in comes out CC0.
+        # 27.1 s, 24-bit/48k, unnormalised, 0 of 1355 windows transient.
+        #
+        # THE MOST MOVEMENT OF ANY TREATMENT TRIED. Spectral flux inside a 2 s
+        # window: raw 0.136, Ensemble+ChromaVerb 0.291, Alchemy 0.407,
+        # PaulXStretch **0.430** — against the vox pad's 0.449, which is the
+        # author's own benchmark for "interesting". Smearing a sound across
+        # time is apparently a better way to make granular material than
+        # modulating it.
+        #
+        # -1200: centroid 497 Hz, so one octave by the same reasoning that
+        # settled gtr_ens_Cmaj7 — two octaves put that one at 162 Hz and was
+        # rejected as too low.
+        win=(2.95, 2.50),
+        smooth=1.00,
+        transpose=-1200,
+        voices=[0, 6, -6],
+        target=-28.0,
+    ),
 ]
 
 # ── ON LOOP LENGTH, WHICH TURNS OUT TO BE A MUSICAL CHOICE ─────────────────

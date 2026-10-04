@@ -24,6 +24,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `gtr_pad_Cmaj7.mp3` | **CC0** | Freesound 870087 by LAPS-Catalog — see below | **yes** |
 | `alchemy_gtr_Cmaj7.mp3` | **CC0** | 870087 through Logic's Alchemy — chain confirmed | **yes** |
 | `gtr_ens_Cmaj7.mp3` | **CC0** | 870087 through Ensemble + ChromaVerb — both algorithmic | **yes** |
+| `paulx_drone.mp3` | **CC0** | through PaulXStretch — pure processing; **upstream source to confirm** | **yes** |
 
 ## The two organ pads
 
@@ -442,6 +443,45 @@ And one metric disagreed with the other, as they keep doing: centroid *swing*
 inside the window FELL from 124 Hz to 89 Hz while flux rose, because the reverb
 smooths the centroid even as it adds frame-to-frame change. Two numbers, opposite
 verdicts, same file. See the note on what the metrics cannot see.
+
+## paulx_drone — and the treatment that won
+
+Built with **[PaulXStretch](https://sonosaurus.com/paulxstretch/)** — free,
+standalone, and **pure processing**: extreme time-stretching with spectral
+smear, contributing no audio of its own, so whatever CC0 goes in comes out CC0.
+27.1 s bounced, 24-bit/48 kHz, unnormalised, **0 of 1355 windows transient**.
+
+**UPSTREAM SOURCE TO CONFIRM** — presumably Freesound 870087, but the author
+has not said, and a derived work's provenance is only as good as its chain.
+
+| | |
+|---|---|
+| window | 2.95–5.45 s |
+| transpose | −1200¢ |
+| result | 22.7% below C2 · centroid **281 Hz** · RMS −19.7 dB · peak −4.8 dB |
+| loop | 5 s, so it recurs ~7 times in the pad |
+
+### It added more movement than anything else tried
+
+Spectral flux inside a 2-second window, all measured the same way:
+
+| treatment | flux | |
+|---|---|---|
+| none (raw 870087) | 0.136 | |
+| Ensemble + ChromaVerb | 0.291 | doubled it |
+| Alchemy, spectral engine | 0.407 | tripled it |
+| **PaulXStretch** | **0.430** | **the most** |
+| *vox pad, the author's benchmark for "interesting"* | *0.449* | |
+
+**Smearing a sound across time turns out to be a better way to make granular
+material than modulating it** — and it came from the free standalone tool rather
+than from the £200 DAW's flagship synth. Worth remembering before reaching for
+the complicated instrument again.
+
+The caution from the loop-length finding still applies: flux measures movement,
+and movement is not the same as interest. The vox pad and the J8 pad measure
+0.449 and 0.449 and the author can tell them apart instantly. Flux earns its
+keep as a check that movement **survived the 2 s cut**, not as a verdict.
 
 ## Loop length is a musical choice, not a technical one
 
