@@ -24,7 +24,7 @@ record, and a file that cannot be stated here should not be in the directory.
 | `gtr_pad_Cmaj7.mp3` | **CC0** | Freesound 870087 by LAPS-Catalog — see below | **yes** |
 | `alchemy_gtr_Cmaj7.mp3` | **CC0** | 870087 through Logic's Alchemy — chain confirmed | **yes** |
 | `gtr_ens_Cmaj7.mp3` | **CC0** | 870087 through Ensemble + ChromaVerb — both algorithmic | **yes** |
-| `paulx_drone.mp3` | **CC0** | through PaulXStretch — pure processing; **upstream source to confirm** | **yes** |
+| `paulx_drone.mp3` | **CC0** | Freesound 870087 through PaulXStretch — chain confirmed | **yes** |
 
 ## The two organ pads
 
@@ -451,8 +451,10 @@ standalone, and **pure processing**: extreme time-stretching with spectral
 smear, contributing no audio of its own, so whatever CC0 goes in comes out CC0.
 27.1 s bounced, 24-bit/48 kHz, unnormalised, **0 of 1355 windows transient**.
 
-**UPSTREAM SOURCE TO CONFIRM** — presumably Freesound 870087, but the author
-has not said, and a derived work's provenance is only as good as its chain.
+**Upstream confirmed 2026-10-04: Freesound 870087** (CC0, LAPS-Catalog), the
+same freeze-pedal guitar chord as `gtr_pad_Cmaj7`, `gtr_ens_Cmaj7` and
+`alchemy_gtr_Cmaj7`. PaulXStretch contributes no audio of its own, so the CC0
+carries through unbroken.
 
 | | |
 |---|---|
@@ -474,6 +476,13 @@ then buries it. The organ pads' two-octave drop is not a precedent for a
 processed source — they are single pipe tones with little else in them.
 
 **Start a processed source at 0 and move down only if asked.**
+
+### Four pads from one chord, which is the useful thing here
+
+`gtr_pad_Cmaj7`, `gtr_ens_Cmaj7`, `alchemy_gtr_Cmaj7` and `paulx_drone` all
+come from **Freesound 870087** and differ only in treatment. That makes them a
+controlled comparison of what each tool does to the same material, which no
+amount of reading about granular synthesis would have given.
 
 ### It added more movement than anything else tried
 
