@@ -212,6 +212,9 @@
      CSS was simply being overridden.
      Trust the hex on the border line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-04e: GREEN (new default set by the author: the PaulXStretch drone,
+     ch2 back to two octaves — which the smeared source tolerates where the
+     Alchemy one did not). Next = blue.
      2026-10-04d: RED (paulx_drone up an octave to no transposition at all —
      the third downward shift to be undone; processed sources want less).
      Next = green.
@@ -268,7 +271,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #27ae60 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -464,9 +467,9 @@ const ENUM_DISPLAY_INV = Object.fromEntries(
 //
 // This literal is the FALLBACK, for when the fetch fails: opened from file://
 // it will, and the module should still make a sound rather than sit mute.
-let SAMPLES = { alchemy_gtr_cmaj7: 'sources/alchemy_gtr_Cmaj7.mp3' };
-let SAMPLE_LABELS = { alchemy_gtr_cmaj7: 'alchemy gtr cmaj7' };
-let DEFAULT_SAMPLE = 'alchemy_gtr_cmaj7';
+let SAMPLES = { paulx_drone: 'sources/paulx_drone.mp3' };
+let SAMPLE_LABELS = { paulx_drone: 'paulx drone' };
+let DEFAULT_SAMPLE = 'paulx_drone';
 
 async function loadManifest() {
   try {
@@ -1449,7 +1452,7 @@ window.addEventListener('message', (event) => {
 buildChain();
 storedText = [
   '%%bd_module bd_M_DroneFrac',
-  '%%bd_p_sample alchemy_gtr_cmaj7',
+  '%%bd_p_sample paulx_drone',
   '%%bd_axiom X',
   '%%bd_rule X: XFYFX+F+YFXFY-F-XFYFX',
   '%%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY',
@@ -1462,7 +1465,7 @@ storedText = [
   '%%bd_p_grain_from_run 0.50',
   '%%bd_p_offsetCH2 52',
   '%%bd_p_ch2_level 0',
-  '%%bd_p_ch2_cents 700',
+  '%%bd_p_ch2_cents 2400',
   '%%bd_p_overlap 0.44',
   '%%bd_p_playback_rate 1.00',
   '%%bd_p_duration 60',
