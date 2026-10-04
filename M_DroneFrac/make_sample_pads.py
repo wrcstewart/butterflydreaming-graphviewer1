@@ -180,12 +180,22 @@ PADS = [
         # time is apparently a better way to make granular material than
         # modulating it.
         #
-        # -1200: centroid 497 Hz, so one octave by the same reasoning that
-        # settled gtr_ens_Cmaj7 — two octaves put that one at 162 Hz and was
-        # rejected as too low.
+        # NO TRANSPOSITION. Built at -1200 and rejected as "an octave at least
+        # too low", which is the THIRD time a downward shift has had to be
+        # undone — gtr_ens went -2400 to -1200, this one -1200 to 0, and the
+        # Alchemy pad needed none from the start.
+        #
+        # The pattern is now clear enough to state: **smeared and resynthesised
+        # material wants LESS transposition than raw material, often none.**
+        # Reverb tails, spectral smear and time-stretching all fill the low and
+        # mid range on their own, so the pad is already dark before anything is
+        # shifted; shifting then buries it. The organ pads' two-octave drop is
+        # not a precedent for a processed source.
+        #
+        # Start a processed source at 0 and move DOWN only if the author asks.
         win=(2.95, 2.50),
         smooth=1.00,
-        transpose=-1200,
+        transpose=0,
         voices=[0, 6, -6],
         target=-28.0,
     ),

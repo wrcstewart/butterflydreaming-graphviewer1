@@ -457,9 +457,23 @@ has not said, and a derived work's provenance is only as good as its chain.
 | | |
 |---|---|
 | window | 2.95–5.45 s |
-| transpose | −1200¢ |
-| result | 22.7% below C2 · centroid **281 Hz** · RMS −19.7 dB · peak −4.8 dB |
-| loop | 5 s, so it recurs ~7 times in the pad |
+| transpose | **0 — none** |
+| result | 1.2% below C2 · centroid **470 Hz** · RMS −19.7 dB · peak −4.7 dB |
+| loop | 2.5 s, so it recurs ~14 times in the pad |
+
+### Processed sources want LESS transposition, often none
+
+This was built at −1200 and rejected as "an octave at least too low" — the
+**third** downward shift to be undone. `gtr_ens_Cmaj7` went −2400 → −1200, this
+one −1200 → 0, and `alchemy_gtr_Cmaj7` needed none from the outset.
+
+The pattern is worth stating because it cost three corrections: **reverb tails,
+spectral smear and time-stretching all fill the low and mid range on their own**,
+so a processed source is already dark before anything is shifted, and shifting
+then buries it. The organ pads' two-octave drop is not a precedent for a
+processed source — they are single pipe tones with little else in them.
+
+**Start a processed source at 0 and move down only if asked.**
 
 ### It added more movement than anything else tried
 
