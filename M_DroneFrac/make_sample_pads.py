@@ -152,11 +152,16 @@ PADS = [
         # same source untreated, so the two are a controlled comparison of what
         # the processing adds.
         #
-        # -2400 like its untreated twin: the treatment barely moved the register
-        # (centroid 553 -> 530 Hz), so it needs the same two octaves.
+        # -1200, ONE octave. It was built at -2400 like its untreated twin,
+        # since the treatment barely moved the register (centroid 553 -> 530 Hz)
+        # — but at two octaves it came out too low by ear, 55.4% of its energy
+        # at or below C2 and a centroid of 162 Hz, the deepest of the set.
+        # One octave is the correction. The untreated twin keeps -2400, so the
+        # two remain a comparison of treatment at different registers rather
+        # than duplicates.
         win=(19.00, 2.50),
         smooth=1.00,
-        transpose=-2400,
+        transpose=-1200,
         voices=[0, 6, -6],
         target=-28.0,
     ),

@@ -403,17 +403,23 @@ why that distinction is load-bearing here.
 | | |
 |---|---|
 | window | 19.00–21.50 s, the flattest stretch |
-| transpose | −2400¢ |
-| result | **55.4% below C2** · centroid **162 Hz** · RMS −19.4 dB · peak −5.9 dB |
-| loop | 10 s, so it recurs 3.6 times in the pad |
+| transpose | **−1200¢, one octave** |
+| result | 21.6% below C2 · centroid **314 Hz** · RMS −19.6 dB · peak −5.8 dB |
+| loop | 5 s, so it recurs ~7 times in the pad |
 
-**The deepest of the nine.** Centroid 162 Hz and more than half its energy at or
-below C2.
+**Built at −2400 first and corrected by ear to −1200.** The reasoning for two
+octaves was sound — the treatment barely moved the register (centroid
+553 → 530 Hz), so it looked like it needed the same drop as its untreated twin —
+and it was still wrong: at −2400 it measured 55.4% below C2 with a centroid of
+162 Hz, the deepest of the set, and the author's verdict was simply "too low".
 
-**It needed the same two octaves as its untreated twin**, because the treatment
-barely moved the register: centroid 553 → 530 Hz. Ensemble detunes by a few
-cents and ChromaVerb's tail is broadband, so neither shifts the fundamental —
-unlike Alchemy, which dropped the same source to 204 Hz on its own.
+A useful reminder that **matching a sibling's transposition is not a reason**.
+The untreated twin keeps −2400, so the two sit an octave apart and remain a
+comparison of *treatment* rather than duplicates.
+
+A side benefit: one octave rather than two halves the loop from 10 s to **5 s**,
+which doubles the recurrences in a 36 s pad — better by the loop-length finding
+below.
 
 ### A controlled comparison, which is the useful part
 
@@ -422,11 +428,15 @@ Three pads now come from **one guitar chord**, differing only in treatment:
 | pad | treatment | ≤C2 | centroid | flux in 2 s |
 |---|---|---|---|---|
 | `gtr_pad_Cmaj7` | none | 51.4% | 173 Hz | 0.136 |
-| `gtr_ens_Cmaj7` | Ensemble + ChromaVerb | **55.4%** | **162 Hz** | 0.291 |
+| `gtr_ens_Cmaj7` | Ensemble + ChromaVerb | 21.6% | 314 Hz | 0.291 |
 | `alchemy_gtr_Cmaj7` | Alchemy, spectral | 2.1% | 220 Hz | 0.407 |
 
 **The Ensemble doubled the flux** — movement measurably survived the 2 s cut,
 which was the thing worth testing. Alchemy tripled it but gutted the bass.
+
+(The three sit at different transpositions — −2400, −1200 and 0 — each set by
+ear, so the register column compares the finished pads rather than the
+treatments. Flux is the column that isolates what the treatment did.)
 
 And one metric disagreed with the other, as they keep doing: centroid *swing*
 inside the window FELL from 124 Hz to 89 Hz while flux rose, because the reverb
