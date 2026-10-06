@@ -6,6 +6,164 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-06 — the L-system was one endless string all along
+
+A morning that began as two measurement questions and ended by rewriting how
+DroneFrac generates anything, changing the grammar it ships with, and finding a
+regression I had introduced the day before.
+
+### The question, and the answer that reframed it
+
+The author asked how far `offsetCH2` must reach for new material at iterations
+5, 6 and 7, and what the iteration ceiling is for 20 MB. Both were measurable
+rather than arguable, and the measuring turned up something better than either
+answer.
+
+**The default rules each BEGIN with their own non-terminal.** `X` rewrites to
+`XFYFX+F+YFXFY-F-XFYFX`, which starts with `X`. So expanding X to depth N starts
+by expanding X to depth N-1, which means **string(N) opens with string(N-1),
+character for character.** Verified: string(5) is the first 147,621 characters of
+string(6); the first 300,000 symbols of iterations 6 and 7 are byte-identical.
+
+So raising `iterations` never altered the beginning — it only added material at
+the END. **There were never seven fractals; there is one endless string, and
+`iterations` said how much of it had been computed.** Without the skip, 5, 6, 7
+and 8 would sound identical, which is exactly what the skip was built to hide.
+
+The author saw the oddity straight off: *"Why are we doing that if we have NOT
+first played the preceding iterations?"* Right — the discarded prefix is not
+inferior material, and nothing had played it. The skip was never a musical
+device but a **coordinate** one, making the stepper mean "start L(N-1) symbols
+in". One control doing two jobs: depth, which is inaudible, and starting
+position, which is all you can hear.
+
+### Measuring the shared opening instead of assuming it
+
+`skipSymbols` was `L(iterations - 1)`, a formula true of one grammar and
+**silently wrong for every other** — and the grammar lives in the script, so a
+user can type any. `sharedOpening()` now advances two expansions in lockstep and
+skips exactly what they share. Memoised, since the cost is O(what it finds).
+
+It returns the old value for the old rules, so nothing moved: **verified
+byte-identical output at every iteration 3-7, trajectory points and diagnostics
+alike.** See `feedback_formula_from_one_example.md` — the tell is a comment that
+justifies a formula by describing one example.
+
+### Expansion and the turtle, fused
+
+The prefix cannot be skipped outright: the turtle's position and heading where
+the kept material begins depend on every turn before it, and `isHorizontal` —
+which decides what carries pitch at all — comes from the heading. But those are
+**three scalars**, and nothing else about the prefix is ever read.
+
+So the two stages are fused and the prefix is **traversed without being
+stored.** At iteration 7 the old pipeline built 651,441 segment objects and
+discarded 531,440 of them — 82% of the work, 45 MB of a 54 MB peak.
+
+| iteration | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|
+| peak memory before | 8.3 MB | 15.3 MB | **45.4 MB** | clamped to 7 |
+| peak memory after | <1 MB | <1 MB | **~7 MB flat** | ~7 MB |
+| time after | 10 ms | 28 ms | 52 ms | 396 ms |
+
+**Memory stopped depending on the iteration at all**, and it got FASTER — 97 ms
+to 52 ms at iteration 7 — because a 1.6 M-character string and 651,441 objects
+are no longer built and thrown away. Two separate functions could not do this:
+the intermediate string IS the thing being avoided.
+
+`MAX_TOTAL_EMISSION` (a memory ceiling at 5 M) became `MAX_SYMBOLS_TRAVERSED`
+(a **time** ceiling at 20 M), since memory is no longer what it bounds.
+Iteration 8 had been clamped back to 7 by the old cap and is now reachable, so
+the stepper max went 7 → 8.
+
+### The author's question that removed the problem entirely
+
+*"If in both rules we remove the first symbol would that remove the prefix
+problem?"* — yes, completely. The recursion becomes `shared(N) = 2 + shared(N-2)`
+instead of a ninefold multiplication:
+
+| iteration | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|
+| shared opening, rules as given | 1,821 | 16,401 | 147,621 | 1,328,601 |
+| leading symbol cut | **3** | **4** | **5** | **6** |
+
+Exponential becomes linear and the skip has nothing left to do. Checked for
+degeneration, since removing a symbol from a space-filling curve could easily
+ruin it: the walk still fills a region (229 × 229), pitch variety is unchanged
+at nine values, and run lengths get RICHER — 1 to 9 where the old rules produce
+only {1, 2, 5}. **It became the default at the author's request.**
+
+One side effect, measured and written down rather than silently compensated:
+`grain_from_run` normalises against the longest run, now 9, while 98% of runs
+are still 1-5 — so effective grain size falls from a mean of 0.656 to 0.526,
+about 20% shorter. `grain_size` 0.61 → 0.76 restores the old mean. Left alone so
+that one change is judged at a time.
+
+### A default lives in five places
+
+The new default script — the **generated** pad `synth_pad_a2`, `offsetCH2` 100,
+`ch2_level` -10 — had to be set in the module's boot script, `parseScript`'s
+fallback, the pre-manifest `SAMPLES`/`DEFAULT_SAMPLE` pair, the standalone host
+page, and the stored node `bd_M_DroneFrac_001`. Each verified line-identical to
+the script as given.
+
+**`SAMPLES` is keyed by the lowercased manifest `id`**, and the lookup is exact,
+so `synth_pad_A2` fails **silently** and falls back. I had told the author to
+type exactly that; he typed `synth_pad_a2` and was right.
+
+### Echo versus offset — a table, and then the same table measured properly
+
+An autocorrelation of the pitch sequence against lag, normalised by the chance
+floor (Σpᵢ², the probability two unrelated instants coincide). Useful, and
+standard — a self-similarity lag profile, not an invention. **Not monotonic**,
+which is the trap: the peaks sit on the grammar's block boundaries, so offset 40
+echoes at 64% where 4 echoes at 62% and 66 at 13%.
+
+Which meant the table **went stale the moment the grammar changed** — the peaks
+move with the rules. Re-measured. A measurement is only a fact about the thing
+measured.
+
+Then the author asked what "same pitch" actually meant, and the answer was that
+I had described it wrongly. The figures compare the voices' RAW trajectory
+values, before `ch2_cents` — so a match is the **same interval**, parallel
+motion, ch2 a rigid transposed copy. Not the same frequency. Both the questions
+it was not answering are now measured: **true unison is 0 of 11,900 instants**
+and near-unreachable by construction, and the 14.1% octave coincidence sits on
+its own 14.4% chance floor, so it is coincidence rather than a finding. Taking
+it for one would have been a ratio read against no baseline.
+
+### Reset "not setting the default script" — and the regression behind it
+
+Reset *was* setting it. Driven in a real browser it restores every stepper, the
+sample and the textarea correctly, and did so before any fix. What it did not do
+was change anything **audible**, which from the listening chair is the same
+thing.
+
+`scheduleTrajectory` lays down all 12,000 transport events upfront with their
+pitches baked in; only the grain parameters are read live. So a rebuilt
+trajectory sat unused while the transport finished the old schedule. **That lag
+had always existed and had always corrected itself**, because the pass was
+`duration` = 60 seconds. Decoupling the loop from `duration` the previous day
+made the pass the trajectory's own length — about 20 hours — and turned a
+one-minute lag into a permanent one.
+
+Invisible because nothing about it is an error: the module plays, the panel
+updates, the script is right, and the sound is of the script before.
+`regenerate()` now reschedules, **debounced at 180 ms** because the steppers
+repeat on press-and-hold and rescheduling 12,000 events per tick would stutter
+the audio it is meant to update; the pending timer is cleared in
+`stopPlayback()`. The stepper path now calls `regenerate()` rather than its own
+drifted copy of its body, which had lost the status reporting.
+
+Verified in **headless Chrome against the real module** — it cannot start audio
+output, but the module's top-level functions are globals on the iframe's window,
+so a harness can spy on `relaunchTrajectory` and count calls. One reschedule per
+regen nudge, still one across five rapid nudges, Reset reschedules and restores,
+and a non-regen stepper does not reschedule at all. See
+`feedback_lengthening_a_loop_exposes_staleness.md`.
+
+---
+
 ## 2026-10-04 — eleven pads, and the one with no upstream
 
 ### The synthesised pad, which is the best of them
