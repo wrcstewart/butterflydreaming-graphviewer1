@@ -84,6 +84,8 @@ The 2026-08-02 planning doc listed six open questions. Resolutions:
 grammar (%%bd_ directives)
   ├→ parseGrammarFromScript
   ├→ sharedOpening (two expansions in lockstep; how much N repeats of N-1)
+  ├→ start_at (thousands of symbols, ADDED to the shared opening,
+  │            clamped to 25% of the iteration's length)
   └→ expandAndWalk (DFS streaming + turtle FUSED, memory O(iter))
        ↓ segments past the shared opening only — the prefix is WALKED
          (position and heading are needed) but never STORED
@@ -126,9 +128,14 @@ grammar (%%bd_ directives)
   `F`s (the DFS descends the leftmost branch N levels, emitting one `F`
   per level), and after that run the figure depends only on the PARITY of
   N. So odd iterations give one piece and even ones its mirror.
-  **What would give genuine variety is an independent `start_at` offset
-  into the string** — one honest axis in place of a depth control that
-  cannot hear itself. NOT BUILT; see `PLANNING_REGISTER.md`.
+  **`start_at` is what gives genuine variety, and it is BUILT**
+  (2026-10-06): a `%%bd_p_` stepper giving the offset into the rewritten
+  string in **thousands of symbols**, added to the shared opening so 0
+  is the old behaviour. Measured, twelve settings from 0 to 177k give
+  **twelve distinct figures** — against three for `iterations` here.
+  Clamped to 25% of the iteration's real length, reported when it bites.
+  **Reach for `start_at` before `iterations` when you want a different
+  piece**; `iterations` now mostly decides how far `start_at` may go.
 - **Tonic scan**: raw-y seed means iterations start on random scale
   degrees. Not musically satisfying. Scan forward to first horizontal
   at y ≡ 0 (tonic in some octave) so every iteration opens on the

@@ -164,6 +164,51 @@ and a non-regen stepper does not reschedule at all. See
 
 ---
 
+### `start_at` — the control `iterations` could never be
+
+Proposed in the morning's write-up as the thing that would actually work, and
+built the same day at the author's request, with his own shape for it: a
+`%%bd_p_` stepper, 0 to 200, in steps of 0.1 — **thousands of symbols**, so
+`2.5` means 2,500 and a six-figure range fits a three-character readout.
+
+**Measured before building**, because this is exactly the assumption that had
+just failed for `iterations`. Twelve settings from 0 to 177k gave **twelve
+distinct figures**, every step a new one, against five across DroneFrac's whole
+`iterations` range and three across Fractal's.
+
+It is **added to** the shared opening rather than replacing it, so `start_at` 0
+is precisely the behaviour from before it existed. Clamped at generation to 25%
+of the iteration's real length — which is the job `computeExpansionLength` kept
+when it stopped driving the skip — and the clamp **reports itself**, since a
+control that quietly ignores what it was set to is indistinguishable from one
+that does nothing. It only bites below iteration 7.
+
+**`decimals`**, a new field on the stepper spec. Without it `formatDisplay`
+printed 177.9 as `178` — and `getStepperValue` reads the *display* back, so the
+fraction would have been destroyed by looking at it. That is the same
+formatDisplay/getStepperValue inverse that once flipped `loop` off in Fractal,
+and the comment warning about it is still beside the function.
+
+**And a permanent false alarm came off DroneFrac's status line.** `truncated`
+means the walk found more material than it took — which, since the loop was
+decoupled from `duration`, is the normal case at every iteration from 6 up. So
+*"trajectory capped at 12000 points"* had been sitting there in error styling,
+describing the module working exactly as intended. A warning that is always on
+is not a warning, and it was about to drown the clamp message.
+
+Verified in headless Chrome against both real modules: the row appears, 25
+presses give exactly `2.5`, the script line follows, and the clamp reports
+itself. Fractal needed `pointerdown` rather than `click` — its stepper handler
+differs from DroneFrac's, which is worth knowing before writing the next test.
+
+Left open and written into the register: with `start_at` carrying the variety,
+**`iterations` is nearly redundant** — it now only decides how long the string
+is, which is to say how far `start_at` may reach. It could become derived and
+leave the panel. Kept for now, because removing a control from scripts people
+have already saved is not reversible.
+
+---
+
 ### M_Fractal gets the same treatment — and the finding that qualifies it
 
 Both L-system modules now share `sharedOpening()` and the fused walk. It
