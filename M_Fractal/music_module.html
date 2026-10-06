@@ -448,16 +448,25 @@
     ];
 
     // Safety caps:
-    //   MAX_TURTLE_INPUT_CHARS — how many post-skip symbols we walk.
-    //   MAX_TOTAL_EMISSION — hard ceiling on skip + post-skip. Grammar
-    //     growth is exponential per iteration; without this, iter 9+ of
-    //     Peano would ask for ~4 billion symbols and crash the JS heap
-    //     (silent failure = notes-don't-update). If the requested iter's
-    //     skip-plus-emit would exceed this, we drop the effective iter
-    //     count until it fits and surface the fact in the status readout.
+    //   MAX_TURTLE_INPUT_CHARS — how many post-skip symbols we KEEP.
+    //   MAX_SYMBOLS_TRAVERSED — how many symbols are worth WALKING PAST.
     //   MAX_NOTES — post-collapse-and-reflect run count cap.
+    //
+    // The second was MAX_TOTAL_EMISSION at 5,000,000 and was a MEMORY
+    // ceiling: every symbol walked was a character stored and, two in five
+    // of them, a seven-field segment object. Since expandAndWalk traverses
+    // the shared opening without storing it (2026-10-06), memory no longer
+    // depends on the iteration — so this is a TIME ceiling now, set by how
+    // long a pause is tolerable rather than by how much heap is safe.
+    //
+    // Raising it 5 M -> 20 M matters here more than it did in DroneFrac,
+    // because this module's `iterations` stepper goes to 20. Under the Peano
+    // rules the old cap clamped every setting above 7 — thirteen of the
+    // stepper's sixteen positions did nothing at all, silently. 20 M admits
+    // 8. A grammar without the prefix property is unclamped to the top of
+    // the range, which is the real fix.
     const MAX_TURTLE_INPUT_CHARS  = 300000;     // musical length limit
-    const MAX_TOTAL_EMISSION      = 5000000;    // hard memory ceiling
+    const MAX_SYMBOLS_TRAVERSED   = 20000000;   // how far we will WALK
     const MAX_NOTES               = 1000;       // final note count cap
 
     STEPPERS.forEach((s) => {
@@ -561,14 +570,27 @@
     // ── L-system + turtle + ABC generation ──────────────────────────────────
 
     function parseGrammarFromScript(text) {
-      // Fallbacks match preview.html's DEFAULT_SCRIPT (Peano curve on
-      // C pentatonic, fast 0.2 s stepping). Effect params default to
-      // the same values as bd_M_ABC so the two modules feel similar.
+      // Fallbacks match the host page's DEFAULT_SCRIPT (C pentatonic, fast
+      // 0.2 s stepping). Effect params default to the same values as
+      // bd_M_ABC so the two modules feel similar.
+      //
+      // THE RULES NO LONGER BEGIN WITH THEIR OWN NON-TERMINAL (2026-10-06),
+      // and that is the point of them. The Peano rules this module shipped
+      // with were `X: XFYFX+F+YFXFY-F-XFYFX` / `Y: YFXFY-F-XFYFX+F+YFXFY`,
+      // and because the rule for X began with X, iteration N opened with the
+      // whole of iteration N-1 — 1,328,601 symbols at iteration 7. The skip
+      // mechanism exists entirely to get past that.
+      //
+      // Cutting the one leading symbol from each rule turns the recursion
+      // into shared(N) = 2 + shared(N-2) instead of a ninefold
+      // multiplication, so the shared opening is about N symbols and the
+      // skip has nothing left to do. Paste the two rules above back into a
+      // script to hear the old figure.
       const g = {
         axiom:      'X',
         rules:      {
-          X: 'XFYFX+F+YFXFY-F-XFYFX',
-          Y: 'YFXFY-F-XFYFX+F+YFXFY'
+          X: 'FYFX+F+YFXFY-F-XFYFX',
+          Y: 'FXFY-F-XFYFX+F+YFXFY'
         },
         iterations: 5,
         angle:      90,
@@ -691,6 +713,58 @@
     }
 
     // Expand L-system via depth-first streaming, up to `maxChars` symbols.
+    // ── HOW MUCH OF THE OPENING HAVE WE ALREADY HEARD (2026-10-06) ──────
+    // MEASURED, not assumed. This was `L(iterations - 1)`, on the reasoning
+    // that iteration N opens with iteration N-1. That is true of the Peano
+    // rules this module shipped with and of nothing else: it holds only
+    // because the rule for X BEGINS with X, so expanding X to depth N starts
+    // by expanding X to depth N-1.
+    //
+    // The grammar lives in the SCRIPT, so a user can type rules without the
+    // property — and for those the formula over-skipped by hundreds of
+    // thousands of symbols of material nobody had heard. The failure is
+    // inaudible: the music still plays, it is simply not the music the walk
+    // produced. So compare the two expansions symbol by symbol and skip
+    // exactly what they actually share.
+    //
+    // Two streams advanced in lockstep; neither string is materialised.
+    function symbolStream(axiom, rules, iterations) {
+      const stack = [{ expansion: axiom, index: 0, depth: iterations }];
+      return function next() {
+        while (stack.length > 0) {
+          const frame = stack[stack.length - 1];
+          if (frame.index >= frame.expansion.length) { stack.pop(); continue; }
+          const sym = frame.expansion[frame.index];
+          frame.index++;
+          const rule = rules[sym];
+          if (frame.depth === 0 || rule === undefined) return sym;
+          stack.push({ expansion: rule, index: 0, depth: frame.depth - 1 });
+        }
+        return null;                          // exhausted
+      };
+    }
+
+    // Memoised: the cost is O(the shared opening), which under the old rules
+    // is the same order as the walk itself, so paying it on every stepper
+    // move would double generation time.
+    const sharedOpeningCache = new Map();
+    function sharedOpening(axiom, rules, iterations, cap) {
+      if (iterations < 1) return 0;
+      const key = axiom + '|' + JSON.stringify(rules) + '|' + iterations + '|' + cap;
+      if (sharedOpeningCache.has(key)) return sharedOpeningCache.get(key);
+      const a = symbolStream(axiom, rules, iterations);
+      const b = symbolStream(axiom, rules, iterations - 1);
+      let n = 0;
+      while (n < cap) {
+        const x = a(), y = b();
+        // y === null means iteration N-1 ran out: all of it is repeated by N.
+        if (x === null || y === null || x !== y) break;
+        n++;
+      }
+      sharedOpeningCache.set(key, n);
+      return n;
+    }
+
     // Because rewriting is context-free (each symbol's expansion depends
     // only on itself), we can emit iter-N's symbols one at a time via DFS
     // recursion without ever materialising an intermediate iteration.
@@ -698,60 +772,70 @@
     //
     // Coded as an explicit-stack loop rather than a JS generator function
     // to avoid per-yield GC pressure at ~million-symbol outputs.
-    function expandLSystem(axiom, rules, iterations, maxChars) {
-      const cap = maxChars;
-      const parts = [];
+    //
+    // ── EXPANSION AND TURTLE, FUSED (2026-10-06) ────────────────────────
+    // These were two functions: expandLSystem built the whole string,
+    // turtleWalk turned it into segments, and regenerateAbc then threw the
+    // leading ones away. Under the old rules at iteration 7 that meant
+    // building 651,441 segment objects and discarding 531,440 of them —
+    // 82% of the work, and these segments carry seven fields each.
+    //
+    // The prefix cannot simply be skipped: the turtle's position and heading
+    // where the kept material begins depend on every turn before it, and
+    // `isHorizontal` — which decides what becomes a note at all — comes from
+    // the heading. But those are THREE SCALARS. Nothing else about the
+    // prefix is ever read.
+    //
+    // So the prefix is TRAVERSED WITHOUT BEING STORED: no string for it, no
+    // segment objects. Peak memory stops depending on the iteration, and it
+    // is faster besides, since the discarded work is never done. Two
+    // separate functions cannot do this — the intermediate string IS the
+    // thing being avoided.
+    //
+    // Turtle: F=forward, +=turn CCW, -=turn CW. Heading in degrees, 0 = east.
+    // Segments keep the shape generateAbc expects, unchanged.
+    function expandAndWalk(axiom, rules, iterations, angleDeg,
+                           skipSymbols, keepSymbols, traverseCap) {
+      const segments = [];
+      let x = 0, y = 0, heading = 0;
+      let n = 0;              // absolute symbol index, prefix included
+      let kept = 0;           // symbols emitted past the shared opening
+      let skippedSegs = 0;    // segments the prefix would have produced
       let truncated = false;
-      // Explicit-stack DFS. Each frame is {expansion, index, depth}:
-      // 'expansion' is the string being iterated (axiom at the outer
-      // level, a rule's RHS deeper in); 'index' is the next symbol to
-      // process; 'depth' is remaining iterations to apply at this level.
       const stack = [{ expansion: axiom, index: 0, depth: iterations }];
       while (stack.length > 0) {
-        if (parts.length >= cap) { truncated = true; break; }
+        if (kept >= keepSymbols) { truncated = true; break; }
+        // A TIME guard where the old cap was a MEMORY guard: the
+        // prefix no longer costs memory, but it still has to be walked.
+        if (n >= traverseCap)   { truncated = true; break; }
         const frame = stack[stack.length - 1];
-        if (frame.index >= frame.expansion.length) {
-          stack.pop();
-          continue;
-        }
+        if (frame.index >= frame.expansion.length) { stack.pop(); continue; }
         const sym = frame.expansion[frame.index];
         frame.index++;
         const rule = rules[sym];
-        if (frame.depth === 0 || rule === undefined) {
-          // Leaf: emit the symbol as-is
-          parts.push(sym);
-        } else {
-          // Recurse: push a new frame at depth-1 over this rule's RHS
+        if (frame.depth > 0 && rule !== undefined) {
           stack.push({ expansion: rule, index: 0, depth: frame.depth - 1 });
+          continue;
         }
-      }
-      return { symbols: parts.join(''), turtleTruncated: truncated };
-    }
-
-    // Turtle: walk the symbol string with F=forward, +=turn CCW, -=turn CW.
-    // Heading in degrees, 0 = east. Each F emits a segment tagged with
-    // the source symbol index (needed for the skip mechanism — we walk
-    // the whole prefix to maintain turtle state but only KEEP segments
-    // from symIdx ≥ skipSymbols downstream).
-    function turtleWalk(symbols, angleDeg) {
-      const segments = [];
-      let x = 0, y = 0, heading = 0;
-      for (let i = 0; i < symbols.length; i++) {
-        const ch = symbols[i];
-        if (ch === 'F') {
+        const keeping = n >= skipSymbols;
+        if (sym === 'F') {
           const rad = heading * Math.PI / 180;
           const dx = Math.cos(rad), dy = Math.sin(rad);
           const nx = x + dx, ny = y + dy;
-          const isHorizontal = Math.abs(dx) > 0.5;
-          segments.push({ symIdx: i, x1: x, y1: y, x2: nx, y2: ny, isHorizontal, length: 1 });
+          if (keeping) {
+            segments.push({ symIdx: n, x1: x, y1: y, x2: nx, y2: ny,
+                            isHorizontal: Math.abs(dx) > 0.5, length: 1 });
+          } else skippedSegs++;
           x = nx; y = ny;
-        } else if (ch === '+') {
+        } else if (sym === '+') {
           heading = (heading + angleDeg) % 360;
-        } else if (ch === '-') {
+        } else if (sym === '-') {
           heading = (heading - angleDeg + 360) % 360;
         }
+        n++;
+        if (keeping) kept++;
       }
-      return segments;
+      return { segments, truncated, skippedSegs, symbolsLen: n };
     }
 
     // Map an integer y-coordinate to a MIDI note number given a scale + root.
@@ -1044,42 +1128,51 @@
       g.scale        = SCALE_NAMES[getStepperValue('scale')] || 'major';
       // g.root and g.rootOctave stay as parsed from the script (no stepper).
 
-      // Skip mechanism (user 2026-08-07): iter N and iter (N-1) share the
-      // same first L(N-1) symbols (DFS emission property). Skip that
-      // prefix so bumping iterations reveals new material.
+      // Skip mechanism (user 2026-08-07): iteration N may OPEN with material
+      // already heard at iteration N-1, in which case taking the first runs
+      // of it gives the same music at every setting. Skipping that shared
+      // opening is what makes a higher iteration a different piece.
       //
-      // Effective-iteration guard (2026-08-07 v2): grammar growth is
-      // exponential (9× per iter for Peano), so L(N-1) at high iter can
-      // exceed our memory ceiling. Step the effective iteration count
-      // down until skip + emit-cap fits in MAX_TOTAL_EMISSION. Surface
-      // in status if the requested iter was reduced.
+      // How much is shared is MEASURED per grammar now (2026-10-06) rather
+      // than assumed to be L(N-1) — see sharedOpening(). Under the Peano
+      // rules it is the whole previous string; under a grammar whose rules do
+      // not begin with their own non-terminal it is a handful of symbols, and
+      // `iterations` then needs no skip at all to mean something.
+      //
+      // Effective-iteration guard: the shared opening still has to be WALKED
+      // even though it is no longer stored, so a grammar whose prefix runs to
+      // hundreds of millions of symbols is a stall. Step the effective
+      // iteration down until it fits, and surface it in status.
       let effIter    = g.iterations;
       let skipSymbols = 0;
       let iterReduced = false;
       while (effIter > 1) {
-        const proposedSkip = computeExpansionLength(g.axiom, g.rules, effIter - 1);
-        if (proposedSkip + MAX_TURTLE_INPUT_CHARS <= MAX_TOTAL_EMISSION) {
+        const proposedSkip = sharedOpening(g.axiom, g.rules, effIter,
+                                           MAX_SYMBOLS_TRAVERSED);
+        if (proposedSkip + MAX_TURTLE_INPUT_CHARS <= MAX_SYMBOLS_TRAVERSED) {
           skipSymbols = proposedSkip;
           break;
         }
         effIter--;
         iterReduced = true;
       }
-      const emitCap = Math.min(skipSymbols + MAX_TURTLE_INPUT_CHARS, MAX_TOTAL_EMISSION);
-      const { symbols, turtleTruncated } =
-        expandLSystem(g.axiom, g.rules, effIter, emitCap);
-      const allSegments = turtleWalk(symbols, g.angle);
-      const firstIdx = allSegments.findIndex(s => s.symIdx >= skipSymbols);
-      const segments = firstIdx >= 0 ? allSegments.slice(firstIdx) : allSegments;
-      derivedAbc = generateAbc(segments, g);
+      const walk = expandAndWalk(g.axiom, g.rules, effIter, g.angle,
+                                 skipSymbols, MAX_TURTLE_INPUT_CHARS,
+                                 MAX_SYMBOLS_TRAVERSED);
+      derivedAbc = generateAbc(walk.segments, g);
       lastGenerationInfo = {
-        turtleTruncated,
-        symbolsLen:  symbols.length,
+        turtleTruncated: walk.truncated,
+        symbolsLen:  walk.symbolsLen,
         skipSymbols,
-        skippedSegments: firstIdx >= 0 ? firstIdx : 0,
+        skippedSegments: walk.skippedSegs,
         requestedIter:   g.iterations,
         effectiveIter:   effIter,
-        iterReduced
+        iterReduced,
+        // What the whole iteration WOULD be, so the readout can say how small
+        // a window is being heard. Arithmetic and memoised, so it costs
+        // nothing to ask — and it is the only remaining caller of
+        // computeExpansionLength, which used to drive the skip itself.
+        totalSymbols: computeExpansionLength(g.axiom, g.rules, effIter)
       };
       // 2026-08-19 — the read-only ABC pane is gone (grid layout). Surface the
       // derived score's T: header instead; "Copy for ABC Player" still hands
@@ -1091,7 +1184,8 @@
     let lastGenerationInfo = {
       turtleTruncated: false, symbolsLen: 0,
       skipSymbols: 0, skippedSegments: 0,
-      requestedIter: 0, effectiveIter: 0, iterReduced: false
+      requestedIter: 0, effectiveIter: 0, iterReduced: false,
+      totalSymbols: 0
     };
 
     // ── Audio: reused from bd_M_ABC ─────────────────────────────────────────
@@ -1245,6 +1339,12 @@
       }
       if (lastGenerationInfo.skipSymbols > 0) {
         readyMsg += ` (skipped ${lastGenerationInfo.skippedSegments} prefix segs)`;
+      }
+      // How small a window of the iteration is actually being heard. Worth
+      // saying: under a prefix-stable grammar the skip can be most of it.
+      if (lastGenerationInfo.totalSymbols > lastGenerationInfo.symbolsLen) {
+        readyMsg += ` [${lastGenerationInfo.symbolsLen.toLocaleString()} of ` +
+                    `${lastGenerationInfo.totalSymbols.toLocaleString()} symbols]`;
       }
       if (generateAbcTruncated) readyMsg += ` [notes capped at ${MAX_NOTES}]`;
       if (lastGenerationInfo.turtleTruncated) readyMsg += ` [turtle trimmed]`;

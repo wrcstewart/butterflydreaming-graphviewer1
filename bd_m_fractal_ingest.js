@@ -38,8 +38,8 @@ const GATEWAY_TEXT =
 const CONTENT1_TEXT =
   '%%bd_module bd_M_Fractal\n' +
   '%%bd_axiom X\n' +
-  '%%bd_rule X: XFYFX+F+YFXFY-F-XFYFX\n' +
-  '%%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY\n' +
+  '%%bd_rule X: FYFX+F+YFXFY-F-XFYFX\n' +
+  '%%bd_rule Y: FXFY-F-XFYFX+F+YFXFY\n' +
   '%%bd_iterations 5\n' +
   '%%bd_angle 90\n' +
   '%%bd_scale min_pentatonic\n' +

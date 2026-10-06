@@ -71,12 +71,15 @@
      2026-10-06e: BLUE (bd_M_DroneFrac's offset note corrected - it measures
      parallel motion, not unison; buster v31 -> v32).
      2026-10-06f: RED (bd_M_DroneFrac reschedules a running transport on a
-     script change; buster v32 -> v33). Next = green. */
+     script change; buster v32 -> v33).
+     2026-10-06g: GREEN (bd_M_Fractal given the same treatment - shared opening
+     measured, expansion and turtle fused, and the grammar with no shared
+     opening as its default; buster v33 -> v34). Next = blue. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
+    border: 2px solid #2e8b57;              /* CANARY — green (was red) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -186,7 +189,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to a module.
-    frame.src = AV_RENDERERS[AV_MODULE] + '?v=33';
+    frame.src = AV_RENDERERS[AV_MODULE] + '?v=34';
 
     // ── What this viewer is currently showing (2026-09-16) ────────────────
     //
