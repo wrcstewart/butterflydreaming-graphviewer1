@@ -841,6 +841,29 @@
       bakeMp3Btn.disabled      = !ready || baking;
     }
     playPauseBtn.addEventListener('click', async () => {
+      // ── iOS: ESCAPE THE RING/SILENT SWITCH (2026-10-06) ──────────────────
+      // Reported from an iPhone 8: the spectrum showed signal at the bottom end —
+      // so the samples had loaded, the graph was running and the drone was being
+      // generated — and nothing came out of the speaker. That is not a loading
+      // fault, and the spectrum is what rules loading out.
+      //
+      // iOS Safari gives a page that only uses Web Audio the **ambient** audio
+      // session, and ambient audio is SILENCED BY THE HARDWARE SWITCH on the side
+      // of the phone. Same page, same build, same everything: audible on a handset
+      // with the switch up and silent on one with it down. Nothing in the page can
+      // detect which, and nothing reports an error.
+      //
+      // `navigator.audioSession.type = 'playback'` says "this page is here to play
+      // music, not to decorate", which moves it off the ambient category and out
+      // from under the switch. Safari 16.4+ — an iPhone 8 reaches iOS 16.7, so it
+      // is available there if the handset has been updated.
+      //
+      // Feature-detected and wrapped: on every browser without it this is a no-op,
+      // and on those older iOS versions the switch still wins. Set INSIDE the
+      // gesture, beside Tone.start(), because that is where the session is decided.
+      try {
+        if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      } catch (_) {}
       await Tone.start();
       if (playerState === 'playing') {
         Tone.Transport.pause(); playerState = 'paused'; setStatus('Paused');

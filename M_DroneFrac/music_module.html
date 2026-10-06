@@ -213,6 +213,9 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06j: GREEN (iOS ring/silent switch: the module now asks for a
+     `playback` audio session, so Web Audio stops being treated as ambient
+     and silenced along with the ringer). Next = blue.
      2026-10-06i: RED (start_at — WHERE IN THE STRING TO BEGIN, in thousands
      of symbols. Twelve settings give twelve distinct figures where
      `iterations` gives five across its whole range; the permanent false
@@ -304,7 +307,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #2e8b57 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -1249,6 +1252,23 @@ let grain = null, grain2 = null, ch2Gain = null;
 let chorus = null, vibrato = null, reverb = null, limiter = null, fft = null;
 let eq = null, panner = null, outVol = null;
 let buffer = null, bufferReady = false;
+// ── THE REVERB'S IMPULSE RESPONSE IS NOT THERE AT BOOT (2026-10-06) ────
+// Tone.Reverb generates its impulse response asynchronously and the convolver
+// holds NULL until that resolves — verified: immediately after `new
+// Tone.Reverb(...)` the buffer is NULL, and buildChain() runs at boot, before
+// any gesture.
+//
+// A convolver with no buffer outputs SILENCE. So `wet` is not a blend here,
+// it is the share of the signal that DISAPPEARS: at this module's default of
+// 0.90 that is 20 dB down, which on a phone speaker is "no sound". The other
+// two music modules default to 0.35 and would only lose 3.7 dB — which is why
+// this is the module the author's family could not hear.
+//
+// So the wet mix is HELD BACK until the impulse arrives, and restored when it
+// does. If it never arrives the drone plays dry: degraded, never silent, which
+// is the right way round for a failure nothing can detect from outside.
+let reverbReady = false;
+const REVERB_DRY_FALLBACK = 0.15;
 let storedText = '';
 let params = null;
 let playing = false;
@@ -1276,6 +1296,7 @@ function buildChain() {
   fft = new Tone.FFT(64);
   outVol.connect(fft);
   reverb  = new Tone.Reverb({ decay: 4, wet: 0.45 }).connect(eq);
+  watchReverbReady();
   vibrato = new Tone.Vibrato({ frequency: 3, depth: 0.1, type: 'sine' }).connect(reverb);
   chorus  = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.4, wet: 0.3 }).connect(vibrato);
   chorus.start();
@@ -1284,6 +1305,22 @@ function buildChain() {
   // ear, so matching their gains does not match their presence. One line from
   // being a stepper if it wants balancing.
   ch2Gain = new Tone.Gain(Math.pow(10, -5 / 20)).connect(chorus);
+}
+
+// Follow the impulse response in, and put the script's wet back when it lands.
+// Tone 14's Reverb exposes `ready`; the guard is for any build that does not,
+// where assuming it is ready is the harmless choice (the convolver will have a
+// buffer or the module was already working).
+function watchReverbReady() {
+  if (!reverb) return;
+  const p = reverb.ready;
+  if (!p || typeof p.then !== 'function') { reverbReady = true; return; }
+  reverbReady = false;
+  p.then(() => {
+    reverbReady = true;
+    applyLiveParams();                 // restore the script's wet
+    if (playing) setStatus('');        // clear the warning if it was shown
+  }).catch(() => { /* leave it dry; audible beats correct */ });
 }
 
 function applyLiveParams() {
@@ -1297,15 +1334,23 @@ function applyLiveParams() {
     g.playbackRate = getStepperValue('playback_rate');
     g.grainSize    = getStepperValue('grain_size');
   }
-  if (reverb)  { reverb.wet.value = getStepperValue('reverb_wet');
+  if (reverb)  { const wantWet = getStepperValue('reverb_wet');
+                 // Not a blend while the convolver is empty — see the note by
+                 // reverbReady. Hold the wet share back so the dry path still
+                 // carries the sound.
+                 reverb.wet.value = reverbReady ? wantWet
+                                                : Math.min(wantWet, REVERB_DRY_FALLBACK);
                  const d = getStepperValue('reverb_decay');
                  if (Math.abs(reverb.decay - d) > 0.01) {
                    reverb.decay = d;
                    clearTimeout(applyLiveParams._t);
                    // generate() rebuilds the impulse response and is
                    // expensive; debounced so holding the stepper does not
-                   // rebuild it on every tick.
-                   applyLiveParams._t = setTimeout(() => { try { reverb.generate(); } catch (_) {} }, 150);
+                   // rebuild it on every tick. It also REPLACES the buffer, so
+                   // readiness goes back to false until the new one lands.
+                   applyLiveParams._t = setTimeout(() => {
+                     try { reverbReady = false; reverb.generate(); watchReverbReady(); } catch (_) {}
+                   }, 150);
                  } }
   if (vibrato) { vibrato.frequency.value = getStepperValue('vibrato_frequency');
                  vibrato.depth.value     = getStepperValue('vibrato_depth'); }
@@ -1407,7 +1452,37 @@ const liveGrainRead = () => ({
 
 async function startPlayback() {
   if (!bufferReady || !grain) return;
+  // ── iOS: ESCAPE THE RING/SILENT SWITCH (2026-10-06) ──────────────────
+  // Reported from an iPhone 8: the spectrum showed signal at the bottom end —
+  // so the samples had loaded, the graph was running and the drone was being
+  // generated — and nothing came out of the speaker. That is not a loading
+  // fault, and the spectrum is what rules loading out.
+  //
+  // iOS Safari gives a page that only uses Web Audio the **ambient** audio
+  // session, and ambient audio is SILENCED BY THE HARDWARE SWITCH on the side
+  // of the phone. Same page, same build, same everything: audible on a handset
+  // with the switch up and silent on one with it down. Nothing in the page can
+  // detect which, and nothing reports an error.
+  //
+  // `navigator.audioSession.type = 'playback'` says "this page is here to play
+  // music, not to decorate", which moves it off the ambient category and out
+  // from under the switch. Safari 16.4+ — an iPhone 8 reaches iOS 16.7, so it
+  // is available there if the handset has been updated.
+  //
+  // Feature-detected and wrapped: on every browser without it this is a no-op,
+  // and on those older iOS versions the switch still wins. Set INSIDE the
+  // gesture, beside Tone.start(), because that is where the session is decided.
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+  } catch (_) {}
   await Tone.start();
+  // Two things that produce "it looks like it is playing and I hear nothing",
+  // both invisible from outside the page. Say them out loud.
+  if (Tone.getContext().state !== 'running') {
+    setStatus('audio is ' + Tone.getContext().state + ' — the browser has not released it', true);
+  } else if (!reverbReady) {
+    setStatus('reverb impulse not ready — playing drier until it arrives', true);
+  }
   stopPlayback(true);
   // The trajectory's own length, not `duration`: the music plays to the end of
   // the material and only then repeats.
