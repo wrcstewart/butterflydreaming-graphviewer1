@@ -638,3 +638,17 @@ Re-checked against code and the live DB rather than carried forward on trust:
 | Delete stale BARE layout hints | **166 edges** still carry `hint_x` — unchanged since 08-23. |
 | Drop `raw_text` duplication | No references in `server.js` or `viewer.js`; the duplication is DB-side only, so this is a migration, not a code change. |
 | Desktop docking for media modules | `positionExtendPanel` still early-returns above 1024px. |
+
+## Added 2026-10-06 — the L-system skip, and what `iterations` cannot do
+
+Both music modules that walk an L-system (`M_DroneFrac`, `M_Fractal`) had the
+same three problems. Two are fixed; the third is now understood and not built.
+
+| item | where | note |
+|---|---|---|
+| **Shared opening MEASURED, not assumed** | `M_DroneFrac`, `M_Fractal` | **BUILT 2026-10-06.** `sharedOpening()` advances two expansions in lockstep and skips exactly what they share. The old `L(iterations - 1)` was true only of a grammar whose rule for X *begins with X* — and the grammar lives in the script, so it was silently wrong for any other, over-skipping material nobody had heard. Returns the old value for the old rules; verified byte-identical output at every iteration. |
+| **Expansion and turtle FUSED** | both modules | **BUILT 2026-10-06.** The shared opening is traversed without being stored — it only ever contributes the turtle's x, y and heading. DroneFrac iteration 7: peak **45 MB → ~7 MB**, and *faster* (97 → 52 ms), since the discarded work is no longer done. `MAX_TOTAL_EMISSION` (memory, 5 M) became `MAX_SYMBOLS_TRAVERSED` (**time**, 20 M). |
+| **Grammar with no shared opening as the default** | both modules | **BUILT 2026-10-06**, at the author's request. Cutting the leading symbol from each rule turns the recursion into `shared(N) = 2 + shared(N-2)`, so the shared opening is ~N and the skip has nothing to do. **Not a clean win**: distinct figures across M_Fractal's 5–20 range go **4 → 3**. DroneFrac was unaffected (5 either way). |
+| **`start_at` — one honest axis in place of `iterations`** | **NOT BUILT** | The real finding. **`iterations` is not a variety control under ANY of these grammars.** Iterations 6 and 8 are byte-identical under both, because the curve is self-similar and `L(N-1)` lands on a self-similar boundary *by construction*. The current rules fail differently rather than better: their string opens with a run of N consecutive `F`s, and after it the figure depends only on the **parity** of N. The fractal is **one endless string**; depth only extends it. A single `start_at` offset would replace the depth/skip pair with the only thing audible — where you begin. |
+| **A canary for `M_Fractal`** | `M_Fractal/music_module.html` | **NOT BUILT.** DroneFrac declared one (the Play button's background) and it has repeatedly answered "am I seeing my edit or a cached copy". M_Fractal has none, and BD serves its module with no cache-buster — only the AV renderer has one. |
+| **`grain_from_run` normalises against the MAXIMUM run** | `M_DroneFrac` | **NOT FIXED.** Under the current grammar `maxRun` is 9 while 98% of runs are 1–5, so most notes land in the bottom half of the grain-size range and the control is less potent — effective grain size fell from a mean of 0.656 to 0.526. A high **percentile** rather than the maximum would make it behave the same under any grammar. |

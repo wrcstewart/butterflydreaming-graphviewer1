@@ -164,6 +164,51 @@ and a non-regen stepper does not reschedule at all. See
 
 ---
 
+### M_Fractal gets the same treatment — and the finding that qualifies it
+
+Both L-system modules now share `sharedOpening()` and the fused walk. It
+matters more in Fractal, whose segments carry seven fields each rather than
+four, and where the old 5 M cap was doing real damage: under the Peano rules it
+clamped every setting above 7, so **thirteen of the `iterations` stepper's
+sixteen positions did nothing at all**, silently. The cap is 20 M and a time
+guard now, which admits 8.
+
+`computeExpansionLength` stopped being load-bearing and would have been dead
+code still encoding the assumption the skip had just stopped making, so it
+feeds a diagnostic instead: the status line now says how small a window of the
+iteration is being heard.
+
+**Then the measurement spoiled the story, which is the useful part.** Counting
+*distinct figures* across the stepper's range:
+
+| | Peano (old) | current rules |
+|---|---|---|
+| M_Fractal, iterations 5–20 | **4** | **3** |
+| DroneFrac, iterations 3–8 | **5** | **5** |
+
+So the grammar swap cost DroneFrac nothing and cost Fractal one figure. More
+importantly, **`iterations` is not a variety control under either grammar**:
+iterations 6 and 8 are byte-identical in both. The curve is self-similar, so
+`L(N-1)` lands on a self-similar boundary *by construction* — the skip aims at
+precisely the place where the material repeats its own shape. The new rules
+fail differently rather than better: their string opens with a run of N
+consecutive `F`s, because the DFS descends the leftmost branch N levels
+emitting one `F` per level, and after that run the figure depends only on the
+**parity** of N. Odd iterations give one piece, even ones its mirror.
+
+`FractalMusic.md` had half of this written down since August — *"even after
+skip, the local delta shape of Peano at high iterations mimics low-iteration
+structure"*. The parity result is the sharp version of a problem the doc had
+already named, which is a reminder that the docs are worth reading before the
+code.
+
+What follows is the design conclusion, recorded and not built: the fractal is
+**one endless string**, depth only extends it, and the only audible axis is
+where you begin. A single `start_at` offset would replace the depth-and-skip
+pair with that one honest control. See `PLANNING_REGISTER.md`.
+
+---
+
 ## 2026-10-04 — eleven pads, and the one with no upstream
 
 ### The synthesised pad, which is the best of them

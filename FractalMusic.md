@@ -83,12 +83,10 @@ The 2026-08-02 planning doc listed six open questions. Resolutions:
 ```
 grammar (%%bd_ directives)
   ├→ parseGrammarFromScript
-  └→ expandLSystem (DFS streaming, memory O(iter))
-       ↓ symbols (up to MAX_TURTLE_INPUT_CHARS)
-     turtleWalk
-       ↓ segments with symIdx
-     skip mechanism (slice past iter-(N-1) prefix)
-       ↓ post-skip segments
+  ├→ sharedOpening (two expansions in lockstep; how much N repeats of N-1)
+  └→ expandAndWalk (DFS streaming + turtle FUSED, memory O(iter))
+       ↓ segments past the shared opening only — the prefix is WALKED
+         (position and heading are needed) but never STORED
      collapseRuns (merge consecutive same-y horizontals)
        ↓ runs
      applyPitchReflection (bounce between ±scaleLength walls)
@@ -103,20 +101,47 @@ grammar (%%bd_ directives)
 
 ## Key subtleties (would trip up a re-implementer)
 
-- **DFS shared prefix**: iter N and iter (N-1) emit the same first
-  L(N-1) symbols. Without the skip step, bumping iterations doesn't
-  audibly change the piece's start.
+- **DFS shared prefix — MEASURED, not assumed (2026-10-06)**: iteration
+  N can open with the same symbols as iteration N-1, and without the
+  skip, bumping iterations doesn't audibly change the piece's start.
+  But *how much* is shared was hardwired to `L(N-1)`, and that is true
+  only of a grammar whose rule for X **begins with X** — which the Peano
+  rules did and which the default rules no longer do. The grammar lives
+  in the script, so `sharedOpening()` now advances two expansions in
+  lockstep and skips exactly what they share. For the Peano rules it
+  returns the old value (verified byte-identical); for the current ones
+  it returns about N.
 - **Self-similar deltas**: even after skip, the local delta shape of
   Peano at high iterations mimics low-iteration structure. Fix:
   seed pitch reflection from raw-y (mod scaleLength) rather than 0
   so different absolute y positions → different scale degrees.
+- **`iterations` IS NOT A VARIETY CONTROL, under any of these grammars**
+  (measured 2026-10-06, and the sharp version of the bullet above).
+  Distinct figures across the stepper's 5–20 range: **Peano 4, the
+  current rules 3.** Iterations 6 and 8 are byte-identical under BOTH,
+  because the curve is self-similar and `L(N-1)` lands on a self-similar
+  boundary *by construction* — the skip aims at exactly the place where
+  the material repeats its own shape. The current rules fail differently
+  rather than better: their string opens with a run of N consecutive
+  `F`s (the DFS descends the leftmost branch N levels, emitting one `F`
+  per level), and after that run the figure depends only on the PARITY of
+  N. So odd iterations give one piece and even ones its mirror.
+  **What would give genuine variety is an independent `start_at` offset
+  into the string** — one honest axis in place of a depth control that
+  cannot hear itself. NOT BUILT; see `PLANNING_REGISTER.md`.
 - **Tonic scan**: raw-y seed means iterations start on random scale
   degrees. Not musically satisfying. Scan forward to first horizontal
   at y ≡ 0 (tonic in some octave) so every iteration opens on the
   root.
-- **Memory ceiling**: at very high iterations (Peano iter 9+) the
-  skip-size alone can exceed JS heap. Effective-iter guard walks the
-  requested iter down until skip fits under a 5M-symbol emission cap.
+- **The ceiling is now TIME, not memory (2026-10-06)**: `expandAndWalk`
+  traverses the shared opening without storing it — the prefix only ever
+  contributes the turtle's x, y and heading, three scalars — so memory
+  stopped depending on the iteration. `MAX_TOTAL_EMISSION` (5M, memory)
+  became `MAX_SYMBOLS_TRAVERSED` (20M, time): the prefix still has to be
+  WALKED. The effective-iter guard remains, for the same reason.
+  **The old 5M cap was doing real damage**: under the Peano rules it
+  clamped every setting above 7, so thirteen of the `iterations`
+  stepper's sixteen positions did nothing at all, silently.
 - **Chord voice octave spread**: base note unchanged, offset2 voice
   −12 semitones, offset3 voice +12 semitones. Spreads chord ~3
   octaves. If a shift would push a note off the piano ([21, 108]),
