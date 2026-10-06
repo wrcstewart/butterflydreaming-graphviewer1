@@ -213,6 +213,10 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06i: RED (start_at — WHERE IN THE STRING TO BEGIN, in thousands
+     of symbols. Twelve settings give twelve distinct figures where
+     `iterations` gives five across its whole range; the permanent false
+     "trajectory capped" error is gone with it). Next = green.
      2026-10-06h: BLUE (a rebuilt trajectory now reaches a RUNNING transport:
      every event is scheduled upfront, so Reset and the regen steppers changed
      nothing audible until the pass ended - and decoupling the loop from
@@ -300,7 +304,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
+    background: #c0392b !important;      /* CANARY — red (was blue) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -411,6 +415,28 @@
 // live audio parameter and takes effect without a rebuild.
 const STEPPERS = [
   { name: 'iterations',        min: 3,    max: 8,   step: 1,    fallback: 6,    regen: true },
+  // ── WHERE IN THE STRING TO BEGIN, in THOUSANDS of symbols (2026-10-06) ──
+  // The control `iterations` could never be. Measured: across twelve settings
+  // from 0 to 177k this gives TWELVE distinct figures, where `iterations`
+  // gives five across its whole range and 6 and 8 are byte-identical.
+  //
+  // The reason is structural. The grammar is prefix-stable or near enough, so
+  // the fractal is ONE ENDLESS STRING and depth only ever extends it — the
+  // only thing you can hear is WHERE YOU BEGIN. The skip mechanism already
+  // held a position in that string; it just had no control attached, and the
+  // one position it chose (the shared opening) is the one place the material
+  // repeats its own shape by construction.
+  //
+  // ADDED to the shared opening rather than replacing it, so `start_at` 0 is
+  // exactly the behaviour before this existed and `iterations` keeps whatever
+  // meaning it had.
+  //
+  // In THOUSANDS because the useful range is six figures wide and a stepper
+  // readout is three characters: 2.5 says 2,500. The status line prints the
+  // real count so the unit is never a guess. Clamped at generation to 25% of
+  // the iteration's actual length — the string is finite and short iterations
+  // are much shorter — and the clamp is REPORTED, never silent.
+  { name: 'start_at',          min: 0,    max: 200, step: 0.1,  fallback: 0,    decimals: 1, regen: true },
   { name: 'step_seconds',      min: 0.05, max: 4,   step: 0.05, fallback: 0.5,  regen: true },
   { name: 'detune_span',       min: 0,    max: 24,  step: 1,    fallback: 12,   regen: true },
   { name: 'scale',             min: 0,    max: 4,   step: 1,    fallback: 0,    isEnum: true, regen: true },
@@ -716,6 +742,10 @@ function formatDisplay(spec, val) {
     const v = (ENUM_VALUES[spec.name] || [])[Math.round(val)] || (ENUM_VALUES[spec.name] || [])[0];
     return ENUM_DISPLAY[v] || v;
   }
+  // An explicit decimal count wins over the size-based rule below, which
+  // would otherwise print 177.9 as "178" — and getStepperValue reads the
+  // DISPLAY back, so the fraction would be destroyed by looking at it.
+  if (spec.decimals != null) return val.toFixed(spec.decimals);
   if (spec.step >= 1) return String(Math.round(val));
   if (val < 1)  return val.toFixed(2);
   if (val < 10) return val.toFixed(2);
@@ -823,6 +853,7 @@ function currentScript() {
     const v = getStepperValue(s.name);
     if (s.isToggle)      setters[s.name] = v >= 0.5 ? 'true' : 'false';
     else if (s.isEnum)   setters[s.name] = (ENUM_VALUES[s.name] || [])[Math.round(v)] || '';
+    else if (s.decimals != null) setters[s.name] = v.toFixed(s.decimals);
     else if (s.step >= 1) setters[s.name] = String(Math.round(v));
     else                 setters[s.name] = v.toFixed(2);
   }
@@ -1109,6 +1140,18 @@ function buildTrajectory(g) {
     skipSymbols = sharedOpening(g.axiom, g.rules, iter, MAX_SYMBOLS_TRAVERSED);
     iterReduced = true;
   }
+  // ── start_at: the position control, in thousands of symbols ──────────
+  // Added to the shared opening, so 0 reproduces the behaviour from before it
+  // existed. Clamped to a quarter of the iteration's real length — which is
+  // what computeExpansionLength is for, and its only remaining job now that
+  // the skip is measured rather than computed from it.
+  const totalSymbols = computeExpansionLength(g.axiom, g.rules, iter);
+  const startRequested = Math.max(0, Math.round((g.start_at || 0) * 1000));
+  const startLimit = Math.floor(totalSymbols * 0.25);
+  const startAt = Math.min(startRequested, startLimit);
+  const startClamped = startAt < startRequested;
+  skipSymbols += startAt;
+
   const degrees = SCALES[(ENUM_VALUES.scale || [])[Math.round(g.scale)]] || SCALES.minor;
 
   // detune_span is in SEMITONES, because that is what the name says — but the
@@ -1173,7 +1216,9 @@ function buildTrajectory(g) {
     skippedSegments: walk.skippedSegs, symbolsWalked: walk.symbols,
     // What the whole iteration WOULD be, for the sake of knowing how small a
     // window we are hearing. Arithmetic, so it costs nothing to ask.
-    totalSymbols: computeExpansionLength(g.axiom, g.rules, iter),
+    totalSymbols: totalSymbols,
+    startAt: startAt, startRequested: startRequested,
+    startClamped: startClamped, startLimit: startLimit,
   };
   return pts;
 }
@@ -1462,10 +1507,27 @@ function regenerate() {
   try {
     params = parseScript(storedText);
     buildTrajectory(params);
+    // setStatus only DISPLAYS when the second argument is true, so this list
+    // is "what is worth interrupting someone for" and nothing else.
+    //
+    // `truncated` was on it and had to come off: it means the walk found more
+    // material than it took, which since the loop/duration decoupling is the
+    // NORMAL case at every iteration from 6 up — so "trajectory capped at
+    // 12000 points" sat there permanently, in error styling, describing the
+    // module working exactly as intended. A warning that is always on is not a
+    // warning, and it was about to drown the two real ones below.
     if (trajectoryInfo.points === 0) {
       setStatus('grammar produced no horizontal runs — nothing to play', true);
-    } else if (trajectoryInfo.truncated) {
-      setStatus('trajectory capped at ' + trajectoryInfo.points + ' points', true);
+    } else if (trajectoryInfo.startClamped) {
+      // Never silent: a control that quietly ignores what it was set to is
+      // indistinguishable from one that does nothing.
+      setStatus('start_at ' + (trajectoryInfo.startRequested / 1000).toFixed(1) +
+                'k clamped to ' + (trajectoryInfo.startAt / 1000).toFixed(1) +
+                'k — iteration ' + trajectoryInfo.iter + ' is only ' +
+                trajectoryInfo.totalSymbols.toLocaleString() + ' symbols', true);
+    } else if (trajectoryInfo.iterReduced) {
+      setStatus('iterations reduced to ' + trajectoryInfo.iter +
+                ' — the shared opening above that is too long to walk', true);
     } else {
       setStatus('');
     }
@@ -1766,6 +1828,7 @@ storedText = [
   '%%bd_rule Y: FXFY-F-XFYFX+F+YFXFY',
   '%%bd_angle 90',
   '%%bd_p_iterations 6',
+  '%%bd_p_start_at 0.0',
   '%%bd_p_step_seconds 2.00',
   '%%bd_p_detune_span 10',
   '%%bd_p_scale min_pentatonic',

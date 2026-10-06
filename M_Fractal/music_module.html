@@ -431,6 +431,26 @@
     //                  vibrato frequency).
     const STEPPERS = [
       { name: 'iterations',        min: 5,   max: 20,  step: 1,    fallback: 5,   regen: true },
+      // ── WHERE IN THE STRING TO BEGIN, in THOUSANDS of symbols (2026-10-06) ──
+      // The control `iterations` could never be. Measured: twelve settings
+      // from 0 to 177k give TWELVE distinct figures, where `iterations` gives
+      // THREE across its whole 5-20 range and 6 and 8 are byte-identical.
+      //
+      // The grammar is prefix-stable or near enough, so the fractal is ONE
+      // ENDLESS STRING and depth only extends it — the only thing you can hear
+      // is WHERE YOU BEGIN. The skip mechanism already held a position in that
+      // string; it had no control attached, and the one position it chose (the
+      // shared opening) is the one place the material repeats its own shape by
+      // construction.
+      //
+      // ADDED to the shared opening rather than replacing it, so start_at 0 is
+      // exactly the behaviour before this existed.
+      //
+      // In THOUSANDS because the useful range is six figures wide and a
+      // stepper readout is three characters: 2.5 means 2,500. Clamped at
+      // generation to 25% of the iteration's real length, and the clamp is
+      // REPORTED in the status line, never silent.
+      { name: 'start_at',          min: 0,   max: 200, step: 0.1,  fallback: 0,   decimals: 1, regen: true },
       { name: 'step_seconds',      min: 0.1, max: 2.0, step: 0.1,  fallback: 0.2, regen: true },
       { name: 'vertical_time',     min: 0.0, max: 2.0, step: 0.1,  fallback: 0.2, regen: true },
       { name: 'scale',             min: 0,   max: SCALE_NAMES.length - 1, step: 1, fallback: 2,
@@ -536,6 +556,10 @@
         const v = spec.values[Math.round(val)] || spec.values[0];
         return ENUM_DISPLAY[v] || v;
       }
+      // An explicit decimal count wins over the size-based rules below, which
+      // would print 177.9 as "178" — and getStepperValue reads the DISPLAY
+      // back, so the fraction would be destroyed by looking at it.
+      if (spec.decimals != null) return val.toFixed(spec.decimals);
       if (spec.step >= 1) return String(Math.round(val));
       if (val < 1)  return val.toFixed(2);
       if (val < 10) return val.toFixed(1);
@@ -593,6 +617,7 @@
           Y: 'FXFY-F-XFYFX+F+YFXFY'
         },
         iterations: 5,
+        startAt:    0,          // thousands of symbols; see the stepper's note
         angle:      90,
         scale:      'min_pentatonic',
         root:       0,
@@ -627,6 +652,10 @@
       if (Object.keys(foundRules).length) g.rules = foundRules;
       const iterM = text.match(/^%%bd_(?:p_)?iterations\s+(\d+)/m);
       if (iterM) g.iterations = Math.max(5, Math.min(20, parseInt(iterM[1], 10)));
+      // start_at is in THOUSANDS of symbols, so it is fractional on purpose —
+      // `[\d.]+` and parseFloat, not the \d+/parseInt the iteration uses.
+      const startM = text.match(/^%%bd_(?:p_)?start_at\s+([\d.]+)/m);
+      if (startM) g.startAt = Math.max(0, Math.min(200, parseFloat(startM[1]) || 0));
       const angleM = text.match(/^%%bd_(?:p_)?angle\s+([\d.]+)/m);
       if (angleM) g.angle = parseFloat(angleM[1]);
       const scaleM = text.match(/^%%bd_(?:p_)?scale\s+(\w+)/m);
@@ -1094,6 +1123,7 @@
     function syncSteppersFromScript() {
       const g = parseGrammarFromScript(storedText || '');
       setStepperValue('iterations',        g.iterations);
+      setStepperValue('start_at',          g.startAt);
       setStepperValue('step_seconds',      g.stepSeconds);
       setStepperValue('vertical_time',     g.verticalTime);
       setStepperValue('scale',             SCALE_NAMES.indexOf(g.scale));
@@ -1123,6 +1153,7 @@
     function regenerateAbc() {
       const g = parseGrammarFromScript(storedText || '');
       g.iterations   = getStepperValue('iterations');
+      g.startAt      = getStepperValue('start_at');
       g.stepSeconds  = getStepperValue('step_seconds');
       g.verticalTime = getStepperValue('vertical_time');
       g.scale        = SCALE_NAMES[getStepperValue('scale')] || 'major';
@@ -1156,6 +1187,18 @@
         effIter--;
         iterReduced = true;
       }
+      // ── start_at: the position control, in thousands of symbols ────────
+      // Added to the shared opening, so 0 reproduces the behaviour from before
+      // it existed. Clamped to a quarter of the iteration's real length —
+      // which is what computeExpansionLength is for, and its only remaining
+      // job now that the skip is measured rather than derived from it.
+      const totalSymbols   = computeExpansionLength(g.axiom, g.rules, effIter);
+      const startRequested = Math.max(0, Math.round((g.startAt || 0) * 1000));
+      const startLimit     = Math.floor(totalSymbols * 0.25);
+      const startAt        = Math.min(startRequested, startLimit);
+      const startClamped   = startAt < startRequested;
+      skipSymbols += startAt;
+
       const walk = expandAndWalk(g.axiom, g.rules, effIter, g.angle,
                                  skipSymbols, MAX_TURTLE_INPUT_CHARS,
                                  MAX_SYMBOLS_TRAVERSED);
@@ -1170,9 +1213,10 @@
         iterReduced,
         // What the whole iteration WOULD be, so the readout can say how small
         // a window is being heard. Arithmetic and memoised, so it costs
-        // nothing to ask — and it is the only remaining caller of
-        // computeExpansionLength, which used to drive the skip itself.
-        totalSymbols: computeExpansionLength(g.axiom, g.rules, effIter)
+        // nothing to ask — and it now also bounds start_at, which is the job
+        // computeExpansionLength kept when it stopped driving the skip.
+        totalSymbols,
+        startAt, startRequested, startClamped, startLimit
       };
       // 2026-08-19 — the read-only ABC pane is gone (grid layout). Surface the
       // derived score's T: header instead; "Copy for ABC Player" still hands
@@ -1185,7 +1229,8 @@
       turtleTruncated: false, symbolsLen: 0,
       skipSymbols: 0, skippedSegments: 0,
       requestedIter: 0, effectiveIter: 0, iterReduced: false,
-      totalSymbols: 0
+      totalSymbols: 0, startAt: 0, startRequested: 0,
+      startClamped: false, startLimit: 0
     };
 
     // ── Audio: reused from bd_M_ABC ─────────────────────────────────────────
@@ -1336,6 +1381,16 @@
       let readyMsg = `${notes.length} notes, ${endTimeSecs.toFixed(1)}s`;
       if (lastGenerationInfo.iterReduced) {
         readyMsg += ` [iter ${lastGenerationInfo.requestedIter} too big → using ${lastGenerationInfo.effectiveIter}]`;
+      }
+      if (lastGenerationInfo.startClamped) {
+        // Never silent: a control that quietly ignores what it was set to is
+        // indistinguishable from one that does nothing.
+        readyMsg += ` [start_at ${(lastGenerationInfo.startRequested / 1000).toFixed(1)}k` +
+                    ` clamped to ${(lastGenerationInfo.startAt / 1000).toFixed(1)}k —` +
+                    ` iter ${lastGenerationInfo.effectiveIter} is only` +
+                    ` ${lastGenerationInfo.totalSymbols.toLocaleString()} symbols]`;
+      } else if (lastGenerationInfo.startAt > 0) {
+        readyMsg += ` (from symbol ${lastGenerationInfo.startAt.toLocaleString()})`;
       }
       if (lastGenerationInfo.skipSymbols > 0) {
         readyMsg += ` (skipped ${lastGenerationInfo.skippedSegments} prefix segs)`;
@@ -1562,6 +1617,7 @@
           : '';
       const setters = {
         iterations:        String(Math.round(getStepperValue('iterations'))),
+        start_at:          getStepperValue('start_at').toFixed(1),
         step_seconds:      getStepperValue('step_seconds').toFixed(2),
         vertical_time:     getStepperValue('vertical_time').toFixed(2),
         scale:             SCALE_NAMES[getStepperValue('scale')] || 'minor',

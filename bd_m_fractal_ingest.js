@@ -41,6 +41,7 @@ const CONTENT1_TEXT =
   '%%bd_rule X: FYFX+F+YFXFY-F-XFYFX\n' +
   '%%bd_rule Y: FXFY-F-XFYFX+F+YFXFY\n' +
   '%%bd_iterations 5\n' +
+  '%%bd_p_start_at 0.0\n' +
   '%%bd_angle 90\n' +
   '%%bd_scale min_pentatonic\n' +
   '%%bd_root C,\n' +
