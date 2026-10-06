@@ -67,12 +67,14 @@
      2026-10-06c: RED (bd_M_DroneFrac's default grammar changed to the one with
      no shared opening; buster v29 -> v30).
      2026-10-06d: GREEN (bd_M_DroneFrac's new default script; buster
-     v30 -> v31). Next = blue. */
+     v30 -> v31).
+     2026-10-06e: BLUE (bd_M_DroneFrac's offset note corrected - it measures
+     parallel motion, not unison; buster v31 -> v32). Next = red. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2e8b57;              /* CANARY — green (was red) */
+    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -182,7 +184,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to a module.
-    frame.src = AV_RENDERERS[AV_MODULE] + '?v=31';
+    frame.src = AV_RENDERERS[AV_MODULE] + '?v=32';
 
     // ── What this viewer is currently showing (2026-09-16) ────────────────
     //
