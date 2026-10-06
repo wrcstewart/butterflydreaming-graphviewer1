@@ -213,6 +213,8 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06f: RED (new default script set by the author: the GENERATED
+     pad synth_pad_a2, offsetCH2 100, ch2_level -10). Next = green.
      2026-10-06e: BLUE (the chopped grammar IS the default now, by the
      author's choice — no shared opening, so the skip does nothing and
      `iterations` is live at every setting). Next = red.
@@ -289,7 +291,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
+    background: #c0392b !important;      /* CANARY — red (was blue) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -416,20 +418,35 @@ const STEPPERS = [
   // raise `duration` for this; it governs Bake length and nothing else.
   //
   // WHICH OFFSET. The offset indexes TRAJECTORY POINTS, and the useful question
-  // is how much channel 2 still ECHOES channel 1. Measured as the fraction of
-  // notes sounding the same pitch at the same instant, over the first 4,000
-  // notes, at iterations 5, 6 and 7 (which agree closely):
+  // is how much channel 2 still ECHOES channel 1 — measured as the fraction of
+  // notes sounding the same pitch at the same instant, over the first 4,000.
   //
-  //   offset    2    4   36   40   80  116  160  |   52   54   66   70  142  182
-  //   echo     42%  62%  48%  64%  44%  38%  38%  |  15%  14%  13%  14%  14%  12%
+  // RE-MEASURED FOR THE CURRENT GRAMMAR (2026-10-06). The first version of this
+  // table was taken under the rules that began with their own non-terminal, and
+  // became wrong the moment those stopped being the default: the echo peaks sit
+  // on the grammar's own block boundaries, so they MOVE when the grammar does.
+  // A measurement is only a fact about the thing measured.
+  //
+  //   offset     4   36    2  112  116   76   80  |  46   60   62   64   52   48
+  //   echo      50%  42%  38%  35%  33%  32%  32%  | 14%  14%  14%  14%  15%  15%
   //
   // 12% is the floor — with nine reachable pitches, two UNRELATED stretches of
-  // this grammar agree that often. So the right-hand group is as fresh as the
-  // material can be, and **66** or **182** are the best in range.
+  // this grammar agree that often. The right-hand group is as fresh as the
+  // material gets, and the freshest band is a broad one, 46 to 66.
   //
-  // IT IS NOT MONOTONIC, which is the trap: the echo peaks wherever the offset
-  // lands on one of the L-system's block boundaries, so 40 is far worse than 4,
-  // and 160 worse than 142. A bigger offset is not a safer one.
+  // Identical to the integer at iterations 5, 6 and 7, which is not a slip: the
+  // echo at a given offset is a property of the REWRITING, so it is the same
+  // wherever in the string you start. The iteration changes which material you
+  // hear (verified differing from the second note, agreeing only at the floor),
+  // not how it rhymes with itself.
+  //
+  // IT IS NOT MONOTONIC, which is the trap: 112 echoes more than 40, and 36
+  // more than 8. A bigger offset is not a safer one.
+  //
+  // The default is 100, at 22% — the author's choice by ear, and deliberately
+  // not the freshest available. Echo measures DIFFERENCE, not interest, and
+  // some rhyme between the two voices is a musical decision this number has no
+  // standing to overrule.
   //
   // ODD offsets all score 0%, but that is the measure failing rather than
   // freshness: the turtle alternates axes, so adjacent points can never share a
@@ -522,9 +539,9 @@ const ENUM_DISPLAY_INV = Object.fromEntries(
 //
 // This literal is the FALLBACK, for when the fetch fails: opened from file://
 // it will, and the module should still make a sound rather than sit mute.
-let SAMPLES = { paulx_drone: 'sources/paulx_drone.mp3' };
+let SAMPLES = { synth_pad_a2: 'sources/synth_pad_A2.mp3' };
 let SAMPLE_LABELS = { paulx_drone: 'paulx drone' };
-let DEFAULT_SAMPLE = 'paulx_drone';
+let DEFAULT_SAMPLE = 'synth_pad_a2';
 
 async function loadManifest() {
   try {
@@ -1674,7 +1691,7 @@ window.addEventListener('message', (event) => {
 buildChain();
 storedText = [
   '%%bd_module bd_M_DroneFrac',
-  '%%bd_p_sample paulx_drone',
+  '%%bd_p_sample synth_pad_a2',
   '%%bd_axiom X',
   '%%bd_rule X: FYFX+F+YFXFY-F-XFYFX',
   '%%bd_rule Y: FXFY-F-XFYFX+F+YFXFY',
@@ -1685,8 +1702,8 @@ storedText = [
   '%%bd_p_scale min_pentatonic',
   '%%bd_p_grain_size 0.61',
   '%%bd_p_grain_from_run 0.50',
-  '%%bd_p_offsetCH2 52',
-  '%%bd_p_ch2_level 4',
+  '%%bd_p_offsetCH2 100',
+  '%%bd_p_ch2_level -10',
   '%%bd_p_ch2_cents 1700',
   '%%bd_p_overlap 0.44',
   '%%bd_p_playback_rate 1.00',
