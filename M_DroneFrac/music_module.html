@@ -213,6 +213,10 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06h: BLUE (a rebuilt trajectory now reaches a RUNNING transport:
+     every event is scheduled upfront, so Reset and the regen steppers changed
+     nothing audible until the pass ended - and decoupling the loop from
+     `duration` made that pass 20 hours instead of 60 seconds). Next = red.
      2026-10-06g: GREEN (the offset note said its figures measured notes
      "sounding the same pitch"; they measure PARALLEL MOTION — the raw
      trajectory values before ch2_cents. True unison turns out to be 0 of
@@ -296,7 +300,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2e8b57 !important;      /* CANARY — green (was red) */
+    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -1204,6 +1208,7 @@ let storedText = '';
 let params = null;
 let playing = false;
 let loopTimer = null;
+let rescheduleTimer = null;
 let lastBake = null;
 
 function buildChain() {
@@ -1397,6 +1402,11 @@ function relaunchTrajectory() {
 }
 
 function stopPlayback(quiet) {
+  // The pending reschedule too: without this, a stepper moved a moment before
+  // Stop would fire relaunchTrajectory() after it and start the transport
+  // again. relaunchTrajectory guards on `playing`, but that is cleared BELOW,
+  // so the race is real on the path where Stop arrives first.
+  clearTimeout(rescheduleTimer); rescheduleTimer = null;
   clearTimeout(loopTimer); loopTimer = null;
   const t = Tone.getTransport();
   t.cancel(0); t.stop(); t.position = 0;
@@ -1460,6 +1470,33 @@ function regenerate() {
       setStatus('');
     }
     updateControls();
+    // ── A REBUILT TRAJECTORY MUST REACH A RUNNING TRANSPORT (2026-10-06) ──
+    // scheduleTrajectory lays down EVERY event upfront with its pitch baked
+    // in; only the grain parameters are read live, at grain-fire time. So
+    // rebuilding `trajectory` while playing changed nothing audible — the
+    // Transport went on firing the old schedule until the pass ended and the
+    // loop timer called relaunchTrajectory().
+    //
+    // That was survivable while the pass was `duration`, 60 seconds: a stale
+    // schedule corrected itself within a minute and nobody saw it. Decoupling
+    // the loop from `duration` made the pass the trajectory's own length —
+    // about 20 HOURS at the defaults — which turned a one-minute lag into a
+    // permanent one. The symptom was the author's: Reset, and the drone goes
+    // on playing the script you just replaced.
+    //
+    // relaunchTrajectory() returns immediately when not playing, so this is a
+    // no-op at boot and on every regen with the transport stopped. It restarts
+    // the walk from the beginning, which is right: when the trajectory changes
+    // shape, a position part-way through the old one means nothing in the new.
+    // The grain is never torn down, so there is no gap and no click.
+    //
+    // DEBOUNCED, because the steppers repeat on press-and-hold: rescheduling
+    // 12,000 transport events on every tick would stutter the audio it is
+    // meant to update. Same treatment as reverb.generate() above, which is
+    // expensive for the same reason. 180 ms is below noticing and well above
+    // the repeat interval.
+    clearTimeout(rescheduleTimer);
+    rescheduleTimer = setTimeout(() => { try { relaunchTrajectory(); } catch (_) {} }, 180);
   } catch (err) {
     console.error('regenerate failed', err);
     setStatus('grammar error: ' + err.message, true);
@@ -1484,7 +1521,10 @@ controlPanel.addEventListener('click', (e) => {
   if (!s) return;
   setStepperValue(name, getStepperValue(name) + delta * s.step);
   storedText = currentScript();
-  if (s.regen) { params = parseScript(storedText); buildTrajectory(params); updateControls(); }
+  // regenerate() rather than an inline copy of its body: that copy had drifted
+  // (no status reporting, no reschedule), so a grammar error reached by a
+  // stepper went unreported where the same error from a script was announced.
+  if (s.regen) regenerate();
   applyLiveParams();
   // Announcing on a STEPPER PRESS is what makes the pull direction work, and
   // it cannot loop: a person has to press something. Announcing on
