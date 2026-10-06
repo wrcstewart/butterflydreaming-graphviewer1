@@ -164,6 +164,57 @@ and a non-regen stepper does not reschedule at all. See
 
 ---
 
+### Silence on three iPhones — the reverb's impulse response is not there at boot
+
+The author sent the standalone link to his family: **the app appears to play,
+the spectrum shows energy at the bottom end, and nothing comes out.** His own
+phone was fine. He suspected caching; then, correctly, *"might the tone have
+started before everything loaded and the last routing through messed up?"*
+
+**The spectrum is what rules out a loading fault.** It taps `outVol`, after the
+whole chain — so the samples had loaded, the graph was running and the drone
+was being generated. A sound being made and not heard is an output problem.
+
+`Tone.Reverb` generates its impulse response asynchronously, and **the
+convolver holds NULL until that resolves** — verified: immediately after `new
+Tone.Reverb(...)` the buffer is NULL, and `buildChain()` runs at boot, before
+any gesture. A convolver with no buffer outputs **silence**, so in that window
+`wet` is not a blend: it is the share of the signal that **disappears**.
+
+| module | default `reverb_wet` | signal surviving an empty convolver |
+|---|---|---|
+| M_Music | 0.35 | −3.7 dB |
+| M_Fractal | 0.35 | −3.7 dB |
+| **M_DroneFrac** | **0.90** | **−20.0 dB** |
+
+Twenty decibels down is "no sound" on a phone speaker — and DroneFrac is both
+the only module at 0.90 **and** the only one with a spectrum display, which is
+why the report arrived with that detail attached. Every part of the symptom
+fits.
+
+The wet mix is now held back until the impulse arrives and restored when it
+does. If it never arrives the drone plays dry — **degraded, never silent**,
+which is the right way round for a failure nothing outside the page can detect.
+Play says so too, and reports a context that is not running, both being states
+that otherwise read as "it looks like it is playing and I hear nothing".
+
+**Not proven to be what those handsets did.** It cannot be reproduced here, and
+headless Chrome will not settle `Reverb.ready` either way — three probe runs
+said it never resolves, and all three were invalid, because
+`--virtual-time-budget` fires `setTimeout` instantly and my timeout races were
+winning in virtual time rather than measuring anything. What stands is that
+this is a real hazard matching every detail of the report, and the module
+should never have been able to go silent this way.
+
+**Separately, and worth having regardless**: all three music modules now set
+`navigator.audioSession.type = 'playback'` inside the gesture. iOS gives a page
+that uses only Web Audio the *ambient* session, which the ring/silent switch
+mutes — and nothing was setting it, on any module, on any iOS version. The
+standalones' About sections gained a line about the side switch, since below
+iOS 16.4 the switch wins and a page cannot even notice.
+
+---
+
 ### `start_at` — the control `iterations` could never be
 
 Proposed in the morning's write-up as the thing that would actually work, and
