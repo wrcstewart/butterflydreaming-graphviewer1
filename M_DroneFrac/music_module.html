@@ -205,15 +205,20 @@
   .big-btn { min-width: 108px; min-height: 52px; font-size: 0.95rem;
              font-weight: bold; color: #10240f !important; }
   /* ── CANARY host for bd_M_DroneFrac (declared 2026-10-01) ──────────────────
-     The border of the Play button. Rotates red -> green -> blue on every
+     The BACKGROUND of the Play button (the note said "border" long after it
+     stopped being one). Rotates red -> green -> blue on every
      change to this file, so there is always something to LOOK at to answer
      "am I seeing my edit or a cached copy" — the question that cost three
      rounds on the stepper width above, where the file WAS current and the
      CSS was simply being overridden.
-     Trust the hex on the border line, not this prose: the note has gone
+     Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06c: RED (the shared opening is MEASURED per grammar instead of
+     assumed to be the whole previous iteration; expansion and turtle fused so
+     the prefix is walked but never stored, which takes iteration 7 from 45 MB
+     to about 7 MB and makes iterations 8 reachable). Next = green.
      2026-10-06b: BLUE (the loop is a safety net, not a feature: the trajectory
-     is no longer cut off at `duration`, which now governs Bake only). Next = red.
+     is no longer cut off at `duration`, which now governs Bake only).
      2026-10-06: GREEN (offsetCH2 max 60 -> 200).
      2026-10-04g: RED (synth_pad_A2 — generated from arithmetic, so no upstream
      and no licence question; seamless by construction). Next = green.
@@ -278,7 +283,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
+    background: #c0392b !important;      /* CANARY — red (was blue) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -388,7 +393,7 @@
 // `regen: true` means a change rebuilds the trajectory; anything else is a
 // live audio parameter and takes effect without a rebuild.
 const STEPPERS = [
-  { name: 'iterations',        min: 3,    max: 7,   step: 1,    fallback: 6,    regen: true },
+  { name: 'iterations',        min: 3,    max: 8,   step: 1,    fallback: 6,    regen: true },
   { name: 'step_seconds',      min: 0.05, max: 4,   step: 0.05, fallback: 0.5,  regen: true },
   { name: 'detune_span',       min: 0,    max: 24,  step: 1,    fallback: 12,   regen: true },
   { name: 'scale',             min: 0,    max: 4,   step: 1,    fallback: 0,    isEnum: true, regen: true },
@@ -396,17 +401,34 @@ const STEPPERS = [
   { name: 'grain_from_run',    min: 0,    max: 1,   step: 0.05, fallback: 0.4 },
   // max 200 (2026-10-06), raised from 60 to guarantee decoupling from channel 1.
   //
-  // READ THIS BEFORE SETTING IT HIGH. The offset indexes TRAJECTORY POINTS, and
-  // there are far fewer of those than you might expect: the count is
-  // duration / step_seconds, bounded by the walk — at the current default
-  // (duration 60, step_seconds 2.00) there are just **10**. `iterations` does
-  // not change the count at all, only WHICH material is used.
+  // THIS NOTE REPLACES AN OBSOLETE ONE. It used to warn that the trajectory was
+  // only `duration / step_seconds` points — ten at the default — so that any
+  // offset past the end clamped to a constant drone. True when written, and
+  // wrong as soon as generation stopped being bounded by `duration`: there are
+  // 12,000 points now, and the clamp touches only the last 200 of them. An
+  // offset anywhere in 0-200 reads ahead in the walk at every iteration. Do not
+  // raise `duration` for this; it governs Bake length and nothing else.
   //
-  // Beyond the last point the lookup CLAMPS, so channel 2 holds the final
-  // detune for ever. That is decoupled, but it is also STATIC — an offset of 52
-  // on a 10-point trajectory is not reading ahead in the walk, it is a constant
-  // drone. For a genuine moving offset the trajectory must be longer than the
-  // offset: raise `duration` or lower `step_seconds`.
+  // WHICH OFFSET. The offset indexes TRAJECTORY POINTS, and the useful question
+  // is how much channel 2 still ECHOES channel 1. Measured as the fraction of
+  // notes sounding the same pitch at the same instant, over the first 4,000
+  // notes, at iterations 5, 6 and 7 (which agree closely):
+  //
+  //   offset    2    4   36   40   80  116  160  |   52   54   66   70  142  182
+  //   echo     42%  62%  48%  64%  44%  38%  38%  |  15%  14%  13%  14%  14%  12%
+  //
+  // 12% is the floor — with nine reachable pitches, two UNRELATED stretches of
+  // this grammar agree that often. So the right-hand group is as fresh as the
+  // material can be, and **66** or **182** are the best in range.
+  //
+  // IT IS NOT MONOTONIC, which is the trap: the echo peaks wherever the offset
+  // lands on one of the L-system's block boundaries, so 40 is far worse than 4,
+  // and 160 worse than 142. A bigger offset is not a safer one.
+  //
+  // ODD offsets all score 0%, but that is the measure failing rather than
+  // freshness: the turtle alternates axes, so adjacent points can never share a
+  // pitch. Rigid anti-phase is a kind of dependence too. The table is even
+  // offsets for that reason.
   { name: 'offsetCH2',         min: 0,    max: 200, step: 1,    fallback: 12 },
   // ── CHANNEL 2's OWN LEVEL AND INTERVAL (2026-10-03) ────────────────────
   // Added to diagnose a monotonous high pulse at about the grain rate. The
@@ -544,15 +566,31 @@ function buildSampleSelect() {
 // Safety caps. Grammar growth is exponential per iteration; without a ceiling
 // a high iteration count asks for billions of symbols and takes the tab with
 // it. Fractal learned this the hard way — the symptom is silence, not an error.
-// Two caps, the same scheme bd_M_Fractal arrived at:
-//   MAX_WALK_CHARS      how many POST-SKIP symbols are worth walking
-//   MAX_TOTAL_EMISSION  hard memory ceiling on skip + walk together
-// Grammar growth is exponential — the default rules carry nine non-terminals,
-// so each iteration multiplies the string about ninefold, and iteration 9
-// would ask for ~108 million symbols. Without a ceiling that is a dead tab,
-// and the symptom is silence rather than an error.
-const MAX_WALK_CHARS     = 300000;
-const MAX_TOTAL_EMISSION = 5000000;
+//   MAX_WALK_CHARS         how many POST-SKIP symbols are worth KEEPING
+//   MAX_SYMBOLS_TRAVERSED  how many symbols are worth WALKING PAST
+//
+// The second used to be MAX_TOTAL_EMISSION at 5,000,000, and it was a MEMORY
+// ceiling: every symbol walked was a character stored and, two in five of them,
+// a segment object. Since expandAndWalk traverses the shared opening without
+// storing it, memory no longer depends on the iteration — so this is a TIME
+// ceiling now, and it is set by how long a pause is tolerable rather than by
+// how much heap is safe. Measured END TO END through buildTrajectory, default
+// rules (which multiply about ninefold per iteration):
+//
+//   iteration         6        7        8        9        10
+//   shared opening    148 k    1.3 M    12.0 M   107.6 M  968.6 M
+//   first move        28 ms    52 ms    396 ms   ~3 s     ~30 s
+//   same iter again   13 ms    24 ms    156 ms
+//
+// The first move at an iteration costs about twice the rest, because measuring
+// the shared opening walks the prefix once more; sharedOpening() memoises, so
+// only the first move pays it.
+//
+// 20 million admits iteration 8 and refuses 9, which is where the pause starts
+// to read as a hang. Raise it to 150 million if a ~3 second first move is
+// acceptable; the memory will not move, because none of this is stored.
+const MAX_WALK_CHARS        = 300000;
+const MAX_SYMBOLS_TRAVERSED = 20000000;
 // 12,000 rather than 4,000 (2026-10-06). This is now the ONLY thing deciding
 // how long the music plays before it repeats, so it wants to be generous: at
 // step_seconds 2.00 it is ~6.7 hours, at 0.05 about ten minutes. Each point is
@@ -778,46 +816,133 @@ function computeExpansionLength(axiom, rules, iterations) {
   return total;
 }
 
-// Depth-first streaming expansion, ported from bd_M_Fractal. Rewriting is
-// context-free — each symbol's expansion depends only on itself — so iter-N's
-// symbols can be emitted one at a time by DFS without ever materialising an
-// intermediate iteration. Memory is O(iterations) for the stack rather than
-// O(k^iter). An explicit stack, not a generator, to avoid per-yield GC
-// pressure at million-symbol outputs.
-function expandLSystem(axiom, rules, iterations, maxChars) {
-  const parts = [];
+// ── HOW MUCH OF THE OPENING IS MATERIAL WE HAVE ALREADY HEARD ──────────
+// MEASURED, not assumed (2026-10-06). This was `L(iterations - 1)`, on the
+// reasoning that iteration N opens with iteration N-1. That is true of the
+// DEFAULT grammar and of nothing else: it holds only because the rule for X
+// BEGINS with X, so expanding X to depth N starts by expanding X to depth N-1.
+//
+// For those rules the shared opening is the whole previous string. Delete the
+// one leading symbol from each rule and it collapses to about N symbols,
+// because the recursion becomes shared(N) = 2 + shared(N-2) instead of a
+// ninefold multiplication. Measured both ways:
+//
+//   iteration            3       4        5          6
+//   rules as given       1,821   16,401   147,621    1,328,601
+//   leading X and Y cut  3       4        5          6
+//
+// The grammar lives in the SCRIPT, so a user can type either kind — and the
+// hardwired formula was silently wrong for every grammar but the one it was
+// derived from. So compare the two expansions symbol by symbol and skip
+// exactly what they actually share.
+//
+// Two streams advanced in lockstep; neither string is ever materialised.
+function symbolStream(axiom, rules, iterations) {
+  const stack = [{ expansion: axiom, index: 0, depth: iterations }];
+  return function next() {
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      if (frame.index >= frame.expansion.length) { stack.pop(); continue; }
+      const sym = frame.expansion[frame.index];
+      frame.index++;
+      const rule = rules[sym];
+      if (frame.depth === 0 || rule === undefined) return sym;
+      stack.push({ expansion: rule, index: 0, depth: frame.depth - 1 });
+    }
+    return null;                            // exhausted
+  };
+}
+
+// Memoised, because the cost is O(shared opening) — which for the default rules
+// is the same order as the walk itself, so paying it on every stepper move
+// would double generation time. Keyed on the grammar AND the iteration, since
+// both decide the answer.
+const sharedOpeningCache = new Map();
+function sharedOpening(axiom, rules, iterations, cap) {
+  if (iterations < 1) return 0;
+  const key = axiom + '|' + JSON.stringify(rules) + '|' + iterations + '|' + cap;
+  if (sharedOpeningCache.has(key)) return sharedOpeningCache.get(key);
+  const a = symbolStream(axiom, rules, iterations);
+  const b = symbolStream(axiom, rules, iterations - 1);
+  let n = 0;
+  while (n < cap) {
+    const x = a(), y = b();
+    // y === null means iteration N-1 ran out: all of it is repeated by N.
+    if (x === null || y === null || x !== y) break;
+    n++;
+  }
+  sharedOpeningCache.set(key, n);
+  return n;
+}
+
+// ── EXPANSION AND TURTLE, FUSED (2026-10-06) ───────────────────────────
+// These were two functions: expandLSystem built the whole string, turtleWalk
+// turned it into segments, and buildTrajectory then threw the leading ones
+// away. At iteration 7 that discarded 531,440 of 651,441 segment objects —
+// 82% of the work, and it was 45 MB of a 54 MB peak.
+//
+// The prefix cannot simply be skipped: the turtle's x, y and heading where the
+// kept material begins depend on every turn before it, and `isHorizontal` —
+// the thing deciding which runs carry pitch at all — comes from the heading.
+// But those are THREE SCALARS. Nothing else about the prefix is ever read.
+//
+// So the two stages are fused and the prefix is TRAVERSED WITHOUT BEING
+// STORED: no string for it, no segment objects. Measured, peak memory stops
+// depending on the iteration at all — peak flat near 7 MB where iteration 7
+// cost 45 MB, and under 1 MB resident once the segments are collected — and
+// what grows instead is time. Two separate functions cannot do this: the
+// intermediate string IS the thing being avoided.
+//
+// It is also FASTER, which was not the point but follows: 97 ms to 52 ms at
+// iteration 7, since a 1.6 M-character string and 651,441 objects are no
+// longer built and then discarded. Verified byte-identical output against the
+// two-function version at every iteration from 3 to 7, trajectory points and
+// diagnostics alike.
+//
+// Rewriting is context-free — each symbol's expansion depends only on itself —
+// so iteration N's symbols can be emitted one at a time by depth-first walk
+// without ever materialising an intermediate iteration. An explicit stack, not
+// a generator, to avoid per-yield GC pressure at million-symbol outputs.
+//
+// Turtle: F forward, + turn CCW, - turn CW. Heading in degrees, 0 = east.
+// Only F, + and - are acted on; X and Y shape the string and are never walked,
+// which is what makes the grammar two-layered.
+function expandAndWalk(axiom, rules, iterations, angleDeg,
+                       skipSymbols, keepSymbols, traverseCap) {
+  const segs = [];
+  let x = 0, y = 0, heading = 0;
+  let n = 0;                 // absolute symbol index, prefix included
+  let kept = 0;              // symbols emitted past the shared opening
+  let skippedSegs = 0;       // segments the prefix would have produced
   let truncated = false;
   const stack = [{ expansion: axiom, index: 0, depth: iterations }];
   while (stack.length > 0) {
-    if (parts.length >= maxChars) { truncated = true; break; }
+    if (kept >= keepSymbols) { truncated = true; break; }
+    // A TIME guard where MAX_TOTAL_EMISSION was a MEMORY guard: the prefix no
+    // longer costs memory, but it still has to be walked.
+    if (n >= traverseCap)    { truncated = true; break; }
     const frame = stack[stack.length - 1];
     if (frame.index >= frame.expansion.length) { stack.pop(); continue; }
     const sym = frame.expansion[frame.index];
     frame.index++;
     const rule = rules[sym];
-    if (frame.depth === 0 || rule === undefined) parts.push(sym);
-    else stack.push({ expansion: rule, index: 0, depth: frame.depth - 1 });
-  }
-  return { symbols: parts.join(''), truncated: truncated };
-}
-
-// Turtle: F forward, + turn CCW, - turn CW. Heading in degrees, 0 = east.
-// Only F, + and - reach here; X and Y shape the string and are never walked,
-// which is what makes the grammar two-layered.
-function turtleWalk(symbols, angleDeg) {
-  const segs = [];
-  let x = 0, y = 0, heading = 0;
-  for (let i = 0; i < symbols.length; i++) {
-    const ch = symbols[i];
-    if (ch === 'F') {
+    if (frame.depth > 0 && rule !== undefined) {
+      stack.push({ expansion: rule, index: 0, depth: frame.depth - 1 });
+      continue;
+    }
+    const keeping = n >= skipSymbols;
+    if (sym === 'F') {
       const rad = heading * Math.PI / 180;
       const dx = Math.cos(rad), dy = Math.sin(rad);
-      segs.push({ symIdx: i, x1: x, y1: y, isHorizontal: Math.abs(dx) > 0.5 });
+      if (keeping) segs.push({ symIdx: n, x1: x, y1: y, isHorizontal: Math.abs(dx) > 0.5 });
+      else skippedSegs++;
       x += dx; y += dy;
-    } else if (ch === '+') heading = (heading + angleDeg) % 360;
-    else if (ch === '-')   heading = (heading - angleDeg + 360) % 360;
+    } else if (sym === '+') heading = (heading + angleDeg) % 360;
+    else if (sym === '-')   heading = (heading - angleDeg + 360) % 360;
+    n++;
+    if (keeping) kept++;
   }
-  return segs;
+  return { segs: segs, truncated: truncated, skippedSegs: skippedSegs, symbols: n };
 }
 
 // Collapse consecutive same-direction segments into runs. A horizontal run at
@@ -903,29 +1028,31 @@ let trajectory = [];
 let trajectoryInfo = { points: 0, truncated: false, span: 0 };
 
 function buildTrajectory(g) {
-  // THE SKIP MECHANISM, ported from bd_M_Fractal — without it `iterations` is
-  // an inert control. Iteration N's string BEGINS with material that is
-  // effectively iteration N-1's, so taking the first runs of it gives the same
-  // trajectory at every setting: measured 3, 6 and 8 producing byte-identical
-  // output. Skipping the prefix is what makes a higher iteration a DIFFERENT
-  // piece rather than the same opening at greater expense.
+  // THE SKIP MECHANISM, ported from bd_M_Fractal — without it `iterations` CAN
+  // be an inert control. Iteration N's string may OPEN with material already
+  // heard at iteration N-1, in which case taking the first runs of it gives the
+  // same trajectory at every setting: measured 3, 6 and 8 producing
+  // byte-identical output under the default grammar. Skipping that shared
+  // opening is what makes a higher iteration a DIFFERENT piece rather than the
+  // same opening at greater expense.
   //
-  // The turtle still walks the prefix — it has to, or the heading and position
-  // would be wrong when the kept material begins — but those segments are
-  // dropped.
+  // How much is shared is MEASURED per grammar now rather than assumed — see
+  // sharedOpening(). Under the default rules it is the whole previous string;
+  // under a grammar whose rules do not begin with their own non-terminal it is
+  // a handful of symbols, and `iterations` then needs no skip at all to mean
+  // something. The old formula was right about one grammar and silently wrong
+  // about every other.
   let iter = Math.round(g.iterations);
-  let skipSymbols = iter > 0 ? computeExpansionLength(g.axiom, g.rules, iter - 1) : 0;
-  // If the prefix alone would blow the symbol ceiling there is nothing left to
-  // keep, so drop the effective iteration until it fits. Silent truncation
-  // here would read as "the module plays nothing".
+  let skipSymbols = sharedOpening(g.axiom, g.rules, iter, MAX_SYMBOLS_TRAVERSED);
+  // If the shared opening alone would blow the traversal ceiling there is
+  // nothing left to keep, so drop the effective iteration until it fits.
+  // Silent truncation here would read as "the module plays nothing".
   let iterReduced = false;
-  while (iter > 1 && skipSymbols + 2000 > MAX_TOTAL_EMISSION) {
+  while (iter > 1 && skipSymbols + 2000 > MAX_SYMBOLS_TRAVERSED) {
     iter--;
-    skipSymbols = computeExpansionLength(g.axiom, g.rules, iter - 1);
+    skipSymbols = sharedOpening(g.axiom, g.rules, iter, MAX_SYMBOLS_TRAVERSED);
     iterReduced = true;
   }
-  const emitCap = Math.min(skipSymbols + MAX_WALK_CHARS, MAX_TOTAL_EMISSION);
-  const exp  = expandLSystem(g.axiom, g.rules, iter, emitCap);
   const degrees = SCALES[(ENUM_VALUES.scale || [])[Math.round(g.scale)]] || SCALES.minor;
 
   // detune_span is in SEMITONES, because that is what the name says — but the
@@ -934,10 +1061,9 @@ function buildTrajectory(g) {
   // it a minor seventeenth, when it had promised an octave. Convert.
   const wall = Math.max(0, Math.round(g.detune_span / 12 * degrees.length));
 
-  const allSegs = turtleWalk(exp.symbols, g.angle);
-  const firstIdx = allSegs.findIndex((seg) => seg.symIdx >= skipSymbols);
-  const segs = firstIdx >= 0 ? allSegs.slice(firstIdx) : allSegs;
-  const runs = applyReflection(collapseRuns(segs), wall);
+  const walk = expandAndWalk(g.axiom, g.rules, iter, g.angle,
+                             skipSymbols, MAX_WALK_CHARS, MAX_SYMBOLS_TRAVERSED);
+  const runs = applyReflection(collapseRuns(walk.segs), wall);
 
   // The longest run in THIS grammar, so grain_from_run spans its full effect
   // whatever the rules produce. Normalising against a fixed constant made the
@@ -966,7 +1092,7 @@ function buildTrajectory(g) {
   const limit = Infinity;
   const pts = [];
   let t = 0;
-  let used = 0, truncated = exp.truncated;
+  let used = 0, truncated = walk.truncated;
   let minC = 0, maxC = 0;
   for (const run of runs) {
     if (t >= limit) { truncated = true; break; }
@@ -988,7 +1114,10 @@ function buildTrajectory(g) {
     span: Math.round((maxC - minC) / 100), length: t,
     runs: runs.length, used: used,
     iter: iter, iterReduced: iterReduced, skipSymbols: skipSymbols,
-    skippedSegments: firstIdx >= 0 ? firstIdx : 0,
+    skippedSegments: walk.skippedSegs, symbolsWalked: walk.symbols,
+    // What the whole iteration WOULD be, for the sake of knowing how small a
+    // window we are hearing. Arithmetic, so it costs nothing to ask.
+    totalSymbols: computeExpansionLength(g.axiom, g.rules, iter),
   };
   return pts;
 }
