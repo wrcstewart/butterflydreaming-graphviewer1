@@ -212,6 +212,7 @@
      CSS was simply being overridden.
      Trust the hex on the border line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06: GREEN (offsetCH2 max 60 -> 200). Next = blue.
      2026-10-04g: RED (synth_pad_A2 — generated from arithmetic, so no upstream
      and no licence question; seamless by construction). Next = green.
      2026-10-04f: BLUE (default refined: ch2 an octave and a fourth up at +4 dB,
@@ -275,7 +276,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #27ae60 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -391,7 +392,20 @@ const STEPPERS = [
   { name: 'scale',             min: 0,    max: 4,   step: 1,    fallback: 0,    isEnum: true, regen: true },
   { name: 'grain_size',        min: 0.02, max: 1,   step: 0.01, fallback: 0.2 },
   { name: 'grain_from_run',    min: 0,    max: 1,   step: 0.05, fallback: 0.4 },
-  { name: 'offsetCH2',         min: 0,    max: 60,  step: 1,    fallback: 12 },
+  // max 200 (2026-10-06), raised from 60 to guarantee decoupling from channel 1.
+  //
+  // READ THIS BEFORE SETTING IT HIGH. The offset indexes TRAJECTORY POINTS, and
+  // there are far fewer of those than you might expect: the count is
+  // duration / step_seconds, bounded by the walk — at the current default
+  // (duration 60, step_seconds 2.00) there are just **10**. `iterations` does
+  // not change the count at all, only WHICH material is used.
+  //
+  // Beyond the last point the lookup CLAMPS, so channel 2 holds the final
+  // detune for ever. That is decoupled, but it is also STATIC — an offset of 52
+  // on a 10-point trajectory is not reading ahead in the walk, it is a constant
+  // drone. For a genuine moving offset the trajectory must be longer than the
+  // offset: raise `duration` or lower `step_seconds`.
+  { name: 'offsetCH2',         min: 0,    max: 200, step: 1,    fallback: 12 },
   // ── CHANNEL 2's OWN LEVEL AND INTERVAL (2026-10-03) ────────────────────
   // Added to diagnose a monotonous high pulse at about the grain rate. The
   // level lets channel 2 be muted outright (-60 dB) so it can be ruled in or
