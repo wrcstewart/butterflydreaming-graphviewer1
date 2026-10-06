@@ -213,10 +213,13 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06d: GREEN (an alternative grammar recorded beside the default
+     script: cutting the leading symbol from each rule removes the shared
+     opening entirely, at the price of a different piece). Next = blue.
      2026-10-06c: RED (the shared opening is MEASURED per grammar instead of
      assumed to be the whole previous iteration; expansion and turtle fused so
      the prefix is walked but never stored, which takes iteration 7 from 45 MB
-     to about 7 MB and makes iterations 8 reachable). Next = green.
+     to about 7 MB and makes iterations 8 reachable).
      2026-10-06b: BLUE (the loop is a safety net, not a feature: the trajectory
      is no longer cut off at `duration`, which now governs Bake only).
      2026-10-06: GREEN (offsetCH2 max 60 -> 200).
@@ -283,7 +286,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #2e8b57 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -1622,6 +1625,41 @@ window.addEventListener('message', (event) => {
     setStatus('Message error: ' + err.message, true);
   }
 });
+
+// ── AN ALTERNATIVE GRAMMAR, FOR COMPARISON (2026-10-06) ────────────────
+// The default rules each BEGIN with their own non-terminal, and that one fact
+// is why the skip mechanism exists: iteration N opens with the whole of
+// iteration N-1, so without skipping, `iterations` would be inert. Measured —
+// the first 300,000 symbols of iterations 6 and 7 are byte-identical.
+//
+// Cut that leading symbol from both rules and the property goes away. Paste
+// these two lines over the %%bd_rule lines below to hear it:
+//
+//   %%bd_rule X: FYFX+F+YFXFY-F-XFYFX
+//   %%bd_rule Y: FXFY-F-XFYFX+F+YFXFY
+//
+// What changes, all measured at iteration 6:
+//
+//                          rules as given      leading symbol cut
+//   shared opening         147,621 symbols     5 symbols
+//   generation             28 ms               7 ms
+//   runs available         60,000              63,161
+//   run lengths            1, 2, 5 only        1 to 9
+//   distinct pitches       9                   9  (the reflection wall sets this)
+//   walk extent            566 x 242           229 x 229, and it crosses itself
+//
+// It is A DIFFERENT PIECE — that is the price, and the only reason not to make
+// it the default. Two things to know before judging it by ear:
+//
+//   - grain_from_run normalises against the longest run in the grammar, which
+//     becomes 9. But 98% of runs are still 1-5, so most notes land in the
+//     bottom half of the grain-size range where the default's tight {1,2,5}
+//     spread across the whole of it. The control gets less potent, not broken.
+//   - The curve crossing itself matters to nothing here; this module never
+//     plots it. It would matter if the grammar were shared with a visual
+//     module, and M_Fractal is the only other place these rules appear.
+//
+// M_Fractal carries the same skip mechanism and would want the same treatment.
 
 // ── Boot ───────────────────────────────────────────────────────────────
 buildChain();
