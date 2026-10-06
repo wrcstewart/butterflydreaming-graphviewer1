@@ -1239,9 +1239,38 @@
     let loopEnabled = false;
     let loopGapSecs = 6;
     let reverb, vibrato, chorus, sampler;
+    // ── THE REVERB'S IMPULSE RESPONSE IS NOT THERE AT BOOT (2026-10-06) ──
+    // Tone.Reverb generates its impulse response asynchronously and the
+    // convolver holds NULL until that resolves. A convolver with no buffer
+    // outputs SILENCE, so in that window `wet` is not a blend — it is the
+    // share of the signal that DISAPPEARS. At this module's 0.35 that is
+    // 3.7 dB down and dry; bd_M_DroneFrac defaults to 0.90, where the same
+    // fault is 20 dB and was reported as "no sound at all" from three phones.
+    //
+    // The bake path below has always had `await rev.ready` — so an exported
+    // file was correct while what you HEARD was not. The knowledge was in the
+    // file; it just was not on the live chain.
+    //
+    // So the wet share is held back until the impulse lands and restored when
+    // it does. If it never lands the module plays dry: degraded, never
+    // silent, which is the right way round for a failure nothing outside the
+    // page can detect.
+    let reverbReady = false;
+    const REVERB_DRY_FALLBACK = 0.15;
+    function watchReverbReady() {
+      if (!reverb) return;
+      const p = reverb.ready;
+      if (!p || typeof p.then !== 'function') { reverbReady = true; return; }
+      reverbReady = false;
+      p.then(() => {
+        reverbReady = true;
+        applyParam('reverb_wet', getStepperValue('reverb_wet'));   // put it back
+      }).catch(() => { /* leave it dry; audible beats correct */ });
+    }
     try {
       reverb  = new Tone.Reverb({ decay: 2.5 });
       reverb.wet.value = 0.35;
+      watchReverbReady();
       vibrato = new Tone.Vibrato({ frequency: 5, depth: 0.15, type: 'sine' });
       chorus  = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.3, wet: 0.2 });
       chorus.start();
@@ -1275,11 +1304,15 @@
     function applyParam(name, val) {
       if (!reverb) return;
       switch (name) {
-        case 'reverb_wet':        reverb.wet.value = val; break;
+        case 'reverb_wet':
+          reverb.wet.value = reverbReady ? val : Math.min(val, REVERB_DRY_FALLBACK);
+          break;
         case 'reverb_decay':
           reverb.decay = val;
           clearTimeout(decayTimer);
-          decayTimer = setTimeout(() => { try { reverb.generate(); } catch(_) {} }, 150);
+          decayTimer = setTimeout(() => {
+            try { reverbReady = false; reverb.generate(); watchReverbReady(); } catch(_) {}
+          }, 150);
           break;
         case 'vibrato_frequency': vibrato.frequency.value = val; break;
         case 'vibrato_depth':     vibrato.depth.value = val; break;
