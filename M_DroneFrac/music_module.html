@@ -212,7 +212,9 @@
      CSS was simply being overridden.
      Trust the hex on the border line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
-     2026-10-06: GREEN (offsetCH2 max 60 -> 200). Next = blue.
+     2026-10-06b: BLUE (the loop is a safety net, not a feature: the trajectory
+     is no longer cut off at `duration`, which now governs Bake only). Next = red.
+     2026-10-06: GREEN (offsetCH2 max 60 -> 200).
      2026-10-04g: RED (synth_pad_A2 — generated from arithmetic, so no upstream
      and no licence question; seamless by construction). Next = green.
      2026-10-04f: BLUE (default refined: ch2 an octave and a fourth up at +4 dB,
@@ -276,7 +278,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #27ae60 !important;      /* CANARY — green (was red) */
+    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -425,7 +427,14 @@ const STEPPERS = [
   { name: 'ch2_cents',         min: 0,    max: 2400, step: 100, fallback: 2400 },
   { name: 'overlap',           min: 0,    max: 0.5, step: 0.01, fallback: 0.1 },
   { name: 'playback_rate',     min: 0.1,  max: 2,   step: 0.05, fallback: 1 },
-  { name: 'duration',          min: 5,    max: 300, step: 5,    fallback: 60,   regen: true },
+  // BAKE LENGTH ONLY, since 2026-10-06. It used to bound the trajectory and
+  // therefore the repeat interval too, which made the loop a musical feature
+  // when it is meant to be a safety net for running out of notes. Playback now
+  // runs the whole trajectory and repeats only at its natural end.
+  //
+  // Kept at this name rather than renamed: RULE 1 says a script carries the
+  // form it was read in, and stored scripts already say %%bd_p_duration.
+  { name: 'duration',          min: 5,    max: 300, step: 5,    fallback: 60 },
   { name: 'reverb_wet',        min: 0,    max: 1,   step: 0.05, fallback: 0.45 },
   { name: 'reverb_decay',      min: 0.1,  max: 20,  step: 0.1,  fallback: 4 },
   { name: 'vibrato_frequency', min: 0.5,  max: 20,  step: 0.1,  fallback: 3 },
@@ -544,7 +553,12 @@ function buildSampleSelect() {
 // and the symptom is silence rather than an error.
 const MAX_WALK_CHARS     = 300000;
 const MAX_TOTAL_EMISSION = 5000000;
-const MAX_POINTS         = 4000;
+// 12,000 rather than 4,000 (2026-10-06). This is now the ONLY thing deciding
+// how long the music plays before it repeats, so it wants to be generous: at
+// step_seconds 2.00 it is ~6.7 hours, at 0.05 about ten minutes. Each point is
+// a small object and one Transport event, and Tone's timeline is a sorted array
+// with binary search, so twelve thousand is comfortable.
+const MAX_POINTS         = 12000;
 
 const controlPanel = document.getElementById('control-panel');
 
@@ -932,12 +946,24 @@ function buildTrajectory(g) {
   let maxRun = 1;
   for (const r of runs) if (r.isHorizontal && r.length > maxRun) maxRun = r.length;
 
-  // STOP AT `duration`. Without this the default script built a 7,000-second
-  // trajectory and played the first 60 of it, so iterations 6 and 10 produced
-  // an identical audible result — both truncated at the same cap, and 99% of
-  // the walk was computed and thrown away. The walk now fills the time it has,
-  // and step_seconds is what decides how far through the grammar that reaches.
-  const limit = g.duration;
+  // ── HOW MUCH OF THE WALK TO TURN INTO MUSIC (corrected 2026-10-06) ───
+  // This was bounded by `duration`, which was wrong and conflated three
+  // different things. The author put it plainly: **the loop is not a musical
+  // feature — it is a safety net for running out of notes.** With 60,000 runs
+  // available the music should play through them and repeat only when genuinely
+  // exhausted, not every 60 seconds.
+  //
+  // The earlier bug was real — a 7,000-second trajectory of which the first 60
+  // was heard, so iterations 6 and 10 sounded identical — but bounding
+  // GENERATION at `duration` entrenched the limitation instead of removing it.
+  // The right fix is to generate plenty and let PLAYBACK run through it.
+  //
+  // So the only ceiling now is MAX_POINTS. At step_seconds 2.00 that is about
+  // six hours before anything repeats; at 0.05, about ten minutes. Both are
+  // "very infrequently" where 60 seconds was not.
+  //
+  // `duration` now governs the BAKE LENGTH only — see the stepper's note.
+  const limit = Infinity;
   const pts = [];
   let t = 0;
   let used = 0, truncated = exp.truncated;
@@ -1152,7 +1178,9 @@ async function startPlayback() {
   if (!bufferReady || !grain) return;
   await Tone.start();
   stopPlayback(true);
-  const dur = getStepperValue('duration');
+  // The trajectory's own length, not `duration`: the music plays to the end of
+  // the material and only then repeats.
+  const dur = (trajectoryInfo.length || getStepperValue('duration')) + 0.5;
   const t = Tone.getTransport();
   t.cancel(0);
   t.stop(); t.position = 0;
@@ -1183,7 +1211,7 @@ function relaunchTrajectory() {
   t.scheduleOnce(() => {
     if (getStepperValue('loop') >= 0.5) loopTimer = setTimeout(relaunchTrajectory, 0);
     else stopPlayback();
-  }, getStepperValue('duration'));
+  }, (trajectoryInfo.length || getStepperValue('duration')) + 0.5);
   t.start();
 }
 
