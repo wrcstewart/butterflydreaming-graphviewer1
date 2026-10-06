@@ -213,6 +213,9 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-06e: BLUE (the chopped grammar IS the default now, by the
+     author's choice — no shared opening, so the skip does nothing and
+     `iterations` is live at every setting). Next = red.
      2026-10-06d: GREEN (an alternative grammar recorded beside the default
      script: cutting the leading symbol from each rule removes the shared
      opening entirely, at the price of a different piece). Next = blue.
@@ -286,7 +289,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2e8b57 !important;      /* CANARY — green (was red) */
+    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -703,7 +706,7 @@ function setStepperValue(name, val) {
 function parseScript(text) {
   const g = {
     axiom: 'X',
-    rules: { X: 'XFYFX+F+YFXFY-F-XFYFX', Y: 'YFXFY-F-XFYFX+F+YFXFY' },
+    rules: { X: 'FYFX+F+YFXFY-F-XFYFX', Y: 'FXFY-F-XFYFX+F+YFXFY' },
     angle: 90,
     sample: DEFAULT_SAMPLE,
     marked: new Set(),
@@ -1626,21 +1629,24 @@ window.addEventListener('message', (event) => {
   }
 });
 
-// ── AN ALTERNATIVE GRAMMAR, FOR COMPARISON (2026-10-06) ────────────────
-// The default rules each BEGIN with their own non-terminal, and that one fact
-// is why the skip mechanism exists: iteration N opens with the whole of
-// iteration N-1, so without skipping, `iterations` would be inert. Measured —
-// the first 300,000 symbols of iterations 6 and 7 are byte-identical.
+// ── THE DEFAULT GRAMMAR, AND THE ONE IT REPLACED (2026-10-06) ──────────
+// The rules below do NOT begin with their own non-terminal, and that is the
+// point of them. The earlier ones did —
 //
-// Cut that leading symbol from both rules and the property goes away. Paste
-// these two lines over the %%bd_rule lines below to hear it:
+//   %%bd_rule X: XFYFX+F+YFXFY-F-XFYFX
+//   %%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY
 //
-//   %%bd_rule X: FYFX+F+YFXFY-F-XFYFX
-//   %%bd_rule Y: FXFY-F-XFYFX+F+YFXFY
+// — and with a rule for X that BEGINS with X, expanding X to depth N starts by
+// expanding X to depth N-1, so iteration N opens with the whole of iteration
+// N-1. Measured: the first 300,000 symbols of iterations 6 and 7 were
+// byte-identical. The entire skip mechanism exists to get past that, and
+// without it `iterations` was inert for anything above 5.
 //
-// What changes, all measured at iteration 6:
+// Cutting the one leading symbol from each rule turns the recursion into
+// shared(N) = 2 + shared(N-2) rather than a ninefold multiplication. Measured
+// at iteration 6:
 //
-//                          rules as given      leading symbol cut
+//                          rules it replaced   DEFAULT NOW
 //   shared opening         147,621 symbols     5 symbols
 //   generation             28 ms               7 ms
 //   runs available         60,000              63,161
@@ -1648,18 +1654,21 @@ window.addEventListener('message', (event) => {
 //   distinct pitches       9                   9  (the reflection wall sets this)
 //   walk extent            566 x 242           229 x 229, and it crosses itself
 //
-// It is A DIFFERENT PIECE — that is the price, and the only reason not to make
-// it the default. Two things to know before judging it by ear:
+// Paste the two lines above over the %%bd_rule lines below to go back.
 //
-//   - grain_from_run normalises against the longest run in the grammar, which
-//     becomes 9. But 98% of runs are still 1-5, so most notes land in the
-//     bottom half of the grain-size range where the default's tight {1,2,5}
-//     spread across the whole of it. The control gets less potent, not broken.
-//   - The curve crossing itself matters to nothing here; this module never
-//     plots it. It would matter if the grammar were shared with a visual
-//     module, and M_Fractal is the only other place these rules appear.
+// ONE SIDE EFFECT WORTH KNOWING. grain_from_run normalises against the longest
+// run in the grammar, which is now 9 — but 98% of runs are still 1-5, so most
+// notes land in the bottom half of the grain-size range where {1,2,5} spread
+// across the whole of it. At the defaults below the effective grain size falls
+// from a mean of 0.656 to 0.526, about 20% shorter. If that sounds thin, raise
+// grain_size from 0.61 to about 0.76 to restore the old mean; the control is
+// less potent, not broken. The better fix is to normalise against a high
+// PERCENTILE rather than the maximum, which is not done.
 //
-// M_Fractal carries the same skip mechanism and would want the same treatment.
+// The curve crossing itself matters to nothing here; this module never plots
+// it. It would matter if the grammar were shared with a visual module, and
+// M_Fractal is the only other place these rules appear — and M_Fractal still
+// carries both the old rules and the old skip mechanism.
 
 // ── Boot ───────────────────────────────────────────────────────────────
 buildChain();
@@ -1667,8 +1676,8 @@ storedText = [
   '%%bd_module bd_M_DroneFrac',
   '%%bd_p_sample paulx_drone',
   '%%bd_axiom X',
-  '%%bd_rule X: XFYFX+F+YFXFY-F-XFYFX',
-  '%%bd_rule Y: YFXFY-F-XFYFX+F+YFXFY',
+  '%%bd_rule X: FYFX+F+YFXFY-F-XFYFX',
+  '%%bd_rule Y: FXFY-F-XFYFX+F+YFXFY',
   '%%bd_angle 90',
   '%%bd_p_iterations 6',
   '%%bd_p_step_seconds 2.00',
