@@ -302,3 +302,50 @@ there too.
 
 Six minutes gave something usable. An hour, recorded consistently, should give
 something considerably better than "not bad considering".
+
+---
+
+## Where the trained voices live, and why they left `voices/` (2026-10-07)
+
+**They are in `~/bd_voices_private/`, outside the checkout.** Moved there after
+finding this:
+
+```
+https://graph.virtualfictions.uk/voices/bd_will_01.onnx   →  HTTP 200, 63,516,051 bytes
+```
+
+`.gitignore` keeps `voices/` out of the repo — and the comment there gives the
+reason, *"a fine-tune IS someone's voice"* — but `server.js:144` is
+`app.use(express.static('.'))`, so the repo **root** is served. The file was
+excluded from one distribution channel and published through another.
+
+Exactly the shape of the Sample Focus licence breach of 2026-10-02, and that
+directory reached the conclusion this one needs: **there is no safe folder
+inside the checkout.** Nor can the fix be a check on the requester — cloudflared
+runs on this host, so every public visitor arrives from 127.0.0.1 and an IP
+test would grant everyone.
+
+So the only fix is for the file not to be there. Verified after moving:
+`bd_will_01.onnx`, its `.json` and `testvoice.onnx` all return **404** from
+outside, while `voices/alba_int8dp.onnx` — the quantised public voice BD now
+speaks with — still returns 200.
+
+### To hear your own voice in BD again
+
+Copy it back for the session, and move it out afterwards:
+
+```sh
+cp ~/bd_voices_private/bd_will_01.onnx* voices/
+#   open BD with ?voice=local/bd_will_01
+mv voices/bd_will_01.onnx* ~/bd_voices_private/
+```
+
+Deliberately a manual copy rather than a second static route or an environment
+flag. A route that is off by default is a route that can be left on, and the
+failure would be silent and total — the voice public again with nothing to show
+it. Two commands that leave no mechanism behind cannot be left on by mistake.
+
+**What is safe to serve from `voices/`:** builds derived from *published*
+voices, which is what `make_quantised_voice.py` produces. `alba_int8dp` exposes
+nothing that HuggingFace does not already serve to anyone. A fine-tune is the
+opposite case, and the distinction is the whole reason the directory is split.
