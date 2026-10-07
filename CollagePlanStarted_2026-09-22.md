@@ -582,3 +582,394 @@ declines and says which pair it refused.
   so `p_symmetry` parses as a *different directive* unless stripped.
 - The write-back path builds `%%bd_${name}` from the stripped name —
   `visual_module.html:713`. This is RULE 1.
+
+---
+
+# COLLAGE v1 — decided 2026-10-07
+
+Written after a long design conversation with the author. It opens with the two
+questions he put, because the existing decisions in §1–§6 already answered more
+of them than either of us remembered.
+
+---
+
+## 7. The two questions, and what was already settled
+
+### 7.1 "Should every text node live inside a module content directive, or should the collage have a Paste button that wraps it?"
+
+**Neither. §4 settled it and the decision is better than both:**
+
+> *"Do not migrate the corpus. Treat the absence of `%%bd_module` as 'this is
+> text'."*
+
+A text node is **already a valid module script**. There is no header to add — the
+*absence* of `%%bd_module` is the type declaration. Wrapping at rest is a
+corpus-wide migration for nothing; wrapping on paste is a no-op dressed as a
+feature.
+
+The worry behind the question — *"invisible in Browse mode so it appears as
+now"* — is also already handled, and for **every** node rather than only module
+nodes. Browse shows prose and strips every `%%bd_` directive
+(`viewer.js:1114`, built 2026-09-29). A text node can carry `%%bd_x 40` today
+and Browse will not show it.
+
+### 7.2 So what IS the real question
+
+**Where the arrangement's state lives.** And the answer is *not* the text node:
+
+**Placement is a property of the ARRANGEMENT, not of the text.** The same poem in
+two collages wants two placements. Put placement in the node and the second
+collage fights the first. That is a normalisation argument and it settles it.
+
+Which means the "Paste button" is **Merge**, already specified in §5. The one
+thing to add to it is the author's own suggestion: Merge stamps **default
+placement directives** for the block it brings in.
+
+---
+
+## 8. Where placement directives live, and the slot id
+
+Two candidates were weighed. One fails on a rule of the author's own.
+
+**Inside each module's block** — containment is identity, no ids needed, and
+`currentScript()` already preserves directives it does not recognise (verified
+in `M_DroneFrac`), so RULE 1 protects them for free. **But BD surfaces every
+`_p_` it finds as a stepper**, so the collage's placement controls would appear
+in the *module's* panel as knobs the module cannot turn. Dead UI, and against
+RULE 9's spirit.
+
+**So: placement lives in the collage's own block, naming slots by id.**
+
+That forces **Merge to stamp a slot id**, because a module name is not unique —
+and that incidentally answers §5's open question *"what happens to two identical
+module blocks in one merged script"*: they get different ids and the question
+dissolves. Two text slots, or two drones at different `start_at`, become a
+legitimate collage rather than a problem.
+
+### 8.1 Placement carries NO `_p_` — decided by the author
+
+Formatting is hand-crafted into the script. The argument, and it is the strong
+one: **View has no steppers, and View is the target** — the BD preview will never
+be big enough to judge a layout in.
+
+This needs no new rule. **RULE 4a already licenses it**: `bd_V_Kolam3D` has no
+control for `%%bd_weight` on the principle that a mark is a *request* and a
+module may decline. The collage declines placement controls for the same reason.
+
+**One wrinkle to decide rather than discover.** RULE 2 is evaluated per SCRIPT,
+not per block — `parseScript` collects `marked` across the whole text and
+`applyControlVisibility` only asks whether the set is non-empty. So:
+
+- anything in the collage carries `_p_` → auto-population off everywhere, and
+  unmarked placement correctly gets no steppers. **This is the wanted case and
+  it comes free.**
+- *nothing* does — a collage of plain text nodes — → "none present ⇒ numeric
+  gets a stepper" fires and **every placement directive sprouts a control.**
+
+Per-block evaluation is the principled fix, since §1 already says the block is
+the namespace. It is a behaviour change to a shipped rule, so it wants deciding
+deliberately. See §12.
+
+---
+
+## 9. The collage has TWO steppers, and a rule for why
+
+`%%bd_p_opacity` and `%%bd_p_duck`. Nothing else.
+
+**A control earns its place when the value cannot be chosen without perceiving
+the outcome.** Placement is set once, by eye, and stays. Opacity and ducking are
+*mix* decisions — only an ear and an eye on the live result can pick them. That
+rule predicts the next case too.
+
+### 9.1 Ducking needs a TRANSIENT channel, never the script
+
+There is no volume on an iframe, so the collage cannot attenuate the music
+itself; it must ask the module. But if it asks by rewriting `%%bd_p_volume`,
+then **a momentary mix change becomes part of the authored document** — save the
+collage mid-sentence and it carries the ducked volume for ever, with nothing to
+show why it is quiet.
+
+So: a `bd_mix { volume }` message, applied to the output stage and never written
+back. Same distinction RULE 7 draws about announcing on a human action: **a
+transient must not enter the record.** `M_DroneFrac` already has the `outVol`
+node to apply it to.
+
+---
+
+## 10. What a module shows inside a collage
+
+**The module author pre-decides, in CSS. Fixed formatting for v1.** The author's
+reason is the right one: anything else overwhelms the end user with decisions.
+
+**A rejected design, recorded so it is not re-proposed.** A vocabulary of part
+*roles* — the module announcing `parts: ['transport','controls','analyser',…]`
+and the host switching entries off — was proposed and refused. It is a
+vocabulary two parties must agree on, it is **invisible in the script** (so a
+reader cannot see why the spectrum vanished), and it grows a name every time a
+module grows a feature. That is the `%%bd_ui` line of §1 in different clothes.
+
+**What replaces it is one flag and one override:**
+
+1. **One new `bd_ui_config` flag** asserting a single thing: *"the host drives
+   this — show only your output."* Measured gap it closes: with
+   `hideControls: true` today, `M_DroneFrac` still shows **Play, Stop, Bake,
+   Save wav and the spectrum**, because `controls-hidden` covers
+   `#control-panel`, `.copy-row`, `#sample-select` and the arrows slot — not the
+   player panel and not the canvas.
+2. **`opacity` on the slot** as the collage author's override. *This is the
+   mechanism for "heard but not seen"* — a drone whose spectrum you do not want
+   gets `opacity 0` and plays on. Self-evident in the script, zero coupling.
+
+Use `opacity` or `visibility`, **not `display: none`** — browsers may suspend a
+hidden iframe's media, and a silent drone is the opposite of the intent.
+
+**This is also what makes a slot-sized module viable at all.** A module's layout
+fills its iframe at screen size; `M_DroneFrac`'s is a 24-row stepper column plus
+a canvas, which at a quarter of a phone screen is not a reduced version of
+itself but a mess. Output-only is a canvas, which scales. **Verify first in v1:
+does each module look right as just its output at quarter size?**
+
+`V_Kolam` already does: `visual_module.html:273-274` hides `.control-panel` and
+gives `.canvas-wrapper { flex: 1 1 auto }` under `controls-hidden`, so
+full-bleed background needs no work.
+
+---
+
+## 11. THE COLLAGE HAS NO OTHER STEPPERS — and the author's reasoning
+
+> *"the collage doesn't have any steppers other than its actual arrangement
+> directives. The user selects a composing module script first and copy merge
+> pastes it in. If tweaking is required then it can be done manually by editing
+> the script."*
+
+**This dissolves a fork rather than resolving it.** Two options had been weighed:
+
+- **(a) one merged stepper column owned by the collage** — needs every module to
+  declare control metadata over the wire, because **the script carries name and
+  value only**: `%%bd_p_grain_size 0.61` against
+  `{ name:'grain_size', min:0.02, max:1, step:0.01, fallback:0.2 }`. Every
+  range, step, toggle and enum list lives in module CODE.
+- **(b) per-slot columns, one at a time** — needs nothing new.
+
+Neither is built, because **the collage instantiates the REAL module.** So
+min/max/step come free, any stepper that appears is the module's own in its own
+panel, and the collage's whole job is **layout + relay**. `AV/kolam.html` is
+already this shape.
+
+And the deciding number against (a) was screen space, not elegance:
+`M_DroneFrac` has **24** steppers and `M_Fractal` **13**. A merged column is
+forty-odd controls in one list on a phone, in a module whose point is a reduced
+mock-up.
+
+### 11.1 Do NOT strip `_p_` on merge
+
+The author suggested stripping marks on merge. It achieves nothing and can make
+things worse:
+
+**RULE 2 inverts it.** No marks anywhere tips the script into legacy mode and
+**auto-populates every numeric directive** — `M_DroneFrac` would go from its
+marked handful to all 24. `hideControls: true` from the collage already does the
+job properly without touching the script.
+
+*(The author's counter was correct and is recorded: the ORIGINAL node keeps its
+marks, so stripping the collage's copy destroys nothing — the source node and
+the history entry are both inverses. An earlier claim of mine that marks are
+"authored information with no inverse" was wrong.)*
+
+### 11.2 A hand-inserted mark gives exactly one knob
+
+The author's refinement, and it works with no new mechanism: **the collage sends
+`hideControls` according to whether the block it is passing carries marks.**
+
+- stripped / no marks → `hideControls: true` → no knobs, the default
+- hand-insert one `%%bd_p_volume` → `hideControls: false` → RULE 2 takes over,
+  marked-only, **exactly that one stepper**, and it sits beside the thing it
+  controls rather than in a distant column.
+
+The collage computes `hasMarks` while parsing a block it is already parsing.
+
+### 11.3 Merge-replace is a convenience, not a requirement
+
+Corrected from an earlier overstatement. Tweaking happens by editing the collage
+script directly, so round-tripping through the single-module view is only for
+checking the effect at size. *"It's just the steppers we have lost."*
+
+---
+
+## 12. Block structure — the author's correction
+
+An earlier draft of this section claimed a collage nests brackets two deep
+(collage → module → score) and that a bare `%%bd_]` would be ambiguous. **Wrong.**
+
+> *"A module terminates either just before the next or at end of script. The
+> `%%bd_]` terminates the content blocks."*
+
+Module blocks are **implicitly delimited**; `%%bd_]` closes a **content** block
+only. There is one explicit bracket level, never two, so no ambiguity exists.
+
+**The one consequence to specify:** `%%bd_module` must **implicitly close an open
+content block**, or an unterminated `%%bd_text [` swallows every slot after it.
+Block parsing here is already fragile — the tap-hint was once welded onto
+`%%bd_]` and `score` stopped parsing.
+
+**And version the format from day one — `%%bd_collage 1`.** §5 already quotes
+`DeepLinking.md`'s own conclusion, written about a far smaller change than this.
+
+---
+
+## 13. THE PRESENTATION SURFACE — in-page, not a second tab
+
+The biggest decision of the session, and it reverses the working assumption.
+
+### 13.1 Why a separate Viewer cannot do this job
+
+**On iOS, `window.open` gives a TAB, so BD becomes a BACKGROUND tab** — and this
+is already documented in the code, from when it broke the angle sync:
+
+> *"Safari throttles or suspends background timers… Every time iOS lets BD run,
+> it pushes an angle from several seconds ago… roughly every 5 seconds: that is
+> the wake-up interval, not anything in our code."* — `viewer.js:520`
+
+Two consequences for speech: **Web Audio in a background tab is suspended**, and
+**speech is sequenced by timers** (`SPEAK_GAP_MS`, `SPEAK_LINE_GAP_MS`) which are
+throttled to that same wake-up. Utterances would arrive in bursts rather than
+prose. `stopMediaPlayback` (`viewer.js:8880`) exists because media-element audio
+*did* survive backgrounding and had to be killed deliberately — so media
+elements survive, Web Audio and timers do not, and speech is the wrong side of
+that line.
+
+### 13.2 The surface, as named by the author
+
+- **BD preview** — the small render, with steppers, script and graph around it.
+- **BD Viewer** — full screen, **no steppers, no script, no graph**.
+
+One surface, two sizes, one thing to explain.
+
+**Not a third radio mode.** §3 warns that *"if a sub-toggle appears to solve
+that, it is the third mode returning in disguise"*, and it does not need to be
+one: §3 already settled that **"Create does not choose a layout — the NODE
+does."** A collage node is a module node, so landing on it gives the module
+layout; full-bleed is the existing three flags set as the standalones set them,
+plus BD hiding its own furniture.
+
+**The discriminator to hold:** *a mode changes what you can DO; this changes only
+what you can SEE.* Same gesture in and out, no capability gated. The moment it
+decides what you may edit, it has become the third mode and should be refused.
+
+**No state saving.** Nothing leaves the page, so the graph, cards and module
+iframe stay instantiated and some simply stop being painted. Strictly *less*
+machinery than the tab route, which needs the MST token, the push, the relay and
+the drift suppression.
+
+### 13.3 And it is the shape VR requires
+
+**A headset cannot have two windows.** An immersive WebXR session is taken out by
+*one document* and renders *one scene*; there is no compositing of browser tabs
+in a headset.
+
+Stronger: **in an immersive session the DOM is not displayed at all** — only the
+WebGL scene. So a headset can show the collage and nothing else: no steppers, no
+script, no graph. **That is precisely the BD Viewer specified above**, arrived at
+by reasoning about an iPhone. The author's own standing note points the same way
+from the controls end — in VR the steppers must move the world, not the eye,
+which makes controls objects in the scene.
+
+**Of the two designs, in-page is the only one that survives the VR transition.**
+The separate-tab model would have to be undone; in-page is already the
+destination's shape. One programming model across desktop, iOS and the headset.
+
+### 13.4 The AV is demoted, not deleted
+
+It is built, verified, and serves the **facilitator-and-participant** case that
+is close to the centre of what BD is for. So it stays — but it stops being *a
+second way of viewing* and becomes **a send-to-another-screen action: a verb, not
+a mode.** One viewer, optionally mirrored. Nobody has to hold two viewing
+concepts.
+
+### 13.5 Where the audio plays, in v1
+
+**All of it in BD.** Speech is BD-only for v1 (the Viewer has *no* speech —
+`AV/kolam.html` has zero matches, and the stack is `piper_direct.js` plus
+`viewer.js` plus a voice model). Ducking is then a purely local transient and
+nothing crosses a relay.
+
+Stated plainly: **that works in a room and not across a network.** Laptop makes
+the sound, big screen shows the picture, same people. A View link sent elsewhere
+gets a silent kolam. That is the gap option 2 closes, and the author's
+assessment is that *"a multimedia collage viewer is a significant app in
+itself"* — so it is a later project, not a tidy-up.
+
+The arrangement to avoid is the middle one — music in View, speech in BD —
+where ducking crosses the relay and the audio arrives from two devices.
+
+---
+
+## 14. v1 SPEC
+
+- **One graphic** as a full-bleed background at variable opacity. `V_Kolam`
+  needs no work for this.
+- **One music module**, showing its output plus minimal controls — `volume`,
+  perhaps one more. One music module only, which makes the AudioContext budget
+  moot.
+- **One or more text slots**: a rectangle, **no border**, at a default position
+  in the drawn window. The collage renders the text itself; there is no text
+  module in v1.
+- **Font size in RELATIVE units** — container-query units or a computed
+  percentage of the slot. The requirement *"need not be readable in the preview
+  but must be in View"* then holds automatically from **one** value. In `px` it
+  would be unreadable in preview *and* wrong in View, needing two values for one
+  decision. Check on the oldest target device.
+- **Two collage steppers**: `opacity`, `duck`.
+- **Speakable**, in BD, with ducking as a transient.
+- **Fixed formatting.** CSS, decided by each module's author.
+
+### 14.1 Registries
+
+The collage is a module, so it needs the same **four** registries `bd_V_Kolam3D`
+needed: `MODULES` (`viewer.js:2818`), `AV_VIEWER_MODULES` (`viewer.js:13358`),
+`AV_RENDERERS` (`AV/kolam.html:175`), and an `express.static` route
+(`server.js:163`).
+
+### 14.2 Test this FIRST
+
+The collage is the first module that itself **hosts** modules, so postMessage
+goes one level deeper than anything today: module → collage → BD. Each hop must
+forward. **Prove it with one frame and one directive before building any
+layout** — if a script does not reach the innermost module the whole shape is
+wrong and no amount of CSS will show it. That is §8's cheap-test argument
+applied here: measure the thing that would invalidate everything.
+
+In-page presentation deletes the deeper version of this problem. Through the AV
+it would have been module → collage → AV → BD, three hops.
+
+---
+
+## 15. Still to decide
+
+| item | note |
+|---|---|
+| **How you leave the BD Viewer** | Full screen, no steppers, no script, no graph — and on iOS no keyboard. It needs an exit that survives having no furniture. §3's step 3 was circling this for module nodes; the Viewer sharpens it. **Decide before building.** |
+| **Slot id convention** | Merge stamps it; placement names it. |
+| **`%%bd_module` closes an open content block** | §12. |
+| **The `bd_mix` transient message** | §9.1. |
+| **RULE 2 per-block or per-script** | §8.1. May not need deciding for v1, since `hideControls` covers the only case that bites. |
+| **Prose for the collage node** | Browse shows prose and falls back to the name for an all-directive node. Already owed for the five module nodes; a collage wants it most, since prose is where a collage says what it is. |
+| **The iframes-vs-one-scene fork** | Still open — §7 of `ThreeJS_and_VR_2026-09-28.md`. v1 with iframes has no headset reading. **In-page prejudices neither side**, because a shared scene is also one document; that is the real reason to choose it now. The deciding numbers (live WebGL contexts per device) remain *documented but never measured*. |
+
+## 16. Things measured while writing this
+
+- Browse's prose strip is real and covers every node — `viewer.js:1114`, with
+  its own "THIS STRIP HAS NO INVERSE" warning beside it.
+- **BD builds no steppers at all.** Every mention in `viewer.js` concerns the
+  *module's* steppers; the column is built inside the iframe from the module's
+  own `STEPPERS` array.
+- The script carries **name and value only**; ranges live in code.
+- **Shared stepper names between modules**: Fractal + DroneFrac **11**
+  (including `scale`, `iterations`, `step_seconds`, `start_at`), Music + Fractal
+  8, Music + DroneFrac 7. V_Kolam shares none with the music modules. This was
+  the argument for grouping a merged column by module — moot now that there is
+  no merged column, and recorded because it returns the moment one is proposed.
+- `controls-hidden` in `M_DroneFrac` leaves the **player panel and the spectrum**
+  visible; in `V_Kolam` it leaves a full-bleed canvas.
+- `AV/kolam.html` has **no speech**; the stack is `piper_direct.js` + `viewer.js`
+  + a voice model.

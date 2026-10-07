@@ -658,3 +658,28 @@ same three problems. Two are fixed; the third is now understood and not built.
 | **`decimals` on a stepper spec** | both modules | **BUILT 2026-10-06** as part of `start_at`. `formatDisplay` printed 177.9 as "178", and `getStepperValue` reads the DISPLAY back — so the fraction was destroyed by looking at it. The same inverse-pair hazard once flipped `loop` off in Fractal. Any future stepper needing more than two significant figures wants this field. |
 | **A `start_at` stepper is 2,000 clicks end to end** | both modules | **Accepted, not solved.** 0–200 in steps of 0.1. Press-and-hold repeat covers it, and the directive can be typed, but a coarse/fine pair or a log step would suit the range better. |
 | **`iterations` is now nearly redundant** | both modules | **Open question for the author.** With `start_at` carrying the variety, `iterations` only decides how long the string is — i.e. how far `start_at` may reach. It could become derived (expand to whatever depth covers `start_at` + the window) and leave the panel entirely. Kept for now because removing a control from existing scripts is not reversible. |
+
+## Added 2026-10-07 — collage v1 decided
+
+Design conversation with the author, written up as §7–§16 of
+`CollagePlanStarted_2026-09-22.md`. Nothing built yet; the decisions are what
+changed.
+
+| item | where | note |
+|---|---|---|
+| **Text nodes stay as they are** | §7 | **DECIDED — no migration, and it was already decided in §4.** Absence of `%%bd_module` already means "this is text", and Browse already strips directives for every node (`viewer.js:1114`). Placement goes in the COLLAGE, not the node, because **placement is a property of the arrangement** — the same poem in two collages wants two placements. |
+| **Merge stamps a slot id and default placement** | §8 | **DECIDED.** The "Paste button" is Merge, already in §5. Slot ids are needed because a module name is not unique — which retires §5's open question about two identical blocks: they are just two slots. |
+| **Placement carries no `_p_`** | §8.1 | **DECIDED by the author**: View has no steppers and View is the target. Needs no new rule — RULE 4a already lets a module decline a control. |
+| **The collage has exactly TWO steppers** | §9 | **DECIDED**: `opacity` and `duck`. The rule that generalises: **a control earns its place when the value cannot be chosen without perceiving the outcome.** Placement is set once by eye; mix decisions need the live result. |
+| **Ducking is a TRANSIENT, never script state** | §9.1 | **NOT BUILT.** A `bd_mix { volume }` message. Writing a duck into `%%bd_p_volume` would make a momentary mix change part of the saved document — save mid-sentence and it is quiet for ever. Same principle as RULE 7. |
+| **Module output decided by its own author, in CSS** | §10 | **DECIDED.** One new `bd_ui_config` flag ("show only your output") plus slot `opacity` as the override. **A parts/roles vocabulary was proposed and REFUSED** — invisible in the script, needs two parties to agree, grows per feature; the `%%bd_ui` line of §1 in different clothes. |
+| **The collage runs the REAL modules** | §11 | **DECIDED**, and it dissolves a fork. No control-metadata contract, because the script carries name and value only while ranges live in code. A merged column would also be forty-odd knobs on a phone (DroneFrac 24 + Fractal 13). |
+| **Do not strip `_p_` on merge** | §11.1 | **DECIDED.** RULE 2 inverts it: no marks tips the script into legacy mode and auto-populates ALL controls. `hideControls` does the job properly. |
+| **PRESENTATION IS IN-PAGE, not a second tab** | §13 | **DECIDED — the session's biggest reversal.** `window.open` on iOS backgrounds BD, suspending Web Audio and throttling the timers that sequence speech (`viewer.js:520`, already documented from the angle-sync bug). In-page also deletes the relay-depth problem **and is the shape VR requires** — an immersive session shows only the WebGL scene, no DOM, which is exactly the "no steppers, no script, no graph" surface. **Not a third radio mode**: a mode changes what you can DO, this changes only what you can SEE. |
+| **BD preview / BD Viewer** | §13.2 | **DECIDED** — the author's names. One surface, two sizes. |
+| **The AV is demoted, not deleted** | §13.4 | **DECIDED.** It becomes a *send-to-another-screen* action — a verb, not a second viewer — keeping the facilitator/participant case it was built for. |
+| **Speech and all audio in BD for v1** | §13.5 | **DECIDED.** The Viewer has no speech at all. Consequence stated: works in a room, not across a network. Speech in View is a later project — the author: *"a multimedia collage viewer is a significant app in itself"*. |
+| **Relay depth is the FIRST thing to test** | §14.2 | **NOT DONE.** The collage is the first module that hosts modules, so postMessage goes a level deeper. Prove one frame and one directive before any layout — if the script does not arrive, no CSS will reveal it. |
+| **How you LEAVE the BD Viewer** | §15 | **UNDECIDED, and the one that gets found late.** No chrome, and on iOS no keyboard. |
+| **Font size in relative units** | §14 | **DECIDED.** One value then serves both the unreadable preview and a readable View; `px` would need two values for one decision. |
+| **The iframes-vs-one-scene fork** | §15 | **STILL OPEN**, and in-page prejudices neither side — a shared scene is also one document. The deciding numbers remain *documented but never measured*. |
