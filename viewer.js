@@ -1553,17 +1553,34 @@ function unduckMedia() {
 // presentation on the client, and audio is the most expensive of them.
 // 2026-09-05 — ?voice= overrides, so a locally-trained voice can be heard in BD
 // without editing code. `?voice=local/william` loads voices/william.onnx and its
-// .onnx.json from BD itself.
+// .onnx.json from BD itself. It is also how the quantised builds were compared:
+// ?voice=en_GB-alba-medium for the 60 MB original against the local default.
 const SPEAK_VOICE = (() => {
   try {
     const v = new URLSearchParams(location.search).get('voice');
     if (v) return v;
   } catch (_) {}
   // 2026-09-05 — alba (Scottish) preferred over jenny_dioco (Irish) by ear.
-  // Fetched from the normal distribution path rather than voices/, which stays
-  // for locally-trained voices; there is no reason to ship 63 MB in the repo for
-  // a voice anyone can fetch.
-  return 'en_GB-alba-medium';
+  //
+  // 2026-10-07 — now a QUANTISED build of that same voice, 19.4 MB against
+  // 60.3 MB, and chosen by ear after an A/B against the original. The author's
+  // verdict on the three builds: the full-precision one is "slightly more
+  // musical in intonation", the 17.9 MB one loses that, and this one — which
+  // spares the DURATION PREDICTOR from quantisation — brings it back. That is
+  // consistent rather than lucky: intonation is prosody and prosody is what the
+  // duration predictor decides, so it was the one part worth paying 1.5 MB to
+  // keep in full precision.
+  //
+  // Measured: int8 everywhere shifts the utterance 163 ms; sparing `dp` shifts
+  // it 58 ms. The spectral measure said the two were identical, which was no
+  // evidence either way — a long-term average spectrum is structurally blind to
+  // intonation, so the ear was the only instrument that could decide this.
+  //
+  // Why it is served from voices/ rather than HuggingFace: it is a BUILD, not a
+  // published voice. ./make_quantised_voice.py makes it, voices/ is gitignored,
+  // and piper_direct falls back to the public original if the build is absent.
+  // So a fresh checkout still speaks, one size larger, and says why.
+  return 'local/alba_int8dp';
 })();
 // length_scale > 1 is SLOWER, so a "rate of 0.8" is 1/0.8. This is the model's
 // own timing parameter, not a time-stretch: the delivery changes rather than the

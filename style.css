@@ -1159,8 +1159,13 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-07: BLUE (the default speech voice is now a QUANTISED build of
+   en_GB-alba-medium — 19.4 MB against 60.3 MB, same Scottish speaker, chosen
+   by ear; built by make_quantised_voice.py, with piper_direct falling back to
+   the published voice when the build is absent). Next = red.
+
    2026-10-02: GREEN (speech 10% slower and a 20% longer sentence pause; the
-   drone module gained an output stage). Next = blue.
+   drone module gained an output stage).
 
    2026-10-01b: RED (the new module is bd_M_DroneFrac, Cluster Drone, after
    bd_M_Grain was renamed before anything depended on it). Next = green.
@@ -1191,7 +1196,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

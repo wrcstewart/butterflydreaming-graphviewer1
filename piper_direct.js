@@ -49,6 +49,29 @@ const CACHE = 'bd-piper-v1';
 let ortMod = null, phonMod = null;
 const voices = new Map();          // voiceId -> { cfg, session }
 
+// ── WHEN A LOCAL VOICE IS NOT THERE (2026-10-07) ──────────────────────────
+// BD's default voice is now a QUANTISED build of en_GB-alba-medium, served
+// from voices/ at a third of the size (19.4 MB against 60.3 MB) and chosen by
+// ear over the full-precision one after an A/B.
+//
+// But voices/ is GITIGNORED — deliberately, because a fine-tune is someone's
+// voice and none of it belongs in the repo — so a fresh checkout has no model
+// at all. Without a fallback, speech would fail there with a 404 and no
+// explanation, which is this project's standing failure mode.
+//
+// So a missing local voice falls back to the public one it was built from, and
+// SAYS SO. The fallback is cached under the ORIGINAL id, so every later call
+// for the local name gets the same answer and synthesise() needs no knowledge
+// of any of this.
+//
+// Rebuild the local model with ./make_quantised_voice.py, which downloads the
+// public voice and quantises it — the same "a derived work must be rebuildable"
+// rule the sample pads follow.
+const VOICE_FALLBACK = {
+  'local/alba_int8dp': 'en_GB-alba-medium',
+  'local/alba_int8':   'en_GB-alba-medium',
+};
+
 async function cached(url, onProgress) {
   const cache = await caches.open(CACHE);
   const hit = await cache.match(url);
@@ -123,11 +146,27 @@ export async function loadVoice(voiceId, onProgress) {
   // overlap playback and the audio stops starving.
   ortMod.env.wasm.proxy = true;
 
-  const cfgBuf = await cached(urls.cfg, onProgress);
+  let use = urls;
+  try {
+    // Probe the CONFIG, not the model: it is a few kB, so a missing local voice
+    // is discovered without pulling tens of megabytes first.
+    await cached(urls.cfg, onProgress);
+  } catch (err) {
+    const alt = VOICE_FALLBACK[voiceId];
+    if (!alt) throw err;
+    console.warn('[piper] ' + voiceId + ' unavailable (' + err.message +
+                 ') — falling back to ' + alt +
+                 '. Run ./make_quantised_voice.py to build the local model.');
+    use = voiceUrls(alt);
+  }
+
+  const cfgBuf = await cached(use.cfg, onProgress);
   const cfg = JSON.parse(new TextDecoder().decode(cfgBuf));
-  const modelBuf = await cached(urls.model, onProgress);
+  const modelBuf = await cached(use.model, onProgress);
   const session = await ortMod.InferenceSession.create(modelBuf);
 
+  // Keyed by the id that was ASKED FOR, even when the fallback answered, so a
+  // second call cannot re-probe and re-decide.
   const v = { cfg, session };
   voices.set(voiceId, v);
   return v;
