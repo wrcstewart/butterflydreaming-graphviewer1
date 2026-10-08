@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-09n' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09o' };
 
 let bdViewTitleText = '';
 
@@ -3055,6 +3055,36 @@ function parseCollage(text) {
     b.body = (b.kind === 'text') ? collageTextBody(b.script) : '';
   }
   return { version: Number(vm[1]), blocks };
+}
+
+// A MODULE'S ANNOUNCEMENT MUST *UPDATE* A COLLAGE CARD, NEVER REPLACE IT.
+//
+// The `auto` writer and the focusout echo both write whatever the module last
+// announced straight into the focused card. For a module node that is exactly
+// right — the card and the module hold the same one script. For a COLLAGE it
+// silently destroyed the document: the module announces its own slot, so the
+// card lost `%%bd_collage`, lost the text block, and was left holding the
+// Kolam3D slot alone. Reported as "the collage module header and the text
+// module stuff is absent in preview with only Kolam3d script present", and
+// "maybe I saw it briefly on initial press" — which is exactly right: the card
+// was correct until the module's first announcement overwrote it.
+//
+// It was also one keystroke from permanent. The card is what Sv saves, so
+// saving after that overwrite would have written the slot over the collage in
+// the database. That is the Sv lesson a third time: A RENDERER NEEDS ITS
+// INVERSE BESIDE IT. mergeExploredValues is that inverse — it replaces values
+// by bare name and returns every other line untouched, so the header, the
+// module boundaries and the whole text block survive while the slot's values
+// move.
+//
+// An incoming script that is ITSELF a collage is a genuine replacement and
+// passes straight through; so does every write to an ordinary card, which is
+// why this is safe to put in front of both writers.
+function collagePreservingWrite(cardText, incoming) {
+  if (typeof cardText !== 'string' || typeof incoming !== 'string') return incoming;
+  if (!parseCollage(cardText)) return incoming;     // ordinary card — unchanged
+  if (parseCollage(incoming))  return incoming;     // a whole collage — a real replace
+  return mergeExploredValues(cardText, incoming);
 }
 
 // THE VISUAL SLOT A NODE SHOULD ACTUALLY BE SHOWING — saved script with the
@@ -12893,9 +12923,13 @@ async function init() {
         why('skip: card is a ' + have + ' script, incoming is ' + want);
         return;
       }
-      if (getCardText(body) === text) { why('skip: card already equals the script'); return; }
-      why('writing ' + text.length + ' chars into ' + describeCardBody(body));
-      setCardText(body, text);
+      // Through collagePreservingWrite, so a module's announcement updates a
+      // collage card instead of replacing it with one slot. See its note.
+      const outgoing = collagePreservingWrite(getCardText(body), text);
+      if (getCardText(body) === outgoing) { why('skip: card already equals the script'); return; }
+      why('writing ' + outgoing.length + ' chars into ' + describeCardBody(body) +
+          (outgoing === text ? '' : ' (merged into a collage)'));
+      setCardText(body, outgoing);
     }
 
     function autoClearPending() {
@@ -13094,8 +13128,10 @@ async function init() {
                       ' script into a ' + bdModuleOf(getCardText(body)) + ' card');
           return;
         }
-        if (getCardText(body) === avLastState) return;
-        setCardText(body, avLastState);
+        // Same guard as the auto writer, and for the same reason.
+        const outgoing = collagePreservingWrite(getCardText(body), avLastState);
+        if (getCardText(body) === outgoing) return;
+        setCardText(body, outgoing);
       });
     });
 
