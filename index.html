@@ -346,6 +346,36 @@
     destination.
   </div>
 
+  <!-- ── VIEW: the in-page presentation surface (2026-10-08) ──────────────
+       "BD Viewer" in the author's naming: the same surface as the preview at
+       a different size, NOT a second way of viewing and NOT a mode. A mode
+       changes what you can do; this changes only what you can see.
+
+       In-page rather than a window or tab, and the reason is iOS: window.open
+       there gives a TAB, so BD goes to the background and Safari suspends its
+       Web Audio and throttles the timers that sequence speech. The separate
+       viewer is still reached by the Device button, which is the case the
+       relay exists for — another screen, not a bigger one.
+
+       It shows the module's OUTPUT and nothing else, which is the same
+       contract the collage will use. If View showed more than the Output it
+       would teach the user that more is available to collage than is.
+
+       The return control is PERMANENT, by the author's decision. Nothing
+       fades: on an iPhone there is no Esc to fall back on. -->
+  <div id="bd-view-bar" hidden>
+    <button id="bd-view-exit" type="button" title="Back to the graph and the controls">&larr; Back</button>
+    <span id="bd-view-title"></span>
+  </div>
+  <!-- Text nodes present here rather than through an iframe: there is no text
+       module, and the collage will render text itself for the same reason.
+       The reference line is dim grey on purpose — it is for keeping track of
+       which node this was, not for reading. -->
+  <div id="bd-view-text" hidden>
+    <div id="bd-view-text-body"></div>
+    <div id="bd-view-text-ref"></div>
+  </div>
+
   <div id="loading-overlay">
     <div id="loading-box">
       <p id="loading-msg">Connecting…</p>

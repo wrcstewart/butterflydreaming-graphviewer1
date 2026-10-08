@@ -291,7 +291,28 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
-  </style>
+    /* ── output-only: the module's OUTPUT and nothing else (2026-10-08) ──
+     For a MUSIC module the output is the player panel — the transport, and the
+     piece title where there is one. NOT the steppers, NOT Copy or Bake or
+     Save: those are authoring, and a presentation surface has no business
+     offering them. Not the status line either — that is the module talking
+     about itself.
+
+     HIDE-ALL-THEN-EXEMPT inside the layout rather than a list of things to
+     hide. A list is right today and wrong the first time a panel is added;
+     inverted, a new panel has to ASK to appear here.
+
+     The grid collapses to a block so the panel is the whole of it. BD's View
+     sizes this iframe to a shallow strip at the foot — where a collage will
+     put it — so what is seen here is what a collage gets. */
+  body.output-only .module-layout { display: block; }
+  body.output-only .module-layout > *:not(.player-panel) { display: none; }
+  body.output-only .player-panel {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; height: 100%; box-sizing: border-box;
+  }
+  body.output-only { overflow: hidden; }
+</style>
 </head>
 <body>
 
@@ -1967,14 +1988,27 @@
           // The host is supplying the control surface, so this module is a
           // viewer: hide the steppers and the copy buttons, keep Play/Stop.
           // See the note beside .controls-hidden in the stylesheet.
+          // ── outputOnly (2026-10-08) — "show only your output" ───────────
+          // The fourth flag and the strongest: the host is PRESENTING this
+          // module, so none of its own furniture belongs on screen. BD's View
+          // uses it and the collage will use the same one — which is the
+          // point: View rehearses the collage's contract while there is only
+          // one slot to get wrong.
+          //
+          // It IMPLIES hideControls and hostChrome:false rather than sitting
+          // beside them. Each flag still asserts ONE thing; this one asserts
+          // "only the output", which entails the others.
+          const outputOnly = !!(data && data.outputOnly === true);
+          document.body.classList.toggle('output-only', outputOnly);
           document.body.classList.toggle('controls-hidden',
-                                         data && data.hideControls === true);
+                                         outputOnly || (data && data.hideControls === true));
           // hostChrome: does the host draw anything AROUND this iframe? BD
           // does — it stamps its arrows and Extension panel into the two
           // dock slots — so the layout reserves a grid area for each. A
           // standalone draws neither. DEFAULTS TO TRUE, so a host that says
           // nothing keeps BD's behaviour and nothing already working changes.
           document.body.classList.toggle('no-host-chrome',
+                                         outputOnly ||
                                          (data && data.hideControls === true) ||
                                          (data && data.hostChrome === false));
         } else if (type === 'BD_STOP') {

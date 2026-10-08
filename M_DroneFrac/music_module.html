@@ -213,6 +213,9 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-09: BLUE (outputOnly — the player panel alone is this module's
+     Output, so BD's View and later a collage get a transport strip and
+     nothing else: no spectrum, no steppers, no Bake or Save). Next = red.
      2026-10-06j: GREEN (iOS ring/silent switch: the module now asks for a
      `playback` audio session, so Web Audio stops being treated as ambient
      and silenced along with the ringer). Next = blue.
@@ -307,7 +310,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2e8b57 !important;      /* CANARY — green (was red) */
+    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -374,6 +377,27 @@
   body.host-script-panel #copy-script-btn { display: none; }
   #status:empty { display: none; }
   #status { font-size: 0.6rem; color: var(--dim); }
+  /* ── output-only: the module's OUTPUT and nothing else (2026-10-08) ──
+     For a MUSIC module the output is the player panel — the transport, and the
+     piece title where there is one. NOT the steppers, NOT Copy or Bake or
+     Save: those are authoring, and a presentation surface has no business
+     offering them. Not the status line either — that is the module talking
+     about itself.
+
+     HIDE-ALL-THEN-EXEMPT inside the layout rather than a list of things to
+     hide. A list is right today and wrong the first time a panel is added;
+     inverted, a new panel has to ASK to appear here.
+
+     The grid collapses to a block so the panel is the whole of it. BD's View
+     sizes this iframe to a shallow strip at the foot — where a collage will
+     put it — so what is seen here is what a collage gets. */
+  body.output-only .module-layout { display: block; }
+  body.output-only .module-layout > *:not(.player-panel) { display: none; }
+  body.output-only .player-panel {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; height: 100%; box-sizing: border-box;
+  }
+  body.output-only { overflow: hidden; }
 </style>
 </head>
 <body>
@@ -1828,13 +1852,26 @@ window.addEventListener('message', (event) => {
     } else if (type === 'bd_script_request') {
       postToParent({ type: 'bd_script_response', script: currentScript() });
     } else if (type === 'bd_ui_config') {
-      document.body.classList.toggle('controls-hidden', data.hideControls === true);
+      // ── outputOnly (2026-10-08) — "show only your output" ───────────
+      // The fourth flag and the strongest: the host is PRESENTING this
+      // module, so none of its own furniture belongs on screen. BD's View
+      // uses it and the collage will use the same one — which is the
+      // point: View rehearses the collage's contract while there is only
+      // one slot to get wrong.
+      //
+      // It IMPLIES hideControls and hostChrome:false rather than sitting
+      // beside them. Each flag still asserts ONE thing; this one asserts
+      // "only the output", which entails the others.
+      const outputOnly = !!(data && data.outputOnly === true);
+      document.body.classList.toggle('output-only', outputOnly);
+      document.body.classList.toggle('controls-hidden',
+        outputOnly || data.hideControls === true);
       // hostChrome: does the host draw anything AROUND this iframe? BD stamps
       // its arrows into the dock slot, so the grid reserves an area for it. A
       // standalone draws nothing. DEFAULTS TO TRUE, so a host that says
       // nothing keeps BD's behaviour and nothing working changes.
       document.body.classList.toggle('no-host-chrome',
-        data.hideControls === true || data.hostChrome === false);
+        outputOnly || data.hideControls === true || data.hostChrome === false);
       // hostScriptPanel: does the host show the script with its own copy
       // control? Then this module's Copy Script is redundant. Defaults to
       // false — see the note beside .host-script-panel.

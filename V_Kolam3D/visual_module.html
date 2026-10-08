@@ -393,6 +393,12 @@
     .canvas-wrapper { position: relative; }
     /* The fatal message is two sentences on two lines. */
     #waiting { white-space: pre-line; }
+    /* ── output-only: the module's OUTPUT and nothing else (2026-10-08) ──
+       For this module the output is the canvas. #status is the module talking
+       about itself, which a presentation surface has no room for and a collage
+       would never want. */
+    body.output-only #status { display: none; }
+    body.output-only { overflow: hidden; }
   </style>
 </head>
 <body>
@@ -2121,7 +2127,19 @@
           // renderer and the canvas stay fully functional — this is what an
           // AV/AVX viewer sends, and the reason a viewer has no steppers.
           case 'bd_ui_config': {
-            const hide = !!(event.data && event.data.hideControls === true);
+            // ── outputOnly (2026-10-08) — "show only your output" ─────────
+            // The fourth flag and the strongest: the host is PRESENTING this
+            // module, so none of its own furniture belongs on screen. BD's
+            // View uses it and the collage will use the same one — which is
+            // the point: View rehearses the collage's contract while there is
+            // only one slot to get wrong.
+            //
+            // It IMPLIES hideControls and hostChrome:false rather than sitting
+            // beside them. Each flag still asserts ONE thing; this one asserts
+            // "only the output", which entails the others.
+            const outputOnly = !!(event.data && event.data.outputOnly === true);
+            const hide = outputOnly || !!(event.data && event.data.hideControls === true);
+            document.body.classList.toggle('output-only', outputOnly);
             document.body.classList.toggle('controls-hidden', hide);
             // hostChrome: does the host draw anything AROUND this iframe? BD
             // does — arrows beside the stepper column, an Extension strip under

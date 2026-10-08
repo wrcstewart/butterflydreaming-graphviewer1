@@ -2869,7 +2869,18 @@ function flattenProps(props) {
 // to send would be silently replaced by the page's default — which is the
 // worst failure available here, because nothing anywhere would report it.
 const MODULES = {
+  // ── `kind` (2026-10-08) — WHERE the module's output goes ──────────────
+  // View, and later the collage, must place a module's Output: a visual one
+  // fills the space, a musical one is a shallow strip at the foot. That is a
+  // property of the module and belongs here.
+  //
+  // NOT inferred from the `bd_V_` / `bd_M_` prefix, though it could be today.
+  // A naming convention used as logic is the enumerating-matcher fault: it
+  // works until someone writes a module whose name does not fit, and then it
+  // fails silently by placing the output in the wrong band. One declared field
+  // cannot drift from the thing it describes.
   'bd_V_Kolam': {
+    kind:       'visual',
     embedded:   '/bd_V_Kolam/index.html',
     standalone: 'https://wrcstewart.github.io/bd_V_Kolam/preview.html',
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam/',
@@ -2879,15 +2890,18 @@ const MODULES = {
   // honest answer and is what drives the warning in buildExternalWebsiteUrl.
   // It does now have a `page` — see the note there.
   'bd_V_Kolam3D': {
+    kind:       'visual',
     embedded:   '/bd_V_Kolam3D/index.html',
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam3D/',
   },
   'bd_M_ABC': {
+    kind:       'music',
     embedded:   '/bd_M_ABC/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_ABC/preview.html',
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-ABC/',
   },
   'bd_M_Fractal': {
+    kind:       'music',
     embedded:   '/bd_M_Fractal/index.html',
     standalone: 'https://wrcstewart.github.io/bd_M_Fractal/preview.html',
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Fractal/',
@@ -2896,12 +2910,21 @@ const MODULES = {
   // neither a deep-link target nor a published repo, and naming one that does
   // not exist is worse than naming none.
   'bd_M_DroneFrac': {
+    kind:       'music',
     embedded:   '/bd_M_DroneFrac/index.html',
+    // 2026-10-08 — the standalone exists and is live now, so it can be named.
+    page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-DroneFrac/',
   },
 };
 
 function getModuleUrl(moduleId) {
   return (MODULES[moduleId] && MODULES[moduleId].embedded) || null;
+}
+
+// 'visual' | 'music' | null. Null for an unknown module, which View treats as
+// visual — filling the space is the safer guess for something that may draw.
+function getModuleKind(moduleId) {
+  return (MODULES[moduleId] && MODULES[moduleId].kind) || null;
 }
 
 function getStandaloneUrl(moduleId) {
@@ -10400,6 +10423,14 @@ async function init() {
   // pressable at any time.)
 
   function positionCyEl() {
+    // ── VIEW OWNS THE IFRAME'S RECT (2026-10-08) ───────────────────────
+    // This function stamps INLINE top/left/width/height, which beats any
+    // stylesheet rule. In View the iframe is not sharing #cy's rect at all,
+    // so the honest fix is for this writer to stand down rather than for the
+    // View rules to shout `!important` over it. Narrowing a selector against
+    // a competing writer cost three rounds on the stepper buttons and the
+    // lesson was to remove the competition, not to out-specify it.
+    if (document.body.classList.contains('view-active')) return;
     // 2026-08-14 — panel split changes what sits at the bottom of the
     // panel stack. Layout is now:
     //   #current-panel  →  #action-bar  →  #chat-panel  →  cy
@@ -13421,7 +13452,131 @@ async function init() {
         } catch (_) { return null; }
       }
 
+      // ══ VIEW — the in-page presentation surface (2026-10-08) ══════════
+      // "BD Viewer": the preview's own module at full size, BD's furniture out
+      // of the way. The author's framing — one surface, two sizes.
+      //
+      // It shows the module's OUTPUT and nothing else, and that is the point
+      // rather than a style: the Output is what a collage will be given, so if
+      // View showed more it would teach the user that more is available to
+      // collage than is. View is therefore a REHEARSAL of the collage contract,
+      // which is why building it first is worth more than sequencing.
+      //
+      // Nothing moves in the DOM. Reparenting an <iframe> reloads it — the
+      // document is destroyed and rebuilt — which would restart the module,
+      // stop the audio and lose the user's setup. #visual-iframe is already a
+      // direct child of <body> positioned by CSS, so View is a class.
+      function bdViewNode() {
+        // The same route buildExternalWebsiteUrl takes, and for the same
+        // reason: activeNodeId and lastReadNodeId live in setupInteractions,
+        // this code lives in init(), and the two are SIBLING functions — not
+        // nested. Reaching for those names directly here would throw on the
+        // first click. The accessors exist to cross exactly that gap.
+        const id = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
+                   (typeof getActiveNodeId   === 'function' && getActiveNodeId());
+        if (!id) return null;
+        const n = cy.getElementById(id);
+        return (n && n.length > 0) ? n : null;
+      }
+
+      function bdViewExit() {
+        const body = document.body;
+        if (!body.classList.contains('view-active')) return;
+        body.classList.remove('view-active', 'view-music');
+        const bar = document.getElementById('bd-view-bar');
+        const tp  = document.getElementById('bd-view-text');
+        if (bar) bar.hidden = true;
+        if (tp)  tp.hidden  = true;
+        const f = document.getElementById('visual-iframe');
+        if (f && f.contentWindow) {
+          // Back to BD's own defaults: its chrome returns, its steppers
+          // return. hostScriptPanel is not sent in either direction — BD has
+          // never sent it and View does not change that.
+          try {
+            f.contentWindow.postMessage({ type: 'bd_ui_config',
+              outputOnly: false, hideControls: false, hostChrome: true }, '*');
+          } catch (_) {}
+        }
+        // positionCyEl stood down while View held the rect; hand it back.
+        try { positionCyEl(); } catch (_) {}
+        console.log('[view] left');
+      }
+
+      function bdViewEnter() {
+        const body = document.body;
+        if (body.classList.contains('view-active')) return;
+        const node     = bdViewNode();
+        const text     = node ? (node.data('text') || '') : '';
+        const name     = (node && node.data('name')) || '';
+        const moduleId = parseModuleId(text);
+        const bar      = document.getElementById('bd-view-bar');
+        const title    = document.getElementById('bd-view-title');
+        const tp       = document.getElementById('bd-view-text');
+        const f        = document.getElementById('visual-iframe');
+
+        if (moduleId && f && f.src) {
+          // Clear the inline rect positionCyEl stamped, so the stylesheet can
+          // own it. See the note at the top of positionCyEl.
+          f.style.top = f.style.left = f.style.width = f.style.height = '';
+          // A musical Output is a shallow strip at the foot — which is where a
+          // collage will put it, so View shows it where it will live.
+          if (getModuleKind(moduleId) === 'music') body.classList.add('view-music');
+          // ALL THREE, not just outputOnly, and the reason is RULE 3's
+          // receivers-first discipline. outputOnly IMPLIES the other two
+          // inside a module that knows it — but a module that has not been
+          // taught the flag yet would show its FULL interface in View, which
+          // is the silent failure this project keeps meeting. Sending the
+          // stronger set means such a module degrades to "controls hidden, no
+          // chrome": not the Output, but not broken either. Every one of the
+          // three is a true statement about what BD is doing here.
+          try {
+            f.contentWindow.postMessage({ type: 'bd_ui_config',
+              outputOnly: true, hideControls: true, hostChrome: false }, '*');
+          } catch (_) {}
+          if (tp) tp.hidden = true;
+        } else {
+          // No module: present the node's PROSE — the same strip Browse uses,
+          // so View is Browse at size rather than a second idea of what the
+          // text of a node is. Formatting arrives after the merge button, so
+          // there is deliberately none here.
+          const bodyEl = document.getElementById('bd-view-text-body');
+          const refEl  = document.getElementById('bd-view-text-ref');
+          if (bodyEl) bodyEl.textContent = nodeProse(text) || name || '(this node has no text)';
+          // Dim grey, for keeping track of WHICH node this was so the
+          // collage's Merge can name it later. Not for reading.
+          if (refEl) refEl.textContent =
+            [name, node && node.data('url')].filter(Boolean).join('   ·   ');
+          if (tp) tp.hidden = false;
+        }
+        if (title) title.textContent = name || moduleId || '';
+        if (bar) bar.hidden = false;
+        body.classList.add('view-active');
+        console.log('[view] entered — ' +
+          (moduleId ? moduleId + ' (' + (getModuleKind(moduleId) || 'visual') + ')' : 'text') +
+          (name ? ' — ' + name : ''));
+      }
+
+      const bdViewExitBtn = document.getElementById('bd-view-exit');
+      if (bdViewExitBtn) bdViewExitBtn.addEventListener('click', bdViewExit);
+
       jumpToBtn.addEventListener('click', () => {
+        // ── VIEW IS IN-PAGE NOW (2026-10-08) ─────────────────────────────
+        // Everything below this return is the WINDOW route, RETIRED AND NOT
+        // DELETED — the same treatment #copy-link-to-ext-btn got in September.
+        //
+        // Why it was retired: on iOS window.open gives a TAB, so BD goes to
+        // the background and Safari suspends its Web Audio and throttles the
+        // timers that sequence speech. Documented at the top of this file from
+        // when the same throttling broke the angle sync.
+        //
+        // What it cost: this route opened a window BESIDE BD so you could
+        // watch while working the controls, and in-page gives that up. The
+        // preview is where you adjust and View is where you look. The
+        // other-screen case was never this button's — that is Device, which
+        // is untouched and is what the relay exists for.
+        bdViewEnter();
+        return;
+
         bdModeBeforeView = bdViewMode;   // restored by av_return
         // ── Synchronous section. Do not introduce an await above window.open. ──
 

@@ -267,6 +267,14 @@
       display: none;
     }
 
+    /* ── output-only: the module's OUTPUT and nothing else (2026-10-08) ──
+       For this module the output is the canvas. #status is the module talking
+       about itself, which a presentation surface has no room for and a collage
+       would never want. controls-hidden already hides .control-panel and lets
+       .canvas-wrapper take the space, so this adds only what that leaves. */
+    body.output-only #status { display: none; }
+    body.output-only { overflow: hidden; }
+
     /* Set by the host harness via postMessage bd_ui_config { hideControls: true }.
        Preview.html supplies its own outer stepper column; hiding the internal
        one lets the canvas take the whole iframe width. */
@@ -1677,7 +1685,21 @@
           // supplying an outer control surface. The renderer + canvas stay
           // fully functional — only the built-in stepper column is hidden.
           case 'bd_ui_config': {
-            const hide = !!(event.data && event.data.hideControls === true);
+            // ── outputOnly (2026-10-08) — "show only your output" ─────────
+            // The fourth flag, and the strongest: the host is presenting this
+            // module and nothing of the module's own furniture belongs on
+            // screen. BD's View uses it, and the collage will use the same one
+            // — which is the point, because View then rehearses the contract a
+            // collage depends on while there is only one slot to get wrong.
+            //
+            // It IMPLIES hideControls and hostChrome:false rather than being
+            // orthogonal to them. Each existing flag asserts one thing and
+            // that discipline is kept: this one asserts "only the output",
+            // which entails the other two. A host sending outputOnly need not
+            // know that, and sending all three is harmless.
+            const outputOnly = !!(event.data && event.data.outputOnly === true);
+            const hide = outputOnly || !!(event.data && event.data.hideControls === true);
+            document.body.classList.toggle('output-only', outputOnly);
             document.body.classList.toggle('controls-hidden', hide);
             // hostChrome: does the host draw anything AROUND this iframe? BD
             // does — arrows beside the stepper column, an Extension strip under
@@ -1685,7 +1707,7 @@
             // standalone draws neither. DEFAULTS TO TRUE, so a host that says
             // nothing keeps BD's behaviour and nothing already working changes.
             const chrome = !(event.data && event.data.hostChrome === false);
-            document.body.classList.toggle('no-host-chrome', hide || !chrome);
+            document.body.classList.toggle('no-host-chrome', outputOnly || hide || !chrome);
             // Canvas needs a resize kick so it fills the reclaimed space.
             updateCanvasSize();
             if (storedText) render(storedText);
