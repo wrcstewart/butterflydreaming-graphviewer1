@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-09l";
+  --bd-css-build: "2026-10-09m";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,13 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-09m: BLUE (collage text is TOP-ALIGNED — one of a pair of auto
+   margins survived the reference line being emptied, so the prose was pushed
+   to the foot and overspilled rather than being centred — and sits at 0.7
+   opacity so a little of the figure shows through. Also: a gateway with no
+   sections now shows its own CHILD content, which every one of the five
+   module gateways needed). Next = red.
+
    2026-10-09l: GREEN (COLLAGE v1 — a node whose script opens `%%bd_collage 1`
    renders in View as a picture with the words over it: one visual slot at the
    module's own low opacity, one text slot above it, and the music slot
@@ -1283,7 +1290,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2535,6 +2542,26 @@ body.view-active.collage-active #bd-view-text:not([hidden]) {
   pointer-events: auto;
 }
 body.view-active.collage-active #bd-view-text-body {
+  /* ── TOP-ALIGNED, AND WHY IT WAS AT THE BOTTOM ──────────────────────────
+     The single-node rules centre the prose with a PAIR of auto margins —
+     `margin-top: auto` on this body and `margin-bottom: auto` on the reference
+     line below it. A collage empties the reference line and the rule above
+     takes it out of the flow, which leaves the top margin UNOPPOSED: the text
+     was not centred, it was pushed to the foot, and a long passage then
+     overspilled the frame. One of a pair of balanced margins is not half a
+     centring, it is an alignment to the other end.
+
+     Top-aligned is also the better default here regardless: a passage grows
+     downwards into space that is already reserved, instead of growing upwards
+     out of the top of the screen.                                          */
+  margin-top: 0;
+  /* Author's call, 2026-10-08 — a little of the figure shows through the
+     glyphs. Applied to the element, so the shadow below fades with the text
+     rather than standing proud of it as a hard outline. Worth knowing it cuts
+     contrast: at 0.7 over this ground the prose goes from about 16:1 to about
+     9:1, which is still comfortably above the 4.5:1 body threshold, but the
+     margin for a bright passage of the figure is now thinner. */
+  opacity: 0.7;
   /* LUMINANCE, NOT COLOUR. A dark halo under bright glyphs holds whatever hue
      the figure takes, which matters because the ink's luminance spans 6.6x
      across hue at one `lightness` setting and `colour_speed` cycles hue along

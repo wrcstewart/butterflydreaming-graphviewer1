@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09l' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-09m' };
 
 let bdViewTitleText = '';
 
@@ -8555,12 +8555,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
             ? cy.nodes('node[type="TextNode"]').filter(n =>
                 n.data('section_title') && n.data('source_text') === work)
             : cy.collection());
-      titles.show();
+      // ── A MODULE GATEWAY HAS NO SECTIONS (fixed 2026-10-08) ─────────────
+      // `titles` is empty for all FIVE module gateways — verified, not assumed:
+      // every bd_* gateway has zero CONTAINS_SECTION edges and no section_title
+      // node naming it as its source_text. So this branch showed the gateway
+      // ALONE, reported as "Kolam3D from Gateway was registering no children at
+      // all". It had been true of every module since they were ingested; the
+      // Cluster route (Conversation -> Arts -> Graphics -> Kolam3D) works and is
+      // how they have always been reached.
+      //
+      // The fallback is the gateway's own CHILD targets, and it is not a second
+      // idea of what a section is: a module gateway's children ARE its content,
+      // there is no title page between them, and the CHILD edge genuinely
+      // exists — so drawing it claims nothing the graph does not. A work with
+      // sections is untouched, because `titles` is non-empty there.
+      const shown = titles.length
+        ? titles
+        : node.outgoers('edge[type="CHILD"]').targets();
+      shown.show();
       // Only edges that genuinely exist between what is shown — which is the
       // gateway's link to the first title. The others connect through passages
       // that are not in this view, and inventing a line to them would be a claim
       // the graph does not make.
-      node.edgesWith(titles).show();
+      node.edgesWith(shown).show();
       runLayout(cy, node);
       markReadNode(node, cy);
       return;
