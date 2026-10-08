@@ -757,3 +757,168 @@ waste, and the same shim would serve them.
 | item | where | note |
 |---|---|---|
 | **`GRACE_MS` 10 s → 65000** | `server.js:1337` | **NOT a bug — the author's deliberate development compromise (2026-09-12).** But 65 s exists so a phone **locking its screen** does not tear a pair down: `connectionStateRecovery` is 60 s and the grace period must outlast it. At 10 s a screen lock, a backgrounded tab or a tunnel blip ends the pair. `BD_GRACE_MS=65000 node server.js` — no code edit. **Verified the only setting flagged as a development value** in `server.js` or `viewer.js`. Surfaced 2026-10-08 on a restart done for another reason: the warning prints at **start-up only**, and that process had been up since 2 October, so a server already running never shows it. |
+
+
+## Added 2026-10-08 — text over a 3D graphic, and a line-at-a-time 3D text module
+
+Nothing here is built. It came out of one question — *can text be superimposed
+on a reduced-opacity Kolam / Kolam3D?* — whose answer is **yes in both cases**,
+but only because of facts that are easy to get wrong in the same way twice.
+
+### The layering facts, measured not assumed
+
+- **`background` is a DIRECTIVE** (`%%bd_background`, default `#0a0a0f`), not a
+  stepper, in both Kolams. So it is an authored choice per node and a viewer
+  cannot change it mid-reading. **`lightness` and `saturation` ARE live
+  steppers** (0–100, defaults 65 and 100), so the *ink* is not fixed.
+- At the default `L=65 S=100` the ink's relative luminance runs **0.141**
+  (hue 240) to **0.933** (hue 60) — a **6.6× spread at one lightness setting**.
+  White text scores 5.50:1 over the blue end and **1.07:1** over the yellow.
+  `colour_speed` cycles hue *along the curve*, so both ends are present in a
+  single frame. Given the author's reduced colour vision there is no hue rule to
+  fall back on: **the number in the panel does not predict legibility.**
+- **The figure's densest point is the canvas CENTRE** — the turtle starts there
+  (`V_Kolam/visual_module.html:1267`) and `applySymmetry` rotates about it
+  (`:1357-1365`), so all N copies converge there. That is exactly where centred
+  text goes.
+- `angle_drift` (2D) and `cam_elevation_speed` (3D) redraw continuously, so
+  contrast beneath a fixed glyph can only be **bounded**, never verified on a
+  frame.
+
+### The two `opacity` controls are not interchangeable
+
+- **A module's own `opacity` fades the ink toward `params.background`, not
+  toward transparency.** 2D: `globalAlpha` applies to the *offscreen*
+  (`V_Kolam/visual_module.html:1280`), which is then `drawImage`d over a canvas
+  already filled with the background. 3D: `WebGLRenderer({ canvas, antialias:
+  true })` — **no `alpha: true`** (`V_Kolam3D/visual_module.html:1512`) — and
+  `scene.background` is an opaque `THREE.Color`, so `material.opacity` blends
+  against it.
+- So **a dimmed Kolam3D is still an opaque near-black rectangle** holding a
+  faint figure. This is invisible as a limitation at the default background,
+  because `#0a0a0f` is almost exactly BD's page ground — the wrong control
+  *appears* to work and then fails on any node with a light `%%bd_background`.
+- **For the first experiments (graphic as background, bright text on top) the
+  module's own `opacity` is the RIGHT control** — better than CSS opacity on the
+  iframe, which would also fade the slot's own black toward the page and buy
+  nothing.
+- The limit is one layer up: **two stacked visual slots, or a background that is
+  not near-black**, needs `alpha: true` + `setClearAlpha(0)` +
+  `scene.background = null`. That is a change to the MODULE, so its author's
+  call.
+- **Round-trip is safe.** `applyControlDirectives` writes `opacity` on every
+  control change (`V_Kolam3D/visual_module.html:1136`) and `setDirectiveValue`
+  reconstructs whichever form it read (RULE 1, `:1094-1114`), so a value chosen
+  in preview rides into the collage inside the module's own block.
+- **Naming, deferred not decided.** A collage stepper also called `opacity`
+  would collide with `%%bd_p_opacity` inside a merged block, and at the default
+  background the two are indistinguishable. If a collage-level dimmer is ever
+  needed, call it **`dim`**, pairing with `duck` — duck lowers a module's sound,
+  dim lowers its picture, and neither word appears in any module's stepper list.
+  The background case does not need one, which is the better outcome under
+  `CollagePlanStarted_2026-09-22.md` §7–§16's rule that a control earns its place
+  only when the value cannot be chosen without perceiving the outcome.
+
+### Text IN the 3D scene — the numbers
+
+There is no font size in a 3D scene; the governing quantity is world height ÷
+camera distance. The module pins everything else: `CAM_FOV = 50`
+(`V_Kolam3D/visual_module.html:1487`), a **square** canvas — `min(wrapper width,
+height)` (`:1522-1534`) — and default `cam_distance` 260, giving a visible
+vertical span of **242.5 world units**.
+
+> **world height ≈ 0.64 × desired cap height in CSS px**, at `cam_distance` 260,
+> scaling linearly with distance.
+
+| cap px | ≈ font px | world height | chars across, H=380 | H=800 |
+|---|---|---|---|---|
+| 7 | 10 — floor | 4.5 | 76 | 160 |
+| 10 | **14 — comfortable min** | 6.4 | **53** | 112 |
+| 14 | 20 | 8.9 | 38 | 80 |
+| 18 | 26 | 11.5 | 29 | 62 |
+| 24 | 34 | 15.3 | 22 | 46 |
+| 30 | **43 — headset-safe** | 19.1 | **18** | 37 |
+
+(cap height ≈ 0.70 em, character advance ≈ 0.50 em for a readable sans.)
+
+- **Headset-safe is ~18 characters per line.** A Quest 3 gives roughly 25 pixels
+  per degree against a phone's ~95, so text needs **3–4× the angular size** in a
+  headset. Size for VR and it is comfortably large on screen; size for the phone
+  and VR gets mush. This is §8c's rule — *specify size in ANGLE, not pixels* —
+  applied to glyphs rather than to lines.
+- **The square canvas, not the preview, is the constraint.** Portrait phone:
+  View ≈ 390 px, the BD preview ≈ 380 px — **essentially identical**, because the
+  canvas is square and sized to the narrower dimension. So whatever is readable
+  while adjusting steppers is readable in View, and on a phone the preview is all
+  you have. The gain arrives only on a desktop or landscape screen, where the
+  square becomes the ~800 px height and everything roughly doubles.
+- **`cam_distance` (20–9900) will swim world-sized text** — a third the size at
+  780, unreadable at 2000. Either parent the text to the camera (fixed angular
+  size, a HUD plane) or slave its scale to `cam_distance`. **Decide before
+  building, not after.**
+
+**Technique.**
+
+- **`CSS2DRenderer` / `CSS3DRenderer` is ruled out.** It is the obvious route and
+  it is crisp, because it is real DOM text — and an immersive WebXR session
+  displays **no DOM at all**, so it is precisely the thing that cannot make the
+  jump. Choosing it would repeat the mistake the three.js standing decision
+  exists to prevent.
+- **Start with a `PlaneGeometry` + `CanvasTexture`**: it reuses the `ctx.fillText`
+  idiom already in the module, adds no dependency, and at ~18 characters needs no
+  wrapping. Render the canvas at 2–3× for texel density or it blurs.
+- Keep **`troika-three-text`** (MSDF — crisp at any scale and depth, real
+  wrapping) in reserve for text that must be read at varying distance.
+
+**Why it is worth doing at all:** a plane in the scene can be **occluded by and
+intersect** the figure. No DOM overlay can do that, at any opacity. That is the
+new expressive thing, not "text in 3D" as such.
+
+**Caveat, and it is load-bearing:** the module already sets
+`material.depthWrite = false` whenever `opacity < 1`
+(`V_Kolam3D/visual_module.html:1617-1623`), so at the low opacity wanted here the
+figure will **not** hide the text — the text reads *through* it. That is almost
+certainly the wanted effect, but it is currently a side-effect of the opacity
+handling rather than a decision, so it is easy to break later without noticing.
+
+### A second collage module — lines one at a time in 3D (author's sketch, FUTURE)
+
+Shape, as sketched: takes the text **a line at a time** and displays it in 3D on
+a **programmable interval**. Explicitly for later; recorded because three of its
+consequences bind decisions being taken now.
+
+**1. It is evidence for §7's SHARED-SCENE branch, and that is the main reason to
+record it.** As a module of its own it gets its own iframe, its own WebGL context
+and its own scene — and then the text **cannot** be occluded by or intersect the
+Kolam figure, because the two are composited by CSS and not by a depth buffer.
+That removes the one thing a 3D text module offers over a flat overlay. So the
+exciting version requires either **one scene**, or the text being a **mode inside
+Kolam3D** rather than a separate module. §7's middle path — a module may *also*
+export geometry — would serve equally.
+
+**2. It is a music-module shape with visual output.** Its defining feature is a
+**clock**: transport, Play/Stop, a `%%bd_p_` interval. Structurally it is closer
+to DroneFrac than to Kolam3D. That breaks **`MODULES.kind`**, currently a binary
+`'visual' | 'music'` — it will need a third value or a second axis.
+
+**3. Consequences to carry:**
+
+- **No new syntax is needed.** `%%bd_text [` … `%%bd_]` already gives one line
+  per line. Settling that now stops a format being invented for it later.
+- **The interval stepper earns its place** under the §7–§16 rule: reading pace
+  cannot be chosen without hearing/seeing the outcome. Probably a fade or hold
+  beside it, so lines cross-fade rather than cut.
+- **Write the line clock on WALL TIME from the start** — `driftNextDue`-style, as
+  the 2D Kolam's drift clock does. A timer rescheduled *after* its render has a
+  systematic rate bias (`project_script_source_of_truth`), already paid for once;
+  here it would make the reading pace drift with scene complexity.
+- **Speech and the line clock are two clocks and they will fight.** Piper
+  utterance length is not predictable from character count. The sane default is
+  **speech drives, the interval is a floor** — but that is a fork to NAME now and
+  decide later.
+- **18 characters against 30–45.** A headset-safe line is ~18 characters; a line
+  of verse is typically 30–45. So "one line at a time" in VR means accepting
+  roughly half the safe size, or folding each line in two.
+- The in-page presentation decision already protects a line timer from iOS
+  throttling of background tabs — but **only** because of that decision, so the
+  dependency now runs both ways.

@@ -394,6 +394,44 @@ contracts is a cost, but it does not force a choice today.
 actually allow — desktop Safari, iOS Safari, and the Quest browser. That number
 decides whether the iframe option has a ceiling worth caring about.
 
+### New evidence, 2026-10-08 — text in the scene decides it
+
+The author sketched a **second collage module: takes the text a line at a time
+and displays it in 3D on a programmable interval.** It is for later, but it is
+the first concrete thing that *requires* the shared scene, and that makes it
+evidence in this fork rather than a feature request beside it.
+
+Under **A**, a 3D text module gets its own iframe, its own WebGL context and its
+own scene. The text is then composited with the Kolam figure **by CSS, not by a
+depth buffer** — so it can never be occluded by the figure, and can never
+intersect it. That is the one thing text in a scene offers over a flat DOM
+overlay; without it, A's version of a 3D text module is a worse flat overlay
+with extra machinery.
+
+So the fork now has a third resolution alongside A and B: **the text is a MODE
+INSIDE `V_Kolam3D`**, not a module at all. One scene, one context, no new
+contract, and the occlusion works. It gives up composing text with an *arbitrary*
+visual module, which is the thing B would buy.
+
+Two numbers that bear on it, measured from the module (`CAM_FOV = 50`, square
+canvas, default `cam_distance` 260 → a 242.5-world-unit vertical span):
+
+- **world height ≈ 0.64 × desired cap height in CSS px**, scaling linearly with
+  `cam_distance` — which is a live stepper (20–9900), so world-sized text swims
+  unless it is parented to the camera or slaved to the distance.
+- **A headset-safe line is ~18 characters**, against ~50 at a comfortable
+  on-screen 14px equivalent: a Quest 3 gives ~25 pixels per degree where a phone
+  gives ~95, so glyphs need 3–4× the angular size. §8c's rule, applied to text.
+
+Also settled while measuring, and relevant to A: the Kolam canvas is **square**,
+sized to the narrower wrapper dimension. On a portrait phone that makes the BD
+preview (~380 px) and full-screen View (~390 px) **the same size** — so a
+small-preview legibility worry is misplaced, and a collage laying several square
+slots across a phone has far less glyph area than the arithmetic of screen width
+suggests.
+
+Full detail: `PLANNING_REGISTER.md`, *Added 2026-10-08 — text over a 3D graphic*.
+
 ---
 
 ## 8. The cheap test, before anything is built
@@ -818,6 +856,11 @@ already is — near-black is very nearly transparent. Do not let anything come t
 | **Which trajectory to watch (§8d)** | Meta is making opaque VR smaller (VR Glasses, spring 2027); Android XR and the glasses makers are making optical see-through better. **BD's dial argument attaches to the second.** Watch that lane, not Meta's. |
 | **Immersion as a DIAL, not a switch (§8d)** | Electrochromic dimming makes depth-of-immersion continuous and adjustable mid-session — a facilitator can raise transparency instead of removing a headset. A therapeutic affordance no headset can offer, and the strongest argument for glasses as an eventual target. |
 | **Does Piper run in the Quest browser? (§8b)** | Compute, not storage. Decides whether the headset carries the voice or only receives audio. |
+| **Text in the scene — module or MODE? (§7)** | A line-at-a-time 3D text module is the first thing that NEEDS the shared scene: under A its text cannot be occluded by the figure (CSS composites, not a depth buffer). Third resolution: make the text a MODE inside `V_Kolam3D`. Gives up composing text with an arbitrary visual module, which is what B buys. |
+| **How is 3D text sized? (§7)** | `cam_distance` is a live stepper 20–9900, so world-sized text swims. Parent it to the camera (fixed angular size) or slave its scale to the distance. Decide before building. |
+| **Two clocks: speech vs the line interval** | Piper utterance length is not predictable from character count. Default worth assuming: **speech drives, the interval is a floor.** Named, not decided. |
+| **`MODULES.kind` is a binary** | A timed module with visual output is both. Needs a third value or a second axis before a line-at-a-time text module exists. |
+| **Does anything need a TRANSPARENT 3D canvas?** | `V_Kolam3D` has no `alpha: true`, so a dimmed figure is still an opaque near-black rectangle. Fine while the ground is `#0a0a0f`; two stacked visual slots or a light background need `alpha: true` + `setClearAlpha(0)` + `scene.background = null`. A change to the MODULE. |
 | **Does Whisper / `getUserMedia` work there too? (§5a)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. |
 
 ---
