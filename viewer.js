@@ -13681,6 +13681,18 @@ async function init() {
         audioUnlocked = true;
         // interrupt:true stops whatever is playing and starts again from the
         // top, which is what was asked for. speak() does the stopping itself.
+        // ── SAY SOMETHING IMMEDIATELY (2026-10-09) ────────────────────
+        // Even with the voice cached there is a gap before the first words:
+        // synthesis runs at about 15% of real time, so a seven-second sentence
+        // costs a second before anything is heard. speechProgress only speaks
+        // up during a DOWNLOAD, so a warm cache gave a silent second with a lit
+        // button and no explanation.
+        //
+        // Guarded on the title being the node's own name so this cannot
+        // overwrite a download message — those are different strings, and
+        // speechProgress owns the bar while one is showing.
+        const vt = document.getElementById('bd-view-title');
+        if (vt && vt.textContent === bdViewTitleText) vt.textContent = 'preparing…';
         speak(bdViewProse, { interrupt: true });
         bdViewSpeakBtn.classList.add('speaking');
         // stopSpeech() empties the queue and clears speakBusy, and so does
@@ -13688,8 +13700,15 @@ async function init() {
         // pressing again and the reading simply finishing.
         if (bdViewSpeakPoll) clearInterval(bdViewSpeakPoll);
         bdViewSpeakPoll = setInterval(() => {
+          const t = document.getElementById('bd-view-title');
+          // Audio has started, so "preparing" has stopped being true. Only
+          // ours is cleared — a download message is left to speechProgress.
+          if (speakBusy && t && t.textContent === 'preparing…') {
+            t.textContent = bdViewTitleText;
+          }
           if (!speakBusy && speakQueue.length === 0) {
             bdViewSpeakBtn.classList.remove('speaking');
+            if (t && t.textContent === 'preparing…') t.textContent = bdViewTitleText;
             clearInterval(bdViewSpeakPoll);
             bdViewSpeakPoll = null;
           }

@@ -1165,6 +1165,10 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09h: RED (View's Speak says "preparing…" in the bar before the
+   first words — synthesis costs about a second even with the voice cached,
+   and speechProgress only speaks up during a download). Next = green.
+
    2026-10-09g: BLUE (View's Speak now puts the CONSENT question where the
    user is rather than sending them out to find a checkbox, and shows the
    download progress in its own bar. The first-use figure was 60 MB and is
@@ -1241,7 +1245,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
