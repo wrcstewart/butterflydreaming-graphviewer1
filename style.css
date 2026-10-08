@@ -1159,6 +1159,11 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09b: RED (#bd-view-bar's base rule said `display: flex` with no
+   view-active qualifier, so it beat the `hidden` attribute and sat on the
+   mode radios permanently — reported as "a Back button and no radio bar").
+   Next = green.
+
    2026-10-09: BLUE (VIEW — the in-page presentation surface. The View button
    stops opening a window and takes over this page instead; the window route
    is retired in place, Device is untouched). Next = red.
@@ -1209,7 +1214,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2286,12 +2291,26 @@ body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):no
 
 /* The return bar. PERMANENT — no fade, no tap-to-reveal. On an iPhone there is
    no Esc, so a control that hides itself is a control that can trap someone. */
+/* ── THE ATTRIBUTE MUST WIN (fixed 2026-10-09) ────────────────────────────
+   This rule said `display: flex` unqualified, and an author display rule BEATS
+   the `hidden` attribute — which is only a low-specificity UA `display:none`.
+   So the bar showed permanently: 44px, opaque, sitting exactly on top of the
+   mode radios. Reported as "a Back button top left and no radio bar", which is
+   one rule causing both halves.
+
+   Both of these elements are toggled by `hidden` in JS, so the attribute is
+   made to win explicitly rather than left to specificity. Narrow on purpose —
+   a global `[hidden] { display: none !important }` would be the general fix and
+   would also change every other element in BD that relies on an author display
+   rule, which is not a change to make while chasing a bug.                  */
+#bd-view-bar[hidden], #bd-view-text[hidden] { display: none !important; }
+
 #bd-view-bar {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 44px;
   z-index: 60;
-  display: flex;
+  display: none;
   align-items: center;
   gap: 12px;
   padding: 0 12px;
@@ -2299,7 +2318,7 @@ body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):no
   border-bottom: 1px solid #2a2a32;
   box-sizing: border-box;
 }
-body.view-active #bd-view-bar { display: flex; }
+body.view-active #bd-view-bar:not([hidden]) { display: flex; }
 #bd-view-exit {
   background: #1c1c26;
   border: 1px solid #8d7900;          /* local gold — see the mark palette */
@@ -2341,7 +2360,7 @@ body.view-active.view-music #visual-iframe {
 }
 
 /* Text has no module, so it presents directly. */
-body.view-active #bd-view-text {
+body.view-active #bd-view-text:not([hidden]) {
   display: flex;
   flex-direction: column;
   position: fixed;
