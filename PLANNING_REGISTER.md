@@ -751,3 +751,9 @@ that races a timer against real I/O.**
 `handleGatewayClick` still use `RETURN n, r, m`. Small result sets, the same
 waste, and the same shim would serve them.
 
+
+## Trigger-conditioned 2026-10-08 — before pairing leaves development
+
+| item | where | note |
+|---|---|---|
+| **`GRACE_MS` 10 s → 65000** | `server.js:1337` | **NOT a bug — the author's deliberate development compromise (2026-09-12).** But 65 s exists so a phone **locking its screen** does not tear a pair down: `connectionStateRecovery` is 60 s and the grace period must outlast it. At 10 s a screen lock, a backgrounded tab or a tunnel blip ends the pair. `BD_GRACE_MS=65000 node server.js` — no code edit. **Verified the only setting flagged as a development value** in `server.js` or `viewer.js`. Surfaced 2026-10-08 on a restart done for another reason: the warning prints at **start-up only**, and that process had been up since 2 October, so a server already running never shows it. |
