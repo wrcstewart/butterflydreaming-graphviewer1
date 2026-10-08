@@ -29,7 +29,20 @@
   <script>
     'use strict';
 
-    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update', 'BD_INIT', 'BD_STOP', 'BD_INFO_DIALOG_RESULT']);
+    // 2026-10-09 — bd_ui_config ADDED. Without it this wrapper silently
+    // dropped every host UI instruction: the module could not be told it was
+    // a viewer, that its host draws no chrome, or (new today) that only its
+    // OUTPUT should show. BD's View therefore presented the module's whole
+    // interface — reported as "a clutter of buttons".
+    //
+    // THE THREE SITES AGAIN. A relayed message needs the sender, the relay and
+    // the receiver; two of three fails in silence. Today's work added the
+    // sender (BD) and the receiver (the module) and missed the middle one here.
+    // M_DroneFrac's wrapper had already written the gap down for "the two
+    // older music wrappers" — and did not notice this one was missing too.
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update',
+                                'bd_ui_config', 'BD_INIT', 'BD_STOP',
+                                'BD_INFO_DIALOG_RESULT']);
     const RELAY_UP   = new Set([
       'BD_READY',
       'bd_script_response',

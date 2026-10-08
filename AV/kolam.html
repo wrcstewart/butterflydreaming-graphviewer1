@@ -84,12 +84,15 @@
      bd_M_Fractal, which had the same fault at 3.7 dB rather than 20; buster
      v36 -> v37).
      2026-10-09: BLUE (all five modules gained outputOnly for BD's in-page
-     View — "show only your output"; buster v37 -> v38). Next = red. */
+     View — "show only your output"; buster v37 -> v38).
+     2026-10-09b: RED (three wrappers were DROPPING bd_ui_config in
+     RELAY_DOWN, so outputOnly never reached Kolam, ABC or Fractal;
+     buster v38 -> v39). Next = green. */
   #back {
     position: fixed; top: 10px; right: 12px; z-index: 6;
     font: 12px/1 system-ui, sans-serif; color: #b9b9c4;
     background: rgba(0,0,0,.55);
-    border: 2px solid #2d7ff9;              /* CANARY — blue (was green) */
+    border: 2px solid #c0392b;              /* CANARY — red (was blue) */
     padding: 6px 10px; border-radius: 3px; cursor: pointer;
   }
   #back:hover { color: #fff; border-color: #6a6a78; }
@@ -199,7 +202,7 @@
     // Versioned: iOS Safari caches an iframe src hard, and a stale renderer
     // here means layout and behaviour fixes silently never arrive. Bump on any
     // change to a module.
-    frame.src = AV_RENDERERS[AV_MODULE] + '?v=38';
+    frame.src = AV_RENDERERS[AV_MODULE] + '?v=39';
 
     // ── What this viewer is currently showing (2026-09-16) ────────────────
     //
