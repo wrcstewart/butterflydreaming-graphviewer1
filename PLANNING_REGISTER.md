@@ -683,3 +683,40 @@ changed.
 | **How you LEAVE the BD Viewer** | §15 | **UNDECIDED, and the one that gets found late.** No chrome, and on iOS no keyboard. |
 | **Font size in relative units** | §14 | **DECIDED.** One value then serves both the unreadable preview and a readable View; `px` would need two values for one decision. |
 | **The iframes-vs-one-scene fork** | §15 | **STILL OPEN**, and in-page prejudices neither side — a shared scene is also one document. The deciding numbers remain *documented but never measured*. |
+
+## IN PROGRESS 2026-10-08 — scaling fixes 1 and 2
+
+`BD_Viewer_Scaling_Brief.md` §CC.4's two no-behaviour-change fixes, done before
+the Quest arrives so that a slow boot there cannot be mistaken for a speech
+problem. Pre-flight: DB backup `backups/memgraph_2026-10-08_091028.cypher`,
+git level with origin at `c665bfd`.
+
+**Measured before starting:** 483 nodes, 2,725 edge rows. The boot query
+returns one row per edge carrying BOTH endpoint nodes in full, so node payloads
+cross the wire **5,450 times for 483 nodes — 11.3×**.
+
+| fix | what | saving | state |
+|---|---|---|---|
+| **2** | drop `raw_text` | ~2× of the text payload | 198 TextNodes carry it, 123,760 B against 128,044 B of `text` — a near-duplicate that **nothing reads** (verified: zero references in any `.js`/`.html`). A DB migration, not a code change. |
+| **1** | send each node once | ~11.3× | `viewer.js:10062` `MATCH (n)-[r]->(m) RETURN n, r, m` → a node query plus an edge query carrying only what the edge builder needs from its endpoints. |
+
+**Fix 1 is NOT "query and serialisation only", which is how the brief rated
+it.** `buildEdgeData(r, n, m)` denormalises `n.properties.name` onto every edge
+as `source_name`/`target_name`, for stylesheet selectors that cannot reach into
+an endpoint's data; and `nodeId()` falls back to `getElementId()` for the 42
+url-less orphan endpoints, which [[stable-ids]] records as load-bearing. So an
+endpoint needs **three** fields, not an id: `url`, `name`, and the elementId
+fallback.
+
+Approach chosen to keep that contained: the edge query returns those three per
+endpoint, and the client **shims** them into `{elementId, properties:{url,name}}`
+so `buildEdgeData` and `nodeId` are untouched.
+
+**Equivalence checked, not assumed:** the proposed node set is 483, today's is
+483, and the DB holds 483 — every node has at least one edge, so `MATCH (n)`
+needs no pattern predicate and cannot introduce isolated nodes that were
+previously invisible.
+
+Still on one query shape afterwards: `fetchNodeByUrl`, `fetchNodesSince` and
+`handleGatewayClick` also use `RETURN n, r, m`. Small result sets, so not urgent
+— but they are the same waste and the same shim would serve them.
