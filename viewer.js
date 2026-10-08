@@ -381,7 +381,27 @@ let avLastState  = null;   // freshest announcement, pushed or not
 // speaks on a stepper press, so after editing a Fractal script it still held
 // KOLAM's. Anything writing it somewhere has to ask whether it belongs there.
 function bdModuleOf(text) {
-  const m = /^%%bd_(?:p_)?module[ \t]+(\S+)/m.exec(String(text || ''));
+  const s = String(text || '');
+  // ── A COLLAGE NAMES SEVERAL MODULES, SO THE FIRST LINE IS NOT THE ANSWER.
+  // This read the first `%%bd_module` line, which is right for every ordinary
+  // script and wrong for a collage the moment the picture is not the first
+  // block. Reversing the blocks to put the figure ON TOP made the first line
+  // `%%bd_module text`, so bdSameModule compared 'text' against the module's
+  // own 'bd_V_Kolam3D', refused the match, and the exploration recorder
+  // dropped every announcement — while the identical collage in the other
+  // order worked. Reported as "002 does not start with the current slider
+  // settings; 001 was working correctly in that regard".
+  //
+  // What callers mean by "which module is this script about" is the module
+  // LOADED IN THE IFRAME, which for a collage is its visual slot — not
+  // whichever block the author happened to write first. Order is the stacking
+  // order and must not also be an identity.
+  const c = parseCollage(s);
+  if (c) {
+    const vis = collageSlot(c, 'visual');
+    return vis ? vis.moduleId : null;   // text-only collage: honestly unknown
+  }
+  const m = /^%%bd_(?:p_)?module[ \t]+(\S+)/m.exec(s);
   return m ? m[1] : null;
 }
 // Two scripts may be exchanged only if they do not name DIFFERENT modules.
@@ -412,6 +432,10 @@ let avLastModuleId = null;
 // stays the authored record, the Down button still loads it, and nothing here
 // ever reaches the database.
 const explorationByNode = new Map();   // nodeId -> latest live script
+// Why the last exploration record was refused, and how many times running —
+// so the log says it on change and every 50th rather than once or never.
+let bdExpRejectWhy = null;
+let bdExpRejects   = 0;
 const savedByNode       = new Map();   // nodeId -> the node's authored text
 let   avNodeId = null;                 // node whose script the module is showing
 
@@ -685,6 +709,24 @@ if (typeof window !== 'undefined') {
     // into the module the next time the node opened.
     if (avNodeId && bdSameModule(text, savedByNode.get(avNodeId))) {
       explorationByNode.set(avNodeId, text);   // remember where we got to
+    } else if (avNodeId) {
+      // ── SAY SO (2026-10-08) ────────────────────────────────────────────
+      // This guard had no voice, and its silence is exactly what hid a
+      // collage's exploration never being recorded: the module played, the
+      // steppers worked, the panel updated, and View quietly showed the saved
+      // script. "Changes nothing I can see" again.
+      //
+      // Logged on CHANGE and then every 50th, per the once-only-log lesson: a
+      // module announcing on drift would otherwise bury the console, and a
+      // log that fires once reads as "this never happened again".
+      const why = bdModuleOf(text) + ' vs ' + bdModuleOf(savedByNode.get(avNodeId));
+      bdExpRejects = (bdExpRejectWhy === why) ? bdExpRejects + 1 : 1;
+      if (bdExpRejectWhy !== why || bdExpRejects % 50 === 0) {
+        console.log('[AV] exploration NOT recorded for ' + avNodeId +
+                    ' — module mismatch ' + why +
+                    (bdExpRejects > 1 ? ' (x' + bdExpRejects + ')' : ''));
+      }
+      bdExpRejectWhy = why;
     }
     if (document.hidden && bgHiddenAt) bgFrames += 1;      // background-rate probe
 
@@ -2105,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09r' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-09s' };
 
 let bdViewTitleText = '';
 
