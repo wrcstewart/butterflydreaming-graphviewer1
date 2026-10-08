@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-09m' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-09n' };
 
 let bdViewTitleText = '';
 
@@ -3055,6 +3055,23 @@ function parseCollage(text) {
     b.body = (b.kind === 'text') ? collageTextBody(b.script) : '';
   }
   return { version: Number(vm[1]), blocks };
+}
+
+// THE VISUAL SLOT A NODE SHOULD ACTUALLY BE SHOWING — saved script with the
+// user's live exploration merged back in. Two callers need exactly this (the
+// Player-mode loader and View), and the first cut had each build it from the
+// raw saved text, so both ignored every stepper the user had moved. Reported
+// as "the image that appears is the default script not that current in the
+// preview".
+//
+// The merge is onto the WHOLE collage text, not onto the slot. That is what
+// keeps the collage intact: mergeExploredValues replaces values by BARE NAME
+// and returns every other line untouched, so `%%bd_collage`, the module
+// headers and the whole text block survive and only the visual slot's values
+// move. Re-parsed afterwards so the slot still comes from one place.
+function collageVisualSlot(savedText, explored) {
+  const merged = explored ? mergeExploredValues(savedText, explored) : savedText;
+  return collageSlot(parseCollage(merged), 'visual');
 }
 
 // The first block of a kind, or null. Named rather than inlined because three
@@ -10800,9 +10817,18 @@ async function init() {
     // slot and nothing else; View is where a collage is actually assembled.
     const collageHere = parseCollage(savedText);
     if (collageHere) {
-      const vis = collageSlot(collageHere, 'visual');
-      if (!vis) return;
-      loadCollageVisual(vis.moduleId, vis.script);
+      // EXPLORATION HAS TO WORK HERE TOO, and the first cut lost it in both
+      // directions. This branch returned before `avNodeId` and `savedByNode`
+      // were set, so the bd_av_state listener's record guard
+      // — bdSameModule(text, savedByNode.get(avNodeId)) — could never pass and
+      // nothing was ever remembered; then View re-posted the stored script and
+      // the figure snapped back to it. Setting both is what makes a collage
+      // node explorable on the same terms as a module node.
+      avNodeId = nodeId;
+      savedByNode.set(nodeId, savedText);
+      const slot = collageVisualSlot(savedText, explorationByNode.get(nodeId));
+      if (!slot) return;
+      loadCollageVisual(slot.moduleId, slot.script);
       return;
     }
 
@@ -13846,14 +13872,54 @@ async function init() {
                          ' and this build renders v1 — rendering anyway');
           }
 
-          const vis = collageSlot(collage, 'visual');
+          const vis = collageVisualSlot(text,
+                        node ? explorationByNode.get(node.id()) : null);
           if (vis && f) {
             // Clear the inline rect positionCyEl stamped, so the stylesheet
             // can own it — the same reason the single-module branch does.
             f.style.top = f.style.left = f.style.width = f.style.height = '';
+            // ── SENT HERE, NOT ONLY ON THE SWAP PATH (fixed 2026-10-08) ─────
+            // The first cut sent bd_ui_config only from loadCollageVisual's
+            // BD_READY handler, which fires on the SWAP path alone. Every
+            // entry after the first takes the FAST path — the module is
+            // already loaded — so nothing was sent and the module kept its
+            // steppers. Reported as "there are sliders in the view mode which
+            // is incorrect", on both platforms, which is exactly the shape of
+            // a flag that is sent once and then not again.
+            //
+            // So it is sent unconditionally here, the way the single-module
+            // branch does it, and the BD_READY handler keeps its copy for the
+            // swap path where this one would arrive before the module exists.
+            // Sending it twice is harmless; sending it never is not.
+            //
+            // All three flags, by RULE 3's receivers-first discipline: a module
+            // that has not been taught outputOnly still degrades to "controls
+            // hidden, no chrome".
+            try {
+              f.contentWindow.postMessage({ type: 'bd_ui_config',
+                outputOnly: true, hideControls: true, hostChrome: false }, '*');
+            } catch (_) {}
             if (typeof loadCollageVisual === 'function') {
               loadCollageVisual(vis.moduleId, vis.script);
             }
+            // ── GEOMETRY PROBE ─────────────────────────────────────────────
+            // On iOS the picture appeared as a small frame instead of filling
+            // the screen, and nothing in the stylesheet explains it from here.
+            // Two frames' delay so the load and the first layout pass are done.
+            requestAnimationFrame(() => setTimeout(() => {
+              try {
+                const cs = getComputedStyle(f);
+                const r  = f.getBoundingClientRect();
+                console.log('[collage] iframe rect ' + Math.round(r.width) + 'x' +
+                  Math.round(r.height) + ' at ' + Math.round(r.left) + ',' +
+                  Math.round(r.top) + ' | position=' + cs.position +
+                  ' top=' + cs.top + ' bottom=' + cs.bottom +
+                  ' w=' + cs.width + ' h=' + cs.height +
+                  ' display=' + cs.display +
+                  ' | body.class=' + document.body.className +
+                  ' | dvh supported=' + CSS.supports('height', '100dvh'));
+              } catch (_) {}
+            }, 120));
           } else {
             console.warn('[collage] no visual slot — text will sit on the ground colour');
           }
