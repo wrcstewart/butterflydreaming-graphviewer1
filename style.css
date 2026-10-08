@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-09p";
+  --bd-css-build: "2026-10-09q";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,12 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-09q: RED (ONE BOX: the picture and the text now take the same
+   centred square, named once as --bd-collage-side, because the module's canvas
+   is square and the words were being centred on the VIEWPORT instead. The font
+   scales with that square — vmin, then cqmin — where 2.2vw had been pinned at
+   its 20px floor on any narrow window). Next = green.
+
    2026-10-09p: BLUE (the collage picture is sized by the SAME rule
    single-module View uses, with no override at all in the ordinary case. Two
    previous cuts both reached a 150px box: a calc carrying a custom property
@@ -1310,7 +1316,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2540,47 +2546,84 @@ body.view-active #bd-view-text:not([hidden]) {
    whereas CSS opacity here would also fade the slot's own black toward the page
    and buy nothing. The two controls share a name and are not the same lever —
    PLANNING_REGISTER.md, "Added 2026-10-08 — text over a 3D graphic".          */
-body.view-active.collage-active            { --bd-collage-music: 0px; }
+body.view-active.collage-active {
+  --bd-collage-music: 0px;
+  /* ── ONE BOX FOR BOTH, AND WHY IT HAS TO BE ────────────────────────────
+     The module's canvas is SQUARE — `min(wrapper width, height)` — so a
+     full-screen iframe on a phone draws a centred 390x390 square inside a
+     390x756 frame, while the text was laid out against the whole screen.
+     Two different boxes: the picture centred as a square, the words centred
+     on the viewport. Nothing could line up, and the author's report is
+     exactly that — "the graphic occupies a centred roughly half the screen
+     whilst the text occupies the top 65%, so not in any way centred in the
+     graphics frame".
+
+     So the square is named ONCE here and both read it. That is also the
+     answer to "scaling both graphic and text might be a problem": it is not,
+     as long as there is a single number. Two expressions that happen to agree
+     today are the problem.
+
+     If this value fails to resolve, the width/height declarations that use it
+     are dropped and both boxes fall back to filling the screen — which is
+     today's behaviour, not a collapse. That degradation is deliberate: the
+     last two rounds were both lost to a dropped declaration leaving nothing
+     behind. */
+  --bd-collage-side: min(100vw, calc(100dvh - 44px - var(--bd-collage-music)));
+}
 /* 110px — the same figure the single-module music band uses, so a collage and
    View agree about how deep a player is. Read by the TEXT COLUMN's bottom
    inset, as a plain length rather than a term inside a calc — see the note on
    the picture below for why that distinction cost two rounds. */
 body.view-active.collage-active.collage-music { --bd-collage-music: 110px; }
 
-/* ── THE PICTURE'S SIZE COMES FROM THE PROVEN RULE ABOVE ──────────────────
-   There is deliberately NO override here in the ordinary case. The
-   `body.view-active #visual-iframe` rule already states width and height and
-   is proven on both platforms by single-module View, so the collage reuses it
-   rather than restating it.
+/* ── THE PICTURE IS THE SQUARE ───────────────────────────────────────────
+   Centred by `margin: auto` against all four insets with a DEFINITE width and
+   height. That is the one safe way to centre an absolutely positioned replaced
+   element, and the reason the size is stated rather than left to `auto`:
 
-   TWO WRONG CUTS, both reaching the same 150px box by different routes, both
-   worth recording because each looked like the obvious fix:
+   TWO WRONG CUTS, both reaching the same 150px box, both worth recording:
 
    1. `height: calc(100dvh - 44px - var(--bd-collage-music))`. On iOS the
       picture came up as a small frame. A calc that does not resolve drops the
-      WHOLE declaration, and nothing else here supplies a height — JS normally
+      WHOLE declaration, and nothing else supplied a height — JS normally
       stamps one and View clears it — so the iframe fell back to its intrinsic
-      size. The base rule's own `calc(100dvh - 44px)` works, so dvh is not the
-      culprit; a custom property inside the calc is the only difference, and it
-      is now simply not needed.
+      size. dvh was NOT the culprit: the base rule's own `calc(100dvh - 44px)`
+      works on iOS in single-module View.
 
    2. `top/left/right/bottom` with `width: auto; height: auto`, expecting the
-      box to stretch to the insets. AN IFRAME IS A REPLACED ELEMENT: `auto`
-      resolves to the INTRINSIC 300x150, not to the insets, and an
-      over-constrained inset then parks it at one corner. That is the "very
-      small and positioned to the top right" report — and it broke desktop,
-      which the first cut had not.
+      box to stretch to the insets. AN IFRAME IS A REPLACED ELEMENT — `auto`
+      resolves to the intrinsic 300x150, not to the insets — and the
+      over-constrained inset then parked it in a corner. "Very small and
+      positioned to the top right", and that one broke desktop too.
 
-   The rule to carry: a replaced element must be given a stated size, and a
-   reserve must not be a term inside the expression that states it.         */
-body.view-active.collage-active.collage-music #visual-iframe {
-  /* Literals only, and its own declaration. If this one ever fails to parse,
-     the strip is not reserved — but the picture keeps the height the base rule
-     gave it, instead of losing both at once. */
-  height: calc(100dvh - 44px - 110px);
+   The rule to carry: a replaced element must be given a STATED size.
+
+   Shrinking the iframe to the square costs nothing visible, because the area
+   it gives up was never the picture — it was the module's own background,
+   which is #0a0a0f against the page's #07070c. If anything the faint edge
+   between those two blacks gets smaller.                                   */
+body.view-active.collage-active #visual-iframe {
+  top: 44px; left: 0; right: 0;
+  bottom: var(--bd-collage-music);
+  margin: auto;
+  width:  var(--bd-collage-side);
+  height: var(--bd-collage-side);
 }
 body.view-active.collage-active #bd-view-text:not([hidden]) {
+  /* THE SAME BOX AS THE PICTURE, by the same centring, from the same value —
+     so the words sit inside the figure's frame instead of on the screen. */
+  top: 44px; left: 0; right: 0;
   bottom: var(--bd-collage-music);
+  margin: auto;
+  width:  var(--bd-collage-side);
+  height: var(--bd-collage-side);
+  /* Padding in PER CENT, so the margin round the words is a property of the
+     square rather than a pixel count that stops meaning anything when the
+     square is a third the size. */
+  padding: 5%;
+  /* Makes this element the query container the font below measures itself
+     against. Without it `cqmin` falls back to the viewport-based line. */
+  container-type: size;
   /* Stays interactive on purpose. The obvious move is pointer-events:none so
      taps reach the picture — but this panel IS the scroll container, and the
      Kolam canvas takes no pointer input in outputOnly (its only handlers are on
@@ -2589,6 +2632,25 @@ body.view-active.collage-active #bd-view-text:not([hidden]) {
   pointer-events: auto;
 }
 body.view-active.collage-active #bd-view-text-body {
+  /* ── THE FONT SCALES WITH THE SQUARE, NOT WITH THE VIEWPORT ────────────
+     The single-node rule is `clamp(20px, 2.2vw, 28px)`, and 2.2vw on a
+     390px-wide phone is 8.6px — so the clamp FLOOR held it at 20px and the
+     type stopped scaling altogether. That is why shrinking the desktop window
+     made the text overlap the frame: the box got smaller and the glyphs did
+     not.
+
+     Two declarations, the second preferred. `vmin` already fixes the real
+     complaint, because it tracks whichever viewport dimension is smaller —
+     which on a phone is the one that defines the square. `cqmin` is better
+     still: it measures the SQUARE ITSELF, so it stays correct if the box ever
+     stops being viewport-derived (a quarter-size slot in a real collage, say).
+     An engine without container units simply keeps the first line. */
+  font-size: clamp(11px, 3.6vmin, 24px);
+  font-size: clamp(11px, 4.2cqmin, 24px);
+  /* The square is the measure now. 54ch at this size would be wider than the
+     box, and a max-width that never binds is a comment pretending to be a
+     rule. */
+  max-width: 100%;
   /* ── TOP-ALIGNED, AND WHY IT WAS AT THE BOTTOM ──────────────────────────
      The single-node rules centre the prose with a PAIR of auto margins —
      `margin-top: auto` on this body and `margin-bottom: auto` on the reference
