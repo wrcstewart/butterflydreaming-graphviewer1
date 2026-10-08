@@ -684,7 +684,7 @@ changed.
 | **Font size in relative units** | §14 | **DECIDED.** One value then serves both the unreadable preview and a readable View; `px` would need two values for one decision. |
 | **The iframes-vs-one-scene fork** | §15 | **STILL OPEN**, and in-page prejudices neither side — a shared scene is also one document. The deciding numbers remain *documented but never measured*. |
 
-## IN PROGRESS 2026-10-08 — scaling fixes 1 and 2
+## DONE 2026-10-08 — scaling fixes 1 and 2
 
 `BD_Viewer_Scaling_Brief.md` §CC.4's two no-behaviour-change fixes, done before
 the Quest arrives so that a slow boot there cannot be mistaken for a speech
@@ -720,3 +720,34 @@ previously invisible.
 Still on one query shape afterwards: `fetchNodeByUrl`, `fetchNodesSince` and
 `handleGatewayClick` also use `RETURN n, r, m`. Small result sets, so not urgent
 — but they are the same waste and the same shim would serve them.
+
+**BOTH DONE, verified 2026-10-08.**
+
+- **Fix 2**: `raw_text` removed from 198 TextNodes (123,760 B). `text` intact at
+  215 nodes / 128,044 B, so only the duplicate went.
+- **Fix 1**: `viewer.js` now runs `MATCH (n) RETURN n` plus an edge query
+  carrying `url`, `name` and `toString(id(n))` per endpoint, shimmed client-side
+  into the shape `buildEdgeData`/`nodeId` already expect. **Node payloads on the
+  wire: 5,450 → 483, 11.3× less.**
+
+**How it was verified**, since the browser could not do it: the real
+`buildEdgeData`, `nodeId`, `getElementId` and `flattenProps` were extracted from
+`viewer.js` and run against the real query output. Result — 483 nodes, 2,725
+edges, **0 edges with an endpoint missing from the node map** (cytoscape drops
+those silently, so a correct count IS the test), and **84 endpoints resolved via
+the elementId fallback**, which exercises the url-less orphan path
+`stable_id_spec.md` calls load-bearing. The 438 edges with neither endpoint
+named were confirmed against the DB as pre-existing (438 there too), not a loss
+from the shim.
+
+**`--virtual-time-budget` defeated the browser test** and it is worth recording
+why: BD's loader races its queries against `sleep(8000)`, and under virtual time
+a `setTimeout` fires instantly, so the race always loses and the log showed only
+"Load attempt 1 failed: timeout". The same trap invalidated three measurements
+during the voice work the day before. **Headless Chrome cannot test anything
+that races a timer against real I/O.**
+
+**Still outstanding:** `fetchNodeByUrl`, `fetchNodesSince` and
+`handleGatewayClick` still use `RETURN n, r, m`. Small result sets, the same
+waste, and the same shim would serve them.
+

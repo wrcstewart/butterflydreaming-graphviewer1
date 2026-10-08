@@ -456,6 +456,20 @@ two problems to fix.
 |---|---|---|---|---|
 | 1 | Send each node once, not once per incident edge | **~12.6x** | none | low — query/serialisation only |
 | 2 | Stop sending `raw_text` | **~2x** | none | trivial |
+
+> **FIXES 1 AND 2 ARE BUILT — 2026-10-08.** Measured on the corpus as it then
+> stood: 483 nodes, 2,725 edge rows, so node payloads crossed the wire **5,450
+> times for 483 nodes — 11.3x**, close to the 12.6x this table predicted for
+> TextNodes specifically. Both now: 483. `raw_text` removed from 198 nodes
+> (123,760 B against 128,044 B of `text` — a near-duplicate nothing read).
+>
+> **Fix 1 was NOT "query/serialisation only", and this table should say so.**
+> `buildEdgeData` denormalises each endpoint's `name` onto the edge, because a
+> cytoscape selector cannot reach into an endpoint's data; and `nodeId` falls
+> back to `getElementId` for the url-less orphan endpoints. So an endpoint needs
+> **three** fields, not an id. The fix returns those three and shims them
+> client-side, leaving both builders untouched. See `PLANNING_REGISTER.md`
+> 2026-10-08.
 | 3 | Send `text` only when a node is opened | ~2.6x | one small fetch on tap | moderate |
 
 Combined: **~50x**, turning 405 MB into ~7.7 MB at 100x corpus.

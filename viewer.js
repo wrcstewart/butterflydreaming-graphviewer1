@@ -10042,7 +10042,7 @@ async function init() {
   // Retry loop — keeps trying until both the WebSocket and the graph queries
   // succeed. Handles cold Docker / Memgraph / Cloudflare start-up gracefully
   // without blocking alerts or silent reloads.
-  let ws, records, cfRecords, sfRecords;
+  let ws, nodeRecords, records, cfRecords, sfRecords;
   for (let attempt = 1; ; attempt++) {
     // Connect (or reconnect) WebSocket
     while (true) {
@@ -10056,10 +10056,39 @@ async function init() {
     // Run queries with a 15-second timeout per attempt
     setMsg(attempt === 1 ? 'Loading graph…' : `Loading graph… (attempt ${attempt})`);
     try {
-      [records, cfRecords, sfRecords] = await Promise.race([
+      [nodeRecords, records, cfRecords, sfRecords] = await Promise.race([
         Promise.all([
-          queryWS(ws, 'graph',
-            'MATCH (n)-[r]->(m) RETURN n, r, m'),
+          // ── SEND EACH NODE ONCE (2026-10-08) ────────────────────────────
+          // This was ONE query, `MATCH (n)-[r]->(m) RETURN n, r, m`, which
+          // returns a row per EDGE carrying BOTH endpoints in full. Measured
+          // here: 483 nodes, 2,725 edge rows — so node payloads crossed the
+          // wire 5,450 times for 483 nodes, **11.3x**, and a TextNode is the
+          // heaviest thing in the graph. BD_Viewer_Scaling_Brief.md §CC.4 rates
+          // this the most valuable of the three scaling fixes and the easiest.
+          //
+          // `MATCH (n)` rather than a pattern predicate because every node in
+          // this graph has at least one edge — checked, not assumed: the
+          // proposed set is 483, the old set is 483, and the database holds
+          // 483. So this cannot introduce isolated nodes that were previously
+          // invisible, which is the one way it could have changed behaviour.
+          queryWS(ws, 'graphNodes', 'MATCH (n) RETURN n'),
+          // The edge query now carries only what buildEdgeData needs from its
+          // endpoints, which is THREE fields rather than a whole node:
+          //   url   — nodeId() prefers it
+          //   name  — denormalised onto the edge as source_name/target_name,
+          //           because a cytoscape selector cannot reach into an
+          //           endpoint's data
+          //   id    — nodeId()'s fallback for the 42 url-less orphan
+          //           endpoints, which stable_id_spec.md records as
+          //           load-bearing
+          // toString(id(n)) is exactly what the client receives as elementId —
+          // verified against a live row rather than assumed, because
+          // serializeEntity sends `elementId ?? identity.toString()` and the
+          // two would not have to agree.
+          queryWS(ws, 'graphEdges',
+            'MATCH (n)-[r]->(m) RETURN r, ' +
+            'n.url AS sUrl, n.name AS sName, toString(id(n)) AS sEid, ' +
+            'm.url AS tUrl, m.name AS tName, toString(id(m)) AS tEid'),
           queryWS(ws, 'clusterFamily',
             'MATCH (c:Cluster)-[r]-(f:Family) RETURN c, r, f'),
           queryWS(ws, 'subfamilyLinks',
@@ -10080,18 +10109,26 @@ async function init() {
   const nodesById = new Map();
   const edgesById = new Map();
 
-  for (const rec of records) {
+  // Nodes arrive once now, from their own query — see the note on it above.
+  for (const rec of nodeRecords) {
     const n = rec.n;
-    const r = rec.r;
-    const m = rec.m;
     const nId = nodeId(n);
-    const mId = nodeId(m);
+    if (!nodesById.has(nId)) nodesById.set(nId, buildNodeData(n));
+  }
+
+  for (const rec of records) {
+    const r = rec.r;
+    // Endpoint SHIMS. buildEdgeData() and nodeId() read exactly `elementId`
+    // and `properties.{url,name}` from an endpoint, so those three fields are
+    // rebuilt into the shape they expect and both functions stay untouched.
+    // Keeping the builders out of this is deliberate: they are shared with the
+    // clusterFamily and subfamily loops below, which still pass real nodes.
+    const n = { elementId: rec.sEid, properties: { url: rec.sUrl, name: rec.sName } };
+    const m = { elementId: rec.tEid, properties: { url: rec.tUrl, name: rec.tName } };
     // Prefix all relationship IDs with 'r_' to avoid Cytoscape silently dropping edges
     // whose integer ID happens to equal a node's integer ID (Memgraph shares the
     // integer namespace between nodes and relationships).
     const rId = 'r_' + getElementId(r);
-    if (!nodesById.has(nId)) nodesById.set(nId, buildNodeData(n));
-    if (!nodesById.has(mId)) nodesById.set(mId, buildNodeData(m));
     if (!edgesById.has(rId)) {
       const ed = buildEdgeData(r, n, m);
       ed.id = rId;
@@ -10158,6 +10195,17 @@ async function init() {
     edgesById.delete('r_' + rId);  // remove main-loop entry (r_-prefixed) if present
     edgesById.set(sfEdgeId, ed);
   }
+
+  // ── WHAT THE BOOT ACTUALLY COST (2026-10-08) ──────────────────────────
+  // One line, forwarded to the server log by the console bridge above, because
+  // BD_Viewer_Scaling_Brief.md's whole argument is that the WIRE cost is the
+  // number that binds and nothing was reporting it. `rows` against `nodes` is
+  // the duplication factor the scaling fixes exist to remove: it read 5,450
+  // node payloads for 483 nodes before the split, and should now read 483.
+  console.log('[boot] graph built:', nodesById.size, 'nodes,', edgesById.size,
+              'edges — from', nodeRecords.length, 'node rows and',
+              records.length, 'edge rows',
+              '(+' + cfRecords.length + ' cf, +' + sfRecords.length + ' sf)');
 
   // Post-process edges
   edgesById.forEach(ed => {
