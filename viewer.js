@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-09j' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-09k' };
 
 let bdViewTitleText = '';
 
@@ -13751,11 +13751,25 @@ async function init() {
           if (!t) return;
           const own = t.textContent === bdViewTitleText || t.textContent === 'preparing…';
           const working = speakQueue.length > 0 || speakBusy;
-          if (working && !speakBusy && own) {
-            // Queued, nothing audible yet — this is the wait worth naming.
+          // AUDIBLE IS NOT speakBusy, and that was the bug. speakBusy goes true
+          // the moment an utterance is TAKEN OFF THE QUEUE (viewer.js:1856) —
+          // before synthesis has even begun — so it means "the speech machine
+          // is working", not "sound is coming out". `working && !speakBusy`
+          // could therefore never be true, and the message never appeared.
+          // Reported twice as "no preparing message", and both times I had
+          // reasoned about the flag instead of reading where it is set.
+          //
+          // The audio element is the honest signal: it is paused until play()
+          // actually starts. Read directly rather than through speakElement(),
+          // which CREATES one if none exists — a probe must not have side
+          // effects.
+          const audible = !!(speakEls && speakEls[0] && !speakEls[0].paused);
+          if (working && !audible && own) {
+            // Queued or synthesising, nothing yet coming out — the wait worth
+            // naming, and on a first use it is nearly six seconds.
             t.textContent = 'preparing…';
-          } else if (speakBusy && t.textContent === 'preparing…') {
-            t.textContent = bdViewTitleText;        // audible now
+          } else if (audible && t.textContent === 'preparing…') {
+            t.textContent = bdViewTitleText;
           }
           if (!working) {
             bdViewSpeakBtn.classList.remove('speaking');

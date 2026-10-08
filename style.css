@@ -1,15 +1,23 @@
 :root {
-/* ── WHICH BUILD OF THIS FILE IS THE BROWSER ACTUALLY USING ──────────────
-   Read by viewer.js at boot and logged beside what that build expects. A
-   colour cannot answer this: the canary cycles red -> green -> blue, so red
-   has been current three separate times today and "stale" and "three
-   rotations stale" look identical. The author said as much — "perhaps the
-   Canary is one from three cycles back" — and was right to doubt it.
+  /* ── WHICH BUILD OF THIS FILE IS THE BROWSER ACTUALLY USING ────────────
+     Read by viewer.js at boot and logged beside what that build expects. A
+     colour cannot answer this: the canary cycles red -> green -> blue, so red
+     has been current three separate times in one day, and "stale" and "three
+     rotations stale" look identical. The author said as much — "perhaps the
+     Canary is one from three cycles back" — and was right to doubt it.
 
-   This is a date-and-letter, so a mismatch names BOTH versions and the gap
-   between them is readable. Bump it with every canary rotation; viewer.js
-   carries the expected value and says so loudly when the two differ.        */
-:root { --bd-css-build: "2026-10-09j"; }
+     A date-and-letter, so a mismatch names BOTH versions and the gap between
+     them is readable. Bump it with every canary rotation.
+
+     A DECLARATION inside this block, not a rule of its own. The first cut
+     wrote `:root { --bd-css-build: … }` immediately after the opening brace of
+     THIS block — a nested rule inside a declaration block, which is invalid,
+     and whose closing brace ended the block early. --bd-gold, declared below
+     it, was being dropped. It reported itself: the browser logged
+     "css build (none — pre-marker)" while painting the NEW canary colour,
+     which is a combination that cannot happen and so could only mean the
+     property was not being read. The check caught its own installation.  */
+  --bd-css-build: "2026-10-09k";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1176,6 +1184,10 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09k: RED (the build marker was a NESTED :root rule inside the
+   :root block — invalid, and it was dropping --bd-gold; and "preparing…"
+   tested speakBusy, which means "working" not "audible"). Next = green.
+
    2026-10-09j: BLUE ("preparing…" is poll-driven now — the one-shot version
    never appeared, because on a first use the download message claims the
    bar first and then leaves it empty through the synthesis). Next = red.
@@ -1265,7 +1277,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
