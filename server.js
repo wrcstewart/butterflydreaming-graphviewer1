@@ -1555,9 +1555,21 @@ io.on('connection', async (socket) => {
       if (bdRelay.handleMessage(relay, io, sessions, socket, msg, relayLog)) return;
 
       if (msg.type === 'client_log') {
+        // ── TIMESTAMPED (2026-10-08) ──────────────────────────────────────
+        // Added after a question that should have been answerable from this
+        // log and was not: "is speech slower since the voice changed?" The
+        // log held every timing and no way to date any of them, so two
+        // regimes 2.2x apart could not be attributed to the voice change, to
+        // the 10% speech slowdown of 2026-10-02, or to anything else. Several
+        // rounds of inference followed, all of it unnecessary.
+        //
+        // HH:MM:SS local, not an ISO stamp: this file is read by eye beside a
+        // session that just happened, and the date is already implied by the
+        // server's own start-up line. Short enough not to crowd the message.
         const uid = socket.data.userId || '???';
         const lvl = (msg.level || 'log').toUpperCase();
-        console.log(`[client:${uid}][${lvl}] ${msg.line}`);
+        const t   = new Date().toTimeString().slice(0, 8);
+        console.log(`[${t}][client:${uid}][${lvl}] ${msg.line}`);
         return;
       }
       if (msg.type === 'ready_to_pair') {

@@ -1584,8 +1584,23 @@ const SPEAK_VOICE = (() => {
 })();
 // length_scale > 1 is SLOWER, so a "rate of 0.8" is 1/0.8. This is the model's
 // own timing parameter, not a time-stretch: the delivery changes rather than the
-// audio being slowed after the fact. It also buys synthesis more time to stay
-// ahead of playback, which is a second reason to want it.
+// audio being slowed after the fact.
+//
+// A SECOND REASON USED TO BE CLAIMED HERE AND IT IS NOT TRUE (2026-10-08):
+// "it also buys synthesis more time to stay ahead of playback". It does not.
+// length_scale makes the model generate MORE AUDIO, so the synthesis work
+// scales with the time available and the ratio barely moves. Measured on the
+// shipped voice, same sentence:
+//
+//   length_scale   synth    audio    synth/audio
+//   1.4286         1.014 s  6.432 s  0.158
+//   1.5714         1.101 s  7.175 s  0.153
+//
+// Three per cent, which is not headroom. What it DOES do is raise the absolute
+// cost of every utterance by about 9%, so the slowdown is paid for in
+// synthesis time as well as in delivery. That is a fair price for sounding
+// better — which is the real and sufficient reason — but nobody should slow it
+// further expecting the prefetch to benefit.
 // 2026-10-02 — 10% slower again, by ear: "it sounds a little rushed".
 // 1/0.7 = 1.4286 became 1.5714, i.e. an effective rate of 0.636.
 // SPEAK_VERSE_SCALE is derived from this, so verse stays 8% slower than prose
@@ -1681,6 +1696,22 @@ let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
 let speakLoadVoice = null;      // piper_direct's loadVoice(), for the 60 MB model
 let speakAhead   = null;        // { text, promise } — one utterance in advance
+// ── THE PREFETCH LOG RECORDS ONLY MISSES, SO COUNT BOTH (2026-10-08) ─────
+// The line below fires on a miss, or on a hit that still waited >150 ms. A
+// clean hit logs NOTHING — which is right for a diagnostic aimed at a pause
+// someone noticed, and makes the hit RATE unknowable from the log.
+//
+// That gap is not theoretical: reading this log I counted 35 "NOT prefetched"
+// against 1 "prefetched" and reported a 97% miss rate. It was 35 misses across
+// weeks of sessions with every success invisible, and the author's "it's
+// reading perfectly" was the better evidence. Counting only failures and
+// quoting a ratio is the same error as a once-only log hiding a repeating bug,
+// turned inside out.
+//
+// So both are counted, and the tally rides along on the miss line. No new log
+// lines, no noise on the common path, and any single miss now says what the
+// rate is.
+let speakHits = 0, speakMisses = 0;
 
 // VITS synthesises an utterance in ONE pass, so a whole passage means one
 // enormous tensor and a frozen tab. Split on sentences, and break anything
@@ -1820,9 +1851,14 @@ function playNextSpeech() {
 
   p.then(({ blob }) => {
     const waited = Math.round(performance.now() - waitT0);
+    if (prefetched) speakHits++; else speakMisses++;
     if (!prefetched || waited > 150) {
+      const total = speakHits + speakMisses;
       console.log('[BD] speak: ' + (prefetched ? 'prefetched' : 'NOT prefetched') +
-                  ', waited ' + waited + 'ms — ' + JSON.stringify(next.text.slice(0, 46)));
+                  ', waited ' + waited + 'ms' +
+                  ' [hit ' + speakHits + '/' + total +
+                  ' = ' + Math.round(100 * speakHits / total) + '%]' +
+                  ' — ' + JSON.stringify(next.text.slice(0, 46)));
     }
     const el = speakElement();
     const url = URL.createObjectURL(blob);
