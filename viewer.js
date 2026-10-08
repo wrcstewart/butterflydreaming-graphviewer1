@@ -2103,6 +2103,10 @@ function showSpeechIntro() {
 // panel, which the user is still reading when the download starts.
 // What View's bar is naming, so progress messages can borrow it and give it
 // back. Top-level because speechProgress is, and View's own code is in init().
+// Updated in the SAME COMMIT as the border in style.css — see the self-check
+// in init(). Green, 2026-10-09i.
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)' };
+
 let bdViewTitleText = '';
 
 function speechProgress(msg) {
@@ -10325,6 +10329,39 @@ async function init() {
               'edges — from', nodeRecords.length, 'node rows and',
               records.length, 'edge rows',
               '(+' + cfRecords.length + ' cf, +' + sfRecords.length + ' sf)');
+
+  // ── A SELF-CHECKING CANARY (2026-10-09) ───────────────────────────────
+  // The canary is a border colour in style.css, and the whole point of it is to
+  // answer "am I seeing my edit or a cached copy". But style.css is the MORE
+  // cacheable of the two files: at the origin it is max-age=0, and CLOUDFLARE
+  // rewrites it to max-age=14400 — four hours — while viewer.js is no-store and
+  // therefore always current. So the canary can be four hours stale while the
+  // code is fresh, and it fails in the worst direction: a stale colour reads as
+  // "old code" when the code is new. That is exactly the doubt this was written
+  // to remove, and the comment in style.css still says "do not argue from
+  // Cache-Control", which was true of the origin and not of the CDN.
+  //
+  // So viewer.js — which cannot be stale — reports what colour the CSS the
+  // browser ACTUALLY HAS is painting, beside the colour this build expects.
+  // Agreement means both files are current. Disagreement names the stale one.
+  // The question stops being a judgement about a shade and becomes a line in
+  // the log, which can be read from here.
+  //
+  // BD_CANARY_EXPECTED is updated in the same commit as the border, so the two
+  // cannot drift without carelessness — and if they do, this says so loudly,
+  // which beats the silence that let SPEAK_MODEL_MB sit wrong for a month.
+  try {
+    const cl = document.getElementById('copy-link-btn');
+    if (cl) {
+      const got = getComputedStyle(cl).borderTopColor;
+      const want = BD_CANARY_EXPECTED;
+      console.log('[boot] canary: css paints ' + got + ', this build expects ' + want.rgb +
+                  ' (' + want.hex + ') — ' +
+                  (got.replace(/\s/g, '') === want.rgb.replace(/\s/g, '')
+                    ? 'MATCH, both files current'
+                    : 'MISMATCH — style.css is stale, hard-reload'));
+    }
+  } catch (_) {}
 
   // Post-process edges
   edgesById.forEach(ed => {

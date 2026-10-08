@@ -1165,6 +1165,11 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09i: GREEN (rotated on request, to settle whether an iOS device is
+   seeing current CSS at all — and viewer.js now LOGS the computed border
+   against what it expects, so the question is answerable from the server
+   log instead of from memory of a colour). Next = blue.
+
    2026-10-09h: RED (View's Speak says "preparing…" in the bar before the
    first words — synthesis costs about a second even with the voice cached,
    and speechProgress only speaks up during a download). Next = green.
@@ -1245,7 +1250,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
