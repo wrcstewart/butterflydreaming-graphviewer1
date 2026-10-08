@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-09k' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09l' };
 
 let bdViewTitleText = '';
 
@@ -2979,6 +2979,90 @@ function parseModuleId(text) {
   if (typeof text !== 'string') return null;
   const match = text.match(/^%%bd_module\s+(\S+)/m);
   return match ? match[1] : null;
+}
+
+// ══ COLLAGE v1 (2026-10-08) ══════════════════════════════════════════════
+// A collage is a NODE whose script opens `%%bd_collage 1`, followed by one
+// `%%bd_module <id>` block per slot. Blocks are IMPLICITLY delimited — the next
+// `%%bd_module` or the end of the text — and `%%bd_]` closes a CONTENT block
+// only. One bracket level, never two.
+//
+// Placement is NOT a directive in v1, and that is deliberate. It is derived
+// from the module's declared `kind`: a visual block is the picture, a `text`
+// block is the overlay, a music block is the strip at the foot. A `%%bd_slot`
+// directive would be a control that decides nothing while there is exactly one
+// slot per kind — and the rule this plan runs on is that a control earns its
+// place only when the value cannot be chosen without perceiving the outcome.
+// When two visual blocks become possible, that is when placement needs saying.
+//
+// `text` is a PSEUDO-MODULE: there is no iframe, no registry entry and no URL.
+// It is spelled as a module header because that is what makes Merge uniform —
+// every slot arrives the same way, and a text node needs no special case on the
+// way in.
+const BD_COLLAGE_RE = /^%%bd_collage[ \t]+(\d+)/m;
+
+// The body of the one `%%bd_text [ … %%bd_]` block in a slot script. Only
+// `%%bd_text` is harvested: `%%bd_score` and its relatives belong to the module
+// and must travel through `script` untouched, which is why this does not simply
+// take the first bracket block it meets.
+function collageTextBody(script) {
+  const out = [];
+  let inside = false;
+  for (const line of String(script).split('\n')) {
+    if (inside) {
+      if (BD_BLOCK_CLOSE_RE.test(line)) break;
+      out.push(line);
+      continue;
+    }
+    if (/^%%bd_text[ \t]+\[[ \t]*$/.test(line)) inside = true;
+  }
+  return out.join('\n').trim();
+}
+
+// Returns null for any node that is not a collage, so every caller can use it
+// as the discriminator and no second idea of "is this a collage" can appear.
+function parseCollage(text) {
+  if (typeof text !== 'string') return null;
+  const vm = text.match(BD_COLLAGE_RE);
+  if (!vm) return null;
+
+  const blocks = [];
+  let cur = null;
+  for (const line of text.split('\n')) {
+    // THE HEADER IS TESTED FIRST, ON EVERY LINE. That is not an ordering
+    // detail — it IS the "a module header implicitly closes an open content
+    // block" rule, enforced by construction rather than by a flag that could
+    // be left set. Without it an unterminated `%%bd_text [` swallows every
+    // later slot, which is the one failure this format can suffer silently.
+    const mh = line.match(/^%%bd_module[ \t]+(\S+)/);
+    if (mh) {
+      // The header travels WITH the block, so a slot script is a valid module
+      // script on its own. That is what lets it be posted to the module
+      // unchanged, and what lets Merge be its own inverse.
+      cur = { moduleId: mh[1], lines: [line] };
+      blocks.push(cur);
+      continue;
+    }
+    if (cur) cur.lines.push(line);
+    // Lines before the first header are the collage's own preamble
+    // (`%%bd_collage`, and whatever arrangement directives come later).
+  }
+
+  for (const b of blocks) {
+    b.script = b.lines.join('\n').trim();
+    delete b.lines;
+    b.kind = (b.moduleId === 'text') ? 'text' : (getModuleKind(b.moduleId) || 'visual');
+    b.body = (b.kind === 'text') ? collageTextBody(b.script) : '';
+  }
+  return { version: Number(vm[1]), blocks };
+}
+
+// The first block of a kind, or null. Named rather than inlined because three
+// call sites ask the same question and a collage with two visual blocks must
+// fail the same way in all three until placement exists.
+function collageSlot(collage, kind) {
+  if (!collage) return null;
+  return collage.blocks.find((b) => b.kind === kind) || null;
 }
 
 // 2026-07-17 — extract the MOST RECENT module-script from a card's
@@ -10691,6 +10775,20 @@ async function init() {
     const node = cy.getElementById(nodeId);
     if (!node || node.length === 0) return;
     const savedText = node.data('text');
+
+    // A COLLAGE NODE IS NOT A MODULE NODE, though parseModuleId cannot tell:
+    // it would return the first block's id and then the WHOLE collage script —
+    // text block and all — would be posted to that module. It would mostly
+    // work, which is the dangerous kind of wrong. Player mode gets the picture
+    // slot and nothing else; View is where a collage is actually assembled.
+    const collageHere = parseCollage(savedText);
+    if (collageHere) {
+      const vis = collageSlot(collageHere, 'visual');
+      if (!vis) return;
+      loadCollageVisual(vis.moduleId, vis.script);
+      return;
+    }
+
     const moduleId = parseModuleId(savedText);
     if (!moduleId) return;                                // not a media node
 
@@ -10759,6 +10857,75 @@ async function init() {
       } catch (err) {
         console.warn('[MM1.6] onReady: postMessage failed', err);
       }
+    };
+    window.addEventListener('message', onReady);
+    visualIframe.src = url;
+  }
+
+  // ── COLLAGE: load a SCRIPT, not a node (2026-10-08) ────────────────────
+  // loadModuleForNode works from a node because an ordinary media node holds
+  // exactly one script. A collage holds several, so the picture slot needs the
+  // same swap/fast-path logic driven by (moduleId, script) instead.
+  //
+  // It lives HERE, beside loadModuleForNode, for one reason: `currentModuleId`
+  // does. Keeping that variable in step is the whole point — BD believing
+  // module X is loaded while the iframe holds Y is silent and nasty, because
+  // the next ordinary navigation then takes the fast path and posts a Kolam
+  // script into a Kolam3D.
+  //
+  // NO export is needed, and the first cut wrongly added one. Both this and
+  // loadModuleForNode sit at init()'s own block level; bdViewEnter is nested
+  // DEEPER inside init(), and deeper can see shallower. The trap recorded in
+  // "block scope is not function scope" is the other direction — a function
+  // declared in a nested block is invisible outside it — and the accessors
+  // bdViewNode reaches for (getActiveNodeId) cross a genuinely different
+  // boundary, setupInteractions', which this does not.
+  //
+  // `pushToAV` is deliberately NOT called. The Ancillary Viewer would then show
+  // the picture slot alone and call it the collage, which is a claim this has
+  // not earned yet — the AV is a send-to-another-screen action and what a
+  // collage means there is undecided.
+  function loadCollageVisual(moduleId, script) {
+    if (!visualIframe || !moduleId || !script) return;
+    const url = getModuleUrl(moduleId);
+    if (!url) {
+      console.warn(`[collage] unknown module id '${moduleId}' — slot skipped`);
+      return;
+    }
+    if (moduleId === currentModuleId) {
+      console.log('[collage] fast path, posting slot script to ' + moduleId +
+                  ', length=' + script.length);
+      try {
+        visualIframe.contentWindow.postMessage(
+          { type: 'bd_script_update', script }, '*');
+      } catch (_) {}
+      return;
+    }
+    console.log('[collage] swap path, src=' + url + ', script length=' + script.length);
+    currentModuleId = moduleId;
+    const onReady = (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_READY') return;
+      window.removeEventListener('message', onReady);
+      try {
+        visualIframe.contentWindow.postMessage(
+          { type: 'bd_script_update', script }, '*');
+        console.log('[collage] BD_READY — slot script posted to ' + moduleId);
+      } catch (err) {
+        console.warn('[collage] postMessage failed', err);
+      }
+      // The flags have to be re-sent AFTER the module is up, because a module
+      // that has only just loaded has not seen View's bd_ui_config. Same
+      // receivers-first reasoning as bdViewEnter: all three, not just
+      // outputOnly, so a module that does not know the flag still degrades to
+      // "controls hidden, no chrome" rather than showing its whole interface
+      // behind the text.
+      try {
+        if (document.body.classList.contains('view-active')) {
+          visualIframe.contentWindow.postMessage({ type: 'bd_ui_config',
+            outputOnly: true, hideControls: true, hostChrome: false }, '*');
+        }
+      } catch (_) {}
     };
     window.addEventListener('message', onReady);
     visualIframe.src = url;
@@ -13607,7 +13774,8 @@ async function init() {
         const sb = document.getElementById('bd-view-speak');
         if (sb) { sb.hidden = true; sb.classList.remove('speaking'); }
         bdViewProse = '';
-        body.classList.remove('view-active', 'view-music');
+        body.classList.remove('view-active', 'view-music',
+                              'collage-active', 'collage-music');
         const bar = document.getElementById('bd-view-bar');
         const tp  = document.getElementById('bd-view-text');
         if (bar) bar.hidden = true;
@@ -13634,12 +13802,74 @@ async function init() {
         const text     = node ? (node.data('text') || '') : '';
         const name     = (node && node.data('name')) || '';
         const moduleId = parseModuleId(text);
+        const collage  = parseCollage(text);
         const bar      = document.getElementById('bd-view-bar');
         const title    = document.getElementById('bd-view-title');
         const tp       = document.getElementById('bd-view-text');
         const f        = document.getElementById('visual-iframe');
 
-        if (moduleId && f && f.src) {
+        if (collage) {
+          // ══ COLLAGE v1 — the picture behind, the words over it ═════════
+          // This is the whole of the first experiment: a visual module at low
+          // opacity filling the screen, bright text above it. It needs almost
+          // no new layout, because View already stacks #bd-view-text (z-index
+          // 2) over #visual-iframe (z-index 1) with a transparent panel — the
+          // two were simply never shown at the same time.
+          //
+          // The figure is dimmed by the MODULE's own `%%bd_opacity`, in its own
+          // slot script, NOT by CSS on the iframe. That is the right lever and
+          // not merely the convenient one: a module's opacity fades its ink
+          // toward its own background, so on BD's near-black ground it recedes;
+          // CSS opacity on the iframe would also fade the slot's own black
+          // toward the page and buy nothing. See PLANNING_REGISTER.md,
+          // "Added 2026-10-08 — text over a 3D graphic".
+          body.classList.add('collage-active');
+          if (collage.version !== 1) {
+            console.warn('[collage] script declares version ' + collage.version +
+                         ' and this build renders v1 — rendering anyway');
+          }
+
+          const vis = collageSlot(collage, 'visual');
+          if (vis && f) {
+            // Clear the inline rect positionCyEl stamped, so the stylesheet
+            // can own it — the same reason the single-module branch does.
+            f.style.top = f.style.left = f.style.width = f.style.height = '';
+            if (typeof loadCollageVisual === 'function') {
+              loadCollageVisual(vis.moduleId, vis.script);
+            }
+          } else {
+            console.warn('[collage] no visual slot — text will sit on the ground colour');
+          }
+
+          const txt    = collageSlot(collage, 'text');
+          const bodyEl = document.getElementById('bd-view-text-body');
+          const refEl  = document.getElementById('bd-view-text-ref');
+          if (bodyEl) bodyEl.textContent = (txt && txt.body) || '';
+          // NO reference line over a picture. It exists so a reader can tell
+          // which node they are looking at while browsing; in a collage it is
+          // a monospace address sitting on the artwork.
+          if (refEl) refEl.textContent = '';
+          if (tp) tp.hidden = !(txt && txt.body);
+          bdViewProse = (txt && txt.body) || '';
+
+          // THE MUSIC SLOT IS RESERVED, NOT RENDERED. Reserving it now is what
+          // keeps the picture's proportions honest while the player is built:
+          // the text column already sits clear of the strip, so adding the
+          // player later changes no layout that has been looked at and
+          // approved. There is only ONE #visual-iframe, so a second module
+          // needs a second frame — that is the next step, not a missing line.
+          const mus = collageSlot(collage, 'music');
+          if (mus) {
+            body.classList.add('collage-music');
+            console.log('[collage] music slot RESERVED for ' + mus.moduleId +
+                        ' — player not built yet (needs a second iframe)');
+          }
+
+          const sb = document.getElementById('bd-view-speak');
+          if (sb) sb.hidden = !bdViewProse;
+          console.log('[collage] v' + collage.version + ' — ' +
+            collage.blocks.map((bl) => bl.kind + ':' + bl.moduleId).join(', '));
+        } else if (moduleId && f && f.src) {
           // Clear the inline rect positionCyEl stamped, so the stylesheet can
           // own it. See the note at the top of positionCyEl.
           f.style.top = f.style.left = f.style.width = f.style.height = '';

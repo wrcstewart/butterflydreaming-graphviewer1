@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-09k";
+  --bd-css-build: "2026-10-09l";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,12 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-09l: GREEN (COLLAGE v1 — a node whose script opens `%%bd_collage 1`
+   renders in View as a picture with the words over it: one visual slot at the
+   module's own low opacity, one text slot above it, and the music slot
+   RESERVED at 110px but not yet rendered. Placement comes from the module's
+   declared `kind`, not from a directive). Next = blue.
+
    2026-10-09d: BLUE (View reaches TEXT nodes — the node's prose, centred and
    larger, with its reference in dim grey; Device is hidden there because
    there is nothing for another screen to watch). Next = red.
@@ -1277,7 +1283,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2492,4 +2498,56 @@ body.view-active #bd-view-text:not([hidden]) {
      it is the thing that can be calculated instead of guessed. */
   color: #9e9e90;
   word-break: break-all;
+}
+
+/* ══ COLLAGE v1 — the picture behind, the words over it (2026-10-08) ═══════
+   Almost no new layout, and that is the point: View already stacks
+   #bd-view-text (z-index 2) over #visual-iframe (z-index 1) with a panel that
+   declares no background of its own. The two were simply never shown at the
+   same time. So this file adds a reserve for the music strip, a luminance
+   safety margin under the glyphs, and nothing else.
+
+   THE FIGURE IS DIMMED BY THE MODULE, NOT HERE. There is deliberately no
+   `opacity` on #visual-iframe: a module's own `%%bd_opacity` fades its ink
+   toward its own background, so on this near-black ground the figure recedes,
+   whereas CSS opacity here would also fade the slot's own black toward the page
+   and buy nothing. The two controls share a name and are not the same lever —
+   PLANNING_REGISTER.md, "Added 2026-10-08 — text over a 3D graphic".          */
+body.view-active.collage-active            { --bd-collage-music: 0px; }
+/* 110px — the same figure the single-module music band uses, so a collage and
+   View agree about how deep a player is. ONE value, two users: the picture's
+   height and the text column's bottom inset both read it, which is what makes
+   building the player next a change to this line rather than to the layout. */
+body.view-active.collage-active.collage-music { --bd-collage-music: 110px; }
+
+body.view-active.collage-active #visual-iframe {
+  /* Stops ABOVE the reserved strip rather than running behind it, so nothing
+     of the figure is ever hidden by a panel that will be opaque. */
+  height: calc(100dvh - 44px - var(--bd-collage-music));
+}
+body.view-active.collage-active #bd-view-text:not([hidden]) {
+  bottom: var(--bd-collage-music);
+  /* Stays interactive on purpose. The obvious move is pointer-events:none so
+     taps reach the picture — but this panel IS the scroll container, and the
+     Kolam canvas takes no pointer input in outputOnly (its only handlers are on
+     the stepper buttons, which are hidden). So there is nothing beneath to
+     reach and everything to lose. */
+  pointer-events: auto;
+}
+body.view-active.collage-active #bd-view-text-body {
+  /* LUMINANCE, NOT COLOUR. A dark halo under bright glyphs holds whatever hue
+     the figure takes, which matters because the ink's luminance spans 6.6x
+     across hue at one `lightness` setting and `colour_speed` cycles hue along
+     the curve — so both extremes are present in a single frame and no single
+     text colour is safe against all of it. Two shadows: a tight one for the
+     stroke edge, a wide soft one to lift the glyph off a busy lattice.
+     This is the cheap half of the guarantee; a scrim is the expensive half and
+     is deliberately NOT here until a passage proves it needs one. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.75);
+}
+/* No reference line over a picture — JS empties it, and this makes sure an
+   empty one takes no space (its border-top would otherwise draw a bare rule
+   across the artwork). */
+body.view-active.collage-active #bd-view-text-ref:empty {
+  display: none;
 }
