@@ -1165,6 +1165,11 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09g: BLUE (View's Speak now puts the CONSENT question where the
+   user is rather than sending them out to find a checkbox, and shows the
+   download progress in its own bar. The first-use figure was 60 MB and is
+   measured at 31). Next = red.
+
    2026-10-09f: GREEN (View's text panel gains SPEAK — stops and restarts on
    press, stops on Back; the Speak toggle is not bypassed because that is
    where the voice-model download is consented to). Next = blue.
@@ -1236,7 +1241,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

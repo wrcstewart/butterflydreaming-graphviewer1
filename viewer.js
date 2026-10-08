@@ -1691,10 +1691,28 @@ function looksLikeVerse(text) {
   }).length;
   return after.length > 0 && caps / after.length >= 0.7;
 }
-const SPEAK_MODEL_MB = 60;
+// ── WHAT A FIRST USE ACTUALLY DOWNLOADS (corrected 2026-10-09) ──────────
+// This was SPEAK_MODEL_MB = 60 and was wrong in both directions. It named the
+// MODEL, so nobody updated it when the voice became a 19.4 MB quantised build
+// this morning — and it never counted the RUNTIME at all, which is the larger
+// surprise on a metered connection. Measured:
+//
+//   voices/alba_int8dp.onnx     19.4 MB   the voice
+//   ort-wasm-simd.wasm          10.1 MB   onnxruntime-web
+//   ort.min.js                   0.5 MB
+//   piper_phonemize.wasm         0.6 MB   espeak-ng, for the phonemes
+//   piper_phonemize.js           0.1 MB
+//                               ───────
+//                               30.7 MB
+//
+// So the old figure understated the true cost before today and overstates it
+// now. RENAMED because the name is what let it drift: a constant called
+// _MODEL_ was never going to be checked when the runtime changed, and the
+// number a person needs is the one their connection will actually pay.
+const SPEAK_DOWNLOAD_MB = 31;
 let speakLexicon = null;        // word -> IPA, fetched once
 let speakSynth   = null;        // piper_direct's synthesise(), imported once
-let speakLoadVoice = null;      // piper_direct's loadVoice(), for the 60 MB model
+let speakLoadVoice = null;      // piper_direct's loadVoice()
 let speakAhead   = null;        // { text, promise } — one utterance in advance
 // ── THE PREFETCH LOG RECORDS ONLY MISSES, SO COUNT BOTH (2026-10-08) ─────
 // The line below fires on a miss, or on a hit that still waited >150 ms. A
@@ -2056,7 +2074,7 @@ function showSpeechIntro() {
                    + 'background while text is being read.';
     const p3 = document.createElement('p');
     p3.className = 'si-fine';
-    p3.textContent = 'A ' + SPEAK_MODEL_MB + ' MB voice downloads once, then works offline. Best on wi-fi.';
+    p3.textContent = 'About ' + SPEAK_DOWNLOAD_MB + ' MB downloads once, then works offline. Best on wi-fi.';
 
     const row = document.createElement('div');
     row.className = 'si-row';
@@ -2083,9 +2101,23 @@ function showSpeechIntro() {
 
 // Progress goes where the Pair button will later sit — NOT in the reading
 // panel, which the user is still reading when the download starts.
+// What View's bar is naming, so progress messages can borrow it and give it
+// back. Top-level because speechProgress is, and View's own code is in init().
+let bdViewTitleText = '';
+
 function speechProgress(msg) {
   const el = document.getElementById('pair-status');
   if (el) el.textContent = msg || '';
+  // ── AND IN VIEW (2026-10-09) ──────────────────────────────────────────
+  // #pair-status is one of the things View's blanket hide conceals, so a
+  // first-use download — about 31 MB — would otherwise run with NO feedback:
+  // press Speak, and nothing happens for several seconds with nothing saying
+  // why. The view bar is the only thing on screen, so it says it there too,
+  // and hands the title back when the message clears.
+  if (document.body.classList.contains('view-active')) {
+    const vt = document.getElementById('bd-view-title');
+    if (vt) vt.textContent = msg || bdViewTitleText;
+  }
 }
 
 async function enableSpeechFromIntro() {
@@ -2096,7 +2128,7 @@ async function enableSpeechFromIntro() {
   // bd_speak is NOT written: this visit's answer lives in speakEnabled and the
   // checkbox, and dies with the page. Only the download consent persists.
   try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
-  speechProgress('Downloading voice (' + SPEAK_MODEL_MB + ' MB)…');
+  speechProgress('Downloading voice (about ' + SPEAK_DOWNLOAD_MB + ' MB)…');
   try {
     await speakReady();
     speechProgress('');
@@ -12082,7 +12114,7 @@ async function init() {
         if (!agreed) {
           const ok = window.confirm(
             'Read node text aloud?\n\n' +
-            'This downloads a ' + SPEAK_MODEL_MB + ' MB voice to your device the first ' +
+            'This downloads about ' + SPEAK_DOWNLOAD_MB + ' MB to your device the first ' +
             'time, then works offline. Best on wi-fi.');
           if (!ok) { box.checked = false; return; }
           try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
@@ -13526,6 +13558,7 @@ async function init() {
         // stop for exactly this reason (viewer.js:8880).
         try { stopSpeech(); } catch (_) {}
         if (bdViewSpeakPoll) { clearInterval(bdViewSpeakPoll); bdViewSpeakPoll = null; }
+        bdViewTitleText = '';
         const sb = document.getElementById('bd-view-speak');
         if (sb) { sb.hidden = true; sb.classList.remove('speaking'); }
         bdViewProse = '';
@@ -13602,7 +13635,8 @@ async function init() {
           const sb = document.getElementById('bd-view-speak');
           if (sb) sb.hidden = !bdViewProse;
         }
-        if (title) title.textContent = name || moduleId || '';
+        bdViewTitleText = name || moduleId || '';
+        if (title) title.textContent = bdViewTitleText;
         if (bar) bar.hidden = false;
         body.classList.add('view-active');
         console.log('[view] entered — ' +
@@ -13616,19 +13650,31 @@ async function init() {
       const bdViewSpeakBtn = document.getElementById('bd-view-speak');
       if (bdViewSpeakBtn) bdViewSpeakBtn.addEventListener('click', () => {
         if (!bdViewProse) return;
-        // THE SPEAK TOGGLE IS NOT BYPASSED, and the reason is not tidiness:
-        // ticking it is where the 19 MB voice-model download is consented to.
-        // Forcing speech from here would start that download without the
-        // question that exists to ask it. So this says so rather than doing
-        // nothing, which is the failure mode this project keeps meeting.
+        // ── CONSENT, ASKED HERE (2026-10-09) ──────────────────────────
+        // Speech is gated on the Speak toggle, and ticking that toggle is where
+        // the ~31 MB first-use download is consented to. An earlier cut said
+        // "tick Speak in BD first" and sent the user back out of View to find
+        // a checkbox — which is a worse answer than asking the question where
+        // the user is.
+        //
+        // So it TRIGGERS the real control rather than reimplementing it: tick
+        // the box and dispatch its change event, and the existing handler puts
+        // the confirm, records the answer in bd_speak_dl, unlocks audio and
+        // loads the voice. Copying that flow would have put the download
+        // figure and the consent key in a second place to keep in step, and
+        // this file has a note about exactly that: a renderer needs its
+        // inverse BESIDE it, not somewhere else.
+        //
+        // The handler is async but everything that matters here — the confirm
+        // and `speakEnabled = box.checked` — runs before its first await, so
+        // speakEnabled is already settled when dispatchEvent returns. A
+        // decline leaves it false and this stops.
         if (!speakEnabled) {
-          const t = document.getElementById('bd-view-title');
-          if (t) {
-            const was = t.textContent;
-            t.textContent = 'tick Speak in BD first — then press this again';
-            setTimeout(() => { if (t.textContent !== was) t.textContent = was; }, 4000);
-          }
-          return;
+          const box = document.getElementById('speak-toggle');
+          if (!box) return;
+          box.checked = true;
+          box.dispatchEvent(new Event('change', { bubbles: true }));
+          if (!speakEnabled) return;      // declined at the dialog
         }
         // A click IS a gesture, which is what audio unlocking needs — the same
         // reasoning as "ticking is itself a gesture" beside the Speak box.
