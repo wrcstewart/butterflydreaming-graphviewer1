@@ -6,6 +6,94 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-08 — a collage: the words over the figure, or under it
+
+Built, and working on desktop and iOS. A node whose script opens
+`%%bd_collage 1` now renders in View as a visual module filling a square with
+the text laid over it — the first thing in BD that composes two media rather
+than switching between them.
+
+### The format, as small as it would go
+
+One `%%bd_module <id>` block per slot, implicitly delimited by the next header
+or the end of the text. **Placement is not a directive**: it comes from the
+module's declared `kind`, because a `%%bd_slot` would decide nothing while
+there is one slot per kind. **The order of the blocks is the stacking order** —
+a later block sits on top, which needs no syntax and reads the way a document
+reads. Reverse the two and the kolam draws over the words, which is what
+`%%bd_background transparent` was added for: a see-through canvas so the host
+can put something behind the figure. Both Kolam modules honour it.
+
+Making that canvas transparent meant **four** stacked backgrounds had to yield
+— three.js's clear alpha, the module body, the wrapper's html+body, and BD's
+own `#visual-iframe`. One opaque layer anywhere in the stack hides what is
+behind it and nothing reports why: the same shape as the three-site relay trap,
+with a fourth site.
+
+### One box, named once
+
+The module's canvas is **square**, so a full-screen iframe on a phone draws a
+centred 390x390 square inside a 390x756 frame. The first cut centred the
+picture as a square and the words on the viewport — two boxes, and nothing
+could align. The square is now named once as `--bd-collage-side` and read by
+both, each centred by `margin: auto` against four insets.
+
+That is the answer to the author's question of whether the graphic and the text
+can scale together: **yes, so long as there is a single number. Two expressions
+that happen to agree today are the problem.** The font scales with that square
+too — `2.2vw` had been pinned at its 20px clamp FLOOR on any narrow window,
+which is why shrinking the desktop window made the text overlap the frame.
+Lines-per-box is now invariant: 43-64 characters across four viewports.
+
+### Seven bugs, five of them found in the log
+
+Worth recording as a set, because the pattern is consistent — the ones that
+cost time were all **silent**, and the ones that were quick were all read off a
+log line or a query result.
+
+- **A CHILD edge is not enough to be SEEN.** The cluster view runs its own
+  query keyed on the gateway's `source_text` plus a `CLUSTER_REL` edge. The
+  test node had neither, so it loaded into the graph correctly and was simply
+  never asked for. The test that would have caught it is the view's own query,
+  not "does the node exist".
+- **All five module gateways show no children** from the Gateways route, and
+  always have: that branch lists `CONTAINS_SECTION` sections and every `bd_*`
+  gateway has zero. It never bit because modules are reached by the Cluster
+  route.
+- **The text was at the foot, not centred.** The single-node rules centre with a
+  PAIR of auto margins; a collage empties the reference line, so the top margin
+  was left unopposed. One of a pair of balanced margins is not half a centring.
+- **A dropped CSS declaration leaves nothing behind** — twice. A `calc()`
+  carrying a custom property failed whole on iOS and no earlier rule supplied a
+  height, so the iframe fell back to its intrinsic 150px; my fix then used
+  `width: auto; height: auto` with insets, and **an iframe is a REPLACED
+  element** whose `auto` is 300x150, not the insets. Same small box, two routes,
+  and the second broke desktop as well.
+- **A flag sent once is not a flag that holds.** `bd_ui_config` went out only
+  from the BD_READY handler, which fires on the module-swap path; the log showed
+  every entry after the first taking the fast path, so the steppers stayed.
+- **A renderer needs its INVERSE beside it**, for the third time. The card
+  writer put the module's announcement straight into the card, and for a collage
+  the module announces only its own slot — so the header and the whole text
+  block vanished. The card is what Sv saves, so it was one keystroke from
+  writing the slot over the collage in the database.
+- **Block order must not double as an identity.** `bdModuleOf` read the first
+  `%%bd_module` line, so putting the picture on top made it `text` and the
+  exploration recorder refused the module's own announcement — with no log. The
+  identical collage in the other order worked perfectly. It now reports the
+  visual slot, and the guard says when it refuses.
+
+### Where it stands
+
+The music player's space is **reserved and not filled**: `collage-music`
+already shrinks the square and the text column, but there is only one
+`#visual-iframe`, so a second frame is the next piece of work. Merge is agreed
+in shape — "append this node, adding whatever header it lacks" — and unbuilt.
+Full detail, including every open item, in `PLANNING_REGISTER.md` under
+**BUILT 2026-10-08**.
+
+---
+
 ## 2026-10-06 — the L-system was one endless string all along
 
 A morning that began as two measurement questions and ended by rewriting how

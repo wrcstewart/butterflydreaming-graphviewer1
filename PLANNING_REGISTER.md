@@ -922,3 +922,107 @@ to DroneFrac than to Kolam3D. That breaks **`MODULES.kind`**, currently a binary
 - The in-page presentation decision already protects a line timer from iOS
   throttling of background tabs — but **only** because of that decision, so the
   dependency now runs both ways.
+
+
+## BUILT 2026-10-08 — COLLAGE v1, text over (or under) a 3D graphic
+
+Working on desktop and iOS, author-confirmed. Two test nodes under the
+`bd_V_Kolam3D` gateway, Cluster Kolam3D: **`bd_Collage_001`** (picture behind
+the words) and **`bd_Collage_002`** (picture over them, transparent canvas).
+
+### The format, as small as it would go
+
+```
+%%bd_collage 1
+
+%%bd_module text
+%%bd_text [
+…the prose…
+%%bd_]
+
+%%bd_module bd_V_Kolam3D
+…the module's own directives, including %%bd_p_opacity and %%bd_background…
+%%bd_score [ … %%bd_]
+```
+
+- **Blocks are implicitly delimited** by the next `%%bd_module` or EOF, and the
+  header is tested FIRST on every line — which is not an ordering detail but
+  the "a module header implicitly closes an open content block" rule enforced
+  **by construction**. Verified: an unterminated `%%bd_text [` yields two
+  blocks, not one that swallowed the rest.
+- **Placement is NOT a directive.** It comes from the module's declared `kind`:
+  visual is the picture, `text` is the overlay, music is the foot strip. A
+  `%%bd_slot` directive would decide nothing while there is one slot per kind.
+- **THE ORDER OF THE BLOCKS IS THE STACKING ORDER** — a later block sits on
+  top. No directive, it reads the way a document reads, and it was already true
+  of the first cut. Reverse the two blocks and the kolam draws over the text.
+- **`%%bd_background transparent`** (also `none`) makes a kolam canvas
+  see-through, which is what the picture-on-top order needs. Both Kolam modules
+  honour it.
+- **`text` is a PSEUDO-MODULE** — no iframe, no registry entry, no URL. Spelled
+  as a module header so that Merge can be uniform: every slot arrives the same
+  way and a text node needs no special case.
+
+### Geometry — ONE box, named once
+
+The module's canvas is **square** (`min(wrapper width, height)`), so a
+full-screen iframe on a phone draws a centred 390x390 square inside a 390x756
+frame. The first cut centred the picture as a square and the words on the
+viewport: two boxes, nothing aligned. Now:
+
+```css
+--bd-collage-side: min(100vw, calc(100dvh - 44px - var(--bd-collage-music)));
+```
+
+read by both the iframe and the text panel, each centred by `margin: auto`
+against all four insets with a definite width and height. **That is the answer
+to "can the graphic and the text scale together": yes, so long as there is a
+single number. Two expressions that happen to agree today are the problem.**
+
+The font scales with that square — `clamp(11px, 3.6vmin, 24px)` then
+`clamp(11px, 4.2cqmin, 24px)`. The single-node rule was `clamp(20px, 2.2vw,
+28px)`, and 2.2vw on a 390px phone is 8.6px, so the **clamp FLOOR** pinned it at
+20px and the type stopped scaling at all — which is why shrinking the desktop
+window made the text overlap the frame. Consequence worth having:
+**lines-per-box is now invariant**, measured at 43–64 characters across
+desktop 1440x900, a 700x620 window, and iPhone portrait and landscape.
+
+### Seven bugs, and what each one actually was
+
+Recorded because five of the seven were found in the server log or by running
+the view's own query, not by reading the code and reasoning.
+
+| symptom | cause |
+|---|---|
+| "only the former single node under Kolam3D" | A CHILD edge is not enough to be SEEN. The cluster view runs its own query keyed on the GATEWAY's `source_text` plus a `CLUSTER_REL` edge; the node had neither, so it loaded into `cy` and was never asked for. |
+| "Kolam3D from Gateway was registering no children at all" | Pre-existing, and true of **all five** module gateways: that branch shows `CONTAINS_SECTION` sections and every `bd_*` gateway has zero. Now falls back to the gateway's own CHILD content. |
+| text overspilled the frame | It was not centred, it was at the FOOT. The single-node rules centre with a PAIR of auto margins; a collage empties the reference line and takes it out of flow, leaving the top margin unopposed. **One of a pair of balanced margins is not half a centring, it is an alignment to the other end.** |
+| iOS: a small frame instead of the picture | `height: calc(100dvh - … - var(…))`. A calc that does not resolve drops the WHOLE declaration, nothing else supplied a height, and an iframe with no height falls back to its intrinsic 150px. dvh was NOT the culprit — the base rule's own dvh calc works on iOS. |
+| then a small frame at the top right, on BOTH platforms | My fix: insets with `width: auto; height: auto`. **AN IFRAME IS A REPLACED ELEMENT** — `auto` is its intrinsic 300x150, not the insets — and the over-constrained inset parks it in a corner. |
+| steppers visible in View | `bd_ui_config` was sent only from the BD_READY handler, which fires on the module-SWAP path. The log showed every entry after the first takes the FAST path. **A flag sent once is not a flag that holds.** |
+| the collage header and text block vanished from the card | The `auto` writer and focusout echo write the module's last announcement into the card. For a collage the module announces only its SLOT. **And the card is what Sv saves** — one keystroke from writing the slot over the collage in the DB. The Sv lesson a third time: a renderer needs its INVERSE beside it. `collagePreservingWrite` now merges instead of replacing. |
+| 002 ignored the live steppers while 001 obeyed them | `bdModuleOf` read the FIRST `%%bd_module` line. Putting the picture on top made that line `%%bd_module text`, so `bdSameModule` refused the module's own announcement and the exploration recorder dropped it. **Block order is the stacking order and must not ALSO be an identity.** It now reports the collage's visual slot. |
+
+### Two rules worth carrying out of it
+
+1. **A dropped CSS declaration leaves nothing behind.** Two of the seven were a
+   declaration failing whole and no earlier rule supplying a fallback. A
+   reserve must not be a term inside the expression that states a size, and a
+   replaced element must be given a STATED size.
+2. **A guard with no log is a silent feature.** The exploration recorder refused
+   every announcement for 002 and said nothing: the module played, the steppers
+   worked, the panel updated, and View quietly showed the saved script —
+   "changes nothing I can see" for the third time in this project. It now logs
+   on change and every 50th.
+
+### NEXT, in the author's order
+
+| item | state | note |
+|---|---|---|
+| **the music player box** | **NOT BUILT, space reserved** | `collage-music` + `--bd-collage-music: 110px` already shrink the square and the text column. There is only ONE `#visual-iframe`, so a music slot needs a SECOND frame — that is the work. A music block in a script today opens the space and logs that the player is missing. |
+| **Merge** | **NOT BUILT, shape agreed** | "Append this node, adding whatever header it lacks": a module node already begins `%%bd_module <id>` and is copied verbatim; a text node has none, so Merge supplies `%%bd_module text` and wraps the prose in `%%bd_text [ … %%bd_]`. One rule, two cases. Open: where the target collage node comes from (a New-collage action, or append-to-the-one-you-are-on), and whether to stamp a **slot id** — §8 says it must, because a module name is not unique; the field was left out rather than written unused. |
+| **relay depth (§14.2)** | **STILL NOT TESTED, and now not needed for v1** | v1 does not nest modules: the collage is BD itself, hosting one module iframe directly. The test becomes necessary only if a collage ever becomes a module. |
+| **`%%bd_slot` / placement** | deliberately absent | Needed the moment two visual blocks are possible. |
+| **the `dim` stepper** | deferred, maybe never | The module's own `%%bd_opacity` is the right lever for a background slot. If a collage-level dimmer is ever wanted, call it `dim` (pairing with `duck`) — `opacity` would collide with `%%bd_p_opacity` inside a merged block. |
+| **deep links / Device for a collage** | undecided | `extractLatestModuleScript` takes the LAST `%%bd_module` block, which for a collage is one slot. Not wrong so much as meaningless; nothing depends on it yet. |
+| **a canary for the Kolam modules** | still none | Both were edited for `%%bd_background transparent` and neither can report it. The server sends `no-cache` for HTML, so staleness is not the risk — invisibility of a change is. |
