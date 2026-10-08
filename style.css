@@ -302,6 +302,12 @@ html, body {
   flex: 0 0 auto;
 }
 body.module-node #jb-right { display: flex; }
+/* 2026-10-09 — a TEXT node offers View too, but not Device: there is nothing
+   for another screen to watch, and a button that is present and inert is worse
+   than one that is absent. Set in Create only for now. */
+body.text-node #jb-right { display: flex; }
+body.text-node #send-to-device-btn,
+body.text-node #av-sync-note { display: none; }
 
 /* Matching the JB's other controls: 44px for a thumb, a 2px border so the
    heights agree, and the row's 10px type. Deliberately NOT the amber of Local
@@ -1159,6 +1165,10 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09d: BLUE (View reaches TEXT nodes — the node's prose, centred and
+   larger, with its reference in dim grey; Device is hidden there because
+   there is nothing for another screen to watch). Next = red.
+
    2026-10-09c: GREEN (three module wrappers were dropping bd_ui_config in
    RELAY_DOWN, so outputOnly never reached Kolam, ABC or Fractal and View
    showed their whole interface). Next = blue.
@@ -1218,7 +1228,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2367,6 +2377,7 @@ body.view-active.view-music #visual-iframe {
 body.view-active #bd-view-text:not([hidden]) {
   display: flex;
   flex-direction: column;
+  align-items: center;                 /* centred across the screen */
   position: fixed;
   top: 44px; left: 0; right: 0; bottom: 0;
   padding: 24px clamp(16px, 6vw, 80px);
@@ -2374,17 +2385,31 @@ body.view-active #bd-view-text:not([hidden]) {
   overflow-y: auto;
   z-index: 2;
 }
+/* CENTRED VERTICALLY BY AUTO MARGINS, not by justify-content. In a scrolling
+   flex container `justify-content: center` CLIPS the overflow at the top — the
+   first lines become unreachable once the text is taller than the screen.
+   A top auto-margin here and a bottom one on the reference line below centre
+   the pair when it fits and scroll properly when it does not. */
 #bd-view-text-body {
-  flex: 1;
-  font: 17px/1.65 Georgia, "Times New Roman", serif;
+  margin-top: auto;
+  /* Bigger, as asked, and relative so it reads at any size — the same reason
+     the collage's text will want relative units rather than px: one value then
+     serves a small preview and a full screen. */
+  font: clamp(20px, 2.2vw, 28px)/1.6 Georgia, "Times New Roman", serif;
   color: #e8e8e0;
   white-space: pre-wrap;
-  max-width: 68ch;
+  /* Narrower than before because the type is larger: a comfortable line is
+     measured in CHARACTERS, not pixels, so this holds as the font scales.
+     Left-aligned inside a centred block — centred prose is hard to read, and
+     the block being centred is what was asked for. */
+  max-width: 54ch;
 }
 /* Dim grey on purpose: it is for keeping track of WHICH node this was, so the
    collage's Merge can name it later. Not for reading. */
 #bd-view-text-ref {
-  margin-top: 20px;
+  margin-top: 24px;
+  margin-bottom: auto;                 /* the other half of the centring */
+  max-width: 54ch;
   padding-top: 10px;
   border-top: 1px solid #22222a;
   font: 11px/1.5 "Courier New", Courier, monospace;

@@ -7833,6 +7833,34 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       const hadModuleClass = document.body.classList.contains('module-node');
       document.body.classList.toggle('module-node', hasModule);
 
+      // ── VIEW ON A TEXT NODE (2026-10-09) ────────────────────────────────
+      // A text node has no module, so `module-node` is false and #jb-right —
+      // which holds View — stays hidden. But View on text is wanted: the
+      // node's prose, large and centred, with its reference in dim grey so the
+      // collage's Merge can name what it took later.
+      //
+      // Its own class rather than widening `module-node`, because the two are
+      // not the same claim and #jb-right holds DEVICE as well: there is
+      // nothing for another screen to watch on a text node, so that button is
+      // hidden here rather than offered and inert.
+      //
+      // CREATE ONLY for now, by the author's decision. The module case is
+      // offered in both modes; direct View from Browse is wanted later and is
+      // one condition away.
+      //
+      // Gated on there being PROSE rather than on text existing at all: a node
+      // that is nothing but directives shows only its name in Browse, and
+      // offering to present that full-screen would be offering nothing.
+      let textNodeForView = false;
+      if (!hasModule && readingState && readingState.nodeId) {
+        const rn = cy.getElementById(readingState.nodeId);
+        if (rn && rn.length) {
+          textNodeForView = !!(nodeProse(rn.data('text') || '') || '').trim();
+        }
+      }
+      document.body.classList.toggle('text-node',
+                                     textNodeForView && bdViewMode === 'create');
+
       // 2026-09-29 — ONE-SHOT GEOMETRY PROBE for the Jump Bar.
       //
       // Reported on iOS: View and Device sit beside Local instead of at the
