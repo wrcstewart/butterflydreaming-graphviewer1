@@ -1165,6 +1165,10 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09e: RED (View's reference line brightened to #9e9e90 — measured,
+   #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
+   become unreadable; 13px rather than 11). Next = green.
+
    2026-10-09d: BLUE (View reaches TEXT nodes — the node's prose, centred and
    larger, with its reference in dim grey; Device is hidden there because
    there is nothing for another screen to watch). Next = red.
@@ -1228,7 +1232,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2411,8 +2415,21 @@ body.view-active #bd-view-text:not([hidden]) {
   margin-bottom: auto;                 /* the other half of the centring */
   max-width: 54ch;
   padding-top: 10px;
-  border-top: 1px solid #22222a;
-  font: 11px/1.5 "Courier New", Courier, monospace;
-  color: #5a5a62;
+  border-top: 1px solid #2a2a34;
+  /* 13px, not 11: the body text beside it is now clamp(20px..28px), and a
+     reference line a fifth of that size reads as decoration rather than
+     information. */
+  font: 13px/1.6 "Courier New", Courier, monospace;
+  /* BRIGHTENED 2026-10-09, and measured rather than judged. #5a5a62 on this
+     background is 2.94:1 — it fails BOTH WCAG thresholds (4.5 body, 3.0
+     large), so "dim grey" had become "not readable", which is what was
+     reported. #9e9e90 is 7.42:1 and is already BD's colour for subordinate
+     text, so this is the established value rather than a new one. Still
+     plainly subordinate: the prose beside it is 16.3:1.
+
+     Legibility here is not a preference — see the note on the author's
+     reduced colour vision. Luminance contrast is the thing to get right, and
+     it is the thing that can be calculated instead of guessed. */
+  color: #9e9e90;
   word-break: break-all;
 }
