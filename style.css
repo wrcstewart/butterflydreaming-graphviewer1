@@ -9,7 +9,7 @@
    This is a date-and-letter, so a mismatch names BOTH versions and the gap
    between them is readable. Bump it with every canary rotation; viewer.js
    carries the expected value and says so loudly when the two differ.        */
-:root { --bd-css-build: "2026-10-09i"; }
+:root { --bd-css-build: "2026-10-09j"; }
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1176,6 +1176,10 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    while the Kolam renderer is served no-store — the canary host is the MORE
    cacheable of the two. The canary reports what the user can SEE.)
 
+   2026-10-09j: BLUE ("preparing…" is poll-driven now — the one-shot version
+   never appeared, because on a first use the download message claims the
+   bar first and then leaves it empty through the synthesis). Next = red.
+
    2026-10-09i: GREEN (rotated on request, to settle whether an iOS device is
    seeing current CSS at all — and viewer.js now LOGS the computed border
    against what it expects, so the question is answerable from the server
@@ -1261,7 +1265,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

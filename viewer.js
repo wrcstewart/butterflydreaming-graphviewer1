@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09i' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-09j' };
 
 let bdViewTitleText = '';
 
@@ -13726,38 +13726,44 @@ async function init() {
         audioUnlocked = true;
         // interrupt:true stops whatever is playing and starts again from the
         // top, which is what was asked for. speak() does the stopping itself.
-        // ── SAY SOMETHING IMMEDIATELY (2026-10-09) ────────────────────
-        // Even with the voice cached there is a gap before the first words:
-        // synthesis runs at about 15% of real time, so a seven-second sentence
-        // costs a second before anything is heard. speechProgress only speaks
-        // up during a DOWNLOAD, so a warm cache gave a silent second with a lit
-        // button and no explanation.
-        //
-        // Guarded on the title being the node's own name so this cannot
-        // overwrite a download message — those are different strings, and
-        // speechProgress owns the bar while one is showing.
-        const vt = document.getElementById('bd-view-title');
-        if (vt && vt.textContent === bdViewTitleText) vt.textContent = 'preparing…';
         speak(bdViewProse, { interrupt: true });
         bdViewSpeakBtn.classList.add('speaking');
         // stopSpeech() empties the queue and clears speakBusy, and so does
         // reaching the end naturally — so one condition covers both the user
         // pressing again and the reading simply finishing.
         if (bdViewSpeakPoll) clearInterval(bdViewSpeakPoll);
+        // ── "preparing…" IS DRIVEN BY THE POLL, NOT BY THE PRESS ──────
+        // A first cut set it once, before speak(). It never appeared, and the
+        // log said why: on a first use the CONSENT path runs first and
+        // speechProgress claims the bar with "Downloading voice (about 31
+        // MB)…", so the one-shot guard correctly declined — and then, when the
+        // download finished and speechProgress cleared the bar, the first
+        // synthesis ran for 5,850 ms against an EMPTY bar. Measured on iOS,
+        // not imagined.
+        //
+        // Driving it from the poll makes it order-independent: whenever there
+        // is queued work and nothing yet audible, it says so; whatever
+        // speechProgress is saying wins while it is saying it. One rule
+        // instead of a guess about which message arrives first.
+        if (bdViewSpeakPoll) clearInterval(bdViewSpeakPoll);
         bdViewSpeakPoll = setInterval(() => {
           const t = document.getElementById('bd-view-title');
-          // Audio has started, so "preparing" has stopped being true. Only
-          // ours is cleared — a download message is left to speechProgress.
-          if (speakBusy && t && t.textContent === 'preparing…') {
-            t.textContent = bdViewTitleText;
+          if (!t) return;
+          const own = t.textContent === bdViewTitleText || t.textContent === 'preparing…';
+          const working = speakQueue.length > 0 || speakBusy;
+          if (working && !speakBusy && own) {
+            // Queued, nothing audible yet — this is the wait worth naming.
+            t.textContent = 'preparing…';
+          } else if (speakBusy && t.textContent === 'preparing…') {
+            t.textContent = bdViewTitleText;        // audible now
           }
-          if (!speakBusy && speakQueue.length === 0) {
+          if (!working) {
             bdViewSpeakBtn.classList.remove('speaking');
-            if (t && t.textContent === 'preparing…') t.textContent = bdViewTitleText;
+            if (t.textContent === 'preparing…') t.textContent = bdViewTitleText;
             clearInterval(bdViewSpeakPoll);
             bdViewSpeakPoll = null;
           }
-        }, 400);
+        }, 300);
       });
 
       jumpToBtn.addEventListener('click', () => {
