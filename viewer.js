@@ -13507,9 +13507,28 @@ async function init() {
         return (n && n.length > 0) ? n : null;
       }
 
+      // What the text panel is currently showing, so Speak reads the same
+      // words that are on screen rather than going back to the node and
+      // risking a second idea of what the text is.
+      let bdViewProse = '';
+      // Clears the Speak button's lit state when the reading actually ends.
+      // Without it the indicator says "speaking" for ever after the last
+      // sentence — a small lie, and the kind this file has been bitten by:
+      // a readout that stops tracking the thing it names.
+      let bdViewSpeakPoll = null;
+
       function bdViewExit() {
         const body = document.body;
         if (!body.classList.contains('view-active')) return;
+        // STOP SPEAKING ON THE WAY OUT, by the author's instruction. Leaving a
+        // voice reading a page nobody is looking at is the same fault as BD's
+        // media bar playing on into the standalone — which needed an explicit
+        // stop for exactly this reason (viewer.js:8880).
+        try { stopSpeech(); } catch (_) {}
+        if (bdViewSpeakPoll) { clearInterval(bdViewSpeakPoll); bdViewSpeakPoll = null; }
+        const sb = document.getElementById('bd-view-speak');
+        if (sb) { sb.hidden = true; sb.classList.remove('speaking'); }
+        bdViewProse = '';
         body.classList.remove('view-active', 'view-music');
         const bar = document.getElementById('bd-view-bar');
         const tp  = document.getElementById('bd-view-text');
@@ -13562,6 +13581,10 @@ async function init() {
               outputOnly: true, hideControls: true, hostChrome: false }, '*');
           } catch (_) {}
           if (tp) tp.hidden = true;
+          // No Speak over a module: a music one has its own sound and a visual
+          // one has no text to read.
+          const sb = document.getElementById('bd-view-speak');
+          if (sb) { sb.hidden = true; sb.classList.remove('speaking'); }
         } else {
           // No module: present the node's PROSE — the same strip Browse uses,
           // so View is Browse at size rather than a second idea of what the
@@ -13575,6 +13598,9 @@ async function init() {
           if (refEl) refEl.textContent =
             [name, node && node.data('url')].filter(Boolean).join('   ·   ');
           if (tp) tp.hidden = false;
+          bdViewProse = (bodyEl && bodyEl.textContent) || '';
+          const sb = document.getElementById('bd-view-speak');
+          if (sb) sb.hidden = !bdViewProse;
         }
         if (title) title.textContent = name || moduleId || '';
         if (bar) bar.hidden = false;
@@ -13586,6 +13612,43 @@ async function init() {
 
       const bdViewExitBtn = document.getElementById('bd-view-exit');
       if (bdViewExitBtn) bdViewExitBtn.addEventListener('click', bdViewExit);
+
+      const bdViewSpeakBtn = document.getElementById('bd-view-speak');
+      if (bdViewSpeakBtn) bdViewSpeakBtn.addEventListener('click', () => {
+        if (!bdViewProse) return;
+        // THE SPEAK TOGGLE IS NOT BYPASSED, and the reason is not tidiness:
+        // ticking it is where the 19 MB voice-model download is consented to.
+        // Forcing speech from here would start that download without the
+        // question that exists to ask it. So this says so rather than doing
+        // nothing, which is the failure mode this project keeps meeting.
+        if (!speakEnabled) {
+          const t = document.getElementById('bd-view-title');
+          if (t) {
+            const was = t.textContent;
+            t.textContent = 'tick Speak in BD first — then press this again';
+            setTimeout(() => { if (t.textContent !== was) t.textContent = was; }, 4000);
+          }
+          return;
+        }
+        // A click IS a gesture, which is what audio unlocking needs — the same
+        // reasoning as "ticking is itself a gesture" beside the Speak box.
+        audioUnlocked = true;
+        // interrupt:true stops whatever is playing and starts again from the
+        // top, which is what was asked for. speak() does the stopping itself.
+        speak(bdViewProse, { interrupt: true });
+        bdViewSpeakBtn.classList.add('speaking');
+        // stopSpeech() empties the queue and clears speakBusy, and so does
+        // reaching the end naturally — so one condition covers both the user
+        // pressing again and the reading simply finishing.
+        if (bdViewSpeakPoll) clearInterval(bdViewSpeakPoll);
+        bdViewSpeakPoll = setInterval(() => {
+          if (!speakBusy && speakQueue.length === 0) {
+            bdViewSpeakBtn.classList.remove('speaking');
+            clearInterval(bdViewSpeakPoll);
+            bdViewSpeakPoll = null;
+          }
+        }, 400);
+      });
 
       jumpToBtn.addEventListener('click', () => {
         // ── VIEW IS IN-PAGE NOW (2026-10-08) ─────────────────────────────
