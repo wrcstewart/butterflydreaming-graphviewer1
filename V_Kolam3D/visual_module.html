@@ -40,6 +40,10 @@
       height: 100%;
       overflow: hidden;                  /* A42 §42.9 — module fills its iframe */
     }
+    /* %%bd_background transparent — see the render path. Three.js's clear
+       alpha is only the first of four stacked backgrounds; this is the second,
+       and without it the canvas is see-through onto an opaque body. */
+    body.transparent-bg { background: transparent !important; }
     body {
       background: #0a0a0f;
       color: #e8e8e0;
@@ -1484,6 +1488,11 @@
     pitchDriftSlider.addEventListener('input', manageDriftInterval);
 
     // ── The scene ─────────────────────────────────────────────────────────
+    // `transparent` and `none` both accepted: `transparent` is the CSS
+    // keyword an author will reach for, `none` is what the three.js property
+    // is actually set to, and refusing either would be a riddle.
+    const BD_TRANSPARENT_BG = /^(transparent|none)$/i;
+
     const CAM_FOV = 50;
     let renderer = null, scene = null, camera = null, group = null;
     let geometry = null, material = null;
@@ -1509,7 +1518,11 @@
       // script visibly different from the 2D module — and a figure tuned by
       // eye in one must not change hue when it moves to the other.
       if (THREE.ColorManagement) THREE.ColorManagement.enabled = false;
-      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      // `alpha: true` UNCONDITIONALLY, because it can only be set at
+      // construction — a renderer built without it can never become
+      // see-through, whatever is done later. It costs nothing while the clear
+      // alpha stays 1, which is every case except %%bd_background transparent.
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       scene    = new THREE.Scene();
       scene.background = new THREE.Color('#0a0a0f');
@@ -1953,7 +1966,26 @@
 
         initThree();
         updateCanvasSize();
-        scene.background = new THREE.Color(params.background);
+        // ── %%bd_background transparent (2026-10-08) ──────────────────
+        // The canvas becomes genuinely see-through so a HOST can put something
+        // BEHIND the figure — which is what a collage wants when the words go
+        // underneath the kolam rather than over it.
+        //
+        // FOUR backgrounds are stacked here and all four have to yield, which
+        // is the same shape as the three-site relay trap: three.js's clear
+        // colour, this document's body, the wrapper document's html+body, and
+        // BD's own #visual-iframe. Any one of them left opaque hides whatever
+        // is behind, and nothing reports it — the figure simply sits on black.
+        // The other three are handled where they live; this is the first.
+        if (BD_TRANSPARENT_BG.test(String(params.background).trim())) {
+          scene.background = null;
+          renderer.setClearAlpha(0);
+          document.body.classList.add('transparent-bg');
+        } else {
+          scene.background = new THREE.Color(params.background);
+          renderer.setClearAlpha(1);
+          document.body.classList.remove('transparent-bg');
+        }
         material.linewidth = params.weight;
 
         const lsystem = new LSystem({ axiom: score.axiom, productions: score.productions });

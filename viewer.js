@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-09q' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09r' };
 
 let bdViewTitleText = '';
 
@@ -3048,6 +3048,7 @@ function parseCollage(text) {
     // (`%%bd_collage`, and whatever arrangement directives come later).
   }
 
+  blocks.forEach((b, i) => { b.index = i; });
   for (const b of blocks) {
     b.script = b.lines.join('\n').trim();
     delete b.lines;
@@ -3099,9 +3100,12 @@ function collagePreservingWrite(cardText, incoming) {
 // and returns every other line untouched, so `%%bd_collage`, the module
 // headers and the whole text block survive and only the visual slot's values
 // move. Re-parsed afterwards so the slot still comes from one place.
-function collageVisualSlot(savedText, explored) {
+function collageLive(savedText, explored) {
   const merged = explored ? mergeExploredValues(savedText, explored) : savedText;
-  return collageSlot(parseCollage(merged), 'visual');
+  return parseCollage(merged);
+}
+function collageVisualSlot(savedText, explored) {
+  return collageSlot(collageLive(savedText, explored), 'visual');
 }
 
 // The first block of a kind, or null. Named rather than inlined because three
@@ -13860,6 +13864,12 @@ async function init() {
         if (bar) bar.hidden = true;
         if (tp)  tp.hidden  = true;
         const f = document.getElementById('visual-iframe');
+        // The collage stamps z-index and pointer-events inline, so it has to
+        // take them off again — an inline style outlives every class this
+        // function removes, and a stuck `pointer-events: none` on the module
+        // iframe would be invisible until someone tried to use a stepper.
+        if (f) { f.style.zIndex = ''; f.style.pointerEvents = ''; }
+        if (tp) tp.style.zIndex = '';
         if (f && f.contentWindow) {
           // Back to BD's own defaults: its chrome returns, its steppers
           // return. hostScriptPanel is not sent in either direction — BD has
@@ -13908,8 +13918,28 @@ async function init() {
                          ' and this build renders v1 — rendering anyway');
           }
 
-          const vis = collageVisualSlot(text,
-                        node ? explorationByNode.get(node.id()) : null);
+          const live = collageLive(text,
+                         node ? explorationByNode.get(node.id()) : null) || collage;
+          const vis  = collageSlot(live, 'visual');
+          const txtB = collageSlot(live, 'text');
+
+          // ── THE SCRIPT'S ORDER IS THE STACKING ORDER ───────────────────
+          // A later block sits on top of an earlier one. That needs no
+          // directive, reads the way a document reads, and is already true of
+          // what exists: visual-then-text puts the words over the picture.
+          // Reverse the two blocks in the script and the kolam draws OVER the
+          // text — which is what the figure's own `%%bd_background transparent`
+          // is for. Nothing else to learn, and placement still carries no
+          // `_p_`.
+          const picUnder = !(vis && txtB) || vis.index < txtB.index;
+          if (f)  f.style.zIndex  = picUnder ? '10' : '12';
+          if (tp) tp.style.zIndex = picUnder ? '12' : '10';
+          // When the picture is ON TOP it must not swallow the taps that scroll
+          // the text beneath it. Safe to disable outright: in outputOnly the
+          // canvas takes no pointer input at all — the module's only handlers
+          // are on the stepper buttons, which are hidden.
+          if (f) f.style.pointerEvents = picUnder ? '' : 'none';
+
           if (vis && f) {
             // Clear the inline rect positionCyEl stamped, so the stylesheet
             // can own it — the same reason the single-module branch does.
@@ -13960,7 +13990,7 @@ async function init() {
             console.warn('[collage] no visual slot — text will sit on the ground colour');
           }
 
-          const txt    = collageSlot(collage, 'text');
+          const txt    = txtB;
           const bodyEl = document.getElementById('bd-view-text-body');
           const refEl  = document.getElementById('bd-view-text-ref');
           if (bodyEl) bodyEl.textContent = (txt && txt.body) || '';
@@ -13977,7 +14007,7 @@ async function init() {
           // player later changes no layout that has been looked at and
           // approved. There is only ONE #visual-iframe, so a second module
           // needs a second frame — that is the next step, not a missing line.
-          const mus = collageSlot(collage, 'music');
+          const mus = collageSlot(live, 'music');
           if (mus) {
             body.classList.add('collage-music');
             console.log('[collage] music slot RESERVED for ' + mus.moduleId +

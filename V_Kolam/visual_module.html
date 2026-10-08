@@ -17,6 +17,8 @@
       height: 100%;
       overflow: hidden;                  /* A42 §42.9 — module fills its iframe */
     }
+    /* %%bd_background transparent — see the draw path. */
+    body.transparent-bg { background: transparent !important; }
     body {
       background: #0a0a0f;
       color: #e8e8e0;
@@ -571,6 +573,9 @@
     const lightnessSlider  = document.getElementById('lightness-slider');
     const opacitySlider    = document.getElementById('opacity-slider');
     const canvas         = document.getElementById('kolam-canvas');
+    // `transparent` and `none` both accepted — see the 3D module's note.
+    const BD_TRANSPARENT_BG = /^(transparent|none)$/i;
+
     const ctx            = canvas.getContext('2d');
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     const controlPanel   = document.querySelector('.control-panel');
@@ -1456,8 +1461,22 @@
 
         updateCanvasSize();
         // Clear canvas with background
-        ctx.fillStyle = params.background;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // ── %%bd_background transparent (2026-10-08) ──────────────────
+        // Parity with the 3D module, which needed this first: the canvas
+        // becomes see-through so a HOST can put something BEHIND the figure.
+        // clearRect rather than fillRect — a 2D canvas has no clear colour to
+        // set, the absence of paint IS the transparency. The body background
+        // has to yield too, and so do the wrapper's and BD's iframe; a single
+        // opaque layer anywhere in that stack hides what is behind and nothing
+        // reports it.
+        if (BD_TRANSPARENT_BG.test(String(params.background).trim())) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          document.body.classList.add('transparent-bg');
+        } else {
+          ctx.fillStyle = params.background;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          document.body.classList.remove('transparent-bg');
+        }
 
         // Add subtle border
         ctx.strokeStyle = '#4a9b8e';

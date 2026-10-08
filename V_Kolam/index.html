@@ -19,7 +19,10 @@
     html, body {
       width: 100%;
       height: 100%;
-      background: #0a0a0f;
+      /* TRANSPARENT — the inner module paints its own background, so this
+         shell's only effect is to hide what a host put BEHIND a deliberately
+         see-through module. See the 3D wrapper's note. */
+      background: transparent;
       overflow: hidden;
     }
     #module-frame {
