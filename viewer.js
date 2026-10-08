@@ -2105,7 +2105,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-09i' };
 
 let bdViewTitleText = '';
 
@@ -10355,11 +10355,19 @@ async function init() {
     if (cl) {
       const got = getComputedStyle(cl).borderTopColor;
       const want = BD_CANARY_EXPECTED;
-      console.log('[boot] canary: css paints ' + got + ', this build expects ' + want.rgb +
-                  ' (' + want.hex + ') — ' +
-                  (got.replace(/\s/g, '') === want.rgb.replace(/\s/g, '')
-                    ? 'MATCH, both files current'
-                    : 'MISMATCH — style.css is stale, hard-reload'));
+      // The stylesheet names its own build, which a colour cannot: red has
+      // been the canary three times in one day, so "stale" and "three
+      // rotations stale" are indistinguishable by shade. Quotes are stripped
+      // because a CSS string value keeps them.
+      const cssBuild = (getComputedStyle(document.documentElement)
+                          .getPropertyValue('--bd-css-build') || '')
+                       .trim().replace(/^["']|["']$/g, '') || '(none — pre-marker)';
+      const ok = got.replace(/\s/g, '') === want.rgb.replace(/\s/g, '');
+      console.log('[boot] canary: css build ' + cssBuild +
+                  ', viewer expects ' + want.build +
+                  ' | css paints ' + got + ', expects ' + want.rgb +
+                  ' — ' + (ok ? 'MATCH, both files current'
+                              : 'MISMATCH — style.css is stale, hard-reload'));
     }
   } catch (_) {}
 

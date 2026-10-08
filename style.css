@@ -1,4 +1,15 @@
 :root {
+/* ── WHICH BUILD OF THIS FILE IS THE BROWSER ACTUALLY USING ──────────────
+   Read by viewer.js at boot and logged beside what that build expects. A
+   colour cannot answer this: the canary cycles red -> green -> blue, so red
+   has been current three separate times today and "stale" and "three
+   rotations stale" look identical. The author said as much — "perhaps the
+   Canary is one from three cycles back" — and was right to doubt it.
+
+   This is a date-and-letter, so a mismatch names BOTH versions and the gap
+   between them is readable. Bump it with every canary rotation; viewer.js
+   carries the expected value and says so loudly when the two differ.        */
+:root { --bd-css-build: "2026-10-09i"; }
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
