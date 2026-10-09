@@ -183,6 +183,25 @@
        the iframe is nearly square (as in the preview harness).
        Portrait media query above overrides to a bottom band.
        The <canvas> keeps itself square via its own aspect-ratio + max-*. */
+    /* The column's own header. Smallest size that renders as letters, with a
+       rule under it so it reads as a break rather than another label — the
+       same idiom the music module's strip uses, so two stacked columns in a
+       collage look like one list with two groups. */
+    .strip-title {
+      flex: 0 0 auto;
+      width: 100%;
+      padding: 0 2px 3px;
+      margin-bottom: 3px;
+      border-bottom: 1px solid rgba(74, 155, 142, 0.35);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      color: #cbbf8a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .control-panel {
       /* 2026-08-19 — 220 → 130. A control-row is 94px; with the panel's
          padding, border and a scrollbar it needs ~122. The 220 was defensive
@@ -418,6 +437,15 @@
   </div>
 
   <div class="control-panel">
+    <!-- THE MODULE'S NAME, HEADING ITS OWN GROUP (2026-10-10).
+         "Module headers above each group for clarity" — the author's, in a
+         collage where this column is joined by another module's below it. The
+         title lives IN the column rather than being positioned over it by the
+         host, so each module labels its own steppers and the labels appear in
+         whatever order the host places the modules. Nothing is told twice.
+         Its own identity, not a value read from the script: a directive could
+         otherwise rename the module in its own label. -->
+    <div class="strip-title">bd_V_Kolam3D</div>
     <!-- Media-module control convention (2026-07-02): buttons above, the
          directive's own name below, verbatim.
 

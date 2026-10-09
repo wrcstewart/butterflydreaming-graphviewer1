@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10i' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10j' };
 
 let bdViewTitleText = '';
 
@@ -10859,164 +10859,88 @@ async function init() {
       }
     }
 
-    // ── COLLAGE PREVIEW: A SLICE OFF THE BOTTOM FOR THE PLAYBAR ──────────
-    // DELIBERATELY AFTER THE STAMPS ABOVE, AND NEVER INSTEAD OF THEM.
-    // Yesterday's version took a branch of its own before them and returned —
-    // and in Player mode #cy carries `.hidden` (display: none) so its rect
-    // collapses to zeros, the branch skipped stamping and returned before the
-    // fallback that keeps the last good rect could run. The graphic landed
-    // unstamped in the top-left corner at its intrinsic size, at the same
-    // level as the script panel, which is precisely what was reported.
+    // ── COLLAGE PREVIEW: THE MUSIC MODULE GOES IN THE LANE ───────────────
+    // It was a 52px bar under the graphic. The transport fitted; 25 steppers
+    // in it did not — "too crowded on M" — so the music module now takes the
+    // LOWER HALF OF THE STEPPER LANE, under the graphic module's own column,
+    // each group headed by its module's name. The modules draw those headers
+    // themselves, so the order follows wherever the host puts them.
     //
-    // So this reads the rect the working code JUST WROTE, takes a slice off the
-    // bottom, and puts the bar in the slice. If no stamp happened there is
-    // nothing to read and this does nothing: the failure mode is "no bar", not
-    // "no graphic". That asymmetry is the whole point.
+    // Still AFTER the stamps above and never instead of them. The version that
+    // took its own branch returned early, and in Player mode #cy is
+    // display:none so its rect is zeros — the graphic landed unstamped in the
+    // top-left corner. This reads the rect the working code just wrote, and if
+    // no stamp happened there is nothing to read and it does nothing. The
+    // failure mode is "no music frame", never "no graphic".
+    //
+    // THE LANE IS MEASURED, NOT COMPUTED. `.control-panel` is `flex: 0 0 130px`
+    // inside a flex row whose other child is the canvas wrapper, behind a 44px
+    // band and an 88px left pad in portrait. Duplicating that here would be a
+    // formula about someone else's layout — the fault that cost two rounds on
+    // the bar's width.
     if (document.body.classList.contains('collage-bar') && iframeEl) {
       const bar = document.getElementById('collage-playbar');
       const t0 = parseInt(iframeEl.style.top, 10);
-      const l0 = parseInt(iframeEl.style.left, 10);
-      const w0 = parseInt(iframeEl.style.width, 10);
       const h0 = parseInt(iframeEl.style.height, 10);
-      // ── IT OVERLAYS, IT NO LONGER SLICES (2026-10-10) ────────────────
-      // The slice took 74px off the frame's height, and the frame holds the
-      // STEPPER COLUMN as well as the canvas — so the steppers stopped 74px
-      // short, which was reported as them ending at the top of the playbar
-      // instead of its bottom. It also made the graphic smaller for no gain.
-      //
-      // And the space was there all along: `.canvas-wrapper` carries
-      // `padding-bottom: 52px`, a reserve for BD's Extension strip, so there
-      // is already a band below the square inside the frame. That reserve is
-      // the "massive gap between the graphic and the playbar" — it was never
-      // the bar's doing.
-      //
-      // So the frame is left ALONE at full height and the bar is laid over its
-      // bottom edge. The steppers run the whole depth, the square gets back the
-      // 74px it was losing, and the bar's bottom lines up with the column's.
-      // KNOWN CONSEQUENCE: the bar sits where BD's ↓↑ arrows strip goes.
-      if (bar && [t0, l0, w0, h0].every(Number.isFinite) &&
-          h0 > COLLAGE_BAR_H + 120) {
-        bar.style.height = COLLAGE_BAR_H + 'px';
-        // ── THE TOP COMES FROM THE GRAPHIC, NOT THE FRAME ──────────────
-        // It was the frame's bottom minus the bar's height, which overlapped
-        // the square whenever the square was TALL — and on desktop the square
-        // is height-limited, ending only 52px above the frame's bottom
-        // (`.canvas-wrapper`'s Extension reserve) against a 70px bar. So an
-        // 18px overlap was built in, and the resize that "fixed" it was really
-        // making the square width-limited and therefore shorter.
-        //
-        // max() takes whichever position is LOWER: flush with the frame's
-        // bottom when the square leaves room, and just under the square when
-        // it does not.
-        //
-        // THE TRADE, stated rather than discovered: when the square is tall the
-        // bar now hangs up to ~20px below the frame, so the stepper column ends
-        // slightly above the bar's bottom instead of level with it. Both cannot
-        // hold at once while the bar is 70px and the reserve is 52px. The clean
-        // fix is a 52px bar, which needs DroneFrac's .big-btn to come down from
-        // its 52px minimum — a module change, not asked for yet.
-        const flush = t0 + h0 - COLLAGE_BAR_H;
-        const g0 = collageGraphicRect(iframeEl) || collageLastGraphic;
-        const underGraphic = (g0 && Number.isFinite(g0.top))
-          ? g0.top + g0.height + COLLAGE_BAR_GAP
-          : flush;
-        bar.style.top = Math.round(Math.max(flush, underGraphic)) + 'px';
-
-        // UNDER THE GRAPHIC, matching its width and its left edge — not the
-        // frame's, which would sit across the stepper column.
-        // ── A FLOOR ON THE WIDTH, AND WHY ────────────────────────────
-        // The graphic is SQUARE, so reducing the window vertically reduces its
-        // WIDTH by the same amount — and the bar, matching that width, kept
-        // narrowing until DroneFrac's two 108px buttons had to wrap and stacked
-        // vertically. Reported as "it shrinks horizontally when the size is
-        // reduced vertically — that makes no sense at all", and it did make
-        // sense: the bar was following the graphic exactly as asked.
-        //
-        // 240 = two 108px buttons + the 10px gap + the panel's padding and
-        // border. Below that the content cannot sit in a row at all, so the bar
-        // stops following the square and stays legible. Still LEFT-ALIGNED to
-        // the graphic, so the two share an edge even when the widths differ.
-        const COLLAGE_BAR_MIN_W = 240;
-        const place = (g) => {
-          if (g && g.width > 40) {
-            collageLastGraphic = g;
-            bar.style.left  = Math.round(g.left) + 'px';
-            bar.style.width = Math.round(Math.max(COLLAGE_BAR_MIN_W, g.width)) + 'px';
-            return true;
-          }
-          return false;
+      if (bar && Number.isFinite(t0) && Number.isFinite(h0) && h0 > 160) {
+        const put = (col) => {
+          if (!col || !(col.width > 40) || !(col.height > 120)) return false;
+          collageLastColumn = col;
+          // HALF EACH. The graphic module has 18 directives and the music one
+          // 25, and both columns scroll far more than the lane can ever show
+          // (18 rows at ~94px is already three times its depth), so splitting
+          // by count would buy nothing. Half is predictable, which is worth
+          // more.
+          const half = Math.round(col.height / 2);
+          bar.style.left   = Math.round(col.left) + 'px';
+          bar.style.width  = Math.round(col.width) + 'px';
+          bar.style.top    = Math.round(col.top + half) + 'px';
+          bar.style.height = Math.round(col.height - half) + 'px';
+          return true;
         };
-        if (!place(collageGraphicRect(iframeEl)) && !place(collageLastGraphic)) {
+        const m = collageModuleRects(iframeEl);
+        if (!put(m && m.column) && !put(collageLastColumn)) {
           // Never measured and nothing cached — the module is still loading.
-          // The fallback subtracts the stepper column and the arrows band so a
-          // first paint still clears the steppers, and it is corrected by the
-          // rAF below the moment the canvas exists.
-          bar.style.left  = l0 + 'px';
-          bar.style.width = Math.max(120, w0 - 150 - 44) + 'px';
+          // The lane's own geometry: 130px wide at the frame's right edge.
+          const l0 = parseInt(iframeEl.style.left, 10) || 0;
+          const w0 = parseInt(iframeEl.style.width, 10) || 0;
+          bar.style.left   = Math.max(0, l0 + w0 - 130) + 'px';
+          bar.style.width  = '130px';
+          bar.style.top    = Math.round(t0 + h0 / 2) + 'px';
+          bar.style.height = Math.round(h0 / 2) + 'px';
         }
-        // THE SQUARE DEPENDS ON THE HEIGHT JUST CHANGED, so one measurement
-        // cannot be enough: shrinking the frame can shrink the canvas, and the
-        // canvas is what the bar is being matched to. Re-measured after the
-        // module has re-laid out. Sets only the bar's own two properties, so it
-        // cannot drive another layout pass and cannot loop.
+        // ── THE SECOND MEASURE ────────────────────────────────────────────
+        // The module sizes its own panels from a ResizeObserver that fires
+        // AFTER this pass, so a rect read once is read while it is still
+        // settling. That is what "on the first draw it overlaps, and on
+        // resizing it lines up" was. Sets only the music frame's own four
+        // properties, so it cannot drive another layout pass and cannot loop.
         requestAnimationFrame(() => {
           if (!document.body.classList.contains('collage-bar')) return;
-          const g1 = collageGraphicRect(iframeEl);
-          place(g1);
-          // THE TOP, AGAIN. The square's final size arrives after this frame's
-          // layout — the module re-measures it from a ResizeObserver on its
-          // wrapper, which fires after ours — so a top computed once is
-          // computed from a square that has not finished settling. That is the
-          // whole of "on the first draw it overlaps, and on resizing it lines
-          // up": the resize was simply a second measurement.
-          if (g1 && Number.isFinite(g1.top)) {
-            bar.style.top = Math.round(Math.max(flush, g1.top + g1.height + COLLAGE_BAR_GAP)) + 'px';
-          }
-          // ── PROBE, because one of the four reports has no explanation yet ──
-          // "On mobile the panel is not the same width as the graphic but only
-          // 70% of it." The bar iframe is given the measured width, so the
-          // shortfall is INSIDE the module — and modelling someone else's
-          // layout is what cost the last two rounds. This reads the real rects
-          // through the same-origin frames and logs them once per change.
+          const m2 = collageModuleRects(iframeEl);
+          put(m2 && m2.column);
           try {
-            const g  = collageLastGraphic;
-            const br = bar.getBoundingClientRect();
-            let panel = 'n/a', fd = 'n/a';
-            const bd1 = bar.contentDocument;
-            const bin = bd1 && bd1.querySelector('iframe');
-            const bdoc = bin ? bin.contentDocument : bd1;
-            const pp = bdoc && bdoc.querySelector('.player-panel');
-            if (pp) {
-              const pr = pp.getBoundingClientRect();
-              panel = Math.round(pr.width) + 'x' + Math.round(pr.height) +
-                      ' at x' + Math.round(pr.left);
-              fd = getComputedStyle(pp).flexDirection + '/' +
-                   getComputedStyle(pp).display;
-            }
-            const line = 'graphic ' + (g ? Math.round(g.width) + 'x' + Math.round(g.height) +
-                         ' at x' + Math.round(g.left) : '?') +
-                         ' | bar ' + Math.round(br.width) + 'x' + Math.round(br.height) +
-                         ' at x' + Math.round(br.left) +
-                         ' | player-panel ' + panel + ' ' + fd +
-                         ' | frame h' + Math.round(iframeEl.getBoundingClientRect().height);
+            const c = m2 && m2.canvas, col = m2 && m2.column;
+            const line = 'graphic ' + (c ? Math.round(c.width) + 'x' + Math.round(c.height) : '?') +
+                         ' | lane ' + (col ? Math.round(col.width) + 'x' + Math.round(col.height) +
+                         ' at x' + Math.round(col.left) : '?') +
+                         ' | music frame ' + Math.round(bar.getBoundingClientRect().width) + 'x' +
+                         Math.round(bar.getBoundingClientRect().height);
             if (line !== collageLastProbe) {
               collageLastProbe = line;
               console.log('[collage] ' + line);
             }
           } catch (_) {}
-          // And once the bar is in place, hand the module its second measure.
-          // A frame later again, so our own write has been laid out first.
           collageNudgeVisual(iframeEl);
           requestAnimationFrame(() => {
             if (!document.body.classList.contains('collage-bar')) return;
-            const g2 = collageGraphicRect(iframeEl);
-            if (place(g2) && Number.isFinite(g2.top)) {
-              bar.style.top = Math.round(Math.max(flush, g2.top + g2.height + COLLAGE_BAR_GAP)) + 'px';
-            }
+            const m3 = collageModuleRects(iframeEl);
+            put(m3 && m3.column);
           });
         });
       }
     }
+
   }
 
   // Kept as named constants because THREE places have to agree about them: this
@@ -11181,10 +11105,10 @@ async function init() {
   // the wrapper. Returns null rather than a guess if the frames are not up yet;
   // the caller keeps the last good value, which is the same discipline
   // positionCyEl already applies to #cy's collapsed rect.
-  let collageLastGraphic = null;
-  let collageLastProbe   = '';
+  let collageLastColumn = null;
+  let collageLastProbe  = '';
 
-  function collageGraphicRect(outerIframe) {
+  function collageModuleRects(outerIframe) {
     try {
       const outerRect = outerIframe.getBoundingClientRect();
       const d1 = outerIframe.contentDocument;
@@ -11200,16 +11124,23 @@ async function init() {
         doc = inner.contentDocument;
       }
       if (!doc) return null;
-      const cv = doc.getElementById('kolam-canvas') || doc.querySelector('canvas');
-      if (!cv) return null;
-      const r = cv.getBoundingClientRect();
-      if (!(r.width > 0 && r.height > 0)) return null;
-      return { left: outerRect.left + offX + r.left, width: r.width,
-               top: outerRect.top + offY + r.top, height: r.height };
+      const page = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0)) return null;
+        return { left: outerRect.left + offX + r.left,
+                 top:  outerRect.top  + offY + r.top,
+                 width: r.width, height: r.height };
+      };
+      const canvas = page(doc.getElementById('kolam-canvas') || doc.querySelector('canvas'));
+      const column = page(doc.querySelector('.control-panel'));
+      if (!canvas && !column) return null;
+      return { canvas, column };
     } catch (_) {
       return null;            // cross-origin one day, or simply not loaded yet
     }
   }
+
 
   // ── COLLAGE PREVIEW: THE PLAYBAR (2026-10-10) ─────────────────────────
   // Its own frame, and its own idea of what is loaded: sharing
@@ -11222,18 +11153,8 @@ async function init() {
   // than assumed. NOTE there is therefore no volume control in it; `volume` is
   // a `%%bd_p_` stepper in the column output-only hides, so putting one here
   // is a change to the MODULE and not something BD can arrange from outside.
-  // 52px, and the number is not arbitrary: it is exactly the reserve
-  // `.canvas-wrapper` keeps below the square for BD's Extension strip
-  // (`padding-bottom: 52px`, its own comment explains why). At 52 the two
-  // candidate positions for the bar — flush with the frame's bottom, and
-  // directly under the square — COINCIDE, so there is no overlap and no hang.
-  // It was 70, which is where both faults came from.
-  //
-  // DroneFrac's output-only rules were shallowed to match: 3px panel padding
-  // and a 38px button minimum, leaving 44px of content. Scoped to output-only
-  // there, so its authoring view keeps the 52px buttons.
-  const COLLAGE_BAR_H   = 52;
-  const COLLAGE_BAR_GAP = 0;
+  // No bar height any more: the music module takes half the stepper lane, and
+  // the lane's size is measured. The 52px bar it replaces is in the register.
   let currentBarModuleId = null;
 
   function loadCollagePlaybar(moduleId, script) {

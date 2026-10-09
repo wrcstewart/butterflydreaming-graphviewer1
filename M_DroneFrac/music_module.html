@@ -213,6 +213,12 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-10c: BLUE (the compact controls ADAPT to the rect: a column by
+     default, a row only when the frame is wide and shallow, chosen by an
+     aspect-ratio query rather than a sixth flag — the shape of the frame is a
+     fact the module can see for itself. The host moved the steppers out of the
+     52px bar, which was too crowded on a phone, into the lane beside the
+     graphic). Next = red.
      2026-10-10b: GREEN (compactControls — a fifth bd_ui_config flag: the
      steppers as a shallow horizontally-SCROLLING row beside the transport, so
      all 25 are reachable inside a 52px playbar. A `.control-row` is 24px of
@@ -322,7 +328,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #27ae60 !important;      /* CANARY — green (was red) */
+    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -439,10 +445,44 @@
      #control-panel is re-shown by ID, so it beats
      `body.output-only .module-layout > *:not(.player-panel)` on specificity
      without that rule having to learn about this one. */
+  /* ── IT ADAPTS TO THE RECT IT IS GIVEN (2026-10-10b) ──────────────────
+     COLUMN by default, ROW only when the frame is wide and shallow. The host
+     moved these steppers from a 52px bottom bar into the 130px lane beside the
+     graphic — "too crowded on M" in the bar — and the right layout for each is
+     the opposite of the other.
+
+     An aspect-ratio query rather than a sixth flag: the shape of the frame is a
+     fact the module can see for itself, and a host that has to describe its own
+     geometry in a message is a contract that can disagree with reality. The
+     first media query in this file, and it asks only about its own viewport. */
+  body.output-only.strip-controls .module-layout {
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 4px; padding: 0; height: 100%; min-width: 0; min-height: 0;
+  }
+  /* 108px min-width would not fit a 130px lane and the pair would wrap. They
+     share the width instead, which keeps them side by side as asked. */
+  body.output-only.strip-controls .big-btn { min-width: 0; flex: 1 1 0; }
+  body.output-only.strip-controls .player-panel { flex: 0 0 auto; }
+  body.output-only.strip-controls #control-panel {
+    flex-direction: column; flex-wrap: nowrap;
+    overflow-y: auto; overflow-x: hidden;
+    align-items: stretch; flex: 1 1 auto; min-height: 0;
+  }
+  body.output-only.strip-controls .control-row { width: auto; }
+  /* A header with a rule UNDER it, the column equivalent of the bar's rule
+     beside it. */
+  body.output-only.strip-controls .strip-title {
+    display: block; height: auto; width: 100%;
+    padding: 1px 2px 3px; margin: 0 0 3px;
+    border-right: none; border-bottom: 1px solid #2a2a3a;
+  }
+
+  @media (min-aspect-ratio: 2/1) {
   body.output-only.strip-controls .module-layout {
     display: flex; flex-direction: row; align-items: stretch;
     gap: 5px; padding: 0; height: 100%; min-width: 0;
   }
+  body.output-only.strip-controls .big-btn { min-width: 108px; flex: 0 0 auto; }
   /* The transport keeps its intrinsic width and does not scroll away: Play is
      the one control that must always be reachable, because audio needs a
      gesture in the document that makes the sound. */
@@ -494,6 +534,13 @@
        group; with two there would be two, and a pinned title would lie about
        which steppers you were looking at. */
   }
+  body.output-only.strip-controls .strip-title {
+    display: flex; align-items: center; height: 100%; width: auto;
+    padding: 0 6px 0 2px; margin: 0 1px 0 0;
+    border-bottom: none; border-right: 1px solid #2a2a3a;
+  }
+  }   /* end @media (min-aspect-ratio: 2/1) */
+
   body.output-only.strip-controls .control-row label {
     font-size: 0.52rem; line-height: 1.1;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
