@@ -147,27 +147,11 @@
           title="ButterflyDreaming Visual Module"
           sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
 
-  <!-- COLLAGE v1 (2026-10-09) — the SECOND module frame.
-       A collage can hold a visual slot and a music slot at once, and
-       #visual-iframe can only be one module: reparenting an iframe reloads it,
-       and pointing it at a second module would destroy the first. So a music
-       slot gets a frame of its own.
-       No src, for the same reason as the one above: the loader attaches its
-       BD_READY listener before setting the URL, or it races the module's own
-       announcement. Hidden by default and shown only by the collage rules —
-       there is nothing for it to do outside one. -->
-  <iframe id="collage-music-iframe"
-          title="ButterflyDreaming Collage Music Module"
-          sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
-
-  <!-- COLLAGE PREVIEW (2026-10-09) — one line naming each stacked module.
-       Smallest font that renders; the author's call that readability is not
-       crucial here, because these are separators first and labels second. They
-       are SIBLINGS of the frames rather than wrappers: an iframe cannot be
-       reparented without reloading the module inside it, so everything that
-       has to sit next to one is positioned beside it instead. -->
-  <div id="collage-title-visual" class="collage-title" hidden></div>
-  <div id="collage-title-music"  class="collage-title" hidden></div>
+  <!-- COLLAGE v1 (2026-10-10) — THE RESERVED SOUND BAND, deliberately EMPTY.
+       The space is liberated and shown before anything is put in it, so its
+       depth can be judged on a real screen rather than argued about. No
+       iframe, no module, nothing loaded: an outline and a label. -->
+  <div id="collage-sound-reserve" hidden><span></span></div>
 
   <!-- MM3 (2026-07-12) invite panel — visible only in Player mode
        (body.player-active toggled by setViewMode). Sits in the 220 px band
