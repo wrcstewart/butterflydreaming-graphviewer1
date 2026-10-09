@@ -213,6 +213,11 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-10d: RED (the steppers APPEAR in a narrow lane at last:
+     `display: flex` on #control-panel was only in the wide-aspect block, so
+     nothing re-showed the panel in a column and output-only went on hiding it
+     — the lane showed the transport alone. The transport now sits at the FOOT
+     of that column, under the steppers). Next = green.
      2026-10-10c: BLUE (the compact controls ADAPT to the rect: a column by
      default, a row only when the frame is wide and shallow, chosen by an
      aspect-ratio query rather than a sixth flag — the shape of the frame is a
@@ -328,7 +333,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
+    background: #c0392b !important;      /* CANARY — red (was blue) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -464,10 +469,26 @@
   body.output-only.strip-controls .big-btn { min-width: 0; flex: 1 1 0; }
   body.output-only.strip-controls .player-panel { flex: 0 0 auto; }
   body.output-only.strip-controls #control-panel {
+    /* `display: flex` IS THE WHOLE BUG THIS LINE FIXES. It was only in the
+       wide-aspect block, so in a narrow lane nothing re-showed the panel and
+       `body.output-only .module-layout > *:not(.player-panel)` went on hiding
+       it. The lane showed the transport with the steppers suppressed —
+       reported as "you put the playbar there instead of the steppers", which
+       is precisely what it looked like. An id selector, so it beats that
+       class-only rule without that rule having to know about this one. */
+    display: flex;
     flex-direction: column; flex-wrap: nowrap;
     overflow-y: auto; overflow-x: hidden;
     align-items: stretch; flex: 1 1 auto; min-height: 0;
   }
+  /* THE TRANSPORT GOES TO THE FOOT OF THE COLUMN, not its head. The steppers
+     are what this column is for, so they get the top where reading starts, and
+     Play/Stop sit low — which is also roughly where the bottom bar put them.
+     `order` rather than reordering the markup: the DOM order is the authoring
+     order and three other layouts read it. */
+  body.output-only.strip-controls .player-panel { order: 2; }
+  body.output-only.strip-controls #control-panel { order: 1; }
+  body.output-only.strip-controls .strip-title   { order: 0; }
   body.output-only.strip-controls .control-row { width: auto; }
   /* A header with a rule UNDER it, the column equivalent of the bar's rule
      beside it. */
