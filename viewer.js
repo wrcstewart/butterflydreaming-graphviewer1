@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10f' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10g' };
 
 let bdViewTitleText = '';
 
@@ -10896,8 +10896,31 @@ async function init() {
       // KNOWN CONSEQUENCE: the bar sits where BD's ↓↑ arrows strip goes.
       if (bar && [t0, l0, w0, h0].every(Number.isFinite) &&
           h0 > COLLAGE_BAR_H + 120) {
-        bar.style.top    = (t0 + h0 - COLLAGE_BAR_H) + 'px';
         bar.style.height = COLLAGE_BAR_H + 'px';
+        // ── THE TOP COMES FROM THE GRAPHIC, NOT THE FRAME ──────────────
+        // It was the frame's bottom minus the bar's height, which overlapped
+        // the square whenever the square was TALL — and on desktop the square
+        // is height-limited, ending only 52px above the frame's bottom
+        // (`.canvas-wrapper`'s Extension reserve) against a 70px bar. So an
+        // 18px overlap was built in, and the resize that "fixed" it was really
+        // making the square width-limited and therefore shorter.
+        //
+        // max() takes whichever position is LOWER: flush with the frame's
+        // bottom when the square leaves room, and just under the square when
+        // it does not.
+        //
+        // THE TRADE, stated rather than discovered: when the square is tall the
+        // bar now hangs up to ~20px below the frame, so the stepper column ends
+        // slightly above the bar's bottom instead of level with it. Both cannot
+        // hold at once while the bar is 70px and the reserve is 52px. The clean
+        // fix is a 52px bar, which needs DroneFrac's .big-btn to come down from
+        // its 52px minimum — a module change, not asked for yet.
+        const flush = t0 + h0 - COLLAGE_BAR_H;
+        const g0 = collageGraphicRect(iframeEl) || collageLastGraphic;
+        const underGraphic = (g0 && Number.isFinite(g0.top))
+          ? g0.top + g0.height + 2
+          : flush;
+        bar.style.top = Math.round(Math.max(flush, underGraphic)) + 'px';
 
         // UNDER THE GRAPHIC, matching its width and its left edge — not the
         // frame's, which would sit across the stepper column.
@@ -10938,7 +10961,17 @@ async function init() {
         // cannot drive another layout pass and cannot loop.
         requestAnimationFrame(() => {
           if (!document.body.classList.contains('collage-bar')) return;
-          place(collageGraphicRect(iframeEl));
+          const g1 = collageGraphicRect(iframeEl);
+          place(g1);
+          // THE TOP, AGAIN. The square's final size arrives after this frame's
+          // layout — the module re-measures it from a ResizeObserver on its
+          // wrapper, which fires after ours — so a top computed once is
+          // computed from a square that has not finished settling. That is the
+          // whole of "on the first draw it overlaps, and on resizing it lines
+          // up": the resize was simply a second measurement.
+          if (g1 && Number.isFinite(g1.top)) {
+            bar.style.top = Math.round(Math.max(flush, g1.top + g1.height + 2)) + 'px';
+          }
           // ── PROBE, because one of the four reports has no explanation yet ──
           // "On mobile the panel is not the same width as the graphic but only
           // 70% of it." The bar iframe is given the measured width, so the
@@ -10971,6 +11004,16 @@ async function init() {
               console.log('[collage] ' + line);
             }
           } catch (_) {}
+          // And once the bar is in place, hand the module its second measure.
+          // A frame later again, so our own write has been laid out first.
+          collageNudgeVisual(iframeEl);
+          requestAnimationFrame(() => {
+            if (!document.body.classList.contains('collage-bar')) return;
+            const g2 = collageGraphicRect(iframeEl);
+            if (place(g2) && Number.isFinite(g2.top)) {
+              bar.style.top = Math.round(Math.max(flush, g2.top + g2.height + 2)) + 'px';
+            }
+          });
         });
       }
     }
@@ -11208,6 +11251,7 @@ async function init() {
     }
     console.log('[collage] playbar swap path, src=' + url + ', script length=' + script.length);
     currentBarModuleId = moduleId;
+    collageNudged = false;   // a new load gets a fresh second measure
     const onReady = (e) => {
       const d = e && e.data;
       if (!d || d.type !== 'BD_READY') return;
@@ -11227,6 +11271,31 @@ async function init() {
     };
     window.addEventListener('message', onReady);
     bf.src = url;
+  }
+
+  // ── THE SECOND MEASURE, ONCE PER LOAD (2026-10-10) ────────────────────
+  // The module sizes its square from a ResizeObserver on its own wrapper, so
+  // the first draw happens against a frame rect that BD is still settling and
+  // the square comes out slightly too tall. A resize fixes it — which is why
+  // "resize the window" and "press View and come back" both did.
+  //
+  // So BD supplies that resize itself, same-origin, ONCE per playbar load
+  // rather than on every layout pass: the handler only re-measures and redraws,
+  // it never resizes the frame, so it cannot feed back — but a nudge on every
+  // pass would still be a redraw on every pass.
+  let collageNudged = false;
+
+  function collageNudgeVisual(outerIframe) {
+    if (collageNudged || !outerIframe) return;
+    try {
+      const d1 = outerIframe.contentDocument;
+      const inner = d1 && d1.querySelector('iframe');
+      const win = inner ? inner.contentWindow : (outerIframe.contentWindow || null);
+      if (!win) return;
+      win.dispatchEvent(new Event('resize'));
+      collageNudged = true;
+      console.log('[collage] nudged the visual module to re-measure its square');
+    } catch (_) { /* cross-origin one day, or not loaded yet */ }
   }
 
   function stopCollagePlaybar() {

@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-10f";
+  --bd-css-build: "2026-10-10g";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,12 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-10g: GREEN (the playbar's TOP comes from the measured graphic's
+   bottom rather than the frame's, so it cannot overlap the square; and BD hands
+   the module the second measure it was waiting for — the square settles from a
+   ResizeObserver that fires after BD's layout, which is the whole of "on the
+   first draw it overlaps and on resizing it lines up"). Next = blue.
+
    2026-10-10f: RED (the playbar OVERLAYS the module frame instead of slicing
    74px off it — the frame holds the stepper column too, so the slice made the
    steppers stop short and the graphic smaller for nothing. The "massive gap"
@@ -1358,7 +1364,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
