@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10d' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10e' };
 
 let bdViewTitleText = '';
 
@@ -10886,9 +10886,36 @@ async function init() {
         const visH = h0 - COLLAGE_BAR_H - COLLAGE_BAR_GAP;
         iframeEl.style.height = visH + 'px';
         bar.style.top    = (t0 + visH + COLLAGE_BAR_GAP) + 'px';
-        bar.style.left   = l0 + 'px';
-        bar.style.width  = w0 + 'px';
         bar.style.height = COLLAGE_BAR_H + 'px';
+
+        // UNDER THE GRAPHIC, matching its width and its left edge — not the
+        // frame's, which would sit across the stepper column.
+        const place = (g) => {
+          if (g && g.width > 40) {
+            collageLastGraphic = g;
+            bar.style.left  = Math.round(g.left)  + 'px';
+            bar.style.width = Math.round(g.width) + 'px';
+            return true;
+          }
+          return false;
+        };
+        if (!place(collageGraphicRect(iframeEl)) && !place(collageLastGraphic)) {
+          // Never measured and nothing cached — the module is still loading.
+          // The fallback subtracts the stepper column and the arrows band so a
+          // first paint still clears the steppers, and it is corrected by the
+          // rAF below the moment the canvas exists.
+          bar.style.left  = l0 + 'px';
+          bar.style.width = Math.max(120, w0 - 150 - 44) + 'px';
+        }
+        // THE SQUARE DEPENDS ON THE HEIGHT JUST CHANGED, so one measurement
+        // cannot be enough: shrinking the frame can shrink the canvas, and the
+        // canvas is what the bar is being matched to. Re-measured after the
+        // module has re-laid out. Sets only the bar's own two properties, so it
+        // cannot drive another layout pass and cannot loop.
+        requestAnimationFrame(() => {
+          if (!document.body.classList.contains('collage-bar')) return;
+          place(collageGraphicRect(iframeEl));
+        });
       }
     }
   }
@@ -11036,6 +11063,51 @@ async function init() {
     };
     window.addEventListener('message', onReady);
     visualIframe.src = url;
+  }
+
+  // ── WHERE THE GRAPHIC ACTUALLY IS (2026-10-10) ────────────────────────
+  // The playbar has to match the GRAPHIC's width and horizontal placement, not
+  // the iframe's: the iframe also holds the module's stepper column, so a bar
+  // the width of the frame covers it — which is what was reported.
+  //
+  // And the graphic's rect cannot be computed. The canvas keeps itself SQUARE
+  // at min(wrapper width, wrapper height) and is right-aligned in its wrapper
+  // behind a 44px band kept for BD's arrows, with different alignment and an
+  // 88px left pad in the portrait media query. Every one of those would have to
+  // be duplicated here and kept in step — a formula about someone else's
+  // layout, which is the fault "measure, don't model" is named for.
+  //
+  // So it is MEASURED. Both frames are same-origin (BD's own host, and the
+  // sandbox carries allow-same-origin), so the canvas rect is readable through
+  // the wrapper. Returns null rather than a guess if the frames are not up yet;
+  // the caller keeps the last good value, which is the same discipline
+  // positionCyEl already applies to #cy's collapsed rect.
+  let collageLastGraphic = null;
+
+  function collageGraphicRect(outerIframe) {
+    try {
+      const outerRect = outerIframe.getBoundingClientRect();
+      const d1 = outerIframe.contentDocument;
+      if (!d1) return null;
+      let offX = 0, offY = 0, doc = d1;
+      // The wrapper holds a second iframe (visual_module.html). Its offset
+      // within the wrapper is added rather than assumed to be zero — it is
+      // zero today, and that is exactly the kind of thing that changes.
+      const inner = d1.querySelector('iframe');
+      if (inner) {
+        const ir = inner.getBoundingClientRect();
+        offX += ir.left; offY += ir.top;
+        doc = inner.contentDocument;
+      }
+      if (!doc) return null;
+      const cv = doc.getElementById('kolam-canvas') || doc.querySelector('canvas');
+      if (!cv) return null;
+      const r = cv.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return null;
+      return { left: outerRect.left + offX + r.left, width: r.width };
+    } catch (_) {
+      return null;            // cross-origin one day, or simply not loaded yet
+    }
   }
 
   // ── COLLAGE PREVIEW: THE PLAYBAR (2026-10-10) ─────────────────────────
