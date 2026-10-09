@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-09s' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10' };
 
 let bdViewTitleText = '';
 
@@ -10981,6 +10981,64 @@ async function init() {
     visualIframe.src = url;
   }
 
+  // ── COLLAGE: the MUSIC slot, in its own frame (2026-10-09) ────────────
+  // #visual-iframe can only hold one module — reparenting an iframe reloads
+  // it, so pointing it at a second module would destroy the first. A music
+  // slot therefore gets #collage-music-iframe, and its own idea of what is
+  // loaded: sharing `currentModuleId` between two frames is the same desync
+  // that note warns about, one frame further on.
+  let currentMusicModuleId = null;
+
+  function loadCollageMusic(moduleId, script) {
+    const mf = document.getElementById('collage-music-iframe');
+    if (!mf || !moduleId || !script) return;
+    const url = getModuleUrl(moduleId);
+    if (!url) {
+      console.warn(`[collage] unknown music module '${moduleId}' — slot skipped`);
+      return;
+    }
+    // ALL THREE FLAGS, as everywhere else: outputOnly reduces a music module to
+    // its player panel — the transport and the title, not the steppers, not
+    // Copy or Bake or Save, which are authoring. A module that has not been
+    // taught the flag still degrades to "controls hidden, no chrome".
+    const flags = () => {
+      try {
+        mf.contentWindow.postMessage({ type: 'bd_ui_config',
+          outputOnly: true, hideControls: true, hostChrome: false }, '*');
+      } catch (_) {}
+    };
+    if (moduleId === currentMusicModuleId) {
+      console.log('[collage] music fast path, posting slot script to ' + moduleId +
+                  ', length=' + script.length);
+      try {
+        mf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
+      } catch (_) {}
+      flags();
+      return;
+    }
+    console.log('[collage] music swap path, src=' + url + ', script length=' + script.length);
+    currentMusicModuleId = moduleId;
+    const onReady = (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_READY') return;
+      // THE SOURCE MUST BE CHECKED HERE, unlike in the visual loader. Two
+      // module frames are alive now, so a BD_READY from the OTHER one would
+      // otherwise satisfy this listener and the script would be posted to a
+      // frame that is not ready — or to the wrong module entirely.
+      if (e.source !== mf.contentWindow) return;
+      window.removeEventListener('message', onReady);
+      try {
+        mf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
+        console.log('[collage] music BD_READY — slot script posted to ' + moduleId);
+      } catch (err) {
+        console.warn('[collage] music postMessage failed', err);
+      }
+      flags();
+    };
+    window.addEventListener('message', onReady);
+    mf.src = url;
+  }
+
   // ── COLLAGE: load a SCRIPT, not a node (2026-10-08) ────────────────────
   // loadModuleForNode works from a node because an ordinary media node holds
   // exactly one script. A collage holds several, so the picture slot needs the
@@ -13912,6 +13970,15 @@ async function init() {
         // iframe would be invisible until someone tried to use a stepper.
         if (f) { f.style.zIndex = ''; f.style.pointerEvents = ''; }
         if (tp) tp.style.zIndex = '';
+        // THE MUSIC FRAME MUST BE SILENCED, not merely hidden. Its CSS stops
+        // matching the moment `collage-music` comes off, and a hidden iframe
+        // goes on playing — the same fault as BD's media bar playing into the
+        // standalone, which needed an explicit stop for exactly this reason.
+        // BD_STOP is in every wrapper's RELAY_DOWN set.
+        const mf = document.getElementById('collage-music-iframe');
+        if (mf && mf.contentWindow) {
+          try { mf.contentWindow.postMessage({ type: 'BD_STOP' }, '*'); } catch (_) {}
+        }
         if (f && f.contentWindow) {
           // Back to BD's own defaults: its chrome returns, its steppers
           // return. hostScriptPanel is not sent in either direction — BD has
@@ -14051,9 +14118,14 @@ async function init() {
           // needs a second frame — that is the next step, not a missing line.
           const mus = collageSlot(live, 'music');
           if (mus) {
+            // The class comes FIRST: --bd-collage-side subtracts
+            // --bd-collage-music, so the square has to be told to shrink before
+            // the strip appears in the space it gives up.
             body.classList.add('collage-music');
-            console.log('[collage] music slot RESERVED for ' + mus.moduleId +
-                        ' — player not built yet (needs a second iframe)');
+            if (typeof loadCollageMusic === 'function') {
+              loadCollageMusic(mus.moduleId, mus.script);
+            }
+            console.log('[collage] music slot ' + mus.moduleId + ' — 110px strip, square shrinks');
           }
 
           const sb = document.getElementById('bd-view-speak');

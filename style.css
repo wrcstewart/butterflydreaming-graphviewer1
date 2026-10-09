@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-09s";
+  --bd-css-build: "2026-10-10";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,12 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-10: RED (a collage can carry a MUSIC slot: a second module frame,
+   #collage-music-iframe, as a 110px strip at the foot of View. The square
+   shrinks by exactly the strip's depth because --bd-collage-side already
+   subtracted it, so the two cannot overlap by construction. The preview's
+   merged stepper column is NOT built). Next = green.
+
    2026-10-09s: BLUE (bdModuleOf reports a COLLAGE's visual slot instead of
    its first %%bd_module line. Putting the figure on top made that line
    `%%bd_module text`, so the exploration recorder compared 'text' against the
@@ -1330,7 +1336,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1562,6 +1568,17 @@ body.player-active #auto-echo { display: flex; }
   background: #0a0a0f;
 }
 #visual-iframe.active { display: block; }
+
+/* COLLAGE v1 — the second module frame. Hidden unless a collage in View has a
+   music slot; there is nothing for it to do anywhere else yet. Its own
+   background is transparent so it cannot paint a band over the picture before
+   the module inside it has drawn anything. */
+#collage-music-iframe {
+  display: none;
+  position: fixed;
+  border: 0;
+  background: transparent;
+}
 #cy.hidden { display: none; }
 
 /* MM3 (2026-07-12) — #bd-invite-panel-viewer.
@@ -2401,7 +2418,7 @@ body.player-active #auto-echo { display: flex; }
 body.view-active {
   background: #07070c;
 }
-body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):not(#session-expired):not(#loading-overlay) {
+body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):not(#collage-music-iframe):not(#session-expired):not(#loading-overlay) {
   display: none !important;
 }
 
@@ -2589,6 +2606,27 @@ body.view-active.collage-active {
    inset, as a plain length rather than a term inside a calc — see the note on
    the picture below for why that distinction cost two rounds. */
 body.view-active.collage-active.collage-music { --bd-collage-music: 110px; }
+
+/* ── THE MUSIC SLOT: A STRIP AT THE FOOT ─────────────────────────────────
+   110px, the same figure single-module View uses for a musical Output, so a
+   collage and View agree about how deep a player is.
+
+   It does NOT overlay the picture. --bd-collage-side already subtracts
+   --bd-collage-music, so turning this on SHRINKS THE SQUARE by exactly the
+   strip's depth and the two cannot overlap by construction — which is the
+   whole reason the reserve was built before the player. The author's "which
+   will mean reducing the graphics square on desktop I guess": yes, and that
+   is automatic rather than a second calculation to keep in step. */
+body.view-active.collage-active.collage-music #collage-music-iframe {
+  display: block;
+  left: 0; right: 0; bottom: 0;
+  width: auto;
+  height: 110px;
+  /* Above both the picture and the text. A transport has to be reachable
+     whichever of those two is on top, and it is the one thing on this screen
+     that is a CONTROL rather than content. */
+  z-index: 20;
+}
 
 /* ── THE PICTURE IS THE SQUARE ───────────────────────────────────────────
    Centred by `margin: auto` against all four insets with a DEFINITE width and
