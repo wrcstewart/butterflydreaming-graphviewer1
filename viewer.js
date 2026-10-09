@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10e' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10f' };
 
 let bdViewTitleText = '';
 
@@ -10878,23 +10878,47 @@ async function init() {
       const l0 = parseInt(iframeEl.style.left, 10);
       const w0 = parseInt(iframeEl.style.width, 10);
       const h0 = parseInt(iframeEl.style.height, 10);
-      // 120px floor on what is LEFT for the graphic: a short window should lose
-      // the bar rather than have the picture carved down to nothing, and a band
-      // too small to divide is better left undivided.
+      // ── IT OVERLAYS, IT NO LONGER SLICES (2026-10-10) ────────────────
+      // The slice took 74px off the frame's height, and the frame holds the
+      // STEPPER COLUMN as well as the canvas — so the steppers stopped 74px
+      // short, which was reported as them ending at the top of the playbar
+      // instead of its bottom. It also made the graphic smaller for no gain.
+      //
+      // And the space was there all along: `.canvas-wrapper` carries
+      // `padding-bottom: 52px`, a reserve for BD's Extension strip, so there
+      // is already a band below the square inside the frame. That reserve is
+      // the "massive gap between the graphic and the playbar" — it was never
+      // the bar's doing.
+      //
+      // So the frame is left ALONE at full height and the bar is laid over its
+      // bottom edge. The steppers run the whole depth, the square gets back the
+      // 74px it was losing, and the bar's bottom lines up with the column's.
+      // KNOWN CONSEQUENCE: the bar sits where BD's ↓↑ arrows strip goes.
       if (bar && [t0, l0, w0, h0].every(Number.isFinite) &&
-          h0 > COLLAGE_BAR_H + COLLAGE_BAR_GAP + 120) {
-        const visH = h0 - COLLAGE_BAR_H - COLLAGE_BAR_GAP;
-        iframeEl.style.height = visH + 'px';
-        bar.style.top    = (t0 + visH + COLLAGE_BAR_GAP) + 'px';
+          h0 > COLLAGE_BAR_H + 120) {
+        bar.style.top    = (t0 + h0 - COLLAGE_BAR_H) + 'px';
         bar.style.height = COLLAGE_BAR_H + 'px';
 
         // UNDER THE GRAPHIC, matching its width and its left edge — not the
         // frame's, which would sit across the stepper column.
+        // ── A FLOOR ON THE WIDTH, AND WHY ────────────────────────────
+        // The graphic is SQUARE, so reducing the window vertically reduces its
+        // WIDTH by the same amount — and the bar, matching that width, kept
+        // narrowing until DroneFrac's two 108px buttons had to wrap and stacked
+        // vertically. Reported as "it shrinks horizontally when the size is
+        // reduced vertically — that makes no sense at all", and it did make
+        // sense: the bar was following the graphic exactly as asked.
+        //
+        // 240 = two 108px buttons + the 10px gap + the panel's padding and
+        // border. Below that the content cannot sit in a row at all, so the bar
+        // stops following the square and stays legible. Still LEFT-ALIGNED to
+        // the graphic, so the two share an edge even when the widths differ.
+        const COLLAGE_BAR_MIN_W = 240;
         const place = (g) => {
           if (g && g.width > 40) {
             collageLastGraphic = g;
-            bar.style.left  = Math.round(g.left)  + 'px';
-            bar.style.width = Math.round(g.width) + 'px';
+            bar.style.left  = Math.round(g.left) + 'px';
+            bar.style.width = Math.round(Math.max(COLLAGE_BAR_MIN_W, g.width)) + 'px';
             return true;
           }
           return false;
@@ -10915,6 +10939,38 @@ async function init() {
         requestAnimationFrame(() => {
           if (!document.body.classList.contains('collage-bar')) return;
           place(collageGraphicRect(iframeEl));
+          // ── PROBE, because one of the four reports has no explanation yet ──
+          // "On mobile the panel is not the same width as the graphic but only
+          // 70% of it." The bar iframe is given the measured width, so the
+          // shortfall is INSIDE the module — and modelling someone else's
+          // layout is what cost the last two rounds. This reads the real rects
+          // through the same-origin frames and logs them once per change.
+          try {
+            const g  = collageLastGraphic;
+            const br = bar.getBoundingClientRect();
+            let panel = 'n/a', fd = 'n/a';
+            const bd1 = bar.contentDocument;
+            const bin = bd1 && bd1.querySelector('iframe');
+            const bdoc = bin ? bin.contentDocument : bd1;
+            const pp = bdoc && bdoc.querySelector('.player-panel');
+            if (pp) {
+              const pr = pp.getBoundingClientRect();
+              panel = Math.round(pr.width) + 'x' + Math.round(pr.height) +
+                      ' at x' + Math.round(pr.left);
+              fd = getComputedStyle(pp).flexDirection + '/' +
+                   getComputedStyle(pp).display;
+            }
+            const line = 'graphic ' + (g ? Math.round(g.width) + 'x' + Math.round(g.height) +
+                         ' at x' + Math.round(g.left) : '?') +
+                         ' | bar ' + Math.round(br.width) + 'x' + Math.round(br.height) +
+                         ' at x' + Math.round(br.left) +
+                         ' | player-panel ' + panel + ' ' + fd +
+                         ' | frame h' + Math.round(iframeEl.getBoundingClientRect().height);
+            if (line !== collageLastProbe) {
+              collageLastProbe = line;
+              console.log('[collage] ' + line);
+            }
+          } catch (_) {}
         });
       }
     }
@@ -11083,6 +11139,7 @@ async function init() {
   // the caller keeps the last good value, which is the same discipline
   // positionCyEl already applies to #cy's collapsed rect.
   let collageLastGraphic = null;
+  let collageLastProbe   = '';
 
   function collageGraphicRect(outerIframe) {
     try {
@@ -11104,7 +11161,8 @@ async function init() {
       if (!cv) return null;
       const r = cv.getBoundingClientRect();
       if (!(r.width > 0 && r.height > 0)) return null;
-      return { left: outerRect.left + offX + r.left, width: r.width };
+      return { left: outerRect.left + offX + r.left, width: r.width,
+               top: outerRect.top + offY + r.top, height: r.height };
     } catch (_) {
       return null;            // cross-origin one day, or simply not loaded yet
     }
