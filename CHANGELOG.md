@@ -6,6 +6,87 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-10 — the collage preview, and the one fact the design turns on
+
+The preview shows all three layers now: the words, the figure, and a transport.
+Built in stages at the author's instruction — *"so we can see where any trouble
+arises"* — which paid for itself about six times.
+
+### One document is one rectangle
+
+The constraint that shaped the whole day, and it was asked three times before I
+stated it properly. A module's output and its steppers are in the SAME HTML
+file; one iframe is one rectangle; so they can only be placed as a unit. The
+transport cannot be a bar under the graphic while its own steppers are in the
+lane, because those two regions are not a rectangle. Loading the module twice
+does not rescue it either — Play has to be pressed in the document that makes
+the sound, which DroneFrac's own code says in as many words.
+
+The author then asked the question that cracked it open: if Kolam3D's graphic
+and its stepper column are in different rectangles, why can't DroneFrac's be?
+They aren't — they are both inside ONE rect, subdivided by the module's own CSS,
+and the column only looks deeper than the square because the square is
+`min(width, height)` behind a 52px reserve. Which means the whole module area is
+a single rectangle, and an overlay covering all of it can hold both parts.
+
+### The fact that makes it work
+
+**Pointer events inside an iframe cannot pass through to the parent document —
+the iframe ELEMENT is the hit target.** So `pointer-events: none` on an overlay
+frame would make Play unclickable along with everything else. But a
+**`clip-path` takes part in hit-testing**, so the clipped-away region is not a
+target at all.
+
+That is the only reason the design is possible, because **a clip need not be a
+single rectangle.** The music module now covers the whole module rect, clipped
+to its bar; the eye and the mouse agree, and the module underneath keeps both.
+
+### There is no stepper lane
+
+Also the author's catch. BD owns no stepper panel and builds no steppers: what
+reads as one right-hand column is each module's own column inside its own rect,
+with BD lining the rects up. So the steppers can be **adjacent, never
+continuous** — two documents cannot share a scrollbar.
+
+### Four traps, each caught more than once
+
+- **A dropped CSS declaration leaves nothing behind.** A `calc()` carrying a
+  custom property failed whole on iOS and an iframe with no height falls back
+  to its intrinsic 150px. The fix then used `width/height: auto` — and an iframe
+  is a REPLACED element, whose auto is 300x150, not the insets. Same small box,
+  two routes, and the second broke desktop too.
+- **Four stacked backgrounds, caught a fourth time.** three.js's clear alpha,
+  the module's body, the wrapper's html+body, and the host's iframe element. The
+  fourth hid the preview's text layer: an iframe element paints its own
+  background before the document inside it renders. I had written the list down
+  and still did not check it.
+- **A stale measurement from a different layout.** Returning from View the
+  square is still View's, much larger, so the words spilled past both edges. The
+  fix is to re-measure — and to DROP the cached square on the way out, because
+  the fallback must be "do not move anything yet", never "use a number from
+  another layout".
+- **positionCyEl has one writer.** A branch of its own returned before the
+  fallback that keeps the last good rect, and #cy is display:none in Player
+  mode, so the graphic landed unstamped in the top-left corner. Everything
+  collage-related now runs after the working stamps and reads what they wrote,
+  so the failure mode is "no bar" and never "no graphic".
+
+### Where it stands
+
+Working, and the author is pondering overnight whether it is the right approach
+at all: the stepper columns will be cramped and the model is complicated, even
+with the pieces constrained in iframes, because they still need coordinating on
+which regions are transparent. The alternative he named is much cheaper — set
+the steppers in the original node and flip between the node, the Collage Script
+and the View, perhaps with separate buttons. That needs no overlay, no clip, no
+transparency coordination, and removes the cramming entirely.
+
+So this stands as a proof that the hard version is possible, and a working
+three-layer preview, rather than as a settled direction. Full detail and every
+open item: `PLANNING_REGISTER.md`, **Added 2026-10-10**.
+
+---
+
 ## 2026-10-08 — a collage: the words over the figure, or under it
 
 Built, and working on desktop and iOS. A node whose script opens

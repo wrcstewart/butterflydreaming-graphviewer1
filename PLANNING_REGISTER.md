@@ -1026,3 +1026,188 @@ the view's own query, not by reading the code and reasoning.
 | **the `dim` stepper** | deferred, maybe never | The module's own `%%bd_opacity` is the right lever for a background slot. If a collage-level dimmer is ever wanted, call it `dim` (pairing with `duck`) — `opacity` would collide with `%%bd_p_opacity` inside a merged block. |
 | **deep links / Device for a collage** | undecided | `extractLatestModuleScript` takes the LAST `%%bd_module` block, which for a collage is one slot. Not wrong so much as meaningless; nothing depends on it yet. |
 | **a canary for the Kolam modules** | still none | Both were edited for `%%bd_background transparent` and neither can report it. The server sends `no-cache` for HTML, so staleness is not the risk — invisibility of a change is. |
+
+
+## Added 2026-10-10 — the collage PREVIEW, the overlay architecture, and the question left open
+
+The preview now shows all three layers: the words, the figure, and a transport.
+Built in stages at the author's instruction, *"so we can see where any trouble
+arises"* — which paid for itself repeatedly.
+
+**The author is pondering overnight whether this is the right approach at all.**
+The alternative he named: let the user set steppers in the ORIGINAL node and
+flip between the node, the Collage Script and the View — possibly with separate
+buttons straight to Collage View and Collage Script. See *The question left
+open* at the end; nothing below should be read as settled against it.
+
+### What the preview is made of
+
+| layer | what it is | how it is placed |
+|---|---|---|
+| the words | **BD's own DOM** — `#collage-preview-text`. Not a module, no iframe, no clip, no relay. | over the measured square, `pointer-events: none` |
+| the figure | `#visual-iframe`, the real `bd_V_Kolam3D` | BD's existing stamp, untouched |
+| the transport | `#collage-playbar`, the real `bd_M_DroneFrac`, covering the WHOLE module rect and **clipped** to its bar | `clip-path`, plus `bd_collage_layout` telling it where to draw |
+
+### THE FACT THE WHOLE ARCHITECTURE TURNS ON
+
+**Pointer events inside an iframe cannot pass through to the parent document —
+the iframe ELEMENT is the hit target.** So `pointer-events: none` on an overlay
+frame makes *everything* in it unclickable, Play included. But a **`clip-path`
+takes part in hit-testing**, so the clipped-away region is not a target at all.
+
+That is what lets ONE frame hold two separated parts: **a clip need not be a
+single rectangle.** It is the only reason the overlay design is possible, and it
+was not obvious.
+
+The text layer is the one case where `pointer-events: none` *is* enough —
+because nothing in it is ever clicked. **A text MODULE with steppers would lose
+that**, and would need the same clip treatment as the music module.
+
+### ONE DOCUMENT IS ONE RECTANGLE
+
+The constraint that shaped everything, stated once properly because it was
+asked three times:
+
+- A module's output and its steppers are **in the same HTML file**. One iframe
+  is one rectangle, so they can only be placed as a unit.
+- Hence the transport cannot be a bar under the graphic while its own steppers
+  are in the lane — those two regions are not a rectangle.
+- **Loading the module twice does not rescue it**: Play must be pressed in the
+  document that makes the sound. DroneFrac's own comment: *"Play cannot be
+  delegated: audio needs a user gesture in the document that makes the sound,
+  and a remote press cannot supply one."*
+- The way out is the overlay: a frame covering the whole area, clipped to the
+  union of the regions it occupies.
+
+### THERE IS NO "STEPPER LANE"
+
+The author spotted that I had been talking about one as if it existed. **BD owns
+no stepper panel and builds no steppers.** What reads as a single right-hand
+column is *each module's own column inside its own rect*, with BD lining the
+rects up. The lane is an appearance BD arranges, not a structure.
+
+Consequence, and it matters for the cramming problem: **the steppers can be
+adjacent, never continuous.** Each module's `overflow-y: auto` div scrolls its
+own rows; two documents cannot share a scrollbar. Stacked, the lane holds TWO
+scroll panels with two headers and two scrollbars.
+
+### Geometry, all of it measured rather than computed
+
+- **The module's canvas is SQUARE** — `min(wrapper width, height)` — so a
+  full-screen frame on a phone draws a centred square with dead space, and the
+  text was being centred on the VIEWPORT while the picture centred as a square.
+  Fixed by naming the square ONCE (`--bd-collage-side`) and having both read it.
+  **That is the answer to "can the graphic and the text scale together": yes,
+  so long as there is a single NUMBER. Two expressions that happen to agree
+  today are the problem.**
+- **Lines-per-box is now invariant** — 43–64 characters across desktop
+  1440x900, a 700x620 window, iPhone portrait and landscape. `2.2vw` had been
+  pinned at its 20px clamp FLOOR, so the box shrank and the glyphs did not.
+- **The playbar is 52px because `.canvas-wrapper` reserves exactly 52px** below
+  the square for BD's Extension strip. At 70px the two candidate positions —
+  flush with the frame, and under the square — differed by 18px, so one of
+  overlap-or-hang was guaranteed. At 52 they coincide.
+- The graphic is square and **height-limited on desktop**, so shrinking the
+  window vertically narrows it — which is why the bar followed it down until
+  DroneFrac's two 108px buttons wrapped. Hence a 240px floor on the bar's width.
+- **`.canvas-wrapper { padding-bottom: 52px }` was the "massive gap"** between
+  the graphic and the bar, not anything the bar did.
+
+### Four traps, each caught more than once
+
+1. **A dropped CSS declaration leaves nothing behind.** `calc()` carrying a
+   custom property failed whole on iOS; nothing else supplied a height; an
+   iframe with no height falls back to its intrinsic **150px**. Then the fix
+   used `width: auto; height: auto` — and **an iframe is a REPLACED element**,
+   whose `auto` is 300x150, not the insets. Same small box, two routes.
+2. **FOUR stacked backgrounds, caught a fourth time.** three.js's clear alpha,
+   the module's body, the wrapper's `html, body`, and **the host's
+   `#visual-iframe` element**. The fourth is what hid the preview's text layer:
+   an iframe element paints its own background before the document inside it
+   renders, so `%%bd_background transparent` was working perfectly and could
+   never have been enough. The list was written down and still not checked.
+3. **A stale measurement from a DIFFERENT layout.** Returning from View, the
+   square is still View's `min(100vw, 100dvh - 44px)` — the module re-measures
+   from a ResizeObserver that fires after BD's pass. The text spilled past both
+   edges. Fixed by re-measuring twice AND by **dropping the cached square on
+   View exit**: the fallback must be *"do not move anything yet"*, never *"use a
+   number from another layout"*.
+4. **`positionCyEl` has ONE writer, and a branch of its own is not a place to
+   stand.** The version that took an early branch returned before the fallback
+   that keeps the last good rect — and `#cy` is `display: none` in Player mode,
+   so its rect is zeros. The graphic landed unstamped in the top-left corner,
+   at the same level as the script panel. **Everything collage-related now runs
+   AFTER the working stamps and reads what they wrote**, so the failure mode is
+   "no bar" and never "no graphic".
+
+### Flags and messages added
+
+| name | kind | asserts |
+|---|---|---|
+| `compactControls` | `bd_ui_config` field | "show your controls compactly beside the transport" — needed because `outputOnly` could not answer both *View wants the transport alone* and *the preview is where the piece is built*. **Currently NOT sent.** |
+| `overlay` | `bd_ui_config` field | "you are laid over another module; be transparent where you have nothing to show" |
+| `bd_collage_layout` | **new message TYPE** | frame-relative rects for the module's panels. The host is the only party that can see both modules — but it sends CUSTOM PROPERTIES for the module's own CSS to use, never `style.left`. |
+
+**A new FIELD rides along; a new TYPE needs the wrapper's `RELAY_DOWN` as
+well.** `bd_collage_layout` needed that third site; `compactControls` and
+`overlay` did not.
+
+**DroneFrac chooses its own layout from the shape of its rect** — a column by
+default, a row above a 2:1 aspect ratio — rather than being told by a seventh
+flag. The shape of the frame is a fact the module can see for itself, and a host
+describing its own geometry in a message is a contract that can disagree with
+reality.
+
+### Text as a third module — possible, and the format already allows it
+
+Asked and answered in principle, **not built**:
+
+- Steppers can only come from a real module: **BD builds none**, every column is
+  built inside a module from its own `STEPPERS` array. The alternative is the
+  metadata contract that "the collage runs the REAL modules" dissolved.
+- **The node format needs no change.** `%%bd_module text` was spelled as a
+  module header so Merge could be uniform, and that pays off here: the same
+  script is valid with `text` resolving to a real module. The two can coexist
+  for ever, because **the name in the header decides which path a slot takes.**
+- Costs: the FOUR registries a new module needs; a third `MODULES.kind`;
+  **Speak would read the script rather than the DOM** (arguably more correct);
+  and it loses `pointer-events: none` for a clip.
+- **The lane cannot take three groups.** ~270px deep on a phone: halved is
+  ~135px, which is a header plus one row. Thirds are unusable. That, not the
+  machinery, is the argument against it.
+
+### Reverted along the way, and why it is worth knowing
+
+- **Steppers in the 52px bar** — fitted by arithmetic (a `.control-row` is ~34px
+  against 44px of content) and worked, but *"too crowded on M"*.
+- **The music module in the lane** — put the transport somewhere it does not
+  belong, and the lane is wanted for steppers.
+- **Two stacked module frames** — the author chose it when asked, then it broke
+  on the `positionCyEl` fault above and the simpler bar was preferred.
+
+### The question left open
+
+**Is the overlay the right approach at all?** The author's own summary: the
+stepper columns will be cramped, the programming model is complicated, and
+although the pieces are constrained in iframes *"they still need coordination
+on which regions are transparent"* — against which *"the little graphics area
+is quite cute and the thing is almost there"*.
+
+**The alternative he named:** let the user set steppers in the ORIGINAL node,
+and flip between the node, the Collage Script and the View — possibly with
+separate buttons going straight to Collage View and straight to Collage Script.
+
+Worth noting in its favour, since it is the cheaper design by a long way:
+
+- it needs **no overlay, no clip-path, no `bd_collage_layout`, no transparency
+  coordination** — the collage would only ever need to RENDER, never to be
+  edited through;
+- it removes the cramming problem entirely, because each module's steppers are
+  seen at full size in its own node;
+- `collagePreservingWrite` and the exploration round-trip, both already built,
+  are what make the flip back and forth safe;
+- it costs a round trip in the user's attention instead of in pixels.
+
+**Nothing in this section is settled against that.** The overlay work stands as
+a proof that the hard version is possible — the pointer-events/clip fact is the
+piece that was genuinely unknown — and as a working three-layer preview.
