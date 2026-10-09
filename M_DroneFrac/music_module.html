@@ -213,6 +213,12 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-10: RED (a SHALLOW output-only bar: the player panel's padding
+     drops to 3px and .big-btn to a 38px minimum, so the transport fits a 52px
+     host strip — which is exactly the reserve .canvas-wrapper keeps below the
+     square. Scoped to output-only, so the authoring view and the standalone
+     keep their 52px buttons. The 10px gap between Play and Stop is
+     untouched). Next = green.
      2026-10-09: BLUE (outputOnly — the player panel alone is this module's
      Output, so BD's View and later a collage get a transport strip and
      nothing else: no spectrum, no steppers, no Bake or Save). Next = red.
@@ -310,7 +316,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue (was green) */
+    background: #c0392b !important;      /* CANARY — red (was blue) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -396,6 +402,22 @@
   body.output-only .player-panel {
     display: flex; align-items: center; justify-content: center;
     gap: 10px; height: 100%; box-sizing: border-box;
+    /* ── A SHALLOW BAR (2026-10-10) ────────────────────────────────────
+       3px, down from .panel's 5px. The host's playbar is 52px — exactly the
+       52px `.canvas-wrapper` keeps clear below the square for BD's Extension
+       strip — so with 3px of padding and a 1px border the buttons have 44px
+       to sit in, and nothing hangs below the frame. */
+    padding: 3px;
+  }
+  /* 38px, down from 52. The author: "the font on the buttons has plenty of
+     space round it", and it did — 0.95rem bold in a 52px box. Still a
+     comfortable target at 38, and the 10px GAP is untouched, which is the one
+     thing that was asked to be kept.
+     SCOPED TO output-only on purpose: the authoring view keeps its 52px
+     buttons, so this cannot change the module's own look or its standalone. */
+  body.output-only .big-btn {
+    min-height: 38px;
+    padding: 0 14px;
   }
   body.output-only { overflow: hidden; }
 </style>

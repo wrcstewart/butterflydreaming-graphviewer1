@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10g' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10h' };
 
 let bdViewTitleText = '';
 
@@ -10918,7 +10918,7 @@ async function init() {
         const flush = t0 + h0 - COLLAGE_BAR_H;
         const g0 = collageGraphicRect(iframeEl) || collageLastGraphic;
         const underGraphic = (g0 && Number.isFinite(g0.top))
-          ? g0.top + g0.height + 2
+          ? g0.top + g0.height + COLLAGE_BAR_GAP
           : flush;
         bar.style.top = Math.round(Math.max(flush, underGraphic)) + 'px';
 
@@ -10970,7 +10970,7 @@ async function init() {
           // whole of "on the first draw it overlaps, and on resizing it lines
           // up": the resize was simply a second measurement.
           if (g1 && Number.isFinite(g1.top)) {
-            bar.style.top = Math.round(Math.max(flush, g1.top + g1.height + 2)) + 'px';
+            bar.style.top = Math.round(Math.max(flush, g1.top + g1.height + COLLAGE_BAR_GAP)) + 'px';
           }
           // ── PROBE, because one of the four reports has no explanation yet ──
           // "On mobile the panel is not the same width as the graphic but only
@@ -11011,7 +11011,7 @@ async function init() {
             if (!document.body.classList.contains('collage-bar')) return;
             const g2 = collageGraphicRect(iframeEl);
             if (place(g2) && Number.isFinite(g2.top)) {
-              bar.style.top = Math.round(Math.max(flush, g2.top + g2.height + 2)) + 'px';
+              bar.style.top = Math.round(Math.max(flush, g2.top + g2.height + COLLAGE_BAR_GAP)) + 'px';
             }
           });
         });
@@ -11222,8 +11222,18 @@ async function init() {
   // than assumed. NOTE there is therefore no volume control in it; `volume` is
   // a `%%bd_p_` stepper in the column output-only hides, so putting one here
   // is a change to the MODULE and not something BD can arrange from outside.
-  const COLLAGE_BAR_H   = 70;   // .big-btn is min-height 52 + the panel's padding
-  const COLLAGE_BAR_GAP = 4;
+  // 52px, and the number is not arbitrary: it is exactly the reserve
+  // `.canvas-wrapper` keeps below the square for BD's Extension strip
+  // (`padding-bottom: 52px`, its own comment explains why). At 52 the two
+  // candidate positions for the bar — flush with the frame's bottom, and
+  // directly under the square — COINCIDE, so there is no overlap and no hang.
+  // It was 70, which is where both faults came from.
+  //
+  // DroneFrac's output-only rules were shallowed to match: 3px panel padding
+  // and a 38px button minimum, leaving 44px of content. Scoped to output-only
+  // there, so its authoring view keeps the 52px buttons.
+  const COLLAGE_BAR_H   = 52;
+  const COLLAGE_BAR_GAP = 0;
   let currentBarModuleId = null;
 
   function loadCollagePlaybar(moduleId, script) {
