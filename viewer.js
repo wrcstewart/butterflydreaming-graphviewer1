@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10m' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10n' };
 
 let bdViewTitleText = '';
 
@@ -3110,6 +3110,7 @@ function parseCollage(text) {
 let collageLastCanvas = null;   // the last good square, measured not computed
 let collageTextOnTop  = false;  // from the SCRIPT's block order, not from CSS
 let collageLastProbe  = '';     // so the probe logs on change, not every frame
+let collageTextProbe  = '';     // the same, for the text layer
 
 // A MODULE'S ANNOUNCEMENT MUST *UPDATE* A COLLAGE CARD, NEVER REPLACE IT.
 //
@@ -10917,6 +10918,11 @@ async function init() {
         // slot says `%%bd_background transparent` — the same reason the words
         // can go beneath the kolam in View.
         tl.style.zIndex = collageTextOnTop ? '2' : '0';
+        const say = 'text layer ' + Math.round(g.width) + 'x' + Math.round(g.height) +
+                    ' at ' + Math.round(g.left) + ',' + Math.round(g.top) +
+                    ' font ' + tb.style.fontSize + ' z' + tl.style.zIndex +
+                    ' chars ' + (tb.textContent || '').length;
+        if (say !== collageTextProbe) { collageTextProbe = say; console.log('[collage] ' + say); }
       }
     }
 
@@ -11060,6 +11066,11 @@ async function init() {
       // it to decide whether to take its slice — and the slice has to be taken
       // in the same pass that stamps the graphic, or the graphic is briefly
       // full height and the bar lands on top of it.
+      // Marks a collage in the PREVIEW. Used ONLY to make the module frame
+      // see-through — never for positioning: the version that gave this class
+      // its own branch in positionCyEl returned before the stamp and left the
+      // graphic in the top-left corner.
+      document.body.classList.add('collage-preview');
       document.body.classList.toggle('collage-bar', !!musC);
 
       // ── THE TEXT LAYER (2026-10-10) ───────────────────────────────────
@@ -11095,7 +11106,8 @@ async function init() {
     // same fault as BD's media bar playing on into the standalone.
     if (document.body.classList.contains('collage-bar') ||
         document.body.classList.contains('collage-preview-text')) {
-      document.body.classList.remove('collage-bar', 'collage-preview-text');
+      document.body.classList.remove('collage-bar', 'collage-preview-text',
+                                     'collage-preview');
       const tlOff = document.getElementById('collage-preview-text');
       if (tlOff) tlOff.hidden = true;
       const tlbOff = document.getElementById('collage-preview-text-body');
