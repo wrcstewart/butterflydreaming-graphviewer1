@@ -163,6 +163,18 @@
           title="ButterflyDreaming Collage Playbar"
           sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
 
+  <!-- COLLAGE PREVIEW (2026-10-10) — the TEXT LAYER.
+       Not a module and needing none of their machinery: no iframe, no clip, no
+       relay. It is BD's own DOM, so `pointer-events: none` is enough to keep it
+       clear of the steppers and the transport — the one case where that works,
+       because nothing here is ever clicked.
+       Positioned by positionCyEl from the same measured square the playbar
+       uses: one measurement, two readers. -->
+  <div id="collage-preview-text" hidden>
+    <div id="collage-preview-text-body"></div>
+    <span class="collage-title-mark">text</span>
+  </div>
+
   <!-- MM3 (2026-07-12) invite panel — visible only in Player mode
        (body.player-active toggled by setViewMode). Sits in the 220 px band
        reserved on the right of #visual-iframe by positionCyEl. Buttons

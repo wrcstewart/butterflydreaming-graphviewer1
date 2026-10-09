@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10l' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10m' };
 
 let bdViewTitleText = '';
 
@@ -3099,6 +3099,17 @@ function parseCollage(text) {
   }
   return { version: Number(vm[1]), blocks };
 }
+
+// ── COLLAGE PREVIEW STATE, AT MODULE SCOPE ON PURPOSE ──────────────────────
+// These were `let`s inside init(), declared further down the file than the two
+// functions that use them. `let` is hoisted into a TEMPORAL DEAD ZONE, so that
+// is safe only for as long as neither function is called before init() reaches
+// the declaration — a condition nothing enforces and nobody would think to
+// check. Module scope removes the question rather than relying on an ordering.
+// Same family as the TDZ destructure note in this file's history.
+let collageLastCanvas = null;   // the last good square, measured not computed
+let collageTextOnTop  = false;  // from the SCRIPT's block order, not from CSS
+let collageLastProbe  = '';     // so the probe logs on change, not every frame
 
 // A MODULE'S ANNOUNCEMENT MUST *UPDATE* A COLLAGE CARD, NEVER REPLACE IT.
 //
@@ -10880,6 +10891,35 @@ async function init() {
     // the earlier attempt proved: in Player mode #cy is display:none, its rect
     // is zeros, and a branch of its own returned before the fallback that keeps
     // the last good rect. This reads what the working code just wrote.
+    // ── THE TEXT LAYER TAKES THE SQUARE ─────────────────────────────────
+    // Before the music block, because it needs only the square and the music
+    // block needs the square too — measuring once here and once there would be
+    // two writers of one number, which this function has three notes about.
+    if (document.body.classList.contains('collage-preview-text') && iframeEl) {
+      const tl = document.getElementById('collage-preview-text');
+      const tb = document.getElementById('collage-preview-text-body');
+      const mT = collageModuleRects(iframeEl);
+      const g  = (mT && mT.canvas) || collageLastCanvas;
+      if (tl && tb && g && g.width > 40) {
+        collageLastCanvas = g;
+        tl.style.top    = Math.round(g.top) + 'px';
+        tl.style.left   = Math.round(g.left) + 'px';
+        tl.style.width  = Math.round(g.width) + 'px';
+        tl.style.height = Math.round(g.height) + 'px';
+        // 5% padding and a 4.2%-of-the-square font, the same proportions View
+        // uses — which is the whole point of having settled on relative units:
+        // ONE decision serves the unreadable preview and the readable View.
+        // Here it has to be computed because the square is not a viewport.
+        tl.style.padding   = Math.round(g.width * 0.05) + 'px';
+        tb.style.fontSize  = Math.max(4, Math.round(g.width * 0.042)) + 'px';
+        // Under the module frame (z-index 1) or over it, by the script's order.
+        // Under works because the figure's own canvas is see-through when the
+        // slot says `%%bd_background transparent` — the same reason the words
+        // can go beneath the kolam in View.
+        tl.style.zIndex = collageTextOnTop ? '2' : '0';
+      }
+    }
+
     if (document.body.classList.contains('collage-bar') && iframeEl) {
       const bar = document.getElementById('collage-playbar');
       const t0 = parseInt(iframeEl.style.top, 10);
@@ -11021,6 +11061,22 @@ async function init() {
       // in the same pass that stamps the graphic, or the graphic is briefly
       // full height and the bar lands on top of it.
       document.body.classList.toggle('collage-bar', !!musC);
+
+      // ── THE TEXT LAYER (2026-10-10) ───────────────────────────────────
+      // Not a module: BD's own DOM, so it needs none of the overlay
+      // machinery. Its CONTENT is set here; its rect, its font size and its
+      // z-index are stamped by positionCyEl, which is where the square is
+      // measured.
+      const txtC = collageSlot(liveC, 'text');
+      const tl   = document.getElementById('collage-preview-text');
+      const tlb  = document.getElementById('collage-preview-text-body');
+      if (tlb) tlb.textContent = (txtC && txtC.body) || '';
+      if (tl)  tl.hidden = !(txtC && txtC.body);
+      document.body.classList.toggle('collage-preview-text', !!(txtC && txtC.body));
+      // THE SCRIPT'S BLOCK ORDER DECIDES THE STACKING, as it already does in
+      // View: a later block sits on top. Recorded here rather than recomputed
+      // in positionCyEl, which has no business parsing a script.
+      collageTextOnTop = !!(txtC && slot && txtC.index > slot.index);
       if (musC && typeof loadCollagePlaybar === 'function') {
         loadCollagePlaybar(musC.moduleId, musC.script);
       } else if (typeof stopCollagePlaybar === 'function') {
@@ -11037,8 +11093,13 @@ async function init() {
     // SILENCED rather than merely hidden. Its CSS stops matching the moment
     // `collage-bar` comes off, and a hidden iframe can go on playing — the
     // same fault as BD's media bar playing on into the standalone.
-    if (document.body.classList.contains('collage-bar')) {
-      document.body.classList.remove('collage-bar');
+    if (document.body.classList.contains('collage-bar') ||
+        document.body.classList.contains('collage-preview-text')) {
+      document.body.classList.remove('collage-bar', 'collage-preview-text');
+      const tlOff = document.getElementById('collage-preview-text');
+      if (tlOff) tlOff.hidden = true;
+      const tlbOff = document.getElementById('collage-preview-text-body');
+      if (tlbOff) tlbOff.textContent = '';
       if (typeof stopCollagePlaybar === 'function') stopCollagePlaybar();
     }
 
@@ -11132,8 +11193,7 @@ async function init() {
   // the wrapper. Returns null rather than a guess if the frames are not up yet;
   // the caller keeps the last good value, which is the same discipline
   // positionCyEl already applies to #cy's collapsed rect.
-  let collageLastCanvas = null;
-  let collageLastProbe  = '';
+
 
   function collageModuleRects(outerIframe) {
     try {

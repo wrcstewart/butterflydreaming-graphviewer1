@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-10l";
+  --bd-css-build: "2026-10-10m";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,12 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-10m: GREEN (the PREVIEW gets its text layer — BD's own DOM, not a
+   module, so no iframe, no clip and no relay, and `pointer-events: none` is
+   enough because nothing in it is ever clicked. Placed over the same measured
+   square the playbar uses, with the SCRIPT's block order deciding whether the
+   words sit over or under the figure, exactly as in View). Next = blue.
+
    2026-10-10l: RED (STAGE 1 of the overlay: the music frame now covers the
    WHOLE module rect and is CLIPPED to just its transport's region. Clipped
    rather than pointer-transparent, because pointer events inside an iframe
@@ -1398,7 +1404,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -1644,6 +1650,47 @@ body.player-active #auto-echo { display: flex; }
   background: transparent;
   z-index: 1;
 }
+/* ── THE PREVIEW'S TEXT LAYER ─────────────────────────────────────────────
+   Its rect, its font size and its z-index are all stamped inline by
+   positionCyEl — the font size because the preview square is a third of View's
+   and the type has to track it, the z-index because the SCRIPT's block order
+   decides whether the words sit over or under the figure. Only the things that
+   never vary live here. */
+#collage-preview-text[hidden] { display: none !important; }
+#collage-preview-text {
+  display: none;
+  position: fixed;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* NOTHING HERE IS EVER CLICKED, which is what lets this one layer be
+     pointer-transparent outright. The music overlay could not: its transport
+     needs clicks, and pointer events inside an iframe cannot pass through to
+     the parent, so it had to be clipped instead. */
+  pointer-events: none;
+}
+body.collage-preview-text #collage-preview-text:not([hidden]) { display: block; }
+#collage-preview-text-body {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.5;
+  color: #e8e8e0;
+  opacity: 0.7;
+  white-space: pre-wrap;
+  /* Luminance, not colour: a dark halo under bright glyphs holds whatever hue
+     the figure takes. The same pair View uses, at preview scale. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.75);
+}
+/* The slot marker, in the modules' own 8px idiom — a label that lives WITH the
+   thing it names, which is the rule that keeps the script's order honest
+   without anything having to arrange it. */
+#collage-preview-text .collage-title-mark {
+  position: absolute;
+  top: 0; left: 0;
+  font: 8px/11px ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.06em;
+  color: #9e9e90;
+  text-transform: lowercase;
+}
+
 body.collage-bar #collage-playbar {
   display: block;
   /* ABOVE the module frame now that it overlays rather than sits beneath it.
