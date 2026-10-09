@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10k' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10l' };
 
 let bdViewTitleText = '';
 
@@ -10859,76 +10859,98 @@ async function init() {
       }
     }
 
-    // ── COLLAGE PREVIEW: THE PLAYBAR, UNDER THE GRAPHIC ──────────────────
-    // Back where it was and where it belongs. Putting it in the stepper lane
-    // was wrong twice over: it is not a column of controls, and the lane is
-    // wanted for the music STEPPERS — which is the next piece of work, and a
-    // separate one.
+    // ── COLLAGE PREVIEW: THE MUSIC MODULE AS A CLIPPED OVERLAY ───────────
+    // STAGE 1 of the overlay design. The music frame now covers the WHOLE
+    // module rect — the same rect the visual module has — and is CLIPPED to
+    // just the region its transport occupies. Everything outside the clip
+    // belongs to the module underneath, for the eye and for the mouse alike.
     //
-    // Still AFTER the stamps above and never instead of them. The version that
-    // took its own branch returned early, and in Player mode #cy is
-    // display:none so its rect is zeros — the graphic landed unstamped in the
-    // top-left corner. This reads the rect the working code just wrote, so if
-    // no stamp happened there is nothing to read and it does nothing. The
-    // failure mode is "no bar", never "no graphic".
+    // Why clipped rather than made pointer-transparent: pointer events inside
+    // an iframe cannot pass through to the parent document, because the iframe
+    // ELEMENT is the hit target. `pointer-events: none` on the frame would make
+    // Play unclickable along with everything else. A clip-path takes part in
+    // hit-testing, so the clipped-away area is not a target at all.
+    //
+    // That is what makes one frame able to hold two separated parts: the clip
+    // need not be a single rectangle. Stage 1 clips to one region and should
+    // look EXACTLY like the small bar it replaces — that is its whole test.
+    // Stage 2 adds the stepper region to the clip.
+    //
+    // Still AFTER the stamps above and never instead of them, for the reason
+    // the earlier attempt proved: in Player mode #cy is display:none, its rect
+    // is zeros, and a branch of its own returned before the fallback that keeps
+    // the last good rect. This reads what the working code just wrote.
     if (document.body.classList.contains('collage-bar') && iframeEl) {
       const bar = document.getElementById('collage-playbar');
       const t0 = parseInt(iframeEl.style.top, 10);
       const l0 = parseInt(iframeEl.style.left, 10);
       const w0 = parseInt(iframeEl.style.width, 10);
       const h0 = parseInt(iframeEl.style.height, 10);
-      if (bar && [t0, l0, w0, h0].every(Number.isFinite) &&
-          h0 > COLLAGE_BAR_H + 120) {
-        bar.style.height = COLLAGE_BAR_H + 'px';
-        const flush = t0 + h0 - COLLAGE_BAR_H;
+      if (bar && [t0, l0, w0, h0].every(Number.isFinite) && h0 > COLLAGE_BAR_H + 120) {
+        // The frame IS the module rect. One writer, same numbers.
+        bar.style.top    = t0 + 'px';
+        bar.style.left   = l0 + 'px';
+        bar.style.width  = w0 + 'px';
+        bar.style.height = h0 + 'px';
 
-        // 240 = two 108px buttons + the 10px gap + the panel's padding and
-        // border. The graphic is SQUARE, so shrinking the window vertically
-        // narrows it too, and without a floor the bar followed it down until
-        // the buttons wrapped and stacked.
         const COLLAGE_BAR_MIN_W = 240;
-        const place = (g) => {
-          if (!g || !(g.width > 40)) return false;
-          collageLastCanvas = g;
-          bar.style.left  = Math.round(g.left) + 'px';
-          bar.style.width = Math.round(Math.max(COLLAGE_BAR_MIN_W, g.width)) + 'px';
-          // The TOP comes from the graphic's own bottom, taking whichever
-          // position is lower: flush with the frame when the square leaves
-          // room, just under the square when it does not. Computed from the
-          // frame's bottom alone it overlapped the square whenever the square
-          // was tall.
-          if (Number.isFinite(g.top)) {
-            bar.style.top = Math.round(Math.max(flush, g.top + g.height + COLLAGE_BAR_GAP)) + 'px';
-          }
-          return true;
+        // Frame-relative, because that is what both the clip and the module
+        // need. Page coordinates would have to be converted twice and could
+        // disagree once.
+        const barRect = (g) => {
+          const width = Math.round(Math.max(COLLAGE_BAR_MIN_W,
+                          (g && g.width > 40) ? g.width : (w0 - 130 - 44)));
+          const left  = Math.round((g && g.width > 40) ? (g.left - l0) : 0);
+          // Flush with the frame's bottom, or just under the square when the
+          // square is tall enough to reach into that band. 52 == the reserve
+          // `.canvas-wrapper` keeps, so the two usually coincide exactly.
+          const flush = h0 - COLLAGE_BAR_H;
+          const under = (g && Number.isFinite(g.top))
+            ? (g.top - t0) + g.height + COLLAGE_BAR_GAP
+            : flush;
+          return { left, top: Math.round(Math.max(flush, under)),
+                   width, height: COLLAGE_BAR_H };
         };
+
+        const apply = (g) => {
+          const b = barRect(g);
+          if (g && g.width > 40) collageLastCanvas = g;
+          // CLIP to the transport's region. inset() takes top/right/bottom/left
+          // insets from the element's own box.
+          bar.style.clipPath =
+            'inset(' + b.top + 'px ' +
+                       Math.max(0, w0 - (b.left + b.width)) + 'px ' +
+                       Math.max(0, h0 - (b.top + b.height)) + 'px ' +
+                       b.left + 'px)';
+          // And tell the module where to draw inside that clip. It cannot know:
+          // only BD can see where the module UNDERNEATH put its canvas.
+          try {
+            bar.contentWindow.postMessage({ type: 'bd_collage_layout', bar: b }, '*');
+          } catch (_) {}
+          return !!(g && g.width > 40);
+        };
+
         const m = collageModuleRects(iframeEl);
-        if (!place(m && m.canvas) && !place(collageLastCanvas)) {
-          // Never measured and nothing cached — still loading. The fallback
-          // subtracts the stepper column and the arrows band, so even a first
-          // paint clears the steppers.
-          bar.style.left  = l0 + 'px';
-          bar.style.width = Math.max(COLLAGE_BAR_MIN_W, w0 - 130 - 44) + 'px';
-          bar.style.top   = flush + 'px';
-        }
+        if (!apply(m && m.canvas)) apply(collageLastCanvas);
 
         // ── THE SECOND MEASURE ────────────────────────────────────────────
         // The module sizes its square from a ResizeObserver that fires AFTER
         // this pass, so a rect read once is read while it is still settling.
-        // That is the whole of "on the first draw it overlaps, and on resizing
-        // it lines up". Sets only the bar's own properties, so it cannot drive
+        // Sets only the overlay's clip and sends a message, so it cannot drive
         // another layout pass and cannot loop.
         requestAnimationFrame(() => {
           if (!document.body.classList.contains('collage-bar')) return;
           const m2 = collageModuleRects(iframeEl);
-          place(m2 && m2.canvas);
+          apply(m2 && m2.canvas);
           try {
             const c = m2 && m2.canvas, col = m2 && m2.column;
-            const br = bar.getBoundingClientRect();
-            const line = 'graphic ' + (c ? Math.round(c.width) + 'x' + Math.round(c.height) : '?') +
+            const b = barRect(c);
+            const line = 'overlay stage1 | graphic ' +
+                         (c ? Math.round(c.width) + 'x' + Math.round(c.height) : '?') +
                          ' | lane ' + (col ? Math.round(col.width) + 'x' + Math.round(col.height) : '?') +
-                         ' | bar ' + Math.round(br.width) + 'x' + Math.round(br.height) +
-                         ' at x' + Math.round(br.left);
+                         ' | frame ' + w0 + 'x' + h0 +
+                         ' | bar(frame-rel) ' + b.width + 'x' + b.height +
+                         ' at ' + b.left + ',' + b.top;
             if (line !== collageLastProbe) {
               collageLastProbe = line;
               console.log('[collage] ' + line);
@@ -10938,11 +10960,12 @@ async function init() {
           requestAnimationFrame(() => {
             if (!document.body.classList.contains('collage-bar')) return;
             const m3 = collageModuleRects(iframeEl);
-            place(m3 && m3.canvas);
+            apply(m3 && m3.canvas);
           });
         });
       }
     }
+
 
 
   }
@@ -11183,7 +11206,8 @@ async function init() {
         // of work, and the flag and DroneFrac's two layouts for it are left in
         // place ready for it.
         bf.contentWindow.postMessage({ type: 'bd_ui_config',
-          outputOnly: true, hideControls: true, hostChrome: false }, '*');
+          outputOnly: true, hideControls: true, hostChrome: false,
+          overlay: true }, '*');
       } catch (_) {}
     };
     if (moduleId === currentBarModuleId) {

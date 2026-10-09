@@ -338,7 +338,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue, matching BD's */
+    background: #c0392b !important;      /* CANARY — red, matching BD's */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -441,6 +441,42 @@
     min-height: 38px;
     padding: 0 14px;
   }
+
+  /* ── overlay: LAID OVER ANOTHER MODULE (2026-10-10, stage 1) ───────────
+     The host gives this module the WHOLE module area — the same rect the
+     visual module has — and asks it to be transparent everywhere it has
+     nothing to show. Its panels are then placed at coordinates the host sends,
+     because the host is the only party that can see both modules; a module
+     describing the shared space would be a contract that can disagree with
+     what is on screen.
+
+     THE CLIPPING IS THE HOST'S JOB, not this file's: pointer events inside an
+     iframe cannot pass through to the parent document — the iframe element is
+     the hit target — so BD clips the frame to the regions this module actually
+     occupies. Everything outside that clip belongs to the module underneath,
+     for the eye and for the mouse alike.
+
+     Stage 1 shows the TRANSPORT only. The steppers come next. */
+  body.overlay, html:has(body.overlay) { background: transparent !important; }
+  body.overlay { overflow: visible; }
+  body.overlay .module-layout {
+    display: block; position: relative;
+    width: 100%; height: 100%; padding: 0; gap: 0;
+  }
+  body.overlay .module-layout > * { display: none; }
+  /* The transport, at the rect BD measured for it. The fallbacks are the
+     bottom-left corner: if the geometry has not arrived the bar is still
+     somewhere sane rather than nowhere. */
+  body.overlay .player-panel {
+    display: flex; align-items: center; justify-content: center;
+    position: absolute;
+    left:   var(--bd-bar-left, 0px);
+    top:    var(--bd-bar-top, auto);
+    width:  var(--bd-bar-width, 240px);
+    height: var(--bd-bar-height, 52px);
+    gap: 10px; padding: 3px; box-sizing: border-box;
+  }
+  body.overlay .big-btn { min-height: 38px; min-width: 108px; flex: 0 0 auto; }
 
   /* ── strip-controls: the steppers as a shallow SCROLLING ROW ───────────
      The host's playbar is 52px deep. A `.control-row` is a 24px stepper over
@@ -2081,6 +2117,27 @@ window.addEventListener('message', (event) => {
       // strip. Defaults to false, so a host that says nothing is unaffected.
       document.body.classList.toggle('strip-controls',
         outputOnly && data.compactControls === true);
+      // ── overlay (2026-10-10) ───────────────────────────────────────────
+      // "You are laid over another module: be transparent where you have
+      // nothing to show." A sixth flag, and it asserts one thing like the
+      // others. Independent of outputOnly: what an overlay SHOWS is still
+      // decided by the flags above it.
+      document.body.classList.toggle('overlay', data.overlay === true);
+    } else if (type === 'bd_collage_layout') {
+      // ── WHERE THE HOST WANTS THIS MODULE'S PANELS (2026-10-10) ─────────
+      // Frame-relative pixels, measured by BD from the module underneath.
+      // Applied as custom properties so the CSS above decides what to do with
+      // them — a message that set `style.left` directly would be the host
+      // doing this module's layout, which is the thing every other flag here
+      // avoids.
+      const b = event.data && event.data.bar;
+      const r = document.documentElement.style;
+      if (b && typeof b.left === 'number') {
+        r.setProperty('--bd-bar-left',   Math.round(b.left) + 'px');
+        r.setProperty('--bd-bar-top',    Math.round(b.top) + 'px');
+        r.setProperty('--bd-bar-width',  Math.round(b.width) + 'px');
+        r.setProperty('--bd-bar-height', Math.round(b.height) + 'px');
+      }
     } else if (type === 'BD_STOP') {
       stopPlayback();
     }

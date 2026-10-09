@@ -50,6 +50,12 @@
     const RELAY_DOWN = new Set([
       'bd_script_update', 'bd_script_request', 'bd_param_update',
       'BD_INIT', 'BD_STOP',
+      // 2026-10-10 — bd_collage_layout: where the host wants this module's
+      // panels when it is laid OVER another one. A NEW TYPE, not a new field,
+      // so it needs this site as well as the sender and the receiver. The
+      // whitelist makes an unlisted type vanish here in silence, which is the
+      // trap this file's RELAY_DOWN note already records.
+      'bd_collage_layout',
       'BD_INFO_DIALOG_RESULT',
       'bd_ui_config'
     ]);
