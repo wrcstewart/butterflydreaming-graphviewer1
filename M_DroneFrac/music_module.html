@@ -213,6 +213,12 @@
      CSS was simply being overridden.
      Trust the hex on the background line, not this prose: the note has gone
      stale while the colour rotated on in two other files already.
+     2026-10-10b: GREEN (compactControls — a fifth bd_ui_config flag: the
+     steppers as a shallow horizontally-SCROLLING row beside the transport, so
+     all 25 are reachable inside a 52px playbar. A `.control-row` is 24px of
+     stepper over a 9px label, which fits that depth sideways where a 130px
+     column could not. The spectrum stays hidden: the collage's output is
+     music). Next = blue.
      2026-10-10: RED (a SHALLOW output-only bar: the player panel's padding
      drops to 3px and .big-btn to a 38px minimum, so the transport fits a 52px
      host strip — which is exactly the reserve .canvas-wrapper keeps below the
@@ -316,7 +322,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red (was blue) */
+    background: #27ae60 !important;      /* CANARY — green (was red) */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -418,6 +424,79 @@
   body.output-only .big-btn {
     min-height: 38px;
     padding: 0 14px;
+  }
+
+  /* ── strip-controls: the steppers as a shallow SCROLLING ROW ───────────
+     The host's playbar is 52px deep. A `.control-row` is a 24px stepper over
+     a 9px label — about 38px — so it fits that depth laid out sideways, which
+     a 130px column never could. 25 directives then scroll HORIZONTALLY, which
+     is the author's call: "the current playbar is already scrolling, so why
+     can you not just add them — they scroll very rapidly".
+
+     The spectrum stays hidden. That was decided for the collage: the output is
+     MUSIC, and a spectrum display is an authoring instrument.
+
+     #control-panel is re-shown by ID, so it beats
+     `body.output-only .module-layout > *:not(.player-panel)` on specificity
+     without that rule having to learn about this one. */
+  body.output-only.strip-controls .module-layout {
+    display: flex; flex-direction: row; align-items: stretch;
+    gap: 5px; padding: 0; height: 100%; min-width: 0;
+  }
+  /* The transport keeps its intrinsic width and does not scroll away: Play is
+     the one control that must always be reachable, because audio needs a
+     gesture in the document that makes the sound. */
+  body.output-only.strip-controls .player-panel {
+    flex: 0 0 auto; height: 100%; padding: 3px;
+  }
+  body.output-only.strip-controls #control-panel {
+    display: flex;
+    flex-direction: row; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    align-items: center; gap: 5px;
+    flex: 1 1 auto; min-width: 0; height: 100%;
+    padding: 3px; box-sizing: border-box;
+    /* Momentum scrolling on iOS, and a scrollbar that does not eat the 44px. */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  body.output-only.strip-controls .control-row {
+    flex: 0 0 auto; width: 104px; margin-bottom: 0; gap: 0;
+  }
+  /* 32px, down from the column's 52: a 104px row has to hold two buttons, the
+     readout and two gaps. The readout keeps ~36px — four characters, the same
+     budget the column works to. */
+  body.output-only.strip-controls .step-btn {
+    flex: 0 0 32px; min-height: 22px; font-size: 0.75rem;
+  }
+  body.output-only.strip-controls .stepper-value {
+    font-size: 0.62rem; padding: 2px 1px;
+  }
+  body.output-only.strip-controls .stepper-value.is-enum { font-size: 0.52rem; }
+  /* The title, and the SEPARATOR is the right border — a rule between the
+     module's name and its first stepper, which is what makes it read as a
+     break in the bar rather than just another label. Smallest size that still
+     renders as letters; readability is not crucial here by the author's own
+     framing, and it is a separator first.
+     Hidden outside the strip: the 130px column has its own heading problem and
+     a vertical title is a different design, not this one at 90 degrees. */
+  .strip-title { display: none; }
+  body.output-only.strip-controls .strip-title {
+    display: flex; align-items: center;
+    flex: 0 0 auto; height: 100%;
+    padding: 0 6px 0 2px;
+    margin-right: 1px;
+    border-right: 1px solid #2a2a3a;
+    font-size: 0.5rem; letter-spacing: 0.06em;
+    color: var(--dim); white-space: nowrap;
+    /* It scrolls away with the steppers rather than pinning, so it reads as
+       the HEAD of the group it labels. With one music module there is only one
+       group; with two there would be two, and a pinned title would lie about
+       which steppers you were looking at. */
+  }
+  body.output-only.strip-controls .control-row label {
+    font-size: 0.52rem; line-height: 1.1;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
   body.output-only { overflow: hidden; }
 </style>
@@ -764,6 +843,24 @@ const postToParent = (msg) => { try { window.parent.postMessage(msg, '*'); } cat
 function setStatus(msg, isErr) {
   statusEl.textContent = isErr ? (msg || '') : '';
   postToParent({ type: 'BD_STATUS', text: isErr ? (msg || '') : '', isErr: !!isErr });
+}
+
+// ── THE MODULE'S NAME, AT THE HEAD OF ITS OWN STEPPER AREA ────────────
+// "A one line title break in the stepper bar with the name of the module, in
+// the smallest possible font" — the author's, and the title belongs IN the
+// stepper bar rather than being positioned over it by the host. That matters
+// for more than tidiness: each module then labels its own group, so the labels
+// appear in whatever order the host places the modules, which is the script's
+// order. Nothing has to be told twice and nothing can disagree.
+//
+// Its own identity, not a value read from the script: this file IS
+// bd_M_DroneFrac, and deriving that from a directive would let a script rename
+// the module in its own label.
+{
+  const stripTitle = document.createElement('div');
+  stripTitle.className = 'strip-title';
+  stripTitle.textContent = 'bd_M_DroneFrac';
+  controlPanel.appendChild(stripTitle);
 }
 
 // ── Stepper rows ───────────────────────────────────────────────────────
@@ -1899,6 +1996,18 @@ window.addEventListener('message', (event) => {
       // false — see the note beside .host-script-panel.
       document.body.classList.toggle('host-script-panel',
         data.hostScriptPanel === true);
+      // ── compactControls (2026-10-10) ───────────────────────────────────
+      // "Show your controls as a SHALLOW STRIP beside the transport." A fifth
+      // flag, and it exists because outputOnly could not answer two different
+      // questions: a presentation surface wants the transport ALONE, while a
+      // collage PREVIEW is where the piece is built and wants the steppers
+      // too — in a bar 52px deep, which no column can use.
+      //
+      // Only meaningful alongside outputOnly, and it does not imply it: a
+      // module showing its whole interface has a column already and needs no
+      // strip. Defaults to false, so a host that says nothing is unaffected.
+      document.body.classList.toggle('strip-controls',
+        outputOnly && data.compactControls === true);
     } else if (type === 'BD_STOP') {
       stopPlayback();
     }

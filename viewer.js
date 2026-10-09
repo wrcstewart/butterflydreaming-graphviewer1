@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10h' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10i' };
 
 let bdViewTitleText = '';
 
@@ -11246,8 +11246,14 @@ async function init() {
     }
     const flags = () => {
       try {
+        // compactControls: show the steppers as a shallow scrolling row beside
+        // the transport. The PREVIEW is where a collage is built, so all 25
+        // directives have to be reachable — and the bar is 52px deep, which no
+        // column can use. View will NOT send this: there the output is the
+        // transport alone, which is what outputOnly has always meant.
         bf.contentWindow.postMessage({ type: 'bd_ui_config',
-          outputOnly: true, hideControls: true, hostChrome: false }, '*');
+          outputOnly: true, hideControls: true, hostChrome: false,
+          compactControls: true }, '*');
       } catch (_) {}
     };
     if (moduleId === currentBarModuleId) {
