@@ -160,6 +160,15 @@
           title="ButterflyDreaming Collage Music Module"
           sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
 
+  <!-- COLLAGE PREVIEW (2026-10-09) — one line naming each stacked module.
+       Smallest font that renders; the author's call that readability is not
+       crucial here, because these are separators first and labels second. They
+       are SIBLINGS of the frames rather than wrappers: an iframe cannot be
+       reparented without reloading the module inside it, so everything that
+       has to sit next to one is positioned beside it instead. -->
+  <div id="collage-title-visual" class="collage-title" hidden></div>
+  <div id="collage-title-music"  class="collage-title" hidden></div>
+
   <!-- MM3 (2026-07-12) invite panel — visible only in Player mode
        (body.player-active toggled by setViewMode). Sits in the 220 px band
        reserved on the right of #visual-iframe by positionCyEl. Buttons

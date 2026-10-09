@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10b' };
 
 let bdViewTitleText = '';
 
@@ -10721,6 +10721,13 @@ async function init() {
   // Pair was folded into Chat — Chat is now the single pair+chat toggle,
   // pressable at any time.)
 
+  // The Extension panel and the arrows anchor off the module's live rect, and
+  // a collage has just moved it. Separated so the split above says WHAT it
+  // does and this says what has to be told about it.
+  function alignCollagePanels() {
+    try { if (typeof positionExtendPanel === 'function') positionExtendPanel(); } catch (_) {}
+  }
+
   function positionCyEl() {
     // ── VIEW OWNS THE IFRAME'S RECT (2026-10-08) ───────────────────────
     // This function stamps INLINE top/left/width/height, which beats any
@@ -10778,6 +10785,51 @@ async function init() {
     // so we stamp explicit width/height/top from #cy's bounding rect
     // rather than relying on CSS to derive them.
     const iframeEl = document.getElementById('visual-iframe');
+
+    // ── A COLLAGE PREVIEW SPLITS THE BAND BETWEEN TWO FRAMES ─────────────
+    // Taken FIRST, before the grid-module test, because which modules a
+    // collage holds must not change how its own preview is laid out — a
+    // collage carrying Fractal would otherwise take the panel-column branch
+    // and put its picture in a 40% strip.
+    //
+    // One writer owns this band, as the notes below insist. So the split lives
+    // here beside the stamp it replaces rather than in a second function that
+    // would race it.
+    if (document.body.classList.contains('collage-preview')) {
+      const cyRect0 = cyEl.getBoundingClientRect();
+      if (cyRect0.width > 0 && cyRect0.height > 0) {
+        const mfEl   = document.getElementById('collage-music-iframe');
+        const hasMus = document.body.classList.contains('collage-music') && !!mfEl;
+        const isDesk = window.innerWidth > 767;
+        const w      = Math.max(0, cyRect0.width - (isDesk ? 100 : 0));
+        const TITLE_H = 11;                       // matches the 8px/11px rule
+        // 200px: the player row plus three or four stepper rows. The column
+        // scrolls, which is the point — 25 directives were never going to fit,
+        // and the author asked for a scrolling bar rather than a taller one.
+        const MUSIC_H = hasMus ? 200 : 0;
+        const titles  = hasMus ? TITLE_H * 2 : TITLE_H;
+        // 120px floor so the picture cannot be squeezed out of existence on a
+        // short window; it scrolls off instead, which is recoverable.
+        const visH    = Math.max(120, cyRect0.height - MUSIC_H - titles);
+        const put = (el, top, h) => {
+          if (!el) return;
+          el.style.top    = Math.round(top) + 'px';
+          el.style.left   = Math.round(cyRect0.left) + 'px';
+          el.style.width  = Math.round(w) + 'px';
+          if (h != null) el.style.height = Math.round(h) + 'px';
+        };
+        let y = cyRect0.top;
+        put(document.getElementById('collage-title-visual'), y, null); y += TITLE_H;
+        put(iframeEl, y, visH);                                       y += visH;
+        if (hasMus) {
+          put(document.getElementById('collage-title-music'), y, null); y += TITLE_H;
+          put(mfEl, y, MUSIC_H);
+        }
+      }
+      alignCollagePanels();
+      return;
+    }
+
     const GRID_MODULES = ['/bd_M_ABC/', '/bd_M_Fractal/'];   // modules on the panel-grid layout
     const isGridModule = !!(iframeEl && iframeEl.src &&
                             GRID_MODULES.some(u => iframeEl.src.indexOf(u) !== -1));
@@ -10902,10 +10954,46 @@ async function init() {
       // node explorable on the same terms as a module node.
       avNodeId = nodeId;
       savedByNode.set(nodeId, savedText);
-      const slot = collageVisualSlot(savedText, explorationByNode.get(nodeId));
-      if (!slot) return;
-      loadCollageVisual(slot.moduleId, slot.script);
+      const liveC = collageLive(savedText, explorationByNode.get(nodeId)) || collageHere;
+      const slot  = collageSlot(liveC, 'visual');
+      const musC  = collageSlot(liveC, 'music');
+
+      // ── THE PREVIEW STACKS BOTH MODULES (2026-10-09, author's choice) ───
+      // Each module builds its own stepper column from its own `_p_` marks, and
+      // a module's output and its steppers are ONE document — so they can only
+      // be placed as a unit. A single merged column across two iframes is not
+      // something CSS can do, and loading a module twice to split it would mean
+      // two Tone.js contexts for the music slot. Stacked frames, each with its
+      // own scrolling column, is therefore the arrangement rather than a
+      // compromise: all 43 `_p_` directives are reachable without switching.
+      document.body.classList.add('collage-preview');
+      document.body.classList.toggle('collage-music', !!musC);
+      const tv = document.getElementById('collage-title-visual');
+      const tm = document.getElementById('collage-title-music');
+      if (tv) { tv.textContent = slot ? slot.moduleId : ''; tv.hidden = !slot; }
+      if (tm) { tm.textContent = musC ? musC.moduleId : ''; tm.hidden = !musC; }
+
+      if (slot) loadCollageVisual(slot.moduleId, slot.script);
+      if (musC && typeof loadCollageMusic === 'function') {
+        loadCollageMusic(musC.moduleId, musC.script);
+      }
+      // The band has to be re-split now the second frame is in play.
+      try { positionCyEl(); } catch (_) {}
       return;
+    }
+
+    // Leaving a collage for an ordinary module node: the preview furniture has
+    // to go, or the band stays split around a frame holding nothing.
+    if (document.body.classList.contains('collage-preview')) {
+      document.body.classList.remove('collage-preview', 'collage-music');
+      ['collage-title-visual', 'collage-title-music'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) { el.hidden = true; el.textContent = ''; }
+      });
+      const mfOld = document.getElementById('collage-music-iframe');
+      if (mfOld && mfOld.contentWindow) {
+        try { mfOld.contentWindow.postMessage({ type: 'BD_STOP' }, '*'); } catch (_) {}
+      }
     }
 
     const moduleId = parseModuleId(savedText);
@@ -10997,14 +11085,17 @@ async function init() {
       console.warn(`[collage] unknown music module '${moduleId}' — slot skipped`);
       return;
     }
-    // ALL THREE FLAGS, as everywhere else: outputOnly reduces a music module to
-    // its player panel — the transport and the title, not the steppers, not
-    // Copy or Bake or Save, which are authoring. A module that has not been
-    // taught the flag still degrades to "controls hidden, no chrome".
+    // outputOnly IN VIEW ONLY. In View a music module is its player panel —
+    // the transport and the title, not the steppers, not Copy or Bake or Save,
+    // which are authoring. In the PREVIEW the opposite is wanted: the whole
+    // module, steppers included, because the preview is where the collage is
+    // built. Sent on every load either way, so the flag cannot be a thing that
+    // was true once — that was this module's last bug but one.
     const flags = () => {
+      const inView = document.body.classList.contains('view-active');
       try {
         mf.contentWindow.postMessage({ type: 'bd_ui_config',
-          outputOnly: true, hideControls: true, hostChrome: false }, '*');
+          outputOnly: inView, hideControls: inView, hostChrome: !inView }, '*');
       } catch (_) {}
     };
     if (moduleId === currentMusicModuleId) {
@@ -13978,6 +14069,14 @@ async function init() {
         const mf = document.getElementById('collage-music-iframe');
         if (mf && mf.contentWindow) {
           try { mf.contentWindow.postMessage({ type: 'BD_STOP' }, '*'); } catch (_) {}
+          // And its authoring interface back, or returning to the preview
+          // leaves a music module showing nothing but a transport. The mirror
+          // of what bdViewEnter sent, sent explicitly rather than read off a
+          // class that has just been removed.
+          try {
+            mf.contentWindow.postMessage({ type: 'bd_ui_config',
+              outputOnly: false, hideControls: false, hostChrome: true }, '*');
+          } catch (_) {}
         }
         if (f && f.contentWindow) {
           // Back to BD's own defaults: its chrome returns, its steppers
@@ -14122,6 +14221,16 @@ async function init() {
             // --bd-collage-music, so the square has to be told to shrink before
             // the strip appears in the space it gives up.
             body.classList.add('collage-music');
+            // CLEAR THE PREVIEW'S INLINE RECT, exactly as the picture's branch
+            // does and for the same reason: positionCyEl stamps top/left/
+            // width/height inline while the preview is up, an inline style
+            // beats the stylesheet, and positionCyEl stands down in View — so
+            // nothing would ever take those numbers off and the strip would
+            // keep the preview's 200px band in the middle of the screen.
+            const mfv = document.getElementById('collage-music-iframe');
+            if (mfv) {
+              mfv.style.top = mfv.style.left = mfv.style.width = mfv.style.height = '';
+            }
             if (typeof loadCollageMusic === 'function') {
               loadCollageMusic(mus.moduleId, mus.script);
             }
