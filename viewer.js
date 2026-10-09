@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-10n' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10o' };
 
 let bdViewTitleText = '';
 
@@ -3111,6 +3111,9 @@ let collageLastCanvas = null;   // the last good square, measured not computed
 let collageTextOnTop  = false;  // from the SCRIPT's block order, not from CSS
 let collageLastProbe  = '';     // so the probe logs on change, not every frame
 let collageTextProbe  = '';     // the same, for the text layer
+// Once per playbar load, and re-armed on the way out of View: the square
+// has to be re-measured for a rect that has completely changed.
+let collageNudged     = false;
 
 // A MODULE'S ANNOUNCEMENT MUST *UPDATE* A COLLAGE CARD, NEVER REPLACE IT.
 //
@@ -10893,38 +10896,64 @@ async function init() {
     // is zeros, and a branch of its own returned before the fallback that keeps
     // the last good rect. This reads what the working code just wrote.
     // ── THE TEXT LAYER TAKES THE SQUARE ─────────────────────────────────
-    // Before the music block, because it needs only the square and the music
-    // block needs the square too — measuring once here and once there would be
-    // two writers of one number, which this function has three notes about.
+    // Before the music block, because both need the square and measuring it
+    // twice would be two writers of one number.
+    //
+    // AND IT RE-MEASURES, which the first cut did not. Coming back from View
+    // the square is briefly still View's — `min(100vw, 100dvh - 44px)`, far
+    // larger than the preview's — because View clears the frame's inline rect
+    // on the way in and the module re-lays-out from a ResizeObserver that
+    // fires AFTER this pass. Placed once, the words took the View-sized square
+    // and spilled past both edges of the screen, which is exactly what was
+    // reported. The music overlay already had this pass; the text did not, and
+    // the difference is the whole bug.
     if (document.body.classList.contains('collage-preview-text') && iframeEl) {
       const tl = document.getElementById('collage-preview-text');
       const tb = document.getElementById('collage-preview-text-body');
-      const mT = collageModuleRects(iframeEl);
-      const g  = (mT && mT.canvas) || collageLastCanvas;
-      if (tl && tb && g && g.width > 40) {
+      const placeText = (g) => {
+        if (!tl || !tb || !g || !(g.width > 40)) return false;
         collageLastCanvas = g;
         tl.style.top    = Math.round(g.top) + 'px';
         tl.style.left   = Math.round(g.left) + 'px';
         tl.style.width  = Math.round(g.width) + 'px';
         tl.style.height = Math.round(g.height) + 'px';
-        // 5% padding and a 4.2%-of-the-square font, the same proportions View
-        // uses — which is the whole point of having settled on relative units:
-        // ONE decision serves the unreadable preview and the readable View.
-        // Here it has to be computed because the square is not a viewport.
-        tl.style.padding   = Math.round(g.width * 0.05) + 'px';
-        tb.style.fontSize  = Math.max(4, Math.round(g.width * 0.042)) + 'px';
-        // Under the module frame (z-index 1) or over it, by the script's order.
-        // Under works because the figure's own canvas is see-through when the
-        // slot says `%%bd_background transparent` — the same reason the words
-        // can go beneath the kolam in View.
+        // 5% padding and a 4.2%-of-the-square font, View's own proportions —
+        // the dividend of relative units: ONE decision serves the unreadable
+        // preview and the readable View. Computed here because a square is not
+        // a viewport.
+        tl.style.padding  = Math.round(g.width * 0.05) + 'px';
+        tb.style.fontSize = Math.max(4, Math.round(g.width * 0.042)) + 'px';
+        // Under the module frame (z-index 1) or over it, by the SCRIPT's block
+        // order. Under works because the figure's canvas is see-through when
+        // the slot says `%%bd_background transparent`, and because the frame
+        // itself is transparent in a collage preview — the fourth background.
         tl.style.zIndex = collageTextOnTop ? '2' : '0';
         const say = 'text layer ' + Math.round(g.width) + 'x' + Math.round(g.height) +
                     ' at ' + Math.round(g.left) + ',' + Math.round(g.top) +
                     ' font ' + tb.style.fontSize + ' z' + tl.style.zIndex +
                     ' chars ' + (tb.textContent || '').length;
         if (say !== collageTextProbe) { collageTextProbe = say; console.log('[collage] ' + say); }
-      }
+        return true;
+      };
+      const mT = collageModuleRects(iframeEl);
+      if (!placeText(mT && mT.canvas)) placeText(collageLastCanvas);
+      // Twice more, a frame apart: the module's own ResizeObserver settles the
+      // square after this pass, and after a return from View it has a long way
+      // to settle. Sets only this layer's own properties, so it cannot drive
+      // another layout pass and cannot loop.
+      requestAnimationFrame(() => {
+        if (!document.body.classList.contains('collage-preview-text')) return;
+        const m2 = collageModuleRects(iframeEl);
+        placeText(m2 && m2.canvas);
+        collageNudgeVisual(iframeEl);
+        requestAnimationFrame(() => {
+          if (!document.body.classList.contains('collage-preview-text')) return;
+          const m3 = collageModuleRects(iframeEl);
+          placeText(m3 && m3.canvas);
+        });
+      });
     }
+
 
     if (document.body.classList.contains('collage-bar') && iframeEl) {
       const bar = document.getElementById('collage-playbar');
@@ -11325,7 +11354,6 @@ async function init() {
   // rather than on every layout pass: the handler only re-measures and redraws,
   // it never resizes the frame, so it cannot feed back — but a nudge on every
   // pass would still be a redraw on every pass.
-  let collageNudged = false;
 
   function collageNudgeVisual(outerIframe) {
     if (collageNudged || !outerIframe) return;
@@ -14289,6 +14317,18 @@ async function init() {
               outputOnly: false, hideControls: false, hostChrome: true }, '*');
           } catch (_) {}
         }
+        // THE CACHED SQUARE IS VIEW'S NOW, and it is much larger than the
+        // preview's. Keeping it would let the first preview pass fall back to
+        // it the moment a live measurement is not ready — which is how the
+        // words came back spilling past both edges of the screen. Dropping it
+        // means the fallback is "do not move anything yet" instead of "use a
+        // number from a different layout".
+        collageLastCanvas = null;
+        collageTextProbe  = '';
+        collageLastProbe  = '';
+        // The module must re-measure its square for the preview's rect, and
+        // the nudge is once-per-load, so it has to be re-armed.
+        collageNudged = false;
         // positionCyEl stood down while View held the rect; hand it back.
         try { positionCyEl(); } catch (_) {}
         console.log('[view] left');
