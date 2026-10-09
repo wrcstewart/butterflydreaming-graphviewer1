@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10c' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-10d' };
 
 let bdViewTitleText = '';
 
@@ -10858,6 +10858,39 @@ async function init() {
         iframeEl.style.height = h + 'px';
       }
     }
+
+    // ── COLLAGE PREVIEW: A SLICE OFF THE BOTTOM FOR THE PLAYBAR ──────────
+    // DELIBERATELY AFTER THE STAMPS ABOVE, AND NEVER INSTEAD OF THEM.
+    // Yesterday's version took a branch of its own before them and returned —
+    // and in Player mode #cy carries `.hidden` (display: none) so its rect
+    // collapses to zeros, the branch skipped stamping and returned before the
+    // fallback that keeps the last good rect could run. The graphic landed
+    // unstamped in the top-left corner at its intrinsic size, at the same
+    // level as the script panel, which is precisely what was reported.
+    //
+    // So this reads the rect the working code JUST WROTE, takes a slice off the
+    // bottom, and puts the bar in the slice. If no stamp happened there is
+    // nothing to read and this does nothing: the failure mode is "no bar", not
+    // "no graphic". That asymmetry is the whole point.
+    if (document.body.classList.contains('collage-bar') && iframeEl) {
+      const bar = document.getElementById('collage-playbar');
+      const t0 = parseInt(iframeEl.style.top, 10);
+      const l0 = parseInt(iframeEl.style.left, 10);
+      const w0 = parseInt(iframeEl.style.width, 10);
+      const h0 = parseInt(iframeEl.style.height, 10);
+      // 120px floor on what is LEFT for the graphic: a short window should lose
+      // the bar rather than have the picture carved down to nothing, and a band
+      // too small to divide is better left undivided.
+      if (bar && [t0, l0, w0, h0].every(Number.isFinite) &&
+          h0 > COLLAGE_BAR_H + COLLAGE_BAR_GAP + 120) {
+        const visH = h0 - COLLAGE_BAR_H - COLLAGE_BAR_GAP;
+        iframeEl.style.height = visH + 'px';
+        bar.style.top    = (t0 + visH + COLLAGE_BAR_GAP) + 'px';
+        bar.style.left   = l0 + 'px';
+        bar.style.width  = w0 + 'px';
+        bar.style.height = COLLAGE_BAR_H + 'px';
+      }
+    }
   }
 
   // Kept as named constants because THREE places have to agree about them: this
@@ -10902,10 +10935,34 @@ async function init() {
       // node explorable on the same terms as a module node.
       avNodeId = nodeId;
       savedByNode.set(nodeId, savedText);
-      const slot = collageVisualSlot(savedText, explorationByNode.get(nodeId));
-      if (!slot) return;
-      loadCollageVisual(slot.moduleId, slot.script);
+      const liveC = collageLive(savedText, explorationByNode.get(nodeId)) || collageHere;
+      const slot  = collageSlot(liveC, 'visual');
+      const musC  = collageSlot(liveC, 'music');
+
+      // The PLAYBAR, preview only. The class first, because positionCyEl reads
+      // it to decide whether to take its slice — and the slice has to be taken
+      // in the same pass that stamps the graphic, or the graphic is briefly
+      // full height and the bar lands on top of it.
+      document.body.classList.toggle('collage-bar', !!musC);
+      if (musC && typeof loadCollagePlaybar === 'function') {
+        loadCollagePlaybar(musC.moduleId, musC.script);
+      } else if (typeof stopCollagePlaybar === 'function') {
+        stopCollagePlaybar();
+      }
+
+      if (slot) loadCollageVisual(slot.moduleId, slot.script);
+      // Re-stamp now the band has to be shared.
+      try { positionCyEl(); } catch (_) {}
       return;
+    }
+
+    // Leaving a collage for an ordinary module node: the bar goes, and it is
+    // SILENCED rather than merely hidden. Its CSS stops matching the moment
+    // `collage-bar` comes off, and a hidden iframe can go on playing — the
+    // same fault as BD's media bar playing on into the standalone.
+    if (document.body.classList.contains('collage-bar')) {
+      document.body.classList.remove('collage-bar');
+      if (typeof stopCollagePlaybar === 'function') stopCollagePlaybar();
     }
 
     const moduleId = parseModuleId(savedText);
@@ -10979,6 +11036,74 @@ async function init() {
     };
     window.addEventListener('message', onReady);
     visualIframe.src = url;
+  }
+
+  // ── COLLAGE PREVIEW: THE PLAYBAR (2026-10-10) ─────────────────────────
+  // Its own frame, and its own idea of what is loaded: sharing
+  // `currentModuleId` between two frames is the same desync the visual
+  // loader's note warns about, one frame further on.
+  //
+  // Always outputOnly, in the preview too — the author asked for a simple
+  // playbar and NOT the steppers. For DroneFrac that is exactly Play and Stop:
+  // `.player-panel` holds those two buttons and nothing else, checked rather
+  // than assumed. NOTE there is therefore no volume control in it; `volume` is
+  // a `%%bd_p_` stepper in the column output-only hides, so putting one here
+  // is a change to the MODULE and not something BD can arrange from outside.
+  const COLLAGE_BAR_H   = 70;   // .big-btn is min-height 52 + the panel's padding
+  const COLLAGE_BAR_GAP = 4;
+  let currentBarModuleId = null;
+
+  function loadCollagePlaybar(moduleId, script) {
+    const bf = document.getElementById('collage-playbar');
+    if (!bf || !moduleId || !script) return;
+    const url = getModuleUrl(moduleId);
+    if (!url) {
+      console.warn(`[collage] unknown music module '${moduleId}' — playbar skipped`);
+      return;
+    }
+    const flags = () => {
+      try {
+        bf.contentWindow.postMessage({ type: 'bd_ui_config',
+          outputOnly: true, hideControls: true, hostChrome: false }, '*');
+      } catch (_) {}
+    };
+    if (moduleId === currentBarModuleId) {
+      console.log('[collage] playbar fast path, posting script to ' + moduleId +
+                  ', length=' + script.length);
+      try {
+        bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
+      } catch (_) {}
+      flags();
+      return;
+    }
+    console.log('[collage] playbar swap path, src=' + url + ', script length=' + script.length);
+    currentBarModuleId = moduleId;
+    const onReady = (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_READY') return;
+      // THE SOURCE MUST BE CHECKED, unlike in the single-frame loaders: two
+      // module frames are alive now, so a BD_READY from the other one would
+      // otherwise satisfy this listener and the script would go to a frame
+      // that is not ready, or to the wrong module entirely.
+      if (e.source !== bf.contentWindow) return;
+      window.removeEventListener('message', onReady);
+      try {
+        bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
+        console.log('[collage] playbar BD_READY — script posted to ' + moduleId);
+      } catch (err) {
+        console.warn('[collage] playbar postMessage failed', err);
+      }
+      flags();
+    };
+    window.addEventListener('message', onReady);
+    bf.src = url;
+  }
+
+  function stopCollagePlaybar() {
+    const bf = document.getElementById('collage-playbar');
+    if (bf && bf.contentWindow) {
+      try { bf.contentWindow.postMessage({ type: 'BD_STOP' }, '*'); } catch (_) {}
+    }
   }
 
   // ── COLLAGE: load a SCRIPT, not a node (2026-10-08) ────────────────────

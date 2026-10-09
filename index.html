@@ -153,6 +153,16 @@
        iframe, no module, nothing loaded: an outline and a label. -->
   <div id="collage-sound-reserve" hidden><span></span></div>
 
+  <!-- COLLAGE PREVIEW (2026-10-10) — the playbar, under the graphic.
+       A SECOND module frame, because #visual-iframe can only hold one module:
+       reparenting an iframe reloads it, so pointing it at a second module
+       would destroy the first. Preview only for now; View is untouched.
+       No src — the loader attaches its BD_READY listener before setting the
+       URL, or it races the module's own announcement. -->
+  <iframe id="collage-playbar"
+          title="ButterflyDreaming Collage Playbar"
+          sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
+
   <!-- MM3 (2026-07-12) invite panel — visible only in Player mode
        (body.player-active toggled by setViewMode). Sits in the 220 px band
        reserved on the right of #visual-iframe by positionCyEl. Buttons
