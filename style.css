@@ -1214,11 +1214,11 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
-   2026-10-11m: GREEN (Back shows the DESTINATION'''s text. It restored the view
+   2026-10-11m: GREEN (Back shows the DESTINATION's text. It restored the view
    correctly and then left whatever was in the panel — the whole collage script
    after leaving a collage — while already asserting through activeNodeId and
    markReadNode that you were reading the destination. advanceOrNavigate gains
-   a  option that skips its navigateInto calls and the breadcrumb
+   a `textOnly` option that skips its navigateInto calls and the breadcrumb
    chip, so not one node moves; and because navigateInto is what calls
    saveState, that also stops Back from pushing a state as it pops one, which
    would have left the stack unable to shrink). Next = blue.
