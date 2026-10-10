@@ -90,6 +90,131 @@ work. That is the single biggest reason to think v2 is cheap.
 
 ---
 
-## 4. Open questions
+## 4. Settled in discussion, 2026-10-11
 
-To be filled in from the discussion.
+### 4.1 Saving — DEFERRED, deliberately
+
+Not saved automatically and not permanent. Paired users will save a collage the
+same way as any other script, and the protocol comes after that. **The author's
+reason is the useful part: "the idea is to creep up on exactly what data will
+need to be saved."** Build the thing, see what it actually holds, then decide
+what persistence means — rather than designing a format for data that does not
+exist yet.
+
+For development the author may ask for one or two test cases saved as specific
+new nodes, as `bd_Collage_001` and `002` were.
+
+**BUT ONE SAFETY ITEM CANNOT WAIT, even though saving can.** `Sv` writes the top
+card to the active node. With a collage in the top card, pressing `Sv` while
+standing on a Tao Te Ching passage would overwrite the poem with a collage
+script. This project has been bitten by that shape three times —
+`%%bd_center` destroyed by a round-tripped card, and twice since. So `Sv` needs
+a guard while the top card is a collage, before the Collage button ships, even
+though what a *deliberate* collage save means is undecided. A refusal with a
+reason is enough; it need not be a feature.
+
+### 4.2 The remembered collage — ONE authoritative string, a trail of snapshots
+
+Confirmed by the author:
+
+- As the user navigates, or creates a new card, **the collage card is relegated
+  to history like any other** — nothing special happens, which is the point.
+- **BD remembers the last collage script** and reinstates it as the TOP CARD
+  when Collage is next pressed. The replacement of that node's type then happens
+  on the reinstated copy.
+- In the degenerate case the replacement is byte-identical — the user wandered
+  without touching a stepper — and that is harmless.
+
+So the shape is: **one authoritative "last collage" string held by BD, and the
+cards in history are a trail of earlier versions.** Two consequences worth
+stating because they are not obvious:
+
+- The remembered string has to be kept current while the collage card is TOP —
+  updated by stepper moves and hand edits, exactly as the card is — and frozen
+  when it is relegated. The existing `collagePreservingWrite` path is where that
+  happens.
+- An edit made to a collage card that is already in HISTORY will not be
+  remembered. That is consistent (history cards are a record, not the live
+  document) but it will surprise someone eventually.
+
+### 4.3 Stacking — order of appearance NOW, a directive LATER
+
+Replacing a slot **replaces it in place**, keeping its position, so re-adding a
+module cannot silently bring it to the front and change the composition.
+
+The author's intent is **an `on_top` or `zorder` directive** in place of
+order-of-appearance, deferred until the rest works and it can be judged in use.
+Noted so that nothing is built which makes it awkward: block order remains the
+stacking rule for now, and a directive would simply override it.
+
+### 4.4 The button says what it will do — ACCEPTED
+
+Three states, because pressing it does one of three things: start a collage, add
+this type, or replace this type. Plus a compact readout of which slots are
+filled — `T G ·` for text and graphic present, music absent — so the user knows
+what the collage contains without pressing anything. The author: *"you can put
+that in and I can see if it feels necessary."*
+
+### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
+
+Confirmed, and no attempt will be made to work around it. **See §5 for the one
+part of this that is still open**: whether View follows the top card or prefers
+the remembered collage.
+
+### 4.6 Every type is admitted, including gateways and clusters — ACCEPTED
+
+Anything without a module is TEXT, gateway and cluster blurbs included. A
+gateway's text about a work might be exactly the right title for a collage.
+
+**And the author's wider note: "later we may have further types that have their
+own placement rules."** So the three types are not a closed set, and the type →
+placement mapping should stay a lookup rather than a chain of conditionals.
+
+### 4.7 THE COLLAGE PREVIEW IS NO LONGER NEEDED
+
+The author's words. v2 shows one module at a time with its own steppers, and the
+composite is seen in **View** — which is where v1's placement work is
+repurposed. That removes the overlay, the clip-path, `bd_collage_layout`, the
+`columnMaxHeight` lane sharing and all the transparency coordination from the v2
+path.
+
+**What it does NOT settle is whether that code is deleted** — see §5.
+
+---
+
+## 5. Still open
+
+### 5.1 Does View follow the TOP CARD, or prefer the remembered collage?
+
+The author, on browsing deactivating the collage: *"a press of the view button
+could still display it …"* — left open.
+
+The two readings differ in a way the user would feel:
+
+- **View follows the top card.** On a text node after wandering, View shows that
+  node. To see the collage you press Collage first (one tap), which reinstates
+  it, then View. Predictable: View always shows what is in front of you.
+- **View prefers the remembered collage.** One tap fewer, but View would
+  sometimes show something other than the current context, with nothing on
+  screen explaining why.
+
+**Recommendation: View follows the top card.** A View that shows something other
+than the current node is the kind of surprise that is hard to attribute, and the
+cost is a single tap on a button that is right beside it.
+
+### 5.2 Is v1's preview code KEPT or DELETED?
+
+`bd_Collage_002` stays as a demonstration — but the demonstration IS the
+overlay preview. Deleting the preview path would leave 002 working in View only.
+
+**Recommendation: keep it until v2 is proven, then delete in one commit.**
+Keeping it costs two code paths and no risk; deleting it now costs the
+demonstration. The `collage-preview-working-2026-10-10` tag makes the removal
+recoverable either way.
+
+### 5.3 Smaller things, for when building starts
+
+- Does the Collage button appear on every node, or only where it would do
+  something? (Everything has a type, so it would always do something.)
+- Is there a way to REMOVE a slot from the collage, or only replace it?
+- `%%bd_collage 1` or a new version number for v2's conventions?
