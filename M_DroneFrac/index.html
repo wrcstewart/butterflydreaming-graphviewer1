@@ -22,7 +22,21 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%; height: 100%;
-      background: #0a0a0f;
+      /* TRANSPARENT, not #0a0a0f (2026-10-11). This shell is a relay with a
+         full-size iframe in it, so the inner module always paints its own
+         background and this one never shows — EXCEPT when the module is
+         deliberately see-through, which is what `overlay` makes it in a
+         collage. An opaque shell here hid the module underneath and nothing
+         said why: the lower half of the graphic came up as a black band whose
+         top edge was exactly the top of the stepper clip.
+
+         THE THIRD OF FOUR STACKED BACKGROUNDS. The other three are three.js's
+         clear alpha (or this module's body), the module document's own body,
+         and the host's #visual-iframe / #collage-playbar element. The two Kolam
+         wrappers were given this treatment when the 3D module gained
+         transparency; this one was not, and that is the fourth time this list
+         has caught something after being written down. */
+      background: transparent;
       overflow: hidden;
     }
     #module-frame { width: 100%; height: 100%; border: 0; display: block; }

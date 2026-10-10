@@ -338,7 +338,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue, matching BD's */
+    background: #c0392b !important;      /* CANARY — red, matching BD's */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -457,7 +457,12 @@
      for the eye and for the mouse alike.
 
      Stage 1 shows the TRANSPORT only. The steppers come next. */
-  body.overlay, html:has(body.overlay) { background: transparent !important; }
+  /* `html` is handled by a class JS puts on it, NOT by `html:has(body.overlay)`.
+     `:has()` needs Safari 15.4+, and a selector that silently does nothing on
+     an older engine is the worst shape of failure for a transparency chain
+     where one opaque layer hides everything behind it. A class is a class
+     everywhere. */
+  body.overlay, html.overlay { background: transparent !important; }
   body.overlay { overflow: visible; }
   body.overlay .module-layout {
     display: block; position: relative;
@@ -2162,6 +2167,10 @@ window.addEventListener('message', (event) => {
       // others. Independent of outputOnly: what an overlay SHOWS is still
       // decided by the flags above it.
       document.body.classList.toggle('overlay', data.overlay === true);
+      // <html> too: it carries its own background from the `html, body` rule,
+      // and an opaque root hides everything behind the iframe however
+      // transparent the body is.
+      document.documentElement.classList.toggle('overlay', data.overlay === true);
     } else if (type === 'bd_collage_layout') {
       // ── WHERE THE HOST WANTS THIS MODULE'S PANELS (2026-10-10) ─────────
       // Frame-relative pixels, measured by BD from the module underneath.
