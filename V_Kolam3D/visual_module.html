@@ -187,12 +187,6 @@
        rule under it so it reads as a break rather than another label — the
        same idiom the music module's strip uses, so two stacked columns in a
        collage look like one list with two groups. */
-    /* A WHITE FRAME WHILE SHARING THE LANE, matching the music module's own
-       `.panel` border so two stacked groups read as two panels of one list.
-       The faint teal below is right for a column standing alone and too quiet
-       to divide one column from another. Luminance, not hue, doing the work. */
-    body.sharing-lane .control-panel { border-color: #fff; }
-
     .strip-title {
       flex: 0 0 auto;
       width: 100%;
@@ -237,6 +231,19 @@
       min-width: 0;
       overflow-y: auto;
     }
+
+    /* ── A WHITE FRAME WHILE SHARING THE LANE ─────────────────────────────
+       Matching the music module's own `.panel` border, so two stacked groups
+       read as two panels of one list rather than one column with a line in it.
+       The faint teal above is right for a column standing alone and far too
+       quiet to divide one column from another — luminance, not hue, doing the
+       work, which matters here.
+
+       AFTER the rule it overrides, and the full `border` SHORTHAND rather than
+       `border-color` alone. Specificity already favoured it, but a shorthand
+       below a longhand is the kind of thing that is true until someone adds a
+       declaration, and this file has lost rounds to exactly that. */
+    body.sharing-lane .control-panel { border: 1px solid #fff; }
 
     /* Control cell — one stepper (or select) above, label immediately below.
        Small margin-bottom separates each button-label pair from the next.
@@ -2184,6 +2191,10 @@
             // And it says so, so the column can be framed like the one that
             // joins it below. Only while sharing: a module on its own has
             // nothing to be distinguished FROM.
+            if (document.body.classList.contains('sharing-lane') !== sharing) {
+              console.log('[kolam3d] sharing-lane ' + (sharing ? 'ON' : 'off') +
+                          (sharing ? ' — column capped at ' + Math.round(cmh) + 'px, white frame' : ''));
+            }
             document.body.classList.toggle('sharing-lane', sharing);
             break;
           }
