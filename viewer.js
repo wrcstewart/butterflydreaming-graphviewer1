@@ -3142,6 +3142,9 @@ let collageTextProbe  = '';     // the same, for the text layer
 // Once per playbar load, and re-armed on the way out of View: the square
 // has to be re-measured for a rect that has completely changed.
 let collageNudged     = false;
+// The bounded retry that waits for the module frame to come up, so the text
+// layer is never shown before it has somewhere to be.
+let collageTextRetry  = null;
 
 // ── A MERGE INTO A COLLAGE MUST BE PER-SLOT (2026-10-11) ───────────────────
 // mergeExploredValues keys values by their BARE NAME, which is right for one
@@ -11032,6 +11035,8 @@ async function init() {
       const tl = document.getElementById('collage-preview-text');
       const tb = document.getElementById('collage-preview-text-body');
       const placeText = (g) => {
+        // Returns false WITHOUT revealing anything. The reveal is the caller's,
+        // and only ever after a successful placement.
         if (!tl || !tb || !g || !(g.width > 40)) return false;
         collageLastCanvas = g;
         tl.style.top    = Math.round(g.top) + 'px';
@@ -11056,8 +11061,29 @@ async function init() {
         if (say !== collageTextProbe) { collageTextProbe = say; console.log('[collage] ' + say); }
         return true;
       };
-      const mT = collageModuleRects(iframeEl);
-      if (!placeText(mT && mT.canvas)) placeText(collageLastCanvas);
+      const tryPlaceText = () => {
+        const m = collageModuleRects(iframeEl);
+        const g = (m && m.canvas) || collageLastCanvas;
+        if (placeText(g)) { tl.hidden = false; return true; }
+        tl.hidden = true;        // never on screen unplaced
+        return false;
+      };
+      if (!tryPlaceText()) {
+        // A BOUNDED RETRY, because two animation frames is not long enough for
+        // a module frame to come up on a phone — and the two rAF passes below
+        // were the only thing trying. Stops on success, on leaving the collage,
+        // or after three seconds, so it cannot outlive what it is waiting for.
+        if (collageTextRetry) { clearInterval(collageTextRetry); collageTextRetry = null; }
+        let tries = 0;
+        collageTextRetry = setInterval(() => {
+          if (!document.body.classList.contains('collage-preview-text') ||
+              ++tries > 30 || tryPlaceText()) {
+            clearInterval(collageTextRetry);
+            collageTextRetry = null;
+            if (tries > 30) console.warn('[collage] text layer never placed — square never measured');
+          }
+        }, 100);
+      }
       // Twice more, a frame apart: the module's own ResizeObserver settles the
       // square after this pass, and after a return from View it has a long way
       // to settle. Sets only this layer's own properties, so it cannot drive
@@ -11065,12 +11091,12 @@ async function init() {
       requestAnimationFrame(() => {
         if (!document.body.classList.contains('collage-preview-text')) return;
         const m2 = collageModuleRects(iframeEl);
-        placeText(m2 && m2.canvas);
+        if (placeText(m2 && m2.canvas)) tl.hidden = false;
         collageNudgeVisual(iframeEl);
         requestAnimationFrame(() => {
           if (!document.body.classList.contains('collage-preview-text')) return;
           const m3 = collageModuleRects(iframeEl);
-          placeText(m3 && m3.canvas);
+          if (placeText(m3 && m3.canvas)) tl.hidden = false;
         });
       });
     }
@@ -11250,6 +11276,7 @@ async function init() {
         !b.classList.contains('collage-bar')) return;
     b.classList.remove('collage-preview', 'collage-preview-text',
                        'collage-bar', 'collage-music');
+    if (collageTextRetry) { clearInterval(collageTextRetry); collageTextRetry = null; }
     const tl  = document.getElementById('collage-preview-text');
     const tlb = document.getElementById('collage-preview-text-body');
     if (tl)  tl.hidden = true;
@@ -11330,7 +11357,14 @@ async function init() {
       const tl   = document.getElementById('collage-preview-text');
       const tlb  = document.getElementById('collage-preview-text-body');
       if (tlb) tlb.textContent = (txtC && txtC.body) || '';
-      if (tl)  tl.hidden = !(txtC && txtC.body);
+      // HIDDEN UNTIL PLACED, not shown and then positioned. A `position: fixed`
+      // element with no insets falls back to its STATIC position — in the flow,
+      // beside the script panel — so showing it before the square has been
+      // measured puts the words there until something measures. On iOS the
+      // module frame is not up for several frames, which is why the fault was
+      // iOS-only and why going to Browse and back or into View and back
+      // "fixed" it: those paths measure again. positionCyEl reveals it.
+      if (tl)  tl.hidden = true;
       document.body.classList.toggle('collage-preview-text', !!(txtC && txtC.body));
       // THE SCRIPT'S BLOCK ORDER DECIDES THE STACKING, as it already does in
       // View: a later block sits on top. Recorded here rather than recomputed
