@@ -409,7 +409,21 @@ function bdModuleOf(text) {
 // no module line at all, and refusing those would break the ordinary case.
 function bdSameModule(a, b) {
   const x = bdModuleOf(a), y = bdModuleOf(b);
-  return !x || !y || x === y;
+  if (!x || !y || x === y) return true;
+  // ── A COLLAGE NAMES SEVERAL MODULES (2026-10-11) ─────────────────────────
+  // bdModuleOf reports a collage's VISUAL slot, which was right for the module
+  // in #visual-iframe and silently wrong for every other slot: a MUSIC slot's
+  // announcement looked like it came from a different module, so the
+  // exploration recorder dropped it and the card writer skipped it. Reported as
+  // "the fractal steppers are not syncing with the script".
+  //
+  // An announcement from ANY of a collage's slots is about that collage. Asked
+  // of both sides, because this is called with the arguments either way round
+  // at different sites.
+  const ca = parseCollage(a), cb = parseCollage(b);
+  if (cb && cb.blocks.some((bl) => bl.moduleId === x)) return true;
+  if (ca && ca.blocks.some((bl) => bl.moduleId === y)) return true;
+  return false;
 }
 // What the last token was minted for. Needed because a viewer announcing
 // itself does not say which module it is — the relay's av_request_state
@@ -708,7 +722,21 @@ if (typeof window !== 'undefined') {
     // would otherwise be stored as this node's exploration, and pushed back
     // into the module the next time the node opened.
     if (avNodeId && bdSameModule(text, savedByNode.get(avNodeId))) {
-      explorationByNode.set(avNodeId, text);   // remember where we got to
+      // ── A COLLAGE'S EXPLORATION IS THE SUM OF ITS SLOTS' ──────────────
+      // explorationByNode holds ONE live script per node, which is exactly
+      // right for a module node and not enough for a collage: storing the
+      // music module's announcement would discard everything the visual
+      // module's steppers had done, and the next announcement from the other
+      // one would discard this.
+      //
+      // So for a collage the announcement is MERGED INTO what is already
+      // there, keeping a collage-shaped record of every slot at once.
+      // mergeExploredValues replaces values by bare name and leaves every
+      // other line untouched, which is precisely the operation needed — the
+      // same inverse that keeps the card intact.
+      const prev = explorationByNode.get(avNodeId) || savedByNode.get(avNodeId);
+      explorationByNode.set(avNodeId,
+        parseCollage(prev) ? mergeExploredValues(prev, text) : text);
     } else if (avNodeId) {
       // ── SAY SO (2026-10-08) ────────────────────────────────────────────
       // This guard had no voice, and its silence is exactly what hid a
@@ -13454,10 +13482,14 @@ async function init() {
       // This compares what the two scripts SAY they are, so it holds whatever
       // the order happens to be — and it cannot be defeated by a path nobody
       // remembered to notify.
-      const have = bdModuleOf(getCardText(body));
-      const want = bdModuleOf(text);
-      if (have && want && have !== want) {
-        why('skip: card is a ' + have + ' script, incoming is ' + want);
+      // bdSameModule, not a bare comparison of the two names: a COLLAGE card
+      // legitimately receives announcements from several modules, and a direct
+      // `have !== want` rejected every one that was not its visual slot. The
+      // ordinary case is unchanged — for two single-module scripts the two
+      // tests agree exactly.
+      if (!bdSameModule(getCardText(body), text)) {
+        why('skip: card is a ' + bdModuleOf(getCardText(body)) +
+            ' script, incoming is ' + bdModuleOf(text));
         return;
       }
       // Through collagePreservingWrite, so a module's announcement updates a
