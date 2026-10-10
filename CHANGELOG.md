@@ -6,6 +6,87 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-11 — the overlay finished, and fourteen faults
+
+The collage preview works: the kolam figure with the words over it, each
+module's steppers in its own group in the lane under its own header, and the
+transport as a 52px bar under the graphic. Two iframes, three layers.
+
+### How one module occupies two places
+
+The music module's frame covers the WHOLE module rect and is CLIPPED from the
+lane's midpoint down, so its transport lands under the graphic and its steppers
+land in the lane — from one document, which can only ever be one rectangle. The
+clip is a single `inset()`, because the bounding box of those two regions IS
+that band; what it costs is clicks on the canvas, which takes none, and on the
+half of Kolam3D's column that Kolam3D is told to stop short of.
+
+Each module draws its OWN header. That is what makes the labels follow the
+script's order without anything arranging them: they appear wherever the host
+puts the modules, nothing is told twice, and nothing can disagree.
+
+### The faults, which fell into four families
+
+**Transparency, and the count is five.** A black band across the lower graphic
+turned out to be the THIRD stacked background — DroneFrac's wrapper, the one
+shell never made transparent because nothing had ever been laid over anything.
+Then Kolam3D's steppers were legible THROUGH the music column, because `.panel`
+sets a border and no background and had always been showing the body's.
+Transparency is wanted between panels, never inside them. The five layers:
+three.js's clear alpha, the module's body, the module's `<html>`, the wrapper's
+html+body, and the host's iframe element.
+
+**Identity, and a collage names several modules.** `bdModuleOf` reports a
+collage's visual slot, so a music slot's announcement looked like another
+module's and was dropped by the exploration recorder and skipped by the card
+writer. Then each module's values discarded the other's, because
+`explorationByNode` holds one script per node. Then — the author's own
+diagnosis, from the symptom that named the cause — a BARE-NAME COLLISION:
+`mergeExploredValues` keys by bare name, and this collage holds Kolam3D's
+`%%bd_p_angle 124` beside DroneFrac's `%%bd_angle 90`, a grammar directive with
+no stepper. Each module's announcement overwrote the other's angle, which is
+why a value moved and then reverted a second later. Every merge is now
+per-slot. *"The `_p_angle` stepper is changing when I alter the iterations
+stepper, and HERE'S the clue, the `_p_angle` stepper is not showing"* — not
+showing because it is DroneFrac's, changing because nothing could tell the two
+apart.
+
+**One idea written twice.** Copy Down and publishCard both posted the whole
+card to the visual frame. And `bd_collage_layout` reached Kolam3D's module but
+not its WRAPPER — two sites of three, the relay trap for the third time, proved
+by a log line where two rounds of reading CSS had failed: BD printed
+`lane 130x543` and the module printed no receipt.
+
+**State that outlived its owner.** The collage's text stayed painted over the
+node graph after Back, because the only teardown lived inside a function that
+runs only in Player mode and returns early for a node with no module. Then two
+faults that were never collage faults at all: Back has never shown the
+destination's text, and View has always shown the last module behind a text
+node's prose. Both fixed generally.
+
+And a runaway caught before it was reported: the lane's midpoint was derived
+from the column the same code was about to shorten, so each pass halved the
+already-halved column — 297, 148, 74, 37, 18.
+
+### Three of my own checks were wrong
+
+Worth recording, because each cost a round. A grep was defeated by my own prose
+TWICE — searching for a selector and finding the comment that described it. A
+test hand-sliced a format that has a parser, and silently produced the preamble.
+And a multi-step edit script threw at its second step and never ran its third,
+which I read as one failure rather than two: the later steps of an aborted
+script are not unverified, they are absent.
+
+### The gap the author named
+
+*"The current almost finished system doesn't actually have a mechanism for
+producing the collage script anyway — the collage just assumes it exists and our
+work has been adjusting and viewing it."* Both test collages are hand-built.
+That is the Merge question, and no design avoids it. Full detail and every open
+item: `PLANNING_REGISTER.md`, **Added 2026-10-11**.
+
+---
+
 ## 2026-10-10 — the collage preview, and the one fact the design turns on
 
 The preview shows all three layers now: the words, the figure, and a transport.

@@ -1211,3 +1211,111 @@ Worth noting in its favour, since it is the cheaper design by a long way:
 **Nothing in this section is settled against that.** The overlay work stands as
 a proof that the hard version is possible — the pointer-events/clip fact is the
 piece that was genuinely unknown — and as a working three-layer preview.
+
+
+## Added 2026-10-11 — the overlay COMPLETED, and fourteen faults on the way
+
+The collage preview is finished and author-confirmed. Revert point for
+everything in this section: **`git tag collage-preview-working-2026-10-10`**,
+plus one commit per fault so any single step can go back alone.
+
+### What it is, now it works
+
+```
+┌──────────────────────────────────────┬──────────────┐
+│                                      │ bd_V_Kolam3D │ ← its own 8px header
+│          the kolam figure            │  18 steppers │   white frame
+│          with the words over         │   (scrolls)  │
+│          or under it                 ├──────────────┤
+│                                      │ bd_M_DroneFrac │ ← its own header
+│                                      │  25 steppers │   white frame
+├──────────────────────────────────┐   │   (scrolls)  │
+│  ▶ Play  ■ Stop   52px           │   │              │
+└──────────────────────────────────┴───┴──────────────┘
+```
+
+**Three layers and two modules, from TWO iframes.** The music module occupies
+one frame covering the WHOLE module rect, clipped from the lane's midpoint
+down — so its transport lands under the graphic and its steppers land in the
+lane, from a single document. The text is BD's own DOM. Each module draws its
+OWN header, which is what makes the labels follow the script's order without
+anything arranging them.
+
+In View: the figure and the words full screen, with the transport as a 110px
+strip at the foot, and the square shrinking by exactly that depth because
+`--bd-collage-side` already subtracts it.
+
+### The two facts the architecture rests on
+
+1. **An iframe is ONE hit target.** Pointer events inside it cannot reach the
+   parent, so `pointer-events: none` on an overlay kills every control in it.
+   A **`clip-path` takes part in hit-testing**, and need not be one rectangle —
+   which is the only reason one frame can hold two separated interactive parts.
+   The text layer is the single case where `pointer-events: none` suffices,
+   because nothing in it is ever clicked.
+2. **One document is one rectangle.** A module's output and its controls are in
+   the same HTML file and can only be placed as a unit. Loading it twice does
+   not help where audio is involved: Play must be pressed in the document that
+   makes the sound. Hence the overlay, and hence stepper groups that are
+   **adjacent but never continuous** — two documents cannot share a scrollbar.
+
+### Fourteen faults, and what each one actually was
+
+| # | symptom | cause |
+|---|---|---|
+| 1 | a black band across the lower graphic, its top edge exactly the clip's | **The THIRD stacked background**: `M_DroneFrac/index.html`'s `html, body`. Both Kolam wrappers had been made transparent; this one never was. |
+| 2 | Kolam3D's steppers legible THROUGH the music column | `.panel` sets a border and **no background**, so it had always shown the body's — and the body is transparent in overlay mode. Transparency is wanted between panels, never inside them. |
+| 3 | the music header twice the size of Kolam3D's | It had no `font-size` in overlay mode and was inheriting the body's 16px Courier. |
+| 4 | — (caught before it was reported) | **A RUNAWAY.** The lane's midpoint was `col.top + col.height / 2`, and the column is the thing being shortened — so each pass halved the already-halved column. Simulated: 297 → 148 → 74 → 37 → 18 over five passes. |
+| 5 | no music header at all | Its base `display: none` was written INSIDE `@media (min-aspect-ratio: 2/1)` — a **default that exists at some window shapes and not others**, a latent bug in both directions. |
+| 6 | the music steppers not syncing with the script | `bdModuleOf` reports a collage's VISUAL slot, so a music slot's announcement looked like another module's. `bdSameModule` now knows a collage names several modules. |
+| 7 | each module's values discarding the other's | `explorationByNode` holds ONE live script per node. A collage's exploration now **accumulates** across its slots. |
+| 8 | a value changing then reverting after a second | **A BARE-NAME COLLISION.** `mergeExploredValues` keys by bare name, and this collage has Kolam3D's `%%bd_p_angle 124` beside DroneFrac's `%%bd_angle 90` — a grammar directive with no stepper. Every merge is now **per-slot**. The author diagnosed it from "the `_p_angle` stepper is changing when I alter iterations, and HERE'S the clue, it is not showing". |
+| 9 | editing the script not reaching the music module | Copy Down **and** `publishCard` both posted the WHOLE card to `#visual-iframe`: the visual module read the music slot's directives as its own, the music module received nothing. One idea written twice, which is the shape of most faults in this file. |
+| 10 | no white frame on Kolam3D's column, twice | First an order-fragile `border-color` under a later `border` shorthand; then, the real cause — **`bd_collage_layout` was never in Kolam3D's WRAPPER relay.** The log proved it: BD printed `lane 130x543` and the module printed no receipt. |
+| 11 | the collage's text painted over the node graph after Back | **The teardown was in the wrong place** — inside `loadModuleForNode`, which runs only in Player mode and returns early for a node with no module. The furniture is BD's own fixed DOM and outlives both. One idempotent teardown now runs at three exits. |
+| 12 | Back showed the wrong text | `restoreState` sets `activeNodeId` and calls `markReadNode`, so it already asserted "you are reading dest" while the panel showed something else. `advanceOrNavigate` gained a **`textOnly`** option. A general BD fix, not a collage one. |
+| 13 | View showed the last module behind a text node's prose | `body.view-active #visual-iframe { display: block }` showed the frame whenever View was open, and an iframe keeps its src. Gated on a new `view-has-module`. **A hole from the start**, invisible until something had been loaded first. |
+| 14 | iOS only: on FIRST arrival the text overlaid the script panel | **Shown before placed.** A `position: fixed` element with no insets falls back to its STATIC position — in the flow, beside the script panel. Two rAF passes was the whole of the patience, and a phone takes longer. Hidden until a placement succeeds, with a bounded retry. |
+
+### Four rules worth carrying
+
+1. **A measurement must not be derived from a value the same code is about to
+   change.** Fault 4. The frame's height is stable; the column's is not,
+   because this code sets it.
+2. **A default must live at the top level.** Fault 5. A base rule inside a
+   media query is a default that exists at some window shapes and not others.
+3. **Transparency is wanted BETWEEN panels, never inside them**, and the
+   stacked-background count is now **five**: three.js's clear alpha, the module
+   document's `body`, the module document's `<html>`, the wrapper's `html,
+   body`, and the host's iframe ELEMENT. Faults 1 and 2, and the fifth
+   (`#visual-iframe` in the preview) the day before.
+4. **Hidden until placed, never placed after showing.** Fault 14.
+
+### Three checks of my own that were wrong
+
+Recorded because each cost a round and each is a repeatable mistake:
+
+- **A grep defeated by my own prose.** Twice: a check for
+  `@media (min-aspect-ratio` found the sentence *describing* the bug, and a
+  check for `body.view-active #visual-iframe` found the comment explaining the
+  old rule. Verify by **line number or by listing actual rules**, never by
+  substring, in a file that discusses itself.
+- **Hand-slicing a format that has a parser.** A test split the script on
+  `%%bd_module text` and silently produced the preamble, because this script
+  has the text block FIRST — so it reported the code broken when the test was.
+- **An aborted multi-step script leaves later steps ABSENT, not unverified.**
+  A Python edit script threw at its second step and never ran its third — the
+  Kolam3D wrapper relay, fault 10 — and the traceback was read as one failure
+  rather than two.
+
+### What is still NOT built
+
+| item | note |
+|---|---|
+| **A mechanism to PRODUCE a collage script** | The author's own observation, and the real gap: *"the collage just assumes it exists and our work has been adjusting and viewing it."* `bd_Collage_001` and `002` are hand-built. This is the Merge question, and no design avoids it. |
+| **Merge** | Shape agreed: "append this node, adding whatever header it lacks". Open: where the target node comes from, and whether to stamp a slot id. |
+| **The multiple-sources question** | The author is weighing how script GENERATION combines with the adjustment system — possibly setting steppers in the ORIGINAL node and flipping between node, Collage Script and View, with separate buttons. |
+| `%%bd_slot` / placement | Needed when two visual blocks become possible. |
+| A text MODULE | Possible in principle and the format already allows it — `%%bd_module text` reads as a module header, so the NAME in the header decides the path. The objection is space: the lane cannot take three groups. |
+| Kolam3D's column heading in the non-collage case | It appears only while sharing the lane. |
