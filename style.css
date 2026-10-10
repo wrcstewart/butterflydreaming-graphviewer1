@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-11j";
+  --bd-css-build: "2026-10-11k";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,13 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-11k: BLUE (bd_collage_layout was never in KOLAM3D'''s WRAPPER
+   relay, so the white frame never appeared and its column was never capped
+   either. The log proved it: BD reported `lane 130x543` while the module
+   printed no receipt — two sites of three, the relay trap for the third time.
+   A multi-step edit script had thrown at its second step and never run its
+   third, and I read the traceback as one failure rather than two). Next = red.
+
    2026-10-11j: GREEN (Kolam3D's stepper column gets its WHITE FRAME while
    sharing the lane, matching the music panel's so the two stacked groups read
    as two panels of one list. Moved below the rule it overrides and written as
@@ -1490,7 +1497,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

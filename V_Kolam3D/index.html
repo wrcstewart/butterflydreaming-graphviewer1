@@ -58,8 +58,18 @@
     // viewer loads visual_module.html directly with no wrapper in between — so
     // the gap has never shown. It is a gap all the same, and leaving it in a
     // new file to match an old one would be copying a bug forward.
+    // bd_collage_layout (2026-10-11): the host tells this module to stop its
+    // stepper column short, because another module's steppers go beneath it in
+    // a collage. A NEW TYPE, not a new field, so it needs THIS SITE as well as
+    // a sender and a receiver — and a whitelist makes an unlisted type vanish
+    // here in silence.
+    //
+    // It was missed, and the proof was in the log: BD reported `lane 130x543`
+    // so it was measuring and sending, and the module never printed a receipt.
+    // Two sites of three, which is precisely the trap this project has a note
+    // about, met for the third time.
     const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update',
-                                'bd_ui_config', 'BD_STOP']);
+                                'bd_ui_config', 'BD_STOP', 'bd_collage_layout']);
 
     // BD_ERROR is here and is NOT in the 2D wrapper's set, for a reason
     // specific to this module: it depends on three.js arriving from a CDN, and
