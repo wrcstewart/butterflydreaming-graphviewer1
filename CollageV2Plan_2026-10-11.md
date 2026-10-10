@@ -198,16 +198,16 @@ The two readings differ in a way the user would feel:
   sometimes show something other than the current context, with nothing on
   screen explaining why.
 
-**Recommendation: View follows the top card.** A View that shows something other
-than the current node is the kind of surprise that is hard to attribute, and the
-cost is a single tap on a button that is right beside it.
+**ACCEPTED 2026-10-11: View follows the top card.** A View that shows something
+other than the current node is the kind of surprise that is hard to attribute,
+and the cost is a single tap on a button that is right beside it.
 
 ### 5.2 Is v1's preview code KEPT or DELETED?
 
 `bd_Collage_002` stays as a demonstration — but the demonstration IS the
 overlay preview. Deleting the preview path would leave 002 working in View only.
 
-**Recommendation: keep it until v2 is proven, then delete in one commit.**
+**ACCEPTED 2026-10-11: keep it until v2 is proven, then delete in one commit.**
 Keeping it costs two code paths and no risk; deleting it now costs the
 demonstration. The `collage-preview-working-2026-10-10` tag makes the removal
 recoverable either way.
@@ -218,3 +218,148 @@ recoverable either way.
   something? (Everything has a type, so it would always do something.)
 - Is there a way to REMOVE a slot from the collage, or only replace it?
 - `%%bd_collage 1` or a new version number for v2's conventions?
+
+---
+
+## 6. How v2 works — the specification
+
+### 6.1 The model
+
+A collage is a **script**, and it lives in a **card** — not in a node. It opens
+`%%bd_collage 1` and holds one `%%bd_module` block per slot, **at most one of
+each type**.
+
+BD holds **one authoritative current-collage string**. The top card is its live
+view; cards relegated to history are a trail of earlier versions.
+
+### 6.2 The three types, derived and never declared
+
+| the node's script | type |
+|---|---|
+| no `%%bd_module` line | **TEXT** |
+| `%%bd_module X` where `MODULES[X].kind === 'visual'` | **GRAPHIC** |
+| `%%bd_module X` where `MODULES[X].kind === 'music'` | **MUSIC** |
+
+Nothing is stored and nothing can drift out of step. A collage script itself has
+no type: it is a collage, not a slot. The mapping stays a **lookup**, because
+further types with their own placement rules are expected.
+
+### 6.3 The Collage button
+
+Sits beside View. It is an **action, not a mode**: nothing navigates, and the
+module stays on screen with its own steppers.
+
+It shows what pressing it will do, and what the collage already holds:
+
+| state | label | readout |
+|---|---|---|
+| no current collage | **Collage** | `. . .` |
+| collage exists, this type absent | **+ Text** / **+ Graphic** / **+ Music** | e.g. `. G .` |
+| collage exists, this type present | **Replace Text** / ... | e.g. `T G .` |
+
+The readout names the slots that are filled — `T G .` is text and graphic
+present, music absent.
+
+### 6.4 What one press does
+
+1. **Reinstate.** If the current collage is not the top card, put it there as a
+   new top card from the remembered string. If there is no current collage,
+   start one: `%%bd_collage 1`.
+2. **Convert this node to a slot block.**
+   - **TEXT** -> `%%bd_module text`, then the node's prose inside
+     `%%bd_text [ ... %%bd_]`.
+   - **GRAPHIC / MUSIC** -> the module's **live** script, headed by its own
+     `%%bd_module <id>`. Live, not saved: the steppers you have just set are
+     what goes in.
+3. **Add or replace.** If a block of that type exists, **replace it in place**,
+   keeping its position. Otherwise append.
+4. **Commit.** The top card and the remembered string both become the new
+   collage.
+5. **Stay put.** No navigation, no mode change, no reload of the module.
+
+Pressing it twice without touching anything replaces a block with an identical
+one. That is harmless and needs no special case.
+
+### 6.5 What stays in sync with what
+
+All of this is already built and in use by v1:
+
+| when | what happens |
+|---|---|
+| a stepper moves | the module announces; `collagePreservingWrite` merges it into **its own slot** of the card; the remembered string follows |
+| the card is hand-edited | `publishCard` splits the collage and sends **each slot to its own module** |
+| Copy Down is pressed | the same split |
+| the collage card is relegated | the remembered string freezes at its last top-card state |
+
+**Only the module you are standing on is loaded**, so only its slot can move.
+That is what makes one-module-at-a-time simpler rather than poorer.
+
+### 6.6 View
+
+View **follows the top card**. If that card is a collage it renders the whole
+thing; otherwise it behaves exactly as it does today.
+
+| slot | placement |
+|---|---|
+| GRAPHIC | fills the square |
+| TEXT | overlays it, in the same square |
+| MUSIC | a 110px transport strip at the foot, the square shrinking to suit |
+
+Placement comes from the type, not from a directive. **Stacking is block
+order — a later block sits on top** — until an `on_top` / `zorder` directive
+replaces it.
+
+### 6.7 A walk-through
+
+1. On a Tao Te Ching passage. Button reads **Collage**, `. . .`. Press.
+   -> a collage with one TEXT slot; the card shows it.
+2. Navigate to `bd_V_Kolam3D_001`. The collage drops into history. Button reads
+   **+ Graphic**, `T . .`. Adjust the steppers until the figure is right. Press.
+   -> the collage is reinstated as the top card with a GRAPHIC slot carrying the
+   live stepper values.
+3. Press **View** -> the figure with the words over it.
+4. Navigate to `bd_M_DroneFrac_001`. Button reads **+ Music**, `T G .`. Press.
+   -> MUSIC added. View now also has the transport at the foot.
+5. Go back to the kolam, change `lightness`, press **Replace Graphic**.
+   -> that slot alone is rewritten, in place, so the stacking does not change.
+6. Press **New** -> the collage goes to history and the next Collage press
+   starts a fresh one.
+
+### 6.8 Invariants
+
+The rules that must hold. **Each one is a thing that has already gone wrong
+once in v1**, which is why they are worth stating rather than discovering
+again:
+
+1. **At most one slot per type.**
+2. **Replacement is IN PLACE.** Block order is the stacking order, so moving a
+   block to the end would silently change the composition.
+3. **The remembered string is updated only while the collage is the top card.**
+   History cards are a record, not the live document.
+4. **Every merge into a collage is PER SLOT**, never by bare name across the
+   whole text — two modules can use the same directive name, and
+   `%%bd_p_angle` against `%%bd_angle` is a live example in `bd_Collage_002`.
+5. **Only one module is live at a time** in the preview.
+6. **`Sv` refuses while the top card is a collage**, with a reason.
+7. **The Collage button never navigates** and never reloads a module.
+
+### 6.9 What has to be written, and what is reused
+
+| new | reused |
+|---|---|
+| the Collage button, its three states and its readout | `parseCollage`, `collageSlot` |
+| `collageTypeOf(script)` — the 6.2 lookup | `collageMergeBySlot` |
+| `collageBlockFor(node)` — node to slot block | `collagePreservingWrite` |
+| add-or-replace-in-place | exploration accumulation |
+| the remembered string, and reinstatement | `publishCard` / Copy Down per-slot split |
+| the `Sv` guard | View's three-layer render |
+| View following the top card rather than the node | `getModuleKind` |
+
+### 6.10 Deliberately NOT in v2
+
+- **No composite preview.** One module at a time; the composite is View's job.
+- **Therefore no overlay, no clip-path, no `bd_collage_layout`, no lane
+  sharing, no transparency coordination.** All of that is v1's, and stays with
+  `bd_Collage_002`.
+- **No persistence.** 4.1 — build it, see what it holds, then decide.
+- **No slot removal yet.** 5.3.
