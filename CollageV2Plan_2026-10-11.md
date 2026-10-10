@@ -17,6 +17,21 @@ iframes-versus-one-scene fork, still open).
 
 ---
 
+## 0. How this document is written
+
+**Paragraphs headed `WRCS note:` are the author's own.** They may appear
+anywhere in this file, in any section.
+
+The rule for anyone editing this document, me included: **a `WRCS note:`
+paragraph is never reworded, never summarised, never moved out of the context it
+was written beside, and never folded into surrounding prose.** Respond to one by
+writing *after* it, or by adding to the section it sits in — not by editing it.
+If a note turns out to be superseded, say so beneath it and leave it standing;
+the record of what was thought at the time is worth more than a tidy page.
+
+§1 below is the same principle applied to the notes this file started from:
+quoted verbatim rather than absorbed.
+
 ## 1. The author's notes, verbatim (2026-10-11)
 
 > Keep the collage 002 in Kolam3D —
