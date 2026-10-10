@@ -7474,8 +7474,28 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   //   • Same node, past last chunk + descendants  → navigate into node
   //   • Same node, past last chunk + no descendants → silent no-op
   //   • No text at all                       → navigate immediately
-  function advanceOrNavigate(node) {
+  // `opts.textOnly` — SHOW THE NODE'S TEXT AND MOVE NOTHING (2026-10-11).
+  //
+  // The Back button restores the view perfectly and then shows the WRONG
+  // TEXT: it sets activeNodeId and calls markReadNode, so it asserts "you are
+  // now reading dest", while the panel goes on showing whatever was there
+  // before — which after leaving a collage is the whole collage script, and
+  // misleading enough to look like a caching fault.
+  //
+  // It could not simply call this function, because the card write and the
+  // navigation live in it together. textOnly separates them, which is the
+  // whole of the fix: the three `navigateInto` calls and the breadcrumb chip
+  // are skipped, and everything about reading the node happens as usual.
+  //
+  // IT ALSO REMOVES A WORSE BUG THAN THE ONE BEING FIXED. navigateInto routes
+  // to handleGatewayClick / handleTitlePageTap / expandToNode, and each of
+  // those calls saveState — so a Back that navigated would pop one state and
+  // push another, the stack would never shrink, and a second press could never
+  // reach further back. Verified that advanceOrNavigate saves nowhere else, so
+  // suppressing navigateInto suppresses the save with it and no flag is needed.
+  function advanceOrNavigate(node, opts) {
     if (!node || !node.length) return;
+    const textOnly = !!(opts && opts.textOnly);
     const meta = navNodeMeta(node);
     const nid = node.id();
     // Root is the one node that keeps chunk-advance (the staged boot: message
@@ -7493,7 +7513,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // subsequent chunk-advance taps on the same node don't duplicate the chip.
       const type = node.data('type');
       if (type === 'Entry' || type === 'Family' || type === 'Cluster' || type === 'TextNode') {
-        addYouChip(node);
+        // Not on a Back: restoreState has already placed the chip for dest,
+        // and a second would be a crumb for a step nobody took.
+        if (!textOnly) addYouChip(node);
       }
       // Reaching Conversations is what unlocks Pair — see updateBackBtn.
       if (type === 'Entry' && node.data('name') === 'Conversations') pairUnlocked = true;
@@ -7522,7 +7544,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         const emptyCard = insertNodeChunkAsCard('', getChunkHint(true, nav, node, isRoot), node, 0);
         if (emptyCard) readingState.cardsByIdx[0] = emptyCard;
         // Unified focus: reveal the neighbourhood on the SAME fresh tap.
-        if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
+        if (!textOnly && UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
         return;
       }
       readingState = { nodeId: nid, chunkIndex: 0, chunks, hasDescendants: nav, cardsByIdx: {} };
@@ -7556,7 +7578,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (introWillShow) speechSuppressed = false;
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
-      if (UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
+      if (!textOnly && UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
       // Suppressed while priming: see primeRootReading.
       // 2026-09-01 — Root boot, when Root's FIRST chunk is also its LAST.
       //
@@ -7590,11 +7612,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
               if (box) box.checked = false;
               speakEnabled = false;
             }
-            navigateInto(node);
+            if (!textOnly) navigateInto(node);
           });
           return;
         }
-        navigateInto(node);
+        if (!textOnly) navigateInto(node);
       }
       return;
     }
@@ -7637,7 +7659,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // into it, matching the "Tap the Settling node to advance" CTA. No extra
     // "navigate" tap needed. navigateInto → expandToNode(root) shows
     // root + Settling and runs the parentIsRoot nav layout.
-    if (isRoot && isLast && hasNavDescendants(node)) navigateInto(node);
+    if (!textOnly && isRoot && isLast && hasNavDescendants(node)) navigateInto(node);
   }
 
   // navigateInto — the pure "expand into this node" branch, extracted from
@@ -8506,7 +8528,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // specific — and arriving with nothing selected loses the amber ring and
       // leaves Unified Focus with nothing to focus. Guarded on visible() so a
       // node the restored view does not show cannot become the selection.
-      if (dest.visible()) { activeNodeId = dest.id(); markReadNode(dest, cy); }
+      if (dest.visible()) {
+        activeNodeId = dest.id();
+        markReadNode(dest, cy);
+        // AND SHOW ITS TEXT. Back restored the view; this makes the panel agree
+        // with it. textOnly, so not one node moves — the view you came back to
+        // is the view you keep.
+        try { advanceOrNavigate(dest, { textOnly: true }); } catch (_) {}
+      }
 
       // Arrived back at Root without ever having had its opening — a deep-link
       // visitor who wandered first. restoreState restores the VIEW only: no
