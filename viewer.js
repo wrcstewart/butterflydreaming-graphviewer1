@@ -10969,12 +10969,19 @@ async function init() {
         bar.style.height = h0 + 'px';
 
         const COLLAGE_BAR_MIN_W = 240;
-        // The lane's midpoint: Kolam3D's steppers keep the top half, the music
-        // module's take the bottom. Both columns already scroll far more than
-        // the lane can show — 18 rows at ~94px is three times its depth — so
-        // splitting by directive count would buy nothing, and half is
-        // predictable.
-        const laneMid = (col) => Math.round(col.top + col.height / 2);
+        // ── THE SPLIT COMES FROM THE FRAME, NOT FROM THE COLUMN ─────────
+        // This was `col.top + col.height / 2`, which is a RUNAWAY: the column
+        // is the thing being shortened, so the next pass measures the halved
+        // column, halves that, and the midpoint creeps upward until the lane
+        // collapses. A measurement must not be derived from a value this code
+        // is about to change.
+        //
+        // The frame's own height is stable — BD stamps it and nothing else
+        // touches it — so the midpoint is fixed and the loop cannot start.
+        // Both columns scroll far more than the lane can ever show (18 rows at
+        // ~94px is three times its depth), so splitting by directive count
+        // would buy nothing and half is predictable.
+        const mid = t0 + Math.round(h0 / 2);
         // Frame-relative, because that is what both the clip and the module
         // need. Page coordinates would have to be converted twice and could
         // disagree once.
@@ -11009,7 +11016,7 @@ async function init() {
           // the canvas never wanted — it takes no pointer input at all — and
           // clicks on Kolam3D's lower column, which is exactly the half
           // Kolam3D is now told to stop short of. Nothing reachable is lost.
-          const top = col ? Math.max(0, laneMid(col) - t0) : b.top;
+          const top = col ? Math.max(0, mid - t0) : b.top;
           bar.style.clipPath = 'inset(' + top + 'px 0px 0px 0px)';
 
           // Where to draw inside that clip. The module cannot know: only BD
@@ -11018,9 +11025,11 @@ async function init() {
           if (col) {
             msg.col = {
               left:   Math.round(col.left - l0),
-              top:    Math.round(laneMid(col) - t0),
+              top:    Math.round(mid - t0),
+              // Down to the frame's bottom, not to the column's — the column's
+              // height is the value being changed and cannot be read back.
+              height: Math.round(t0 + h0 - mid),
               width:  Math.round(col.width),
-              height: Math.round(col.top + col.height - laneMid(col)),
             };
           }
           try { bar.contentWindow.postMessage(msg, '*'); } catch (_) {}
@@ -11031,8 +11040,10 @@ async function init() {
           // through nothing and clickable through nothing.
           if (col && iframeEl.contentWindow) {
             try {
+              // Stop at the midpoint. Computed from the column's TOP, which is
+              // stable, and never from its height, which this is setting.
               iframeEl.contentWindow.postMessage({ type: 'bd_collage_layout',
-                columnMaxHeight: Math.round(col.height / 2) }, '*');
+                columnMaxHeight: Math.max(40, Math.round(mid - col.top)) }, '*');
             } catch (_) {}
           }
           return !!(g && g.width > 40);

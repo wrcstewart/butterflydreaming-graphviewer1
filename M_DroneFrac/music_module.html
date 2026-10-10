@@ -338,7 +338,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red, matching BD's */
+    background: #27ae60 !important;      /* CANARY — green, matching BD's */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -492,6 +492,14 @@
      same bug, as the strip: a column rule that forgot `display` left the panel
      hidden and made it look as though the transport had been put in the lane
      on its own. */
+  /* ── AN OVERLAY'S PANELS ARE OPAQUE; ONLY THE GAPS ARE NOT ────────────
+     `.panel` sets a border and no background, so it had always been showing
+     the body's — and the body is now transparent. The result was Kolam3D's
+     lower steppers legible THROUGH this module's own column. Transparency is
+     wanted between the panels, never inside them.
+     `--ground` rather than a new colour: this module's own ground, so the
+     column reads as its own thing beside Kolam3D's amber one. */
+  body.overlay .panel { background: var(--ground); }
   body.overlay #control-panel {
     display: flex;
     flex-direction: column; flex-wrap: nowrap;
@@ -509,6 +517,17 @@
     display: block; width: 100%; height: auto;
     padding: 0 2px 3px; margin: 0 0 3px;
     border-right: none; border-bottom: 1px solid #2a2a3a;
+    /* 8px and ui-monospace, THE SAME AS KOLAM3D'S COLUMN HEADER — two stacked
+       groups have to read as one list with two headings, and a heading twice
+       the size of the one above it reads as a different kind of thing. It had
+       no font-size at all here and was inheriting the body's 16px Courier,
+       which is why it came out much too big. */
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 8px;
+    line-height: 11px;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   /* The lane is 130px where this module's own column is built for 150, so the
      rows are compacted rather than the column widened: the width is the other
