@@ -736,7 +736,7 @@ if (typeof window !== 'undefined') {
       // same inverse that keeps the card intact.
       const prev = explorationByNode.get(avNodeId) || savedByNode.get(avNodeId);
       explorationByNode.set(avNodeId,
-        parseCollage(prev) ? mergeExploredValues(prev, text) : text);
+        parseCollage(prev) ? collageMergeBySlot(prev, text) : text);
     } else if (avNodeId) {
       // ── SAY SO (2026-10-08) ────────────────────────────────────────────
       // This guard had no voice, and its silence is exactly what hid a
@@ -3143,6 +3143,66 @@ let collageTextProbe  = '';     // the same, for the text layer
 // has to be re-measured for a rect that has completely changed.
 let collageNudged     = false;
 
+// ── A MERGE INTO A COLLAGE MUST BE PER-SLOT (2026-10-11) ───────────────────
+// mergeExploredValues keys values by their BARE NAME, which is right for one
+// script and wrong for a collage: two modules can use the same name for
+// different things. `bd_Collage_002` has Kolam3D's `%%bd_p_angle 124` and
+// DroneFrac's `%%bd_angle 90` — the second a grammar directive with no stepper
+// at all — and merging either module's announcement across the whole text
+// overwrote the other's `angle`.
+//
+// The author found it from the symptom that named the cause: *"the _p_angle
+// stepper is changing when I alter the iterations stepper, and HERE'S the clue,
+// the _p_angle stepper is not showing"*. Not showing because it is DroneFrac's
+// and DroneFrac has no angle stepper; changing because the merge could not tell
+// the two apart. The visible effect was a value moving and then reverting, as
+// each module's next announcement undid the other's.
+//
+// So the merge is scoped to the block it belongs to. `incoming` may be a single
+// module's script — merged into the block that names that module — or a whole
+// collage, merged block by block. Any line outside the matching block is
+// returned untouched, which is what keeps the other slots and the text block
+// intact.
+//
+// Checked against the real node: `angle` is the ONLY name shared between its
+// two modules today, and nothing stops the next pair sharing more.
+function collageMergeBySlot(baseText, incoming) {
+  const base = parseCollage(baseText);
+  if (!base || typeof incoming !== 'string') return baseText;
+
+  // Everything the incoming side has to say, keyed by the module it is about.
+  const byModule = new Map();
+  const inc = parseCollage(incoming);
+  if (inc) {
+    for (const b of inc.blocks) byModule.set(b.moduleId, b.script);
+  } else {
+    const id = bdModuleOf(incoming);
+    if (!id) return baseText;
+    byModule.set(id, incoming);
+  }
+
+  // Walk the base, gathering each block's lines, and merge only within it.
+  // The header test comes FIRST on every line, which is the same construction
+  // that makes parseCollage's implicit block close reliable.
+  const out = [];
+  let cur = null, curId = null;
+  const flush = () => {
+    if (cur === null) return;
+    const src = curId && byModule.get(curId);
+    const text = cur.join('\n');
+    out.push(src ? mergeExploredValues(text, src) : text);
+    cur = null; curId = null;
+  };
+  for (const line of baseText.split('\n')) {
+    const mh = line.match(/^%%bd_module[ \t]+(\S+)/);
+    if (mh) { flush(); cur = [line]; curId = mh[1]; continue; }
+    if (cur === null) { out.push(line); continue; }   // the preamble
+    cur.push(line);
+  }
+  flush();
+  return out.join('\n');
+}
+
 // A MODULE'S ANNOUNCEMENT MUST *UPDATE* A COLLAGE CARD, NEVER REPLACE IT.
 //
 // The `auto` writer and the focusout echo both write whatever the module last
@@ -3170,7 +3230,8 @@ function collagePreservingWrite(cardText, incoming) {
   if (typeof cardText !== 'string' || typeof incoming !== 'string') return incoming;
   if (!parseCollage(cardText)) return incoming;     // ordinary card — unchanged
   if (parseCollage(incoming))  return incoming;     // a whole collage — a real replace
-  return mergeExploredValues(cardText, incoming);
+  // PER-SLOT, not across the whole text: see collageMergeBySlot.
+  return collageMergeBySlot(cardText, incoming);
 }
 
 // THE VISUAL SLOT A NODE SHOULD ACTUALLY BE SHOWING — saved script with the
@@ -3186,7 +3247,10 @@ function collagePreservingWrite(cardText, incoming) {
 // headers and the whole text block survive and only the visual slot's values
 // move. Re-parsed afterwards so the slot still comes from one place.
 function collageLive(savedText, explored) {
-  const merged = explored ? mergeExploredValues(savedText, explored) : savedText;
+  // PER-SLOT here too, and for the same reason: the stored exploration is
+  // itself collage-shaped, so a bare-name merge would collapse two modules'
+  // `angle` into whichever came last and then apply it to both.
+  const merged = explored ? collageMergeBySlot(savedText, explored) : savedText;
   return parseCollage(merged);
 }
 function collageVisualSlot(savedText, explored) {
@@ -13260,6 +13324,47 @@ async function init() {
           return;
         }
         const script = getCardText(body) || '';
+
+        // ── A COLLAGE IS SPLIT AND SENT PER SLOT (2026-10-11) ────────────
+        // Posting the whole text to #visual-iframe was wrong in both
+        // directions: the visual module would read the MUSIC slot's
+        // directives as its own — `bd_Collage_002` has DroneFrac's
+        // `%%bd_angle 90` against Kolam3D's `%%bd_p_angle 124`, and the two
+        // share a bare name — and the music module would receive nothing at
+        // all. Reported as "they are not syncing if I alter the script".
+        const cDown = parseCollage(script);
+        if (cDown) {
+          const visD = collageSlot(cDown, 'visual');
+          const musD = collageSlot(cDown, 'music');
+          if (visD) {
+            try {
+              iframeEl2.contentWindow.postMessage(
+                { type: 'bd_script_update', script: visD.script }, '*');
+            } catch (_) {}
+          }
+          const mfD = document.getElementById('collage-playbar');
+          if (musD && mfD && mfD.contentWindow) {
+            try {
+              mfD.contentWindow.postMessage(
+                { type: 'bd_script_update', script: musD.script }, '*');
+            } catch (_) {}
+          }
+          // The TEXT slot has no module to send to — it is BD's own DOM — so
+          // it is re-rendered from the edited script here. Without this a
+          // hand-edited passage would be the one layer that did not follow.
+          const tlD  = document.getElementById('collage-preview-text');
+          const tlbD = document.getElementById('collage-preview-text-body');
+          const txtD = collageSlot(cDown, 'text');
+          if (tlbD) tlbD.textContent = (txtD && txtD.body) || '';
+          if (tlD)  tlD.hidden = !(txtD && txtD.body);
+          document.body.classList.toggle('collage-preview-text', !!(txtD && txtD.body));
+          try { positionCyEl(); } catch (_) {}
+          console.log('[Copy Down] collage split — ' +
+            cDown.blocks.map((b) => b.kind + ':' + b.moduleId).join(', '));
+          if (copyUpBtn) copyUpBtn.disabled = false;
+          return;
+        }
+
         console.log('[Copy Down] posting bd_script_update, len=', script.length);
         iframeEl2.contentWindow.postMessage(
           { type: 'bd_script_update', script },

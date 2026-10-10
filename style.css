@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-11f";
+  --bd-css-build: "2026-10-11h";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,16 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-11h: BLUE (THE MERGE IS PER-SLOT. mergeExploredValues keys by BARE
+   NAME, and this collage holds Kolam3D's %%bd_p_angle 124 beside DroneFrac's
+   %%bd_angle 90 — a grammar directive with no stepper — so each module's
+   announcement overwrote the other's angle and values moved then reverted. The
+   author found it from "the _p_angle stepper is changing when I alter
+   iterations, and HERE IS THE CLUE, the _p_angle stepper is not showing". Also
+   Copy Down now SPLITS a collage per slot: it had been posting the whole text
+   to the visual module, which read the music slot's directives as its own
+   while the music module received nothing). Next = red.
+
    2026-10-11f: RED (the music steppers SYNC with the script at last. bdModuleOf
    reports a collage's VISUAL slot — right for #visual-iframe and silently
    wrong for every other slot — so a music slot's announcement looked like a
@@ -1464,7 +1474,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
