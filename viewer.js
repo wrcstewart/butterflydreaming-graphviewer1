@@ -11480,7 +11480,8 @@ async function init() {
       window.removeEventListener('message', onReady);
       try {
         bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
-        console.log('[collage] playbar BD_READY — script posted to ' + moduleId);
+        console.log('[collage] PUSH to playbar (BD_READY, loadCollagePlaybar) ' + moduleId +
+                    ' iterations=' + ((script.match(/^%%bd_p_iterations (\S+)/m) || [])[1] || '-'));
       } catch (err) {
         console.warn('[collage] playbar postMessage failed', err);
       }
@@ -13746,10 +13747,38 @@ async function init() {
       // script go their own ways.
       const box = document.getElementById('auto-echo-box');
       if (box && box.checked && iframeEl2 && iframeEl2.contentWindow) {
-        try {
-          iframeEl2.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
-          console.log('[auto] card -> module (' + reason + ')');
-        } catch (_) {}
+        // ── A COLLAGE IS SPLIT PER SLOT HERE TOO (2026-10-11) ────────────
+        // This posted the WHOLE card to #visual-iframe, which for a collage
+        // means the visual module reads the music slot's directives as its own
+        // — bd_Collage_002 has DroneFrac's `%%bd_angle 90` against Kolam3D's
+        // `%%bd_p_angle 124` — while the music module receives nothing. Same
+        // fault as Copy Down had, in a second place, which is the shape of
+        // every bug in this file's history: one idea written twice.
+        const cP = parseCollage(text);
+        if (cP) {
+          const vP = collageSlot(cP, 'visual');
+          const mP = collageSlot(cP, 'music');
+          const mfP = document.getElementById('collage-playbar');
+          if (vP) {
+            try {
+              iframeEl2.contentWindow.postMessage(
+                { type: 'bd_script_update', script: vP.script }, '*');
+            } catch (_) {}
+          }
+          if (mP && mfP && mfP.contentWindow) {
+            try {
+              mfP.contentWindow.postMessage(
+                { type: 'bd_script_update', script: mP.script }, '*');
+            } catch (_) {}
+          }
+          console.log('[auto] card -> modules per slot (' + reason + '): ' +
+            cP.blocks.map((b) => b.kind).join(','));
+        } else {
+          try {
+            iframeEl2.contentWindow.postMessage({ type: 'bd_script_update', script: text }, '*');
+            console.log('[auto] card -> module (' + reason + ')');
+          } catch (_) {}
+        }
       }
     }
 

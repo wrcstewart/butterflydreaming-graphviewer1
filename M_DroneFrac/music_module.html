@@ -338,7 +338,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #2d7ff9 !important;      /* CANARY — blue, matching BD's */
+    background: #c0392b !important;      /* CANARY — red, matching BD's */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -2139,6 +2139,14 @@ window.addEventListener('message', (event) => {
     const type = data.type;
     if (type === 'bd_script_update') {
       storedText = typeof data.script === 'string' ? data.script : '';
+      // SAYS SO, because this is the one thing that can silently undo a
+      // stepper: it replaces storedText and syncSteppersFromScript then
+      // rewrites every display from it. A press followed a second later by a
+      // stale push looks exactly like "the value reverts after a second", and
+      // nothing said a push had happened.
+      console.log('[drone] bd_script_update received, len=' + storedText.length +
+                  ' iterations=' + ((storedText.match(/^%%bd_p_iterations (\S+)/m) || [])[1] || '-') +
+                  ' grain_size=' + ((storedText.match(/^%%bd_p_grain_size (\S+)/m) || [])[1] || '-'));
       syncSteppersFromScript();
       regenerate();
       // DELIBERATELY SILENT. Announcing here loops: the script is REBUILT
