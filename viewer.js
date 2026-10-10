@@ -14648,7 +14648,7 @@ async function init() {
               overlay: true }, '*');
           } catch (_) {}
         }
-        body.classList.remove('view-active', 'view-music',
+        body.classList.remove('view-active', 'view-music', 'view-has-module',
                               'collage-active', 'collage-music');
         const bar = document.getElementById('bd-view-bar');
         const tp  = document.getElementById('bd-view-text');
@@ -14716,6 +14716,10 @@ async function init() {
           // toward the page and buy nothing. See PLANNING_REGISTER.md,
           // "Added 2026-10-08 — text over a 3D graphic".
           body.classList.add('collage-active');
+          // A collage SHOWS a module, so the frame is wanted. Set here rather
+          // than inferred from `collage-active`, because a collage with no
+          // visual slot shows no module either and must not reserve one.
+          if (collageSlot(collage, 'visual')) body.classList.add('view-has-module');
           if (collage.version !== 1) {
             console.warn('[collage] script declares version ' + collage.version +
                          ' and this build renders v1 — rendering anyway');
@@ -14854,6 +14858,7 @@ async function init() {
           f.style.top = f.style.left = f.style.width = f.style.height = '';
           // A musical Output is a shallow strip at the foot — which is where a
           // collage will put it, so View shows it where it will live.
+          body.classList.add('view-has-module');
           if (getModuleKind(moduleId) === 'music') body.classList.add('view-music');
           // ALL THREE, not just outputOnly, and the reason is RULE 3's
           // receivers-first discipline. outputOnly IMPLIES the other two
