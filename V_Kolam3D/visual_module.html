@@ -203,6 +203,13 @@
     }
 
     .control-panel {
+      /* ── SHARING THE LANE (2026-10-10) ───────────────────────────────────
+         `--bd-col-max` is set by the host via bd_collage_layout when another
+         module's steppers are to sit beneath these. Unset everywhere else, so
+         `none` is the normal case and nothing changes for a module on its own.
+         A max-height rather than a height: the column should still be short
+         when it has few rows. */
+      max-height: var(--bd-col-max, none);
       /* 2026-08-19 — 220 → 130. A control-row is 94px; with the panel's
          padding, border and a scrollbar it needs ~122. The 220 was defensive
          (stop the canvas squeezing the panel to zero in the preview harness)
@@ -2157,6 +2164,18 @@
       try {
         const { type, payload, script } = event.data;
         switch (type) {
+          case 'bd_collage_layout': {
+            // ── THE HOST IS SHARING THIS MODULE'S LANE (2026-10-10) ───────
+            // `columnMaxHeight` in px: another module's steppers go beneath
+            // these, so this column has to stop short. Applied as a custom
+            // property for the CSS to use — a message setting style.maxHeight
+            // directly would be the host doing this module's layout, which
+            // every other flag here avoids.
+            const cmh = event.data && event.data.columnMaxHeight;
+            document.documentElement.style.setProperty('--bd-col-max',
+              (typeof cmh === 'number' && cmh > 0) ? Math.round(cmh) + 'px' : 'none');
+            break;
+          }
           case 'bd_script_update': {
             renderFromScript(typeof script === 'string' ? script : '');
             break;

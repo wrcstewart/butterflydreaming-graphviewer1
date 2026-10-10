@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-10o' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11' };
 
 let bdViewTitleText = '';
 
@@ -10969,6 +10969,12 @@ async function init() {
         bar.style.height = h0 + 'px';
 
         const COLLAGE_BAR_MIN_W = 240;
+        // The lane's midpoint: Kolam3D's steppers keep the top half, the music
+        // module's take the bottom. Both columns already scroll far more than
+        // the lane can show — 18 rows at ~94px is three times its depth — so
+        // splitting by directive count would buy nothing, and half is
+        // predictable.
+        const laneMid = (col) => Math.round(col.top + col.height / 2);
         // Frame-relative, because that is what both the clip and the module
         // need. Page coordinates would have to be converted twice and could
         // disagree once.
@@ -10987,26 +10993,53 @@ async function init() {
                    width, height: COLLAGE_BAR_H };
         };
 
-        const apply = (g) => {
+        const apply = (g, col) => {
           const b = barRect(g);
           if (g && g.width > 40) collageLastCanvas = g;
-          // CLIP to the transport's region. inset() takes top/right/bottom/left
-          // insets from the element's own box.
-          bar.style.clipPath =
-            'inset(' + b.top + 'px ' +
-                       Math.max(0, w0 - (b.left + b.width)) + 'px ' +
-                       Math.max(0, h0 - (b.top + b.height)) + 'px ' +
-                       b.left + 'px)';
-          // And tell the module where to draw inside that clip. It cannot know:
-          // only BD can see where the module UNDERNEATH put its canvas.
-          try {
-            bar.contentWindow.postMessage({ type: 'bd_collage_layout', bar: b }, '*');
-          } catch (_) {}
+
+          // ── STAGE 2: THE CLIP COVERS BOTH REGIONS ───────────────────────
+          // The transport sits at the bottom-left and the steppers up the
+          // right, so the clip has to admit both. It is still ONE rectangle,
+          // deliberately: the bounding box of the two is the band from the
+          // lane's midpoint down to the frame's bottom, and a single `inset()`
+          // says that. A two-region clip would need `path()` with two
+          // subpaths, which is a narrower feature for no gain.
+          //
+          // What that band costs is clicks on the graphic's lower half, which
+          // the canvas never wanted — it takes no pointer input at all — and
+          // clicks on Kolam3D's lower column, which is exactly the half
+          // Kolam3D is now told to stop short of. Nothing reachable is lost.
+          const top = col ? Math.max(0, laneMid(col) - t0) : b.top;
+          bar.style.clipPath = 'inset(' + top + 'px 0px 0px 0px)';
+
+          // Where to draw inside that clip. The module cannot know: only BD
+          // can see where the module UNDERNEATH put its canvas and its column.
+          const msg = { type: 'bd_collage_layout', bar: b };
+          if (col) {
+            msg.col = {
+              left:   Math.round(col.left - l0),
+              top:    Math.round(laneMid(col) - t0),
+              width:  Math.round(col.width),
+              height: Math.round(col.top + col.height - laneMid(col)),
+            };
+          }
+          try { bar.contentWindow.postMessage(msg, '*'); } catch (_) {}
+
+          // ── STAGE 3: AND THE MODULE UNDERNEATH YIELDS THE LOWER HALF ────
+          // Without this its column would run the full depth behind the
+          // overlay's clip, so its lower rows would be unreachable — visible
+          // through nothing and clickable through nothing.
+          if (col && iframeEl.contentWindow) {
+            try {
+              iframeEl.contentWindow.postMessage({ type: 'bd_collage_layout',
+                columnMaxHeight: Math.round(col.height / 2) }, '*');
+            } catch (_) {}
+          }
           return !!(g && g.width > 40);
         };
 
         const m = collageModuleRects(iframeEl);
-        if (!apply(m && m.canvas)) apply(collageLastCanvas);
+        if (!apply(m && m.canvas, m && m.column)) apply(collageLastCanvas, null);
 
         // ── THE SECOND MEASURE ────────────────────────────────────────────
         // The module sizes its square from a ResizeObserver that fires AFTER
@@ -11016,11 +11049,11 @@ async function init() {
         requestAnimationFrame(() => {
           if (!document.body.classList.contains('collage-bar')) return;
           const m2 = collageModuleRects(iframeEl);
-          apply(m2 && m2.canvas);
+          apply(m2 && m2.canvas, m2 && m2.column);
           try {
             const c = m2 && m2.canvas, col = m2 && m2.column;
             const b = barRect(c);
-            const line = 'overlay stage1 | graphic ' +
+            const line = 'overlay s2/3 | graphic ' +
                          (c ? Math.round(c.width) + 'x' + Math.round(c.height) : '?') +
                          ' | lane ' + (col ? Math.round(col.width) + 'x' + Math.round(col.height) : '?') +
                          ' | frame ' + w0 + 'x' + h0 +
@@ -11035,7 +11068,7 @@ async function init() {
           requestAnimationFrame(() => {
             if (!document.body.classList.contains('collage-bar')) return;
             const m3 = collageModuleRects(iframeEl);
-            apply(m3 && m3.canvas);
+            apply(m3 && m3.canvas, m3 && m3.column);
           });
         });
       }
@@ -11137,6 +11170,16 @@ async function init() {
         document.body.classList.contains('collage-preview-text')) {
       document.body.classList.remove('collage-bar', 'collage-preview-text',
                                      'collage-preview');
+      // AND GIVE KOLAM3D ITS FULL COLUMN BACK. It was told to stop short while
+      // sharing the lane; a module left shortened for a collage it is no longer
+      // in would lose half its steppers with nothing to show why.
+      const vf = document.getElementById('visual-iframe');
+      if (vf && vf.contentWindow) {
+        try {
+          vf.contentWindow.postMessage({ type: 'bd_collage_layout',
+            columnMaxHeight: 0 }, '*');
+        } catch (_) {}
+      }
       const tlOff = document.getElementById('collage-preview-text');
       if (tlOff) tlOff.hidden = true;
       const tlbOff = document.getElementById('collage-preview-text-body');
