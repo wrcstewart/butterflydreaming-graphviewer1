@@ -11201,6 +11201,60 @@ async function init() {
   // Player-mode entry and from the bd:node-read handler when Player is
   // active. Same module → postMessage the script (fast). Different module
   // → swap src, await BD_READY, then postMessage script.
+  // ── THE COLLAGE'S PREVIEW FURNITURE MUST COME DOWN ON LEAVING ──────────
+  // It did not, and the symptom read like a caching fault: pressing Back to an
+  // earlier node left the collage's text layer painted over the graph, and on
+  // iOS the words and the whole collage script appeared together.
+  //
+  // THE CAUSE IS THAT THE TEARDOWN LIVED IN THE WRONG PLACE. It was inside
+  // loadModuleForNode, which is called ONLY in Player mode and which returns
+  // early for a node with no module at all — so navigating back to a text node
+  // never reached it, in either mode. The furniture is BD's OWN DOM, fixed and
+  // z-indexed, so it outlives the iframe it was arranged around and has to be
+  // taken down by whatever notices the node changed.
+  //
+  // Idempotent and cheap: it returns at once unless something is actually up.
+  function collagePreviewTeardown() {
+    const b = document.body;
+    if (!b.classList.contains('collage-preview') &&
+        !b.classList.contains('collage-preview-text') &&
+        !b.classList.contains('collage-bar')) return;
+    b.classList.remove('collage-preview', 'collage-preview-text',
+                       'collage-bar', 'collage-music');
+    const tl  = document.getElementById('collage-preview-text');
+    const tlb = document.getElementById('collage-preview-text-body');
+    if (tl)  tl.hidden = true;
+    if (tlb) tlb.textContent = '';
+    const bar = document.getElementById('collage-playbar');
+    if (bar) {
+      // SILENCED, not merely hidden: a hidden iframe can go on playing. And
+      // its inline rect and clip cleared, or they would be waiting for the
+      // next collage with the last one's geometry.
+      if (bar.contentWindow) {
+        try { bar.contentWindow.postMessage({ type: 'BD_STOP' }, '*'); } catch (_) {}
+      }
+      bar.style.top = bar.style.left = bar.style.width = bar.style.height = '';
+      bar.style.clipPath = '';
+      bar.style.zIndex = '';
+    }
+    // And the visual module gets its full stepper column back, or it would
+    // stay capped for a collage it is no longer in.
+    const vf = document.getElementById('visual-iframe');
+    if (vf && vf.contentWindow) {
+      try {
+        vf.contentWindow.postMessage({ type: 'bd_collage_layout',
+          columnMaxHeight: 0 }, '*');
+      } catch (_) {}
+    }
+    // The cached square belongs to a layout that has gone. "Do not move
+    // anything yet" is always better than a number from somewhere else.
+    collageLastCanvas = null;
+    collageTextProbe  = '';
+    collageLastProbe  = '';
+    collageNudged     = false;
+    console.log('[collage] preview furniture down');
+  }
+
   function loadModuleForNode(nodeId) {
     if (!nodeId || !visualIframe) return;
     const node = cy.getElementById(nodeId);
@@ -11265,30 +11319,8 @@ async function init() {
       return;
     }
 
-    // Leaving a collage for an ordinary module node: the bar goes, and it is
-    // SILENCED rather than merely hidden. Its CSS stops matching the moment
-    // `collage-bar` comes off, and a hidden iframe can go on playing — the
-    // same fault as BD's media bar playing on into the standalone.
-    if (document.body.classList.contains('collage-bar') ||
-        document.body.classList.contains('collage-preview-text')) {
-      document.body.classList.remove('collage-bar', 'collage-preview-text',
-                                     'collage-preview');
-      // AND GIVE KOLAM3D ITS FULL COLUMN BACK. It was told to stop short while
-      // sharing the lane; a module left shortened for a collage it is no longer
-      // in would lose half its steppers with nothing to show why.
-      const vf = document.getElementById('visual-iframe');
-      if (vf && vf.contentWindow) {
-        try {
-          vf.contentWindow.postMessage({ type: 'bd_collage_layout',
-            columnMaxHeight: 0 }, '*');
-        } catch (_) {}
-      }
-      const tlOff = document.getElementById('collage-preview-text');
-      if (tlOff) tlOff.hidden = true;
-      const tlbOff = document.getElementById('collage-preview-text-body');
-      if (tlbOff) tlbOff.textContent = '';
-      if (typeof stopCollagePlaybar === 'function') stopCollagePlaybar();
-    }
+    // Leaving a collage for an ordinary module node.
+    collagePreviewTeardown();
 
     const moduleId = parseModuleId(savedText);
     if (!moduleId) return;                                // not a media node
@@ -11797,6 +11829,11 @@ async function init() {
       positionExtendPanel();
       requestAnimationFrame(() => positionExtendPanel());
     } else {
+      // LEAVING THE PLAYER LAYOUT. #cy comes back and the module iframe goes,
+      // but the collage's own layers are fixed-position DOM of BD's and would
+      // sit over the graph. Taken down here as well as on a node read, because
+      // a mode change is the other way out of a collage.
+      collagePreviewTeardown();
       // The graph layout: cy visible, iframe hidden. Both modes use it — the
       // only difference is body.edit-active, which CSS uses to surface the
       // compose controls (Send + New) that belong to Create.
@@ -11828,9 +11865,19 @@ async function init() {
   // AND is currently in Player mode. In Nodes mode we don't touch the
   // iframe; the user's mental model is "browsing", not "previewing".
   document.addEventListener('bd:node-read', () => {
-    if (!visualIframe || !visualIframe.classList.contains('active')) return;
     const nodeId = (typeof getLastReadNodeId === 'function' && getLastReadNodeId()) ||
                    (typeof getActiveNodeId    === 'function' && getActiveNodeId());
+    // ── BEFORE THE PLAYER-MODE GATE, AND DELIBERATELY ──────────────────
+    // The collage's furniture is BD's own fixed DOM, so it survives both the
+    // mode and the iframe. If the node just read is not a collage it must come
+    // down whatever mode we are in — the gate below is about whether to LOAD a
+    // module, which is a different question.
+    const nRead = nodeId && cy.getElementById(nodeId);
+    const readIsCollage = !!(nRead && nRead.length &&
+                             parseCollage(nRead.data('text') || ''));
+    if (!readIsCollage) collagePreviewTeardown();
+
+    if (!visualIframe || !visualIframe.classList.contains('active')) return;
     if (nodeId) loadModuleForNode(nodeId);
   });
   // Window resize while Player is active — restamp the iframe rect from #cy.
