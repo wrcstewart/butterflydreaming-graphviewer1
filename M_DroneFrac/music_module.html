@@ -338,7 +338,7 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #27ae60 !important;      /* CANARY — green, matching BD's */
+    background: #2d7ff9 !important;      /* CANARY — blue, matching BD's */
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -514,7 +514,10 @@
     -webkit-overflow-scrolling: touch;
   }
   body.overlay .strip-title {
-    display: block; width: 100%; height: auto;
+    /* `flex: 0 0 auto` because this is a flex item in a column holding 25 rows
+       that overflow it. `min-height: auto` ought to protect one line of text,
+       but "ought to" is not a thing to rest a header on. */
+    display: block; flex: 0 0 auto; width: 100%; height: auto;
     padding: 0 2px 3px; margin: 0 0 3px;
     border-right: none; border-bottom: 1px solid #2a2a3a;
     /* 8px and ui-monospace, THE SAME AS KOLAM3D'S COLUMN HEADER — two stacked
@@ -540,6 +543,17 @@
     font-size: 0.52rem; line-height: 1.15;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
+
+  /* ── THE MODULE'S OWN HEADER ───────────────────────────────────────────
+     HIDDEN BY DEFAULT, AND THIS RULE MUST LIVE AT THE TOP LEVEL. It was
+     written inside the `@media (min-aspect-ratio: 2/1)` block, so there was no
+     base rule at all below that ratio and one above it — a default that exists
+     at some window shapes and not others, which is a latent bug in both
+     directions at once: a stray heading in the ordinary authoring column at
+     one size, and a missing one at another.
+     Shown only where a host has asked for it: a module on its own needs no
+     label, because there is nothing to tell it apart from. */
+  .strip-title { display: none; }
 
   /* ── strip-controls: the steppers as a shallow SCROLLING ROW ───────────
      The host's playbar is 52px deep. A `.control-row` is a 24px stepper over
@@ -638,14 +652,6 @@
     font-size: 0.62rem; padding: 2px 1px;
   }
   body.output-only.strip-controls .stepper-value.is-enum { font-size: 0.52rem; }
-  /* The title, and the SEPARATOR is the right border — a rule between the
-     module's name and its first stepper, which is what makes it read as a
-     break in the bar rather than just another label. Smallest size that still
-     renders as letters; readability is not crucial here by the author's own
-     framing, and it is a separator first.
-     Hidden outside the strip: the 130px column has its own heading problem and
-     a vertical title is a different design, not this one at 90 degrees. */
-  .strip-title { display: none; }
   body.output-only.strip-controls .strip-title {
     display: flex; align-items: center;
     flex: 0 0 auto; height: 100%;
