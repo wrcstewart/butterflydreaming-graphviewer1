@@ -2147,7 +2147,7 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11b' };
 
 let bdViewTitleText = '';
 
@@ -11411,6 +11411,49 @@ async function init() {
     } catch (_) { /* cross-origin one day, or not loaded yet */ }
   }
 
+  // ── THE SAME FRAME, VIEW'S FLAGS (2026-10-11) ─────────────────────────
+  // View's music Output is the TRANSPORT ALONE — no steppers, no overlay, no
+  // clip — which is what outputOnly has always meant. The preview's extra
+  // flags are therefore sent as explicit FALSE rather than omitted: the module
+  // keeps a class once it is set, so a flag that merely stops being sent is a
+  // flag that stays on.
+  function loadCollageViewPlayer(moduleId, script) {
+    const bf = document.getElementById('collage-playbar');
+    if (!bf || !moduleId || !script) return;
+    const url = getModuleUrl(moduleId);
+    if (!url) {
+      console.warn(`[collage] unknown music module '${moduleId}' — View player skipped`);
+      return;
+    }
+    const flags = () => {
+      try {
+        bf.contentWindow.postMessage({ type: 'bd_ui_config',
+          outputOnly: true, hideControls: true, hostChrome: false,
+          overlay: false, compactControls: false }, '*');
+      } catch (_) {}
+    };
+    if (moduleId === currentBarModuleId) {
+      try { bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*'); } catch (_) {}
+      flags();
+      console.log('[collage] View player fast path — ' + moduleId);
+      return;
+    }
+    currentBarModuleId = moduleId;
+    const onReady = (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_READY') return;
+      // e.source checked: two module frames are alive, so the other one's
+      // announcement would otherwise satisfy this listener.
+      if (e.source !== bf.contentWindow) return;
+      window.removeEventListener('message', onReady);
+      try { bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*'); } catch (_) {}
+      flags();
+      console.log('[collage] View player BD_READY — ' + moduleId);
+    };
+    window.addEventListener('message', onReady);
+    bf.src = url;
+  }
+
   function stopCollagePlaybar() {
     const bf = document.getElementById('collage-playbar');
     if (bf && bf.contentWindow) {
@@ -14338,6 +14381,20 @@ async function init() {
         bdViewProse = '';
         const res = document.getElementById('collage-sound-reserve');
         if (res) { res.hidden = true; const sp = res.querySelector('span'); if (sp) sp.textContent = ''; }
+        // SILENCED, not merely hidden: its CSS stops matching the moment
+        // `collage-music` comes off, and a hidden iframe can go on playing —
+        // the same fault as BD's media bar playing into the standalone. And
+        // its overlay mode handed back, or returning to the preview leaves a
+        // transport that is no longer positioned by anything.
+        const mfx = document.getElementById('collage-playbar');
+        if (mfx && mfx.contentWindow) {
+          try { mfx.contentWindow.postMessage({ type: 'BD_STOP' }, '*'); } catch (_) {}
+          try {
+            mfx.contentWindow.postMessage({ type: 'bd_ui_config',
+              outputOnly: true, hideControls: true, hostChrome: false,
+              overlay: true }, '*');
+          } catch (_) {}
+        }
         body.classList.remove('view-active', 'view-music',
                               'collage-active', 'collage-music');
         const bar = document.getElementById('bd-view-bar');
@@ -14506,14 +14563,32 @@ async function init() {
             // --bd-collage-music, so the square has to be told to shrink
             // before anything appears in the space it gives up.
             body.classList.add('collage-music');
-            const res = document.getElementById('collage-sound-reserve');
-            if (res) {
-              const sp = res.querySelector('span');
-              if (sp) sp.textContent = mus.moduleId + ' — reserved';
-              res.hidden = false;
+            // ── THE PREVIEW'S GEOMETRY MUST COME OFF FIRST ──────────────
+            // The same frame serves both surfaces. In the preview it is a
+            // full-size overlay with an inline rect and a clip-path; in View
+            // it is a 110px strip from the stylesheet. An inline style beats
+            // the stylesheet, and positionCyEl — the only writer that would
+            // remove them — stands down in View, so nothing else ever would.
+            const mf = document.getElementById('collage-playbar');
+            if (mf) {
+              mf.style.top = mf.style.left = mf.style.width = mf.style.height = '';
+              mf.style.clipPath = '';
+              mf.style.zIndex = '';
             }
-            console.log('[collage] sound band RESERVED (110px) for ' + mus.moduleId +
-                        ' — nothing loaded into it; the square shrinks by that much');
+            if (typeof loadCollageViewPlayer === 'function') {
+              loadCollageViewPlayer(mus.moduleId, mus.script);
+              const res = document.getElementById('collage-sound-reserve');
+              if (res) res.hidden = true;
+              console.log('[collage] View player ' + mus.moduleId +
+                          ' — 110px strip, square shrinks by that much');
+            } else {
+              const res = document.getElementById('collage-sound-reserve');
+              if (res) {
+                const sp = res.querySelector('span');
+                if (sp) sp.textContent = mus.moduleId + ' — reserved';
+                res.hidden = false;
+              }
+            }
           }
 
           const sb = document.getElementById('bd-view-speak');

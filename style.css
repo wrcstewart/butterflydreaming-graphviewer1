@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-11";
+  --bd-css-build: "2026-10-11b";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,12 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-11b: BLUE (VIEW GETS THE PLAYER: the same frame the preview uses,
+   moved to a 110px strip at the foot, transport only — no steppers, no
+   overlay, no clip. The square shrinks by exactly the strip's depth because
+   --bd-collage-side already subtracted it. The dashed reserve stands down but
+   stays in the file, for a music module BD cannot load). Next = red.
+
    2026-10-11: GREEN (STAGES 2 AND 3: the music module's 25 steppers appear in
    the LOWER HALF of the lane and Kolam3D's column stops at the midpoint to
    make room. The overlay's clip grows to one band from the lane's midpoint to
@@ -1426,7 +1432,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2568,7 +2574,7 @@ body.collage-bar #collage-playbar {
 body.view-active {
   background: #07070c;
 }
-body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):not(#collage-sound-reserve):not(#session-expired):not(#loading-overlay) {
+body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):not(#collage-playbar):not(#collage-sound-reserve):not(#session-expired):not(#loading-overlay) {
   display: none !important;
 }
 
@@ -2756,6 +2762,34 @@ body.view-active.collage-active {
    inset, as a plain length rather than a term inside a calc — see the note on
    the picture below for why that distinction cost two rounds. */
 body.view-active.collage-active.collage-music { --bd-collage-music: 110px; }
+
+/* ── THE PLAYER IN VIEW ───────────────────────────────────────────────────
+   The same frame the preview uses, moved to the foot. 110px — the depth
+   single-module View gives a musical Output, so a collage and View agree about
+   how deep a player is — and --bd-collage-side already subtracts
+   --bd-collage-music, so the square shrinks by exactly this and the two cannot
+   overlap by construction.
+
+   Above the picture and the text both: a transport has to be reachable
+   whichever of those two the script puts on top.
+
+   The PREVIEW's inline rect and clip-path are cleared by bdViewEnter, because
+   an inline style beats this rule and positionCyEl — the only thing that would
+   otherwise remove them — stands down in View. */
+body.view-active.collage-active.collage-music #collage-playbar {
+  display: block;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  top: auto;
+  width: auto;
+  height: 110px;
+  z-index: 20;
+  background: transparent;
+}
+/* The dashed placeholder stands down once there is a real player to show. It
+   stays in the file: it is what proves the space is reserved when a collage
+   names a music module BD cannot load. */
+body.view-active.collage-active.collage-music #collage-sound-reserve { display: none; }
 
 /* ── THE RESERVED SOUND BAND — EMPTY ON PURPOSE ──────────────────────────
    110px at the foot, the same depth single-module View gives a musical Output,
