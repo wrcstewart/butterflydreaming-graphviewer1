@@ -423,25 +423,46 @@ recoverable either way.
 - Is there a way to REMOVE a slot from the collage, or only replace it?
 - `%%bd_collage 1` or a new version number for v2's conventions?
 
-### 5.4 Centre the block being worked on — AUTHOR'S REQUEST 2026-10-11
+### 5.4 Centre the block being worked on — BUILT 2026-10-11
 
 *"I'm wondering if a nice touch would be to autoscroll the collage to centre
 whatever module is currently being worked on — not forgetting when returning
-from View."* Accepted as wanted, not yet built.
+from View."*
 
-Shape of it. The trigger is a CHANGE of which module is being worked on — the
-Collage press, and the return from View — and explicitly **not** the drift echo,
-which writes several times a minute and would yank the text out from under
-someone reading it.
+**The TEXTAREA scrolls, not the panes** (the author: *"there would be no point
+in scrolling the panes"*), which is also what the layout already wants: a local
+card body is a fixed-height textarea (`min-height: 8.5em`, `resize: none`) with
+its own overflow, so it is the scroll container and `#current-stack` is left
+alone.
 
-**The TEXTAREA scrolls, not the panes** (the author, correcting an earlier
-reading of this: *"there would be no point in scrolling the panes"*). So the
-card's own body is the scroll container and `#current-stack` is left alone.
+**Two triggers, both a CHANGE of which module is being worked on**: the Collage
+press (centres the block just written) and the return from View (centres the
+node's own module, the one the frame has just been handed back to — `'text'` for
+a text node). Explicitly **not** the drift echo, which writes several times a
+minute and would pull the text out from under someone reading it. Nor under a
+live caret: `collageCentreBlock` declines when the card has focus, the same
+refusal `autoWrite` makes for the same reason.
 
-The one thing to avoid: `setSelectionRange`/`focus` to scroll a textarea. It
-would steal the caret and open the keyboard on iOS. Measuring a hidden mirror
-element with the same width, font and padding gives the pixel offset of the
-block's header line without touching focus.
+**Measured, not computed.** Multiplying a line count by a line height is wrong
+the moment a line wraps, and a collage's text block wraps constantly. A hidden
+mirror div with the same content width, font metrics and wrapping gives the real
+offset. Two details that are not obvious:
+
+- **Not `setSelectionRange`/`focus`**, the obvious way to scroll a textarea to a
+  position: it steals the caret and raises the iOS keyboard. Nothing in the
+  measurement touches focus.
+- A trailing newline's empty line box is **not rendered identically across
+  engines**, so "measure everything above the line" is undependable. Measuring
+  everything above *plus one real line* (a zero-width space) and subtracting a
+  line whose height is also measured is exact — and `line-height` is not parsed,
+  because it can be the keyword `normal`.
+
+Verified in headless Chrome against a real textarea, three-block collage, 360px
+wide: block tops came out 51 / 179 / 282 px against the arithmetic 51.2 / 179.2 /
+281.6, and the resulting scrollTops 42 / 158 / 286. A block taller than the
+window (the 1,152px text block) is shown from its START rather than centred,
+because centring it would hide the header — the one line that says which module
+you are looking at.
 
 ---
 

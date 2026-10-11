@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11x' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11y' };
 
 let bdViewTitleText = '';
 
@@ -14978,16 +14978,21 @@ async function init() {
         if (bdViewCollageShown) {
           const txt = bdViewCollageShown;
           bdViewCollageShown = '';
+          const n = bdViewNode();
+          // WHICH BLOCK THE USER IS ABOUT TO WORK ON: the node's own module,
+          // since that is what the frame is being handed back to just below.
+          // A text node has no module line, and 'text' is the right answer
+          // there rather than nothing.
+          const centreOn = n ? (parseModuleId(n.data('text') || '') || 'text') : null;
           // 1. The collage is what the user was just working on, so it is the
-          //    current script again. collageReinstate is a no-op when it is
-          //    already the card on screen.
-          try { collageReinstate('back from View'); }
+          //    current script again — and scrolled to the block in question,
+          //    whether it had to be reinstated or was already on top.
+          try { collageReinstate('back from View', centreOn); }
           catch (e) { console.warn('[collage] reinstate on exit threw: ' + e.message); }
           // 2. The module frame goes back to the NODE's own module, with its
           //    own steppers — which is where v2 says a slot is adjusted. The
           //    collage card then follows those steppers through the echo, which
           //    is the whole point of having put it back on top.
-          const n = bdViewNode();
           if (n) {
             try { loadModuleForNode(n.id()); }
             catch (e) { console.warn('[view] handing the frame back threw: ' + e.message); }
@@ -15290,26 +15295,129 @@ async function init() {
         const t = collageTopCard();
         return (t && t.onTop) ? t.text : '';
       }
-      // Put the collage back where it can be seen and worked on. A no-op when
-      // it is already the card on screen; otherwise a NEW top card, leaving the
-      // relegated copy as the snapshot it became. Two callers — the button's
-      // press and the way out of View — and they must not be allowed to differ
-      // on what "reinstate" means.
-      function collageReinstate(reason) {
+      // ── CENTRE THE BLOCK BEING WORKED ON (2026-10-11) ──────────────────
+      // The author's request: the collage should scroll so the module currently
+      // being worked on is in the middle, "not forgetting when returning from
+      // View". The TEXTAREA scrolls — the panes are left alone, by the author's
+      // correction — which is right anyway: a local card body is a fixed-height
+      // textarea (min-height 8.5em, resize:none) with its own overflow, so it
+      // is already the scroll container.
+      //
+      // MEASURED, NOT COMPUTED. Multiplying a line count by a line height is
+      // wrong the moment a line wraps, and in a collage the text block wraps
+      // constantly. A hidden mirror with the same content width, font metrics
+      // and wrapping gives the real pixel offset.
+      //
+      // NOT `setSelectionRange`/`focus`, which is the obvious way to scroll a
+      // textarea to a position and would steal the caret and raise the iOS
+      // keyboard. Nothing here touches focus.
+      function collageCentreBlock(body, moduleId) {
+        if (!body || body.tagName !== 'TEXTAREA' || !moduleId) return false;
+        // Never under a live caret: a redraw that moves the view while someone
+        // is typing in it is the same fault autoWrite refuses for the same
+        // reason.
+        if (document.activeElement === body) {
+          console.log('[collage] centring skipped — the caret is in the card');
+          return false;
+        }
+        const text = body.value || '';
+        if (!parseCollage(text)) return false;
+        const lines = text.split('\n');
+        const esc = String(moduleId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re  = new RegExp('^%%bd_module[ \t]+' + esc + '[ \t]*$');
+        let at = -1;
+        for (let i = 0; i < lines.length; i++) { if (re.test(lines[i])) { at = i; break; } }
+        if (at < 0) { console.log('[collage] centring: no ' + moduleId + ' block'); return false; }
+        let end = lines.length;
+        for (let i = at + 1; i < lines.length; i++) {
+          if (/^%%bd_module[ \t]/.test(lines[i])) { end = i; break; }
+        }
+
+        const cs   = getComputedStyle(body);
+        const padT = parseFloat(cs.paddingTop) || 0;
+        const inner = body.clientWidth - (parseFloat(cs.paddingLeft) || 0)
+                                       - (parseFloat(cs.paddingRight) || 0);
+        if (!(inner > 0)) return false;              // not laid out yet
+        const mirror = document.createElement('div');
+        const st = mirror.style;
+        st.position = 'absolute'; st.visibility = 'hidden';
+        st.left = '-9999px'; st.top = '0'; st.height = 'auto';
+        st.width = inner + 'px';
+        st.padding = '0'; st.border = '0'; st.boxSizing = 'content-box';
+        st.whiteSpace = 'pre-wrap';
+        ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight',
+         'letterSpacing', 'wordSpacing', 'textTransform', 'textIndent',
+         'tabSize', 'overflowWrap', 'wordBreak'].forEach((k) => { st[k] = cs[k]; });
+        document.body.appendChild(mirror);
+        let top = 0, blockH = 0;
+        try {
+          const h = (str) => { mirror.textContent = str; return mirror.getBoundingClientRect().height; };
+          // A ZERO-WIDTH SPACE ON THE TARGET LINE, then one line taken off.
+          // A trailing newline's empty line box is not rendered identically
+          // across engines, so measuring "everything above" directly is not
+          // dependable; measuring "everything above plus one real line" is, and
+          // the line's own height is measured too rather than parsed out of
+          // `line-height`, which can be the keyword `normal`.
+          const one = h('\u200b');
+          top    = (at === 0) ? 0
+                 : (h(lines.slice(0, at).concat(['\u200b']).join('\n')) - one);
+          blockH = h(lines.slice(at, end).join('\n'));
+        } finally {
+          try { document.body.removeChild(mirror); } catch (_) {}
+        }
+
+        const view = body.clientHeight;
+        const max  = Math.max(0, body.scrollHeight - view);
+        // A block taller than the window cannot be centred, so show its START —
+        // centring it would hide its header, which is the one line that says
+        // which module you are looking at.
+        let want = (blockH >= view) ? (padT + top - 4)
+                                    : (padT + top - (view - blockH) / 2);
+        want = Math.max(0, Math.min(max, Math.round(want)));
+        body.scrollTop = want;
+        console.log('[collage] centred ' + moduleId + ' — block top ' + Math.round(top) +
+                    'px, ' + Math.round(blockH) + 'px tall, window ' + view +
+                    'px, scrollTop ' + want + ' of ' + Math.round(max));
+        return true;
+      }
+
+      // Put the collage back where it can be seen and worked on. It writes a
+      // NEW top card only when the collage has been relegated, leaving the
+      // relegated copy as the snapshot it became; and either way it centres the
+      // block named by `centreOn`, so "reinstated" and "already there" look the
+      // same to the eye. Two callers — the button's press and the way out of
+      // View — and they must not be allowed to differ on what it means.
+      function collageReinstate(reason, centreOn) {
         const t   = collageTopCard();
         const txt = (t && t.text) || collageRemembered;
         if (!txt) return false;
-        if (t && t.onTop) return false;
-        const card = createCard({ kind: 'local' });
-        const body = card && card.body;
-        if (!body) { console.warn('[collage] reinstate: no card to write into'); return false; }
-        setCardText(body, txt);
-        collageRemembered = txt;
-        if (currentStackEl) currentStackEl.scrollTop = 0;
-        console.log('[collage] reinstated as the top card — ' + reason);
-        try { refreshCollageBtn(); }
-        catch (e) { console.warn('[collage] refresh threw after reinstate: ' + e.message); }
-        return true;
+        let body = (t && t.onTop) ? t.card.body : null;
+        let made = false;
+        if (!body) {
+          const card = createCard({ kind: 'local' });
+          body = card && card.body;
+          if (!body) { console.warn('[collage] reinstate: no card to write into'); return false; }
+          setCardText(body, txt);
+          collageRemembered = txt;
+          if (currentStackEl) currentStackEl.scrollTop = 0;
+          made = true;
+          console.log('[collage] reinstated as the top card — ' + reason);
+          try { refreshCollageBtn(); }
+          catch (e) { console.warn('[collage] refresh threw after reinstate: ' + e.message); }
+        }
+        if (centreOn) collageCentreSoon(body, centreOn);
+        return made;
+      }
+
+      // ONE FRAME LATER, because a card created in this tick has no layout yet
+      // and `clientWidth` would be 0 — which the measurement treats as "not
+      // ready" and declines. Wrapped so the two callers cannot disagree about
+      // the delay, and logged if it throws rather than swallowed.
+      function collageCentreSoon(body, moduleId) {
+        requestAnimationFrame(() => {
+          try { collageCentreBlock(body, moduleId); }
+          catch (e) { console.warn('[collage] centring threw: ' + e.message); }
+        });
       }
 
       let collageBtnLast = '';
@@ -15467,8 +15575,11 @@ async function init() {
                         .map((b) => b.kind).join(',');
         console.log('[collage] ' + (started ? 'STARTED' : (inPlace ? 'updated in place' : 'REINSTATED as the top card')) +
                     ' — ' + block.kind + ' set; slots now ' + kinds);
-        // 5. STAY PUT. The label has to catch up, though.
+        // 5. STAY PUT. The label has to catch up, though — and the card is
+        //    scrolled to the block that has just changed, which in a
+        //    three-block collage is otherwise off the bottom of the window.
         try { refreshCollageBtn(); } catch (_) {}
+        collageCentreSoon(body, block.kind === 'text' ? 'text' : parseModuleId(block.text));
       });
       // The label depends on the node being read and on what the top card
       // holds, so it is refreshed wherever either can change.

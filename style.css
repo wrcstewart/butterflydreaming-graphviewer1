@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-11x";
+  --bd-css-build: "2026-10-11y";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,16 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-11y: GREEN (THE COLLAGE SCROLLS TO THE BLOCK BEING WORKED ON — the
+   textarea, not the panes, on a Collage press and on the way back from View.
+   MEASURED with a hidden mirror, because multiplying lines by a line height is
+   wrong as soon as a line wraps, and a trailing newline's empty line box is not
+   rendered the same way by every engine — so it measures "everything above plus
+   one real line" and takes off a line whose height is also measured. Not
+   setSelectionRange/focus, which would steal the caret and raise the iOS
+   keyboard. Declines under a live caret, and shows a too-tall block from its
+   start so the header stays visible). Next = blue.
+
    2026-10-11x: RED (THE COLLAGE DIMS THE PICTURE FOR YOU. A Collage press on a
    graphic writes %%bd_opacity 0.4 into the block AND pushes the script to the
    module — card-only would have been undone within a second, because the echo
@@ -1623,7 +1633,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
