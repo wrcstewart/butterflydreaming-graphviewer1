@@ -690,3 +690,114 @@ again by another route. Step 8.
 result of steps 4 onwards. **Step 9 is deliberately last** — the author will
 judge whether the readout is wanted at all, which is easier against a working
 collage.
+
+---
+
+## 8. A PASTED SCRIPT IS AN INSTRUCTION TO MAKE A COLLAGE (2026-10-11)
+
+### 8.1 The question, and why it was hard
+
+*"What happens when a user pastes a module that is incompatible with the current
+node?"* — the author, putting in one sentence what two rounds of discussion had
+been circling.
+
+It is hard because BD has **one** module frame and the node decides what is in
+it. Making a pasted script load its module gives the CARD a second authority
+over the screen, which is navigation without a navigation; leaving the paste
+inert makes it dead text, since View's non-collage branch reads the NODE and
+requires the frame to be loaded already. Both answers were unsatisfactory, and
+the state before this round was worse than either: `pastedIntoTopCard` already
+raised the module layout from a paste, so the layout changed and the frame went
+on showing whatever the last node had left in it.
+
+### 8.2 The resolution, and why it dissolves the question
+
+The author's: **regard the paste as an instruction to create a collage.**
+
+A collage is the one document in BD that is *allowed* to name a module the
+current node does not have. So "is this paste compatible with the node?" stops
+being a question rather than getting an answer. The frame stays the node's, the
+pasted module becomes a slot, the card becomes the collage, and View is where it
+is shown. Nothing autonavigates.
+
+It also inherits everything already built: relegation on a wander and
+reinstatement by the Collage button (§4.4a), the per-slot merge so each module
+only ever updates its own block, `bdSameModule`'s collage-awareness so a card
+legitimately receives several modules' announcements, the hand-back on View exit
+(§4.4c), the 0.45 dimming (§4.4e) and the scroll-to-block (§5.4).
+
+**The pasted slot is inert until the user wanders to a node with that module and
+presses Collage.** That is not a gap — it is §4.4a's behaviour arriving for
+free, and it is what the author meant by *"it will then pick up the editing of
+collage after wandering behaviour"*. The slot is RECORDED at once and becomes
+ADJUSTABLE when a module for it is in front of you.
+
+**Do not special-case a paste that happens to match the current node.** Loading
+it directly would be lighter and it reintroduces the compatibility test the
+collage idea removes. Uniform is the entire benefit.
+
+### 8.3 What it does
+
+On a **paste** into a card body — the `paste` event, not `input`, so that typing
+a script by hand is never rewritten under the keyboard mid-word:
+
+1. If the pasted text is already a **collage**, it is adopted: remembered,
+   button refreshed, scrolled. Nothing is rewritten.
+2. Otherwise the **first properly parsed module block** is taken and everything
+   outside it is ignored — the author's rule. "Properly parsed" is concrete: the
+   `%%bd_module` id must resolve through `getModuleUrl`, so a header naming
+   nothing is skipped rather than trusted.
+3. **The current node's prose is folded in as the text slot.** The author:
+   *"I think it should fold it in — after all it can always be replaced."* Which
+   is the argument: a slot is one press from being replaced, so presuming is
+   cheap and leaving it empty costs a press every time. Skipped when the node
+   has no prose.
+4. The result is assembled through `collageAddOrReplace`, so it comes out in the
+   canonical picture-sound-words order with the words on top (§4.3).
+
+And **a paste no longer raises the module layout**: `pastedIntoTopCard` is
+suppressed when the card is a collage. A collage has no page preview in v2
+(§4.7), so raising the layout showed something that was not the collage. This
+also fixes a pre-existing misfire the log had been showing all along — pressing
+Collage on a text passage logged `module layout for pasted script`, because BD's
+own write into the card looks exactly like a paste to that test.
+
+### 8.4 The author's observation: this is becoming a PROTOCOL
+
+*"I think we are circling round a protocol that might be useful for the
+collaborative editing."*
+
+Worth recording, because it is true and it was not the aim. What has accumulated
+is not a file format — it is a set of rules for **one document assembled from
+typed blocks with different owners**:
+
+- **A block declares what it is and whose it is** (`%%bd_module <id>`,
+  `%%bd_module text`). Nothing depends on where the text came from, which is why
+  a paste can be an instruction at all.
+- **Merge is PER OWNER, never across the document.** `collageMergeBySlot` keys
+  every value by the block that owns it, which is what lets two producers use the
+  same bare field name — Kolam3D's `angle` and DroneFrac's `angle` — without
+  either corrupting the other. That bug cost a round to find (§the `_p_angle`
+  report) and the fix is the protocol's central rule.
+- **Updates replace IN PLACE.** A producer's update never changes the document's
+  structure or the order of anything else, so concurrent updates cannot reorder
+  the document.
+- **The emitted order is CANONICAL**, so the document's form does not depend on
+  the order edits arrived in (§4.3, amended).
+- **One authoritative copy, plus a trail of snapshots** — `collageRemembered`
+  and the relegated cards left in History.
+- **Receivers first**: a producer that has not been taught a field degrades
+  rather than breaking (the `bd_ui_config` discipline).
+
+What is missing before it could carry two PEOPLE rather than two modules is
+small and nameable: **identity per block** (today the owner is a module id, and
+a person is not a module), **a clock or version per block** so two edits to the
+same slot can be ordered, and **a rule for concurrent edits to the same slot** —
+today the last announcement wins, which is correct for a module reporting its own
+state and wrong for two people typing. BD already has the transport (the pair
+relay) and the consent model, so what would be new is the ordering, not the
+plumbing.
+
+Not scheduled. Recorded because the next person to want collaborative editing
+should start from here rather than from a blank page — and because the three
+rules above were each paid for with a bug.
