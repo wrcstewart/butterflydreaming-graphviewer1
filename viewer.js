@@ -3146,6 +3146,23 @@ let collageNudged     = false;
 // layer is never shown before it has somewhere to be.
 let collageTextRetry  = null;
 
+// ── COLLAGE v2: A SCRIPT'S TYPE (2026-10-11) ───────────────────────────────
+// TEXT, GRAPHIC or MUSIC, DERIVED and never declared — so nothing is stored
+// and nothing can drift out of step with the module it describes. A collage
+// itself has no type: it is a collage, not a slot.
+//
+// A LOOKUP rather than a chain of conditionals, because the author expects
+// further types with their own placement rules and a chain is where that goes
+// wrong. Plan: CollageV2Plan_2026-10-11.md §6.2.
+function collageTypeOf(text) {
+  if (typeof text !== 'string' || !text.trim()) return null;
+  if (parseCollage(text)) return null;              // a collage is not a slot
+  const id = parseModuleId(text);
+  if (!id) return 'TEXT';                           // no module line at all
+  const kind = getModuleKind(id);
+  return kind === 'music' ? 'MUSIC' : kind === 'visual' ? 'GRAPHIC' : null;
+}
+
 // ── A MERGE INTO A COLLAGE MUST BE PER-SLOT (2026-10-11) ───────────────────
 // mergeExploredValues keys values by their BARE NAME, which is right for one
 // script and wrong for a collage: two modules can use the same name for
@@ -9873,6 +9890,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       devStatus('switch to Create before saving — Browse cards have no directives');
       return;
     }
+    // ── COLLAGE v2 STEP 1: Sv REFUSES A COLLAGE CARD ──────────────────────
+    // Sv reads the CARDS and writes them to the node. With a v2 collage in the
+    // top card that would write a collage script onto a navigation node —
+    // and Sv saves only root / Entry / Family / Cluster, so it is one of those
+    // it would land on.
+    //
+    // NARROWER THAN I FIRST CLAIMED, and the correction is worth keeping: I
+    // said a collage could be saved over a text passage. It cannot. labelByType
+    // above has no TextNode, so Sv already refuses those outright.
+    //
+    // A refusal with a reason, not a feature. What a DELIBERATE collage save
+    // means is undecided — plan §4.1, deferred so that what needs saving can be
+    // learned from a working system rather than designed for in advance.
     const cardsByIdx = readingState.cardsByIdx || {};
     const parts = [];
     for (let i = 0; i < readingState.chunks.length; i++) {
@@ -9899,6 +9929,33 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // authoring convention had to be doubled brackets first: this path meets
     // ABC scores, and single brackets would have eaten their chords.
     const text = normalizeBotBlocks(parts.join('\n%%bd_chunk\n'));
+
+    // ── COLLAGE v2 STEP 1: Sv REFUSES A COLLAGE ───────────────────────────
+    // CHECKED HERE, on the text Sv is about to write, and not on the top card
+    // — which is both simpler and stricter. The first cut read the top card
+    // with getCardText, and that is defined in init() while this handler is in
+    // setupInteractions: SIBLING SCOPES, so it was a ReferenceError swallowed
+    // by a try/catch, and the guard would have silently done nothing. The
+    // block-scope note in this project's history is about exactly that, and
+    // check_module.sh cannot see it because the syntax is fine.
+    //
+    // Checking the assembled text also needs no reader of its own, so there is
+    // no second copy of getCardText to keep in step.
+    //
+    // Sv saves only root / Entry / Family / Cluster, so a collage saved here
+    // would land on a navigation node. NARROWER THAN I FIRST CLAIMED and the
+    // correction is worth keeping: I said a collage could be saved over a text
+    // passage, and it cannot — labelByType above has no TextNode.
+    //
+    // A refusal with a reason, not a feature. What a DELIBERATE collage save
+    // means is undecided — CollageV2Plan_2026-10-11.md §4.1, deferred so that
+    // what needs saving can be learned from a working system.
+    if (parseCollage(text)) {
+      devStatus('that is a collage, not this node\u2019s script — not saved');
+      console.log('[collage] Sv refused: the card holds a collage (' +
+                  (parseCollage(text).blocks.map((b) => b.kind).join(',') || 'no slots') + ')');
+      return;
+    }
 
     const wsNow = wsRef.current;
     if (!wsNow || !wsNow.connected) { devStatus('ws not open'); return; }
@@ -14725,7 +14782,24 @@ async function init() {
         const body = document.body;
         if (body.classList.contains('view-active')) return;
         const node     = bdViewNode();
-        const text     = node ? (node.data('text') || '') : '';
+        // ── COLLAGE v2 STEP 2: VIEW FOLLOWS THE TOP CARD ────────────────
+        // A v2 collage lives in a CARD, not in a node, so View has to be able
+        // to read it from there. The node is still the source for everything
+        // else — and deliberately: a View that showed something other than the
+        // current node would be a surprise with nothing on screen to explain
+        // it. So the card is consulted ONLY when it holds a collage, which is
+        // the one case where the card is the document and the node is not.
+        //
+        // Accepted 2026-10-11, plan §5.1.
+        let cardCollage = '';
+        try {
+          const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
+          const topTxt = (topC && topC.body && typeof getCardText === 'function')
+            ? (getCardText(topC.body) || '') : '';
+          if (parseCollage(topTxt)) cardCollage = topTxt;
+        } catch (_) {}
+        const text     = cardCollage || (node ? (node.data('text') || '') : '');
+        if (cardCollage) console.log('[collage] View is reading the TOP CARD, not the node');
         const name     = (node && node.data('name')) || '';
         const moduleId = parseModuleId(text);
         const collage  = parseCollage(text);
@@ -14936,6 +15010,62 @@ async function init() {
           (moduleId ? moduleId + ' (' + (getModuleKind(moduleId) || 'visual') + ')' : 'text') +
           (name ? ' — ' + name : ''));
       }
+
+      // ══ COLLAGE v2 STEP 3 — THE BUTTON'S LABEL, AND NOTHING ELSE YET ══
+      // Inert on purpose: this step proves the type lookup and the three-state
+      // machine with no behaviour to go wrong. Pressing it says so in the log
+      // and does nothing. Plan: CollageV2Plan_2026-10-11.md §6.3, §7.2 step 3.
+      //
+      // The three states exist because one press does one of three things, and
+      // a button that does not say which is a button you have to press to find
+      // out.
+      function collageCurrentText() {
+        try {
+          const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
+          const txt = (topC && topC.body && typeof getCardText === 'function')
+            ? (getCardText(topC.body) || '') : '';
+          return parseCollage(txt) ? txt : '';
+        } catch (_) { return ''; }
+      }
+
+      function refreshCollageBtn() {
+        const btn = document.getElementById('collage-btn');
+        const out = document.getElementById('collage-slots');
+        if (!btn) return;
+        const n = bdViewNode();
+        const type = n ? collageTypeOf(n.data('text') || '') : null;
+        // No type means nothing to add — a collage node itself, or an empty one.
+        btn.disabled = !type;
+        const current = collageCurrentText();
+        const c = current ? parseCollage(current) : null;
+        const have = new Set(c ? c.blocks.map((b) => b.kind) : []);
+        const kindOf = { TEXT: 'text', GRAPHIC: 'visual', MUSIC: 'music' };
+        const word   = { TEXT: 'Text', GRAPHIC: 'Graphic', MUSIC: 'Music' };
+        if (!type)            btn.textContent = 'Collage';
+        else if (!c)          btn.textContent = 'Collage';
+        else if (have.has(kindOf[type])) btn.textContent = 'Replace ' + word[type];
+        else                  btn.textContent = '+ ' + word[type];
+        if (out) {
+          // T G M in fixed positions, a full stop for an empty slot, so the
+          // columns never move as the contents change.
+          out.textContent = (have.has('text') ? 'T' : '.') +
+                            (have.has('visual') ? 'G' : '.') +
+                            (have.has('music') ? 'M' : '.');
+          out.hidden = !c;
+        }
+      }
+
+      const collageBtnEl = document.getElementById('collage-btn');
+      if (collageBtnEl) collageBtnEl.addEventListener('click', () => {
+        const n = bdViewNode();
+        const type = n ? collageTypeOf(n.data('text') || '') : null;
+        console.log('[collage] v2 button pressed — would ' +
+                    collageBtnEl.textContent + ' (type ' + type + ') — INERT, step 3');
+      });
+      // The label depends on the node being read and on what the top card
+      // holds, so it is refreshed wherever either can change.
+      document.addEventListener('bd:node-read', () => { try { refreshCollageBtn(); } catch (_) {} });
+      try { refreshCollageBtn(); } catch (_) {}
 
       const bdViewExitBtn = document.getElementById('bd-view-exit');
       if (bdViewExitBtn) bdViewExitBtn.addEventListener('click', bdViewExit);
