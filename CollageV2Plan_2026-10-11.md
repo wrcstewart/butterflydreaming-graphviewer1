@@ -173,6 +173,43 @@ filled — `T G ·` for text and graphic present, music absent — so the user k
 what the collage contains without pressing anything. The author: *"you can put
 that in and I can see if it feels necessary."*
 
+**WITHDRAWN 2026-10-11, on testing.** The label is `Collage` and nothing else.
+The author, having used it: *"the buttons labelled replace can just say
+collage — the type may not be accurate and the type the user knows."* Both
+halves of that are right, and the second is the stronger: the type is
+**derived**, so a three-state label asserts something the code has worked out
+and can get wrong, about a thing the user already knows — they chose the node.
+A label that can be wrong about the obvious buys nothing and spends trust that
+the readout needs.
+
+The `T G M` readout stays, and it is the part that earned its place: it reports
+a **fact** (which slots are filled) rather than a prediction about what the next
+press will do. It now also follows the collage wherever the card lies, so
+relegating the collage to History no longer blanks the one display that says
+what it holds.
+
+### 4.4a The collage must come BACK to the top card — ADDED 2026-10-11
+
+A press reinstates the collage **as the top card in Current**, not wherever the
+card happens to be. This was built as "write to a new top card unless the
+collage is already there", and the test showed the condition was wrong:
+`topLocalCard()` answers *the newest local card in the model*, while the user's
+"top card" is a **place** — the first card in `#current-stack`. The two agree
+until a wander relegates a card to History, after which the collage went on
+being updated perfectly correctly several screens down, where the syncing it
+exists to show could not be watched. The author: *"at this stage the collage
+script should be back as the top card so we can see the syncing going on in the
+script."*
+
+`collageTopCard()` therefore reports **both** — the newest collage card wherever
+it lies, and whether it is the one on screen. The press takes its base text from
+either (so no edit is ever lost) but writes **in place only while the collage is
+on screen**; once relegated, the update goes to a fresh top card and the
+relegated copy stays as the snapshot it became. That also puts the live card
+back under `topLocalCard()`, which is what the module's stepper announcements
+write into — so the syncing lands where it can be seen without any change to
+the auto-echo path.
+
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 
 Confirmed, and no attempt will be made to work around it. **See §5 for the one
