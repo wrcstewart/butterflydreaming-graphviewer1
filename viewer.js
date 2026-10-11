@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11z' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11aa' };
 
 let bdViewTitleText = '';
 
@@ -3463,14 +3463,9 @@ function collageSlot(collage, kind) {
 //      inside an open score block. That line marks non-module text.
 // The module's own syntax is the boundary — no need for a blank line
 // above the %%bd_module marker.
-function extractLatestModuleScript(text) {
-  if (typeof text !== 'string' || !text.includes('%%bd_module')) return null;
-  const lines = text.split('\n');
-  let startIdx = -1;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (/^%%bd_module\s+\S+/.test(lines[i])) { startIdx = i; break; }
-  }
-  if (startIdx < 0) return null;
+// The walk itself, shared by the two finders below. Step 2 and step 3 of the
+// algorithm; which header to start from is the callers' business.
+function moduleBlockFrom(lines, startIdx) {
   const out = [];
   let inScoreBlock = false;
   for (let i = startIdx; i < lines.length; i++) {
@@ -3485,6 +3480,52 @@ function extractLatestModuleScript(text) {
     break;   // non-directive line + not inside a score → module block ends here
   }
   return out.join('\n').trim();
+}
+
+function extractLatestModuleScript(text) {
+  if (typeof text !== 'string' || !text.includes('%%bd_module')) return null;
+  const lines = text.split('\n');
+  let startIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^%%bd_module\s+\S+/.test(lines[i])) { startIdx = i; break; }
+  }
+  if (startIdx < 0) return null;
+  return moduleBlockFrom(lines, startIdx);
+}
+
+// ── THE FIRST PROPERLY PARSED MODULE, AND NOTHING OUTSIDE IT ──────────────
+// The author's rule for a pasted script: *"anything outside the first properly
+// parsed module is ignored and just the module is shown"*. Plan §8.3.
+//
+// FIRST, not latest, and that is a deliberate difference from the function
+// above. `extractLatestModuleScript` serves a chat card that has ACCUMULATED
+// many node taps, where the most recent is what the user means. A paste is one
+// act with one intention, and its intention is at the top.
+//
+// "Properly parsed" is made concrete rather than left to taste: the header's id
+// must RESOLVE through getModuleUrl, so a line naming a module BD does not have
+// is skipped and the search goes on to the next header. Without that test a
+// typo would produce a block that looks valid and loads nothing — the shape of
+// failure this file keeps meeting.
+//
+// Returns { moduleId, kind, script } or null.
+function extractFirstModuleScript(text) {
+  if (typeof text !== 'string' || !text.includes('%%bd_module')) return null;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^%%bd_module[ \t]+(\S+)/);
+    if (!m) continue;
+    const id = m[1];
+    if (id === 'text') continue;              // a text block names no module
+    if (!getModuleUrl(id)) {
+      console.warn('[paste] %%bd_module names an unknown module: ' + id + ' — skipped');
+      continue;
+    }
+    const script = moduleBlockFrom(lines, i);
+    if (!script) continue;
+    return { moduleId: id, kind: getModuleKind(id) === 'music' ? 'music' : 'visual', script };
+  }
+  return null;
 }
 
 // --- Neo4j → Cytoscape element builders ---
@@ -8337,7 +8378,19 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // unchanged its id already equals lastAutoPlayerNodeId, so the repeated
       // updateSendBtn calls can't drag the user back into Player.
       const landedOnModuleNode = nodeHasModule && moduleNodeId !== lastAutoPlayerNodeId;
-      const pastedIntoTopCard  = !nodeHasModule && cardHasModule && !prevCardHasModule;
+      // ── A COLLAGE IN THE CARD DOES NOT RAISE THE MODULE LAYOUT ────────
+      // (2026-10-11, plan §8.3.) A collage has no page preview in v2 — it is
+      // read in the card and shown in View — so raising the layout for one puts
+      // a module on screen that is NOT the collage, which is the half-state
+      // this whole question started from.
+      //
+      // It also fixes a misfire the log had been showing all along: pressing
+      // Collage on a text passage logged "module layout for pasted script",
+      // because BD's own write into the card looks exactly like a paste to this
+      // test. A collage is never the thing this path is for.
+      const cardIsCollage      = !!parseCollage(text);
+      const pastedIntoTopCard  = !nodeHasModule && cardHasModule &&
+                                 !prevCardHasModule && !cardIsCollage;
       // 2026-09-29 — no longer switches the MODE. Browse is where a collage is
       // read, and a tap on a module node hijacking the screen is the opposite
       // of browsing. So the module appears when you are in Create and not
@@ -15435,6 +15488,103 @@ async function init() {
         if (centreOn) collageCentreSoon(body, centreOn);
         return made;
       }
+
+      // ══ A PASTED SCRIPT IS AN INSTRUCTION TO MAKE A COLLAGE ══════════
+      // Plan §8. The question it answers: what should happen when a pasted
+      // module is incompatible with the node you are standing on? A collage is
+      // the one document in BD that is ALLOWED to name a module the current
+      // node does not have, so the question dissolves instead of needing an
+      // answer. The module frame stays the node's; the paste becomes a slot.
+      //
+      // THE `paste` EVENT, NOT `input`. A script typed by hand would otherwise
+      // be rewritten under the keyboard the moment the module id became
+      // resolvable, mid-word. A paste is one act with one intention; typing is
+      // a hundred acts, and only the last of them is a script.
+      function collageFromPaste(body) {
+        if (!body) return;
+        const cardText = getCardText(body) || '';
+
+        // Already a collage: ADOPT it, rewrite nothing. A collage pasted from
+        // elsewhere is the finished article, and the only thing it needs is for
+        // the rest of the machinery to know it is here.
+        if (parseCollage(cardText)) {
+          collageRemembered = cardText;
+          const c = parseCollage(cardText);
+          console.log('[paste] adopted a pasted collage — slots ' +
+                      c.blocks.map((b) => b.kind).join(','));
+          try { refreshCollageBtn(); }
+          catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
+          const v = collageSlot(c, 'visual') || collageSlot(c, 'music');
+          if (v) collageCentreSoon(body, v.moduleId);
+          return;
+        }
+
+        const first = extractFirstModuleScript(cardText);
+        if (!first) return;                    // not a script — ordinary text
+
+        // ── DIMMED HERE TOO, AND IT MATTERS MORE HERE (§4.4e) ───────────
+        // The same reason as the Collage button: a figure at full opacity
+        // swamps the words over it. More necessary on this path, not less —
+        // the pasted module is NOT on screen, so there is no stepper to reach
+        // for, and an undimmed paste would give an unreadable View whose only
+        // remedy is editing the script by hand. Nothing is pushed to a module
+        // because there is no module of this slot loaded; there is therefore
+        // also nothing announcing over it.
+        let slotText = first.script;
+        if (first.kind === 'visual') {
+          const dimmed = collageSetDirective(slotText, 'opacity', COLLAGE_GRAPHIC_OPACITY);
+          if (dimmed !== slotText) {
+            slotText = dimmed;
+            console.log('[paste] graphic opacity set to ' + COLLAGE_GRAPHIC_OPACITY +
+                        ' in the pasted slot (no module of it is loaded to push to)');
+          }
+        }
+        let next = collageAddOrReplace('%%bd_collage 1\n',
+                                       { kind: first.kind, text: slotText });
+        // ── THE NODE'S PROSE IS FOLDED IN (author, 2026-10-11) ──────────
+        // *"I think it should fold it in — after all it can always be
+        // replaced."* Which is the argument entire: a slot is one press from
+        // being replaced, so presuming is cheap, and leaving it out costs a
+        // press every single time. Skipped when the node has no prose — a
+        // module node's text may be directives and nothing else.
+        const n = bdViewNode();
+        const prose = n ? (nodeProse(n.data('text') || '') || '').trim() : '';
+        if (prose) {
+          next = collageAddOrReplace(next, {
+            kind: 'text',
+            text: '%%bd_module text\n%%bd_text [\n' + prose + '\n%%bd_]'
+          });
+        }
+        setCardText(body, next);
+        collageRemembered = next;
+        console.log('[paste] ' + first.moduleId + ' pasted — card is now a collage, slots ' +
+                    (parseCollage(next) || { blocks: [] }).blocks.map((b) => b.kind).join(',') +
+                    (prose ? ' (the node\'s prose folded in as the text slot)'
+                           : ' (no prose on this node — no text slot)'));
+        try { refreshCollageBtn(); }
+        catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
+        collageCentreSoon(body, first.moduleId);
+      }
+
+      document.addEventListener('paste', (e) => {
+        const el = e && e.target;
+        if (!el || !el.classList || !el.classList.contains('card-body')) return;
+        let incoming = '';
+        try {
+          incoming = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+        } catch (err) {
+          console.warn('[paste] could not read the clipboard: ' + err.message);
+        }
+        // Cheap test on what is ARRIVING, so an ordinary paste of prose costs
+        // nothing at all. The real work reads the card AFTER the paste has
+        // landed, because a paste can be one block into a card that already
+        // holds others and only the finished text says what the card is.
+        if (!/^%%bd_module[ \t]+\S+/m.test(incoming)) return;
+        setTimeout(() => {
+          try { collageFromPaste(el); }
+          catch (err) { console.warn('[paste] collage from paste threw: ' + err.message); }
+        }, 0);
+      });
 
       // ONE FRAME LATER, because a card created in this tick has no layout yet
       // and `clientWidth` would be 0 — which the measurement treats as "not

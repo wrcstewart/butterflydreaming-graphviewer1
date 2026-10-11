@@ -752,8 +752,21 @@ a script by hand is never rewritten under the keyboard mid-word:
    is the argument: a slot is one press from being replaced, so presuming is
    cheap and leaving it empty costs a press every time. Skipped when the node
    has no prose.
-4. The result is assembled through `collageAddOrReplace`, so it comes out in the
+4. **The graphic is dimmed to 0.45**, as on a button press (§4.4e) — and it
+   matters MORE here, not less: the pasted module is not on screen, so there is
+   no stepper to reach for, and an undimmed paste would give an unreadable View
+   whose only remedy is editing the script by hand. Nothing is pushed to a
+   module, because no module of that slot is loaded; there is therefore also
+   nothing announcing over it. (A judgement call, taken rather than asked,
+   because the alternative was to ship a known-unreadable result.)
+5. The result is assembled through `collageAddOrReplace`, so it comes out in the
    canonical picture-sound-words order with the words on top (§4.3).
+
+Verified against the parser, seven cases: prose either side of a script is
+excluded; two headers give the FIRST; an unresolvable id is skipped and the
+search continues; `%%bd_module text` is not a module; no module gives null; the
+`%%bd_score [ … %%bd_]` block survives intact; and the assembled collage comes
+out `visual,text` with the words on top.
 
 And **a paste no longer raises the module layout**: `pastedIntoTopCard` is
 suppressed when the card is a collage. A collage has no page preview in v2
