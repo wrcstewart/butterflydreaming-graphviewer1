@@ -2185,7 +2185,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11s' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11t' };
 
 let bdViewTitleText = '';
 
@@ -15104,13 +15104,34 @@ async function init() {
       // The three states exist because one press does one of three things, and
       // a button that does not say which is a button you have to press to find
       // out.
-      function collageCurrentText() {
+      // ── WHERE THE COLLAGE CARD IS, NOT JUST WHETHER ONE EXISTS ────────
+      // `topLocalCard()` answers "the newest local card in the MODEL". The
+      // user's "top card" is a PLACE: the first card in the Current pane. The
+      // two agree until a card is relegated to History, and that divergence is
+      // the whole of this round's fault — the collage went on being updated
+      // perfectly correctly where it lay, several screens down in History, so
+      // the syncing it exists to show could not be watched.
+      //
+      // So this reports BOTH: the newest collage card wherever it lies, and
+      // whether it is the one on screen. The press uses the text from either
+      // and writes to a NEW top card when the old one has been relegated.
+      function collageTopCard() {
         try {
           const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
-          const txt = (topC && topC.body && typeof getCardText === 'function')
-            ? (getCardText(topC.body) || '') : '';
-          return parseCollage(txt) ? txt : '';
-        } catch (_) { return ''; }
+          if (!topC || !topC.body) return null;
+          const txt = (typeof getCardText === 'function') ? (getCardText(topC.body) || '') : '';
+          if (!parseCollage(txt)) return null;
+          const first = currentStackEl && currentStackEl.querySelector('.card');
+          return { card: topC, text: txt, onTop: !!(first && topC.el === first) };
+        } catch (e) {
+          console.warn('[collage] collageTopCard threw: ' + e.message);
+          return null;
+        }
+      }
+      // The collage the user can actually see, '' when there is none there.
+      function collageCurrentText() {
+        const t = collageTopCard();
+        return (t && t.onTop) ? t.text : '';
       }
 
       let collageBtnLast = '';
@@ -15132,15 +15153,24 @@ async function init() {
         // what it decided. A label that is briefly out of date is a cosmetic
         // fault; a button that cannot be pressed is not.
         btn.disabled = false;
-        const current = collageCurrentText();
+        // ── THE LABEL IS ALWAYS "Collage" (2026-10-11) ───────────────────
+        // It used to read "Replace Graphic" / "+ Text". Dropped at the
+        // author's instruction, and the reason is worth keeping: the type is
+        // DERIVED, so the label was asserting something the code had worked
+        // out and could get wrong, about a thing the user already knows — they
+        // chose the node. A label that can be wrong about the obvious buys
+        // nothing and costs trust in the one that matters.
+        //
+        // The slot readout beside it still carries the state, and it reports a
+        // FACT (which slots are filled) rather than a prediction about what the
+        // next press will do.
+        btn.textContent = 'Collage';
+        // The readout follows the collage WHEREVER it lies — relegating it to
+        // History must not blank the one display that says what it holds.
+        const t = collageTopCard();
+        const current = (t && t.text) || collageRemembered || '';
         const c = current ? parseCollage(current) : null;
         const have = new Set(c ? c.blocks.map((b) => b.kind) : []);
-        const kindOf = { TEXT: 'text', GRAPHIC: 'visual', MUSIC: 'music' };
-        const word   = { TEXT: 'Text', GRAPHIC: 'Graphic', MUSIC: 'Music' };
-        if (!type)            btn.textContent = 'Collage';
-        else if (!c)          btn.textContent = 'Collage';
-        else if (have.has(kindOf[type])) btn.textContent = 'Replace ' + word[type];
-        else                  btn.textContent = '+ ' + word[type];
         if (out) {
           // T G M in fixed positions, a full stop for an empty slot, so the
           // columns never move as the contents change.
@@ -15153,7 +15183,8 @@ async function init() {
         // and so "the button is greyed out" is visible in the log rather than
         // only on screen.
         const say = btn.textContent + ' | disabled ' + btn.disabled +
-                    ' | type ' + type + ' | slots ' + (out ? out.textContent : '-');
+                    ' | type ' + type + ' | slots ' + (out ? out.textContent : '-') +
+                    ' | collage ' + (!t ? 'none' : (t.onTop ? 'on top' : 'relegated'));
         if (say !== collageBtnLast) { collageBtnLast = say; console.log('[collage] btn: ' + say); }
       }
 
@@ -15194,27 +15225,26 @@ async function init() {
           return;
         }
 
-        // 1. REINSTATE. The top card if it holds a collage; otherwise the
-        //    remembered one; otherwise a new collage. A reinstated collage is
-        //    written to a NEW top card, and the copy in history stays as the
-        //    snapshot it became when it was relegated.
-        const fromTop = collageCurrentText();
-        let base = fromTop || collageRemembered;
+        // 1. REINSTATE — AND BRING IT BACK WHERE IT CAN BE SEEN.
+        //    The collage card is found wherever it lies, so no edit is lost;
+        //    but it is only WRITTEN IN PLACE while it is still the card on
+        //    screen. Once a wander has relegated it to History the update goes
+        //    to a NEW top card, and the relegated copy stays as the snapshot it
+        //    became. Plan §4.2, and the author's requirement: the collage has
+        //    to be the top card for the syncing to be watchable at all.
+        const t0 = collageTopCard();
+        const inPlace = !!(t0 && t0.onTop);
+        let base = (t0 && t0.text) || collageRemembered;
         const started = !base;
         if (started) base = '%%bd_collage 1\n';
 
         // 2 and 3. ADD, or REPLACE IN PLACE.
         const next = collageAddOrReplace(base, block);
 
-        // 4. COMMIT — to a new top card unless the collage is already there,
-        //    and to the remembered string either way.
-        let body = null;
-        if (fromTop) {
-          try {
-            const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
-            body = topC && topC.body;
-          } catch (_) {}
-        }
+        // 4. COMMIT — to the card on screen if the collage is already there,
+        //    to a fresh top card otherwise, and to the remembered string
+        //    either way.
+        let body = inPlace ? t0.card.body : null;
         if (!body) {
           const card = createCard({ kind: 'local' });
           body = card && card.body;
@@ -15226,9 +15256,8 @@ async function init() {
 
         const kinds = (parseCollage(next) || { blocks: [] }).blocks
                         .map((b) => b.kind).join(',');
-        console.log('[collage] ' + (started ? 'STARTED' : (fromTop ? 'updated in place' : 'REINSTATED')) +
-                    ' — ' + block.kind + ' ' + (fromTop || collageRemembered ? 'set' : 'added') +
-                    '; slots now ' + kinds);
+        console.log('[collage] ' + (started ? 'STARTED' : (inPlace ? 'updated in place' : 'REINSTATED as the top card')) +
+                    ' — ' + block.kind + ' set; slots now ' + kinds);
         // 5. STAY PUT. The label has to catch up, though.
         try { refreshCollageBtn(); } catch (_) {}
       });
