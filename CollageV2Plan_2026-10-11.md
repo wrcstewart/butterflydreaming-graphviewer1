@@ -249,6 +249,35 @@ than a special case for each. A card in Current that must not receive the script
 is still refused by `bdSameModule`, out loud, so the worst case is a logged
 refusal and not a wrong write.
 
+### 4.4c View GIVES BACK what it borrowed — ADDED 2026-10-11
+
+There is one module frame, and a collage View points it at the collage's visual
+slot. Leaving View put the classes back and nothing else, so the page returned
+holding a state View had created: stand on a DroneFrac node, View the collage,
+press Back, and the preview is the **Kolam** with **Kolam steppers** while the
+card beside it is the plain DroneFrac script. The author: *"sort of a double
+error"* — and it is exactly two, with one principle behind both. **View borrows
+the page's state, so every exit restores it.**
+
+So on the way out of a collage View:
+
+1. **The frame goes back to the node's own module**, through
+   `loadModuleForNode`, which also brings back that node's exploration rather
+   than its saved default. Steppers belong to the node's own module in v2
+   (§4.7), so this is where a slot is adjusted.
+2. **The collage goes back on top**, through a shared `collageReinstate` that
+   the button's press and this exit cannot disagree about. The collage is what
+   the user was just working on, and with it on top the echo feeds it from the
+   steppers restored in (1) — which is the whole reason for putting it back.
+
+Neither half decides what the state ought to be: it asks the node and the card,
+the two things that already know.
+
+Note what is NOT changed: View still reads a collage from the card **wherever
+that card lies**, per the author's answer to §5.1 — *"a press of the view button
+could still display it"*. A relegated collage is still viewable; it is only the
+RETURN that had to be repaired.
+
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 
 Confirmed, and no attempt will be made to work around it. **See §5 for the one

@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11u' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11v' };
 
 let bdViewTitleText = '';
 
@@ -14847,6 +14847,11 @@ async function init() {
       // words that are on screen rather than going back to the node and
       // risking a second idea of what the text is.
       let bdViewProse = '';
+      // ── WHAT VIEW BORROWED, SO IT CAN BE GIVEN BACK ───────────────────
+      // Set when View renders a collage that came from a CARD (not from a
+      // collage NODE, where there is nothing to reinstate — the node is the
+      // collage). Read on the way out, by the two halves of the hand-back.
+      let bdViewCollageShown = '';
       // Clears the Speak button's lit state when the reading actually ends.
       // Without it the indicator says "speaking" for ever after the last
       // sentence — a small lie, and the kind this file has been bitten by:
@@ -14916,6 +14921,43 @@ async function init() {
         // The module must re-measure its square for the preview's rect, and
         // the nudge is once-per-load, so it has to be re-armed.
         collageNudged = false;
+
+        // ══ VIEW GIVES BACK WHAT IT BORROWED (2026-10-11) ═══════════════
+        // A collage View takes over the ONE module frame and points it at the
+        // collage's visual slot. Leaving put the classes back and nothing
+        // else, so the page returned holding the wrong module: stand on a
+        // DroneFrac node, View the collage, press Back, and the preview is the
+        // KOLAM with Kolam steppers while the card beside it is the plain
+        // DroneFrac script. Reported as *"sort of a double error"*, and it is
+        // exactly two: the frame was not handed back, and the collage was not
+        // put back on top.
+        //
+        // Both halves are the same principle — View is a surface that BORROWS
+        // the page's state, so every exit has to restore it. Nothing here
+        // decides what the state should be; it asks the node and the card, the
+        // two things that already know.
+        if (bdViewCollageShown) {
+          const txt = bdViewCollageShown;
+          bdViewCollageShown = '';
+          // 1. The collage is what the user was just working on, so it is the
+          //    current script again. collageReinstate is a no-op when it is
+          //    already the card on screen.
+          try { collageReinstate('back from View'); }
+          catch (e) { console.warn('[collage] reinstate on exit threw: ' + e.message); }
+          // 2. The module frame goes back to the NODE's own module, with its
+          //    own steppers — which is where v2 says a slot is adjusted. The
+          //    collage card then follows those steppers through the echo, which
+          //    is the whole point of having put it back on top.
+          const n = bdViewNode();
+          if (n) {
+            try { loadModuleForNode(n.id()); }
+            catch (e) { console.warn('[view] handing the frame back threw: ' + e.message); }
+          }
+          console.log('[view] left a collage — frame handed back to ' +
+                      (n ? (parseModuleId(n.data('text') || '') || 'no module') : 'no node') +
+                      ', collage ' + txt.length + ' chars back on top');
+        }
+        bdViewCollageShown = '';
         // positionCyEl stood down while View held the rect; hand it back.
         try { positionCyEl(); } catch (_) {}
         console.log('[view] left');
@@ -14942,6 +14984,7 @@ async function init() {
           if (parseCollage(topTxt)) cardCollage = topTxt;
         } catch (_) {}
         const text     = cardCollage || (node ? (node.data('text') || '') : '');
+        bdViewCollageShown = cardCollage || '';
         if (cardCollage) console.log('[collage] View is reading the TOP CARD, not the node');
         const name     = (node && node.data('name')) || '';
         const moduleId = parseModuleId(text);
@@ -15190,6 +15233,27 @@ async function init() {
       function collageCurrentText() {
         const t = collageTopCard();
         return (t && t.onTop) ? t.text : '';
+      }
+      // Put the collage back where it can be seen and worked on. A no-op when
+      // it is already the card on screen; otherwise a NEW top card, leaving the
+      // relegated copy as the snapshot it became. Two callers — the button's
+      // press and the way out of View — and they must not be allowed to differ
+      // on what "reinstate" means.
+      function collageReinstate(reason) {
+        const t   = collageTopCard();
+        const txt = (t && t.text) || collageRemembered;
+        if (!txt) return false;
+        if (t && t.onTop) return false;
+        const card = createCard({ kind: 'local' });
+        const body = card && card.body;
+        if (!body) { console.warn('[collage] reinstate: no card to write into'); return false; }
+        setCardText(body, txt);
+        collageRemembered = txt;
+        if (currentStackEl) currentStackEl.scrollTop = 0;
+        console.log('[collage] reinstated as the top card — ' + reason);
+        try { refreshCollageBtn(); }
+        catch (e) { console.warn('[collage] refresh threw after reinstate: ' + e.message); }
+        return true;
       }
 
       let collageBtnLast = '';
