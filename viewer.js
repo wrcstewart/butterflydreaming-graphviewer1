@@ -2175,7 +2175,17 @@ function showSpeechIntro() {
 // back. Top-level because speechProgress is, and View's own code is in init().
 // Updated in the SAME COMMIT as the border in style.css — see the self-check
 // in init(). Green, 2026-10-09i.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11b' };
+// ── THE BUILD HALF OF THIS WAS STALE FOR FOURTEEN ROTATIONS (fixed 2026-10-11)
+// It said `2026-10-11b` while style.css said `q`. Every canary edit since was a
+// `str.replace()` with NO ASSERT, so once the target string stopped matching,
+// each one silently did nothing while style.css advanced normally.
+//
+// AND THE SELF-CHECK PRINTED IT ON EVERY BOOT — "css build 2026-10-11q, viewer
+// expects 2026-10-11b" — and still said "MATCH, both files current", because
+// `ok` is computed from the COLOUR alone. So a readout that was telling the
+// truth was contradicting itself in the same line, and I read the half that
+// agreed with me. `ok` now takes the build into account too.
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11r' };
 
 let bdViewTitleText = '';
 
@@ -10818,7 +10828,12 @@ async function init() {
       const cssBuild = (getComputedStyle(document.documentElement)
                           .getPropertyValue('--bd-css-build') || '')
                        .trim().replace(/^["']|["']$/g, '') || '(none — pre-marker)';
-      const ok = got.replace(/\s/g, '') === want.rgb.replace(/\s/g, '');
+      // BOTH HALVES, not the colour alone. A build mismatch is exactly as much
+      // a staleness signal as a colour mismatch, and reporting MATCH beside a
+      // printed disagreement is worse than not checking at all.
+      const colourOk = got.replace(/\s/g, '') === want.rgb.replace(/\s/g, '');
+      const buildOk  = (cssBuild === want.build);
+      const ok = colourOk && buildOk;
       console.log('[boot] canary: css build ' + cssBuild +
                   ', viewer expects ' + want.build +
                   ' | css paints ' + got + ', expects ' + want.rgb +
@@ -15098,10 +15113,11 @@ async function init() {
         } catch (_) { return ''; }
       }
 
+      let collageBtnLast = '';
       function refreshCollageBtn() {
         const btn = document.getElementById('collage-btn');
         const out = document.getElementById('collage-slots');
-        if (!btn) return;
+        if (!btn) { console.warn('[collage] #collage-btn not in the DOM'); return; }
         const n = bdViewNode();
         const type = n ? collageTypeOf(n.data('text') || '') : null;
         // No type means nothing to add — a collage node itself, or an empty one.
@@ -15123,18 +15139,39 @@ async function init() {
                             (have.has('music') ? 'M' : '.');
           out.hidden = !c;
         }
+        // Logged on CHANGE, so the state can be read back without watching —
+        // and so "the button is greyed out" is visible in the log rather than
+        // only on screen.
+        const say = btn.textContent + ' | disabled ' + btn.disabled +
+                    ' | type ' + type + ' | slots ' + (out ? out.textContent : '-');
+        if (say !== collageBtnLast) { collageBtnLast = say; console.log('[collage] btn: ' + say); }
       }
 
       const collageBtnEl = document.getElementById('collage-btn');
+      console.log('[collage] v2 button ' + (collageBtnEl ? 'found, click handler attached' : 'NOT FOUND in the DOM'));
       if (collageBtnEl) collageBtnEl.addEventListener('click', () => {
         // ══ COLLAGE v2 STEPS 4 AND 5 — ONE PRESS, FIVE THINGS ════════════
         // Plan §6.4. Nothing navigates and no module is reloaded: the steppers
         // stay exactly where they are, which is the point of making this an
         // action rather than a mode.
+        // EVERY EXIT SAYS SO. The first cut returned silently when there was
+        // no node, so a press that did nothing left nothing in the log and
+        // "pressing Collage did not change the top script" could not be told
+        // apart from "the handler never ran". That is the third time a silent
+        // guard has cost a round here.
         const n = bdViewNode();
-        if (!n) return;
+        console.log('[collage] v2 press — node ' + (n ? n.id() : 'NONE') +
+                    ', type ' + (n ? collageTypeOf(n.data('text') || '') : '-') +
+                    ', label "' + collageBtnEl.textContent + '"' +
+                    ', disabled ' + collageBtnEl.disabled);
+        if (!n) { console.warn('[collage] v2 press: no node is being read — nothing to add'); return; }
         const block = collageBlockFor(n);
-        if (!block) { console.warn('[collage] nothing to add from this node'); return; }
+        if (!block) {
+          console.warn('[collage] v2 press: collageBlockFor returned null — ' +
+                       'type ' + collageTypeOf(n.data('text') || '') +
+                       ', text length ' + (n.data('text') || '').length);
+          return;
+        }
 
         // 1. REINSTATE. The top card if it holds a collage; otherwise the
         //    remembered one; otherwise a new collage. A reinstated collage is
