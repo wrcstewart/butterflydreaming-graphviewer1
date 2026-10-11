@@ -119,14 +119,17 @@ exist yet.
 For development the author may ask for one or two test cases saved as specific
 new nodes, as `bd_Collage_001` and `002` were.
 
-**BUT ONE SAFETY ITEM CANNOT WAIT, even though saving can.** `Sv` writes the top
-card to the active node. With a collage in the top card, pressing `Sv` while
-standing on a Tao Te Ching passage would overwrite the poem with a collage
-script. This project has been bitten by that shape three times —
-`%%bd_center` destroyed by a round-tripped card, and twice since. So `Sv` needs
-a guard while the top card is a collage, before the Collage button ships, even
-though what a *deliberate* collage save means is undecided. A refusal with a
-reason is enough; it need not be a feature.
+**ONE SAFETY ITEM, AND I OVERSTATED IT — corrected 2026-10-11 after reading
+the code.** I said a collage in the top card could be saved over a Tao Te Ching
+passage by pressing `Sv`. **It cannot.** `dev-save` carries
+`labelByType = { root, Entry, Family, Cluster }` and refuses anything else, so a
+**TextNode cannot be saved by `Sv` at all** — the scenario I described is
+impossible and was never a risk.
+
+What remains is narrower and still worth a guard: standing on a **Cluster,
+Entry, Family or root** node with a collage in the top card, `Sv` would write
+the collage script onto that navigation node. One line, a refusal with a
+reason.
 
 ### 4.2 The remembered collage — ONE authoritative string, a trail of snapshots
 
@@ -378,3 +381,47 @@ again:
   `bd_Collage_002`.
 - **No persistence.** 4.1 — build it, see what it holds, then decide.
 - **No slot removal yet.** 5.3.
+
+---
+
+## 7. Build order
+
+Each step is independently testable and independently revertable, with the
+canary rotating per step so there is never a question of whether what is on
+screen is the current code. Tag before step 1: **`collage-v2-start`**.
+
+### 7.1 Two findings from reading the code first
+
+**The live script needs no async pull.** I expected a
+`bd_script_request` / `bd_script_response` round trip, which would have made a
+Collage press asynchronous for module nodes. It does not:
+**`explorationByNode.get(nodeId)` IS the node's live script**, recorded from the
+module's own announcements, falling back to `node.data('text')` when nothing has
+been explored. Entirely synchronous, and it removes the only async risk from
+step 5.
+
+**v1's per-slot push targets FIXED FRAMES** — visual to `#visual-iframe`, music
+to `#collage-playbar`. v2 has no overlay and therefore **one live module,
+whichever the current node uses, always in `#visual-iframe`.** So the push must
+select the slot matching `currentModuleId`, not the slot matching a frame. Missed,
+it would post a music script into a kolam, which is the `%%bd_angle` collision
+again by another route. Step 8.
+
+### 7.2 The steps
+
+| # | step | test |
+|---|---|---|
+| 1 | **`Sv` guard** | on a Cluster with a collage in the top card, `Sv` refuses with a reason |
+| 2 | **View follows the top card** | tap `bd_Collage_002`, press View — unchanged, but arrived at via the card. A regression test that unblocks 4 onwards |
+| 3 | **`collageTypeOf` + the button, INERT** | walk the graph; the label tracks the type of the node you are on |
+| 4 | **Start a collage — TEXT** | press Collage on a Tao passage; the top card becomes a one-slot collage; View shows the words |
+| 5 | **Add GRAPHIC** — reinstatement, live script, remembered string | set the kolam's steppers, press Collage; View shows figure AND words with the values set. **The riskiest step; stop here to test** |
+| 6 | **Replace in place** | change `lightness`, press again; only that block changes and its position holds |
+| 7 | **Add MUSIC** | DroneFrac; View shows all three layers |
+| 8 | **Per-slot push to the LIVE module** (7.1) | hand-edit the card on a kolam node, press Down; the kolam follows and nothing reaches the wrong module |
+| 9 | **The `T G .` readout** | cosmetic, last, so it can be judged against something working |
+
+**Step 2 must come early**: until View reads the card there is no way to SEE the
+result of steps 4 onwards. **Step 9 is deliberately last** — the author will
+judge whether the readout is wanted at all, which is easier against a working
+collage.
