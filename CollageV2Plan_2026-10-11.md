@@ -340,11 +340,18 @@ card would then be right and the picture wrong, with the echo quietly undoing
 the card.
 
 0.4 is a starting point, not a verdict: the stepper still works and what it says
-syncs back like any other value. **The one consequence to know is that a later
-press re-applies 0.4**, since a press means "take this module into the collage"
-and that is what a collage does to a picture. If that proves annoying the
-alternative is to apply it only when the opacity is still 1 — offered, not
-assumed.
+syncs back like any other value. A later press re-applies 0.4, since a press
+means "take this module into the collage" and that is what a collage does to a
+picture.
+
+**SETTLED 2026-10-11 — apply it unconditionally.** I had offered the narrower
+rule (dim only while the opacity is still 1, so a deliberate setting survives a
+second press) and the author declined it, with the frequencies the right way
+round: *"that is more unusual than wanting to change opacity virtually every
+time from some high value … the user can always readjust back up if that is what
+they have done."* The common case is the one worth automating, the rare case has
+a one-stepper remedy, and the unconditional rule needs no explaining — which the
+conditional one would have, every time it declined to act.
 
 `collageSetDirective` does the edit by line-walking rather than a global regex,
 so a `%%bd_score [ … %%bd_]` body containing something that looks like a
