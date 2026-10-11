@@ -319,6 +319,39 @@ which three are sound and three are worth watching:
 None of these were touched in this round. They are recorded so the next person
 to meet one knows it was seen and left, not missed.
 
+### 4.4e The collage dims the picture for you — ADDED 2026-10-11
+
+A figure at full opacity swamps the words over it, so every collage began with
+the same chore: find the opacity stepper and wind it down. The author: *"The
+user can do this manually but it's slightly annoying — it would be better if it
+happened automatically when the user presses Collage, set it to 0.4."*
+
+So a Collage press on a GRAPHIC writes `%%bd_opacity 0.4` into the block —
+`COLLAGE_GRAPHIC_OPACITY`, one constant, both visual modules taking the
+directive on 0..1 step 0.01 so no per-module table is needed.
+
+**And it is pushed to the MODULE, not only written to the card.** That is not a
+nicety: the echo merges the module's announced values into the matching slot
+about once a second, so a card-only change is undone before it can be read —
+the module would go on saying `opacity 1` and win every time. Pushing the script
+down sets the control, which is precisely what the author was doing by hand.
+When the frame is not on this node the push is refused **out loud**, because the
+card would then be right and the picture wrong, with the echo quietly undoing
+the card.
+
+0.4 is a starting point, not a verdict: the stepper still works and what it says
+syncs back like any other value. **The one consequence to know is that a later
+press re-applies 0.4**, since a press means "take this module into the collage"
+and that is what a collage does to a picture. If that proves annoying the
+alternative is to apply it only when the opacity is still 1 — offered, not
+assumed.
+
+`collageSetDirective` does the edit by line-walking rather than a global regex,
+so a `%%bd_score [ … %%bd_]` body containing something that looks like a
+directive is not reached into. Verified on five cases: replace in place, insert
+after the header, score block untouched, idempotent, and a hand-set value
+overridden.
+
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 
 Confirmed, and no attempt will be made to work around it. **See §5 for the one
@@ -392,10 +425,11 @@ from View."* Accepted as wanted, not yet built.
 Shape of it. The trigger is a CHANGE of which module is being worked on — the
 Collage press, and the return from View — and explicitly **not** the drift echo,
 which writes several times a minute and would yank the text out from under
-someone reading it. A local card's body is a fixed-height `<textarea>`
-(`min-height: 8.5em`, `resize: none`) inside `#current-stack`, which is the
-`overflow-y: auto` element, so "centre" may mean scrolling the pane, the
-textarea, or both — whichever actually has overflow at the time.
+someone reading it.
+
+**The TEXTAREA scrolls, not the panes** (the author, correcting an earlier
+reading of this: *"there would be no point in scrolling the panes"*). So the
+card's own body is the scroll container and `#current-stack` is left alone.
 
 The one thing to avoid: `setSelectionRange`/`focus` to scroll a textarea. It
 would steal the caret and open the keyboard on iOS. Measuring a hidden mirror

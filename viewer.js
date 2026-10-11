@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11w' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11x' };
 
 let bdViewTitleText = '';
 
@@ -3191,6 +3191,45 @@ function collageBlockFor(node) {
   const live = (explorationByNode.get(node.id()) || saved).trim();
   if (!parseModuleId(live)) return null;
   return { kind: type === 'MUSIC' ? 'music' : 'visual', text: live };
+}
+
+// ── THE COLLAGE DIMS THE PICTURE FOR YOU (2026-10-11) ─────────────────────
+// A figure at full opacity swamps the words over it, so every collage began
+// with the same manual chore: find the opacity stepper, wind it down. The
+// author: *"The user can do this manually but it's slightly annoying — it would
+// be better if it happened automatically when the user presses Collage, set it
+// to 0.4."*
+//
+// 0.4 is a starting point, not a verdict: the stepper still works, and what it
+// says syncs into the collage through the echo like any other value. The one
+// consequence to know is that a LATER press re-applies 0.4, because the press
+// means "take this module into the collage" and that is what the collage does
+// to a picture.
+//
+// Both visual modules take `%%bd_opacity` on 0..1 with step 0.01 (checked in
+// V_Kolam and V_Kolam3D), so the value is legal in both and needs no
+// per-module table.
+const COLLAGE_GRAPHIC_OPACITY = 0.4;
+
+// Set one directive in a block, replacing the existing line IN PLACE or
+// inserting it after the module header. Line-walking, not a regex over the
+// whole text, for the usual reason: a `%%bd_score [ … %%bd_]` body can contain
+// anything at all, including something that looks like a directive, and a
+// global replace would reach inside it.
+function collageSetDirective(blockText, name, value) {
+  const want = '%%bd_' + name + ' ' + value;
+  const re   = new RegExp('^%%bd_' + name + '[ \t]');
+  const out  = [];
+  let inBlock = false, done = false, headerAt = -1;
+  for (const line of String(blockText).split('\n')) {
+    if (inBlock) { out.push(line); if (BD_BLOCK_CLOSE_RE.test(line)) inBlock = false; continue; }
+    if (BD_BLOCK_OPEN_RE.test(line)) { inBlock = true; out.push(line); continue; }
+    if (/^%%bd_module[ \t]/.test(line)) { headerAt = out.length; out.push(line); continue; }
+    if (!done && re.test(line)) { out.push(want); done = true; continue; }
+    out.push(line);
+  }
+  if (!done) out.splice(headerAt >= 0 ? headerAt + 1 : 0, 0, want);
+  return out.join('\n');
 }
 
 // Add a block, or REPLACE the one of its kind IN PLACE.
@@ -15356,12 +15395,43 @@ async function init() {
           console.warn('[collage] v2 press: this node IS a collage — a collage is not a slot');
           return;
         }
-        const block = collageBlockFor(n);
+        let block = collageBlockFor(n);
         if (!block) {
           console.warn('[collage] v2 press: collageBlockFor returned null — ' +
                        'type ' + collageTypeOf(n.data('text') || '') +
                        ', text length ' + (n.data('text') || '').length);
           return;
+        }
+
+        // ── DIM THE PICTURE, AND TELL THE MODULE (2026-10-11) ────────────
+        // See COLLAGE_GRAPHIC_OPACITY. The push to the module is not a nicety:
+        // the echo merges the module's announced values into the matching slot
+        // about once a second, so a card-only change is undone before it can be
+        // read — the module would go on saying opacity 1 and win every time.
+        // Setting the control is also exactly what the author was doing by
+        // hand, which is the thing being automated.
+        if (block.kind === 'visual') {
+          const dimmed = collageSetDirective(block.text, 'opacity', COLLAGE_GRAPHIC_OPACITY);
+          if (dimmed === block.text) {
+            console.log('[collage] graphic opacity already ' + COLLAGE_GRAPHIC_OPACITY);
+          } else {
+            block = { kind: block.kind, text: dimmed };
+            if (avNodeId === n.id() && visualIframe && visualIframe.contentWindow) {
+              try {
+                visualIframe.contentWindow.postMessage(
+                  { type: 'bd_script_update', script: dimmed }, '*');
+                console.log('[collage] graphic opacity set to ' + COLLAGE_GRAPHIC_OPACITY +
+                            ' and pushed to the module');
+              } catch (e) {
+                console.warn('[collage] opacity push to the module failed: ' + e.message);
+              }
+            } else {
+              // SAID OUT LOUD, because the card would be right and the picture
+              // would not, and the echo would then quietly undo the card.
+              console.warn('[collage] opacity set in the card but NOT pushed — the module ' +
+                           'frame is on ' + avNodeId + ', not ' + n.id());
+            }
+          }
         }
 
         // 1. REINSTATE — AND BRING IT BACK WHERE IT CAN BE SEEN.
