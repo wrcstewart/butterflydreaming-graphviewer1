@@ -383,6 +383,25 @@ recoverable either way.
 - Is there a way to REMOVE a slot from the collage, or only replace it?
 - `%%bd_collage 1` or a new version number for v2's conventions?
 
+### 5.4 Centre the block being worked on — AUTHOR'S REQUEST 2026-10-11
+
+*"I'm wondering if a nice touch would be to autoscroll the collage to centre
+whatever module is currently being worked on — not forgetting when returning
+from View."* Accepted as wanted, not yet built.
+
+Shape of it. The trigger is a CHANGE of which module is being worked on — the
+Collage press, and the return from View — and explicitly **not** the drift echo,
+which writes several times a minute and would yank the text out from under
+someone reading it. A local card's body is a fixed-height `<textarea>`
+(`min-height: 8.5em`, `resize: none`) inside `#current-stack`, which is the
+`overflow-y: auto` element, so "centre" may mean scrolling the pane, the
+textarea, or both — whichever actually has overflow at the time.
+
+The one thing to avoid: `setSelectionRange`/`focus` to scroll a textarea. It
+would steal the caret and open the keyboard on iOS. Measuring a hidden mirror
+element with the same width, font and padding gives the pixel offset of the
+block's header line without touching focus.
+
 ---
 
 ## 6. How v2 works — the specification
