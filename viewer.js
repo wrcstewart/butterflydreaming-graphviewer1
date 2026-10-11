@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11y' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11z' };
 
 let bdViewTitleText = '';
 
@@ -3209,26 +3209,43 @@ function collageBlockFor(node) {
 // Both visual modules take `%%bd_opacity` on 0..1 with step 0.01 (checked in
 // V_Kolam and V_Kolam3D), so the value is legal in both and needs no
 // per-module table.
-const COLLAGE_GRAPHIC_OPACITY = 0.4;
+const COLLAGE_GRAPHIC_OPACITY = 0.45;
 
 // Set one directive in a block, replacing the existing line IN PLACE or
 // inserting it after the module header. Line-walking, not a regex over the
 // whole text, for the usual reason: a `%%bd_score [ … %%bd_]` body can contain
 // anything at all, including something that looks like a directive, and a
 // global replace would reach inside it.
+//
+// ── THE NAME IN THE SCRIPT IS NOT THE BARE NAME (fixed 2026-10-11) ────────
+// Every stepper-backed directive carries the `p_` prefix. The real Kolam node
+// says `%%bd_p_opacity 0.76`, so matching `^%%bd_opacity` found nothing,
+// INSERTED a second line, and left both in the script — whereupon the module's
+// parser, which reads both spellings into one key, took the LAST and kept 0.76.
+// The symptom was the worst kind: a log line saying the opacity had been set,
+// and a figure that had not changed. `BD_BLOCK_OPEN_RE` two lines up already
+// allows for the prefix; this did not.
+//
+// So the match accepts either spelling and the replacement KEEPS the one the
+// script was using. An insertion takes the prefix from the block itself —
+// measured, not assumed, because which directives have steppers is the
+// module's business and not knowable from here.
 function collageSetDirective(blockText, name, value) {
-  const want = '%%bd_' + name + ' ' + value;
-  const re   = new RegExp('^%%bd_' + name + '[ \t]');
+  const re   = new RegExp('^%%bd_(p_)?' + name + '[ \t]');
+  const pref = /^%%bd_p_/m.test(String(blockText)) ? 'p_' : '';
   const out  = [];
   let inBlock = false, done = false, headerAt = -1;
   for (const line of String(blockText).split('\n')) {
     if (inBlock) { out.push(line); if (BD_BLOCK_CLOSE_RE.test(line)) inBlock = false; continue; }
     if (BD_BLOCK_OPEN_RE.test(line)) { inBlock = true; out.push(line); continue; }
     if (/^%%bd_module[ \t]/.test(line)) { headerAt = out.length; out.push(line); continue; }
-    if (!done && re.test(line)) { out.push(want); done = true; continue; }
+    const m = done ? null : re.exec(line);
+    if (m) { out.push('%%bd_' + (m[1] || '') + name + ' ' + value); done = true; continue; }
     out.push(line);
   }
-  if (!done) out.splice(headerAt >= 0 ? headerAt + 1 : 0, 0, want);
+  if (!done) {
+    out.splice(headerAt >= 0 ? headerAt + 1 : 0, 0, '%%bd_' + pref + name + ' ' + value);
+  }
   return out.join('\n');
 }
 
@@ -15349,7 +15366,7 @@ async function init() {
          'letterSpacing', 'wordSpacing', 'textTransform', 'textIndent',
          'tabSize', 'overflowWrap', 'wordBreak'].forEach((k) => { st[k] = cs[k]; });
         document.body.appendChild(mirror);
-        let top = 0, blockH = 0;
+        let top = 0, blockH = 0, one = 0;
         try {
           const h = (str) => { mirror.textContent = str; return mirror.getBoundingClientRect().height; };
           // A ZERO-WIDTH SPACE ON THE TARGET LINE, then one line taken off.
@@ -15358,7 +15375,7 @@ async function init() {
           // dependable; measuring "everything above plus one real line" is, and
           // the line's own height is measured too rather than parsed out of
           // `line-height`, which can be the keyword `normal`.
-          const one = h('\u200b');
+          one    = h('\u200b');
           top    = (at === 0) ? 0
                  : (h(lines.slice(0, at).concat(['\u200b']).join('\n')) - one);
           blockH = h(lines.slice(at, end).join('\n'));
@@ -15368,15 +15385,25 @@ async function init() {
 
         const view = body.clientHeight;
         const max  = Math.max(0, body.scrollHeight - view);
-        // A block taller than the window cannot be centred, so show its START —
-        // centring it would hide its header, which is the one line that says
-        // which module you are looking at.
-        let want = (blockH >= view) ? (padT + top - 4)
-                                    : (padT + top - (view - blockH) / 2);
+        // ── TWO AND A HALF LINES DOWN, NOT CENTRED (author, 2026-10-11) ──
+        // *"Please centre the text so that the top line of the relevant module
+        // is approximately two or three lines below the top — this will enable
+        // the user to see where in the whole script the module script fits."*
+        //
+        // Better than centring on both counts. Centring a SHORT block put it in
+        // the middle of the window with nothing useful either side, and a block
+        // taller than the window could not be centred at all and needed its own
+        // case — which this rule removes, because a header two and a half lines
+        // down is visible whatever the block's height. What the lead buys is
+        // CONTEXT: the tail of the block above, so the position in the whole
+        // script is legible rather than having to be remembered.
+        const LEAD_LINES = 2.5;
+        let want = padT + top - (LEAD_LINES * one);
         want = Math.max(0, Math.min(max, Math.round(want)));
         body.scrollTop = want;
-        console.log('[collage] centred ' + moduleId + ' — block top ' + Math.round(top) +
+        console.log('[collage] scrolled to ' + moduleId + ' — block top ' + Math.round(top) +
                     'px, ' + Math.round(blockH) + 'px tall, window ' + view +
+                    'px, lead ' + Math.round(LEAD_LINES * one) +
                     'px, scrollTop ' + want + ' of ' + Math.round(max));
         return true;
       }
@@ -15447,9 +15474,11 @@ async function init() {
         // chose the node. A label that can be wrong about the obvious buys
         // nothing and costs trust in the one that matters.
         //
-        // The slot readout beside it still carries the state, and it reports a
-        // FACT (which slots are filled) rather than a prediction about what the
-        // next press will do.
+        // The slot readout is gone from the bar too (author, 2026-10-11): iOS
+        // will be tight for width once the pairing buttons are showing, and
+        // three characters of status are the cheapest thing in the row to give
+        // up. The state is not lost — it moves to the button's own `title`,
+        // which costs no space, and it is still on every `btn:` log line.
         btn.textContent = 'Collage';
         // The readout follows the collage WHEREVER it lies — relegating it to
         // History must not blank the one display that says what it holds.
@@ -15457,19 +15486,22 @@ async function init() {
         const current = (t && t.text) || collageRemembered || '';
         const c = current ? parseCollage(current) : null;
         const have = new Set(c ? c.blocks.map((b) => b.kind) : []);
-        if (out) {
-          // T G M in fixed positions, a full stop for an empty slot, so the
-          // columns never move as the contents change.
-          out.textContent = (have.has('text') ? 'T' : '.') +
-                            (have.has('visual') ? 'G' : '.') +
-                            (have.has('music') ? 'M' : '.');
-          out.hidden = !c;
-        }
+        const slots = (have.has('text')   ? 'T' : '.') +
+                      (have.has('visual') ? 'G' : '.') +
+                      (have.has('music')  ? 'M' : '.');
+        // T G M in fixed positions, a full stop for an empty slot, so the
+        // three characters never move as the contents change.
+        btn.title = c ? ('Collage holds ' + slots +
+                         ' — press to add or replace what you are looking at')
+                      : 'Add what you are looking at to the collage';
+        // The span is gone from the bar; the guard stays because a build that
+        // still has one should keep working rather than throw.
+        if (out) { out.textContent = slots; out.hidden = !c; }
         // Logged on CHANGE, so the state can be read back without watching —
         // and so "the button is greyed out" is visible in the log rather than
         // only on screen.
         const say = btn.textContent + ' | disabled ' + btn.disabled +
-                    ' | type ' + type + ' | slots ' + (out ? out.textContent : '-') +
+                    ' | type ' + type + ' | slots ' + slots +
                     ' | collage ' + (!t ? 'none' : (t.onTop ? 'on top' : 'relegated'));
         if (say !== collageBtnLast) { collageBtnLast = say; console.log('[collage] btn: ' + say); }
       }

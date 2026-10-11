@@ -278,10 +278,14 @@
            already is and because the two are read together: Collage assembles,
            View shows. An ACTION and not a mode: pressing it never navigates and
            never reloads the module, so the steppers stay where they are.
-           Its label says what pressing it will DO, and #collage-slots says what
-           the collage already holds. Plan: CollageV2Plan_2026-10-11.md §6.3. -->
+           Its label is just "Collage": the type is DERIVED, so a three-state
+           label asserted something the code had worked out about a thing the
+           user already knows. What the collage HOLDS is in the button's own
+           title (T G M, set by refreshCollageBtn) rather than in a span beside
+           it — iOS is tight for width once the pairing buttons show, and three
+           characters of status are the cheapest thing in this row to give up.
+           Plan: CollageV2Plan_2026-10-11.md §6.3, §4.4. -->
       <button id="collage-btn" type="button" title="Add what you are looking at to the collage">Collage</button>
-      <span id="collage-slots" hidden></span>
       <!-- 2026-09-22 — the same viewer, on a DIFFERENT device. View opens one
            beside BD and can reach it directly; a phone, tablet or headset has
            no window handle, which is the one case the relay exists for. -->

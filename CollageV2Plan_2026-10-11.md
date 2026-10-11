@@ -199,11 +199,24 @@ and can get wrong, about a thing the user already knows — they chose the node.
 A label that can be wrong about the obvious buys nothing and spends trust that
 the readout needs.
 
-The `T G M` readout stays, and it is the part that earned its place: it reports
-a **fact** (which slots are filled) rather than a prediction about what the next
-press will do. It now also follows the collage wherever the card lies, so
-relegating the collage to History no longer blanks the one display that says
-what it holds.
+The `T G M` readout earned its place by reporting a **fact** (which slots are
+filled) rather than a prediction about what the next press will do, and it
+follows the collage wherever the card lies, so relegating it does not blank the
+display.
+
+**But it has left the BAR, 2026-10-11, on the author's instruction:** *"Please
+remove the TGM type label in the buttons bar. We will be struggling for space on
+iOS when the pairing buttons (remote and coincident) are appearing."* Three
+characters of status are the cheapest thing in that row to give up. The state is
+not lost — it moved to the Collage button's own `title`, which costs no width at
+all, and it is on every `[collage] btn:` line in the log.
+
+Two more width savings in the same row, same request: `#jb-right`'s gap goes 8px
+→ 4px, and the buttons' horizontal padding 10px → 7px, which is about 10% off
+each button at these label lengths. Taken from the PADDING, not the font, so the
+44px thumb target and the 10px type are untouched. The group was already
+right-aligned by `margin-left: auto`, which takes every spare pixel in the flex
+row; the tighter gap is what pushes it as far right as the row allows.
 
 ### 4.4a The collage must come BACK to the top card — ADDED 2026-10-11
 
@@ -326,9 +339,24 @@ the same chore: find the opacity stepper and wind it down. The author: *"The
 user can do this manually but it's slightly annoying — it would be better if it
 happened automatically when the user presses Collage, set it to 0.4."*
 
-So a Collage press on a GRAPHIC writes `%%bd_opacity 0.4` into the block —
-`COLLAGE_GRAPHIC_OPACITY`, one constant, both visual modules taking the
-directive on 0..1 step 0.01 so no per-module table is needed.
+So a Collage press on a GRAPHIC writes the opacity directive into the block —
+`COLLAGE_GRAPHIC_OPACITY`, **0.45** (the author's figure, revised from 0.4 on
+seeing it), one constant, both visual modules taking the directive on 0..1 step
+0.01 so no per-module table is needed.
+
+**It did not work on the first attempt, and the way it failed is the lesson:
+THE NAME IN THE SCRIPT IS NOT THE BARE NAME.** Every stepper-backed directive
+carries the `p_` prefix — the real node says `%%bd_p_opacity 0.76` — so matching
+`^%%bd_opacity` found nothing, INSERTED a second line, and left both in the
+script; the module's parser reads both spellings into one key and took the LAST,
+keeping 0.76. The symptom was the worst available: a log line saying the opacity
+had been set, beside a figure that had not changed. (It was visible in the log
+all the same — the module's own `script in:` dump listed `opacity=0.76` with the
+key in the position our inserted line had created, which is what gave it away.)
+`BD_BLOCK_OPEN_RE`, two lines above in the same file, already allowed for the
+prefix. The match now accepts either spelling, the replacement KEEPS the one the
+script was using, and an insertion takes its prefix from the block itself —
+measured, because which directives have steppers is the module's business.
 
 **And it is pushed to the MODULE, not only written to the card.** That is not a
 nicety: the echo merges the module's announced values into the matching slot
@@ -355,9 +383,9 @@ conditional one would have, every time it declined to act.
 
 `collageSetDirective` does the edit by line-walking rather than a global regex,
 so a `%%bd_score [ … %%bd_]` body containing something that looks like a
-directive is not reached into. Verified on five cases: replace in place, insert
-after the header, score block untouched, idempotent, and a hand-set value
-overridden.
+directive is not reached into. Verified on six cases including the REAL node
+text: one opacity line out of it, prefix kept, `p_` inserted when the block uses
+`p_` and bare when it does not, score block untouched, and idempotent.
 
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 
@@ -435,8 +463,19 @@ card body is a fixed-height textarea (`min-height: 8.5em`, `resize: none`) with
 its own overflow, so it is the scroll container and `#current-stack` is left
 alone.
 
+**TWO AND A HALF LINES DOWN, NOT CENTRED** (the author, on seeing it): *"Please
+centre the text so that the top line of the relevant module is approximately two
+or three lines below the top — this will enable the user to see where in the
+whole script the module script fits."* Better on both counts. Centring a short
+block put it in the middle of the window with nothing useful either side, and a
+block taller than the window could not be centred at all and needed its own
+case — which the lead removes, since a header two and a half lines down is
+visible whatever the block's height. What the lead buys is CONTEXT: the tail of
+the block above, so the position in the whole script is legible instead of
+having to be remembered.
+
 **Two triggers, both a CHANGE of which module is being worked on**: the Collage
-press (centres the block just written) and the return from View (centres the
+press (scrolls to the block just written) and the return from View (centres the
 node's own module, the one the frame has just been handed back to — `'text'` for
 a text node). Explicitly **not** the drift echo, which writes several times a
 minute and would pull the text out from under someone reading it. Nor under a
@@ -459,10 +498,9 @@ offset. Two details that are not obvious:
 
 Verified in headless Chrome against a real textarea, three-block collage, 360px
 wide: block tops came out 51 / 179 / 282 px against the arithmetic 51.2 / 179.2 /
-281.6, and the resulting scrollTops 42 / 158 / 286. A block taller than the
-window (the 1,152px text block) is shown from its START rather than centred,
-because centring it would hide the header — the one line that says which module
-you are looking at.
+281.6. With a 64px lead (2.5 × 25.6px) the scrollTops are 0 / 123 / 226, putting
+each header exactly 2.5 lines below the top except the first, which clamps at
+scrollTop 0 and lands at 2.3 lines — which is the clamp working, not a fault.
 
 ---
 
