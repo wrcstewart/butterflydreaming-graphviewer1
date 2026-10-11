@@ -165,6 +165,23 @@ order-of-appearance, deferred until the rest works and it can be judged in use.
 Noted so that nothing is built which makes it awkward: block order remains the
 stacking rule for now, and a directive would simply override it.
 
+**AMENDED 2026-10-11, on testing — the EMITTED order is canonical.** The rule
+stands, but v2 no longer lets press order into it. A v1 collage was written by
+hand, so its block order was a decision; a v2 collage is assembled by pressing
+buttons, and the order of those presses carries no intention at all. Build
+text-then-graphic — which is what anyone does, because the passage is what you
+start from — and the figure became the later block, drew over the words, and hid
+them behind its own background. Reported as *"it's not yet overlaying the text on
+the View"*.
+
+So `collageAddOrReplace` emits **picture, sound, words**: words last, therefore
+on top, which is the only arrangement legible by default. Nothing about the
+stacking rule changes, and picture-over-text stays expressible — `bd_Collage_002`
+still demonstrates it, because the canonical order is applied only on the v2
+press path. What a v2 collage cannot yet do is ASK for it, and that is what the
+`on_top` directive above is for. The honest trade until then: a default that
+works, and no override.
+
 ### 4.4 The button says what it will do — ACCEPTED
 
 Three states, because pressing it does one of three things: start a collage, add
@@ -209,6 +226,28 @@ relegated copy stays as the snapshot it became. That also puts the live card
 back under `topLocalCard()`, which is what the module's stepper announcements
 write into — so the syncing lands where it can be seen without any change to
 the auto-echo path.
+
+### 4.4b The steppers sync with the card ON SCREEN — ADDED 2026-10-11
+
+The same divergence as §4.4a, met on the write path. `getFocusedCardBody()` —
+which the drift echo, Copy Down and `publishCard` all use — fell through to
+`topLocalCard()`, so after one Collage press the collage was the echo's target
+for good. Standing at a Kolam node and working its steppers wrote into the
+relegated collage: `bdSameModule` accepted it (a collage legitimately receives
+several modules' announcements), the per-slot merge found no block of that module
+to put it in, and the no-op write was reported as **"card already equals the
+script"** — the same reason as the previous skip, so the change-only log
+suppressed it and the steppers appeared to sync with nothing whatever. The
+author: *"the steppers should sync with the normal Kolam module."*
+
+The card in **Current** now wins, with `topLocalCard()` kept as a late fallback
+for an empty Current. In the ordinary case the two are the same element and
+nothing changes. The rule that comes out of it is the one worth carrying: **the
+write target is the card the user is looking at** — which is the node's own
+reading card before a press and the collage after one, from a single rule rather
+than a special case for each. A card in Current that must not receive the script
+is still refused by `bdSameModule`, out loud, so the worst case is a logged
+refusal and not a wrong write.
 
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 

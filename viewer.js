@@ -748,8 +748,14 @@ if (typeof window !== 'undefined') {
       // module announcing on drift would otherwise bury the console, and a
       // log that fires once reads as "this never happened again".
       const why = bdModuleOf(text) + ' vs ' + bdModuleOf(savedByNode.get(avNodeId));
+      // Every 250th, not every 50th. Standing on a MUSIC node with a collage
+      // on the card is now an ordinary thing to do, and the visual slot goes
+      // on drifting behind it — so this correct refusal fires about ten times a
+      // second and buried two minutes of log in 1,300 identical lines. The
+      // refusal is right (the Kolam drift is not this node's exploration; the
+      // card is what carries it), so what needed changing was the volume.
       bdExpRejects = (bdExpRejectWhy === why) ? bdExpRejects + 1 : 1;
-      if (bdExpRejectWhy !== why || bdExpRejects % 50 === 0) {
+      if (bdExpRejectWhy !== why || bdExpRejects % 250 === 0) {
         console.log('[AV] exploration NOT recorded for ' + avNodeId +
                     ' — module mismatch ' + why +
                     (bdExpRejects > 1 ? ' (x' + bdExpRejects + ')' : ''));
@@ -2185,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11t' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11u' };
 
 let bdViewTitleText = '';
 
@@ -3197,12 +3203,13 @@ function collageAddOrReplace(collageText, block) {
   const base = parseCollage(collageText);
   if (!base) return collageText;
 
-  const out = [];
+  const pre = [];                                   // lines before any block
+  const kept = [];                                  // { kind, text }
   let cur = null, curKind = null, replaced = false;
   const flush = () => {
     if (cur === null) return;
-    if (curKind === block.kind) { out.push(block.text); replaced = true; }
-    else out.push(cur.join('\n').replace(/\s+$/, ''));
+    if (curKind === block.kind) { kept.push({ kind: block.kind, text: block.text }); replaced = true; }
+    else kept.push({ kind: curKind, text: cur.join('\n').replace(/\s+$/, '') });
     cur = null; curKind = null;
   };
   for (const line of collageText.split('\n')) {
@@ -3214,11 +3221,34 @@ function collageAddOrReplace(collageText, block) {
       curKind = (id === 'text') ? 'text' : (getModuleKind(id) || 'visual');
       continue;
     }
-    if (cur === null) { out.push(line); continue; }     // the preamble
+    if (cur === null) { pre.push(line); continue; }     // the preamble
     cur.push(line);
   }
   flush();
-  if (!replaced) out.push('', block.text);
+  if (!replaced) kept.push({ kind: block.kind, text: block.text });
+
+  // ── THE BLOCKS COME OUT IN A CANONICAL ORDER (2026-10-11) ────────────────
+  // Block order is the STACKING order — a later block draws over an earlier
+  // one — and in v1 that was a decision, because a v1 collage was written by
+  // hand. In v2 the order is simply which button was pressed first, which
+  // carries no intention whatever. Build text-then-graphic, as anyone would,
+  // and the figure lands ON TOP of the words and hides them behind its own
+  // background: reported as *"it's not yet overlaying the text on the View"*.
+  //
+  // So the string is emitted picture, sound, words — words last, therefore on
+  // top, which is the only arrangement that is legible by default. The
+  // stacking RULE is untouched; what changes is that press order no longer
+  // leaks into it. Picture-over-text remains expressible (the v1 demonstration
+  // node bd_Collage_002 still does it, and still reads correctly, because this
+  // runs only on the v2 press path) and is what the `on_top` directive in plan
+  // §4.3 is for. Until that exists, a v2 collage cannot ask for it — which is
+  // the honest trade: a default that works, and no way yet to override it.
+  const RANK = { visual: 0, music: 1, text: 2 };
+  kept.sort((a, b) => (RANK[a.kind] != null ? RANK[a.kind] : 9) -
+                      (RANK[b.kind] != null ? RANK[b.kind] : 9));
+
+  const out = pre.concat();
+  for (const b of kept) { out.push(''); out.push(b.text); }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
 }
 
@@ -13546,16 +13576,44 @@ async function init() {
         lastCardRung = 'activeElement';
         return active;
       }
+      // ── THE NEWEST LOCAL CARD, BUT ONLY WHILE IT IS ON SCREEN ─────────
+      // `topLocalCard()` answers "the newest local card in the MODEL". Every
+      // caller of this function — the drift echo, Copy Down, publishCard —
+      // means the card the user is LOOKING at. The two agree until a wander
+      // relegates that card to History, and then they do not.
+      //
+      // What the difference cost, 2026-10-11: after one Collage press the
+      // collage is the newest local card for good, so arriving at a Kolam node
+      // and working its steppers wrote into the relegated collage instead of
+      // the node's own reading card. The collage accepted the announcement
+      // (`bdSameModule` is collage-aware, and rightly), found no slot of that
+      // module to put it in, and the no-op write was reported as "card already
+      // equals the script" — the SAME reason as the previous skip, so the
+      // change-only log suppressed it and the steppers appeared to sync with
+      // nothing at all. Reported as *"the steppers should sync with the normal
+      // Kolam module"*.
+      //
+      // So: the card on screen wins. In the ordinary case the two are the same
+      // element and nothing changes; when they differ, the one in Current is
+      // the one that is true. A card in Current that must NOT receive the
+      // script is still refused downstream by `bdSameModule`, out loud — so
+      // the worst case here is a logged refusal, not a wrong write.
       const top = topLocalCard();
-      if (top && top.body) { lastCardRung = 'topLocalCard'; return top.body; }
+      const inCurrent = (el) => !!(currentStackEl && el && currentStackEl.contains(el));
+      if (top && top.body && inCurrent(top.el)) { lastCardRung = 'topLocalCard'; return top.body; }
       // 2026-08-14 — panel split: the newest card lives in #current-stack
       // now, older cards in #chat-stack. Check both, current-first.
-      const topEl =
-        document.querySelector('#current-stack .card') ||
-        document.querySelector('#chat-stack .card');
+      const curEl = document.querySelector('#current-stack .card');
+      if (curEl) {
+        const body = curEl.querySelector('.card-body');
+        if (body) { lastCardRung = 'firstCardInCurrent'; return body; }
+      }
+      // Current is empty: fall back to the old meaning rather than to nothing.
+      if (top && top.body) { lastCardRung = 'topLocalCard(relegated)'; return top.body; }
+      const topEl = document.querySelector('#chat-stack .card');
       if (topEl) {
         const body = topEl.querySelector('.card-body');
-        if (body) { lastCardRung = 'firstCardInStack'; return body; }
+        if (body) { lastCardRung = 'firstCardInHistory'; return body; }
       }
       lastCardRung = 'none';
       return null;
