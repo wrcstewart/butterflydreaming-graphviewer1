@@ -273,10 +273,51 @@ So on the way out of a collage View:
 Neither half decides what the state ought to be: it asks the node and the card,
 the two things that already know.
 
-Note what is NOT changed: View still reads a collage from the card **wherever
-that card lies**, per the author's answer to §5.1 — *"a press of the view button
-could still display it"*. A relegated collage is still viewable; it is only the
-RETURN that had to be repaired.
+### 4.4d View shows what is ON SCREEN — CORRECTED 2026-10-11
+
+The round above left View reading the collage from the card *wherever that card
+lay*, on the reading of the author's *"a press of the view button could still
+display it"*. That was wrong, and the author found it within the hour: **wander
+to a new graphic node, press View before pressing Collage, and the old collage
+appears instead of the node you are standing on.** The same place-versus-model
+confusion as §4.4a and §4.4b, met a third time, on the third function that asked
+`topLocalCard()` while meaning "the card on screen".
+
+View now consults the card **only while the collage is the card on screen**, via
+the same `collageCurrentText()` the button uses. The author's requirement is
+still met, and more plainly: the press that displays a wandered-away collage is
+**Collage**, which reinstates it as the top card; then View shows it. One rule
+covers every case — **View shows what is on screen** — and it is the rule the
+code's own comment had already argued for: *a View showing something other than
+the current node is a surprise with nothing on screen to explain it.*
+
+When a collage exists but is relegated, View says so in the log rather than
+silently preferring the node, because "View is showing the node" and "View could
+not find the collage" look identical on screen.
+
+**The lesson, now that it has cost three rounds: every `topLocalCard()` in this
+file is a claim about the MODEL, and almost every caller means the SCREEN.**
+Three sites have now been corrected — the Collage press, `getFocusedCardBody()`
+and `bdViewEnter`.
+
+So the remaining callers were read rather than left to be found later. Six, of
+which three are sound and three are worth watching:
+
+- `prependSystemCard` and `prependPartnerCard` use it only to NUMBER a card
+  ("Helper (3.1)"), where "the newest local card" is the meaning wanted. Sound.
+- The SR fallback at ~12894 already tests `currentStackEl.contains(top.el)`
+  before using it, and creates a card when it fails — someone got this right
+  before the rule was named.
+- `setChatText` writes arriving chat content into the top local card, and
+  APPENDS when that card has text. With a collage relegated, that would append
+  into the collage and silently corrupt it. **Unverified and untouched** — it
+  needs its callers read first.
+- `updateSendBtn` and `sendTopLocalCard` decide what Send enables and sends. A
+  relegated collage would be sent in place of the card on screen. Pairing-path
+  only, so left alone deliberately rather than changed while untestable.
+
+None of these were touched in this round. They are recorded so the next person
+to meet one knows it was seen and left, not missed.
 
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 

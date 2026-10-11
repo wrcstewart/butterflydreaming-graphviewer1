@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11v' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-11w' };
 
 let bdViewTitleText = '';
 
@@ -14967,22 +14967,39 @@ async function init() {
         const body = document.body;
         if (body.classList.contains('view-active')) return;
         const node     = bdViewNode();
-        // ── COLLAGE v2 STEP 2: VIEW FOLLOWS THE TOP CARD ────────────────
+        // ── COLLAGE v2 STEP 2: VIEW FOLLOWS THE CARD ON SCREEN ──────────
         // A v2 collage lives in a CARD, not in a node, so View has to be able
-        // to read it from there. The node is still the source for everything
-        // else — and deliberately: a View that showed something other than the
-        // current node would be a surprise with nothing on screen to explain
-        // it. So the card is consulted ONLY when it holds a collage, which is
-        // the one case where the card is the document and the node is not.
+        // to read it from there. The card is consulted ONLY when it holds a
+        // collage — the one case where the card is the document and the node is
+        // not.
         //
-        // Accepted 2026-10-11, plan §5.1.
+        // AND ONLY WHILE THAT CARD IS THE ONE ON SCREEN (corrected
+        // 2026-10-11). The first cut asked `topLocalCard()`, the newest local
+        // card in the MODEL, so a collage relegated to History went on
+        // answering for ever: wander to a NEW graphic node, press View before
+        // pressing Collage, and you got the old collage instead of the node you
+        // were standing on. The author found it; it is the same place-versus-
+        // model confusion as §4.4a and §4.4b, met a third time.
+        //
+        // This supersedes the earlier reading of the author's *"a press of the
+        // view button could still display it"*: it does, and the press that
+        // makes it so is **Collage**, which reinstates the collage as the top
+        // card. One rule covers both — VIEW SHOWS WHAT IS ON SCREEN — and the
+        // comment this replaces had already stated the reason it should:
+        // a View showing something other than the current node is a surprise
+        // with nothing on screen to explain it.
         let cardCollage = '';
-        try {
-          const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
-          const topTxt = (topC && topC.body && typeof getCardText === 'function')
-            ? (getCardText(topC.body) || '') : '';
-          if (parseCollage(topTxt)) cardCollage = topTxt;
-        } catch (_) {}
+        try { cardCollage = collageCurrentText(); }
+        catch (e) { console.warn('[collage] View could not read the top card: ' + e.message); }
+        if (!cardCollage) {
+          // SAY WHY, because "View shows the node" and "View failed to find the
+          // collage" look identical on screen.
+          try {
+            const tc = collageTopCard();
+            if (tc) console.log('[collage] View: a collage exists but is not the card ' +
+                                'on screen — showing the node instead. Press Collage first.');
+          } catch (_) {}
+        }
         const text     = cardCollage || (node ? (node.data('text') || '') : '');
         bdViewCollageShown = cardCollage || '';
         if (cardCollage) console.log('[collage] View is reading the TOP CARD, not the node');
