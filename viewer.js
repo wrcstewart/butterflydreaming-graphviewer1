@@ -2185,7 +2185,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11r' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-11s' };
 
 let bdViewTitleText = '';
 
@@ -15120,8 +15120,18 @@ async function init() {
         if (!btn) { console.warn('[collage] #collage-btn not in the DOM'); return; }
         const n = bdViewNode();
         const type = n ? collageTypeOf(n.data('text') || '') : null;
-        // No type means nothing to add — a collage node itself, or an empty one.
-        btn.disabled = !type;
+        // ── NEVER DISABLED (2026-10-11) ────────────────────────────────────
+        // This was `btn.disabled = !type`, and it is how the button came to do
+        // nothing in silence: the label is refreshed from EVENTS, so a moment
+        // when no node has been read yet left it greyed, a press produced no
+        // click event at all, and there was nothing in the log because the
+        // handler never ran. Disabling a control from cached state that can be
+        // stale turns a stale label into a dead button.
+        //
+        // The press decides for itself now, at the moment it happens, and says
+        // what it decided. A label that is briefly out of date is a cosmetic
+        // fault; a button that cannot be pressed is not.
+        btn.disabled = false;
         const current = collageCurrentText();
         const c = current ? parseCollage(current) : null;
         const have = new Set(c ? c.blocks.map((b) => b.kind) : []);
@@ -15149,6 +15159,13 @@ async function init() {
 
       const collageBtnEl = document.getElementById('collage-btn');
       console.log('[collage] v2 button ' + (collageBtnEl ? 'found, click handler attached' : 'NOT FOUND in the DOM'));
+      // REFRESHED ON pointerdown AS WELL AS ON EVENTS. The label depends on the
+      // node being read and on what the top card holds, and an event-driven
+      // refresh is only as current as the last event that fired. Pressing is
+      // the one moment it has to be right, so it is recomputed then.
+      if (collageBtnEl) collageBtnEl.addEventListener('pointerdown', () => {
+        try { refreshCollageBtn(); } catch (e) { console.warn('[collage] refresh threw: ' + e.message); }
+      });
       if (collageBtnEl) collageBtnEl.addEventListener('click', () => {
         // ══ COLLAGE v2 STEPS 4 AND 5 — ONE PRESS, FIVE THINGS ════════════
         // Plan §6.4. Nothing navigates and no module is reloaded: the steppers
@@ -15165,6 +15182,10 @@ async function init() {
                     ', label "' + collageBtnEl.textContent + '"' +
                     ', disabled ' + collageBtnEl.disabled);
         if (!n) { console.warn('[collage] v2 press: no node is being read — nothing to add'); return; }
+        if (parseCollage(n.data('text') || '')) {
+          console.warn('[collage] v2 press: this node IS a collage — a collage is not a slot');
+          return;
+        }
         const block = collageBlockFor(n);
         if (!block) {
           console.warn('[collage] v2 press: collageBlockFor returned null — ' +
@@ -15213,8 +15234,16 @@ async function init() {
       });
       // The label depends on the node being read and on what the top card
       // holds, so it is refreshed wherever either can change.
-      document.addEventListener('bd:node-read', () => { try { refreshCollageBtn(); } catch (_) {} });
-      try { refreshCollageBtn(); } catch (_) {}
+      // A LOGGED catch, not a swallowed one. The first cut was
+      // `catch (_) {}`, so if the refresh threw there was no second `btn:`
+      // line and no way to tell that from the event never firing — which is
+      // exactly the ambiguity that cost this round.
+      document.addEventListener('bd:node-read', () => {
+        try { refreshCollageBtn(); }
+        catch (e) { console.warn('[collage] refresh threw on node-read: ' + e.message); }
+      });
+      try { refreshCollageBtn(); }
+      catch (e) { console.warn('[collage] refresh threw at init: ' + e.message); }
 
       const bdViewExitBtn = document.getElementById('bd-view-exit');
       if (bdViewExitBtn) bdViewExitBtn.addEventListener('click', bdViewExit);
