@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-11p";
+  --bd-css-build: "2026-10-11q";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1214,6 +1214,13 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-11q: BLUE (COLLAGE v2, STEPS 4 AND 5 — the button WORKS. Press it on
+   a text node and a collage is started in a new top card; press it on a module
+   node and that module'''s LIVE script is added as a slot, or replaces the one
+   of its kind IN PLACE so the stacking cannot change. BD remembers one
+   authoritative collage string, so wandering away and pressing Collage again
+   reinstates it). Next = red.
+
    2026-10-11p: GREEN (COLLAGE v2, STEPS 1-3. Sv refuses to save a collage —
    checked on the text it is about to write, not on the top card, because
    getCardText lives in init() and that handler lives in setupInteractions:
@@ -1541,7 +1548,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

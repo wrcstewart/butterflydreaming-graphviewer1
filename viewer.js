@@ -3146,6 +3146,72 @@ let collageNudged     = false;
 // layer is never shown before it has somewhere to be.
 let collageTextRetry  = null;
 
+// ── COLLAGE v2: THE REMEMBERED COLLAGE (2026-10-11) ───────────────────────
+// ONE authoritative current-collage string. The top card is its live view;
+// cards relegated to history are a trail of earlier versions. Kept current
+// while the collage IS the top card — by the press handler that writes it and
+// by the card writers that update it — and frozen when it is relegated, which
+// is what makes "wander away and come back" work. Plan §4.2.
+let collageRemembered = '';
+
+// The slot block for a node, ready to go into a collage.
+//
+// TEXT takes the node's PROSE — nodeProse strips every directive, and a text
+// node has nothing else worth carrying. GRAPHIC and MUSIC take the module's
+// LIVE script: `explorationByNode` holds what the steppers are actually set to,
+// recorded from the module's own announcements, so what goes in is what is on
+// screen rather than what was last saved. That is also why no asynchronous pull
+// is needed — plan §7.1.
+function collageBlockFor(node) {
+  if (!node || !node.length) return null;
+  const saved = node.data('text') || '';
+  const type  = collageTypeOf(saved);
+  if (!type) return null;
+  if (type === 'TEXT') {
+    const prose = (typeof nodeProse === 'function' ? nodeProse(saved) : saved).trim();
+    if (!prose) return null;
+    return { kind: 'text', text: '%%bd_module text\n%%bd_text [\n' + prose + '\n%%bd_]' };
+  }
+  const live = (explorationByNode.get(node.id()) || saved).trim();
+  if (!parseModuleId(live)) return null;
+  return { kind: type === 'MUSIC' ? 'music' : 'visual', text: live };
+}
+
+// Add a block, or REPLACE the one of its kind IN PLACE.
+//
+// In place, and that is the whole point: block order is the stacking order, so
+// appending a replacement would move the module to the front and silently
+// change the composition. Plan §6.8 invariant 2.
+function collageAddOrReplace(collageText, block) {
+  if (!block) return collageText;
+  const base = parseCollage(collageText);
+  if (!base) return collageText;
+
+  const out = [];
+  let cur = null, curKind = null, replaced = false;
+  const flush = () => {
+    if (cur === null) return;
+    if (curKind === block.kind) { out.push(block.text); replaced = true; }
+    else out.push(cur.join('\n').replace(/\s+$/, ''));
+    cur = null; curKind = null;
+  };
+  for (const line of collageText.split('\n')) {
+    const mh = line.match(/^%%bd_module[ \t]+(\S+)/);
+    if (mh) {
+      flush();
+      cur = [line];
+      const id = mh[1];
+      curKind = (id === 'text') ? 'text' : (getModuleKind(id) || 'visual');
+      continue;
+    }
+    if (cur === null) { out.push(line); continue; }     // the preamble
+    cur.push(line);
+  }
+  flush();
+  if (!replaced) out.push('', block.text);
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
+}
+
 // ── COLLAGE v2: A SCRIPT'S TYPE (2026-10-11) ───────────────────────────────
 // TEXT, GRAPHIC or MUSIC, DERIVED and never declared — so nothing is stored
 // and nothing can drift out of step with the module it describes. A collage
@@ -13768,6 +13834,10 @@ async function init() {
       // Through collagePreservingWrite, so a module's announcement updates a
       // collage card instead of replacing it with one slot. See its note.
       const outgoing = collagePreservingWrite(getCardText(body), text);
+      // The remembered collage follows the live card. Without this a stepper
+      // moved after the collage was assembled would be in the card and not in
+      // the memory, so wandering away and coming back would lose it. Plan §4.2.
+      if (parseCollage(outgoing)) collageRemembered = outgoing;
       if (getCardText(body) === outgoing) { why('skip: card already equals the script'); return; }
       why('writing ' + outgoing.length + ' chars into ' + describeCardBody(body) +
           (outgoing === text ? '' : ' (merged into a collage)'));
@@ -15057,10 +15127,52 @@ async function init() {
 
       const collageBtnEl = document.getElementById('collage-btn');
       if (collageBtnEl) collageBtnEl.addEventListener('click', () => {
+        // ══ COLLAGE v2 STEPS 4 AND 5 — ONE PRESS, FIVE THINGS ════════════
+        // Plan §6.4. Nothing navigates and no module is reloaded: the steppers
+        // stay exactly where they are, which is the point of making this an
+        // action rather than a mode.
         const n = bdViewNode();
-        const type = n ? collageTypeOf(n.data('text') || '') : null;
-        console.log('[collage] v2 button pressed — would ' +
-                    collageBtnEl.textContent + ' (type ' + type + ') — INERT, step 3');
+        if (!n) return;
+        const block = collageBlockFor(n);
+        if (!block) { console.warn('[collage] nothing to add from this node'); return; }
+
+        // 1. REINSTATE. The top card if it holds a collage; otherwise the
+        //    remembered one; otherwise a new collage. A reinstated collage is
+        //    written to a NEW top card, and the copy in history stays as the
+        //    snapshot it became when it was relegated.
+        const fromTop = collageCurrentText();
+        let base = fromTop || collageRemembered;
+        const started = !base;
+        if (started) base = '%%bd_collage 1\n';
+
+        // 2 and 3. ADD, or REPLACE IN PLACE.
+        const next = collageAddOrReplace(base, block);
+
+        // 4. COMMIT — to a new top card unless the collage is already there,
+        //    and to the remembered string either way.
+        let body = null;
+        if (fromTop) {
+          try {
+            const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
+            body = topC && topC.body;
+          } catch (_) {}
+        }
+        if (!body) {
+          const card = createCard({ kind: 'local' });
+          body = card && card.body;
+          if (currentStackEl) currentStackEl.scrollTop = 0;
+        }
+        if (!body) { console.warn('[collage] no card to write into'); return; }
+        setCardText(body, next);
+        collageRemembered = next;
+
+        const kinds = (parseCollage(next) || { blocks: [] }).blocks
+                        .map((b) => b.kind).join(',');
+        console.log('[collage] ' + (started ? 'STARTED' : (fromTop ? 'updated in place' : 'REINSTATED')) +
+                    ' — ' + block.kind + ' ' + (fromTop || collageRemembered ? 'set' : 'added') +
+                    '; slots now ' + kinds);
+        // 5. STAY PUT. The label has to catch up, though.
+        try { refreshCollageBtn(); } catch (_) {}
       });
       // The label depends on the node being read and on what the top card
       // holds, so it is refreshed wherever either can change.
