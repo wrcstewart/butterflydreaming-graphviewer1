@@ -6,6 +6,132 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-11/13 — Collage v2 built, and one mistake made three times
+
+v1 assembled a collage by hand into a NODE. v2 builds one with a button, into
+the top CARD, from wherever you happen to be standing — and the whole of it is
+now working: start a collage from a passage, add a figure, add a drone, replace
+any slot in place, View it, come back and go on adjusting.
+
+Design and the full decision trail: `CollageV2Plan_2026-10-11.md`, §4 and §8.
+
+### The mistake, which is the useful part
+
+**`topLocalCard()` answers "the newest local card in the MODEL". Almost every
+caller means "the card on the SCREEN".** The two agree until a wander relegates
+a card to History, and then they do not. Three separate functions asked the
+first and meant the second, in three consecutive rounds:
+
+- **the Collage press** — so the collage went on being updated faithfully
+  several screens down in History, where the syncing it exists to show could not
+  be watched;
+- **`getFocusedCardBody()`**, the drift echo's write target — so after one
+  Collage press the collage was the echo's target for ever: standing at a Kolam
+  node and working the steppers wrote into the relegated collage, which accepted
+  the announcement, found no block of that module, and reported the no-op as
+  *"card already equals the script"* — the same reason as the previous skip, so
+  the change-only log suppressed it and the steppers appeared to sync with
+  nothing at all;
+- **`bdViewEnter`** — so wandering to a new graphic node and pressing View
+  showed the old collage instead of the node under your feet.
+
+Each fix is the same sentence: ask the DOM where the card is.
+`collageTopCard()` now returns `{ card, text, onTop }` so a caller can take the
+TEXT from a relegated card while refusing to WRITE to it. The remaining six
+`topLocalCard()` callers were then read rather than left to be found: three are
+sound, three are recorded as seen and deliberately left (`setChatText` would
+append arriving chat into a relegated collage; `updateSendBtn`/
+`sendTopLocalCard` would send it in place of the card on screen).
+
+### View gives back what it borrows
+
+A collage View points the ONE module frame at the collage's visual slot. Leaving
+put the classes back and nothing else, so you returned to a state View had
+created: on a DroneFrac node, the preview showed the KOLAM with Kolam steppers
+while the card beside it was the plain DroneFrac script. The author: *"sort of a
+double error"*, and it was exactly two. Both halves follow from one principle —
+**View borrows the page's state, so every exit restores it**: the frame goes back
+to the node's own module through `loadModuleForNode` (bringing that node's
+exploration with it), and the collage goes back on top through a shared
+`collageReinstate` the press and the exit cannot disagree about.
+
+### Four faults worth naming
+
+**A directive's name in a script is not the bare name.** Every stepper-backed
+directive carries the `p_` prefix — the real node says `%%bd_p_opacity 0.76` — so
+the new auto-dimming matched `^%%bd_opacity`, found nothing, INSERTED a second
+line, and the module's parser read both spellings into one key and kept 0.76. A
+log line saying the opacity had been set, beside a figure that had not changed.
+What gave it away: the module's own directive dump listed `opacity` FIRST, where
+every earlier dump had it near the end — a JS object keeps a key where it was
+first set and the value from the last assignment, so one line showed the
+inserted line's position and the original line's value at once.
+
+**Block order is the stacking order, and v2 builds in PRESS order.** Text first,
+because the passage is what you start from — so the figure became the later block
+and hid the words behind its own background. `collageAddOrReplace` now emits a
+canonical picture, sound, words. The stacking rule is untouched; what changed is
+that press order no longer leaks into it.
+
+**The paste handler never saw the paste.** Its guard tested the event target with
+`classList.contains('card-body')` — right for a `<textarea>`, wrong for a
+contenteditable card, where the target is the inner `.chunk-text` div. So the
+first real test declined in silence, with the boot line proving the handler was
+attached and both files current. And a paste into a BUILT card cannot be read
+back at all: the log showed `bd_V_Kolam3D%%bd_p_symmetry`, a module id with the
+next line welded on, because browser paste markup is not what the chunk reader
+was built from. The Sv lesson again.
+
+**The card's own words outrank the node's.** Typing *"This is my own text"* into
+a new card and pasting a script under it put the node's Tao passage in the text
+slot. Words typed into that card a moment ago are a deliberate act; the node's
+prose is a default, not a precedence.
+
+### A pasted script is an instruction to make a collage
+
+The author's resolution of a question two rounds had circled: *"what happens
+when a user pastes a module that is incompatible with the current node?"* A
+collage is the one document in BD that is ALLOWED to name a module the current
+node does not have — so the question dissolves instead of being answered. The
+frame stays the node's, the paste becomes a slot, View shows it, and nothing
+autonavigates. It inherits relegation, reinstatement, the per-slot merge and the
+View hand-back for free; the pasted slot is inert until you wander to a node
+with that module and press Collage, which is the wandering behaviour arriving
+rather than a gap.
+
+A pasted collage is adopted unchanged. Otherwise the FIRST properly parsed
+module becomes a slot — "properly parsed" made concrete as *the id resolves
+through `getModuleUrl`* — everything outside it is ignored, prose is folded in as
+the text slot, and the graphic is dimmed.
+
+### Smaller things, all the author's calls
+
+The button says just `Collage`: the type is derived, so a three-state label
+asserted something the code had worked out about a thing the user already knows.
+The graphic is dimmed to **0.45** on every press, pushed to the module as well as
+written to the card — card-only would be undone within the second by the echo.
+The collage scrolls so the module's header sits **two and a half lines below the
+top**, not centred: context above beats symmetry, and it removes the
+taller-than-the-window special case. The `T G M` readout leaves the bar for iOS
+width, moving into the button's `title`; the row's gap goes 8px → 4px and the
+buttons' padding 10px → 7px, taken from the padding so the 44px thumb target
+survives.
+
+### And an observation, recorded
+
+The author: *"I think we are circling round a protocol that might be useful for
+the collaborative editing."* True, and not the aim. What has accumulated is a set
+of rules for one document assembled from typed blocks with different owners: a
+block declares whose it is; **merge is per owner, never across the document**;
+updates replace in place so concurrent edits cannot reorder anything; the emitted
+order is canonical so form does not depend on arrival order; one authoritative
+copy plus a trail of snapshots; receivers-first so an untaught producer degrades
+rather than breaks. What is missing to carry two PEOPLE rather than two modules
+is nameable: identity per block, a clock per block, and a rule for concurrent
+edits to one slot. `CollageV2Plan_2026-10-11.md` §8.4.
+
+---
+
 ## 2026-10-11 — the overlay finished, and fourteen faults
 
 The collage preview works: the kolam figure with the words over it, each
