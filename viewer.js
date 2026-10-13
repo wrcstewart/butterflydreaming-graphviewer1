@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-13c' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13d' };
 
 let bdViewTitleText = '';
 
@@ -13728,84 +13728,122 @@ async function init() {
       return null;
     }
 
+    // ══ ↑ AND ↓ CARRY CARDS, NOT SCRIPTS (2026-10-13) ══════════════════
+    // They were Copy Down (card → module) and Copy Up (module → card). The
+    // author asked for the pair the glyphs actually suggest, and had already
+    // observed that the old pair does nothing while `auto` is ticked — which it
+    // is by default, and which keeps the card and the steppers in step both
+    // ways without a press:
+    //
+    //   ↓  keep a copy of the top card in History, and leave the top card's
+    //      content SELECTED, ready for one keystroke to clear it.
+    //   ↑  copy the picked History card up into Current.
+    //
+    // WHAT IS GIVEN UP, stated rather than discovered later: the manual
+    // card↔module route. `auto` covers both directions, so the only real loss
+    // is the OVERRIDE for the two cases publishCard declines on purpose — a
+    // card with no directives, and a directive whose value has been deleted
+    // mid-keystroke. Untick `auto` and there is now no manual way across at
+    // all. Say so if that is ever wanted back; a long-press is the obvious
+    // home for it.
+    //
+    // `bd_script_request`/`bd_script_response` is UNTOUCHED and still live —
+    // checked rather than assumed, because it would have been easy to call it
+    // dead along with the button. Two paths still send the request: the
+    // Copy-Link update gate (`requestModuleSyncBD`, which syncs the card before
+    // baking a URL out of it, so a stale card cannot become a stale share) and
+    // the first-push state query, which asks a module what it is showing when
+    // nothing has been pushed this session. The §42.7 response handler
+    // therefore still writes into the focused card. All that changed is that no
+    // BUTTON reaches it any more.
+
+    // WHICH History card ↑ MEANS: the last one touched. No new gesture is
+    // invented — you tap into the card you want in order to read it, and that
+    // tap is the pick. `pointerdown`, so it is recorded before the arrow's own
+    // press moves focus anywhere.
+    let historyPick = null;
+    function markHistoryPick(el) {
+      if (historyPick === el) return;
+      if (historyPick) historyPick.classList.remove('picked');
+      historyPick = el || null;
+      if (historyPick) historyPick.classList.add('picked');
+    }
+    if (chatStackEl) {
+      chatStackEl.addEventListener('pointerdown', (e) => {
+        const card = e.target && e.target.closest ? e.target.closest('.card') : null;
+        if (!card || !chatStackEl.contains(card)) return;
+        markHistoryPick(card);
+        const b = card.querySelector('.card-body');
+        console.log('[pick] History card picked — ' +
+                    (b ? describeCardBody(b) : 'no body'));
+      });
+    }
+
     if (copyDownBtn) {
       copyDownBtn.addEventListener('click', () => {
-        if (!iframeEl2) {
-          console.warn('[Copy Down] no visual iframe — bail');
-          return;
-        }
-        const body = getFocusedCardBody();
-        if (!body) {
-          console.warn('[Copy Down] no card body found — panel empty?');
-          return;
-        }
-        const script = getCardText(body) || '';
-
-        // ── A COLLAGE IS SPLIT AND SENT PER SLOT (2026-10-11) ────────────
-        // Posting the whole text to #visual-iframe was wrong in both
-        // directions: the visual module would read the MUSIC slot's
-        // directives as its own — `bd_Collage_002` has DroneFrac's
-        // `%%bd_angle 90` against Kolam3D's `%%bd_p_angle 124`, and the two
-        // share a bare name — and the music module would receive nothing at
-        // all. Reported as "they are not syncing if I alter the script".
-        const cDown = parseCollage(script);
-        if (cDown) {
-          const visD = collageSlot(cDown, 'visual');
-          const musD = collageSlot(cDown, 'music');
-          if (visD) {
-            try {
-              iframeEl2.contentWindow.postMessage(
-                { type: 'bd_script_update', script: visD.script }, '*');
-            } catch (_) {}
+        const top = topBodyInCurrent();
+        if (!top) { console.warn('[down] no card in Current — nothing to keep'); return; }
+        const text = getCardText(top) || '';
+        if (!text.trim()) { console.warn('[down] the top card is empty — nothing to keep'); return; }
+        // toHistory, so Current is NOT displaced: the copy goes to the older
+        // slot and the card you are looking at stays where it is.
+        const card = createCard({ kind: 'local', toHistory: true });
+        const body = card && card.body;
+        if (!body) { console.warn('[down] could not make a History card'); return; }
+        setCardText(body, text);
+        if (chatStackEl) chatStackEl.scrollTop = 0;
+        markHistoryPick(card.el);
+        // SELECTED, NOT CLEARED. The author: *"the down arrow may as well leave
+        // the current card content selected ready for a one key delete if that
+        // is what the user wants"* — so the decision stays theirs and nothing
+        // is destroyed on their behalf. A textarea has select(); a built card
+        // is a div and needs a Range.
+        try {
+          top.focus({ preventScroll: true });
+          if (typeof top.select === 'function') top.select();
+          else {
+            const r = document.createRange();
+            r.selectNodeContents(top);
+            const sel = window.getSelection();
+            sel.removeAllRanges(); sel.addRange(r);
           }
-          const mfD = document.getElementById('collage-playbar');
-          if (musD && mfD && mfD.contentWindow) {
-            try {
-              mfD.contentWindow.postMessage(
-                { type: 'bd_script_update', script: musD.script }, '*');
-            } catch (_) {}
-          }
-          // The TEXT slot has no module to send to — it is BD's own DOM — so
-          // it is re-rendered from the edited script here. Without this a
-          // hand-edited passage would be the one layer that did not follow.
-          const tlD  = document.getElementById('collage-preview-text');
-          const tlbD = document.getElementById('collage-preview-text-body');
-          const txtD = collageSlot(cDown, 'text');
-          if (tlbD) tlbD.textContent = (txtD && txtD.body) || '';
-          if (tlD)  tlD.hidden = !(txtD && txtD.body);
-          document.body.classList.toggle('collage-preview-text', !!(txtD && txtD.body));
-          try { positionCyEl(); } catch (_) {}
-          console.log('[Copy Down] collage split — ' +
-            cDown.blocks.map((b) => b.kind + ':' + b.moduleId).join(', '));
-          if (copyUpBtn) copyUpBtn.disabled = false;
-          return;
-        }
-
-        console.log('[Copy Down] posting bd_script_update, len=', script.length);
-        iframeEl2.contentWindow.postMessage(
-          { type: 'bd_script_update', script },
-          '*'
-        );
-        if (copyUpBtn) copyUpBtn.disabled = false;
+        } catch (err) { console.warn('[down] could not select the top card: ' + err.message); }
+        console.log('[down] kept ' + text.length + ' chars in History; the top card is selected ' +
+                    'and one keystroke will clear it');
+        document.dispatchEvent(new CustomEvent('bd:cards-changed'));
       });
     }
 
     if (copyUpBtn) {
       copyUpBtn.addEventListener('click', () => {
-        if (!iframeEl2) {
-          console.warn('[Copy Up] no visual iframe — bail');
+        // NEVER DISABLED, and the press says what it decided — the lesson from
+        // the Collage button, which was greyed from stale state and so produced
+        // no click event at all.
+        const srcEl = historyPick;
+        const src   = srcEl && srcEl.querySelector('.card-body');
+        if (!src) {
+          console.warn('[up] no History card picked — tap the card you want first');
           return;
         }
-        const body = getFocusedCardBody();
-        if (!body) {
-          console.warn('[Copy Up] no card body found — response would have nowhere to land');
-          return;
+        const text = getCardText(src) || '';
+        if (!text.trim()) { console.warn('[up] the picked History card is empty'); return; }
+        // Into the top card if it is EMPTY, otherwise a new one — which
+        // relegates the current top card rather than overwriting it. Bringing
+        // something up must not destroy what is already there.
+        const top     = topBodyInCurrent();
+        const topText = top ? (getCardText(top) || '') : '';
+        let dest = (top && !topText.trim()) ? top : null;
+        const made = !dest;
+        if (!dest) {
+          const card = createCard({ kind: 'local' });
+          dest = card && card.body;
         }
-        console.log('[Copy Up] requesting — will land in: ' + describeCardBody(body));
-        iframeEl2.contentWindow.postMessage(
-          { type: 'bd_script_request' },
-          '*'
-        );
+        if (!dest) { console.warn('[up] nowhere to put it'); return; }
+        setCardText(dest, text);
+        if (currentStackEl) currentStackEl.scrollTop = 0;
+        console.log('[up] copied ' + text.length + ' chars up from History into ' +
+                    (made ? 'a new top card' : 'the empty top card'));
+        document.dispatchEvent(new CustomEvent('bd:cards-changed'));
       });
     }
 
@@ -15373,12 +15411,24 @@ async function init() {
       // and writes to a NEW top card when the old one has been relegated.
       function collageTopCard() {
         try {
+          // ── THE CARD ON SCREEN IS ASKED FIRST (2026-10-13) ──────────────
+          // Not merely a tidier order. ↓ writes a SNAPSHOT of the top card
+          // straight into History, and `cards.push` makes that snapshot the
+          // newest local card in the model — so asking `topLocalCard()` first
+          // would answer with the snapshot while the live collage sat in
+          // Current, and an edit made after the snapshot would be read back
+          // stale. Asking the screen first cannot go wrong that way round.
+          const first = currentStackEl && currentStackEl.querySelector('.card');
+          const fb    = first && first.querySelector('.card-body');
+          if (fb && typeof getCardText === 'function') {
+            const t = getCardText(fb) || '';
+            if (parseCollage(t)) return { body: fb, text: t, onTop: true };
+          }
           const topC = (typeof topLocalCard === 'function') ? topLocalCard() : null;
           if (!topC || !topC.body) return null;
           const txt = (typeof getCardText === 'function') ? (getCardText(topC.body) || '') : '';
           if (!parseCollage(txt)) return null;
-          const first = currentStackEl && currentStackEl.querySelector('.card');
-          return { card: topC, text: txt, onTop: !!(first && topC.el === first) };
+          return { body: topC.body, text: txt, onTop: false };
         } catch (e) {
           console.warn('[collage] collageTopCard threw: ' + e.message);
           return null;
@@ -15495,7 +15545,7 @@ async function init() {
         const t   = collageTopCard();
         const txt = (t && t.text) || collageRemembered;
         if (!txt) return false;
-        let body = (t && t.onTop) ? t.card.body : null;
+        let body = (t && t.onTop) ? t.body : null;
         let made = false;
         if (!body) {
           const card = createCard({ kind: 'local' });
@@ -15524,7 +15574,7 @@ async function init() {
       // be rewritten under the keyboard the moment the module id became
       // resolvable, mid-word. A paste is one act with one intention; typing is
       // a hundred acts, and only the last of them is a script.
-      function collageFromPaste(body, incoming) {
+      function collageFromPaste(body, incoming, before) {
         if (!body) return;
         // ── WHERE THE TEXT COMES FROM DEPENDS ON THE BODY ─────────────────
         // Not a detail. A local card is a <textarea>: a paste there keeps its
@@ -15551,6 +15601,41 @@ async function init() {
           dest = card && card.body;
           if (!dest) { console.warn('[paste] no card to write the collage into'); return; }
           if (currentStackEl) currentStackEl.scrollTop = 0;
+        }
+
+        // ── A MODULE PASTED INTO AN EXISTING COLLAGE IS A SLOT FOR IT ───
+        // (2026-10-13.) The obvious thing to try, and before this it did
+        // nothing visible: the card already held `%%bd_collage 1`, so the adopt
+        // branch below claimed it and the pasted module was left lying in the
+        // text as an unordered extra block. A paste is an instruction (§8), and
+        // the instruction into a collage that already exists is "put this
+        // module in it" — which is `collageAddOrReplace`, so it replaces a slot
+        // of the same kind IN PLACE and lands in canonical order.
+        //
+        // Merged into `before`, the collage as it stood when the paste began.
+        // The card now holds both and cannot be the base.
+        const baseCollage = editable ? parseCollage(before || '') : null;
+        if (baseCollage && !parseCollage(incoming || '')) {
+          const add = extractFirstModuleScript(incoming || '');
+          if (add) {
+            let slotText = add.script;
+            if (add.kind === 'visual') {
+              slotText = collageSetDirective(slotText, 'opacity', COLLAGE_GRAPHIC_OPACITY);
+            }
+            const merged = collageAddOrReplace(before, { kind: add.kind, text: slotText });
+            setCardText(body, merged);
+            collageRemembered = merged;
+            const had = baseCollage.blocks.some((b) => b.kind === add.kind);
+            console.log('[paste] ' + add.moduleId + ' ' + (had ? 'REPLACED' : 'added as') +
+                        ' the ' + add.kind + ' slot — slots now ' +
+                        (parseCollage(merged) || { blocks: [] }).blocks.map((b) => b.kind).join(','));
+            try { refreshCollageBtn(); }
+            catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
+            collageCentreSoon(body, add.moduleId);
+            return;
+          }
+          console.log('[paste] the card is a collage but the pasted text has no ' +
+                      'properly parsed module — left as it arrived');
         }
 
         // Already a collage: ADOPT it, rewrite nothing. A collage pasted from
@@ -15664,8 +15749,14 @@ async function init() {
         // overwritten and the markup a browser paste would create never has to
         // be read back. collageFromPaste writes a new local card instead.
         if (!editable) { try { e.preventDefault(); } catch (_) {} }
+        // WHAT THE CARD HELD BEFORE, read SYNCHRONOUSLY — the only moment it
+        // is still available. A module pasted into an existing collage has to
+        // be merged into the collage as it was, and by the time the timeout
+        // runs the card holds both, with the new block already appended by the
+        // browser; adding it again from there would leave two of it.
+        const before = editable ? (getCardText(body) || '') : '';
         setTimeout(() => {
-          try { collageFromPaste(body, incoming); }
+          try { collageFromPaste(body, incoming, before); }
           catch (err) { console.warn('[paste] collage from paste threw: ' + err.message); }
         }, 0);
       });
@@ -15827,7 +15918,7 @@ async function init() {
         // 4. COMMIT — to the card on screen if the collage is already there,
         //    to a fresh top card otherwise, and to the remembered string
         //    either way.
-        let body = inPlace ? t0.card.body : null;
+        let body = inPlace ? t0.body : null;
         if (!body) {
           const card = createCard({ kind: 'local' });
           body = card && card.body;
@@ -15856,6 +15947,16 @@ async function init() {
       document.addEventListener('bd:node-read', () => {
         try { refreshCollageBtn(); }
         catch (e) { console.warn('[collage] refresh threw on node-read: ' + e.message); }
+      });
+      // ── A HOOK FOR CODE THAT CANNOT SEE THIS BLOCK ────────────────────
+      // The ↑ and ↓ handlers live at init()'s own level and this block is
+      // nested deeper, so they cannot call refreshCollageBtn directly — deeper
+      // sees shallower, not the reverse. An event rather than a hoisted
+      // reference, so the dependency is one line at each end and visible from
+      // both.
+      document.addEventListener('bd:cards-changed', () => {
+        try { refreshCollageBtn(); }
+        catch (e) { console.warn('[collage] refresh threw on cards-changed: ' + e.message); }
       });
       try { refreshCollageBtn(); }
       catch (e) { console.warn('[collage] refresh threw at init: ' + e.message); }

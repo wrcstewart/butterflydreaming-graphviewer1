@@ -845,6 +845,72 @@ also fixes a pre-existing misfire the log had been showing all along — pressin
 Collage on a text passage logged `module layout for pasted script`, because BD's
 own write into the card looks exactly like a paste to that test.
 
+### 8.5 A module pasted INTO an existing collage is a slot for it
+
+The obvious thing to try, and before 2026-10-13 it did nothing visible: the card
+already held `%%bd_collage 1`, so the adopt branch claimed it and the pasted
+module was left lying in the text as an unordered extra block. A paste is an
+instruction, and the instruction into a collage that already exists is **"put
+this module in it"** — which is `collageAddOrReplace`, so a slot of the same kind
+is replaced IN PLACE and the result lands in canonical order.
+
+The one subtlety: the merge base is the collage **as it stood when the paste
+began**, captured synchronously in the `paste` handler. By the time the timeout
+runs the card holds both, with the new block already appended by the browser, and
+adding it again from there would leave two of it. Verified: pasting a music
+module into a figure+words collage gives `visual, music, text` with the words
+intact; pasting a different graphic replaces the visual slot, dims it to 0.45,
+and leaves exactly one visual block.
+
+### 8.6 ↑ and ↓ carry CARDS now, not scripts
+
+The author, wanting to experiment with a second module: *"I think they were
+supposed to copy a selected card in history up to the current top card (up) or
+to create a new history card from the current card (down). I think the down
+arrow may as well leave the current card content selected ready for a one key
+delete if that is what the user wants."*
+
+They were in fact Copy Down (card → module) and Copy Up (module → card) — but the
+author had already observed that pair does nothing while `auto` is ticked, which
+it is by default. So:
+
+- **↓** keeps a copy of the top card in History (`toHistory`, so Current is not
+  displaced) and leaves the top card's content **selected**, ready for one
+  keystroke to clear it. Selected and not cleared: the decision stays the
+  user's, and nothing is destroyed on their behalf. A textarea has `select()`; a
+  built card is a div and needs a `Range`.
+- **↑** copies the **picked** History card up — into the top card if it is
+  empty, otherwise into a NEW top card, which relegates the current one rather
+  than overwriting it. Bringing something up must not destroy what is there.
+
+**The pick needs no new gesture**: you tap into the card you want in order to
+read it, and that tap is the pick, recorded on `pointerdown` so it lands before
+the arrow's own press moves focus. Marked with a brighter rim and full
+brightness — luminance, not hue — using `outline` rather than `border`, so the
+pane does not shift as the pick moves. ↑ is **never disabled** and says what it
+decided, after the Collage button taught that lesson.
+
+**What is given up, stated rather than discovered later:** the manual
+card↔module route. `auto` covers both directions, so the only real loss is the
+OVERRIDE for the two cases `publishCard` declines on purpose — a card with no
+directives, and a directive whose value has been deleted mid-keystroke. With
+`auto` unticked there is now no manual way across at all. A long-press is the
+obvious home for it if it is ever wanted back.
+
+**`bd_script_request`/`bd_script_response` is untouched and still live** —
+checked rather than assumed, since it would have been easy to call it dead along
+with the button. The Copy-Link update gate and the first-push state query both
+still send the request, so §42.7's response handler still writes into the focused
+card. All that changed is that no BUTTON reaches it.
+
+**One consequence of ↓ that had to be fixed with it:** `createCard` pushes the
+snapshot onto `cards`, so the copy in History becomes the newest local card in
+the MODEL. `collageTopCard()` therefore now asks **the card on screen first** —
+otherwise it would answer with the snapshot while the live collage sat in
+Current, and an edit made after the snapshot would be read back stale. The same
+model-versus-screen distinction as §4.4a/b/d, met a fourth time, and this time
+anticipated rather than reported.
+
 ### 8.4 The author's observation: this is becoming a PROTOCOL
 
 *"I think we are circling round a protocol that might be useful for the

@@ -91,8 +91,14 @@
       <input type="checkbox" id="auto-echo-box" checked>
       <span>auto</span>
     </label>
-    <button id="copy-down-btn" type="button" title="Copy Down (card → module)">↓</button>
-    <button id="copy-up-btn" type="button" title="Copy Up (module → card)" disabled>↑</button>
+    <!-- 2026-10-13 — these two now carry CARDS, not scripts. They were Copy
+         Down (card → module) and Copy Up (module → card), which `auto` covers
+         in both directions without a press. ↑ is no longer born `disabled`:
+         that gate was "nothing has been sent down yet", and a greyed button
+         from stale state is how the Collage button came to produce no click
+         event at all. -->
+    <button id="copy-down-btn" type="button" title="Keep a copy of this card in History (the card stays, its text is selected)">↓</button>
+    <button id="copy-up-btn" type="button" title="Copy the picked History card up into Current (tap a History card first)">↑</button>
     <!-- 2026-08-14 — radio group promoted to top row (position:fixed, yellow
          background). All three radios always visible. Player disabled until
          top card contains a %%bd_module directive. 2026-08-15 — Edit is now
