@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13g' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13h' };
 
 let bdViewTitleText = '';
 
@@ -3316,6 +3316,10 @@ function collageGetDirective(blockText, name) {
 // module's live script does not mention `loop` or `duration` at all (they are
 // not its business), so without this every press would reset them to the
 // default and quietly undo that edit.
+// `prevBlockText` is the LAST block of this kind, not the current step: a new
+// step inherits what the author set for the kind in THIS collage, rather than
+// reverting to the global default. It is the same reasoning as the carry-forward
+// itself — a hand-set duration is an intention about this arrangement.
 function collageStampTimeline(blockText, kind, prevBlockText) {
   const want = COLLAGE_TIMELINE[kind];
   if (!want) return blockText;
@@ -3336,15 +3340,47 @@ function collageStampTimeline(blockText, kind, prevBlockText) {
 // whole reason no new name was needed.
 const COLLAGE_PREAMBLE = '%%bd_collage 1\n%%bd_loop true\n';
 
-// Add a block, or REPLACE the one of its kind IN PLACE.
+// Add a block — or, with mode 'replace', substitute the current step's block of
+// that kind in place.
 //
-// In place, and that is the whole point: block order is the stacking order, so
-// appending a replacement would move the module to the front and silently
-// change the composition. Plan §6.8 invariant 2.
-function collageAddOrReplace(collageText, block) {
+// ── A PRESS NOW ADDS (2026-10-13, the author's rule change) ───────────────
+// It used to replace, which was §6.8 invariant 2, and the author inverted it to
+// make sequences reachable without a new gesture: *"the most flexible is to
+// change the rule so that module scripts are not replaced but added … it avoids
+// the user gesture departure."*
+//
+// What makes that safe is that REPLACE WAS ALREADY REDUNDANT. A slot does not
+// need a press to stay current: the echo merges each module's announcements into
+// its own block, per step, so moving a stepper updates the collage by itself.
+// The author's version: *"the user can already adjust (ie replace) parameter
+// values via the steppers or editing."* So the press has exactly one job — put
+// this module IN — and deletion is how one of several comes out.
+//
+// ADDED LAST AMONG ITS KIND, the author's choice (*"last is more likely and once
+// again can always be edited"*). Appending plus the canonical sort gives that
+// for nothing: the sort is stable, so equal ranks keep their insertion order and
+// the kinds stay grouped.
+//
+// 'replace' is kept rather than deleted because a "replace this step" gesture is
+// a likely thing to want, and a mode that must be asked for cannot be arrived at
+// by accident.
+function collageAddOrReplace(collageText, block, mode) {
   if (!block) return collageText;
   const base = parseCollage(collageText);
   if (!base) return collageText;
+  const replace = (mode === 'replace');
+  // ── A DOUBLE PRESS IS NOT A SEQUENCE OF TWO IDENTICAL STEPS ────────────
+  // Adding is now the default, so pressing twice on the same node with nothing
+  // changed in between would otherwise leave two byte-identical blocks — which
+  // nobody means, and which the user would then have to delete. Anything the
+  // least bit different still adds, so two steps of the same module at
+  // different angles are unaffected. Refusing identity is not policy about
+  // what a sequence may contain; it is refusing a no-op.
+  if (!replace) {
+    const same = collageSlots(base, block.kind);
+    const last = same.length ? same[same.length - 1] : null;
+    if (last && last.script.trim() === String(block.text).trim()) return collageText;
+  }
 
   const pre = [];                                   // lines before any block
   const kept = [];                                  // { kind, text }
@@ -3355,11 +3391,12 @@ function collageAddOrReplace(collageText, block) {
   // each kind as the walk passes them is all that is needed, and with one of a
   // kind the count is always 0 and the behaviour is exactly as before.
   const seen = Object.create(null);
-  const want = collageStepOf(block.kind, collageCountOf(base, block.kind));
+  // -1 on an add, so no block matches and the new one is appended.
+  const want = replace ? collageStepOf(block.kind, collageCountOf(base, block.kind)) : -1;
   const flush = () => {
     if (cur === null) return;
     const idx = (seen[curKind] = (seen[curKind] == null ? 0 : seen[curKind] + 1));
-    if (curKind === block.kind && idx === want) {
+    if (replace && curKind === block.kind && idx === want) {
       kept.push({ kind: block.kind, text: block.text }); replaced = true;
     } else kept.push({ kind: curKind, text: cur.join('\n').replace(/\s+$/, '') });
     cur = null; curKind = null;
@@ -15781,17 +15818,25 @@ async function init() {
             if (add.kind === 'visual') {
               slotText = collageSetDirective(slotText, 'opacity', COLLAGE_GRAPHIC_OPACITY);
             }
-            const prevB  = collageSlot(baseCollage, add.kind);
+            const sameB  = collageSlots(baseCollage, add.kind);
+            const prevB  = sameB.length ? sameB[sameB.length - 1] : null;
             const merged = collageAddOrReplace(before, {
               kind: add.kind,
               text: collageStampTimeline(slotText, add.kind, prevB && prevB.script)
             });
             setCardText(body, merged);
             collageRemembered = merged;
-            const had = baseCollage.blocks.some((b) => b.kind === add.kind);
-            console.log('[paste] ' + add.moduleId + ' ' + (had ? 'REPLACED' : 'added as') +
-                        ' the ' + add.kind + ' slot — slots now ' +
-                        (parseCollage(merged) || { blocks: [] }).blocks.map((b) => b.kind).join(','));
+            if (merged === before) {
+              console.log('[paste] nothing added — that exact ' + add.kind +
+                          ' block is already the last of its kind');
+              return;
+            }
+            const mergedC = parseCollage(merged) || { blocks: [] };
+            const mineP = (mergedC.blocks || []).filter((b) => b.kind === add.kind);
+            if (mineP.length) collageStepSet(add.kind, mineP.length - 1);
+            console.log('[paste] ' + add.moduleId + ' added as ' + add.kind + ' ' +
+                        mineP.length + ' of its kind — slots now ' +
+                        (mergedC.blocks || []).map((b) => b.kind).join(','));
             try { refreshCollageBtn(); }
             catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
             collageCentreSoon(body, add.moduleId);
@@ -15984,8 +16029,19 @@ async function init() {
                       (have.has('music')  ? 'M' : '.');
         // T G M in fixed positions, a full stop for an empty slot, so the
         // three characters never move as the contents change.
-        btn.title = c ? ('Collage holds ' + slots +
-                         ' — press to add or replace what you are looking at')
+        // COUNTS, not just presence: with adding rather than replacing, how MANY
+        // of a kind there are is the thing a user can no longer see anywhere
+        // else, and a second identical-looking slot is exactly what they would
+        // want to know about.
+        const counts = c
+          ? ['text', 'visual', 'music']
+              .map((k) => ({ k, n: c.blocks.filter((b) => b.kind === k).length }))
+              .filter((x) => x.n > 1)
+              .map((x) => x.n + ' ' + x.k)
+              .join(', ')
+          : '';
+        btn.title = c ? ('Collage holds ' + slots + (counts ? ' (' + counts + ')' : '') +
+                         ' — press to ADD what you are looking at')
                       : 'Add what you are looking at to the collage';
         // The span is gone from the bar; the guard stays because a build that
         // still has one should keep working rather than throw.
@@ -16087,14 +16143,20 @@ async function init() {
         // survive a press.
         {
           const prevC = parseCollage(base);
-          const prev  = prevC ? collageSlot(prevC, block.kind) : null;
+          const same  = prevC ? collageSlots(prevC, block.kind) : [];
+          const prev  = same.length ? same[same.length - 1] : null;
           block = { kind: block.kind,
                     text: collageStampTimeline(block.text, block.kind,
                                                prev && prev.script) };
         }
 
-        // 2 and 3. ADD, or REPLACE IN PLACE.
+        // 2 and 3. ADD — last among its kind. See collageAddOrReplace.
         const next = collageAddOrReplace(base, block);
+        if (next === base) {
+          console.log('[collage] nothing added — that exact ' + block.kind +
+                      ' block is already the last of its kind');
+          return;
+        }
 
         // 4. COMMIT — to the card on screen if the collage is already there,
         //    to a fresh top card otherwise, and to the remembered string
@@ -16109,10 +16171,19 @@ async function init() {
         setCardText(body, next);
         collageRemembered = next;
 
-        const kinds = (parseCollage(next) || { blocks: [] }).blocks
-                        .map((b) => b.kind).join(',');
-        console.log('[collage] ' + (started ? 'STARTED' : (inPlace ? 'updated in place' : 'REINSTATED as the top card')) +
-                    ' — ' + block.kind + ' set; slots now ' + kinds);
+        // THE NEW BLOCK BECOMES THE CURRENT STEP of its kind, and it has to:
+        // the echo merges a module's announcements into the CURRENT step, so
+        // leaving the step at 0 would send the stepper you are about to move
+        // into the wrong block. It is also the one the user just chose, so
+        // showing it is right until the sequencer owns the step (stage 3).
+        const nextC = parseCollage(next) || { blocks: [] };
+        const mine  = (nextC.blocks || []).filter((b) => b.kind === block.kind);
+        if (mine.length) collageStepSet(block.kind, mine.length - 1);
+
+        const kinds = (nextC.blocks || []).map((b) => b.kind).join(',');
+        console.log('[collage] ' + (started ? 'STARTED' : (inPlace ? 'added in place' : 'REINSTATED as the top card')) +
+                    ' — ' + block.kind + ' added as ' + mine.length + ' of its kind' +
+                    ' (step ' + (mine.length - 1) + '); slots now ' + kinds);
         // 5. STAY PUT. The label has to catch up, though — and the card is
         //    scrolled to the block that has just changed, which in a
         //    three-block collage is otherwise off the bottom of the window.

@@ -646,9 +646,22 @@ The rules that must hold. **Each one is a thing that has already gone wrong
 once in v1**, which is why they are worth stating rather than discovering
 again:
 
-1. **At most one slot per type.**
-2. **Replacement is IN PLACE.** Block order is the stacking order, so moving a
-   block to the end would silently change the composition.
+1. ~~**At most one slot per type.**~~ **WITHDRAWN 2026-10-13** — the whole point
+   of §9's sequencing is more than one of a kind. What replaces it:
+   **`collageSlot(collage, kind)` returns the CURRENT STEP**, and every caller
+   means that, so no caller had to change (§9.5 stage 2).
+2. ~~**Replacement is IN PLACE.**~~ **WITHDRAWN 2026-10-13, by the author** —
+   a press ADDS, last among its kind. Replacement in place was not wrong, it
+   was redundant: the echo already merges each module's announcements into its
+   own block, so a slot stays current without any press. The author: *"the user
+   can already adjust (ie replace) parameter values via the steppers or
+   editing"*, and deletion is how one of several comes out. The original
+   reason for in-place — that block order is the stacking order, so moving a
+   block would change the composition — is answered by the **canonical kind
+   order** (§4.3 amended): appending cannot move a block past a different kind,
+   because the sort regroups them and is stable within a kind. What `replace`
+   mode is kept for: a likely future "replace this step" gesture, which has to
+   be asked for by name.
 3. **The remembered string is updated only while the collage is the top card.**
    History cards are a record, not the live document.
 4. **Every merge into a collage is PER SLOT**, never by bare name across the
@@ -1098,11 +1111,46 @@ collage). Nothing reads the directives yet.
    step 0 at 90, a press at step 1 leaves two blocks and the text intact, and
    with one of a kind every behaviour is unchanged.
 
-   **The gap before stage 3 is worth anything:** nothing in the UI can ADD a
-   second block of a kind — the press and the paste both REPLACE, which was the
-   decided behaviour (§6.8 invariant 2). Hand-editing the script is the only
-   route today. The obvious gesture is a long-press on Collage meaning "add
-   rather than replace"; not built, and worth the author's view before it is.
+   **The gap is CLOSED, 2026-10-13 — by inverting the rule rather than adding a
+   gesture.** I had offered a long-press on Collage meaning "add rather than
+   replace"; the author declined the modifier and changed the rule instead:
+   *"the most flexible is to change the rule so that module scripts are not
+   replaced but added … it avoids the user gesture departure."*
+
+   Which is right, and the reason is that **replace was already redundant**: a
+   slot does not need a press to stay current, because the echo merges each
+   module's announcements into its own block. So the press has exactly one job —
+   put this module in — and deletion is how one of several comes out, with
+   stepper and script edits covering the rest.
+
+   Three consequences, each settled:
+
+   - **Added LAST among its kind** (*"last is more likely and once again can
+     always be edited"*). Appending plus the canonical sort gives it for
+     nothing — the sort is stable, so equal ranks keep insertion order and the
+     kinds stay grouped. Verified: pressing graphic, graphic, music, text gives
+     `visual,visual,music,text` with the angles in press order.
+   - **The new block becomes the current step of its kind, and must.** The echo
+     merges into the CURRENT step, so leaving the step at 0 would send the next
+     stepper move into the wrong block. It is also the block the user just
+     chose. The sequencer takes the step over in stage 3.
+   - **A double press is not a sequence of two identical steps.** Pressing twice
+     with nothing changed between would leave two byte-identical blocks, which
+     nobody means and the user would then have to delete. An add that is
+     identical to the last of its kind is refused and says so; anything the
+     least bit different still adds, so two steps of one module at different
+     angles are unaffected. Refusing identity is not a policy about what a
+     sequence may contain — it is refusing a no-op.
+
+   A new step **inherits the last same-kind block's `loop` and `duration`**
+   rather than reverting to the global default, for the same reason the
+   carry-forward exists: a hand-set duration is an intention about this
+   arrangement. Verified — editing step 1 to `duration 1800` and pressing again
+   gives 300, 1800, 1800.
+
+   The counts are now in the Collage button's `title` (`2 visual`), because with
+   adding rather than replacing, how MANY of a kind there are is the thing the
+   user can no longer see anywhere else.
 3. **The sequencer in View** — honour `duration`/`loop`, advance through
    same-kind slots in script order, and the preamble `loop` to repeat the whole.
 4. **The module changes** — DroneFrac's `duration` loses its stepper, the three
