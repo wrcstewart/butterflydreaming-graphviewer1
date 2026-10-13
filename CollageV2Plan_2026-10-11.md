@@ -387,6 +387,38 @@ directive is not reached into. Verified on six cases including the REAL node
 text: one opacity line out of it, prefix kept, `p_` inserted when the block uses
 `p_` and bare when it does not, score block untouched, and idempotent.
 
+### 4.4f Editing the TEXT slot in the card — FIXED 2026-10-13
+
+Editing the words inside `%%bd_text [ … %%bd_]` worked, except that *"it
+interprets a space as a newline, or some sort of end entry signal"*. The text
+was never corrupted: **the caret was being taken away from it.**
+
+`autoWrite` carried an exception — *"fromDrift:false means a person moved a
+control, so they are demonstrably not typing in the card; take the caret out and
+write"*. True when written, and falsified by `auto` itself: with the box ticked a
+**hand edit causes a non-drift announcement**, because `publishCard` pushes the
+card down and the module normalises it and announces back. So typing in the card
+triggered the one path that assumes you are not typing in the card. A second
+after you stopped — which is right after a space, where a typist pauses — the
+echo blurred the card and replaced its value, and further typing landed at the
+end of the script below `%%bd_]`.
+
+The log named it without naming it: `[auto] writing 552 chars … len=552` — an
+equal-length rewrite (the drift had moved `angle_minutes` by the same number of
+digits), alternating with `skip: caret is in the target card` for the drift
+writes that were correctly held back.
+
+**Withdrawing the exception costs nothing, and that is provable rather than
+hoped:** working a stepper necessarily moves focus to the stepper's button, so a
+card that still holds focus cannot be a card whose owner has just reached for a
+control. The case the exception was added for — *"editing a script then working
+the steppers echoed nothing, for ever"* — is therefore unreachable, and is in any
+event now covered by the focusout catch-up, which did not exist when it was
+written.
+
+It restores the rule the file states for itself: **recording is data and must
+never stop; redrawing is presentation and must not happen under a live cursor.**
+
 ### 4.5 Browsing deactivates the collage — ACCEPTED as a consequence
 
 Confirmed, and no attempt will be made to work around it. **See §5 for the one

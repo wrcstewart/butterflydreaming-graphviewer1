@@ -55,7 +55,7 @@ to the node's own module through `loadModuleForNode` (bringing that node's
 exploration with it), and the collage goes back on top through a shared
 `collageReinstate` the press and the exit cannot disagree about.
 
-### Four faults worth naming
+### Five faults worth naming
 
 **A directive's name in a script is not the bare name.** Every stepper-backed
 directive carries the `p_` prefix — the real node says `%%bd_p_opacity 0.76` — so
@@ -86,6 +86,20 @@ was built from. The Sv lesson again.
 a new card and pasting a script under it put the node's Tao passage in the text
 slot. Words typed into that card a moment ago are a deliberate act; the node's
 prose is a default, not a precedence.
+
+**A premise that was true when written was falsified by a later feature.**
+`autoWrite` held an exception: *"fromDrift:false means a person moved a control,
+so they are demonstrably not typing in the card — take the caret out and write."*
+With `auto` ticked a hand edit now CAUSES a non-drift announcement, because the
+card is pushed down and the module announces its normalised form back. So typing
+in the card triggered the one path that assumes you are not typing in the card:
+a second after you stopped, which is right after a space, the echo blurred the
+card and replaced its value, and further typing landed below `%%bd_]`. Reported
+as *"it interprets a space as a newline, or some sort of end entry signal"* — and
+the text was never corrupted; the caret was taken away from it. Withdrawing the
+exception costs nothing, provably: working a stepper necessarily moves focus to
+the stepper's button, so a card still holding focus cannot belong to someone who
+has just reached for a control.
 
 ### A pasted script is an instruction to make a collage
 

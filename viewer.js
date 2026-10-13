@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13b' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-13c' };
 
 let bdViewTitleText = '';
 
@@ -13985,12 +13985,36 @@ async function init() {
       // Pressing Copy Up appeared to cure it. It did not: the press moved
       // focus to the BUTTON, and that is all that was ever needed.
       //
-      // fromDrift:false means a person moved a control. They are demonstrably
-      // not typing in the card at that moment, so take the caret out and
-      // write. Drift keeps the old behaviour and waits.
+      // ── THE BLUR EXCEPTION IS WITHDRAWN (2026-10-13) ──────────────────
+      // It read: "fromDrift:false means a person moved a control, so they are
+      // demonstrably not typing in the card — take the caret out and write."
+      // That premise was true when it was written and is not true any more.
+      //
+      // With `auto` on, a HAND EDIT of the card now causes a non-drift
+      // announcement: publishCard pushes the card down, the module normalises
+      // it and announces back with fromDrift:false. So typing in the card
+      // triggered the one path that assumes you are not typing in the card —
+      // and about a second after you stopped (which is to say right after a
+      // space, where a typist pauses) the echo BLURRED the card and replaced
+      // its value. The caret left mid-sentence and further typing landed at
+      // the end of the script, below `%%bd_]`. Reported as *"it interprets a
+      // space as a newline, or some sort of end entry signal"* — and the text
+      // was never corrupted at all; the caret was taken away from it.
+      //
+      // Withdrawing the exception costs NOTHING, and that is provable rather
+      // than hoped: working a stepper necessarily moves focus to the stepper's
+      // button, so a card still holding focus cannot be a card whose owner has
+      // just reached for a control. The case the exception was added for
+      // ("editing a script then working the steppers echoed nothing, for
+      // ever") is therefore unreachable here, and is in any event now covered
+      // by the focusout catch-up, which did not exist when it was written.
+      //
+      // This restores the rule the file states for itself two screens up:
+      // recording is data and must never stop; REDRAWING IS PRESENTATION AND
+      // MUST NOT HAPPEN UNDER A LIVE CURSOR.
       if (document.activeElement === body) {
-        if (fromDrift) { why('skip: caret is in the target card'); return; }
-        try { body.blur(); } catch (_) {}
+        why('skip: caret is in the target card' + (fromDrift ? '' : ' (a hand edit echoing back)'));
+        return;
       }
       // NEVER put one module's script into another module's card.
       //
