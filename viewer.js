@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13e' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-13f' };
 
 let bdViewTitleText = '';
 
@@ -3230,9 +3230,16 @@ const COLLAGE_GRAPHIC_OPACITY = 0.45;
 // script was using. An insertion takes the prefix from the block itself —
 // measured, not assumed, because which directives have steppers is the
 // module's business and not knowable from here.
-function collageSetDirective(blockText, name, value) {
+// `prefix` forces the spelling: '' for a directive that must NEVER be marked as
+// a stepper, undefined to take it from the block. Added 2026-10-13 after the
+// timeline directives came out as `%%bd_p_duration` — the prefix-from-the-block
+// rule is right for a value the module owns and has a control for, and exactly
+// wrong for one the COLLAGE owns and deliberately gives no control. `_p_` is a
+// claim about a stepper existing, so it cannot be guessed from the neighbours.
+function collageSetDirective(blockText, name, value, prefix) {
   const re   = new RegExp('^%%bd_(p_)?' + name + '[ \t]');
-  const pref = /^%%bd_p_/m.test(String(blockText)) ? 'p_' : '';
+  const pref = (prefix != null) ? prefix
+             : (/^%%bd_p_/m.test(String(blockText)) ? 'p_' : '');
   const out  = [];
   let inBlock = false, done = false, headerAt = -1;
   for (const line of String(blockText).split('\n')) {
@@ -3240,7 +3247,10 @@ function collageSetDirective(blockText, name, value) {
     if (BD_BLOCK_OPEN_RE.test(line)) { inBlock = true; out.push(line); continue; }
     if (/^%%bd_module[ \t]/.test(line)) { headerAt = out.length; out.push(line); continue; }
     const m = done ? null : re.exec(line);
-    if (m) { out.push('%%bd_' + (m[1] || '') + name + ' ' + value); done = true; continue; }
+    if (m) {
+      const keep = (prefix != null) ? prefix : (m[1] || '');
+      out.push('%%bd_' + keep + name + ' ' + value); done = true; continue;
+    }
     out.push(line);
   }
   if (!done) {
@@ -3248,6 +3258,83 @@ function collageSetDirective(blockText, name, value) {
   }
   return out.join('\n');
 }
+
+// ── THE TIMELINE DIRECTIVES: `loop` AND `duration` (2026-10-13) ───────────
+// The author's design, and the names are deliberately the ones that already
+// exist rather than new ones: *"try to align the behaviours rather than have
+// new directives like show"*.
+//
+// WHAT ALIGNS. `loop` already means "repeat the thing you belong to" in all
+// three music modules, and in a collage's PREAMBLE — above the first
+// `%%bd_module` line, where it belongs to no module — it means the same of the
+// whole arrangement. Nothing collides, because the scope differs and
+// parseCollage already keeps preamble lines apart. `duration` already means
+// "how long this plays" to DroneFrac (narrowed to the bake length by the
+// loop/duration decoupling); in a collage it means how long the slot runs, and
+// the author's point is that these are one idea: *"the user can manually edit
+// the script if for example they want a long play of a piece to make a .wav"*.
+//
+// WHERE THEY LIVE, AND WHY NOT IN THE MODULES' OWN DEFAULT SCRIPTS. RULE 9: a
+// module carries no directive it cannot act on — it is why `%%bd_weight` and
+// `%%bd_stroke` came out of `bd_V_Kolam3D_001`. A visual module cannot act on
+// `duration`; the COLLAGE can. So these are stamped into the collage's blocks,
+// where the thing that reads them lives, and a module ignores them harmlessly.
+// DroneFrac's own `duration` stays in its own script, because it is genuinely
+// that module's.
+//
+// NOT `_p_`, i.e. no stepper, and the author's own rule says why: a control
+// earns its place when the value cannot be chosen without perceiving the
+// outcome. A duration cannot be judged by eye in a preview; it is set by
+// editing.
+const COLLAGE_TIMELINE = {
+  // Text and music run once and hand on; a figure holds the screen.
+  visual: { loop: 'true',  duration: '300' },   // five minutes
+  music:  { loop: 'false' },                    // duration is DroneFrac's own
+  text:   { loop: 'false' }                     // duration ABSENT = 0.5s x words
+};
+
+// Read one directive's value out of a block, either spelling, ignoring
+// anything inside a bracket block. Returns null when absent.
+function collageGetDirective(blockText, name) {
+  const re = new RegExp('^%%bd_(?:p_)?' + name + '[ \t]+(.+)$');
+  let inBlock = false;
+  for (const line of String(blockText).split('\n')) {
+    if (inBlock) { if (BD_BLOCK_CLOSE_RE.test(line)) inBlock = false; continue; }
+    if (BD_BLOCK_OPEN_RE.test(line)) { inBlock = true; continue; }
+    const m = re.exec(line);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
+// Stamp the timeline directives onto a block that is about to go into a
+// collage — CARRYING FORWARD whatever the collage already said for that slot.
+//
+// That carry-forward is the point, and it is a direct instruction: a
+// hand-edited `duration` must survive a Collage press, because editing the
+// script is how the author expects a long play to be set up for a bake. A
+// module's live script does not mention `loop` or `duration` at all (they are
+// not its business), so without this every press would reset them to the
+// default and quietly undo that edit.
+function collageStampTimeline(blockText, kind, prevBlockText) {
+  const want = COLLAGE_TIMELINE[kind];
+  if (!want) return blockText;
+  let out = blockText;
+  for (const name of Object.keys(want)) {
+    const prev = prevBlockText ? collageGetDirective(prevBlockText, name) : null;
+    const have = collageGetDirective(out, name);
+    const val  = prev != null ? prev : (have != null ? have : want[name]);
+    // FORCED BARE. These are the collage's, and `_p_` would claim a stepper
+    // that deliberately does not exist.
+    out = collageSetDirective(out, name, val, '');
+  }
+  return out;
+}
+
+// The preamble a new collage starts from. `%%bd_loop` here is the COLLAGE's,
+// not any module's, because it is above every module header — which is the
+// whole reason no new name was needed.
+const COLLAGE_PREAMBLE = '%%bd_collage 1\n%%bd_loop true\n';
 
 // Add a block, or REPLACE the one of its kind IN PLACE.
 //
@@ -15630,7 +15717,11 @@ async function init() {
             if (add.kind === 'visual') {
               slotText = collageSetDirective(slotText, 'opacity', COLLAGE_GRAPHIC_OPACITY);
             }
-            const merged = collageAddOrReplace(before, { kind: add.kind, text: slotText });
+            const prevB  = collageSlot(baseCollage, add.kind);
+            const merged = collageAddOrReplace(before, {
+              kind: add.kind,
+              text: collageStampTimeline(slotText, add.kind, prevB && prevB.script)
+            });
             setCardText(body, merged);
             collageRemembered = merged;
             const had = baseCollage.blocks.some((b) => b.kind === add.kind);
@@ -15687,8 +15778,9 @@ async function init() {
                         ' in the pasted slot (no module of it is loaded to push to)');
           }
         }
-        let next = collageAddOrReplace('%%bd_collage 1\n',
-                                       { kind: first.kind, text: slotText });
+        let next = collageAddOrReplace(COLLAGE_PREAMBLE,
+                      { kind: first.kind,
+                        text: collageStampTimeline(slotText, first.kind, null) });
         // ── THE NODE'S PROSE IS FOLDED IN (author, 2026-10-11) ──────────
         // *"I think it should fold it in — after all it can always be
         // replaced."* Which is the argument entire: a slot is one press from
@@ -15714,7 +15806,8 @@ async function init() {
         if (prose) {
           next = collageAddOrReplace(next, {
             kind: 'text',
-            text: '%%bd_module text\n%%bd_text [\n' + prose + '\n%%bd_]'
+            text: collageStampTimeline(
+                    '%%bd_module text\n%%bd_text [\n' + prose + '\n%%bd_]', 'text', null)
           });
         }
         setCardText(dest, next);
@@ -15918,7 +16011,17 @@ async function init() {
         const inPlace = !!(t0 && t0.onTop);
         let base = (t0 && t0.text) || collageRemembered;
         const started = !base;
-        if (started) base = '%%bd_collage 1\n';
+        if (started) base = COLLAGE_PREAMBLE;
+        // The timeline directives, carrying forward whatever this slot already
+        // said. See collageStampTimeline — a hand-edited duration has to
+        // survive a press.
+        {
+          const prevC = parseCollage(base);
+          const prev  = prevC ? collageSlot(prevC, block.kind) : null;
+          block = { kind: block.kind,
+                    text: collageStampTimeline(block.text, block.kind,
+                                               prev && prev.script) };
+        }
 
         // 2 and 3. ADD, or REPLACE IN PLACE.
         const next = collageAddOrReplace(base, block);

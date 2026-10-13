@@ -970,3 +970,108 @@ plumbing.
 Not scheduled. Recorded because the next person to want collaborative editing
 should start from here rather than from a blank page — and because the three
 rules above were each paid for with a bug.
+
+---
+
+## 9. A TIMELINE INSIDE ONE COLLAGE — `loop` and `duration` (2026-10-13)
+
+The author's design, decided over one exchange. The aim is a collage that
+*plays*: slots with a length, a sequence where there is more than one of a kind,
+and a whole arrangement that repeats.
+
+### 9.1 The decisions
+
+| # | the author's item | decision |
+|---|---|---|
+| 1 | Collage on a text node makes a text module on a new card, old card to History | **ALREADY IN PLACE, keep as is** (author: *"Keep behaviour as at present"*). The one difference from the description: when the collage is already the top card the press updates IN PLACE rather than making another card, so a run of presses does not litter History — and ↓ is now the explicit "keep a copy" gesture. |
+| 2 | Every module script gains `duration` and `loop`, not `_p_` | **ADOPTED, with the names aligned rather than replaced.** I proposed `%%bd_show` to avoid a clash; the author declined: *"try to align the behaviours rather than have new directives like show."* Correct, and it works — see 9.2. |
+| 3 | Sequence same-type modules in script order when `loop` is false | **ADOPTED, inside ONE collage.** I offered a sequence of whole collages as the cheaper route; the author declined it on composition grounds: *"the editing and composing process will become awkward and demand a new set of rules for composing collages within a presentation. Whereas the process for adding a module into a single collage is already there."* So the cost is accepted knowingly — see 9.4. |
+| 4 | The collage itself has a `loop`, not `_p_`, default true | **ADOPTED**, and it needs no new name: see 9.2. |
+
+### 9.2 Why the existing names align, and where each one lives
+
+**`loop` in the PREAMBLE is the collage's.** Above the first `%%bd_module` line a
+directive belongs to no module, and `parseCollage` already keeps preamble lines
+apart from every block. So `%%bd_loop true` up there is unambiguously the
+arrangement's, while the same word inside a block stays the module's. Item 4
+costs nothing and cannot collide.
+
+**`loop` inside a block is the module's, and it already exists** — a toggle in
+all three music modules (M_Music default on, DroneFrac on, M_Fractal off),
+already emitted bare as `%%bd_loop true|false`. So for music this is a DEFAULT
+change, not a new directive. **`duration` already exists too**, as DroneFrac's
+`%%bd_p_duration` (5–300 s), narrowed by the loop/duration decoupling to
+governing the bake length. The author's framing makes those one idea rather than
+two: *"the user can manually edit the script if for example they want a long play
+of a piece to make a .wav."*
+
+**They are stamped into the COLLAGE's blocks, not into each module's own default
+script** — because of RULE 9, *a module carries no directive it cannot act on*,
+which is why `%%bd_weight` and `%%bd_stroke` came out of `bd_V_Kolam3D_001`. A
+visual module cannot act on `duration`; the collage can, and that is where the
+reader lives. A module ignores them harmlessly. DroneFrac's own `duration` stays
+in its own script, because it genuinely is that module's.
+
+**Never `_p_`**, and the author's own rule says why: a control earns its place
+when the value cannot be chosen without perceiving the outcome. A duration
+cannot be judged by eye in a preview. This had to be FORCED rather than inferred
+— `collageSetDirective` takes its prefix from the block's neighbours, which is
+right for a value the module owns and has a control for, and produced
+`%%bd_p_duration` here. `_p_` is a claim that a stepper exists, so it cannot be
+guessed; the stamping passes `''` explicitly.
+
+### 9.3 Defaults, and the carry-forward that matters more
+
+| kind | `loop` | `duration` |
+|---|---|---|
+| visual | `true` | `300` (five minutes) |
+| music | `false` | absent — the module's own |
+| text | `false` | **absent, and absent MEANS 0.5 s × word count** |
+
+The text duration is deliberately not written in. A number stamped at creation
+goes stale the moment the words are edited; absent = computed at play time,
+present = an explicit override. Same shape as a module filling a missing value
+from its own default. (0.5 s/word is 120 wpm — slow for reading, about right for
+Piper speaking it.)
+
+**`collageStampTimeline` CARRIES FORWARD whatever the collage already said for
+that slot**, and stamps a default only where there was nothing. This is the part
+that makes the author's instruction work: a module's live script never mentions
+`loop` or `duration`, so without the carry-forward every Collage press would
+reset them and silently undo a hand-edited `duration`. Verified: an edited
+`duration 1800` survives a press that updates `symmetry`.
+
+**BUILT 2026-10-13**, at all four creation sites (the press, a new collage from
+a paste, that collage's text slot, and a module pasted into an existing
+collage). Nothing reads the directives yet.
+
+### 9.4 What item 3 still needs, with the cost stated
+
+- **Slot addressing.** `collageSlot(collage, kind)` returns **the first** block
+  of a kind, and there are **12 call sites** that all assume exactly one. Two of
+  a kind is unaddressable until slot ids exist — `%%bd_slot`, flagged in the
+  earlier plan as needed "when two visual blocks become possible". Item 3 is the
+  feature that forces it.
+- **One module frame.** Sequencing two graphics means reloading
+  `#visual-iframe`: the document is destroyed and rebuilt, so a flash and any
+  live state gone. Two music modules is worse — a reload loses the AudioContext,
+  and **on iOS a new context needs a fresh user gesture**, so a music sequence
+  cannot auto-advance there at all. This is the iframes-versus-one-scene fork
+  (`ThreeJS_and_VR_2026-09-28.md` §7) arriving with a deadline, and the author
+  has accepted the single-collage route knowing it.
+
+### 9.5 Build order
+
+1. **The directives and their defaults** — DONE 2026-10-13. Visible in the
+   script, nothing acting on it.
+2. **Slot addressing** — two blocks of a kind become addressable, the 12 sites
+   updated. No visible change while there is one of each, which makes it
+   testable as "nothing moved".
+3. **The sequencer in View** — honour `duration`/`loop`, advance through
+   same-kind slots in script order, and the preamble `loop` to repeat the whole.
+4. **The module changes** — DroneFrac's `duration` loses its stepper, the three
+   `loop` toggles go. LAST, deliberately: it is the only part that changes how a
+   module behaves standing alone. **Open question for then:** M_Music and
+   DroneFrac default `loop` ON today, and the author's default is `false` —
+   flipping their own defaults changes those modules outside any collage. The
+   collage-created blocks already carry `loop false` without touching them.
