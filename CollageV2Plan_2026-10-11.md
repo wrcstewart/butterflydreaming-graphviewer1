@@ -1064,9 +1064,45 @@ collage). Nothing reads the directives yet.
 
 1. **The directives and their defaults** — DONE 2026-10-13. Visible in the
    script, nothing acting on it.
-2. **Slot addressing** — two blocks of a kind become addressable, the 12 sites
-   updated. No visible change while there is one of each, which makes it
-   testable as "nothing moved".
+2. **Slot addressing** — **DONE 2026-10-13**, and no call site needed touching.
+
+   The twelve callers of `collageSlot(collage, kind)` each mean *"the slot that
+   is showing"*, which with a sequence is **the current step**, not the first.
+   So the meaning of that one function changed and the callers did not. Order in
+   the script is the identity, by the author's choice — *"use the order in
+   script"* — so **no `%%bd_slot` directive is needed for sequencing**; one
+   would still be wanted for PLACEMENT, which is not in play. Moving a block in
+   the script reorders the sequence, which is an editing gesture the author
+   already uses.
+
+   `collageStep` holds the index per kind, clamped on read, reset when a NEW
+   arrangement is created or adopted but **not** on a replace — swapping the
+   figure of step 2 must not throw the sequence back to step 1.
+
+   Two faults that only exist once there are two of a kind, both found by
+   writing the test before believing the code:
+
+   - **`collageAddOrReplace` tested the kind alone**, so with two blocks of that
+     kind it pushed the replacement in for BOTH — two identical slots out of one
+     press. It now counts blocks of each kind as the walk passes them and
+     replaces only the current step's.
+   - **`collageMergeBySlot` keyed by module id alone.** Two blocks naming the
+     SAME module — two kolam steps at different angles, which is the whole point
+     of a sequence — cannot be told apart that way, so one announcement would
+     have been written into both and the other step's hand-set values destroyed.
+     Only the block that is current can have announced, so only that one is
+     merged into; and an incoming COLLAGE is matched by kind **and position**.
+
+   Verified: two visual blocks at angles 90 and 120 address as steps 0 and 1, a
+   step beyond the end clamps to the last, an announcement into step 1 leaves
+   step 0 at 90, a press at step 1 leaves two blocks and the text intact, and
+   with one of a kind every behaviour is unchanged.
+
+   **The gap before stage 3 is worth anything:** nothing in the UI can ADD a
+   second block of a kind — the press and the paste both REPLACE, which was the
+   decided behaviour (§6.8 invariant 2). Hand-editing the script is the only
+   route today. The obvious gesture is a long-press on Collage meaning "add
+   rather than replace"; not built, and worth the author's view before it is.
 3. **The sequencer in View** — honour `duration`/`loop`, advance through
    same-kind slots in script order, and the preamble `loop` to repeat the whole.
 4. **The module changes** — DroneFrac's `duration` loses its stepper, the three

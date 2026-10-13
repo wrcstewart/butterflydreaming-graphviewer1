@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-13f' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13g' };
 
 let bdViewTitleText = '';
 
@@ -3349,10 +3349,19 @@ function collageAddOrReplace(collageText, block) {
   const pre = [];                                   // lines before any block
   const kept = [];                                  // { kind, text }
   let cur = null, curKind = null, replaced = false;
+  // WHICH of a kind gets replaced: the current step. The first cut tested the
+  // kind alone, which with two blocks of that kind pushed the replacement in
+  // for BOTH — two identical slots out of one press. Counting the blocks of
+  // each kind as the walk passes them is all that is needed, and with one of a
+  // kind the count is always 0 and the behaviour is exactly as before.
+  const seen = Object.create(null);
+  const want = collageStepOf(block.kind, collageCountOf(base, block.kind));
   const flush = () => {
     if (cur === null) return;
-    if (curKind === block.kind) { kept.push({ kind: block.kind, text: block.text }); replaced = true; }
-    else kept.push({ kind: curKind, text: cur.join('\n').replace(/\s+$/, '') });
+    const idx = (seen[curKind] = (seen[curKind] == null ? 0 : seen[curKind] + 1));
+    if (curKind === block.kind && idx === want) {
+      kept.push({ kind: block.kind, text: block.text }); replaced = true;
+    } else kept.push({ kind: curKind, text: cur.join('\n').replace(/\s+$/, '') });
     cur = null; curKind = null;
   };
   for (const line of collageText.split('\n')) {
@@ -3439,32 +3448,54 @@ function collageMergeBySlot(baseText, incoming) {
   const base = parseCollage(baseText);
   if (!base || typeof incoming !== 'string') return baseText;
 
-  // Everything the incoming side has to say, keyed by the module it is about.
-  const byModule = new Map();
+  // ── AND IT MUST BE PER STEP, NOT PER MODULE ID (2026-10-13) ────────────
+  // Keying by module id alone was right while a collage held one block of each
+  // kind. Two blocks naming the SAME module — two kolam steps with different
+  // angles, which is the whole point of a sequence — cannot be told apart by
+  // module id, so one announcement would have been written into both and the
+  // other step's hand-set values destroyed. Only the block that is CURRENT can
+  // have announced, so only that one is merged into.
   const inc = parseCollage(incoming);
+  // A collage on the incoming side is matched by kind AND POSITION, which is
+  // the only reading that survives two of a kind.
+  const incByKind = new Map();
   if (inc) {
-    for (const b of inc.blocks) byModule.set(b.moduleId, b.script);
-  } else {
-    const id = bdModuleOf(incoming);
-    if (!id) return baseText;
-    byModule.set(id, incoming);
+    for (const b of inc.blocks) {
+      if (!incByKind.has(b.kind)) incByKind.set(b.kind, []);
+      incByKind.get(b.kind).push(b.script);
+    }
   }
+  const soleId = inc ? null : bdModuleOf(incoming);
+  if (!inc && !soleId) return baseText;
 
   // Walk the base, gathering each block's lines, and merge only within it.
   // The header test comes FIRST on every line, which is the same construction
   // that makes parseCollage's implicit block close reliable.
   const out = [];
-  let cur = null, curId = null;
+  let cur = null, curId = null, curKind = null;
+  const seen = Object.create(null);
   const flush = () => {
     if (cur === null) return;
-    const src = curId && byModule.get(curId);
     const text = cur.join('\n');
+    const idx  = (seen[curKind] = (seen[curKind] == null ? 0 : seen[curKind] + 1));
+    let src = null;
+    if (inc) {
+      const list = incByKind.get(curKind);
+      src = (list && list[idx] != null) ? list[idx] : null;
+    } else if (curId === soleId &&
+               idx === collageStepOf(curKind, collageCountOf(base, curKind))) {
+      src = incoming;
+    }
     out.push(src ? mergeExploredValues(text, src) : text);
-    cur = null; curId = null;
+    cur = null; curId = null; curKind = null;
   };
   for (const line of baseText.split('\n')) {
     const mh = line.match(/^%%bd_module[ \t]+(\S+)/);
-    if (mh) { flush(); cur = [line]; curId = mh[1]; continue; }
+    if (mh) {
+      flush(); cur = [line]; curId = mh[1];
+      curKind = (curId === 'text') ? 'text' : (getModuleKind(curId) || 'visual');
+      continue;
+    }
     if (cur === null) { out.push(line); continue; }   // the preamble
     cur.push(line);
   }
@@ -3526,12 +3557,45 @@ function collageVisualSlot(savedText, explored) {
   return collageSlot(collageLive(savedText, explored), 'visual');
 }
 
-// The first block of a kind, or null. Named rather than inlined because three
-// call sites ask the same question and a collage with two visual blocks must
-// fail the same way in all three until placement exists.
+// ── TWO BLOCKS OF A KIND, AND WHICH ONE IS "THE" SLOT (2026-10-13) ────────
+// Stage 2 of the sequencing design, plan §9.5. Until now `collageSlot` returned
+// the FIRST block of a kind and twelve call sites were built on that, each one
+// meaning "the slot that is showing". With a sequence those are two different
+// things, and the honest reading of every one of those callers is **the CURRENT
+// step**, not the first.
+//
+// So the meaning of this one function changes and the callers do not. That is
+// the whole of stage 2: with one block per kind the current step is 0 and
+// nothing moves at all, which is what makes it testable.
+//
+// ORDER IN THE SCRIPT IS THE IDENTITY, by the author's choice — *"they will
+// [play] in order, use the order in script"* — so no `%%bd_slot` directive is
+// needed for sequencing. One would still be needed for PLACEMENT, which is not
+// in play. Moving a block in the script reorders the sequence, which is the
+// editing gesture the author already relies on.
+const collageStep = Object.create(null);     // kind -> index, 0 when unset
+function collageStepOf(kind, count) {
+  const n = Math.max(0, (count | 0) - 1);
+  const i = collageStep[kind] | 0;
+  return Math.min(Math.max(0, i), n);
+}
+function collageStepSet(kind, i) { collageStep[kind] = Math.max(0, i | 0); }
+function collageStepReset() { for (const k of Object.keys(collageStep)) delete collageStep[k]; }
+function collageCountOf(collage, kind) {
+  return collage ? collage.blocks.filter((b) => b.kind === kind).length : 0;
+}
+// Every block of a kind, in script order.
+function collageSlots(collage, kind) {
+  if (!collage) return [];
+  return collage.blocks.filter((b) => b.kind === kind);
+}
+// THE slot of a kind: the current step, clamped. Returns null when there is
+// none of that kind.
 function collageSlot(collage, kind) {
   if (!collage) return null;
-  return collage.blocks.find((b) => b.kind === kind) || null;
+  const all = collageSlots(collage, kind);
+  if (!all.length) return null;
+  return all[collageStepOf(kind, all.length)] || null;
 }
 
 // 2026-07-17 — extract the MOST RECENT module-script from a card's
@@ -15743,6 +15807,8 @@ async function init() {
         if (parseCollage(cardText)) {
           if (madeCard) setCardText(dest, cardText);
           collageRemembered = cardText;
+          collageStepReset();                 // someone else's arrangement
+
           const c = parseCollage(cardText);
           console.log('[paste] adopted a pasted collage — slots ' +
                       c.blocks.map((b) => b.kind).join(',') +
@@ -15778,6 +15844,7 @@ async function init() {
                         ' in the pasted slot (no module of it is loaded to push to)');
           }
         }
+        collageStepReset();                   // a new arrangement
         let next = collageAddOrReplace(COLLAGE_PREAMBLE,
                       { kind: first.kind,
                         text: collageStampTimeline(slotText, first.kind, null) });
@@ -16011,7 +16078,10 @@ async function init() {
         const inPlace = !!(t0 && t0.onTop);
         let base = (t0 && t0.text) || collageRemembered;
         const started = !base;
-        if (started) base = COLLAGE_PREAMBLE;
+        // A NEW arrangement starts at the beginning. Not reset on a replace:
+        // swapping the figure of step 2 should not throw the sequence back to
+        // step 1.
+        if (started) { base = COLLAGE_PREAMBLE; collageStepReset(); }
         // The timeline directives, carrying forward whatever this slot already
         // said. See collageStampTimeline — a hand-edited duration has to
         // survive a press.
