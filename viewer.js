@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-11aa' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13a' };
 
 let bdViewTitleText = '';
 
@@ -15500,27 +15500,58 @@ async function init() {
       // be rewritten under the keyboard the moment the module id became
       // resolvable, mid-word. A paste is one act with one intention; typing is
       // a hundred acts, and only the last of them is a script.
-      function collageFromPaste(body) {
+      function collageFromPaste(body, incoming) {
         if (!body) return;
-        const cardText = getCardText(body) || '';
+        // ── WHERE THE TEXT COMES FROM DEPENDS ON THE BODY ─────────────────
+        // Not a detail. A local card is a <textarea>: a paste there keeps its
+        // newlines, and it may be one block among several already in the card,
+        // so the CARD is the source. A node's reading card is a contenteditable
+        // div built from .chunk-text elements, and a browser paste into it
+        // arrives as <div>/<br> markup that getCardText cannot read back — the
+        // first attempt produced `bd_V_Kolam3D%%bd_p_symmetry`, a module id with
+        // the next line welded onto it, which is exactly what the log reported.
+        // So for a built card the CLIPBOARD is the source and the card is never
+        // read at all.
+        const editable = body.tagName === 'TEXTAREA';
+        const cardText = editable ? (getCardText(body) || '') : (incoming || '');
+
+        // AND A BUILT CARD IS NOT WHERE A COLLAGE GOES. Writing one into the
+        // node's reading card would overwrite the node's own text with the
+        // user's document and leave readChunkBody nothing to read back, so the
+        // collage goes to a new local card — which is where §4.4a says a
+        // collage belongs anyway, and the reading card is left as it was.
+        let dest = editable ? body : null;
+        const madeCard = !dest;
+        if (!dest) {
+          const card = createCard({ kind: 'local' });
+          dest = card && card.body;
+          if (!dest) { console.warn('[paste] no card to write the collage into'); return; }
+          if (currentStackEl) currentStackEl.scrollTop = 0;
+        }
 
         // Already a collage: ADOPT it, rewrite nothing. A collage pasted from
         // elsewhere is the finished article, and the only thing it needs is for
         // the rest of the machinery to know it is here.
         if (parseCollage(cardText)) {
+          if (madeCard) setCardText(dest, cardText);
           collageRemembered = cardText;
           const c = parseCollage(cardText);
           console.log('[paste] adopted a pasted collage — slots ' +
-                      c.blocks.map((b) => b.kind).join(','));
+                      c.blocks.map((b) => b.kind).join(',') +
+                      (madeCard ? ' (into a new card)' : ' (in place)'));
           try { refreshCollageBtn(); }
           catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
           const v = collageSlot(c, 'visual') || collageSlot(c, 'music');
-          if (v) collageCentreSoon(body, v.moduleId);
+          if (v) collageCentreSoon(dest, v.moduleId);
           return;
         }
 
         const first = extractFirstModuleScript(cardText);
-        if (!first) return;                    // not a script — ordinary text
+        if (!first) {
+          console.log('[paste] no properly parsed module in ' + cardText.length +
+                      ' chars — left as text');
+          return;
+        }
 
         // ── DIMMED HERE TOO, AND IT MATTERS MORE HERE (§4.4e) ───────────
         // The same reason as the Collage button: a figure at full opacity
@@ -15555,20 +15586,29 @@ async function init() {
             text: '%%bd_module text\n%%bd_text [\n' + prose + '\n%%bd_]'
           });
         }
-        setCardText(body, next);
+        setCardText(dest, next);
         collageRemembered = next;
-        console.log('[paste] ' + first.moduleId + ' pasted — card is now a collage, slots ' +
+        console.log('[paste] ' + first.moduleId + ' pasted — ' +
+                    (madeCard ? 'a new top card is' : 'the card is') + ' now a collage, slots ' +
                     (parseCollage(next) || { blocks: [] }).blocks.map((b) => b.kind).join(',') +
                     (prose ? ' (the node\'s prose folded in as the text slot)'
                            : ' (no prose on this node — no text slot)'));
         try { refreshCollageBtn(); }
         catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
-        collageCentreSoon(body, first.moduleId);
+        collageCentreSoon(dest, first.moduleId);
       }
 
       document.addEventListener('paste', (e) => {
         const el = e && e.target;
-        if (!el || !el.classList || !el.classList.contains('card-body')) return;
+        // `closest`, NOT `classList.contains`. The first cut tested the event
+        // target itself, which is right for a <textarea> and wrong for a
+        // contenteditable card, where the target is the inner .chunk-text div.
+        // So a paste into a node's reading card returned here, logged nothing,
+        // and "it did not convert to a collage" was indistinguishable from "the
+        // listener never attached" — which is the third time a silent guard has
+        // cost a round on this feature.
+        const body = (el && el.closest) ? el.closest('.card-body') : null;
+        if (!body) return;
         let incoming = '';
         try {
           incoming = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
@@ -15576,12 +15616,18 @@ async function init() {
           console.warn('[paste] could not read the clipboard: ' + err.message);
         }
         // Cheap test on what is ARRIVING, so an ordinary paste of prose costs
-        // nothing at all. The real work reads the card AFTER the paste has
-        // landed, because a paste can be one block into a card that already
-        // holds others and only the finished text says what the card is.
+        // nothing at all.
         if (!/^%%bd_module[ \t]+\S+/m.test(incoming)) return;
+        const editable = body.tagName === 'TEXTAREA';
+        console.log('[paste] module script, ' + incoming.length + ' chars, into ' +
+                    (editable ? 'an editable card'
+                              : 'a built card (' + (el.className || el.tagName) + ')'));
+        // REFUSED into a built card, so the node's reading text is not
+        // overwritten and the markup a browser paste would create never has to
+        // be read back. collageFromPaste writes a new local card instead.
+        if (!editable) { try { e.preventDefault(); } catch (_) {} }
         setTimeout(() => {
-          try { collageFromPaste(el); }
+          try { collageFromPaste(body, incoming); }
           catch (err) { console.warn('[paste] collage from paste threw: ' + err.message); }
         }, 0);
       });

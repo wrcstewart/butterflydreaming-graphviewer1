@@ -768,6 +768,32 @@ search continues; `%%bd_module text` is not a module; no module gives null; the
 `%%bd_score [ … %%bd_]` block survives intact; and the assembled collage comes
 out `visual,text` with the words on top.
 
+**CORRECTED 2026-10-13, on the first real test.** The author pasted a Kolam
+script into a text node and nothing happened — no conversion, and **no log line
+either**, which is what made it diagnosable: the block had run at boot
+(`v2 button found`) and the canary said both files were current, so the handler
+was attached and had declined in silence. Two faults, both from assuming the
+paste would land in a local card:
+
+- **The guard tested the event target itself** (`classList.contains('card-body')`),
+  which is right for a `<textarea>` and wrong for a contenteditable card, where
+  the target is the inner `.chunk-text` div. Now `el.closest('.card-body')`, the
+  same idiom `getFocusedCardBody` already uses for `.card`.
+- **A paste into a BUILT card cannot be read back.** The log proved it
+  independently: `[auto] focusout: not writing a bd_V_Kolam3D script into a
+  bd_V_Kolam3D%%bd_p_symmetry card` — a module id with the next line welded onto
+  it, because a browser paste into a contenteditable arrives as `<div>`/`<br>`
+  markup and `getCardText`'s chunk reader knows nothing of it. This is the Sv
+  lesson again: **a BUILT card must be read back, and a paste is not something
+  it was built from.**
+
+So the source of the text now depends on the body. A `<textarea>` is read from
+the CARD, because a paste there keeps its newlines and may be one block among
+others already present. A built card is read from the **clipboard** and never
+read back at all — and the paste into it is **refused** (`preventDefault`), with
+the collage written to a new local card, so the node's own reading text is left
+intact. Which is also where §4.4a says a collage belongs.
+
 And **a paste no longer raises the module layout**: `pastedIntoTopCard` is
 suppressed when the card is a collage. A collage has no page preview in v2
 (§4.7), so raising the layout showed something that was not the collage. This
