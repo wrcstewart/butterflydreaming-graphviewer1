@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13d' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13e' };
 
 let bdViewTitleText = '';
 
@@ -12259,6 +12259,25 @@ async function init() {
     // Jump Bar. Positioning it would be measuring and moving nothing, several
     // times a frame during a drift. Bail rather than delete, so the dock-slot
     // machinery survives intact if this panel is ever given contents again.
+    // ── THE ARROW RESET RUNS BEFORE EVERY EARLY RETURN (moved 2026-10-13) ──
+    // It used to sit AFTER the `display: none` check below, so when the extend
+    // panel was hidden — which is the no-module case — the reset never ran and
+    // any inline `position: fixed` + coordinates stamped for the mobile player
+    // layout survived into the next one. That was invisible while the arrows
+    // were hidden without a module; they are shown in Create now, so a stale
+    // rect would float them over the cards.
+    //
+    // Release any inline geometry we stamp onto BD chrome for module docking
+    // (↓↑ arrow position/size) so leaving a module/Player restores the CSS
+    // defaults. Re-applied below when applicable. auto-echo joins the reset:
+    // it is stamped position:fixed inline by the branch below, and without
+    // clearing it a box positioned for one layout keeps those coordinates into
+    // the next one — which is how it came to sit on top of the arrows on
+    // desktop.
+    ['copy-up-btn', 'copy-down-btn', 'auto-echo'].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; b.style.zIndex = ''; }
+    });
     if (getComputedStyle(panel).display === 'none') return;
     // 2026-08-17 — release any inline geometry we grew for the Kolam player
     // (History-pane height, ↓↑ arrow tops); the Kolam branch below re-applies
@@ -12266,17 +12285,6 @@ async function init() {
     // Player/desktop restores CSS defaults.
     const histReset = document.getElementById('chat-panel');
     if (histReset) histReset.style.height = '';
-    // Release any inline geometry we stamp onto BD chrome for module docking
-    // (↓↑ arrow position/size, ext-panel width) so leaving a module/Player
-    // restores the CSS defaults. Re-applied below when applicable.
-    // auto-echo joins the reset: it is stamped position:fixed inline by the
-    // branch below, and without clearing it a box positioned for one layout
-    // keeps those coordinates into the next one — which is how it came to sit
-    // on top of the arrows on desktop.
-    ['copy-up-btn', 'copy-down-btn', 'auto-echo'].forEach((id) => {
-      const b = document.getElementById(id);
-      if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; b.style.zIndex = ''; }
-    });
     panel.style.width = '';
     // 2026-08-18 — the desktop early-return moved into the LEGACY path below
     // (after the dock-slot check), so grid modules (ABC) dock their arrows +

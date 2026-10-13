@@ -897,6 +897,26 @@ directives, and a directive whose value has been deleted mid-keystroke. With
 `auto` unticked there is now no manual way across at all. A long-press is the
 obvious home for it if it is ever wanted back.
 
+**They were also almost always INVISIBLE, 2026-10-13.** Reported as *"no up down
+buttons most of the time — occasionally appear after a back to browse then create
+wander"*, which describes one CSS rule exactly:
+`body:not(.player-active) #copy-down-btn { display: none }`. Right while the pair
+meant card → module (with no module there was nothing to copy to), and wrong the
+moment they carried cards — so they showed only when a wander happened to land on
+a module node. The gate is now `body:not(.edit-active)`: **Create, where cards
+are composed, and not Browse, which is reading and gains nothing from buttons
+that rearrange the stack.**
+
+Two things that had to move with it. The mobile rule stays keyed on
+`player-active`, and must: it lifts the arrows out of the bar and stamps them
+beside the STEPPER COLUMN, which exists only when a module does — without one
+they belong in the bar's flow. And `positionExtendPanel`'s reset of their inline
+geometry sat AFTER its `display: none` early return, which is the no-module case,
+so a `position: fixed` plus coordinates stamped for the mobile player layout
+survived into the next one. Invisible while the arrows were hidden without a
+module; it would have floated them over the cards now. The reset runs before
+every early return.
+
 **`bd_script_request`/`bd_script_response` is untouched and still live** —
 checked rather than assumed, since it would have been easy to call it dead along
 with the button. The Copy-Link update gate and the first-push state query both
