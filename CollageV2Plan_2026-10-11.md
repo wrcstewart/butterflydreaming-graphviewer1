@@ -747,11 +747,23 @@ a script by hand is never rewritten under the keyboard mid-word:
    outside it is ignored — the author's rule. "Properly parsed" is concrete: the
    `%%bd_module` id must resolve through `getModuleUrl`, so a header naming
    nothing is skipped rather than trusted.
-3. **The current node's prose is folded in as the text slot.** The author:
-   *"I think it should fold it in — after all it can always be replaced."* Which
-   is the argument: a slot is one press from being replaced, so presuming is
-   cheap and leaving it empty costs a press every time. Skipped when the node
-   has no prose.
+3. **Prose is folded in as the text slot — the CARD's own words first, the
+   node's second.** The author: *"I think it should fold it in — after all it can
+   always be replaced."* Which is the argument: a slot is one press from being
+   replaced, so presuming is cheap and leaving it empty costs a press every
+   time.
+
+   **Corrected 2026-10-13:** the first cut always took the node's prose. The
+   author made a new card, typed *"This is my own text"*, pasted a Kolam script
+   under it, and got the Tao passage in the text slot. Words typed into this
+   card a moment ago are a deliberate act; the node's prose is only a sensible
+   DEFAULT for a card that has none of its own. `nodeProse` is the reader for
+   both — it strips `%%bd_` lines and bracket-block bodies, so what it returns
+   from the card is exactly the prose `extractFirstModuleScript` ignored, which
+   is a pleasing division of one text between two readers with no third rule to
+   keep in step. The log says which source was used.
+
+   Skipped when neither has prose.
 4. **The graphic is dimmed to 0.45**, as on a button press (§4.4e) — and it
    matters MORE here, not less: the pasted module is not on screen, so there is
    no stepper to reach for, and an undimmed paste would give an unreadable View

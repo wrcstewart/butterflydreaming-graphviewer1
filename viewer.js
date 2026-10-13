@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13a' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13b' };
 
 let bdViewTitleText = '';
 
@@ -15578,8 +15578,22 @@ async function init() {
         // being replaced, so presuming is cheap, and leaving it out costs a
         // press every single time. Skipped when the node has no prose — a
         // module node's text may be directives and nothing else.
+        // ── THE WORDS ARE THE CARD'S OWN FIRST, THE NODE'S SECOND ───────
+        // The author typed "This is my own text" into a new card, pasted a
+        // Kolam script under it, and got the NODE's passage in the text slot.
+        // Wrong, and obviously so once seen: words typed into this card a
+        // moment ago are a deliberate act, and the node's prose is only a
+        // sensible DEFAULT for a card that has none of its own.
+        //
+        // nodeProse reads both, and it is the right reader for the card too:
+        // it strips %%bd_ lines and bracket-block bodies, so what it returns
+        // from the card is exactly the prose extractFirstModuleScript ignored.
+        const cardProse = (nodeProse(cardText) || '').trim();
         const n = bdViewNode();
-        const prose = n ? (nodeProse(n.data('text') || '') || '').trim() : '';
+        const nodeOwn   = n ? (nodeProse(n.data('text') || '') || '').trim() : '';
+        const prose     = cardProse || nodeOwn;
+        const proseFrom = cardProse ? "the card's own words"
+                                    : (nodeOwn ? "the node's prose" : 'nowhere');
         if (prose) {
           next = collageAddOrReplace(next, {
             kind: 'text',
@@ -15591,8 +15605,8 @@ async function init() {
         console.log('[paste] ' + first.moduleId + ' pasted — ' +
                     (madeCard ? 'a new top card is' : 'the card is') + ' now a collage, slots ' +
                     (parseCollage(next) || { blocks: [] }).blocks.map((b) => b.kind).join(',') +
-                    (prose ? ' (the node\'s prose folded in as the text slot)'
-                           : ' (no prose on this node — no text slot)'));
+                    (prose ? ' (text slot from ' + proseFrom + ')'
+                           : ' (no prose in the card or on the node — no text slot)'));
         try { refreshCollageBtn(); }
         catch (e) { console.warn('[paste] refresh threw: ' + e.message); }
         collageCentreSoon(dest, first.moduleId);
