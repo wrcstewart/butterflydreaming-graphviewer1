@@ -1159,3 +1159,53 @@ collage). Nothing reads the directives yet.
    DroneFrac default `loop` ON today, and the author's default is `false` —
    flipping their own defaults changes those modules outside any collage. The
    collage-created blocks already carry `loop false` without touching them.
+
+### 9.6 The last block of a kind is LIVE; the earlier ones are frozen
+
+The author, on the first test of the add rule: *"symmetry 8 then Collage is
+correct. Adjust to 7. Collage — result two modules in script but script with 7
+in each."*
+
+**Nothing was broken, which is why it needed thinking about rather than
+patching.** The echo keeps a block in step with its module, so adjusting to 7
+correctly updated the block that was already there; the press then added the
+live script, which was also 7. The 8 had not been kept anywhere — until the
+second press there was no reason to think it was a STEP rather than simply the
+current state of the one slot. A sequence is not knowable from a single press.
+
+So a press now **records what the module said at that moment**, and the NEXT
+press **commits that recorded value as a frozen step ahead of the live block**.
+The rule that falls out is worth stating plainly, because it is what a composer
+means:
+
+> **The last block of a kind is live and follows its module. Every earlier block
+> is frozen at the value it had when you moved on.**
+
+Both behaviours are then right at once, and the single-slot case is untouched:
+one block of a kind tracks its module exactly as before, which is the property
+that justified the add rule in the first place.
+
+Three details that matter:
+
+- **Nothing is ever rewritten to achieve it.** `collageAddOrReplace` gained a
+  `'commit'` mode that INSERTS the recorded value immediately before the last
+  block of its kind. Reverting the existing block would have been the obvious
+  implementation and would have silently undone a hand edit.
+- **The press refreshes the live block from the module** after committing, so it
+  is authoritative rather than racing the echo's next write — otherwise a press
+  landing in the second between a stepper move and the echo would commit and
+  freeze the same value twice.
+- **The echo now targets the LAST block naming the announcing module**, not a
+  step index. Simpler and more robust: the last block of a kind is live by
+  construction, since a commit inserts ahead of it, and it stays correct after a
+  paste without any counter being maintained.
+
+A press with nothing changed since the last one is refused and says so. No
+snapshot for a kind this session — a collage reinstated from History, say —
+falls back to adding the live script, and says that too rather than pretending
+to have frozen a step it never saw.
+
+Verified end to end, in the author's own sequence: 8 → press → `[8]`; adjust 7 →
+`[7]`; press → `[8, 7]`; adjust 5 → `[8, 5]`; press → `[8, 7, 5]`; press again
+unchanged → refused; and an echo of 99 → `[8, 7, 99]`, only the live block
+moving.
