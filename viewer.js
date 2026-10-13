@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-13i' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13j' };
 
 let bdViewTitleText = '';
 
@@ -3366,7 +3366,6 @@ const COLLAGE_PREAMBLE = '%%bd_collage 1\n%%bd_loop true\n';
 // by accident.
 function collageAddOrReplace(collageText, block, mode) {
   if (!block) return collageText;
-  // `mode` is reassigned below in one case, which is why it is not a const.
 
   const base = parseCollage(collageText);
   if (!base) return collageText;
@@ -3383,8 +3382,7 @@ function collageAddOrReplace(collageText, block, mode) {
     const last = same.length ? same[same.length - 1] : null;
     if (last && last.script.trim() === String(block.text).trim()) return collageText;
   }
-  // 'commit' must not fire before there is anything to commit ahead of.
-  if (mode === 'commit' && !collageCountOf(base, block.kind)) mode = 'add';
+
 
   const pre = [];                                   // lines before any block
   const kept = [];                                  // { kind, text }
@@ -3418,21 +3416,7 @@ function collageAddOrReplace(collageText, block, mode) {
     cur.push(line);
   }
   flush();
-  if (!replaced) {
-    if (mode === 'commit') {
-      // ── INSERT BEFORE THE LAST OF ITS KIND ──────────────────────────────
-      // The last block of a kind is the LIVE one: the echo keeps it in step
-      // with the module. So committing a step means putting the value the
-      // module HAD into the sequence ahead of the live block, and never
-      // rewriting a block that already exists. See the press, and §9.6.
-      let at = -1;
-      for (let i = kept.length - 1; i >= 0; i--) {
-        if (kept[i].kind === block.kind) { at = i; break; }
-      }
-      if (at >= 0) kept.splice(at, 0, { kind: block.kind, text: block.text });
-      else kept.push({ kind: block.kind, text: block.text });
-    } else kept.push({ kind: block.kind, text: block.text });
-  }
+  if (!replaced) kept.push({ kind: block.kind, text: block.text });
 
   // ── THE BLOCKS COME OUT IN A CANONICAL ORDER (2026-10-11) ────────────────
   // Block order is the STACKING order — a later block draws over an earlier
@@ -3499,7 +3483,7 @@ function collageTypeOf(text) {
 //
 // Checked against the real node: `angle` is the ONLY name shared between its
 // two modules today, and nothing stops the next pair sharing more.
-function collageMergeBySlot(baseText, incoming) {
+function collageMergeBySlot(baseText, incoming, grow) {
   const base = parseCollage(baseText);
   if (!base || typeof incoming !== 'string') return baseText;
 
@@ -3532,6 +3516,40 @@ function collageMergeBySlot(baseText, incoming) {
     base.blocks.forEach((b, i) => { if (b.moduleId === soleId) lastOfModule = i; });
   }
 
+  // ── A SEALED BLOCK GROWS A NEW ONE RATHER THAN BEING WRITTEN TO ────────
+  // See collageSealed. `grow` is passed only by the ECHO's write path and only
+  // for a DELIBERATE change: the display merge (collageLive) and the
+  // exploration record must never add a block, and drift must never add one
+  // either.
+  if (grow && soleId && collageSealed[soleId] && lastOfModule >= 0) {
+    const b     = base.blocks[lastOfModule];
+    const fresh = mergeExploredValues(b.script, incoming);
+    // Nothing actually different: no step, and the seal stays on. A module can
+    // announce the same values repeatedly, and an identical step is never
+    // what anyone means.
+    if (fresh.trim() === b.script.trim()) return baseText;
+    delete collageSealed[soleId];
+    const out = [];
+    let cur = null, nth = -1;
+    const flushGrow = () => {
+      if (cur === null) return;
+      out.push(cur.join('\n').replace(/\s+$/, ''));
+      // Immediately AFTER the sealed block, which keeps the new step inside its
+      // own kind's group — the canonical order groups by kind, so appending at
+      // the very end would be wrong for anything but the last kind.
+      if (nth === lastOfModule) out.push('', fresh);
+      cur = null;
+    };
+    for (const line of baseText.split('\n')) {
+      if (/^%%bd_module[ \t]/.test(line)) { flushGrow(); cur = [line]; nth += 1; continue; }
+      if (cur === null) { out.push(line); continue; }
+      cur.push(line);
+    }
+    flushGrow();
+    console.log('[collage] ' + soleId + ' changed after a press — a new step added');
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
+  }
+
   const out = [];
   let cur = null, curId = null, curKind = null, nth = -1;
   const seen = Object.create(null);
@@ -3543,7 +3561,15 @@ function collageMergeBySlot(baseText, incoming) {
     if (inc) {
       const list = incByKind.get(curKind);
       src = (list && list[idx] != null) ? list[idx] : null;
-    } else if (curId === soleId && nth === lastOfModule) {
+    } else if (curId === soleId && nth === lastOfModule && !collageSealed[curId]) {
+      // ── AND NEVER A SEALED BLOCK ───────────────────────────────────────
+      // "A sealed block is never written to again" has to mean never, not
+      // "never by a deliberate change". The grow branch above has already
+      // returned for a deliberate change, so reaching here while sealed means
+      // DRIFT — and drift would otherwise go on rewriting a finished step's
+      // `angle_minutes` for as long as it ran. The first test of this missed it
+      // because the fixture's block had no angle to drift.
+      //
       // THE LAST BLOCK NAMING THAT MODULE, not the current step. Simpler and
       // more robust than a step index: the last block of a kind is the live
       // one by construction (a commit inserts ahead of it), so "the last block
@@ -3592,12 +3618,14 @@ function collageMergeBySlot(baseText, incoming) {
 // An incoming script that is ITSELF a collage is a genuine replacement and
 // passes straight through; so does every write to an ordinary card, which is
 // why this is safe to put in front of both writers.
-function collagePreservingWrite(cardText, incoming) {
+// `grow` is "this change was deliberate", and it is the ONLY path allowed to
+// add a step. See collageSealed.
+function collagePreservingWrite(cardText, incoming, grow) {
   if (typeof cardText !== 'string' || typeof incoming !== 'string') return incoming;
   if (!parseCollage(cardText)) return incoming;     // ordinary card — unchanged
   if (parseCollage(incoming))  return incoming;     // a whole collage — a real replace
   // PER-SLOT, not across the whole text: see collageMergeBySlot.
-  return collageMergeBySlot(cardText, incoming);
+  return collageMergeBySlot(cardText, incoming, grow);
 }
 
 // THE VISUAL SLOT A NODE SHOULD ACTUALLY BE SHOWING — saved script with the
@@ -3639,34 +3667,44 @@ function collageVisualSlot(savedText, explored) {
 // needed for sequencing. One would still be needed for PLACEMENT, which is not
 // in play. Moving a block in the script reorders the sequence, which is the
 // editing gesture the author already relies on.
-// ── WHAT THE MODULE SAID WHEN IT WAS LAST PRESSED (2026-10-13) ────────────
-// The fault this exists for, reported by the author: set symmetry 8, press
-// Collage, adjust to 7, press again — and BOTH blocks said 7.
+// ── A PRESS SEALS A STEP; THE NEXT CHANGE STARTS THE NEXT ONE (2026-10-13) ─
+// Third iteration of this mechanism, and the author chose it over keeping the
+// second with a tooltip. The second kept the committed value in an invisible
+// snapshot while the block on screen showed the draft of the NEXT step, so the
+// script did not say what the collage held and which value survived depended on
+// what you did next. The author: *"there's a user understanding problem … first
+// press brings collage on screen but nothing freezes till second press."*
 //
-// Nothing was broken. The echo keeps the LIVE block in step with its module, so
-// adjusting to 7 correctly updated the block that was already there, and the
-// press then added the live script, which was also 7. The 8 had not been kept
-// anywhere, because until the second press there was no reason to think it was a
-// STEP rather than simply the current state of the one slot.
+// What replaces it has no hidden state at all:
 //
-// So a press records what the module said at that moment, and the NEXT press
-// commits that recorded value as a frozen step ahead of the live block. The
-// rule that falls out is worth stating plainly: **the last block of a kind is
-// live and follows its module; every earlier block is frozen at the value it
-// had when you moved on.** Which is what a composer means, and it keeps the
-// single-slot behaviour (one block, tracking) exactly as it was.
-const collagePressSnap = Object.create(null); // kind -> block text at last press
-const collageStep = Object.create(null);     // kind -> index, 0 when unset
+//   · a press SEALS the block (and adds one first, if that module has none);
+//   · a sealed block is never written to again — it is a step, finished;
+//   · the next DELIBERATE change appends a NEW block at that value, which then
+//     tracks the module until the next press.
+//
+// So every block in the script is real, nothing reverts, and a simple collage
+// stays one block for as long as nothing is touched after the press. The cost,
+// stated: a press on a module already in the collage changes nothing visible —
+// it creates the boundary, and the next change is what shows it.
+//
+// DELIBERATE, not drift. Drift announces about once a second, so if it counted
+// as a change it would append a step while nobody was looking. A sealed step
+// therefore holds its angle until a stepper is actually moved.
+const collageSealed = Object.create(null);    // moduleId -> true once sealed
+const collageStep = Object.create(null);     // kind -> index; unset = the LAST
+// UNSET MEANS THE LAST, not the first: with no sequencer yet, the block worth
+// showing is the one being worked on, which is the live one at the end. A
+// sequencer will set the step explicitly and this default will stop mattering.
 function collageStepOf(kind, count) {
   const n = Math.max(0, (count | 0) - 1);
-  const i = collageStep[kind] | 0;
-  return Math.min(Math.max(0, i), n);
+  if (collageStep[kind] == null) return n;
+  return Math.min(Math.max(0, collageStep[kind] | 0), n);
 }
 function collageStepSet(kind, i) { collageStep[kind] = Math.max(0, i | 0); }
 function collageStepReset() {
   for (const k of Object.keys(collageStep)) delete collageStep[k];
-  // The snapshots belong to the arrangement being composed, so they go with it.
-  for (const k of Object.keys(collagePressSnap)) delete collagePressSnap[k];
+  // The seals belong to the arrangement being composed, so they go with it.
+  for (const k of Object.keys(collageSealed)) delete collageSealed[k];
 }
 function collageCountOf(collage, kind) {
   return collage ? collage.blocks.filter((b) => b.kind === kind).length : 0;
@@ -14323,7 +14361,7 @@ async function init() {
       }
       // Through collagePreservingWrite, so a module's announcement updates a
       // collage card instead of replacing it with one slot. See its note.
-      const outgoing = collagePreservingWrite(getCardText(body), text);
+      const outgoing = collagePreservingWrite(getCardText(body), text, !fromDrift);
       // The remembered collage follows the live card. Without this a stepper
       // moved after the collage was assembled would be in the card and not in
       // the memory, so wandering away and coming back would lose it. Plan §4.2.
@@ -16191,45 +16229,29 @@ async function init() {
         // The timeline directives, carrying forward whatever this slot already
         // said. See collageStampTimeline — a hand-edited duration has to
         // survive a press.
-        const prevC = parseCollage(base);
-        const same  = prevC ? collageSlots(prevC, block.kind) : [];
-        const prev  = same.length ? same[same.length - 1] : null;
+        const prevC   = parseCollage(base);
+        const blockId = parseModuleId(block.text) || (block.kind === 'text' ? 'text' : null);
+        // Does THIS MODULE already have a block? Per module, not per kind: a
+        // collage holding a Kolam and a Kolam3D has a step boundary for each.
+        const mine0 = prevC ? prevC.blocks.filter((b) => b.moduleId === blockId) : [];
+        const prev  = mine0.length ? mine0[mine0.length - 1] : null;
         // The module's state NOW, with the timeline directives carried forward.
         const live  = collageStampTimeline(block.text, block.kind, prev && prev.script);
-        const snap  = collagePressSnap[block.kind];
 
-        // 2 and 3. COMMIT THE STEP YOU WERE ON, AND KEEP THE LIVE ONE LIVE.
-        // See collagePressSnap for why this is not simply "append the live
-        // script": that is what put 7 in both blocks.
-        let next;
-        if (!same.length) {
+        // 2 and 3. ADD IF IT IS NEW; otherwise SEAL. See collageSealed.
+        let next = base, sealedOnly = false;
+        if (!mine0.length) {
           next = collageAddOrReplace(base, { kind: block.kind, text: live });
-        } else if (snap && snap.trim() === live.trim()) {
-          console.log('[collage] nothing added — the ' + block.kind +
-                      ' module has not changed since the last press');
-          return;
-        } else if (snap) {
-          // The recorded value goes in AHEAD of the live block, which is then
-          // refreshed from the module so the press is authoritative rather than
-          // racing the echo's next write.
-          next = collageAddOrReplace(base, { kind: block.kind, text: snap }, 'commit');
-          const n1 = collageSlots(parseCollage(next), block.kind).length;
-          collageStepSet(block.kind, n1 - 1);
-          next = collageAddOrReplace(next, { kind: block.kind, text: live }, 'replace');
+          if (next === base) {
+            console.log('[collage] nothing added — that exact ' + block.kind +
+                        ' block is already the last of its kind');
+            return;
+          }
         } else {
-          // No snapshot this session — a collage reinstated from History, say.
-          // Adding the live script is the honest fallback, and it says so rather
-          // than pretending to have frozen a step it never saw.
-          console.log('[collage] no press snapshot for ' + block.kind +
-                      ' this session — adding the live script as a new step');
-          next = collageAddOrReplace(base, { kind: block.kind, text: live });
+          sealedOnly = true;
         }
-        if (next === base) {
-          console.log('[collage] nothing added — that exact ' + block.kind +
-                      ' block is already the last of its kind');
-          return;
-        }
-        collagePressSnap[block.kind] = live;
+        // Sealed either way: a press means "this step is finished".
+        if (blockId) collageSealed[blockId] = true;
 
         // 4. COMMIT — to the card on screen if the collage is already there,
         //    to a fresh top card otherwise, and to the remembered string
@@ -16244,19 +16266,17 @@ async function init() {
         setCardText(body, next);
         collageRemembered = next;
 
-        // THE NEW BLOCK BECOMES THE CURRENT STEP of its kind, and it has to:
-        // the echo merges a module's announcements into the CURRENT step, so
-        // leaving the step at 0 would send the stepper you are about to move
-        // into the wrong block. It is also the one the user just chose, so
-        // showing it is right until the sequencer owns the step (stage 3).
         const nextC = parseCollage(next) || { blocks: [] };
         const mine  = (nextC.blocks || []).filter((b) => b.kind === block.kind);
-        if (mine.length) collageStepSet(block.kind, mine.length - 1);
+        // No step is set: collageStepOf defaults to the LAST of a kind, which is
+        // the one being worked on. A sequencer will set it explicitly.
 
         const kinds = (nextC.blocks || []).map((b) => b.kind).join(',');
         console.log('[collage] ' + (started ? 'STARTED' : (inPlace ? 'added in place' : 'REINSTATED as the top card')) +
-                    ' — ' + block.kind + ' now ' + mine.length + ' of its kind' +
-                    ', live step ' + (mine.length - 1) + '; slots now ' + kinds);
+                    ' — ' + (sealedOnly
+                      ? (block.kind + ' step SEALED (' + blockId + ') — the next change starts a new step')
+                      : (block.kind + ' added, now ' + mine.length + ' of its kind')) +
+                    '; slots now ' + kinds);
         // 5. STAY PUT. The label has to catch up, though — and the card is
         //    scrolled to the block that has just changed, which in a
         //    three-block collage is otherwise off the bottom of the window.

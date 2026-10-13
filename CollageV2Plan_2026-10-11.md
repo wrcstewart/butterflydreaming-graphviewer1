@@ -1249,3 +1249,60 @@ independently.
 **Nothing to build for this** — it is the behaviour committed on 2026-10-13 as
 `2026-10-13i`. Recorded here because the rule is the thing to remember, and it
 is not deducible from any one function.
+
+### 9.8 A PRESS SEALS A STEP; THE NEXT CHANGE STARTS THE NEXT ONE
+
+Third iteration of the commit mechanism, and the author's choice between the two
+I offered. §9.6's version was right in its semantics and wrong in what it showed:
+the committed value lived in an invisible snapshot while the block on screen
+showed the draft of the NEXT step. So the script did not say what the collage
+held, and which value survived depended on what you did next. The author:
+*"there's a user understanding problem … first press brings collage on screen but
+nothing freezes till second press."*
+
+I offered (1) keep it and surface the snapshot in a tooltip, or (2) this. The
+author took 2 — *"lets try 2 as you say"* — and it has no hidden state at all:
+
+- a press **SEALS** the block, and adds one first if that module has none;
+- a sealed block is **never written to again** — it is a step, finished;
+- the next **deliberate** change appends a NEW block at that value, which then
+  tracks the module until the next press.
+
+| you do | script |
+|---|---|
+| symmetry 9, press | `[9]` |
+| adjust to 10 | `[9, 10]` |
+| adjust to 12 | `[9, 12]` |
+| press | `[9, 12]`, sealed |
+| adjust to 14 | `[9, 12, 14]` |
+
+Every block in the script is real, nothing reverts, and the snapshot is gone.
+**A simple collage stays one block** for as long as nothing is touched after the
+press, which neither alternative managed.
+
+Four details:
+
+- **Per MODULE, not per kind.** A collage holding a Kolam and a Kolam3D has a
+  step boundary for each. Verified: sealing the kolam and then changing the
+  drone adds a drone step and leaves the kolam alone.
+- **Deliberate, not drift.** `grow` is passed only by the echo's write path and
+  only when `fromDrift` is false. The display merge (`collageLive`) and the
+  exploration record must never add a block, and drift must never add one
+  either — it announces about once a second and would grow a sequence while
+  nobody was looking.
+- **Drift must not EDIT a sealed step either**, which the first test missed
+  because its fixture had no angle to drift. "Never written to again" has to
+  mean never, or a finished step's `angle_minutes` would go on moving for as
+  long as drift ran. Verified: a sealed block's `angle_minutes 10` survives a
+  drift announcement of 45, and a deliberate change to 45 then adds a second
+  step rather than editing the first.
+- **The cost, stated:** a press on a module already in the collage **changes
+  nothing visible**. It creates the boundary; the next change is what shows it.
+  The log says `step SEALED (<module>) — the next change starts a new step`.
+
+`collageStepOf` now defaults to the **last** block of a kind rather than the
+first, so the preview and View show the step being worked on. A sequencer will
+set the step explicitly and the default will stop mattering.
+
+The `'commit'` mode added in §9.6 is removed rather than left as dead code, and
+`collagePressSnap` with it.
