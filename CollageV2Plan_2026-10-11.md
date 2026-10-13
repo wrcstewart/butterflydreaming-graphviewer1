@@ -1209,3 +1209,43 @@ Verified end to end, in the author's own sequence: 8 → press → `[8]`; adjust
 `[7]`; press → `[8, 7]`; adjust 5 → `[8, 5]`; press → `[8, 7, 5]`; press again
 unchanged → refused; and an echo of 99 → `[8, 7, 99]`, only the live block
 moving.
+
+### 9.7 The rule, as a user would state it
+
+The author's own summary, which is exactly right: *"collage means collage every
+change in that module till either there is another press or the user no longer
+has the collage script as current."*
+
+> **A press says "from now on, this module's changes are the next step". The
+> step before it stops at the value it had when you pressed.**
+
+Three refinements, all taken from the code rather than the intention, because
+each is the kind of thing that surprises someone later:
+
+- **Tracking needs three things at once**: the collage card on screen, the
+  module layout up (`player-active`), and that module announcing. Standing on a
+  text node fails the second — the log says `skip: not player-active` — so
+  nothing reaches the collage even while it is still the top card. Both
+  conditions have to return.
+- **"No longer current" is a PAUSE, not a seal.** Earlier blocks are frozen for
+  good; the LAST block of a kind never is. The moment the collage is the top card
+  again — a press, ↑, or Back from View — it resumes following its module from
+  wherever that module now stands. **So there is no state in which nothing is
+  live:** a collage always has one live block per kind. Harmless in practice,
+  since it only moves if something moves it, but a sequence cannot be "sealed"
+  at exactly three steps — it would be three frozen plus whatever the module is
+  left at.
+- **Drift counts as a change.** With `angle_drift` running the module announces
+  about once a second, so the live block's angle keeps moving and a committed
+  step freezes whatever drift had reached at the instant of the press. A step's
+  angle is therefore a snapshot of a moving target unless drift is 0 before
+  pressing.
+
+And the precision that makes multi-module sequences work: the echo targets the
+last block naming **the announcing module**, not the last block of the kind. So a
+collage holding a Kolam and a Kolam3D has a live block for each, tracking
+independently.
+
+**Nothing to build for this** — it is the behaviour committed on 2026-10-13 as
+`2026-10-13i`. Recorded here because the rule is the thing to remember, and it
+is not deducible from any one function.

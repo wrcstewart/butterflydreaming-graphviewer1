@@ -6,6 +6,89 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-13 — a collage that can hold a SEQUENCE
+
+The author's design: slots with a length, a sequence where there is more than
+one of a kind, and an arrangement that repeats. Four stages were named; the
+first two are built, and the rule that governs composing turned out to be the
+interesting part. `CollageV2Plan_2026-10-11.md` §9.
+
+### The directives, aligned rather than invented
+
+`loop` and `duration`, and deliberately not new names — I proposed `%%bd_show`
+to dodge a clash and was told to align the behaviours instead. It works because
+the scopes differ: **a directive in the PREAMBLE, above the first
+`%%bd_module` line, belongs to no module**, so `%%bd_loop true` up there is the
+arrangement's while the same word inside a block stays the module's. `loop` is
+already built in all three music modules; `duration` is already DroneFrac's.
+
+They are stamped into the collage's blocks and NOT into any module's own default
+script, by RULE 9 — a module carries no directive it cannot act on. And never
+`_p_`: that is a claim that a stepper exists, and a duration cannot be judged by
+eye. It had to be FORCED bare, because the prefix is otherwise taken from the
+block's neighbours, which produced `%%bd_p_duration`.
+
+The stamp **carries forward** what the collage already said for that slot. A
+module's live script never mentions these, so without that every press would
+reset them and silently undo a hand-edited `duration` — which the author had
+asked for explicitly, to set up a long play for a bake.
+
+### Slot addressing, with no call site touched
+
+`collageSlot(collage, kind)` returned the FIRST block of a kind and twelve
+callers were built on it — every one of which means *the slot that is showing*,
+which with a sequence is the CURRENT step. So one function changed meaning and
+no caller changed at all. Order in the script is the identity, by the author's
+choice, so no `%%bd_slot` directive was needed.
+
+Two faults exist only once there are two of a kind, and the test found both
+before the code was believed: `collageAddOrReplace` tested the kind alone and so
+replaced BOTH blocks, and `collageMergeBySlot` keyed by module id alone, which
+cannot tell two kolam steps apart and would have destroyed the other step's
+values.
+
+### A press ADDS — and the rule that came out of testing it
+
+The author inverted the replace-in-place invariant rather than take the
+long-press modifier I offered: *"it avoids the user gesture departure."* Safe
+because **replace was already redundant** — the echo keeps each block in step
+with its module, so a slot stays current without any press.
+
+Then the first real test: *"symmetry 8 then Collage is correct. Adjust to 7.
+Collage — result two modules in script but script with 7 in each."*
+
+Nothing was broken, which is why it needed thinking about. The echo had
+correctly written 7 over the 8 in the only place the 8 lived, and the press then
+added the live script, which was also 7. **A sequence is not knowable from a
+single press.** So a press now records what the module said at that moment and
+the next press commits that recorded value as a frozen step ahead of the live
+block — inserted, never rewritten, so a hand edit cannot be undone.
+
+The rule, in the author's own words and then in one line:
+
+> *"Collage means collage every change in that module till either there is
+> another press or the user no longer has the collage script as current."*
+>
+> **A press says "from now on, this module's changes are the next step". The
+> step before it stops at the value it had when you pressed.**
+
+Three things that are not obvious: tracking needs the card on screen AND the
+module layout AND the module announcing; "no longer current" is a pause rather
+than a seal, so the last block of a kind is never permanently frozen; and
+**drift counts as a change**, so a committed step freezes whatever the drift had
+reached at the instant of the press.
+
+### Also
+
+The ↑↓ arrows carry CARDS now rather than scripts — ↓ keeps a copy of the top
+card in History and leaves its text selected for one keystroke, ↑ brings the
+picked History card up. The old pair meant card → module, which `auto` has
+covered in both directions since September. They were then **invisible almost
+always**, because the rule hiding them was keyed on a module being on screen —
+right for their old meaning, wrong the moment they carried cards.
+
+---
+
 ## 2026-10-11/13 — Collage v2 built, and one mistake made three times
 
 v1 assembled a collage by hand into a NODE. v2 builds one with a button, into
