@@ -1151,8 +1151,7 @@ collage). Nothing reads the directives yet.
    The counts are now in the Collage button's `title` (`2 visual`), because with
    adding rather than replacing, how MANY of a kind there are is the thing the
    user can no longer see anywhere else.
-3. **The sequencer in View** — honour `duration`/`loop`, advance through
-   same-kind slots in script order, and the preamble `loop` to repeat the whole.
+3. **The sequencer in View** — **BUILT 2026-10-13.** See §9.9.
 4. **The module changes** — DroneFrac's `duration` loses its stepper, the three
    `loop` toggles go. LAST, deliberately: it is the only part that changes how a
    module behaves standing alone. **Open question for then:** M_Music and
@@ -1306,3 +1305,63 @@ set the step explicitly and the default will stop mattering.
 
 The `'commit'` mode added in §9.6 is removed rather than left as dead code, and
 `collagePressSnap` with it.
+
+### 9.9 The sequencer — stage 3, BUILT 2026-10-13
+
+A collage with more than one block of a kind plays through them in script order,
+each for its own `duration`, with the preamble's `loop` deciding whether the kind
+begins again after the last step.
+
+**In View only.** The preview surface is retired (§4.7) and composing is the
+page's job — a sequence advancing while you worked would be moving the thing you
+were trying to set.
+
+**One ticker at 250 ms, not a timer per kind.** One thing to clear, and a kind's
+next advance is a timestamp rather than a pending callback, so a slow frame
+cannot leave two timers racing.
+
+**The kinds advance independently.** *"More than one module of the same type
+present … they will [play] in order"* is a statement about a kind, and nothing in
+it ties the picture's clock to the words'.
+
+**It never writes to the card, and that needed a guard.** Posting step 1's script
+to the module makes the module announce it, and the echo would then merge those
+values into the LAST block of that module — a performance overwriting its own
+score. So `collageSeqOn` suppresses the echo's card write while a sequence runs,
+and `autoWrite` says why. The flag is at MODULE scope deliberately: the
+sequencer lives deep inside `init()` and `autoWrite` is shallower, and deeper
+sees shallower and not the reverse.
+
+**A sequence starts at step 1**, not at the step pointer — which has been
+following the block being WORKED on, the last one. A performance starts at the
+beginning.
+
+**`loop true` on a BLOCK holds that step**, by the author's rule: *"if loop false
+and there is more than one module of the same type present then they will [play]
+in order."* So a lone figure holds the screen and a sequence needs its blocks set
+`loop false`.
+
+> **Consequence to settle: the visual DEFAULT is `loop true`, so a graphic
+> sequence HOLDS on step 1 until the blocks are set `%%bd_loop false`.** The
+> sequencer says so in the log, once per kind, rather than appearing to have a
+> broken timer. Whether the graphic default should be flipped for sequences is
+> the author's call — it was specified as `true`.
+
+**Durations.** A block's `duration` if it has one; for text, absent means
+computed at 0.5 s a word with a 4 s floor, which is why no number is stamped into
+a text block — a stamped one goes stale the moment the words are edited.
+
+**`collagePreambleDirective` reads the collage's own `loop`** from the lines
+above the first module header only. Reading it from the whole text would find a
+BLOCK's `loop` once the preamble had none, and answer a question about the
+arrangement with a fact about one module.
+
+Verified with a fake clock: three visual steps advance 1 to 2 to 3 to 1 to 2
+under the collage's `loop true`; `%%bd_loop false` in the preamble holds the last
+step and says so; a block saying `loop true` holds and logs once; a four-word
+text block gets the 4 s floor; and the suppression flag goes on at start and off
+at stop.
+
+**The debug duration:** the visual default is **30** rather than 300 at the
+author's request, so a step change can be watched without waiting five minutes.
+Marked in the code; restore to 300 before this leaves development.

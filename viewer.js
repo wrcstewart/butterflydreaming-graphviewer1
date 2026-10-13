@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-13j' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13k' };
 
 let bdViewTitleText = '';
 
@@ -3288,10 +3288,29 @@ function collageSetDirective(blockText, name, value, prefix) {
 // editing.
 const COLLAGE_TIMELINE = {
   // Text and music run once and hand on; a figure holds the screen.
-  visual: { loop: 'true',  duration: '300' },   // five minutes
+  // DEBUG VALUE, 2026-10-13: 30 rather than 300 at the author's request, so a
+  // step change can be watched without waiting five minutes. Restore to '300'
+  // before this leaves development.
+  visual: { loop: 'true',  duration: '30' },    // DEBUG (was 300 = five minutes)
   music:  { loop: 'false' },                    // duration is DroneFrac's own
   text:   { loop: 'false' }                     // duration ABSENT = 0.5s x words
 };
+
+// A directive from the PREAMBLE only — the lines above the first module header,
+// which belong to the collage rather than to any module. Scoped deliberately:
+// reading `loop` from the whole text would find a BLOCK's loop once the
+// preamble had none, and silently answer a question about the arrangement with
+// a fact about one module.
+function collagePreambleDirective(collageText, name) {
+  const lines = String(collageText).split('\n');
+  const re = new RegExp('^%%bd_' + name + '[ \t]+(.+)$');
+  for (const line of lines) {
+    if (/^%%bd_module[ \t]/.test(line)) break;
+    const m = re.exec(line);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
 
 // Read one directive's value out of a block, either spelling, ignoring
 // anything inside a bracket block. Returns null when absent.
@@ -3691,6 +3710,12 @@ function collageVisualSlot(savedText, explored) {
 // as a change it would append a step while nobody was looking. A sealed step
 // therefore holds its angle until a stepper is actually moved.
 const collageSealed = Object.create(null);    // moduleId -> true once sealed
+// MODULE SCOPE on purpose. The sequencer lives in a block nested deep inside
+// init(); `autoWrite` is shallower, and deeper sees shallower and not the
+// reverse — the trap recorded in "block scope is not function scope". A flag at
+// the top is one line in each place instead of a hoisted reference that would
+// throw on the first write.
+let collageSeqOn = false;
 const collageStep = Object.create(null);     // kind -> index; unset = the LAST
 // UNSET MEANS THE LAST, not the first: with no sequencer yet, the block worth
 // showing is the one being worked on, which is the live one at the end. A
@@ -14293,6 +14318,12 @@ async function init() {
         console.log('[auto] ' + r + (autoWhyN ? ' (x' + autoWhyN + ')' : ''));
       };
       if (!document.body.classList.contains('player-active')) { why('skip: not player-active'); return; }
+      // ── NOT WHILE A SEQUENCE IS PLAYING ────────────────────────────────
+      // The sequencer posts step 1's script to the module; the module
+      // normalises it and announces, and this would then merge those values
+      // into the LAST block of that module — a performance overwriting its own
+      // score. The card is the document; playback is not an edit of it.
+      if (collageSeqOn) { why('skip: a collage sequence is playing'); return; }
       const body = getFocusedCardBody();
       if (!body) { why('skip: no card body (rung=' + lastCardRung + ')'); return; }
       // A hand on a stepper is a hand OFF the card.
@@ -15313,9 +15344,152 @@ async function init() {
       // a readout that stops tracking the thing it names.
       let bdViewSpeakPoll = null;
 
+      // ══ STAGE 3 — THE SEQUENCER (2026-10-13) ══════════════════════════
+      // Plan §9.5 step 3. A collage with more than one block of a kind plays
+      // through them in script order, each for its own `duration`, and the
+      // preamble's `loop` decides whether the kind starts again after the last.
+      //
+      // IN VIEW ONLY. The preview surface is retired (§4.7) and composing is
+      // the page's job, so a sequence that advanced while you were working
+      // would be moving the thing you were trying to set.
+      //
+      // ONE TICKER, not a timer per kind: one thing to clear, and a kind's next
+      // advance is a timestamp rather than a pending callback, so a slow frame
+      // cannot leave two timers racing.
+      //
+      // THE KINDS ADVANCE INDEPENDENTLY. "More than one module of the same type
+      // present … they will [play] in order" is a statement about a kind, and
+      // nothing in it ties the picture's clock to the words'.
+      //
+      // IT NEVER WRITES TO THE CARD. Advancing is presentation; the card is the
+      // document. Posting step 0's script to the module makes the module
+      // announce it, and the echo would then merge those values into the LAST
+      // block of that module — scrambling the sequence with its own playback.
+      // So the echo's card write is suppressed while a sequence is running, and
+      // says so once.
+      let collageSeqTimer  = null;
+      let collageSeqAt     = Object.create(null);   // kind -> ms, when to advance
+      let collageSeqHeld   = Object.create(null);   // kind -> logged "holds" once
+      let collageSeqParsed = null;                  // the collage as it was at entry
+      let collageSeqCardText = '';                  // its text, for the preamble
+
+      function collageSeqDuration(blk, kind) {
+        const v = collageGetDirective(blk.script, 'duration');
+        const n = v != null ? parseFloat(v) : NaN;
+        if (isFinite(n) && n > 0) return n;
+        // ABSENT MEANS COMPUTED for text, which is why no number is stamped
+        // into a text block: a stamped one goes stale the moment the words are
+        // edited. 0.5s a word, with a floor so a two-word line is not a blink.
+        if (kind === 'text') {
+          const words = String(blk.body || '').trim().split(/\s+/).filter(Boolean).length;
+          return Math.max(4, 0.5 * words);
+        }
+        return 30;
+      }
+
+      function collageSeqShow(kind, blk) {
+        if (kind === 'visual') {
+          if (typeof loadCollageVisual === 'function') loadCollageVisual(blk.moduleId, blk.script);
+        } else if (kind === 'music') {
+          if (typeof loadCollageViewPlayer === 'function') loadCollageViewPlayer(blk.moduleId, blk.script);
+        } else if (kind === 'text') {
+          const bodyEl = document.getElementById('bd-view-text-body');
+          if (bodyEl) bodyEl.textContent = blk.body || '';
+          bdViewProse = blk.body || '';
+        }
+      }
+
+      function collageSeqTick() {
+        const C = collageSeqParsed;
+        if (!C) return;
+        const now = Date.now();
+        for (const kind of ['visual', 'music', 'text']) {
+          const all = collageSlots(C, kind);
+          if (all.length < 2) continue;
+          if (!(collageSeqAt[kind] <= now)) continue;
+          const cur = collageStepOf(kind, all.length);
+          const blk = all[cur];
+          // `loop true` HOLDS this step. The author's rule: *"if loop false and
+          // there is more than one module of the same type present then they
+          // will [play] in order"*. Said out loud ONCE per kind, because a
+          // sequence that silently refuses to advance is indistinguishable from
+          // a broken timer — and the visual DEFAULT is `loop true`, so this is
+          // the case a first test will meet.
+          if (collageGetDirective(blk.script, 'loop') === 'true') {
+            if (!collageSeqHeld[kind]) {
+              collageSeqHeld[kind] = true;
+              console.log('[collage] ' + kind + ' step ' + (cur + 1) + ' of ' + all.length +
+                          ' HOLDS — it says %%bd_loop true. Set %%bd_loop false on a block ' +
+                          'to let it hand on.');
+            }
+            collageSeqAt[kind] = now + 2000;        // ask again, cheaply
+            continue;
+          }
+          let nxt = cur + 1;
+          if (nxt >= all.length) {
+            const wrap = collagePreambleDirective(collageSeqCardText, 'loop');
+            if (wrap === 'false') {
+              console.log('[collage] ' + kind + ' sequence finished and the collage says ' +
+                          '%%bd_loop false — holding the last step');
+              collageSeqAt[kind] = Infinity;
+              continue;
+            }
+            nxt = 0;
+          }
+          collageStepSet(kind, nxt);
+          const show = collageSlots(C, kind)[nxt];
+          collageSeqShow(kind, show);
+          const secs = collageSeqDuration(show, kind);
+          collageSeqAt[kind] = now + secs * 1000;
+          console.log('[collage] ' + kind + ' -> step ' + (nxt + 1) + ' of ' + all.length +
+                      ' (' + (show.moduleId || 'text') + ', ' + secs + 's)');
+        }
+      }
+
+      function collageSeqStart(collageText, C) {
+        collageSeqStop();
+        if (!C) return;
+        const counts = ['visual', 'music', 'text'].map((k) => collageSlots(C, k).length);
+        if (!counts.some((n) => n > 1)) {
+          console.log('[collage] no sequence — one block of each kind at most');
+          return;
+        }
+        collageSeqParsed   = C;
+        collageSeqCardText = collageText || '';
+        collageSeqHeld     = Object.create(null);
+        const now = Date.now();
+        for (const kind of ['visual', 'music', 'text']) {
+          const all = collageSlots(C, kind);
+          if (all.length < 2) { collageSeqAt[kind] = Infinity; continue; }
+          // START AT THE FIRST STEP. The step pointer has been following the
+          // block being WORKED on, which is the last; a performance starts at
+          // the beginning.
+          collageStepSet(kind, 0);
+          collageSeqShow(kind, all[0]);
+          const secs = collageSeqDuration(all[0], kind);
+          collageSeqAt[kind] = now + secs * 1000;
+          console.log('[collage] sequence ' + kind + ': ' + all.length + ' steps, ' +
+                      'step 1 for ' + secs + 's');
+        }
+        collageSeqOn    = true;
+        collageSeqTimer = setInterval(collageSeqTick, 250);
+      }
+
+      function collageSeqStop() {
+        collageSeqOn = false;
+        if (collageSeqTimer) { clearInterval(collageSeqTimer); collageSeqTimer = null; }
+        collageSeqParsed   = null;
+        collageSeqCardText = '';
+        collageSeqAt       = Object.create(null);
+        collageSeqHeld     = Object.create(null);
+      }
+
       function bdViewExit() {
         const body = document.body;
         if (!body.classList.contains('view-active')) return;
+        // FIRST, so no tick can fire into a half-dismantled View — and so the
+        // echo is released before anything else runs.
+        try { collageSeqStop(); } catch (e) { console.warn('[collage] seq stop threw: ' + e.message); }
         // STOP SPEAKING ON THE WAY OUT, by the author's instruction. Leaving a
         // voice reading a page nobody is looking at is the same fault as BD's
         // media bar playing on into the standalone — which needed an explicit
@@ -15623,6 +15797,11 @@ async function init() {
           if (sb) sb.hidden = !bdViewProse;
           console.log('[collage] v' + collage.version + ' — ' +
             collage.blocks.map((bl) => bl.kind + ':' + bl.moduleId).join(', '));
+          // STARTED LAST, after every slot is loaded and the layout is settled:
+          // its first act is to show step 1 of each kind, which would otherwise
+          // race the one-off loading above.
+          try { collageSeqStart(text, live); }
+          catch (e) { console.warn('[collage] sequencer failed to start: ' + e.message); }
         } else if (moduleId && f && f.src) {
           // Clear the inline rect positionCyEl stamped, so the stylesheet can
           // own it. See the note at the top of positionCyEl.
