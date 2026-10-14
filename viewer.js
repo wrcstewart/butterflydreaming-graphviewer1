@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14b' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14c' };
 
 let bdViewTitleText = '';
 
@@ -3359,36 +3359,51 @@ function collageStampTimeline(blockText, kind, prevBlockText) {
 // whole reason no new name was needed.
 const COLLAGE_PREAMBLE = '%%bd_collage 1\n%%bd_loop true\n';
 
-// ── ONLY THE LAST GRAPHIC HOLDS (author, 2026-10-14) ──────────────────────
-// *"Only the last graphic should have loop true the others loop false."* So a
-// graphic sequence hands on through every step and then RESTS on the final
-// figure rather than wrapping, which is what `loop true` means to the sequencer
-// (plan 9.9).
+// ── THE LAST STEP OF A KIND HOLDS (author, 2026-10-14) ────────────────────
+// First *"only the last graphic should have loop true the others loop false"*,
+// then, on seeing the text wrap: *"might it be better to loop = true on the
+// last text in the collage?"* Yes, and for a better reason than symmetry — **a
+// piece that arrives somewhere is a better default than one that never ends.**
+// Words cycling for ever under a settled figure is a particular effect, not a
+// sensible default.
+//
+// So for EVERY kind with more than one step: the last gets `loop true`, which
+// the sequencer reads as "hold here", and every earlier one `false`. A lone
+// block of a kind is left alone and keeps its own default.
+//
+// Music is included, and there the directive does double duty by luck rather
+// than design: `loop true` is also what a music module reads as "repeat my own
+// material", so the last drone repeats while the arrangement rests on it. That
+// is the behaviour wanted, but it is worth knowing it is a coincidence of two
+// meanings agreeing, not one meaning.
 //
 // It is an INVARIANT of the arrangement rather than a value anyone sets, so it
-// is re-established after every change to the number of graphic blocks: the
-// last gets `true`, every earlier one `false`. A lone graphic is left alone and
-// keeps the default, which is `true`, and holds the screen.
+// is re-established after every change to the number of blocks of a kind. This
+// is the ONE deliberate exception to "a sealed block is never written to again"
+// (plan 9.8), and worth naming as such: `loop` here says which step HOLDS,
+// which is structural — a fact about the block's position in the sequence, not
+// a parameter the author chose for it. Every composed value stays frozen.
 //
-// This is the ONE deliberate exception to "a sealed block is never written to
-// again" (plan 9.8), and it is worth naming as such: `loop` on a graphic says
-// which step HOLDS, which is structural — a fact about the block's position in
-// the sequence, not a parameter the author chose for it. Every composed value
-// stays frozen.
-function collageLastGraphicHolds(collageText) {
+// HOW TO GET CYCLING BACK, since the default now settles: set the last block of
+// a kind to `loop false` by hand and the preamble's `%%bd_loop true` takes over
+// for that kind. Which is also how the words-cycling-over-a-settled-figure
+// asymmetry is expressed, if it is ever wanted.
+function collageLastStepHolds(collageText) {
   const C = parseCollage(collageText);
   if (!C) return collageText;
-  const n = collageSlots(C, 'visual').length;
-  if (n < 2) return collageText;
+  const n = { visual: collageSlots(C, 'visual').length,
+              music:  collageSlots(C, 'music').length,
+              text:   collageSlots(C, 'text').length };
 
   const pre = [], kept = [];
-  let cur = null, curKind = null, seen = -1;
+  let cur = null, curKind = null;
+  const seen = Object.create(null);
   const flush = () => {
     if (cur === null) return;
     let text = cur.join('\n').replace(/\s+$/, '');
-    if (curKind === 'visual') {
-      seen += 1;
-      text = collageSetDirective(text, 'loop', (seen === n - 1) ? 'true' : 'false', '');
+    if (n[curKind] > 1) {
+      const i = (seen[curKind] = (seen[curKind] == null ? 0 : seen[curKind] + 1));
+      text = collageSetDirective(text, 'loop', (i === n[curKind] - 1) ? 'true' : 'false', '');
     }
     kept.push(text);
     cur = null; curKind = null;
@@ -3616,7 +3631,7 @@ function collageMergeBySlot(baseText, incoming, grow) {
     }
     flushGrow();
     console.log('[collage] ' + soleId + ' changed after a press — a new step added');
-    return collageLastGraphicHolds(
+    return collageLastStepHolds(
       out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n');
   }
 
@@ -16138,7 +16153,7 @@ async function init() {
             }
             const sameB  = collageSlots(baseCollage, add.kind);
             const prevB  = sameB.length ? sameB[sameB.length - 1] : null;
-            const merged = collageLastGraphicHolds(collageAddOrReplace(before, {
+            const merged = collageLastStepHolds(collageAddOrReplace(before, {
               kind: add.kind,
               text: collageStampTimeline(slotText, add.kind, prevB && prevB.script)
             }));
@@ -16496,7 +16511,7 @@ async function init() {
         // Sealed either way: a press means "this step is finished".
         if (blockId) collageSealed[blockId] = true;
         // Only the last graphic holds — re-established after any add.
-        next = collageLastGraphicHolds(next);
+        next = collageLastStepHolds(next);
 
         // 4. COMMIT — to the card on screen if the collage is already there,
         //    to a fresh top card otherwise, and to the remembered string

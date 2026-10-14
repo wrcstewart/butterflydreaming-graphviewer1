@@ -1427,3 +1427,39 @@ watching, not before.
 and the sequencer updates that variable when it advances. So the words on screen
 can change under the voice, which goes on reading the passage it started. Worth
 knowing before trying Speak over a text sequence.
+
+### 9.11 The LAST step of EVERY kind holds (2026-10-14)
+
+The author, on seeing the words wrap while the figure settled: *"might it be
+better to loop = true on the last text in the collage?"*
+
+Yes, and for a better reason than symmetry: **a piece that arrives somewhere is a
+better default than one that never ends.** Words cycling for ever under a settled
+figure is a particular effect, not a sensible default. So
+`collageLastGraphicHolds` becomes `collageLastStepHolds` and applies to every
+kind with more than one step — the last `loop true`, the earlier ones `false`. A
+lone block of a kind is left alone.
+
+**Music is included, and there the directive does double duty by luck rather
+than design:** `loop true` is also what a music module reads as "repeat my own
+material", so the last drone repeats while the arrangement rests on it. That is
+the behaviour wanted, but it is worth knowing it is two meanings agreeing rather
+than one meaning — the collision I flagged at the start of §9 and the author
+overruled, which has turned out benign in exactly this case and would not be in
+general.
+
+**How cycling comes back, now that the default settles:** set the last block of a
+kind to `loop false` by hand and the preamble's `%%bd_loop true` takes over for
+that kind. Which is also how the words-cycling-over-a-settled-figure asymmetry
+is expressed if it is ever wanted — so nothing is lost, it just stops being the
+default.
+
+**One honest wart:** with every kind settling by default, the preamble's
+`%%bd_loop true` has **no effect** until a last block is edited to `false`. A
+directive whose default does nothing is misleading, so its default is worth
+revisiting — left as specified for now rather than changed twice in a day.
+
+Verified across all three kinds at once: graphics `9:false 12:true`, texts
+`false false true`, a lone music block left alone, kind order
+`visual,visual,music,text,text,text`, and the text durations 5.5 s, 4 s, 4 s
+(the last two on the floor).
