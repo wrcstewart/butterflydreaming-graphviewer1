@@ -1856,6 +1856,42 @@ function splitUtterances(text, { verse = false, maxLen = 400 } = {}) {
     if (buf.trim()) out.push({ text: buf.trim(), gap: gapFor(buf.trim()) });
   }
   }
+  // ── A SHORT FIRST FRAGMENT IS MERGED INTO THE SECOND (2026-10-14) ───────
+  // Reported as *"a very long pause after reading Chapter<X> and the actual
+  // rest of the text — it is variable though"*, and the log settled it:
+  //
+  //   NOT prefetched, waited 1035ms — "Chapter 11."
+  //   prefetched,     waited 1667ms — "Thirty spokes are joined together…"
+  //
+  // The second utterance IS prefetched — the prefetch simply had not finished.
+  // It starts when the current clip begins PLAYING, so a clip only covers the
+  // synthesis of the next one if it lasts long enough. "Chapter 11." is about a
+  // second of audio against two and a half seconds of synthesis, so the hole is
+  // the difference, and it varies with the line and the machine's load.
+  //
+  // Overlapping the two synthesis calls would not help: there is one WASM
+  // instance, so they serialise and the total is unchanged. The only real
+  // remedies are to make the first clip longer or to delay the start until two
+  // are ready — which cost the same silence, taken before anything is heard
+  // rather than in the middle. Merging is the simpler of the two and makes one
+  // synthesis call instead of two, which also slows the Emscripten heap's
+  // one-way growth.
+  //
+  // THE FIRST FRAGMENT ONLY. Merging verse lines generally would destroy the
+  // line pacing SPEAK_LINE_GAP_MS exists for — the whole reason each line is
+  // its own utterance. A leading title is not part of that pattern.
+  //
+  // The threshold is derived, not picked: synthesis runs about 5x faster than
+  // speech, so a clip covers the next one when its own length is at least a
+  // fifth of it. A third is used, for margin.
+  if (out.length >= 2) {
+    const a = out[0].text, b = out[1].text;
+    if (a.length < Math.max(30, b.length / 3)) {
+      console.log('[speak] merged a short opening fragment into the next, so the ' +
+                  'prefetch has time: ' + JSON.stringify(a));
+      out.splice(0, 2, { text: a + ' ' + b, gap: out[1].gap });
+    }
+  }
   return out;
 }
 
@@ -2191,7 +2227,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14e' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14f' };
 
 let bdViewTitleText = '';
 

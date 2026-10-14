@@ -1529,3 +1529,52 @@ minute — so a long deliberate duration cannot trip the stall guard.
 Verified: an explicit 30 s with the reading over in 3 s holds until 30 s; an
 explicit 5 s with the reading still going at 20 s waits for the voice; and with
 no duration set the reading alone governs, the floor being 0.
+
+### 9.14 The pause after "Chapter 11" — measured, not guessed (2026-10-14)
+
+Reported as *"a very long pause after reading Chapter<X> and the actual rest of
+the text — it is variable though"*. The log already carried the answer, because
+`playNextSpeech` was built to report exactly this:
+
+```
+[BD] speak: NOT prefetched, waited 1035ms — "Chapter 11."
+[BD] speak: prefetched,     waited 1667ms — "Thirty spokes are joined together…"
+```
+
+The second utterance **is** prefetched — the prefetch simply had not finished.
+It starts when the current clip begins PLAYING, so a clip only covers the
+synthesis of the next one if it lasts long enough. "Chapter 11." is about a
+second of audio against two and a half seconds of synthesis, and the hole is the
+difference — varying with the line and the machine's load, which is the
+variability reported.
+
+**Overlapping the two synthesis calls would not help:** there is one WASM
+instance, so they serialise and the total is unchanged. The only real remedies
+are to make the first clip longer or to delay the start until two are ready, and
+those cost the same silence — taken before anything is heard rather than in the
+middle. Merging is the simpler, and makes one synthesis call instead of two,
+which also slows the Emscripten heap's one-way growth.
+
+So **a short FIRST fragment is merged into the second.** The first only: merging
+verse lines generally would destroy the line pacing `SPEAK_LINE_GAP_MS` exists
+for, which is the whole reason each line is its own utterance. A leading title is
+not part of that pattern.
+
+**The threshold is derived rather than picked.** Synthesis runs about 5x faster
+than speech, so a clip covers the next one when its own length is at least a
+fifth of it; a third is used, for margin.
+
+Verified: the reported case merges, a passage with no short opening is untouched,
+two short lines collapse to one, a single fragment is left alone, and prose
+behaves the same way.
+
+**The cost, stated:** the first audio now starts later — one synthesis of the
+merged pair rather than of the title alone. In a collage the words are on screen
+by then, so there is something to read while it arrives.
+
+**Also fixed on the way:** the test extractor took the first `{` after a
+function's name, which for `splitUtterances(text, { verse = false, maxLen = 400 }
+= {})` is the DESTRUCTURED PARAMETER, so it had been silently truncating that
+function at the parameter list. It now takes the brace after the parameter
+list's closing paren. Worth knowing for anyone else extracting functions to test
+them.
