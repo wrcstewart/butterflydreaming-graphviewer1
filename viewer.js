@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14a' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14b' };
 
 let bdViewTitleText = '';
 
@@ -16469,8 +16469,21 @@ async function init() {
         const live  = collageStampTimeline(block.text, block.kind, prev && prev.script);
 
         // 2 and 3. ADD IF IT IS NEW; otherwise SEAL. See collageSealed.
+        //
+        // ── TEXT ALWAYS ADDS (2026-10-14) ──────────────────────────────
+        // The seal-then-grow rule leans on the ECHO to grow the next block: you
+        // press, the block is sealed, and the next deliberate change to the
+        // module appends a fresh one. Text has no module and therefore no
+        // announcements, so sealing it left no way on earth to add a second
+        // passage — the press would have found the existing text block and done
+        // nothing. The rule that covers both: **a kind with nothing to announce
+        // can only grow by pressing.**
+        //
+        // Pressing twice on the same passage is still refused, by the identity
+        // guard in collageAddOrReplace rather than by anything here.
+        const noEcho = (block.kind === 'text');
         let next = base, sealedOnly = false;
-        if (!mine0.length) {
+        if (!mine0.length || noEcho) {
           next = collageAddOrReplace(base, { kind: block.kind, text: live });
           if (next === base) {
             console.log('[collage] nothing added — that exact ' + block.kind +

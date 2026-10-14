@@ -1387,3 +1387,43 @@ at stop.
 **The debug duration:** the visual default is **30** rather than 300 at the
 author's request, so a step change can be watched without waiting five minutes.
 Marked in the code; restore to 300 before this leaves development.
+
+### 9.10 Text always ADDS — a kind with nothing to announce (2026-10-14)
+
+Found by the author asking whether text loops and times the same way as a
+graphic, which it does not, and the check turned up a blocker they would have
+met on the first press.
+
+The seal-then-grow rule (§9.8) leans on the **echo** to grow the next block: you
+press, the block is sealed, and the next deliberate change to the module appends
+a fresh one. **Text has no module and therefore no announcements**, so sealing it
+left no way at all to add a second passage — the press would find the existing
+text block, seal it again, and do nothing.
+
+The rule that covers both: **a kind with nothing to announce can only grow by
+pressing.** So a press on a passage always adds. Pressing twice on the same
+passage is still refused, by the identity guard in `collageAddOrReplace` rather
+than by anything new.
+
+**The two ways text differs from a graphic, both deliberate:**
+
+| | graphic | text |
+|---|---|---|
+| `duration` | stamped (30 while debugging, 300 in use) | **absent = computed**, 0.5 s a word, 4 s floor |
+| `loop` | only the LAST is `true`, so the sequence rests on it | **every block `false`**, so the sequence wraps |
+| grows by | a deliberate stepper change after a press | a **press** on another passage |
+
+Verified: two passages of 13 and 4 words give 6.5 s and 4 s (the second on the
+floor), both `loop false`, and a third press on the same passage is refused.
+
+**Consequence, and it is the one to watch in use:** with the collage's `loop
+true`, the words cycle for ever while the figure settles on its last step. Short
+passages also pace much faster than a 30 s figure — 4 s against 30 s — so the
+words may change seven times per figure. That may be exactly the texture wanted,
+or it may argue for a floor nearer 10 s. It is a judgement to make while
+watching, not before.
+
+**Known gap, not fixed:** Speak reads `bdViewProse` at the moment it is pressed,
+and the sequencer updates that variable when it advances. So the words on screen
+can change under the voice, which goes on reading the passage it started. Worth
+knowing before trying Speak over a text sequence.

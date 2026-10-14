@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-14a";
+  --bd-css-build: "2026-10-14b";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1221,6 +1221,16 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-14b: GREEN (TEXT ALWAYS ADDS. The seal-then-grow rule leans on the ECHO
+   to grow the next block, and text has no module and so no announcements — so
+   sealing it left no way at all to add a second passage: the press would find
+   the existing text block, seal it again and do nothing. The rule that covers
+   both: a kind with nothing to announce can only grow by pressing. Found by the
+   author asking whether text times and loops like a graphic, which it does not:
+   its duration is absent-means-computed at 0.5s a word with a 4s floor, and
+   every text block is loop false, so the words wrap while the figure rests).
+   Next = blue.
+
    2026-10-14a: RED (ONLY THE LAST GRAPHIC HOLDS. The visual default of loop true
    meant a graphic sequence sat on step 1 until every block was hand-edited; the
    author's rule is that only the last should hold, so a sequence hands on
@@ -1792,7 +1802,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
