@@ -1634,3 +1634,46 @@ is believed.
 **How to apply:** `./check_module.sh viewer.js piper_direct.js` — and read for
 the `ok` lines, not the exit code. This is the "verify the effect, not the exit
 code" lesson arriving in the tool built for that very lesson.
+
+### 9.17 The synthesis backlog — why speech in a collage got worse, not better
+
+Reported after the double-load fix: *"it takes ages to get going in View after
+collage — and then missing most of next sentences."* The log named it without
+ambiguity:
+
+```
+slow synth 14622ms … 10963 … 15332 … 23092 … 24348 … 29446 … 29315
+```
+
+**Monotonically climbing, on short lines.** That is a backlog, not slow text.
+
+`stopSpeech` — which every `speak(…, { interrupt: true })` calls — empties the
+QUEUE, but it cannot cancel a synthesis already dispatched into the WASM worker.
+So each interrupt left its predecessor's one or two calls still running, and a
+handful of View entries and step advances piled up ten pieces of obsolete work
+on a runtime that can only do one at a time. Every new request then queued
+behind all of it, which is why the first sentences of a collage were the worst
+affected and later ones recovered.
+
+**The remedy is not to cancel** — onnxruntime-web offers nothing for that — but
+to stop DISPATCHING. Every request now goes through one chain and checks its
+generation **at the moment it would start**, so work an interrupt has already
+made obsolete is never begun. At most one orphan can be in flight: the one
+already running when the interrupt arrived. It also removes a second-order
+unfairness — with everything serialised, the utterance the listener is waiting
+for is never queued behind three that nobody will ever hear.
+
+**And a stale callback no longer clears `speakBusy`.** That flag belongs to
+whatever generation is current, which by the time a stale promise resolves is a
+later one that has already set it for its own utterance. Clearing it from the
+stale callback let a second `playNextSpeech` run concurrently — two utterances
+writing `src` to the same audio element, one of them lost with nothing in the
+log. That is the other half of "missing most of the sentences", and it was
+invisible precisely because the dropped utterance never errored.
+
+A stale request is logged as abandoned rather than FAILED: calling it a failure
+would train the eye to ignore the line that matters.
+
+**Worth watching next:** the text-node auto-read added in §9.12 fires on every
+node tap, so browsing is now a series of interrupts. The serialisation bounds
+the damage, but a short debounce on that read may still be wanted.

@@ -1948,18 +1948,59 @@ function speakElement() {
 }
 
 // Synthesise ahead; do NOT touch an audio element until the clip is wanted.
+// ── ONE SYNTHESIS AT A TIME, AND STALE WORK IS NEVER STARTED (2026-10-14) ─
+// The fault this fixes, and the log named it without ambiguity:
+//
+//   slow synth 14622ms … 10963 … 15332 … 23092 … 24348 … 29446 … 29315
+//
+// Monotonically climbing, on short lines. That is a BACKLOG, not slow text.
+// `stopSpeech` (which every `speak(…, {interrupt:true})` calls) empties the
+// queue — but it cannot cancel a synthesis already dispatched into the WASM
+// worker. So each interrupt left its predecessor's one or two calls still
+// running, and a handful of View entries and step advances piled up ten pieces
+// of obsolete work on a runtime that can only do one at a time. The symptom:
+// "takes ages to get going in View, then missing most of the next sentences".
+//
+// The remedy is not to try to cancel — nothing in onnxruntime-web offers that
+// — but to stop DISPATCHING. Every request now goes through one chain, and
+// checks its generation at the moment it would start. Work that an interrupt
+// has already made obsolete is therefore never begun, and at most ONE orphan
+// can be in flight: the one that was already running when the interrupt came.
+//
+// It also removes a second-order unfairness: with everything serialised, the
+// utterance the listener is waiting for is never behind three that nobody will
+// ever hear.
+let synthChain = Promise.resolve();
+
 function prepareUtterance(text, scale) {
   // 2026-09-04 — one sentence failing and then recovering is the signature of
   // the catch path below: the error is swallowed and playNextSpeech moves on.
   // Without naming the utterance, an intermittent failure is unattributable.
   const synthT0 = performance.now();
-  return synthOne(text, scale).then(res => {
+  const gen = speakGen;
+  const run = () => {
+    if (gen !== speakGen) {
+      const err = new Error('stale');
+      err.bdStale = true;
+      throw err;
+    }
+    return synthOne(text, scale);
+  };
+  // `.then(run, run)` so a rejection in the chain does not stop the next
+  // request — the chain is a queue, not a dependency.
+  const p = synthChain.then(run, run);
+  synthChain = p.catch(() => {});
+  return p.then(res => {
     const ms = Math.round(performance.now() - synthT0);
     if (ms > 900) console.log('[BD] slow synth ' + ms + 'ms — ' + JSON.stringify(text.slice(0, 46)));
     return res;
   }).catch(err => {
-    console.warn('[BD] synth FAILED on: ' + JSON.stringify(text.slice(0, 60)) +
-                 ' — ' + (err && err.message ? err.message : err));
+    // A stale request is not a failure: it is work correctly abandoned, and
+    // saying FAILED of it would train the eye to ignore the line that matters.
+    if (!(err && err.bdStale)) {
+      console.warn('[BD] synth FAILED on: ' + JSON.stringify(text.slice(0, 60)) +
+                   ' — ' + (err && err.message ? err.message : err));
+    }
     throw err;
   }).then(res => ({ blob: res.blob }));
 }
@@ -1998,7 +2039,14 @@ function playNextSpeech() {
     const url = URL.createObjectURL(blob);
     el.src = url;
     // Interrupted while this was in flight — do not start it now.
-    if (gen !== speakGen) { speakBusy = false; URL.revokeObjectURL(url); return; }
+    //
+    // AND DO NOT TOUCH speakBusy. It belongs to whatever generation is current,
+    // which by here is a later one that has already set it for its own
+    // utterance; clearing it from a stale callback would let a second
+    // playNextSpeech run concurrently, two utterances writing `src` to the same
+    // element, and one of them lost without a word in the log. stopSpeech has
+    // already cleared the flag for the generation this callback belonged to.
+    if (gen !== speakGen) { URL.revokeObjectURL(url); return; }
     // Prepare the FOLLOWING utterance while this one plays — synthesised AND
     // loaded into the other element. One ahead, not more: synthesis runs ~5x
     // faster than speech, and each call grows the Emscripten heap, which never
@@ -2032,8 +2080,14 @@ function playNextSpeech() {
     return el.play();
   })
     .catch(err => {
+      // Stale: an interrupt overtook this request before it started. The queue
+      // it belonged to is gone, so there is nothing to move on to — and moving
+      // on would mean this generation's chain driving the NEXT generation's
+      // queue.
+      if (err && err.bdStale) return;
       console.warn('[BD] speak failed on ' + JSON.stringify(next.text.slice(0, 60)) +
                    ' — ' + (err && err.message ? err.message : err));
+      if (gen !== speakGen) return;
       speakBusy = false;
       playNextSpeech();
     });
@@ -2231,7 +2285,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14i' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14j' };
 
 let bdViewTitleText = '';
 
