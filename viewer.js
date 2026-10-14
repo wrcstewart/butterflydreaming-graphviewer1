@@ -1856,42 +1856,23 @@ function splitUtterances(text, { verse = false, maxLen = 400 } = {}) {
     if (buf.trim()) out.push({ text: buf.trim(), gap: gapFor(buf.trim()) });
   }
   }
-  // ── A SHORT FIRST FRAGMENT IS MERGED INTO THE SECOND (2026-10-14) ───────
-  // Reported as *"a very long pause after reading Chapter<X> and the actual
-  // rest of the text — it is variable though"*, and the log settled it:
+  // ── THE SHORT-FIRST-FRAGMENT MERGE IS REVERTED (2026-10-14) ────────────
+  // It existed for about an hour. The diagnosis behind it was right — the gap
+  // after "Chapter 11." is the prefetch of the next line not finishing, because
+  // a one-second clip cannot cover two and a half seconds of synthesis — but
+  // the remedy made the FIRST clip longer, and so made the start of every
+  // reading two to three times slower. The author, having used it: *"reading
+  // start is much slower than it used to be."*
   //
-  //   NOT prefetched, waited 1035ms — "Chapter 11."
-  //   prefetched,     waited 1667ms — "Thirty spokes are joined together…"
+  // Which settles the trade that was genuinely open: **a gap in the middle is
+  // cheaper than a delay at the beginning.** Silence before anything starts is
+  // the only silence the listener is certain to notice, because it is the only
+  // one they are waiting through with nothing to go on.
   //
-  // The second utterance IS prefetched — the prefetch simply had not finished.
-  // It starts when the current clip begins PLAYING, so a clip only covers the
-  // synthesis of the next one if it lasts long enough. "Chapter 11." is about a
-  // second of audio against two and a half seconds of synthesis, so the hole is
-  // the difference, and it varies with the line and the machine's load.
-  //
-  // Overlapping the two synthesis calls would not help: there is one WASM
-  // instance, so they serialise and the total is unchanged. The only real
-  // remedies are to make the first clip longer or to delay the start until two
-  // are ready — which cost the same silence, taken before anything is heard
-  // rather than in the middle. Merging is the simpler of the two and makes one
-  // synthesis call instead of two, which also slows the Emscripten heap's
-  // one-way growth.
-  //
-  // THE FIRST FRAGMENT ONLY. Merging verse lines generally would destroy the
-  // line pacing SPEAK_LINE_GAP_MS exists for — the whole reason each line is
-  // its own utterance. A leading title is not part of that pattern.
-  //
-  // The threshold is derived, not picked: synthesis runs about 5x faster than
-  // speech, so a clip covers the next one when its own length is at least a
-  // fifth of it. A third is used, for margin.
-  if (out.length >= 2) {
-    const a = out[0].text, b = out[1].text;
-    if (a.length < Math.max(30, b.length / 3)) {
-      console.log('[speak] merged a short opening fragment into the next, so the ' +
-                  'prefetch has time: ' + JSON.stringify(a));
-      out.splice(0, 2, { text: a + ' ' + b, gap: out[1].gap });
-    }
-  }
+  // So the title keeps its own clip and its own gap. If the gap is to go, it has
+  // to go without lengthening the first clip — which means covering it from
+  // somewhere else, such as pre-synthesising the next text step of a collage
+  // during the current one, where there are thirty seconds of warning. Not this.
   return out;
 }
 
@@ -1971,6 +1952,7 @@ function speakElement() {
 // utterance the listener is waiting for is never behind three that nobody will
 // ever hear.
 let synthChain = Promise.resolve();
+let synthDepth = 0;            // requests dispatched and not yet finished
 
 function prepareUtterance(text, scale) {
   // 2026-09-04 — one sentence failing and then recovering is the signature of
@@ -1988,11 +1970,17 @@ function prepareUtterance(text, scale) {
   };
   // `.then(run, run)` so a rejection in the chain does not stop the next
   // request — the chain is a queue, not a dependency.
+  // QUEUE DEPTH IN THE LOG. The backlog was only diagnosable from the SHAPE of
+  // the slow-synth numbers across many lines; one number per request that says
+  // how many were already waiting makes it a single line instead of a pattern.
+  synthDepth += 1;
+  const depthAtCall = synthDepth;
   const p = synthChain.then(run, run);
-  synthChain = p.catch(() => {});
+  synthChain = p.catch(() => {}).finally(() => { synthDepth -= 1; });
   return p.then(res => {
     const ms = Math.round(performance.now() - synthT0);
-    if (ms > 900) console.log('[BD] slow synth ' + ms + 'ms — ' + JSON.stringify(text.slice(0, 46)));
+    if (ms > 900) console.log('[BD] slow synth ' + ms + 'ms, queue depth ' + depthAtCall +
+                              ' — ' + JSON.stringify(text.slice(0, 46)));
     return res;
   }).catch(err => {
     // A stale request is not a failure: it is work correctly abandoned, and
@@ -2285,7 +2273,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14j' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14k' };
 
 let bdViewTitleText = '';
 
