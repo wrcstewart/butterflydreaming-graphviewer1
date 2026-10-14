@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14c' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14d' };
 
 let bdViewTitleText = '';
 
@@ -15436,6 +15436,7 @@ async function init() {
       let collageSeqTimer  = null;
       let collageSeqAt     = Object.create(null);   // kind -> ms, when to advance
       let collageSeqHeld   = Object.create(null);   // kind -> logged "holds" once
+      let collageSeqWait   = Object.create(null);   // kind -> waiting for the voice
       let collageSeqParsed = null;                  // the collage as it was at entry
       let collageSeqCardText = '';                  // its text, for the preamble
 
@@ -15462,6 +15463,29 @@ async function init() {
           const bodyEl = document.getElementById('bd-view-text-body');
           if (bodyEl) bodyEl.textContent = blk.body || '';
           bdViewProse = blk.body || '';
+          // ── SPEAK IT AS IT ARRIVES (author, 2026-10-14) ─────────────────
+          // *"If speak is ticked it should commence the read of the text
+          // whenever it comes on screen — including of course the second text."*
+          // `interrupt` because the previous passage is no longer on screen and
+          // a voice reading words that have gone is worse than silence.
+          collageSeqWait[kind] = false;
+          if (speakEnabled && (blk.body || '').trim()) {
+            try {
+              speak(blk.body, { interrupt: true });
+              // ── AND THE READING BECOMES THE STEP'S LENGTH ───────────────
+              // 0.5 s a word is an ESTIMATE, needed only because the real
+              // length was unknowable. With the voice running it is knowable,
+              // so the step ends when the reading does — which is what "sync"
+              // means here. If the speech never started (no voice loaded, audio
+              // not unlocked, Speak suppressed) `speechActive()` is already
+              // false and the clock keeps its old job.
+              if (speechActive()) collageSeqWait[kind] = true;
+              else console.log('[collage] Speak is on but no speech started — ' +
+                               'the text step keeps its computed duration');
+            } catch (e) {
+              console.warn('[collage] speaking a text step threw: ' + e.message);
+            }
+          }
         }
       }
 
@@ -15472,7 +15496,18 @@ async function init() {
         for (const kind of ['visual', 'music', 'text']) {
           const all = collageSlots(C, kind);
           if (all.length < 2) continue;
-          if (!(collageSeqAt[kind] <= now)) continue;
+          // WAITING FOR THE VOICE, not the clock. collageSeqAt is then a CAP
+          // rather than the length: if the reading never ends — a synthesis that
+          // stalls, a tab the browser has throttled — the step would otherwise
+          // hold for ever with nothing said about it.
+          if (collageSeqWait[kind]) {
+            const capped = collageSeqAt[kind] <= now;
+            if (speechActive() && !capped) continue;
+            if (speechActive()) {
+              console.log('[collage] ' + kind + ' step overran its speech cap — advancing anyway');
+            }
+            collageSeqWait[kind] = false;
+          } else if (!(collageSeqAt[kind] <= now)) continue;
           const cur = collageStepOf(kind, all.length);
           const blk = all[cur];
           // `loop true` HOLDS this step. The author's rule: *"if loop false and
@@ -15506,36 +15541,49 @@ async function init() {
           const show = collageSlots(C, kind)[nxt];
           collageSeqShow(kind, show);
           const secs = collageSeqDuration(show, kind);
-          collageSeqAt[kind] = now + secs * 1000;
+          // Four times the estimate plus a minute: long enough that a real
+          // reading never hits it, short enough that a stall is not for ever.
+          const wait = collageSeqWait[kind];
+          collageSeqAt[kind] = now + (wait ? (secs * 4 + 60) : secs) * 1000;
           console.log('[collage] ' + kind + ' -> step ' + (nxt + 1) + ' of ' + all.length +
-                      ' (' + (show.moduleId || 'text') + ', ' + secs + 's)');
+                      ' (' + (show.moduleId || 'text') + ', ' +
+                      (wait ? 'until the reading ends' : secs + 's') + ')');
         }
       }
 
+      // ONE AUTHORITY FOR WHAT IS SHOWN AT THE START, whether or not anything
+      // will advance. It used to return early when no kind had two blocks,
+      // which meant a single passage was never spoken — and the author's rule
+      // is that a passage is read "whenever it comes on screen", not only when
+      // it is part of a sequence. So step 1 of every kind is rendered here, and
+      // the TICKER is what depends on there being something to advance.
       function collageSeqStart(collageText, C) {
         collageSeqStop();
         if (!C) return;
-        const counts = ['visual', 'music', 'text'].map((k) => collageSlots(C, k).length);
-        if (!counts.some((n) => n > 1)) {
-          console.log('[collage] no sequence — one block of each kind at most');
-          return;
-        }
         collageSeqParsed   = C;
         collageSeqCardText = collageText || '';
         collageSeqHeld     = Object.create(null);
         const now = Date.now();
+        let advancing = false;
         for (const kind of ['visual', 'music', 'text']) {
           const all = collageSlots(C, kind);
-          if (all.length < 2) { collageSeqAt[kind] = Infinity; continue; }
+          if (!all.length) { collageSeqAt[kind] = Infinity; continue; }
           // START AT THE FIRST STEP. The step pointer has been following the
           // block being WORKED on, which is the last; a performance starts at
           // the beginning.
           collageStepSet(kind, 0);
           collageSeqShow(kind, all[0]);
+          if (all.length < 2) { collageSeqAt[kind] = Infinity; continue; }
+          advancing = true;
           const secs = collageSeqDuration(all[0], kind);
-          collageSeqAt[kind] = now + secs * 1000;
-          console.log('[collage] sequence ' + kind + ': ' + all.length + ' steps, ' +
-                      'step 1 for ' + secs + 's');
+          const wait = collageSeqWait[kind];
+          collageSeqAt[kind] = now + (wait ? (secs * 4 + 60) : secs) * 1000;
+          console.log('[collage] sequence ' + kind + ': ' + all.length + ' steps, step 1 ' +
+                      (wait ? 'until the reading ends' : 'for ' + secs + 's'));
+        }
+        if (!advancing) {
+          console.log('[collage] no sequence — one block of each kind at most');
+          return;
         }
         collageSeqOn    = true;
         collageSeqTimer = setInterval(collageSeqTick, 250);
@@ -15548,6 +15596,7 @@ async function init() {
         collageSeqCardText = '';
         collageSeqAt       = Object.create(null);
         collageSeqHeld     = Object.create(null);
+        collageSeqWait     = Object.create(null);
       }
 
       function bdViewExit() {

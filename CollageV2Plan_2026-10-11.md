@@ -1423,10 +1423,8 @@ words may change seven times per figure. That may be exactly the texture wanted,
 or it may argue for a floor nearer 10 s. It is a judgement to make while
 watching, not before.
 
-**Known gap, not fixed:** Speak reads `bdViewProse` at the moment it is pressed,
-and the sequencer updates that variable when it advances. So the words on screen
-can change under the voice, which goes on reading the passage it started. Worth
-knowing before trying Speak over a text sequence.
+~~**Known gap, not fixed:** Speak reads `bdViewProse` at the moment it is
+pressed…~~ **FIXED 2026-10-14 — see §9.12.**
 
 ### 9.11 The LAST step of EVERY kind holds (2026-10-14)
 
@@ -1463,3 +1461,45 @@ Verified across all three kinds at once: graphics `9:false 12:true`, texts
 `false false true`, a lone music block left alone, kind order
 `visual,visual,music,text,text,text`, and the text durations 5.5 s, 4 s, 4 s
 (the last two on the floor).
+
+### 9.12 The voice drives the text sequence (2026-10-14)
+
+The author: *"the main problem is that there is no sync of speech and View
+Collage — if speak is ticked it should commence the read of the text whenever it
+comes on screen, including of course the second text."*
+
+Two things, and the second is the better half of the answer.
+
+**1. A text step is spoken as it arrives.** `collageSeqShow` calls
+`speak(blk.body, { interrupt: true })` when `speakEnabled`. Interrupting rather
+than queueing, because the previous passage has left the screen and a voice
+reading words that have gone is worse than silence.
+
+**2. THE READING BECOMES THE STEP'S LENGTH.** 0.5 s a word was only ever an
+estimate, needed because the real length was unknowable; with the voice running
+it is knowable, so the step ends when the reading does. That is what sync means
+here — the clock stops competing with the voice instead of being tuned against
+it. If the speech did not start (no voice loaded, audio not unlocked, speech
+suppressed) `speechActive()` is already false and the computed duration keeps its
+old job, with a line in the log saying so.
+
+**The cap.** While waiting for the voice, `collageSeqAt` becomes a deadline
+rather than a length: four times the estimate plus a minute. Long enough that a
+real reading never reaches it, short enough that a stalled synthesis or a
+throttled tab cannot hold a step for ever in silence. It logs when it fires.
+
+**`collageSeqStart` is now the single authority for what is shown at the start**,
+whether or not anything will advance. It used to return early when no kind had
+two blocks — which meant a collage with ONE passage was never spoken, and the
+author's rule is "whenever it comes on screen", not "whenever it is part of a
+sequence". So step 1 of every kind is rendered there, and it is the TICKER that
+depends on there being something to advance.
+
+Verified with a stubbed voice: step 1 is read at the start and the step waits
+while the voice runs; each advance reads the new passage; the last step holds;
+a reading that never ends is released by the cap with a log; and with Speak off
+nothing is spoken and the computed clock paces the steps exactly as before.
+
+**Not changed:** a plain text NODE in View still does not read itself when Speak
+is ticked — only a collage does. Consistency would argue for it; it is a
+different surface and was not what was asked.
