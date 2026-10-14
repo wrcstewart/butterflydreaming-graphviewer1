@@ -6,6 +6,118 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-14 — the collage PLAYS, and the voice stops tripping over itself
+
+Stage 3 of the sequencing design, then a day inside the speech path. The second
+half is the more instructive: four faults in a row, three of them mine, and
+every one found by reading the log rather than by reasoning about the code.
+`CollageV2Plan_2026-10-11.md` §9.9–§9.19.
+
+### The sequencer
+
+A collage with more than one block of a kind plays through them in script order,
+each for its own `duration`, with the preamble's `loop` deciding whether that
+kind begins again. In View only — composing is the page's job, and a sequence
+advancing while you worked would be moving the thing you were trying to set. One
+ticker at 250 ms rather than a timer per kind, because a kind's next advance is a
+TIMESTAMP rather than a pending callback, so a slow frame cannot leave two timers
+racing. The kinds advance independently.
+
+**It never writes to the card, and that needed a guard.** Posting step 1's
+script to the module makes the module announce it, and the echo would then merge
+those values into the LAST block of that module — a performance overwriting its
+own score.
+
+**The last step of every kind HOLDS.** First only graphics, at the author's
+instruction; then, on watching the words wrap under a settled figure, all of
+them — *"might it be better to loop = true on the last text?"*. Yes, and for a
+better reason than symmetry: a piece that arrives somewhere is a better default
+than one that never ends. Cycling is still expressible by setting a last block
+to `loop false`, which hands the decision back to the preamble.
+
+**Text always ADDS**, found by the author asking whether text times and loops
+like a graphic. Seal-then-grow leans on the ECHO to grow the next block, and
+text has no module and so no announcements — so sealing it left no way on earth
+to add a second passage. The rule that covers both: **a kind with nothing to
+announce can only grow by pressing.**
+
+### The voice
+
+**The reading became the step's length.** 0.5 s a word was only ever an estimate,
+needed because the real length was unknowable; with the voice running it is
+knowable, so a text step ends when its reading does. An explicitly set
+`duration` is then a FLOOR the reading cannot cut short — *"if the duration
+setting is longer than the read time give preference to the duration"* — while an
+ABSENT one sets no floor, the computed estimate being a worse guess at the
+reading than the reading itself.
+
+Then four faults:
+
+**1. The space bar restarted speech.** Nothing binds space: the Speak toggle and
+View's Speak button keep keyboard focus after a click, and View's Speak button
+TICKS the Speak box when speech is off. Both now blur after a pointer press only.
+
+**2. The voice was being loaded TWICE, concurrently.** `piper_direct.js` cached
+it only at the END of `loadVoice`, after two fetches and an
+`InferenceSession.create` — so two overlapping calls both missed the cache and
+both did the whole thing. And that overlap is the ORDINARY case: ticking Speak
+warms the voice, then the first utterance calls `loadVoice` again. A desktop can
+tick and press View inside the window where iOS cannot, which is exactly the
+platform split reported. Cache the PROMISE, not the result.
+
+**3. A synthesis backlog, and the log named it by its SHAPE:** `slow synth
+14622ms … 10963 … 15332 … 23092 … 24348 … 29446` — monotonically climbing, on
+short lines. `stopSpeech` empties the queue but cannot cancel a synthesis already
+dispatched into the WASM worker, so every interrupt left its predecessor's work
+running and a few View entries piled up ten pieces of obsolete work on a runtime
+that does one at a time. The remedy is not to cancel — nothing offers that — but
+to stop DISPATCHING: one chain, and each request checks its generation at the
+moment it would start. A second half to this: a stale callback was clearing
+`speakBusy`, a flag the CURRENT generation owns, which let two utterances write
+`src` to one audio element with one lost and nothing in the log. That was the
+"missing most of the sentences".
+
+**4. My own fix made it worse, and had to go.** A short first fragment was being
+merged into the second so the prefetch had time — right diagnosis, wrong
+remedy: it lengthened the FIRST clip and so made the start of every reading two
+to three times slower. *"Reading start is much slower than it used to be."*
+Which settles the trade that was genuinely open: **a gap in the middle is
+cheaper than a delay at the beginning**, because silence before anything starts
+is the only silence the listener is certain to notice.
+
+### And the number that explains the rest
+
+With the backlog gone, every remaining long wait was at normal queue depth and
+on a module-description node. Divide through and the rate is strikingly
+constant: **about 50 ms per character.** Speech PLAYS at roughly 70 ms per
+character, so synthesis is about 1.4× faster than playback — which is the whole
+explanation of why the prefetch keeps up once reading has started, and why the
+only cost that cannot be hidden is the FIRST utterance, priced purely by its
+length. So `splitUtterances`' `maxLen` is a **latency budget**, not a tidiness
+rule: 400 characters was ~20 s before anything was heard, and 150 is ~7.5 s. The
+author saw it immediately — *"I feel that is the change that was made earlier,
+effectively"* — and it is: the same move as splitting at all, applied further,
+which is why the merge above was that principle run backwards.
+
+### Two process notes, both uncomfortable
+
+**`check_module.sh` had not been checking anything.** It is `for f in "$@"` — it
+takes FILENAMES, and every invocation in this session passed none. With no
+arguments the loop body never runs and it exits 0 in silence, so every "syntax
+check passed" reported across two days was vacuous. Run properly, everything
+parses. But the guard that once caught a parse error taking BD down with no
+banner had been switched off by the way it was called, and a check that cannot
+fail is worse than none because it is believed. The tell was there: a real pass
+prints `ok   viewer.js`, and the output was always empty.
+
+**An error that becomes ordinary control flow changes what its consequences
+cost.** Making stale synthesis reject ROUTINELY turned a rare dangling promise
+into an unhandled rejection on every interrupt — reported as
+`Unhandled rejection: run@viewer.js:1993`, which named the exact line. Worth
+checking for whenever a rejection stops being rare.
+
+---
+
 ## 2026-10-13 — a collage that can hold a SEQUENCE
 
 The author's design: slots with a length, a sequence where there is more than

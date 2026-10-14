@@ -1348,3 +1348,32 @@ tested in a browser across three sessions; iOS not yet tested.
 | **`on_top` / `zorder` directive** | §4.3 | **NOT BUILT.** The canonical order removes the urgency but not the need: a v2 collage cannot yet ASK for picture-over-text. |
 | **iOS** | — | **NOT TESTED.** Everything above was tested on desktop; the author has flagged iOS as outstanding. |
 | **A protocol for collaborative editing** | §8.4 | **OBSERVED, not scheduled.** Per-owner merge, replace in place, canonical order, one authoritative copy plus snapshots, receivers-first. Missing for two PEOPLE rather than two modules: identity per block, a clock per block, a rule for concurrent edits to one slot. The transport and consent model already exist. |
+
+---
+
+## BUILT 2026-10-13/14 — the collage PLAYS: a timeline inside one collage
+
+`CollageV2Plan_2026-10-11.md` §9 is the authoritative document — §9.1 the
+decisions, §9.5 the build order, §9.6–§9.19 what each stage cost. Desktop only;
+**iOS untested**.
+
+| item | where | note |
+|---|---|---|
+| **`loop` and `duration`, names ALIGNED not invented** | `viewer.js` §9.2 | **BUILT.** A directive in the PREAMBLE belongs to no module, so `%%bd_loop true` above the first header is the ARRANGEMENT's while the same word in a block stays the module's — no new name needed, and `parseCollage` already kept preamble lines apart. Stamped into the collage's blocks and NOT into any module's default script, by RULE 9. Never `_p_`, and it had to be FORCED bare: the prefix is otherwise taken from the block's neighbours, which produced `%%bd_p_duration`. |
+| **The stamp CARRIES FORWARD** | §9.3 | **BUILT.** A module's live script never mentions these, so without it every press would reset them and silently undo a hand-edited `duration` — which the author asked for explicitly, to set up a long play for a bake. |
+| **Slot addressing** | §9.5 step 2 | **BUILT, no call site touched.** `collageSlot` returned the FIRST block of a kind; twelve callers all mean *the slot that is SHOWING*, which with a sequence is the CURRENT step. One function changed meaning. Order in the script is the identity, so **no `%%bd_slot` directive was needed** — one is still wanted for PLACEMENT. |
+| **A press ADDS, last among its kind** | §9.5 | **BUILT**, the author inverting the replace-in-place invariant rather than take a long-press modifier. Safe because replace was already REDUNDANT: the echo keeps each block in step with its module. |
+| **A press SEALS; the next change starts the next step** | §9.8 | **BUILT**, third iteration. The snapshot version was right in semantics and wrong in what it SHOWED. Now: no hidden state, a simple collage stays one block, and drift can neither add a step nor edit a sealed one. |
+| **Text always ADDS** | §9.10 | **BUILT.** A kind with nothing to announce can only grow by pressing — text has no module, so sealing it left no way to add a second passage. |
+| **The sequencer** | §9.9 | **BUILT.** In View only; one ticker at 250 ms; kinds advance independently; starts at step 1. It never writes to the card — posting step 1 makes the module announce, and the echo would merge those values into the last block: a performance overwriting its own score. |
+| **The last step of EVERY kind holds** | §9.11 | **BUILT.** A piece that arrives somewhere beats one that never ends. Cycling is still expressible by setting a last block `loop false`, which hands the decision to the preamble. |
+| **The voice drives the text sequence** | §9.12–§9.13 | **BUILT.** A text step is spoken as it arrives, and THE READING IS THE STEP'S LENGTH; an explicitly set `duration` is a floor the reading cannot cut short, an absent one sets no floor. A plain text NODE in View reads itself too. |
+| **`maxLen` is a latency budget** | §9.18 | **BUILT, 400 → 150.** Synthesis costs ~50 ms per CHARACTER and speech plays at ~70, so synthesis is 1.4× faster than playback — the prefetch keeps up once reading starts, and the only unhidden cost is the FIRST utterance, priced by its length. |
+| **The voice was loaded TWICE** | `piper_direct.js` §9.15 | **FIXED.** Cached only at the END of `loadVoice`, so two overlapping calls both did the whole thing. The overlap is the ORDINARY case. **`piper_direct.js?v=` must be bumped by hand** — it is the one file the canary cannot certify. |
+| **The synthesis backlog** | §9.17 | **FIXED.** `stopSpeech` cannot cancel work already dispatched to the WASM worker, so interrupts piled up obsolete requests. One chain, each request checking its generation at the moment it would START. And a stale callback no longer clears `speakBusy`, which had allowed two utterances to write to one audio element with one lost silently. |
+| **`duration` DEBUG value** | `viewer.js` | **OUTSTANDING, deliberately.** The visual default is **30 s**, not 300, so a step change can be watched without waiting five minutes. The author: *"leave it at 30 for the time being."* Restore before release. |
+| **The preamble `loop` default** | §9.11 | **OPEN.** With every kind settling on its last step, `%%bd_loop true` has NO effect until a last block is hand-edited to `false`. A directive whose default does nothing is misleading; left as specified rather than changed twice in a day. |
+| **`on_top` / `zorder`** | §4.3 | **NOT BUILT.** The canonical order removed the urgency, not the need: a v2 collage still cannot ASK for picture-over-text. |
+| **Speak over a sequence** | §9.12 | **BUILT**, but the text-node auto-read fires on every node tap, so browsing is a series of interrupts. The serialisation bounds the damage; a short debounce may still be wanted. |
+| **`check_module.sh` takes FILENAMES** | — | **PROCESS.** `for f in "$@"` — called with no arguments it exits 0 in silence, and every "syntax check passed" over two days was vacuous. Run it as `./check_module.sh viewer.js piper_direct.js` and read for the `ok` lines, not the exit code. |
+| **iOS** | — | **NOT TESTED** for anything in §9. |
