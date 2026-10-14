@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14d' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14e' };
 
 let bdViewTitleText = '';
 
@@ -15437,6 +15437,7 @@ async function init() {
       let collageSeqAt     = Object.create(null);   // kind -> ms, when to advance
       let collageSeqHeld   = Object.create(null);   // kind -> logged "holds" once
       let collageSeqWait   = Object.create(null);   // kind -> waiting for the voice
+      let collageSeqMin    = Object.create(null);   // kind -> not before this ms
       let collageSeqParsed = null;                  // the collage as it was at entry
       let collageSeqCardText = '';                  // its text, for the preamble
 
@@ -15452,6 +15453,16 @@ async function init() {
           return Math.max(4, 0.5 * words);
         }
         return 30;
+      }
+
+      // An EXPLICITLY SET duration, in seconds, or 0 when the block has none.
+      // Distinct from collageSeqDuration, which falls back to the computed
+      // estimate: only a value someone actually wrote can hold a step open past
+      // the end of its reading.
+      function collageSeqFloor(blk) {
+        const v = collageGetDirective(blk.script, 'duration');
+        const n = v != null ? parseFloat(v) : NaN;
+        return (isFinite(n) && n > 0) ? n : 0;
       }
 
       function collageSeqShow(kind, blk) {
@@ -15501,8 +15512,18 @@ async function init() {
           // stalls, a tab the browser has throttled — the step would otherwise
           // hold for ever with nothing said about it.
           if (collageSeqWait[kind]) {
-            const capped = collageSeqAt[kind] <= now;
-            if (speechActive() && !capped) continue;
+            const capped  = collageSeqAt[kind] <= now;
+            // ── AN EXPLICIT `duration` IS A FLOOR (author, 2026-10-14) ────
+            // *"If the duration setting is longer than the read time give
+            // preference to the duration."* So a step set to 30 s holds for 30 s
+            // even when the reading finishes in ten — the words stay to be
+            // looked at. The reading governs only when it is the LONGER of the
+            // two, which is the case the computed estimate could never get
+            // right. An ABSENT duration sets no floor: the computed value is a
+            // worse estimate of the reading than the reading itself, so letting
+            // it extend a step would hold the words for no reason.
+            const tooSoon = (collageSeqMin[kind] || 0) > now;
+            if ((speechActive() || tooSoon) && !capped) continue;
             if (speechActive()) {
               console.log('[collage] ' + kind + ' step overran its speech cap — advancing anyway');
             }
@@ -15544,10 +15565,13 @@ async function init() {
           // Four times the estimate plus a minute: long enough that a real
           // reading never hits it, short enough that a stall is not for ever.
           const wait = collageSeqWait[kind];
-          collageSeqAt[kind] = now + (wait ? (secs * 4 + 60) : secs) * 1000;
+          const floor = collageSeqFloor(show);
+          collageSeqAt[kind]  = now + (wait ? (Math.max(secs, floor) * 4 + 60) : secs) * 1000;
+          collageSeqMin[kind] = now + (wait ? floor : 0) * 1000;
           console.log('[collage] ' + kind + ' -> step ' + (nxt + 1) + ' of ' + all.length +
                       ' (' + (show.moduleId || 'text') + ', ' +
-                      (wait ? 'until the reading ends' : secs + 's') + ')');
+                      (wait ? ('until the reading ends' + (floor ? ', at least ' + floor + 's' : ''))
+                            : secs + 's') + ')');
         }
       }
 
@@ -15577,9 +15601,12 @@ async function init() {
           advancing = true;
           const secs = collageSeqDuration(all[0], kind);
           const wait = collageSeqWait[kind];
-          collageSeqAt[kind] = now + (wait ? (secs * 4 + 60) : secs) * 1000;
+          const floor = collageSeqFloor(all[0]);
+          collageSeqAt[kind]  = now + (wait ? (Math.max(secs, floor) * 4 + 60) : secs) * 1000;
+          collageSeqMin[kind] = now + (wait ? floor : 0) * 1000;
           console.log('[collage] sequence ' + kind + ': ' + all.length + ' steps, step 1 ' +
-                      (wait ? 'until the reading ends' : 'for ' + secs + 's'));
+                      (wait ? ('until the reading ends' + (floor ? ', at least ' + floor + 's' : ''))
+                            : 'for ' + secs + 's'));
         }
         if (!advancing) {
           console.log('[collage] no sequence — one block of each kind at most');
@@ -15597,6 +15624,7 @@ async function init() {
         collageSeqAt       = Object.create(null);
         collageSeqHeld     = Object.create(null);
         collageSeqWait     = Object.create(null);
+        collageSeqMin      = Object.create(null);
       }
 
       function bdViewExit() {
@@ -15958,6 +15986,22 @@ async function init() {
           bdViewProse = (bodyEl && bodyEl.textContent) || '';
           const sb = document.getElementById('bd-view-speak');
           if (sb) sb.hidden = !bdViewProse;
+          // ── READ IT, IF SPEAK IS TICKED (author, 2026-10-14) ───────────
+          // For consistency with a collage's text, which now reads itself as it
+          // comes on screen: *"yes it should for consistency work that way for
+          // plain text in View."* Speak being ticked is also where the voice
+          // download was consented to, so there is nothing to ask here.
+          //
+          // The Speak BUTTON stays, as the way to hear it again.
+          if (speakEnabled && bdViewProse.trim()) {
+            try {
+              speak(bdViewProse, { interrupt: true });
+              if (!speechActive()) {
+                console.log('[view] Speak is on but no speech started — ' +
+                            'audio may not be unlocked yet');
+              }
+            } catch (e) { console.warn('[view] speaking the node threw: ' + e.message); }
+          }
         }
         bdViewTitleText = name || moduleId || '';
         if (title) title.textContent = bdViewTitleText;

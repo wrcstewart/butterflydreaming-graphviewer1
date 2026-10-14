@@ -1500,6 +1500,32 @@ while the voice runs; each advance reads the new passage; the last step holds;
 a reading that never ends is released by the cap with a log; and with Speak off
 nothing is spoken and the computed clock paces the steps exactly as before.
 
-**Not changed:** a plain text NODE in View still does not read itself when Speak
-is ticked — only a collage does. Consistency would argue for it; it is a
-different surface and was not what was asked.
+**And a plain text NODE in View reads itself too, 2026-10-14** — *"yes it should
+for consistency work that way for plain text in View."* Speak being ticked is
+also where the voice download was consented to, so there is nothing to ask at
+that point. The Speak BUTTON stays, as the way to hear it again.
+
+### 9.13 An explicit `duration` is a floor the reading cannot cut short
+
+The author: *"if the duration setting is longer than the read time give
+preference to the duration, ie only auto change the text in collage when the
+duration is shorter than the read time."*
+
+So a step's length is **the longer of the reading and an explicitly set
+`duration`**. A step set to 30 s holds for 30 s even when the reading finishes in
+ten — the words stay to be looked at — and the reading governs only when it is
+the longer of the two, which is the case the computed estimate could never get
+right.
+
+**An ABSENT duration sets no floor.** The computed 0.5 s a word is a worse
+estimate of the reading than the reading itself, so letting it extend a step
+would hold the words for no reason. Hence `collageSeqFloor`, which reads only a
+value someone actually wrote, kept distinct from `collageSeqDuration`, which
+falls back to the estimate.
+
+The speech cap grows with the floor — four times the LONGER of the two, plus a
+minute — so a long deliberate duration cannot trip the stall guard.
+
+Verified: an explicit 30 s with the reading over in 3 s holds until 30 s; an
+explicit 5 s with the reading still going at 20 s waits for the voice; and with
+no duration set the reading alone governs, the floor being 0.
