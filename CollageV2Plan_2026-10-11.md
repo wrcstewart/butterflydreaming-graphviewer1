@@ -1341,11 +1341,33 @@ and there is more than one module of the same type present then they will [play]
 in order."* So a lone figure holds the screen and a sequence needs its blocks set
 `loop false`.
 
-> **Consequence to settle: the visual DEFAULT is `loop true`, so a graphic
-> sequence HOLDS on step 1 until the blocks are set `%%bd_loop false`.** The
-> sequencer says so in the log, once per kind, rather than appearing to have a
-> broken timer. Whether the graphic default should be flipped for sequences is
-> the author's call — it was specified as `true`.
+**SETTLED 2026-10-14 — only the LAST graphic holds.** The default `loop true`
+meant a graphic sequence sat on step 1 until every block was edited by hand. The
+author: *"only the last graphic should have loop true the others loop false."* So
+a graphic sequence hands on through every step and **rests on the final figure**
+rather than wrapping.
+
+`collageLastGraphicHolds` re-establishes that after every change to the number of
+graphic blocks — the last `true`, every earlier one `false` — at all three places
+a block can arrive: the press, a paste into an existing collage, and the echo's
+grow. A lone graphic is left alone and keeps the default, so it holds the screen.
+
+It is an **invariant of the arrangement**, not a value anyone sets, which is why
+rewriting it does not break §9.8's "a sealed block is never written to again".
+That is this one deliberate exception, and worth naming as such: `loop` on a
+graphic says which step HOLDS — structural, a fact about the block's position in
+the sequence — while every composed value stays frozen.
+
+Music and text are untouched: both default `loop false`, and `loop` in a music
+block is the module's own ("repeat my material"). Note the asymmetry this
+creates with the collage-level `loop true`: the words and the drone wrap round
+while the figure settles on its last step. That may be exactly right — words
+cycling over a settled figure — and is the author's to judge in use.
+
+Verified: one graphic stays `9:true`; adding a second gives `9:false 12:true`; a
+nudge to the live step keeps `9:false 14:true`; a third gives
+`9:false 14:false 20:true`; music and text stay `false`; and no `%%bd_p_loop`
+appears anywhere, since the timeline directives are forced bare.
 
 **Durations.** A block's `duration` if it has one; for text, absent means
 computed at 0.5 s a word with a 4 s floor, which is why no number is stamped into

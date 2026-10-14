@@ -2191,7 +2191,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-13k' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14a' };
 
 let bdViewTitleText = '';
 
@@ -3359,6 +3359,56 @@ function collageStampTimeline(blockText, kind, prevBlockText) {
 // whole reason no new name was needed.
 const COLLAGE_PREAMBLE = '%%bd_collage 1\n%%bd_loop true\n';
 
+// ── ONLY THE LAST GRAPHIC HOLDS (author, 2026-10-14) ──────────────────────
+// *"Only the last graphic should have loop true the others loop false."* So a
+// graphic sequence hands on through every step and then RESTS on the final
+// figure rather than wrapping, which is what `loop true` means to the sequencer
+// (plan 9.9).
+//
+// It is an INVARIANT of the arrangement rather than a value anyone sets, so it
+// is re-established after every change to the number of graphic blocks: the
+// last gets `true`, every earlier one `false`. A lone graphic is left alone and
+// keeps the default, which is `true`, and holds the screen.
+//
+// This is the ONE deliberate exception to "a sealed block is never written to
+// again" (plan 9.8), and it is worth naming as such: `loop` on a graphic says
+// which step HOLDS, which is structural — a fact about the block's position in
+// the sequence, not a parameter the author chose for it. Every composed value
+// stays frozen.
+function collageLastGraphicHolds(collageText) {
+  const C = parseCollage(collageText);
+  if (!C) return collageText;
+  const n = collageSlots(C, 'visual').length;
+  if (n < 2) return collageText;
+
+  const pre = [], kept = [];
+  let cur = null, curKind = null, seen = -1;
+  const flush = () => {
+    if (cur === null) return;
+    let text = cur.join('\n').replace(/\s+$/, '');
+    if (curKind === 'visual') {
+      seen += 1;
+      text = collageSetDirective(text, 'loop', (seen === n - 1) ? 'true' : 'false', '');
+    }
+    kept.push(text);
+    cur = null; curKind = null;
+  };
+  for (const line of String(collageText).split('\n')) {
+    const mh = line.match(/^%%bd_module[ \t]+(\S+)/);
+    if (mh) {
+      flush(); cur = [line];
+      curKind = (mh[1] === 'text') ? 'text' : (getModuleKind(mh[1]) || 'visual');
+      continue;
+    }
+    if (cur === null) { pre.push(line); continue; }
+    cur.push(line);
+  }
+  flush();
+  const out = pre.concat();
+  for (const t of kept) { out.push(''); out.push(t); }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
+}
+
 // Add a block — or, with mode 'replace', substitute the current step's block of
 // that kind in place.
 //
@@ -3566,7 +3616,8 @@ function collageMergeBySlot(baseText, incoming, grow) {
     }
     flushGrow();
     console.log('[collage] ' + soleId + ' changed after a press — a new step added');
-    return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
+    return collageLastGraphicHolds(
+      out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n');
   }
 
   const out = [];
@@ -16087,10 +16138,10 @@ async function init() {
             }
             const sameB  = collageSlots(baseCollage, add.kind);
             const prevB  = sameB.length ? sameB[sameB.length - 1] : null;
-            const merged = collageAddOrReplace(before, {
+            const merged = collageLastGraphicHolds(collageAddOrReplace(before, {
               kind: add.kind,
               text: collageStampTimeline(slotText, add.kind, prevB && prevB.script)
-            });
+            }));
             setCardText(body, merged);
             collageRemembered = merged;
             if (merged === before) {
@@ -16431,6 +16482,8 @@ async function init() {
         }
         // Sealed either way: a press means "this step is finished".
         if (blockId) collageSealed[blockId] = true;
+        // Only the last graphic holds — re-established after any add.
+        next = collageLastGraphicHolds(next);
 
         // 4. COMMIT — to the card on screen if the collage is already there,
         //    to a fresh top card otherwise, and to the remembered string
