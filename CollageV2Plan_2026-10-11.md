@@ -1722,3 +1722,23 @@ Verified: a 258-character sentence becomes 111 + 146 characters, about 6 s and
 7 s of synthesis, the first ending on the short gap; and verse is untouched,
 since its units are lines and a line under 150 characters is one fragment either
 way.
+
+### 9.19 `Unhandled rejection: run@viewer.js:1993` (2026-10-14)
+
+Reported from a collage View, and the line number named it exactly: `run` is the
+stale check inside `prepareUtterance`.
+
+The **prefetch** promise is parked in `speakAhead`, and an interrupt nulls that
+reference without ever attaching a handler — so its rejection reaches the
+window. A no-op `.catch()` at creation marks it handled; the stored promise is
+unchanged and still resolves for its consumer, since a promise may carry more
+than one handler. Verified both ways: a value still reaches a later `.then`, and
+a rejection still reaches a later `.catch` with `bdStale` intact.
+
+**The lesson is about the FIX, not the bug.** Before the stale check, a rejection
+from `prepareUtterance` meant a genuine synthesis failure and was rare enough
+that a dangling promise never surfaced. Making stale work reject *routinely*
+turned a rare dangling rejection into one on every interrupt. **Changing how
+often a path is taken changes which of its consequences matter** — the same
+family as "a faster version of a mechanism exposes bugs the slow one hid", and
+worth checking for whenever an error becomes an ordinary control flow.

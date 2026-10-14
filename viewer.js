@@ -2073,8 +2073,26 @@ function playNextSpeech() {
     // moment for it.
     el.onplaying = () => {
       el.onplaying = null;
-      if (speakQueue.length) speakAhead = { text: speakQueue[0].text,
-                                            promise: prepareUtterance(speakQueue[0].text, speakQueue[0].scale) };
+      if (speakQueue.length) {
+        const pre = prepareUtterance(speakQueue[0].text, speakQueue[0].scale);
+        // ── A PREFETCH MAY NEVER BE CONSUMED (2026-10-14) ───────────────
+        // `Unhandled rejection: run@viewer.js:1993` — reported by the author
+        // from a collage View, and this is it. The prefetch promise is parked
+        // in `speakAhead`, and an interrupt nulls that reference without ever
+        // attaching a handler, so its rejection reaches the window.
+        //
+        // It did not happen before the stale check existed, because a rejection
+        // then meant a genuine synthesis failure and was rare. Making stale
+        // work reject ROUTINELY turned a rare dangling rejection into one on
+        // every interrupt — the cost of the fix, paid in a place the fix never
+        // looked at.
+        //
+        // A no-op catch marks it handled. The original promise is still what is
+        // stored and still resolves for its consumer: a promise may carry more
+        // than one handler, so this neither consumes nor duplicates the work.
+        pre.catch(() => {});
+        speakAhead = { text: speakQueue[0].text, promise: pre };
+      }
     };
     const done = (ev) => {
       if (ev && ev.type === 'error') {
@@ -2301,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14l' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14m' };
 
 let bdViewTitleText = '';
 
