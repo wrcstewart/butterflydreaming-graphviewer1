@@ -116,8 +116,43 @@ function voicePath(voiceId) {
   return `${lang}/${lang}_${region}/${name}/${quality}/${voiceId}`;
 }
 
-export async function loadVoice(voiceId, onProgress) {
-  if (voices.has(voiceId)) return voices.get(voiceId);
+// ── ONE LOAD AT A TIME, AND THE IN-FLIGHT ONE IS SHARED (2026-10-14) ──────
+// `voices.set` happens at the END of loadVoiceOnce, after two fetches and an
+// InferenceSession.create. So two calls that overlap BOTH missed the cache and
+// both did the whole thing: two model decodes and two ONNX sessions, neither
+// released.
+//
+// That overlap is the ordinary case, not a rarity. Ticking Speak calls
+// speakReady() → loadVoice to warm the voice; the first utterance then calls
+// synthesise() → loadVoice again, and on a desktop fast enough to tick and
+// press View inside the loading window the two races.
+//
+// Reported as the first two sentences "stumbling … missing out most of the
+// sentences" while later ones read correctly, with `slow synth 15018ms` and an
+// `audio WAITING` on every utterance in the log — all of which is what two
+// concurrent session creations would do to a single-threaded WASM runtime, and
+// it settles as soon as they finish. iOS was unaffected because the taps cannot
+// arrive close enough together.
+//
+// The remedy is to cache the PROMISE, not only the result. `onProgress` from a
+// later caller is dropped, which is right: there is one load, so there is one
+// thing to report, and the first caller is the one that asked for it.
+const voicesLoading = new Map();   // voiceId -> Promise, while in flight
+
+export function loadVoice(voiceId, onProgress) {
+  if (voices.has(voiceId)) return Promise.resolve(voices.get(voiceId));
+  const already = voicesLoading.get(voiceId);
+  if (already) {
+    console.log('[piper] loadVoice(' + voiceId + ') already in flight — sharing it');
+    return already;
+  }
+  const p = loadVoiceOnce(voiceId, onProgress)
+    .finally(() => { voicesLoading.delete(voiceId); });
+  voicesLoading.set(voiceId, p);
+  return p;
+}
+
+async function loadVoiceOnce(voiceId, onProgress) {
   const urls = voiceUrls(voiceId);
 
   ortMod = ortMod || await import(/* @vite-ignore */ `${ORT}/+esm`);

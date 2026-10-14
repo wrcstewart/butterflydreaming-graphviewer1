@@ -1578,3 +1578,59 @@ function's name, which for `splitUtterances(text, { verse = false, maxLen = 400 
 function at the parameter list. It now takes the brace after the parameter
 list's closing paren. Worth knowing for anyone else extracting functions to test
 them.
+
+### 9.15 Two voice faults, and a check that was not checking (2026-10-14)
+
+**1. The space bar was re-pressing the Speak button.** Nothing in BD binds
+space: the Speak toggle and View's Speak button KEEP KEYBOARD FOCUS after a
+click, so a later space re-activates them — and View's Speak button ticks the
+Speak box when speech is off, so a stray space turned speech back on and started
+reading. Both now blur after a POINTER press only (`detail > 0`; a keyboard
+activation reports 0, so a keyboard user keeps their focus).
+
+**2. The voice was being loaded TWICE, concurrently.** Reported as the first two
+sentences *"stumbling … missing out most of the sentences"* on desktop while
+later ones read correctly, and as *"preparing"* for about twenty seconds after
+re-ticking Speak.
+
+`piper_direct.js` cached the voice in `voices` only at the END of `loadVoice` —
+after two fetches and an `InferenceSession.create`. So two calls that overlapped
+both missed the cache and both did the whole thing: two model decodes, two ONNX
+sessions, neither released. **And that overlap is the ordinary case**: ticking
+Speak calls `speakReady()` to warm the voice, and the first utterance then calls
+`synthesise()` → `loadVoice` again. A desktop fast enough to tick and press View
+inside the loading window races them; iOS was unaffected because the taps cannot
+arrive close enough together, which is exactly the platform split reported.
+
+The log agrees: `slow synth 15018ms` on a 46-character line against 1.5 s for
+longer lines in the same passage, and an `audio WAITING` on nearly every
+utterance — what two concurrent session creations do to a single-threaded WASM
+runtime, settling as soon as they finish. **So the twenty seconds and the
+stumbling are one fault, not two.**
+
+The fix is to cache the PROMISE, not only the result. A later caller's
+`onProgress` is dropped, which is right: there is one load, so there is one
+thing to report.
+
+**`piper_direct.js` is imported with a `?v=` cache-buster, bumped to 794.** That
+file is the one thing the BD canary cannot certify — the canary covers
+`viewer.js` and `style.css`, not an ES module fetched by URL — so the version
+must be bumped by hand with every change to it.
+
+### 9.16 `check_module.sh` had not been checking anything
+
+Found while verifying the above. The script is `for f in "$@"` — it takes
+FILENAMES, and every invocation in this session passed none. With no arguments
+the loop body never runs and it exits 0 in silence, so **every "syntax check
+passed" reported during two days of work was vacuous.** The tell was there to
+see: a real pass prints `ok   viewer.js`, and the output was always empty.
+
+Run properly, `viewer.js` and `piper_direct.js` both parse. Nothing was broken
+by it — but the guard that was supposed to catch a parse error, which once took
+BD down entirely with no banner and no graph, had been switched off by the way
+it was being called. A check that cannot fail is worse than no check, because it
+is believed.
+
+**How to apply:** `./check_module.sh viewer.js piper_direct.js` — and read for
+the `ok` lines, not the exit code. This is the "verify the effect, not the exit
+code" lesson arriving in the tool built for that very lesson.

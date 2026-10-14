@@ -1897,7 +1897,11 @@ function splitUtterances(text, { verse = false, maxLen = 400 } = {}) {
 
 async function speakReady() {
   if (!speakSynth) {
-    const mod = await import('./piper_direct.js?v=793');
+    // ?v= BUMPED WITH EVERY CHANGE TO THAT FILE. It is a cache-buster, and a
+    // stale module is the one kind of fault the BD canary cannot see — the
+    // canary certifies viewer.js and style.css, not an ES module imported by
+    // URL. 794: the shared in-flight voice load.
+    const mod = await import('./piper_direct.js?v=794');
     speakSynth = mod.synthesise;
     speakLoadVoice = mod.loadVoice;
   }
@@ -2227,7 +2231,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14h' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14i' };
 
 let bdViewTitleText = '';
 
