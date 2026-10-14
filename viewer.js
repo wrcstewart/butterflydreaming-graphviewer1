@@ -2227,7 +2227,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14g' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14h' };
 
 let bdViewTitleText = '';
 
@@ -13812,6 +13812,12 @@ async function init() {
     // looking for why speech is behaving as it is.
     try { localStorage.removeItem('bd_speak'); } catch (_) {}
     try { localStorage.removeItem('bd_speak_explained'); } catch (_) {}
+    // The same for the toggle itself: clicked with a pointer it would keep
+    // focus, and a later space would un-tick or re-tick it invisibly. Bound as
+    // `click` rather than `change` because only a click carries `detail`.
+    box.addEventListener('click', (ev) => {
+      if (ev && ev.detail > 0) { try { box.blur(); } catch (_) {} }
+    });
     box.addEventListener('change', async () => {
       // 2026-09-04 — the voice is a ~60 MB download on first use, and it must
       // NOT begin because a checkbox was ticked out of curiosity. Asked once,
@@ -16710,7 +16716,19 @@ async function init() {
       if (bdViewExitBtn) bdViewExitBtn.addEventListener('click', bdViewExit);
 
       const bdViewSpeakBtn = document.getElementById('bd-view-speak');
-      if (bdViewSpeakBtn) bdViewSpeakBtn.addEventListener('click', () => {
+      if (bdViewSpeakBtn) bdViewSpeakBtn.addEventListener('click', (ev) => {
+        // ── A POINTER PRESS MUST NOT LEAVE THE BUTTON FOCUSED ─────────────
+        // Reported as *"the space bar restarts the speech when it has been
+        // turned off"*. Nothing in BD binds the space bar: the button simply
+        // KEEPS KEYBOARD FOCUS after being clicked, so space re-presses it —
+        // and because this handler ticks the Speak box when speech is off, a
+        // stray space turns speech back on and starts reading again.
+        //
+        // `detail > 0` means the click came from a pointer; a keyboard
+        // activation reports 0. So the blur fires for a mouse or a tap and
+        // never for someone operating BD from the keyboard, who needs the focus
+        // to stay where they put it.
+        if (ev && ev.detail > 0) { try { bdViewSpeakBtn.blur(); } catch (_) {} }
         if (!bdViewProse) return;
         // ── CONSENT, ASKED HERE (2026-10-09) ──────────────────────────
         // Speech is gated on the Speak toggle, and ticking that toggle is where
