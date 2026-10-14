@@ -1677,3 +1677,48 @@ would train the eye to ignore the line that matters.
 **Worth watching next:** the text-node auto-read added in §9.12 fires on every
 node tap, so browsing is now a series of interrupts. The serialisation bounds
 the damage, but a short debounce on that read may still be wanted.
+
+### 9.18 `maxLen` is a latency budget, not a tidiness rule (2026-10-14)
+
+With the backlog gone, the log showed what was left — and it was not a backlog.
+Every remaining long wait was at normal queue depth and on a MODULE DESCRIPTION
+node:
+
+```
+slow synth 16402ms, queue depth 2 — "The same L-system turtle as the Kolam module, "
+slow synth 21433ms, queue depth 2 — "step_pitch is how far that lift carries: it sc"
+```
+
+Divide through and the rate is strikingly consistent: **about 50 ms per
+character** (41 chars in 2119 ms; 2.5 s for a 50-character verse line). Those
+12–21 second waits therefore correspond to utterances of 240–410 characters —
+which is to say, `maxLen`-sized ones. `maxLen` was 400.
+
+**Speech PLAYS at roughly 70 ms per character** (~170 wpm), so synthesis is about
+**1.4× faster than playback**. That is the whole explanation of why the prefetch
+keeps up once reading has started, and why the only cost that cannot be hidden
+is the FIRST utterance — whose price is directly proportional to its length. So
+`maxLen` sets the worst-case wait before anything is heard:
+
+| `maxLen` | worst first wait |
+|---|---|
+| 400 (was) | ~20 s |
+| **150 (now)** | **~7.5 s** |
+| 100 | ~5 s |
+
+The author: *"reduce it down — I feel that is the change that was made earlier,
+effectively."* Exactly right, and worth recording as the principle: it is the
+same move as splitting at all — *"reading starts on the first sentence instead of
+after the last"* — applied further into long prose. **The short-first-fragment
+merge tried an hour earlier was that principle run BACKWARDS**, which is why it
+made the start worse and had to go.
+
+What it costs: a long sentence is split at a comma or semicolon rather than read
+whole, so the reading gains a small breath where the author put none. The
+fragment then ends without terminal punctuation and so takes the SHORT gap
+(180 ms) rather than a full stop's — behaviour that was already built.
+
+Verified: a 258-character sentence becomes 111 + 146 characters, about 6 s and
+7 s of synthesis, the first ending on the short gap; and verse is untouched,
+since its units are lines and a line under 150 characters is one fragment either
+way.

@@ -1835,7 +1835,35 @@ let speakHits = 0, speakMisses = 0;
 // a comma, a colon, or a verse line with no punctuation at all — gets the
 // shorter SPEAK_LINE_GAP_MS. That improves prose too: an over-long sentence
 // broken at the 400-char cap used to take a full stop's pause mid-clause.
-function splitUtterances(text, { verse = false, maxLen = 400 } = {}) {
+// ── maxLen IS A LATENCY BUDGET, NOT A TIDINESS RULE (2026-10-14) ──────────
+// 400 -> 150, measured. Synthesis costs about **50 ms per character** on this
+// machine, consistently: 41 chars in 2119 ms, and the 12-21 second waits in the
+// log all turned out to be utterances of 240-410 characters — which is to say,
+// maxLen-sized ones.
+//
+// Speech PLAYS at roughly 70 ms per character (~170 wpm), so synthesis is about
+// 1.4x faster than playback. That is why the prefetch keeps up once reading has
+// started, and why the only cost that cannot be hidden is the FIRST utterance —
+// whose price is directly proportional to its length. So this constant sets the
+// worst-case wait before anything is heard: 400 chars is ~20 s, 150 is ~7.5 s,
+// 100 would be ~5 s.
+//
+// The author: *"reduce it down — I feel that is the change that was made
+// earlier, effectively."* Which is exactly right: it is the same principle as
+// splitting at all ("reading starts on the first sentence instead of after the
+// last"), applied further into long prose. The short-first-fragment merge tried
+// an hour earlier was that principle RUN BACKWARDS, which is why it made the
+// start worse.
+//
+// What it costs: a long sentence is split at a comma or semicolon rather than
+// read whole, so the reading gains a small breath where the author put none.
+// The fragment then ends without terminal punctuation and so takes the SHORT
+// gap (SPEAK_LINE_GAP_MS, 180 ms) rather than a full stop's — which is the
+// behaviour wanted, and already built.
+//
+// VERSE IS UNAFFECTED: its units are lines, and a line under 150 characters is
+// one fragment either way. Only long prose changes.
+function splitUtterances(text, { verse = false, maxLen = 150 } = {}) {
   const out = [];
   const gapFor = (frag) => /[.!?]["'\u201d\u2019)\]]*$/.test(frag) ? SPEAK_GAP_MS : SPEAK_LINE_GAP_MS;
   const units = verse ? text.split('\n') : [text];
@@ -2273,7 +2301,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-14k' };
+const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14l' };
 
 let bdViewTitleText = '';
 
