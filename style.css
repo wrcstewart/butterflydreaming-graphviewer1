@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-14f";
+  --bd-css-build: "2026-10-14g";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1221,6 +1221,13 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-14g: RED (NO TITLE OVER A COLLAGE. The View bar showed the name of
+   whichever node you happened to be standing on, which is not what the collage
+   IS, and a collage can name more modules than one line can hold. The element
+   stays, because it doubles as the speech status line — the only thing that can
+   report "preparing…" or the first-use download in View — and with the title
+   text empty a message still shows and the line returns to blank). Next = green.
+
    2026-10-14f: BLUE (THE PAUSE AFTER "Chapter 11", measured not guessed. The log
    already answered it: the second utterance IS prefetched and had simply not
    finished — the prefetch starts when the current clip begins PLAYING, so a
@@ -1847,7 +1854,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2d7ff9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;

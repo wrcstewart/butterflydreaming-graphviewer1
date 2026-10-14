@@ -2227,7 +2227,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2d7ff9', rgb: 'rgb(45, 127, 249)', build: '2026-10-14f' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-14g' };
 
 let bdViewTitleText = '';
 
@@ -16039,7 +16039,18 @@ async function init() {
             } catch (e) { console.warn('[view] speaking the node threw: ' + e.message); }
           }
         }
-        bdViewTitleText = name || moduleId || '';
+        // ── NO TITLE OVER A COLLAGE (author, 2026-10-14) ────────────────
+        // *"There is no point in having the one module node title in the top
+        // line of Viewer. Better none at all as there may be too many to
+        // accommodate."* Right on both counts: the name shown was whichever
+        // node you happened to be standing on, which is not what the collage
+        // IS, and a collage can name more modules than a single line can hold.
+        //
+        // The element stays, and must: it doubles as the speech status line
+        // ("preparing…", the first-use download progress), which is the only
+        // place that can report in View. With `bdViewTitleText` empty, a message
+        // still shows and the line simply returns to blank when it clears.
+        bdViewTitleText = collage ? '' : (name || moduleId || '');
         if (title) title.textContent = bdViewTitleText;
         if (bar) bar.hidden = false;
         body.classList.add('view-active');
