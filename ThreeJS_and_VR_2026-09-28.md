@@ -327,6 +327,91 @@ clothes. Both are "how do several media share one surface".
 
 ---
 
+## 5b. The turtle makes SHELLS, not helices — except at large angles (2026-10-15)
+
+The author asked whether the parameters could wind the figure into a **tunnel**:
+many turns along the vertical, viewed from inside, flown through slowly. The
+answer is yes, but not where anyone would look for it — and the reasoning that
+got there analytically was wrong twice, so this is what the simulation says.
+
+### Why the obvious settings cannot work
+
+Every `+` applies **yaw about the turtle's own up AND pitch about its own left**.
+That is one fixed rotation in the body frame, so the trajectory is formally a
+helix: `H` precesses on a cone about the composite rotation's axis, and the rise
+per step is `step × cos(angle between H and that axis)`.
+
+**The catch is that the angle is almost exactly 90°.** `H` is the body's forward
+axis and the composite axis lies very nearly in the up/left plane, so:
+
+| angle | pitch | rotation/step | angle(H, axis) | rise per step of 50 |
+|---|---|---|---|---|
+| 90 | 1 | 90.0° | 89.50° | 0.44 |
+| 3.52 | 0.1 | 3.52° | 89.95° | 0.04 |
+| 3.52 | 3 | 4.63° | 88.86° | 1.00 |
+| 30 | 30 | 42.18° | 79.27° | **9.31** |
+
+The X component of that axis is second order in the two angles, so at small
+angles there is essentially no advance and the curve wraps a **shell**. Which is
+the module's own description in different words — *"one degree lifts the figure
+into a shallow dome, five degrees into a deep shell"*. Over a 120-point grid of
+small angles the best roundness obtainable was a radius varying sevenfold with
+the path doubling back along the axis twenty times. No tunnel exists there.
+
+### Where the helix is
+
+Both angles large and comparable. Measured over 1,023 steps, radius taken about
+the **centroid** axis — measuring from a line through the first point was the
+error that hid this, since that point lies on the surface, not the axis:
+
+| angle | pitch | roundness | radius | length | turns | reverses | axis off vertical |
+|---|---|---|---|---|---|---|---|
+| **54** | **8** | **0.997** | 55 | 3535 | 153 | 0 | **9°** |
+| 58 | 12 | 0.961 | 51 | 5254 | 165 | 0 | 12° |
+| 32 | 18 | 0.979 | 80 | 7024 | 91 | 0 | 30° |
+| 52 | 56 | 0.996 | 39 | 17301 | 148 | 0 | 50° |
+
+`1.00` is a perfect tube; `0 reverses` means it never doubles back, so it can be
+flown. **The axis tilt is the column that decides usefulness**: the camera orbits
+in azimuth and elevation, so only a near-vertical axis can be looked *along* at
+`cam_elevation 90`. That rules out the roundest of them (52/56, tilted 50°) in
+favour of 54/8.
+
+### Three things the recipe depends on
+
+- **The SCORE, as much as the angles.** The default rule's minus signs are what
+  make a kolam. `axiom: F` with `F: F+F+F+F` expands to `F(+F)×1023` — uniform
+  turning at every depth — and `depth` caps at **5**, so `4^5 = 1024` steps is
+  the budget. `F: F+F` is uniform too but reaches only 32.
+- **`step` must be near its maximum.** `effectiveStep = step / 3^(depth-1)`, so
+  at depth 5 everything is 1/81 scale. With `step 9900` the tube comes out at
+  radius ~134 and length ~8,600, and `cam_distance`'s floor of 20 is then
+  comfortably **inside** it. At `step 50` the radius would be 0.7 and nothing
+  could get in.
+- **Flying through needs no new geometry.** At `cam_elevation 90` the camera sits
+  at `(0, d, 0)` looking at the origin, so `cam_distance` **is** the position
+  along the tunnel. Winding it down is the fly-through, and press-and-hold
+  already gives a slow one. What is missing is only automation: there is
+  `cam_elevation_speed` and no `cam_distance_speed`. One parameter of a shape
+  that already exists.
+
+### And the VR caveat, which is the serious one
+
+**A slow fly-through is the most reliably nausea-inducing motion in VR**, and it
+is exactly what §1's comfort requirement warns against — *in VR the steppers
+must move the WORLD, not the eye*. Moving the tunnel past a stationary viewer
+produces the same optical flow, so there is no trick that avoids it: the
+mitigations are slowness and a stable reference frame in view. On a flat screen
+this should be lovely. **In a headset, treat it as the one effect that must be
+tested for comfort rather than assumed** — and note that it is the first thing
+BD would do that the standing decision actively cautions about.
+
+**Built as `bd_V_Kolam3D_002`**, seq 4 under the `bd_V_Kolam3D` gateway in the
+Kolam3D cluster, so it is a script to open and adjust rather than a block of text
+to paste. Reload BD to see it.
+
+---
+
 ## 6. Line weight, and why VR forces the issue
 
 Current position, as of RULE 9:
@@ -985,6 +1070,8 @@ to come back with is whether 6.8px node labels resolve at all.
 | **Does the headset carry music and voice (§5a)?** | Under §5C it must, because there is only one device. That makes the Piper question (§8b) load-bearing rather than optional. |
 | **Depth / drift policy inside a session (§3)** | Cap depth, slow drift, or move the L-system off the main thread. |
 | **Scale directive (§3b)** | Table, room, or building. A design decision, not a constant. |
+| **`cam_distance_speed` (§5b)** | The tunnel can be flown by winding `cam_distance` down by hand; nothing automates it, where `cam_elevation_speed` already exists. One parameter of a known shape. **But see §5b's caveat** — a fly-through is the one effect §1's comfort requirement cautions against, so build the comfort test before the convenience. |
+| **A yaw-ONLY symbol, or a roll? (§5b)** | `+` couples yaw and pitch, which is why helices exist only at large comparable angles. A third rotation — a roll about the heading — or a symbol that yaws without pitching would open up helices at any tightness, and much else. A change to the SCORE GRAMMAR, so it needs a name and a migration story. Not needed for the tunnel, which exists without it. |
 | **WebGL context ceiling** | Measure on desktop Safari, iOS Safari, Quest. |
 | **`Line2` (§6)** | Worth it for VR; the ESM/import-map cost is known and real. |
 | **Does anything DEPEND on the black background? (§8d)** | The free hedge for additive AR displays, where black is transparent. Keep the figure legible as lines in space. Costs nothing today. |
