@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BD headset check</title>
+<!--
+  A HEADSET CHECK, BUILT 2026-10-15 FOR A SHOP COUNTER.
+
+  Served at /x so it can be typed into a headset's address bar by gaze and
+  pinch, which is the only way in on a demo unit: Vision Pro has no native QR
+  scanning, the Quest browser has none either, and Handoff, iCloud tabs and
+  AirDrop all need the user's own Apple ID. Every character of the path is paid
+  for by hand, so the path is one character.
+
+  It answers the three things a spec sheet cannot:
+
+    1. does WebXR actually offer immersive-vr on THIS device and browser;
+    2. is BD's prose legible at this device's pixels-per-degree, judged on
+       BD's real text at BD's real sizes rather than on a test card;
+    3. how fast is the WASM speech synthesis here, in ms per CHARACTER, so the
+       number is directly comparable with the ~50 ms/char measured on the Mac.
+
+  NOTHING DOWNLOADS UNASKED. The voice is 19.4 MB and the immersive scene pulls
+  three.js from a CDN; both sit behind a button. That is the same discipline as
+  BD's Speak toggle, and it matters more here — a shop's wi-fi is not the
+  user's to spend.
+
+  LUMINANCE, NOT HUE, throughout: the author has reduced colour vision, so
+  nothing in this page distinguishes a pass from a fail by colour alone. Every
+  verdict is also a word.
+-->
+<style>
+  :root {
+    --ground: #0a0a0f;
+    --ink:    #f2f2ec;
+    --dim:    #9e9e90;
+    --rule:   #3a3a42;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 18px 20px 60px;
+    background: var(--ground); color: var(--ink);
+    font: 17px/1.5 -apple-system, system-ui, sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 0.01em; }
+  h2 {
+    font-size: 15px; margin: 30px 0 10px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+  }
+  p.lede { margin: 0 0 6px; color: var(--dim); font-size: 15px; }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; }
+  td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.k { color: var(--dim); white-space: nowrap; width: 15em; }
+  td.v { font-weight: 600; }
+  .yes::before { content: "YES — "; }
+  .no::before  { content: "NO — "; }
+  /* The mark is a SHAPE as well as a weight, so it survives being read by
+     someone who cannot rely on colour and by a photograph of a headset view. */
+  .yes { color: var(--ink); }
+  .no  { color: var(--dim); text-decoration: line-through; }
+  button {
+    font: 600 16px/1 inherit; color: var(--ink); background: #1a1a20;
+    border: 2px solid rgba(255,255,255,0.5); border-radius: 5px;
+    padding: 13px 18px; margin: 4px 8px 4px 0; cursor: pointer; min-height: 48px;
+  }
+  button:disabled { opacity: 0.45; }
+  button:hover:not(:disabled) { filter: brightness(1.35); }
+  pre {
+    background: #121218; border: 1px solid var(--rule); border-radius: 5px;
+    padding: 10px 12px; overflow-x: auto; font-size: 13px; color: var(--dim);
+    max-width: 760px; white-space: pre-wrap;
+  }
+  .sample { max-width: 34em; margin: 0 0 16px; }
+  .sample .tag { color: var(--dim); font-size: 13px; letter-spacing: 0.06em; }
+  .ruler { font-family: ui-monospace, Menlo, monospace; color: var(--dim); font-size: 13px; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<h1>BD headset check</h1>
+<p class="lede">Nothing is downloaded until you press a button.</p>
+
+<h2>1 · What this browser offers</h2>
+<table id="caps"><tbody></tbody></table>
+
+<h2>2 · Is BD's prose legible here?</h2>
+<p class="lede">
+  Real text at BD's real sizes. Read each line at arm's length as you would in
+  use — the question is which is comfortable, not which is possible.
+</p>
+<div id="samples"></div>
+<p class="ruler" id="ruler"></p>
+
+<h2>3 · Immersive session</h2>
+<p class="lede">
+  Enters <code>immersive-vr</code> with a figure and three text panels at
+  different sizes, 1.6&nbsp;m away. Pulls three.js from a CDN on first press.
+</p>
+<button id="xrBtn" disabled>Enter immersive-vr</button>
+<button id="xrEnd" disabled>Leave</button>
+<pre id="xrLog">not started</pre>
+
+<h2>4 · Speech synthesis speed</h2>
+<p class="lede">
+  Times one 400-character utterance and reports <strong>ms per character</strong>
+  — the figure to compare with ~50&nbsp;ms/char on the Mac. Downloads the 19.4&nbsp;MB
+  voice on first press.
+</p>
+<button id="spBtn">Time a 400-character utterance</button>
+<pre id="spLog">not started</pre>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// 1 · Capabilities
+// ─────────────────────────────────────────────────────────────────────────────
+const capsBody = document.querySelector('#caps tbody');
+function row(k, v, ok) {
+  const tr = document.createElement('tr');
+  const tdk = document.createElement('td'); tdk.className = 'k'; tdk.textContent = k;
+  const tdv = document.createElement('td'); tdv.className = 'v';
+  if (ok === true)  tdv.className += ' yes';
+  if (ok === false) tdv.className += ' no';
+  tdv.textContent = v;
+  tr.append(tdk, tdv); capsBody.appendChild(tr);
+  return tdv;
+}
+
+const hasXR = !!(navigator.xr);
+row('navigator.xr', hasXR ? 'present' : 'absent', hasXR);
+
+const vrCell = row('immersive-vr', 'asking…');
+const arCell = row('immersive-ar', 'asking…');
+row('device pixel ratio', String(window.devicePixelRatio));
+row('viewport', window.innerWidth + ' × ' + window.innerHeight + ' css px');
+row('audio', (window.AudioContext || window.webkitAudioContext) ? 'Web Audio present' : 'absent',
+    !!(window.AudioContext || window.webkitAudioContext));
+row('WASM', (typeof WebAssembly === 'object') ? 'present' : 'absent', typeof WebAssembly === 'object');
+row('threads (SharedArrayBuffer)',
+    self.crossOriginIsolated ? 'available — cross-origin isolated' : 'single-threaded (expected: BD forgoes COOP/COEP)',
+    self.crossOriginIsolated ? true : null);
+row('user agent', navigator.userAgent);
+
+async function askSession(mode, cell) {
+  if (!hasXR) { cell.textContent = 'no WebXR at all'; cell.className = 'v no'; return false; }
+  try {
+    const ok = await navigator.xr.isSessionSupported(mode);
+    cell.textContent = ok ? 'supported' : 'not supported';
+    cell.className = 'v ' + (ok ? 'yes' : 'no');
+    return ok;
+  } catch (e) {
+    cell.textContent = 'threw: ' + e.message;
+    cell.className = 'v no';
+    return false;
+  }
+}
+(async () => {
+  const vr = await askSession('immersive-vr', vrCell);
+  await askSession('immersive-ar', arCell);
+  // immersive-ar is EXPECTED to be absent on visionOS and present on Quest, and
+  // BD needs neither: only the module goes immersive, and it shows a WebGL
+  // scene rather than the room. So a NO there is information, not a failure.
+  document.getElementById('xrBtn').disabled = !vr;
+  if (!vr) document.getElementById('xrLog').textContent =
+    'immersive-vr is not offered here, so there is nothing to enter.';
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2 · Legibility, on BD's own text at BD's own sizes
+// ─────────────────────────────────────────────────────────────────────────────
+// The sizes are the ones BD actually uses, not a sweep: 24px is the top of
+// View's collage clamp, 17px its middle, 11px its floor, and 6.8px is a graph
+// node label — included because the standing note says a 1px line gets WORSE as
+// hardware improves, and a node label is the smallest thing BD draws.
+const PASSAGE = 'Thirty spokes are joined together in a wheel, but it is the centre hole that allows the wheel to function.';
+const SIZES = [
+  [28, "View, single node — clamp ceiling"],
+  [24, "View, collage — clamp ceiling"],
+  [17, "this page's body text"],
+  [11, "View, collage — clamp FLOOR"],
+  [6.8, "a graph node label"]
+];
+const samples = document.getElementById('samples');
+for (const [px, note] of SIZES) {
+  const d = document.createElement('div');
+  d.className = 'sample';
+  const t = document.createElement('div');
+  t.className = 'tag';
+  t.textContent = px + 'px — ' + note;
+  const p = document.createElement('p');
+  p.style.font = px + 'px/1.5 -apple-system, system-ui, sans-serif';
+  p.style.margin = '2px 0 0';
+  p.textContent = PASSAGE;
+  d.append(t, p);
+  samples.appendChild(d);
+}
+// The measured claim to test by eye: ~18 characters is a headset-safe line at
+// ~25 PPD, against ~50 at a comfortable 14px-equivalent on a phone.
+document.getElementById('ruler').textContent =
+  '18 chars: |' + 'x'.repeat(18) + '|    50 chars: |' + 'x'.repeat(50) + '|';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3 · The immersive session
+// ─────────────────────────────────────────────────────────────────────────────
+const xrLog = document.getElementById('xrLog');
+const xrBtn = document.getElementById('xrBtn');
+const xrEnd = document.getElementById('xrEnd');
+let say = (s) => { xrLog.textContent += '\n' + s; };
+let session = null, renderer = null, THREEref = null;
+
+function loadThree() {
+  // The same build and version BD's own 3D module uses, so this page cannot
+  // pass on a three.js that BD does not run.
+  if (window.THREE) return Promise.resolve(window.THREE);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
+    s.onload = () => resolve(window.THREE);
+    s.onerror = () => reject(new Error('three.js failed to load — is the wi-fi reaching the CDN?'));
+    document.head.appendChild(s);
+  });
+}
+
+// Text as a CanvasTexture on a plane, NOT CSS3DRenderer — the standing note:
+// CSS3D is DOM, and DOM does not exist inside an immersive session.
+function textPanel(THREE, lines, worldWidth) {
+  const cv = document.createElement('canvas');
+  cv.width = 1024; cv.height = 512;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, cv.width, cv.height);
+  c.fillStyle = '#f2f2ec'; c.textBaseline = 'top';
+  let y = 24;
+  for (const [px, label] of lines) {
+    c.font = '600 ' + Math.round(px * 2.2) + 'px -apple-system, system-ui, sans-serif';
+    c.fillText(label, 24, y);
+    y += Math.round(px * 2.2 * 1.6) + 14;
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const h = worldWidth * (cv.height / cv.width);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(worldWidth, h),
+                           new THREE.MeshBasicMaterial({ map: tex }));
+  return m;
+}
+
+xrBtn.addEventListener('click', async () => {
+  xrBtn.disabled = true;
+  xrLog.textContent = 'loading three.js…';
+  try {
+    const THREE = THREEref = await loadThree();
+    say('three.js ' + THREE.REVISION);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 50);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.2));
+
+    // A figure that moves, so a dropped frame is visible rather than inferred.
+    const knot = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(0.22, 0.055, 160, 24),
+      new THREE.MeshStandardMaterial({ color: 0xcfd6e0, metalness: 0.1, roughness: 0.6 }));
+    knot.position.set(0, 1.45, -1.6);
+    scene.add(knot);
+
+    // Three sizes at 1.6 m. The question the panel answers is which of BD's
+    // text sizes is comfortable AT THIS DEVICE'S pixels per degree.
+    const panel = textPanel(THREE, [
+      [26, 'Thirty spokes are joined in a wheel —'],
+      [17, 'but it is the centre hole that allows'],
+      [11, 'the wheel to function. (11px equivalent)']
+    ], 1.1);
+    panel.position.set(0, 1.1, -1.6);
+    scene.add(panel);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    session = await navigator.xr.requestSession('immersive-vr', {
+      optionalFeatures: ['local-floor', 'hand-tracking', 'bounded-floor']
+    });
+    say('session started');
+    say('blend mode: ' + (session.environmentBlendMode || 'unreported'));
+    await renderer.xr.setSession(session);
+    xrEnd.disabled = false;
+
+    // WHAT THE INPUT LOOKS LIKE HERE is the thing worth knowing: visionOS
+    // reports `transient-pointer` on a pinch, Quest reports `tracked-pointer`
+    // for a controller. BD's steppers live in the FLAT page, so this is
+    // reconnaissance rather than a requirement.
+    const reportInputs = () => {
+      const kinds = [];
+      for (const s of session.inputSources) {
+        kinds.push(s.targetRayMode + (s.hand ? ' + hand(' + s.hand.size + ' joints)' : ''));
+      }
+      say('input sources: ' + (kinds.length ? kinds.join(', ') : 'none yet — pinch or raise a hand'));
+    };
+    session.addEventListener('inputsourceschange', reportInputs);
+    setTimeout(reportInputs, 1200);
+
+    let frames = 0, t0 = performance.now(), reported = false;
+    renderer.setAnimationLoop(() => {
+      knot.rotation.x += 0.004; knot.rotation.y += 0.007;
+      renderer.render(scene, camera);
+      frames += 1;
+      const dt = performance.now() - t0;
+      if (!reported && dt > 4000) {
+        reported = true;
+        say('frame rate: ' + Math.round(frames / (dt / 1000)) + ' fps over the first four seconds');
+      }
+    });
+
+    session.addEventListener('end', () => {
+      renderer.setAnimationLoop(null);
+      say('session ended');
+      xrBtn.disabled = false; xrEnd.disabled = true; session = null;
+    });
+  } catch (e) {
+    say('FAILED: ' + e.message);
+    xrBtn.disabled = false;
+  }
+});
+
+xrEnd.addEventListener('click', () => { if (session) session.end(); });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4 · Speech synthesis speed, in ms per character
+// ─────────────────────────────────────────────────────────────────────────────
+// 400 characters because that was splitUtterances' old maxLen, and the number
+// this produces is what justified cutting it to 150: time-to-first-audio is
+// proportional to the FIRST utterance's length.
+const SP_TEXT =
+  'When the sea is moved so as to bear it along, it prepares to remove to the Southern Ocean, ' +
+  'and the Southern Ocean is the Pool of Heaven; and when the bird rouses itself and flies, ' +
+  'its wings are like clouds all round the sky, so that no one who looks up can see where it ends.';
+const spLog = document.getElementById('spLog');
+const spBtn = document.getElementById('spBtn');
+
+spBtn.addEventListener('click', async () => {
+  spBtn.disabled = true;
+  const put = (s) => { spLog.textContent += '\n' + s; };
+  spLog.textContent = 'text is ' + SP_TEXT.length + ' characters';
+  try {
+    put('importing piper_direct.js…');
+    const mod = await import('./piper_direct.js?v=794');
+    put('loading the voice (19.4 MB on a first visit)…');
+    const tLoad = performance.now();
+    await mod.loadVoice('local/alba_int8dp', (p) => {
+      if (p && p.total) spLog.textContent =
+        'voice: ' + Math.round(100 * p.loaded / p.total) + '%';
+    });
+    put('voice ready in ' + Math.round(performance.now() - tLoad) + ' ms');
+
+    let lex = {};
+    try {
+      const r = await fetch('speech_lexicon.json');
+      if (r.ok) lex = await r.json();
+    } catch (_) {}
+
+    const t0 = performance.now();
+    await mod.synthesise({ voiceId: 'local/alba_int8dp', text: SP_TEXT, lexicon: lex });
+    const ms = Math.round(performance.now() - t0);
+    put('');
+    put('synthesis: ' + ms + ' ms for ' + SP_TEXT.length + ' characters');
+    put('          = ' + (ms / SP_TEXT.length).toFixed(1) + ' ms per character');
+    put('');
+    put('the Mac measures about 50 ms/char.');
+    put('speech PLAYS at about 70 ms/char, so anything under that means the');
+    put('prefetch can keep up once reading has started.');
+  } catch (e) {
+    put('FAILED: ' + e.message);
+  }
+  spBtn.disabled = false;
+});
+</script>
+</body>
+</html>

@@ -141,6 +141,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── /x — THE HEADSET CHECK, AT THE SHORTEST PATH THERE IS (2026-10-15) ────
+// `x.html` is reachable as /x.html already; this route exists so the path can
+// be ONE character. That is not tidiness: on a headset the URL is typed by gaze
+// and pinch, and a demo unit in a shop offers no other way in — Vision Pro has
+// no native QR scanning, the Quest browser has none, and Handoff, iCloud tabs
+// and AirDrop all need the user's own Apple ID. Every character of the path is
+// paid for by hand.
+//
+// An explicit route rather than express.static's `extensions: ['html']`, which
+// would change how EVERY extensionless path resolves for the sake of one file.
+app.get('/x', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(require('path').join(__dirname, 'x.html'));
+});
+
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
     // 2026-09-04 — .js too. The bench imports piper_direct.js as a module.
