@@ -156,6 +156,15 @@ app.get('/x', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'x.html'));
 });
 
+// /qr — a QR code for any BD URL, defaulting to the headset check. Opened on a
+// Mac or a phone and LOOKED AT through a headset's passthrough, which on a
+// Quest is the quickest way to get a page open. See qr.html for why that is
+// true of a Quest and not of a Vision Pro demo unit.
+app.get('/qr', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(require('path').join(__dirname, 'qr.html'));
+});
+
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
     // 2026-09-04 — .js too. The bench imports piper_direct.js as a module.

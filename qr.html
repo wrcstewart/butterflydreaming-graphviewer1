@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BD · QR for a headset</title>
+<!--
+  A QR CODE FOR ANY BD URL, 2026-10-15.
+
+  WHY THIS EXISTS, and the correction behind it. I told the author a QR code
+  could not get a web page open in a headset. That was wrong for the Quest, and
+  the author's own recollection was right — BD's Device button has generated a
+  QR for exactly this purpose since September, and it works:
+
+    · Quest 3 / 3S: Horizon OS v2.9 adds a BUILT-IN scanner opened by voice
+      ("Hey Meta, open QR code scanner") or from Quick controls, reading codes
+      straight through passthrough with an "open link" action — currently in the
+      Public Test Channel. Third-party scanners (QR Scanner VR, QR Scanner) do
+      the same on the release channel today and hand the URL to the browser.
+
+    · Vision Pro: no native scanner. A third-party app exists, so it works on a
+      device you own and have installed it on — and not at all on one you have
+      not.
+
+  So the honest rule is about the DEVICE, not the QR: on your own headset a QR
+  is the quickest way in; on a demo unit in a shop, where nothing can be
+  installed and no account is yours, the URL has to be typed. Which is why the
+  headset check lives at /x and not at /headset-check.
+
+  It reuses BD's own qrcode.js — the same 57 KB encoder the Device button
+  loads — so there is one QR implementation in the project and not two.
+-->
+<style>
+  body {
+    margin: 0; padding: 22px 20px 50px;
+    background: #0a0a0f; color: #f2f2ec;
+    font: 17px/1.5 -apple-system, system-ui, sans-serif;
+  }
+  h1 { font-size: 19px; margin: 0 0 14px; }
+  label { display: block; font-size: 13px; color: #9e9e90; margin: 18px 0 5px;
+          text-transform: uppercase; letter-spacing: 0.08em; }
+  input {
+    width: 100%; max-width: 620px; font: 16px/1.4 ui-monospace, Menlo, monospace;
+    padding: 11px 12px; color: #f2f2ec; background: #121218;
+    border: 1px solid #3a3a42; border-radius: 5px;
+  }
+  /* WHITE QUIET ZONE, AND A LOT OF IT. A dark page is right for BD and wrong
+     for a QR: a scanner needs the light modules light and a clear margin, and a
+     headset reading a phone screen through passthrough gets one noisy look at
+     it. So the code sits on its own white card, as large as the page allows. */
+  #card {
+    display: inline-block; background: #ffffff; padding: 18px;
+    border-radius: 8px; margin: 14px 0 6px;
+  }
+  canvas { display: block; image-rendering: pixelated; }
+  p.note { color: #9e9e90; font-size: 14px; max-width: 48em; margin: 6px 0 0; }
+  code { color: #f2f2ec; }
+  ol { color: #9e9e90; font-size: 15px; max-width: 48em; padding-left: 1.3em; }
+  li { margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<h1>QR for a headset</h1>
+
+<label for="u">URL</label>
+<input id="u" spellcheck="false" autocapitalize="off">
+
+<div id="card"><canvas id="qr" width="10" height="10"></canvas></div>
+<p class="note" id="status"></p>
+
+<p class="note"><strong>On a Quest you own:</strong></p>
+<ol>
+  <li>say <em>“Hey Meta, open QR code scanner”</em> — or open a scanner app you
+      have installed, since the built-in one is still on the Public Test Channel</li>
+  <li>look at this code through passthrough: on a screen is fine</li>
+  <li>take the <em>open link</em> action</li>
+</ol>
+<p class="note">
+  <strong>On a Vision Pro you own:</strong> there is no native scanner, so this
+  needs a third-party QR app installed first. <strong>On a demo unit in a
+  shop:</strong> nothing can be installed and no account is yours, so the URL
+  must be typed — which is why the check page is at <code>/x</code>.
+</p>
+
+<script src="/qrcode.js"></script>
+<script>
+// The default is the headset check, since that is what this page was made for.
+const DEFAULT_URL = location.origin + '/x';
+const input  = document.getElementById('u');
+const cv     = document.getElementById('qr');
+const status = document.getElementById('status');
+
+try {
+  const q = new URLSearchParams(location.search).get('u');
+  input.value = q || DEFAULT_URL;
+} catch (_) { input.value = DEFAULT_URL; }
+
+function draw() {
+  const text = input.value.trim();
+  if (!text) { status.textContent = 'nothing to encode'; return; }
+  if (typeof qrcode !== 'function') {
+    status.textContent = 'qrcode.js did not load — the URL above is still correct, type it by hand';
+    return;
+  }
+  let q;
+  // Error correction 'M', matching the Device button, and type 0 so the encoder
+  // picks the smallest version that fits. A long URL therefore yields a denser
+  // code — which is the argument for a short path all over again.
+  try { q = qrcode(0, 'M'); q.addData(text); q.make(); }
+  catch (err) { status.textContent = 'could not encode: ' + err.message; return; }
+
+  const n = q.getModuleCount(), quiet = 4;
+  // AS BIG AS THE WINDOW ALLOWS, at an INTEGER pixels-per-module. A fractional
+  // scale blurs module edges, and a headset reading a screen through
+  // passthrough has far less to work with than a phone held up close — this is
+  // the one place in BD where bigger is simply better.
+  const room = Math.min(window.innerWidth - 90, window.innerHeight - 330, 900);
+  const scale = Math.max(4, Math.floor(Math.max(240, room) / (n + 2 * quiet)));
+  const px = (n + 2 * quiet) * scale;
+  cv.width = cv.height = px;
+  cv.style.width = cv.style.height = px + 'px';
+  const c = cv.getContext('2d');
+  c.fillStyle = '#ffffff'; c.fillRect(0, 0, px, px);
+  c.fillStyle = '#000000';
+  for (let r = 0; r < n; r++) {
+    for (let col = 0; col < n; col++) {
+      if (q.isDark(r, col)) {
+        c.fillRect((col + quiet) * scale, (r + quiet) * scale, scale, scale);
+      }
+    }
+  }
+  status.textContent = text + '  ·  ' + n + '×' + n + ' modules at ' + scale + ' px each';
+}
+
+input.addEventListener('input', draw);
+window.addEventListener('resize', draw);
+draw();
+</script>
+</body>
+</html>
