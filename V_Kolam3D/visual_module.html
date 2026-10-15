@@ -754,6 +754,61 @@
       <input id="cam-elevation-speed-slider" class="stepper-source" type="number" min="0" max="60" step="1" value="0">
     </div>
 
+    <!-- 2026-10-15 — ROLL ABOUT THE VIEW AXIS, asked for as "how can we make
+         it rotate about the fly axis".
+
+         It is the THIRD and last degree of freedom the camera has, and the one
+         the other controls cannot reach: azimuth and elevation say where the
+         eye is, cam_distance says how far along, and none of them can turn the
+         picture about the line of sight. Flying down a tunnel is exactly where
+         that becomes the interesting one — a spiral read head-on is a still
+         pattern, and a spiral read head-on while turning is a passage.
+
+         Cyclic, like cam_azimuth: a turn has no far edge. POSITIVE TURNS THE
+         PICTURE ANTICLOCKWISE, derived rather than eyeballed — at roll 90 the
+         camera's up vector becomes the screen's old right, so a feature at the
+         top of the frame moves to the left.
+
+         NO MINUTES. The bearing controls have them because cam_axis MEASURES
+         an aim and a rounded aim misses; nothing is being aimed with the roll,
+         and a degree of it is a degree of picture at every elevation.
+
+         It rides the same clock as the other two speeds and takes no new
+         timer — see ONE CLOCK FOR BOTH MOVES below, which is now three. -->
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-roll-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="cam-roll-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-roll-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_roll</label>
+      <input id="cam-roll-slider" class="stepper-source" type="number" min="0" max="359" step="1" value="0" data-wrap="1">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-roll-speed-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="cam-roll-speed-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-roll-speed-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_roll_speed</label>
+      <!-- DEGREES PER SECOND, and SIGNED, unlike cam_elevation_speed which only
+           goes one way. Both directions of a roll are a real choice and they
+           look different, where a tumble that only goes one way loses nothing.
+           1 is a turn in six minutes, 60 a turn in six seconds. Keep it SLOW
+           for a long flight: at 3 a second the tunnel turns once in two
+           minutes, which reads as movement rather than as spinning.
+
+           WHY IT WANTS TO BE SLOW IS NOT ONLY TASTE. A roll about the view axis
+           is the motion a headset tolerates least — the vestibular system has
+           no matching signal for it, where a yaw at least resembles turning
+           your head. ThreeJS_and_VR_2026-09-28.md section 5b already cautions
+           that a slow fly-through is the most reliably nausea-inducing motion
+           in VR; a fly-through that also rolls is that caution squared. On a
+           flat screen it is simply a nice effect. -->
+      <input id="cam-roll-speed-slider" class="stepper-source" type="number" min="-60" max="60" step="1" value="0">
+    </div>
+
     <div class="control-row">
       <div class="stepper">
         <button class="step-btn" type="button" data-target="cam-axis-slider" data-delta="-1">&minus;</button>
@@ -1002,6 +1057,8 @@
     function wrapElevation(deg) {
       return ELEV_MIN + ((((deg - ELEV_MIN) % 360) + 360) % 360);
     }
+    const camRollSlider      = document.getElementById('cam-roll-slider');
+    const camRollSpeedSlider = document.getElementById('cam-roll-speed-slider');
     const camAxisSlider      = document.getElementById('cam-axis-slider');
     const camDistanceSlider  = document.getElementById('cam-distance-slider');
     const camDistanceSpeedSlider = document.getElementById('cam-distance-speed-slider');
@@ -1060,6 +1117,8 @@
     let camElevationWritten = null; // the integer this module last put in the script
     let camDistanceExact   = null;  // null = follow the slider
     let camDistanceWritten = null;  // the integer this module last put in the script
+    let camRollExact       = null;  // null = follow the slider
+    let camRollWritten     = null;  // the integer this module last put in the script
 
     const setStatus = (msg) => { statusEl.textContent = msg; };
 
@@ -1215,6 +1274,15 @@
         safeParseNumber(directives.cam_elevation_minutes, 0), 0), 59));
       camElevationSpeedSlider.value = String(Math.min(Math.max(
         safeParseNumber(directives.cam_elevation_speed, 0), 0), 60));
+      camRollSlider.value = String(wrapAngle(safeParseNumber(directives.cam_roll, 0)));
+      camRollSpeedSlider.value = String(Math.min(Math.max(
+        safeParseNumber(directives.cam_roll_speed, 0), -60), 60));
+      // The roll's accumulator, on the same terms as the elevation's: a script
+      // naming a different roll is the authority, and the running total goes.
+      if (camRollWritten === null ||
+          safeParseNumber(directives.cam_roll, NaN) !== camRollWritten) {
+        camRollExact = null;
+      }
       // Guarded, unlike every other control above. An unguarded default here
       // would overwrite the auto-framed distance on EVERY render, so the first
       // stepper press would snap the camera back and the auto-fit would look
@@ -1332,6 +1400,8 @@
         cam_azimuth_minutes:   camAzimuthMinutesSlider.value,
         cam_elevation_minutes: camElevationMinutesSlider.value,
         cam_elevation_speed: camElevationSpeedSlider.value,
+        cam_roll:       camRollSlider.value,
+        cam_roll_speed: camRollSpeedSlider.value,
         cam_axis:      camAxisSlider.value,
         cam_distance:  camDistanceSlider.value,
         cam_distance_speed: camDistanceSpeedSlider.value,
@@ -1359,7 +1429,8 @@
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
       'step-pitch-slider', 'opacity-slider', 'cam-elevation-speed-slider',
       'cam-distance-speed-slider', 'cam-axis-slider',
-      'cam-azimuth-minutes-slider', 'cam-elevation-minutes-slider'
+      'cam-azimuth-minutes-slider', 'cam-elevation-minutes-slider',
+      'cam-roll-slider', 'cam-roll-speed-slider'
     ]);
 
     function handleControlChange(ev) {
@@ -1372,7 +1443,8 @@
       // rather than from its own 'input' listener so the order is stated rather
       // than left to whichever listener was registered first.
       if (id === 'cam-elevation-speed-slider' ||
-          id === 'cam-distance-speed-slider') manageCamSpin();
+          id === 'cam-distance-speed-slider' ||
+          id === 'cam-roll-speed-slider') manageCamSpin();
       // Likewise BEFORE the script is rebuilt, and for the same reason: aiming
       // writes cam_azimuth and cam_elevation, and if it ran after
       // applyControlDirectives had read those sliders the script would keep the
@@ -1402,6 +1474,13 @@
           // are part of the same number, and a control the clock undoes is the
           // bug this file already has one note about.
           camElevationExact = wrapElevation(elevationTotal());
+        }
+        if (id === 'cam-roll-slider' && camRollExact !== null) {
+          // The roll's hand-win. Third of three, and written at the same time
+          // as the control rather than discovered as a bug six hours later —
+          // which is the only difference between this line and the note below.
+          camRollExact = wrapAngle(safeParseNumber(camRollSlider.value, 0));
+          camRollWritten = Math.round(camRollExact);
         }
         // THE SAME HAND-WIN FOR THE DISTANCE, which it did not have.
         //
@@ -1439,6 +1518,7 @@
       camAzimuthMinutesSlider, camElevationMinutesSlider,
       camElevationSpeedSlider, camDistanceSlider,
       camDistanceSpeedSlider, camAxisSlider,
+      camRollSlider, camRollSpeedSlider,
       colourSpeedSlider, saturationSlider, lightnessSlider, opacitySlider
     ];
     controlInputs.forEach((input) => { input.addEventListener('input', handleControlChange); });
@@ -1463,6 +1543,8 @@
       cam_azimuth_minutes:   camAzimuthMinutesSlider,
       cam_elevation_minutes: camElevationMinutesSlider,
       cam_elevation_speed: camElevationSpeedSlider,
+      cam_roll:       camRollSlider,
+      cam_roll_speed: camRollSpeedSlider,
       cam_axis:      camAxisSlider,
       cam_distance:  camDistanceSlider,
       cam_distance_speed: camDistanceSpeedSlider,
@@ -1883,7 +1965,33 @@
       // right and world +Z to screen DOWN — the 2D canvas's own axes. That is
       // what makes a pitch-0 figure seen from directly above the same drawing
       // as the 2D module's, and not a mirror image of it.
-      camera.up.set(-se * sa, ce, -se * ca);
+      //
+      // ── ROLL, applied to that up vector ──────────────────────────────
+      // The third degree of freedom: azimuth and elevation say where the eye
+      // is, and neither can turn the picture about the line of sight.
+      //
+      // forward is the unit vector from the eye TO the target, which is minus
+      // the radial one the position was built from; right is forward x up. The
+      // two are orthonormal — the elevation markup records that check, at the
+      // poles included — so the cross product is already the third unit axis
+      // and needs no normalising. Rolling is then one rotation in that plane.
+      //
+      // ROLL 0 IS BIT-FOR-BIT THE OLD up. cos 0 is exactly 1 and sin 0 exactly
+      // 0, so the general form reduces to the north tangent with no rounding,
+      // and there is no need for a branch that could drift from it. That
+      // matters more here than it looks: elevation 90 with roll 0 is the view
+      // that reproduces the 2D kolam segment for segment, and it is the
+      // module's whole invariant.
+      const roll = wrapAngle(camSpinTimer !== null && camRollExact !== null
+        ? camRollExact
+        : safeParseNumber(camRollSlider.value, 0)) * DEG;
+      const ux = -se * sa, uy = ce, uz = -se * ca;
+      const fx = -ce * sa, fy = -se, fz = -ce * ca;
+      const rgx = fy * uz - fz * uy;
+      const rgy = fz * ux - fx * uz;
+      const rgz = fx * uy - fy * ux;
+      const cr = Math.cos(roll), sr = Math.sin(roll);
+      camera.up.set(ux * cr + rgx * sr, uy * cr + rgy * sr, uz * cr + rgz * sr);
       camera.lookAt(tx, ty, tz);
       // Depth range follows the distance, so precision does not fall away when
       // the camera pulls back to 9900.
@@ -1963,8 +2071,22 @@
       // the two moves jitter against each other, and give two places to
       // remember to stop. SIGNED, so `!== 0` rather than `> 0`.
       const dSpeed = safeParseNumber(camDistanceSpeedSlider.value, 0);
-      if (!(speed > 0) && !dSpeed) {
+      // And cam_roll_speed, the third rider. Also signed, so `!== 0`.
+      const rSpeed = safeParseNumber(camRollSpeedSlider.value, 0);
+      if (!(speed > 0) && !dSpeed && !rSpeed) {
         if (camSpinTimer !== null) { clearTimeout(camSpinTimer); camSpinTimer = null; }
+        // The roll's hand-back, on the same terms as the other two: only if the
+        // slider still holds the integer this module wrote.
+        if (camRollExact !== null) {
+          if (camRollWritten === null ||
+              safeParseNumber(camRollSlider.value, NaN) === camRollWritten) {
+            camRollSlider.value = String(wrapAngle(Math.round(camRollExact)));
+          }
+          camRollExact = null;
+          updateValueDisplays();
+          placeCamera();
+          draw();
+        }
         // The distance's own hand-back, on the same terms as the elevation's
         // below: only if the slider still holds the integer this module wrote.
         if (camDistanceExact !== null) {
@@ -2015,6 +2137,7 @@
           camElevationWritten = null;   // the pair no longer says what it said
         }
         camDistanceExact  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
+        camRollExact      = wrapAngle(safeParseNumber(camRollSlider.value, 0));
         camSpinLastWrite  = Date.now();
         camSpinNextDue    = Date.now() + CAM_SPIN_MS;
         camSpinTimer      = setTimeout(camSpinTick, CAM_SPIN_MS);
@@ -2026,14 +2149,24 @@
       // double-scheduling. The stale handle is overwritten at the end.
       const speed  = safeParseNumber(camElevationSpeedSlider.value, 0);
       const dSpeed = safeParseNumber(camDistanceSpeedSlider.value, 0);
-      if (!(speed > 0) && !dSpeed) { camSpinTimer = null; return; }
+      const rSpeed = safeParseNumber(camRollSpeedSlider.value, 0);
+      if (!(speed > 0) && !dSpeed && !rSpeed) { camSpinTimer = null; return; }
       if (camElevationExact === null) {
         camElevationExact = wrapElevation(elevationTotal());
       }
       if (camDistanceExact === null) {
         camDistanceExact = clampCam(safeParseNumber(camDistanceSlider.value, 260));
       }
+      if (camRollExact === null) {
+        camRollExact = wrapAngle(safeParseNumber(camRollSlider.value, 0));
+      }
 
+      // WRAPPED, like the elevation and unlike the distance: a roll is an angle,
+      // so a turn has no far edge and there is nothing to arrive at. Which is
+      // also why the roll alone never stops the clock.
+      if (rSpeed) {
+        camRollExact = wrapAngle(camRollExact + rSpeed * (CAM_SPIN_MS / 1000));
+      }
       if (speed > 0) {
         camElevationExact = wrapElevation(camElevationExact + speed * (CAM_SPIN_MS / 1000));
       }
@@ -2065,8 +2198,10 @@
         camSpinLastWrite = now;
         const whole = wrapElevation(Math.round(camElevationExact));
         const wholeD = clampCam(Math.round(camDistanceExact));
+        const wholeR = wrapAngle(Math.round(camRollExact));
         const elMoved = (speed > 0) && String(whole) !== camElevationSlider.value;
         const dMoved  = !!dSpeed && String(wholeD) !== camDistanceSlider.value;
+        const rMoved  = !!rSpeed && String(wholeR) !== camRollSlider.value;
         if (dMoved) {
           camDistanceSlider.value = String(wholeD);
           camDistanceWritten = wholeD;
@@ -2075,10 +2210,14 @@
           // rebuild would auto-fit and throw the travel away.
           camDistanceExplicit = true;
         }
-        if (elMoved || dMoved) {
+        if (elMoved || dMoved || rMoved) {
           if (elMoved) {
             camElevationSlider.value = String(whole);
             camElevationWritten = whole;
+          }
+          if (rMoved) {
+            camRollSlider.value = String(wholeR);
+            camRollWritten = wholeR;
           }
           updateValueDisplays();
           if (storedText) {
@@ -2096,10 +2235,12 @@
       // ── ARRIVED: STOP THE CLOCK ────────────────────────────────────────
       // Twenty redraws a second for a camera that has stopped moving is a real
       // cost on a battery, and this is a module meant to run for a long time.
-      // Only when the elevation is not spinning too — that has every right to
-      // keep the clock. Flipping the sign of the speed is a control change, so
-      // manageCamSpin starts it again; nothing is stuck.
-      if (arrived && !(speed > 0)) {
+      // Only when NEITHER ANGLE is turning — the elevation and the roll both
+      // have every right to keep the clock, and a roll continuing after the
+      // flight has arrived is a perfectly good piece. Flipping the sign of the
+      // speed is a control change, so manageCamSpin starts it again; nothing is
+      // stuck.
+      if (arrived && !(speed > 0) && !rSpeed) {
         const end = clampCam(Math.round(camDistanceExact));
         console.log('[module3d] cam_distance has reached ' + end +
                     ' and the travel has stopped — reverse the sign of ' +
