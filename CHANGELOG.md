@@ -90,6 +90,51 @@ is how far out the trip can start.
 `bd_V_Kolam3D_002` carries `cam_axis 0` so the stepper is visible on it, since a
 script that marks any control hides every control it does not mark.
 
+### Then two reports on `cam_axis` itself, and both were the same mistake
+
+"The central hole is not centred in middle of screen it is now off to left."
+**The bearing was right and the TARGET was wrong.** The turtle starts at the
+world origin, and on a tube the origin therefore lies on the SURFACE, not on
+the axis — so the fitted axis misses the origin by about the tube's radius, and
+`lookAt(0, 0, 0)` was looking at the wall beside the hole. Flying in would have
+flown into the wall. The camera now looks at the point on the fitted axis
+nearest the origin, so the whole orbit is centred on the arm instead of on the
+world. Nothing else changes meaning: the eye is still placed by azimuth,
+elevation and distance, a nudge still pivots around what you are looking at,
+and `cam_axis 0` is the old behaviour exactly.
+
+That it gets WORSE while flying is the part worth keeping: a fixed sideways
+offset subtends a bigger angle the closer you get, so the hole would have
+drifted further off centre as the trip went on — a static check at the start
+could not have caught it.
+
+"I cannot set the elevation finely enough as you realise." Two causes, and the
+first was mine: `cam_axis` measured an axis to a fortieth of a degree and then
+rounded it to a whole one to write it, so **the control was less precise than
+the measurement it carried**. The second is geometry, and it is why the
+complaint names the elevation rather than the bearing: the azimuth circle has
+radius `cos(elevation)`, so at elevation 82 a degree of azimuth is 0.139° of
+view while a degree of elevation is a whole one. The azimuth was already SEVEN
+TIMES the finer control.
+
+So `cam_azimuth_minutes` and `cam_elevation_minutes`, 0..59 unsigned and adding
+to the signed degrees, exactly as `angle_minutes` adds to `angle` — one spelling
+per arcminute, where a signed ±59 would make 81°+30′ and 82°−30′ the same
+picture twice. Both halves get them, because the asymmetry reverses: at
+elevation 0 a degree of azimuth is a degree of view too, and giving minutes only
+to the half that happened to be short on one figure would be fitting the control
+to the example. MEASURED: the worst bearing error over a grid of awkward values
+falls from half a degree to 0.4 arcminutes, and every edge case stays inside its
+control's range.
+
+A rotation folds the minutes into its accumulator and zeroes them, because a
+rotation passes through every elevation there is and a 1/60-degree offset has
+nothing to express while it runs — otherwise the 200 ms write-back would either
+churn the minutes five times a second or record a bearing a minute off the one
+on screen. It hands the exact bearing back when it stops, which is a strict
+improvement: stopping used to move the picture by up to half a degree at the
+moment it stopped.
+
 ---
 
 ## 2026-10-14 — the collage PLAYS, and the voice stops tripping over itself

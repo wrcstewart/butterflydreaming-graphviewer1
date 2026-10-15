@@ -681,6 +681,53 @@
       <input id="cam-elevation-slider" class="stepper-source" type="number" min="-180" max="179" step="1" value="60" data-wrap="1">
     </div>
 
+    <!-- 2026-10-15 — ARCMINUTES ON THE BEARING, both of it, reported as "i
+         cannot set the elevation finely enough". Two separate reasons, and the
+         second is the one that makes this not a nicety:
+
+         1. cam_axis MEASURES an axis and then had to round the answer to whole
+            degrees to write it, throwing away up to half a degree of a fit
+            that is good to a fortieth of one. The control was less precise
+            than the measurement it carried.
+         2. A DEGREE OF ELEVATION AND A DEGREE OF AZIMUTH ARE NOT THE SAME
+            SIZE. The azimuth circle has radius cos(elevation), so near the
+            pole a degree of azimuth is a fraction of a degree of view while a
+            degree of elevation is a whole one. MEASURED at elevation 82, where
+            this module's tunnel is aimed: cos 82 = 0.139, so the azimuth is
+            already SEVEN TIMES the finer control and the elevation is the one
+            that cannot reach. That asymmetry is why it reads as "the elevation
+            is too coarse" rather than "the bearing is too coarse".
+
+         Both get minutes anyway, because the asymmetry reverses: at elevation
+         0 a degree of azimuth is a degree of view too, and an arm need not run
+         anywhere near vertical. Giving minutes only to the half that happened
+         to be short on one figure would be fitting the control to the example.
+
+         0..59 and UNSIGNED, adding to the signed degrees, exactly as
+         angle_minutes adds to angle. One spelling per arcminute and no second
+         way to write any aim — a signed ±59 would make 81 + 30' and 82 - 30'
+         the same picture twice, which is the thing the elevation markup above
+         refuses for 180 and -180. -->
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-azimuth-minutes-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="cam-azimuth-minutes-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-azimuth-minutes-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_azimuth_minutes</label>
+      <input id="cam-azimuth-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-elevation-minutes-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="cam-elevation-minutes-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-elevation-minutes-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_elevation_minutes</label>
+      <input id="cam-elevation-minutes-slider" class="stepper-source" type="number" min="0" max="59" step="1" value="0">
+    </div>
+
     <div class="control-row">
       <div class="stepper">
         <button class="step-btn" type="button" data-target="cam-elevation-speed-slider" data-delta="-1">−</button>
@@ -945,6 +992,8 @@
     const pitchDriftSlider   = document.getElementById('pitch-drift-slider');
 
     const camAzimuthSlider   = document.getElementById('cam-azimuth-slider');
+    const camAzimuthMinutesSlider   = document.getElementById('cam-azimuth-minutes-slider');
+    const camElevationMinutesSlider = document.getElementById('cam-elevation-minutes-slider');
     const camElevationSlider = document.getElementById('cam-elevation-slider');
     const camElevationSpeedSlider = document.getElementById('cam-elevation-speed-slider');
     // Elevation is a full turn like the others, but centred on 0 rather than
@@ -1160,6 +1209,10 @@
           safeParseNumber(directives.cam_elevation, NaN) !== camElevationWritten) {
         camElevationExact = null;
       }
+      camAzimuthMinutesSlider.value = String(Math.min(Math.max(
+        safeParseNumber(directives.cam_azimuth_minutes, 0), 0), 59));
+      camElevationMinutesSlider.value = String(Math.min(Math.max(
+        safeParseNumber(directives.cam_elevation_minutes, 0), 0), 59));
       camElevationSpeedSlider.value = String(Math.min(Math.max(
         safeParseNumber(directives.cam_elevation_speed, 0), 0), 60));
       // Guarded, unlike every other control above. An unguarded default here
@@ -1276,6 +1329,8 @@
         pitch_drift:   pitchDriftSlider.value,
         cam_azimuth:   camAzimuthSlider.value,
         cam_elevation: camElevationSlider.value,
+        cam_azimuth_minutes:   camAzimuthMinutesSlider.value,
+        cam_elevation_minutes: camElevationMinutesSlider.value,
         cam_elevation_speed: camElevationSpeedSlider.value,
         cam_axis:      camAxisSlider.value,
         cam_distance:  camDistanceSlider.value,
@@ -1303,7 +1358,8 @@
     const NO_REBUILD_INPUT_IDS = new Set([
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
       'step-pitch-slider', 'opacity-slider', 'cam-elevation-speed-slider',
-      'cam-distance-speed-slider', 'cam-axis-slider'
+      'cam-distance-speed-slider', 'cam-axis-slider',
+      'cam-azimuth-minutes-slider', 'cam-elevation-minutes-slider'
     ]);
 
     function handleControlChange(ev) {
@@ -1338,11 +1394,14 @@
         announce();
         applyPitchScale();
         applyOpacity();
-        if (id === 'cam-elevation-slider' && camElevationExact !== null) {
+        if ((id === 'cam-elevation-slider' || id === 'cam-elevation-minutes-slider') &&
+            camElevationExact !== null) {
           // A hand on the stepper wins: restart the smooth accumulator where
           // the finger put it, rather than let the rotation snap back to its
-          // own running total on the next tick.
-          camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+          // own running total on the next tick. EITHER stepper — the minutes
+          // are part of the same number, and a control the clock undoes is the
+          // bug this file already has one note about.
+          camElevationExact = wrapElevation(elevationTotal());
         }
         // THE SAME HAND-WIN FOR THE DISTANCE, which it did not have.
         //
@@ -1376,7 +1435,9 @@
       angleMinutesSlider, pitchMinutesSlider,
       angleSecondsSlider, pitchSecondsSlider,
       angleDriftSlider, pitchDriftSlider,
-      camAzimuthSlider, camElevationSlider, camElevationSpeedSlider, camDistanceSlider,
+      camAzimuthSlider, camElevationSlider,
+      camAzimuthMinutesSlider, camElevationMinutesSlider,
+      camElevationSpeedSlider, camDistanceSlider,
       camDistanceSpeedSlider, camAxisSlider,
       colourSpeedSlider, saturationSlider, lightnessSlider, opacitySlider
     ];
@@ -1399,6 +1460,8 @@
       pitch_drift:   pitchDriftSlider,
       cam_azimuth:   camAzimuthSlider,
       cam_elevation: camElevationSlider,
+      cam_azimuth_minutes:   camAzimuthMinutesSlider,
+      cam_elevation_minutes: camElevationMinutesSlider,
       cam_elevation_speed: camElevationSpeedSlider,
       cam_axis:      camAxisSlider,
       cam_distance:  camDistanceSlider,
@@ -1723,15 +1786,81 @@
       alignStepperTop();
     }
 
+    // ── The bearing, degrees AND arcminutes ───────────────────────────────
+    //
+    // Minutes always ADD to the signed degrees, which is angle_minutes' own
+    // rule. At a negative elevation that means they move TOWARDS zero: -82
+    // with 30' is -81.5. One rule, applied once, and every aim has exactly one
+    // spelling — which is what a round trip through the script needs.
+    function azimuthTotal() {
+      return safeParseNumber(camAzimuthSlider.value, 0)
+           + (safeParseNumber(camAzimuthMinutesSlider.value, 0) / 60);
+    }
+    function elevationTotal() {
+      return safeParseNumber(camElevationSlider.value, 60)
+           + (safeParseNumber(camElevationMinutesSlider.value, 0) / 60);
+    }
+
+    // Split a fractional bearing back into a whole-degree control and an
+    // arcminute one. FLOOR, not round, because the minutes are unsigned and
+    // add: the degrees have to be the value BELOW the total for the remainder
+    // to be positive. The carry matters — 81.9999 would otherwise write 60
+    // minutes, a value the control's range does not hold.
+    function splitBearing(total, wrap) {
+      const t = wrap(total);
+      let degs = Math.floor(t);
+      let mins = Math.round((t - degs) * 60);
+      if (mins >= 60) { mins -= 60; degs += 1; }
+      return { degs: wrap(degs), mins: mins };
+    }
+
+    // ── Which point the camera looks AT ───────────────────────────────────
+    //
+    // The origin, until cam_axis names an arm — and then the point on THAT
+    // ARM'S fitted axis nearest the origin.
+    //
+    // 2026-10-15, reported as "the central hole is not centred in middle of
+    // screen it is now off to left". The bearing was right and the target was
+    // not: an arm's axis passes NEAR the origin but not through it, so looking
+    // at the origin looks at a point beside the tunnel's mouth and the hole
+    // sits off to one side by exactly that miss. Worse while flying, because a
+    // fixed sideways offset subtends a bigger angle the closer you get — the
+    // hole would have drifted further off centre as the trip went on.
+    //
+    // Nothing else changes meaning. The eye is still placed by azimuth,
+    // elevation and distance; the whole orbit is simply centred on the axis
+    // instead of on the world origin, so a nudge of the bearing still pivots
+    // around what you are looking at and cam_distance is still how far along
+    // the aim you are. cam_axis 0 returns null and every number means what it
+    // meant before this existed.
+    //
+    // CACHED on everything that can move the axis — which arm, how many arms,
+    // the live y scale, and the build the samples came from. Measuring is two
+    // passes over six thousand points and the flight asks twenty times a
+    // second; cheap is not the same as free.
+    let camTargetKey   = null;
+    let camTargetPoint = null;
+    function camTarget() {
+      const k = safeParseInt(camAxisSlider.value, 0);
+      if (k <= 0 || !haveGeometry) return null;
+      const key = k + '|' + symmetrySelect.value + '|' + pitchScale() + '|' + axisSerial;
+      if (camTargetKey !== key) {
+        const a = armAxisDirection(k);
+        camTargetKey   = key;
+        camTargetPoint = a ? { x: a.nearX, y: a.nearY, z: a.nearZ } : null;
+      }
+      return camTargetPoint;
+    }
+
     function placeCamera() {
       if (!camera) return;
-      const az = wrapAngle(safeParseNumber(camAzimuthSlider.value, 0)) * DEG;
+      const az = wrapAngle(azimuthTotal()) * DEG;
       // The float while the rotation is running, the slider otherwise. The
       // slider holds whole degrees, so drawing from it would step the camera a
       // degree at a time however fast the clock ticked.
       const el = wrapElevation(camSpinTimer !== null && camElevationExact !== null
         ? camElevationExact
-        : safeParseNumber(camElevationSlider.value, 60)) * DEG;
+        : elevationTotal()) * DEG;
       // Same indirection as the elevation above, and for the same reason: the
       // slider holds whole units, so drawing from it would step the camera a
       // unit at a time however fast the clock ticked.
@@ -1740,7 +1869,10 @@
         : safeParseNumber(camDistanceSlider.value, 260));
       const ce = Math.cos(el), se = Math.sin(el);
       const ca = Math.cos(az), sa = Math.sin(az);
-      camera.position.set(d * ce * sa, d * se, d * ce * ca);
+      // The orbit's centre: the origin, or the arm's own axis if one is named.
+      const t  = camTarget();
+      const tx = t ? t.x : 0, ty = t ? t.y : 0, tz = t ? t.z : 0;
+      camera.position.set(tx + d * ce * sa, ty + d * se, tz + d * ce * ca);
       // The up vector is the sphere's NORTH TANGENT, not world +Y. World +Y is
       // parallel to the view direction at the poles, where lookAt degenerates
       // — and elevation 90 is not a corner case in this module, it is the view
@@ -1752,7 +1884,7 @@
       // what makes a pitch-0 figure seen from directly above the same drawing
       // as the 2D module's, and not a mirror image of it.
       camera.up.set(-se * sa, ce, -se * ca);
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(tx, ty, tz);
       // Depth range follows the distance, so precision does not fall away when
       // the camera pulls back to 9900.
       camera.near = Math.max(0.1, d / 1000);
@@ -1845,16 +1977,21 @@
           placeCamera();
           draw();
         }
-        // Hand the whole degrees back to the slider, so the script, the readout
-        // and the picture all agree the moment the rotation stops. Rounded
-        // BEFORE wrapping: rounding 179.6 gives 180, which is off the end.
+        // Hand the bearing back to the steppers, so the script, the readout
+        // and the picture all agree the moment the rotation stops. Now to the
+        // ARCMINUTE rather than the whole degree: the accumulator has always
+        // been a float, and the only reason it used to round was that there was
+        // nowhere to put the remainder. Stopping therefore no longer moves the
+        // picture by up to half a degree at the moment it stops.
         if (camElevationExact !== null) {
-          // Only if the slider still holds the integer THIS module wrote. If a
-          // script has set it since — arriving with the speed already at 0 —
-          // the script is the authority and the running total is simply dropped.
-          if (camElevationWritten === null ||
-              safeParseNumber(camElevationSlider.value, NaN) === camElevationWritten) {
-            camElevationSlider.value = String(wrapElevation(Math.round(camElevationExact)));
+          // Only if the steppers still hold what THIS module wrote. If a script
+          // has set either since — arriving with the speed already at 0 — the
+          // script is the authority and the running total is simply dropped.
+          if (camElevationWritten === null || elevationTotal() === camElevationWritten) {
+            const b = splitBearing(camElevationExact, wrapElevation);
+            camElevationSlider.value        = String(b.degs);
+            camElevationMinutesSlider.value = String(b.mins);
+            camElevationWritten = elevationTotal();
           }
           camElevationExact = null;
           updateValueDisplays();
@@ -1864,7 +2001,19 @@
         return;
       }
       if (camSpinTimer === null) {
-        camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+        // THE MINUTES ARE FOLDED INTO THE SEED AND THEN ZEROED. A rotation
+        // passes through every elevation there is, so a 1/60-degree offset has
+        // nothing to express while it runs — and leaving it set would mean the
+        // 200 ms write-back either rewrote the minutes five times a second
+        // (churn on the wire, which is the noise the whole integer write-back
+        // exists to avoid) or recorded a bearing up to a minute off the one on
+        // screen. Folding keeps the picture continuous across the press; the
+        // exact bearing comes back in the hand-back above when it stops.
+        camElevationExact = wrapElevation(elevationTotal());
+        if (safeParseNumber(camElevationMinutesSlider.value, 0) !== 0) {
+          camElevationMinutesSlider.value = '0';
+          camElevationWritten = null;   // the pair no longer says what it said
+        }
         camDistanceExact  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
         camSpinLastWrite  = Date.now();
         camSpinNextDue    = Date.now() + CAM_SPIN_MS;
@@ -1879,7 +2028,7 @@
       const dSpeed = safeParseNumber(camDistanceSpeedSlider.value, 0);
       if (!(speed > 0) && !dSpeed) { camSpinTimer = null; return; }
       if (camElevationExact === null) {
-        camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+        camElevationExact = wrapElevation(elevationTotal());
       }
       if (camDistanceExact === null) {
         camDistanceExact = clampCam(safeParseNumber(camDistanceSlider.value, 260));
@@ -2004,9 +2153,12 @@
     // did.
     const AXIS_SAMPLES_MAX = 6000;
     let axisSamples = null;
+    // Bumped on every build. The target cache keys on it, because a new figure
+    // with the same symmetry and the same y scale is still a new axis.
+    let axisSerial = 0;
 
     function recordAxisSamples(positions) {
-      if (!positions || positions.length < 9) { axisSamples = null; return; }
+      if (!positions || positions.length < 9) { axisSamples = null; axisSerial += 1; return; }
       const points = Math.floor(positions.length / 3);
       const stride = Math.max(1, Math.floor(points / AXIS_SAMPLES_MAX));
       const out    = new Float32Array(Math.ceil(points / stride) * 3);
@@ -2018,6 +2170,7 @@
         w += 3;
       }
       axisSamples = w === out.length ? out : out.subarray(0, w);
+      axisSerial += 1;
     }
 
     // The direction arm k runs in, k being 1-based and counted the way
@@ -2093,7 +2246,8 @@
       // How far the fitted line passes from the origin: the part of the
       // centroid perpendicular to the direction.
       const along = rx * dirX + ry * dirY + rz * dirZ;
-      const miss  = Math.hypot(rx - along * dirX, ry - along * dirY, rz - along * dirZ);
+      const nearX = rx - along * dirX, nearY = ry - along * dirY, nearZ = rz - along * dirZ;
+      const miss  = Math.hypot(nearX, nearY, nearZ);
 
       // IS THERE A LONG AXIS AT ALL? The leading eigenvalue's share of the
       // trace: a tube is near 1, a disc about 0.5, a ball about 0.33. MEASURED
@@ -2109,7 +2263,10 @@
       const trace = xx + yy + zz;
       const elongation = trace > 0 ? lead / trace : 0;
       return { x: dirX, y: dirY, z: dirZ, arm: arm, sym: sym, miss: miss,
-               elongation: elongation };
+               elongation: elongation,
+               // The point on the fitted line nearest the origin — what the
+               // camera looks at, so the hole sits in the middle of the screen.
+               nearX: nearX, nearY: nearY, nearZ: nearZ };
     }
 
     function aimAlongArm() {
@@ -2117,10 +2274,13 @@
       if (k <= 0) {
         // 0 is the figure's own axis — the overhead view that reproduces the 2D
         // kolam, and the view every other number is a departure from.
-        camAzimuthSlider.value   = '0';
-        camElevationSlider.value = '90';
+        camAzimuthSlider.value          = '0';
+        camElevationSlider.value        = '90';
+        camAzimuthMinutesSlider.value   = '0';
+        camElevationMinutesSlider.value = '0';
         console.log('[module3d] cam_axis 0 — aimed down the figure\'s own axis: ' +
-                    'cam_azimuth 0, cam_elevation 90');
+                    'cam_azimuth 0, cam_elevation 90, and the camera looks at the ' +
+                    'world origin again');
       } else if (!haveGeometry) {
         console.log('[module3d] cam_axis ' + k + ' — nothing is built yet, so there is ' +
                     'no axis to measure; the bearing is unchanged');
@@ -2139,22 +2299,32 @@
         // bearing and never needs the far half of the elevation range to say
         // where it is looking from.
         //
-        // ROUNDED BEFORE WRAPPING, both of them. An axis a whisker clockwise of
-        // due north gives -0.0001 degrees, which wraps to 359.9999 and rounds
-        // to 360 — a value the azimuth control's range does not contain and
-        // which spells the same view as 0. Wrapping the rounded number instead
-        // sends it back to 0. The module's own discipline, from the elevation
-        // markup: one picture must not have two spellings.
+        // WRITTEN TO THE ARCMINUTE, which is why the minutes controls exist: a
+        // fit good to a fortieth of a degree was being rounded to a whole one,
+        // so the control was less precise than the measurement it carried, and
+        // half a degree of elevation is five world units of sideways error at
+        // cam_distance 600.
+        //
+        // splitBearing wraps the whole part, which is also the fix for an axis
+        // a whisker clockwise of due north: -0.0001 degrees would otherwise
+        // write 360, a value the azimuth control's range does not contain and
+        // which spells the same view as 0. The module's own discipline, from
+        // the elevation markup — one picture must not have two spellings.
         const el = Math.asin(Math.min(Math.max(a.y, -1), 1)) / DEG;
         const az = Math.atan2(a.x, a.z) / DEG;
-        camAzimuthSlider.value   = String(wrapAngle(Math.round(az)));
-        camElevationSlider.value = String(wrapElevation(Math.round(el)));
+        const bAz = splitBearing(az, wrapAngle);
+        const bEl = splitBearing(el, wrapElevation);
+        camAzimuthSlider.value          = String(bAz.degs);
+        camAzimuthMinutesSlider.value   = String(bAz.mins);
+        camElevationSlider.value        = String(bEl.degs);
+        camElevationMinutesSlider.value = String(bEl.mins);
         console.log('[module3d] cam_axis ' + a.arm + ' of ' + a.sym + ' — aimed down its ' +
-                    'axis: cam_azimuth ' + camAzimuthSlider.value +
-                    ', cam_elevation ' + camElevationSlider.value +
-                    '. The fitted axis misses the origin by ' + Math.round(a.miss) +
-                    ' units, and the camera looks at the origin — so that is how far ' +
-                    'off centre the tunnel sits in the frame.');
+                    'axis: cam_azimuth ' + bAz.degs + ' ' + bAz.mins + '\u2032, ' +
+                    'cam_elevation ' + bEl.degs + ' ' + bEl.mins + '\u2032. ' +
+                    'The fitted axis misses the origin by ' + Math.round(a.miss) +
+                    ' units, and the camera now LOOKS AT THAT AXIS rather than at the ' +
+                    'origin, so the hole sits in the middle of the screen and stays ' +
+                    'there as the distance comes down.');
         if (a.elongation < 0.6) {
           console.log('[module3d] cam_axis ' + a.arm + ' — but this figure has no ' +
                       'distinguished long axis (' + a.elongation.toFixed(2) + ' of its ' +
