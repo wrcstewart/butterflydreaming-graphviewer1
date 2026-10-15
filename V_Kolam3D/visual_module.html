@@ -726,6 +726,32 @@
 
     <div class="control-row">
       <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-distance-speed-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="cam-distance-speed-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-distance-speed-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_distance_speed</label>
+      <!-- World units a second, and SIGNED: negative flies IN, positive flies
+           out. It sits beside cam_distance for the same reason step_pitch sits
+           beside step — a rate belongs next to the quantity it moves.
+           ADDED 2026-10-15, for flying through the tunnel of bd_V_Kolam3D_002.
+           At cam_elevation 90 the eye is ON the figure's axis, so the distance
+           IS the position along it and a rate here is a passage through.
+
+           IT CLAMPS AND STOPS at the ends rather than bouncing or wrapping,
+           unlike cam_elevation_speed, which must be cyclic because an angle is.
+           A distance is not cyclic, and a piece that arrives somewhere is a
+           better default than one that never ends — the same judgement the
+           collage sequencer settled on. Reverse by flipping the sign.
+
+           The range is deliberately modest: the tunnel is ~8,600 units long and
+           a minute is a slow passage, so ten a second is already a useful
+           speed and 300 is a rush. -->
+      <input id="cam-distance-speed-slider" class="stepper-source" type="number" min="-300" max="300" step="1" value="0">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="-1">−</button>
         <span class="stepper-value" data-target="colour-speed-slider">4</span>
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="1">+</button>
@@ -875,6 +901,7 @@
       return ELEV_MIN + ((((deg - ELEV_MIN) % 360) + 360) % 360);
     }
     const camDistanceSlider  = document.getElementById('cam-distance-slider');
+    const camDistanceSpeedSlider = document.getElementById('cam-distance-speed-slider');
     const CAM_DIST_MIN = parseFloat(camDistanceSlider.min) || 20;
     const CAM_DIST_MAX = parseFloat(camDistanceSlider.max) || 9900;
     const clampCam = (v) => Math.min(Math.max(v, CAM_DIST_MIN), CAM_DIST_MAX);
@@ -928,6 +955,8 @@
     let camSpinLastWrite  = 0;
     let camElevationExact = null;   // null = follow the slider
     let camElevationWritten = null; // the integer this module last put in the script
+    let camDistanceExact   = null;  // null = follow the slider
+    let camDistanceWritten = null;  // the integer this module last put in the script
 
     const setStatus = (msg) => { statusEl.textContent = msg; };
 
@@ -1085,6 +1114,9 @@
       // like a bug rather than a default.
       if (directives.cam_distance !== undefined) {
         camDistanceSlider.value = String(clampCam(safeParseNumber(directives.cam_distance, 260)));
+        // Signed, so clamped on both sides rather than at zero.
+        camDistanceSpeedSlider.value = String(Math.min(Math.max(
+          safeParseNumber(directives.cam_distance_speed, 0), -300), 300));
       }
 
       manageDriftInterval();
@@ -1182,6 +1214,7 @@
         cam_elevation: camElevationSlider.value,
         cam_elevation_speed: camElevationSpeedSlider.value,
         cam_distance:  camDistanceSlider.value,
+        cam_distance_speed: camDistanceSpeedSlider.value,
         colour_speed:  formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
         saturation:    saturationSlider.value,
         lightness:     lightnessSlider.value,
@@ -1204,7 +1237,8 @@
     // applyPitchScale for why those are the same thing.
     const NO_REBUILD_INPUT_IDS = new Set([
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
-      'step-pitch-slider', 'opacity-slider', 'cam-elevation-speed-slider'
+      'step-pitch-slider', 'opacity-slider', 'cam-elevation-speed-slider',
+      'cam-distance-speed-slider'
     ]);
 
     function handleControlChange(ev) {
@@ -1216,7 +1250,8 @@
       // disagreeing until something else happened to write. Called from here
       // rather than from its own 'input' listener so the order is stated rather
       // than left to whichever listener was registered first.
-      if (id === 'cam-elevation-speed-slider') manageCamSpin();
+      if (id === 'cam-elevation-speed-slider' ||
+          id === 'cam-distance-speed-slider') manageCamSpin();
       updateValueDisplays();
       if (!storedText) return;
       const updatedText = applyControlDirectives(storedText);
@@ -1253,6 +1288,7 @@
       angleSecondsSlider, pitchSecondsSlider,
       angleDriftSlider, pitchDriftSlider,
       camAzimuthSlider, camElevationSlider, camElevationSpeedSlider, camDistanceSlider,
+      camDistanceSpeedSlider,
       colourSpeedSlider, saturationSlider, lightnessSlider, opacitySlider
     ];
     controlInputs.forEach((input) => { input.addEventListener('input', handleControlChange); });
@@ -1276,6 +1312,7 @@
       cam_elevation: camElevationSlider,
       cam_elevation_speed: camElevationSpeedSlider,
       cam_distance:  camDistanceSlider,
+      cam_distance_speed: camDistanceSpeedSlider,
       colour_speed:  colourSpeedSlider,
       saturation:    saturationSlider,
       lightness:     lightnessSlider,
@@ -1605,7 +1642,12 @@
       const el = wrapElevation(camSpinTimer !== null && camElevationExact !== null
         ? camElevationExact
         : safeParseNumber(camElevationSlider.value, 60)) * DEG;
-      const d  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
+      // Same indirection as the elevation above, and for the same reason: the
+      // slider holds whole units, so drawing from it would step the camera a
+      // unit at a time however fast the clock ticked.
+      const d  = clampCam(camSpinTimer !== null && camDistanceExact !== null
+        ? camDistanceExact
+        : safeParseNumber(camDistanceSlider.value, 260));
       const ce = Math.cos(el), se = Math.sin(el);
       const ca = Math.cos(az), sa = Math.sin(az);
       camera.position.set(d * ce * sa, d * se, d * ce * ca);
@@ -1692,8 +1734,27 @@
     // whatever the depth, and the rotation is as smooth at depth 5 as at 1.
     function manageCamSpin() {
       const speed = safeParseNumber(camElevationSpeedSlider.value, 0);
-      if (!(speed > 0)) {
+      // ── ONE CLOCK FOR BOTH MOVES (2026-10-15) ──────────────────────────
+      // cam_distance_speed rides on this timer rather than bringing its own.
+      // It is already a 20-a-second clock that draws every tick and rewrites
+      // the script every fifth; a second timer would double the draws, make
+      // the two moves jitter against each other, and give two places to
+      // remember to stop. SIGNED, so `!== 0` rather than `> 0`.
+      const dSpeed = safeParseNumber(camDistanceSpeedSlider.value, 0);
+      if (!(speed > 0) && !dSpeed) {
         if (camSpinTimer !== null) { clearTimeout(camSpinTimer); camSpinTimer = null; }
+        // The distance's own hand-back, on the same terms as the elevation's
+        // below: only if the slider still holds the integer this module wrote.
+        if (camDistanceExact !== null) {
+          if (camDistanceWritten === null ||
+              safeParseNumber(camDistanceSlider.value, NaN) === camDistanceWritten) {
+            camDistanceSlider.value = String(clampCam(Math.round(camDistanceExact)));
+          }
+          camDistanceExact = null;
+          updateValueDisplays();
+          placeCamera();
+          draw();
+        }
         // Hand the whole degrees back to the slider, so the script, the readout
         // and the picture all agree the moment the rotation stops. Rounded
         // BEFORE wrapping: rounding 179.6 gives 180, which is off the end.
@@ -1714,6 +1775,7 @@
       }
       if (camSpinTimer === null) {
         camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+        camDistanceExact  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
         camSpinLastWrite  = Date.now();
         camSpinNextDue    = Date.now() + CAM_SPIN_MS;
         camSpinTimer      = setTimeout(camSpinTick, CAM_SPIN_MS);
@@ -1723,13 +1785,32 @@
     function camSpinTick() {
       // Do NOT null camSpinTimer here — manageCamSpin checks it to avoid
       // double-scheduling. The stale handle is overwritten at the end.
-      const speed = safeParseNumber(camElevationSpeedSlider.value, 0);
-      if (!(speed > 0)) { camSpinTimer = null; return; }
+      const speed  = safeParseNumber(camElevationSpeedSlider.value, 0);
+      const dSpeed = safeParseNumber(camDistanceSpeedSlider.value, 0);
+      if (!(speed > 0) && !dSpeed) { camSpinTimer = null; return; }
       if (camElevationExact === null) {
         camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
       }
+      if (camDistanceExact === null) {
+        camDistanceExact = clampCam(safeParseNumber(camDistanceSlider.value, 260));
+      }
 
-      camElevationExact = wrapElevation(camElevationExact + speed * (CAM_SPIN_MS / 1000));
+      if (speed > 0) {
+        camElevationExact = wrapElevation(camElevationExact + speed * (CAM_SPIN_MS / 1000));
+      }
+      // CLAMPED, NOT WRAPPED. An angle is cyclic and a distance is not: wrapping
+      // would teleport the eye from the middle of the figure to the far outside,
+      // and bouncing would reverse the travel without being asked. It arrives
+      // and stays, and the sign is how you turn round.
+      let arrived = false;
+      if (dSpeed) {
+        const before = camDistanceExact;
+        camDistanceExact = clampCam(camDistanceExact + dSpeed * (CAM_SPIN_MS / 1000));
+        // PINNED AGAINST A STOP. Detected by the clamp refusing to move rather
+        // than by comparing with the bounds, so there is one definition of
+        // where the ends are and it is clampCam's.
+        arrived = (camDistanceExact === before);
+      }
 
       // Every tick draws. This is the whole point of a 50ms clock, and it costs
       // a matrix and a draw call.
@@ -1744,9 +1825,22 @@
       if (now - camSpinLastWrite >= CAM_WRITE_MS) {
         camSpinLastWrite = now;
         const whole = wrapElevation(Math.round(camElevationExact));
-        if (String(whole) !== camElevationSlider.value) {
-          camElevationSlider.value = String(whole);
-          camElevationWritten = whole;
+        const wholeD = clampCam(Math.round(camDistanceExact));
+        const elMoved = (speed > 0) && String(whole) !== camElevationSlider.value;
+        const dMoved  = !!dSpeed && String(wholeD) !== camDistanceSlider.value;
+        if (dMoved) {
+          camDistanceSlider.value = String(wholeD);
+          camDistanceWritten = wholeD;
+          // The script now names cam_distance, so the module must stop framing
+          // for itself — exactly as a human press does. Without this the next
+          // rebuild would auto-fit and throw the travel away.
+          camDistanceExplicit = true;
+        }
+        if (elMoved || dMoved) {
+          if (elMoved) {
+            camElevationSlider.value = String(whole);
+            camElevationWritten = whole;
+          }
           updateValueDisplays();
           if (storedText) {
             storedText = applyControlDirectives(storedText);
@@ -1758,6 +1852,41 @@
             try { announce(); } finally { renderingFromDrift = false; }
           }
         }
+      }
+
+      // ── ARRIVED: STOP THE CLOCK ────────────────────────────────────────
+      // Twenty redraws a second for a camera that has stopped moving is a real
+      // cost on a battery, and this is a module meant to run for a long time.
+      // Only when the elevation is not spinning too — that has every right to
+      // keep the clock. Flipping the sign of the speed is a control change, so
+      // manageCamSpin starts it again; nothing is stuck.
+      if (arrived && !(speed > 0)) {
+        const end = clampCam(Math.round(camDistanceExact));
+        console.log('[module3d] cam_distance has reached ' + end +
+                    ' and the travel has stopped — reverse the sign of ' +
+                    'cam_distance_speed to come back');
+        // HANDED BACK HERE, NOT BY CALLING manageCamSpin. That function's first
+        // test is "is either speed zero" — and the distance speed is still set,
+        // the traveller having merely run out of road — so it would fall
+        // through to its restart branch and the clock would never stop. A
+        // tempting one-line reuse that is an infinite loop.
+        if (camDistanceWritten === null ||
+            safeParseNumber(camDistanceSlider.value, NaN) === camDistanceWritten) {
+          camDistanceSlider.value = String(end);
+          camDistanceWritten = end;
+          camDistanceExplicit = true;
+          if (storedText) {
+            storedText = applyControlDirectives(storedText);
+            renderingFromDrift = true;
+            try { announce(); } finally { renderingFromDrift = false; }
+          }
+        }
+        camDistanceExact = null;
+        camSpinTimer = null;
+        updateValueDisplays();
+        placeCamera();
+        draw();
+        return;
       }
 
       // Timed from when the tick was DUE, not from now — the same wall-clock
