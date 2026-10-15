@@ -791,6 +791,77 @@ currently cannot both have it.
 
 ---
 
+## 5h. Should the VR-readiness changes be made NOW? (2026-10-15)
+
+The author: *"is there any reason not to make any changes required in readiness
+for the VR?"*
+
+**Yes, three — and the recommendation is to WAIT, with one exception that is not
+really VR work at all.**
+
+### 1. I overstated the forcing, twice
+
+§9 and §5c both said the eye-moving camera model "cannot survive an immersive
+session", which made the refactor sound compulsory. **Corrected.** What is true
+is narrower: `renderer.xr` overwrites `camera.matrix` each frame from the
+tracked pose, so eye placement cannot live on the camera. But §5c.1's DOLLY is
+exactly a parent group, and three's `WebXRManager` composes the user camera's
+parent world matrix — so the present model transfers onto a dolly by mechanical
+translation. Compute the same eye position and orientation, write them to
+`dolly` instead of `camera`, and the headset's pose applies relative to it.
+
+**So the precondition is "eye placement moves to a parent", which is small.
+Moving the WORLD instead is a separate, aesthetic choice** — and §5d/§5e
+established that the felt difference between the two is content-dependent, not
+architectural. The urgency I implied was not there.
+
+### 2. The current module IS the measurement baseline
+
+§8e and §9 are deliberately shaped as a list of MEASUREMENTS to make on real
+hardware: does 6.8px resolve, does a hairline fuse, is the fly-through bearable,
+does stereo rescue the figure. **Refactor first and you throw away the thing you
+would be measuring against.** A headset problem then becomes ambiguous between
+the headset and the refactor, and that ambiguity is expensive to unpick — far
+more expensive than the refactor is to do later.
+
+The order is **measure, then build.** It is the order the document has been
+written in since §8.
+
+### 3. The camera model is the least-tested code in the project this week
+
+`cam_distance_speed`, `cam_axis`, two arcminute controls, `cam_roll` and
+`cam_roll_speed` all landed on 2026-10-15, plus an arrival-logic split. **None
+of it has been tested on iOS at all** — the same standing gap as all of
+`CollageV2Plan` §9. Refactoring the module's hottest path while six hours of new
+behaviour is still unexercised means the next bug report cannot distinguish the
+new controls from the refactor.
+
+### The one thing worth doing now, and it is not VR work
+
+**`weight` (§5f).** The 3D module draws at a third of its own default on every
+platform, today, on a flat screen. That is a present-tense defect that happens
+to also be VR preparation, which makes it the only candidate whose value does
+not depend on hardware arriving.
+
+**But measure before adopting `Line2`:** it expands each segment into a quad, so
+depth 5's 262,144 segments become roughly a million vertices and half a million
+triangles where today they are 524,288 vertices and no triangles. The buffer is
+shared across the symmetry copies, so the cost is memory and fill rather than
+draw calls — but §3's "sustained smoothness beats fidelity" is the governing
+requirement for this module, and a four-fold geometry increase at depth 5 is
+exactly the kind of thing that turns a smooth piece into a stuttering one. **And
+it would visibly thicken every stored figure**, which is a change to tuned work
+and wants the author's eye before it ships.
+
+### What would change the recommendation
+
+- The headset arriving and a measurement coming back that the refactor affects.
+- A decision to build the sequential-text module (§5g), which needs §7 settled
+  and would make the shared-scene question live rather than theoretical.
+- iOS testing completing, which would remove reason 3.
+
+---
+
 ## 6. Line weight, and why VR forces the issue
 
 Current position, as of RULE 9:
@@ -1447,9 +1518,9 @@ to come back with is whether 6.8px node labels resolve at all.
 | **Sequential 3D text (§5g)** | §8e's ~18-character line is a limit on SIMULTANEOUS text, so a phrase at a time sidesteps it entirely — and `splitUtterances` already does the splitting, which makes **the speech chunker the text sequencer**, in step by construction because the phrase on screen is the phrase being spoken. Same module as the 2026-10-08 sketch; strengthens §7's "make it a MODE inside `V_Kolam3D`". **Trap: `applyOpacity` turns `depthWrite` off below opacity 1, so a collage at 0.45 loses the occlusion that is the only reason to put text in the scene at all.** |
 | **DOES STEREO MAKE THE FIGURE LEGIBLE? (§5e)** | **The strongest pro-headset item in this table, and it needs measuring first.** BD's figure has almost no monocular depth cues BY DESIGN — no shading, no ground plane, and `depthWrite: false` at opacity < 1 removes occlusion too — so on a flat screen it is an ambiguous line drawing and binocular disparity is the cue that would resolve it. Against which: a 1px line must FUSE between two eyes, and a hairline that flickers in one eye is a hairline that fails to fuse (§6). **So this item and the `weight` item are the same measurement** and should be made in one sitting on real hardware. |
 | **Is there a STATIC REFERENCE in the field? (§5d)** | The real comfort control, and it is a CONTENT decision rather than an architectural one. With nothing but the figure on black, "the viewer moved" and "the figure moved" are the same experience and carry the same cost; a floor, a horizon, or simply not filling the field makes the motion read as the object's. **It is also the dial between the transformative illusion the author wants and the comfort a headset needs** — they pull opposite ways, so it has to be chosen per piece. Nothing built; `%%bd_background` is the only thing in the field today. |
-| **Do the world-transform refactor NOW? (§5c)** | **The one item on this list that needs no headset.** Re-express `cam_azimuth`/`cam_elevation`/`cam_roll`/`cam_distance` as a transform on a root group above `group`, fix the camera, and the flat and immersive paths become one code path — verifiable to the pixel on a flat screen, because camera-roll and content-counter-roll of one rigid figure are identical. Decide the PIVOT explicitly (§5c). Not started. |
+| **Do the world-transform refactor NOW? (§5c)** | **ANSWERED IN §5h: no — wait, measure first.** The forcing was overstated (a dolly carries the present model over), the current module is the measurement baseline, and the camera model is this week's least-tested code. ~~**The one item on this list that needs no headset.**~~ Re-express `cam_azimuth`/`cam_elevation`/`cam_roll`/`cam_distance` as a transform on a root group above `group`, fix the camera, and the flat and immersive paths become one code path — verifiable to the pixel on a flat screen, because camera-roll and content-counter-roll of one rigid figure are identical. Decide the PIVOT explicitly (§5c). Not started. |
 | **ALIGNMENT FROM THE OTHER END (2026-10-15)** | **The author's observation, and it reframes the arcminute work.** If the world is what moves, then in a headset the VIEWER supplies the fine alignment: you lean a fraction of a degree instead of dialling one. Three things follow. **(1) It is finer AND better conditioned.** Inside-out tracking resolves well under a tenth of a degree, against a stepper's one degree — or one arcminute with `cam_azimuth_minutes` / `cam_elevation_minutes` — and it is CLOSED-LOOP: you see the result while you move, where a stepper is dial-then-look. The badly-conditioned bit of the spherical-coordinate aim (§5b: at elevation 82 a degree of azimuth is 0.139° of view and a degree of elevation is a whole one) simply stops being the author's problem, because the head does not work in azimuth and elevation. **(2) It is good for FINDING an alignment and bad for HOLDING one.** A neck held off-axis for a minute-long fly-through is precisely the wrong ergonomics for a long contemplative piece. So the headset wants the inverse of `cam_axis`: not "measure the geometry and write the bearing" but **"take where I am looking and write it"** — the same shape, the other instrument. That is a real control to build, and the thing that makes head alignment persist. **(3) The right primitive is not a group rotation.** WebXR already has this: `XRReferenceSpace.getOffsetReferenceSpace(XRRigidTransform)`, reached in three through `renderer.xr.setReferenceSpace()`. It re-origins the world for the whole session, costs nothing per frame, and composes with the headset's own tracking instead of fighting it. UNVERIFIED on hardware. |
-| **EYE OR OBJECT? (2026-10-15)** | **The author's question — "are we reversing the roles so that the object is the one moving conceptually?" — and the answer is NO, not yet.** **AND IT IS NOT MERELY A COMFORT CHOICE: in an immersive session the eye-moving model STOPS WORKING.** `renderer.xr` takes the camera pose from the headset every frame, derived from the reference space, so `camera.position.set` and `camera.lookAt` are simply overwritten — the module cannot place its own eye at all. Moving the world is the PRECONDITION for an immersive session, not a concession to the stomach. That is the strongest argument in this table for doing it, and it was reached by the author asking the question rather than by scoping the port. All five camera controls move the EYE: `cam_azimuth`, `cam_elevation`, `cam_roll`, `cam_distance` and their speeds place and point a camera orbiting a target. **On a flat screen that is not a choice at all** — the scene is one rigid figure on a plain ground, so rolling the camera and counter-rolling the object give IDENTICAL pixels, and spending anything on the distinction today buys nothing. **In a headset they are not remotely the same thing**, which is what §1's standing rule already says: move the WORLD, not the eye. Camera roll rolls the viewer's own horizon — the motion the vestibular system has no matching signal for — where rotating the object leaves the room still. `cam_distance` has the same split: an eye flying forward is the vection that makes people ill; an object approaching is far more tolerable. So the conversion is **the whole camera model at once, not one control**, and `cam_roll` is the one to convert first. COST, measured against the code as it stands: the rotation cannot go on `group`, which carries the `step_pitch` Y scale, because a Y scale does not commute with a rotation about an arbitrary axis — it needs an outer wrapper holding the alignment, and the axis moves whenever the aim does. The flat-screen equivalence is what makes this safe to defer; it is **not** an argument that it will not be needed. |
+| **EYE OR OBJECT? (2026-10-15)** | **The author's question — "are we reversing the roles so that the object is the one moving conceptually?" — and the answer is NO, not yet.** ~~**AND IT IS NOT MERELY A COMFORT CHOICE: in an immersive session the eye-moving model STOPS WORKING.**~~ **TOO STRONG — corrected in §5h.** What is true: `renderer.xr` overwrites `camera.matrix` every frame, so eye placement cannot stay on the camera. What does NOT follow is that it must become a world transform — the DOLLY (§5c.1) is a parent group, three composes it, and the existing model carries over onto it by mechanical translation. So the PRECONDITION is "eye placement moves to a parent", which is small; moving the WORLD instead is an aesthetic choice, and §5d/§5e established that the felt difference is content-dependent rather than architectural. All five camera controls move the EYE: `cam_azimuth`, `cam_elevation`, `cam_roll`, `cam_distance` and their speeds place and point a camera orbiting a target. **On a flat screen that is not a choice at all** — the scene is one rigid figure on a plain ground, so rolling the camera and counter-rolling the object give IDENTICAL pixels, and spending anything on the distinction today buys nothing. **In a headset they are not remotely the same thing**, which is what §1's standing rule already says: move the WORLD, not the eye. Camera roll rolls the viewer's own horizon — the motion the vestibular system has no matching signal for — where rotating the object leaves the room still. `cam_distance` has the same split: an eye flying forward is the vection that makes people ill; an object approaching is far more tolerable. So the conversion is **the whole camera model at once, not one control**, and `cam_roll` is the one to convert first. COST, measured against the code as it stands: the rotation cannot go on `group`, which carries the `step_pitch` Y scale, because a Y scale does not commute with a rotation about an arbitrary axis — it needs an outer wrapper holding the alignment, and the axis moves whenever the aim does. The flat-screen equivalence is what makes this safe to defer; it is **not** an argument that it will not be needed. |
 | **Retire `bd_V_Kolam`?** | The 3D module is a *measured* superset. Costs: `weight` (§6), and the canvas rasterises a bezier for free where three tessellates it. Two stored nodes would need migrating. |
 | **Is BD's UI legible in the flat window? (§5, §8e)** | A TEST ITEM, not a blocker. The reading path is 16px; the sub-11px items are chrome whose position a user learns. The only real risk is the 10px / 6.8px node labels, and the graph already zooms to 8x. **§8e adds the arithmetic**: 25 PPD gives 7–8 px of cap height at a comfortable angular size, so prose reads but at ~18 characters a line. **Measure it with `/x`** — the one number wanted is whether 6.8px resolves. |
 | **Delivery shape (§5)** | Leaning C — BD flat in the Quest browser, module immersive. A (facilitated, two people) stays alongside it; both run the same module. Depends on the iframe/immersive-session question. |
