@@ -421,6 +421,36 @@ camera is effectively the viewer + headset?"*
 Yes, and there are exactly three places to put it. They are not variations on a
 theme; they differ in **what they move** and therefore in what the viewer feels.
 
+### In one line each
+
+1. **Dolly** — move the viewer. You are carried through a world that stays put.
+2. **Offset reference space** — move the viewer, once, at the start. Recentring.
+3. **Root group** — move the figure. You stay put and it comes to you.
+
+### And the exact answer to "world coordinates or camera coordinates?"
+
+**Neither, strictly — and the precision is worth having, because it is the thing
+that makes option 3 the comfortable one.**
+
+The world coordinate system never changes in any of the three. It is the fixed
+frame everything else is described against. What changes is **which thing is
+nailed down in it**:
+
+| | fixed in the world | moving in the world | the matrix that changes |
+|---|---|---|---|
+| **today** | the figure | the camera | world → camera |
+| **option 3** | the camera | the figure | figure → world |
+
+So option 3 is not "world coordinates changed". It is **the object's placement
+within unchanged world coordinates** — `root.matrix` instead of `camera.matrix`,
+and that is the whole of the difference in code.
+
+**Why that is the comfortable one, in one sentence: in a headset the world frame
+IS the viewer's physical room** (the XR reference space is anchored to it), so
+"fixed in the world" means "fixed relative to your own body". Move the figure
+and your room stays where your body feels it. Move the camera and your room
+swings about, with nothing in your inner ear agreeing.
+
 ### 1. Move the viewer's play space — the DOLLY
 
 Put the camera inside a `Group` and transform the group:
