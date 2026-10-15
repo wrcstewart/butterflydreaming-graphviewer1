@@ -709,6 +709,50 @@
 
     <div class="control-row">
       <div class="stepper">
+        <button class="step-btn" type="button" data-target="cam-axis-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="cam-axis-slider">0</span>
+        <button class="step-btn" type="button" data-target="cam-axis-slider" data-delta="1">+</button>
+      </div>
+      <label>cam_axis</label>
+      <!-- AIM DOWN ONE ARM'S OWN AXIS. 0 is the figure's axis (azimuth 0,
+           elevation 90 — the overhead view that reproduces the 2D kolam);
+           1..16 is the axis of that numbered arm, the copies applySymmetry
+           makes, counted the way it makes them.
+
+           WHY IT EXISTS, 2026-10-15. Flying in with cam_distance_speed goes
+           down whatever line the camera already looks along, and at elevation
+           90 that is the figure's central axis — which at symmetry 6 is the
+           gap BETWEEN the tubes and at symmetry 1 is alongside the single one,
+           outside the right-hand window. The author found cam_azimuth 325 /
+           cam_elevation 98 by hand for one structure. That measurement is the
+           useful part: it says the arm's axis passes close enough to the
+           ORIGIN that looking at the origin is already looking down the arm,
+           so nothing about placeCamera needs to change — only the aim, and an
+           aim can be MEASURED instead of hunted for.
+
+           So this is a control that WRITES TWO OTHER CONTROLS. Pressing it
+           fits a line to the arm by principal axis and puts the resulting
+           bearing into cam_azimuth and cam_elevation, where it is visible, is
+           saved with the script, and can be nudged afterwards. Nothing new has
+           to be understood to use the result, and the two numbers that were
+           found by hand are still the two numbers that do the work.
+
+           It therefore RE-AIMS ON A PRESS AND NOT ON A SCRIPT PUSH — RULE 7's
+           distinction, for RULE 7's reason. If reading the script re-aimed, a
+           reload would silently throw away a hand nudge of the azimuth, and
+           the author's own 325/98 would be unrecoverable from a script that
+           recorded it.
+
+           Expect the SECOND spelling of the author's bearing: elevation is
+           written in -90..90, so the azimuth comes out on the other side.
+           325/98 and 145/82 are the same view (ce = cos 98 is negative, which
+           is what flips the azimuth), and the module stores the one that does
+           not need the far half of the elevation range. -->
+      <input id="cam-axis-slider" class="stepper-source" type="number" min="0" max="16" step="1" value="0">
+    </div>
+
+    <div class="control-row">
+      <div class="stepper">
         <button class="step-btn" type="button" data-target="cam-distance-slider" data-delta="-1">−</button>
         <span class="stepper-value" data-target="cam-distance-slider">260</span>
         <button class="step-btn" type="button" data-target="cam-distance-slider" data-delta="1">+</button>
@@ -719,8 +763,17 @@
            because the figure's own size does: MEASURED across the four stored
            Kolam settings, the radius about the origin runs 97 (depth 2) to
            1362 (depth 3, angle 68) — a factor of fourteen. Hence also the
-           coarse step above 1000, borrowed from `step`. -->
-      <input id="cam-distance-slider" class="stepper-source" type="number" min="20" max="9900" step="1"
+           coarse step above 1000, borrowed from `step`.
+
+           RAISED to 99000 on 2026-10-15, requested while flying down an arm.
+           Framing never needed it — 9900 is ten times the largest stored
+           figure's radius — but TRAVELLING does: the distance is now where you
+           ARE along the axis you are flying in on, so the top of the range is
+           how far out the trip can START, and the old 9900 put the beginning
+           of the flight inside the figure. Holding the button still crosses
+           the whole range in FULL_TRAVERSE_MS, since that rate is derived from
+           the range rather than set per control. -->
+      <input id="cam-distance-slider" class="stepper-source" type="number" min="20" max="99000" step="1"
              data-coarse-above="1000" data-coarse-step="100" value="260">
     </div>
 
@@ -900,6 +953,7 @@
     function wrapElevation(deg) {
       return ELEV_MIN + ((((deg - ELEV_MIN) % 360) + 360) % 360);
     }
+    const camAxisSlider      = document.getElementById('cam-axis-slider');
     const camDistanceSlider  = document.getElementById('cam-distance-slider');
     const camDistanceSpeedSlider = document.getElementById('cam-distance-speed-slider');
     const CAM_DIST_MIN = parseFloat(camDistanceSlider.min) || 20;
@@ -1112,6 +1166,12 @@
       // would overwrite the auto-framed distance on EVERY render, so the first
       // stepper press would snap the camera back and the auto-fit would look
       // like a bug rather than a default.
+      // Clamped to the SLIDER's 16 and not to the current symmetry: a script
+      // may legitimately name arm 12 while symmetry is being swept down and
+      // back up, and silently rewriting it to 6 on the way through would lose
+      // the author's number. aimAlongArm clamps to the live symmetry at the
+      // moment it aims, which is the only moment the number has to be real.
+      camAxisSlider.value = String(Math.min(Math.max(safeParseInt(directives.cam_axis, 0), 0), 16));
       if (directives.cam_distance !== undefined) {
         camDistanceSlider.value = String(clampCam(safeParseNumber(directives.cam_distance, 260)));
         // Signed, so clamped on both sides rather than at zero.
@@ -1159,12 +1219,16 @@
             ? formatDirectiveNumber(2 ** exp).replace(/^0\./, '.')
             : input.value;
         } else {
-          // 1000 and above read as 1.0k … 9.9k — step and cam_distance both
-          // reach it. Nothing parses these spans back (the steppers read the
-          // hidden input), so the abbreviation has no inverse to keep in step.
+          // 1000 and above read as 1.0k … 9.9k, and 10000 and above drop the
+          // decimal: 10k … 99k. step and cam_distance both reach the first,
+          // cam_distance alone the second, and the decimal has to go there or
+          // "99.0k" is five characters in a column measured for three.
+          // Nothing parses these spans back (the steppers read the hidden
+          // input), so the abbreviation has no inverse to keep in step.
           const n = parseFloat(input.value);
-          span.textContent = (Number.isFinite(n) && n >= 1000)
-            ? (n / 1000).toFixed(1) + 'k'
+          span.textContent = !Number.isFinite(n) ? input.value
+            : n >= 10000 ? Math.round(n / 1000) + 'k'
+            : n >= 1000  ? (n / 1000).toFixed(1) + 'k'
             : input.value;
         }
         span.classList.toggle('stepper-value--wide', span.textContent.length > 3);
@@ -1213,6 +1277,7 @@
         cam_azimuth:   camAzimuthSlider.value,
         cam_elevation: camElevationSlider.value,
         cam_elevation_speed: camElevationSpeedSlider.value,
+        cam_axis:      camAxisSlider.value,
         cam_distance:  camDistanceSlider.value,
         cam_distance_speed: camDistanceSpeedSlider.value,
         colour_speed:  formatDirectiveNumber(2 ** Number(colourSpeedSlider.value)),
@@ -1238,7 +1303,7 @@
     const NO_REBUILD_INPUT_IDS = new Set([
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
       'step-pitch-slider', 'opacity-slider', 'cam-elevation-speed-slider',
-      'cam-distance-speed-slider'
+      'cam-distance-speed-slider', 'cam-axis-slider'
     ]);
 
     function handleControlChange(ev) {
@@ -1252,6 +1317,11 @@
       // than left to whichever listener was registered first.
       if (id === 'cam-elevation-speed-slider' ||
           id === 'cam-distance-speed-slider') manageCamSpin();
+      // Likewise BEFORE the script is rebuilt, and for the same reason: aiming
+      // writes cam_azimuth and cam_elevation, and if it ran after
+      // applyControlDirectives had read those sliders the script would keep the
+      // old bearing while the picture showed the new one.
+      if (id === 'cam-axis-slider') aimAlongArm();
       updateValueDisplays();
       if (!storedText) return;
       const updatedText = applyControlDirectives(storedText);
@@ -1274,6 +1344,25 @@
           // own running total on the next tick.
           camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
         }
+        // THE SAME HAND-WIN FOR THE DISTANCE, which it did not have.
+        //
+        // 2026-10-15, reported as "the cam distance will not adjust when cam
+        // speed process is active ie when flying". It adjusted perfectly: the
+        // slider moved, the script recorded it, and camSpinTick overwrote it
+        // from camDistanceExact fifty milliseconds later, every time. The
+        // accumulator is the authority while the clock runs — placeCamera says
+        // so — so a control that does not re-seed it is a control the clock
+        // undoes. It was written for the elevation and not copied, which is
+        // the whole fault: cam_distance_speed was built to RIDE on
+        // cam_elevation_speed's clock, and inherited its clock without
+        // inheriting its one concession to a hand on the wheel.
+        if (id === 'cam-distance-slider' && camDistanceExact !== null) {
+          camDistanceExact = clampCam(safeParseNumber(camDistanceSlider.value, 260));
+          // And the written value goes with it, or manageCamSpin's hand-back
+          // would think the slider still held the clock's own last number and
+          // overwrite the finger's on the way out.
+          camDistanceWritten = Math.round(camDistanceExact);
+        }
         placeCamera();
         draw();
         return;
@@ -1288,7 +1377,7 @@
       angleSecondsSlider, pitchSecondsSlider,
       angleDriftSlider, pitchDriftSlider,
       camAzimuthSlider, camElevationSlider, camElevationSpeedSlider, camDistanceSlider,
-      camDistanceSpeedSlider,
+      camDistanceSpeedSlider, camAxisSlider,
       colourSpeedSlider, saturationSlider, lightnessSlider, opacitySlider
     ];
     controlInputs.forEach((input) => { input.addEventListener('input', handleControlChange); });
@@ -1311,6 +1400,7 @@
       cam_azimuth:   camAzimuthSlider,
       cam_elevation: camElevationSlider,
       cam_elevation_speed: camElevationSpeedSlider,
+      cam_axis:      camAxisSlider,
       cam_distance:  camDistanceSlider,
       cam_distance_speed: camDistanceSpeedSlider,
       colour_speed:  colourSpeedSlider,
@@ -1903,6 +1993,185 @@
       return clampCam(Math.round((radius / Math.sin((CAM_FOV / 2) * DEG)) * 1.12));
     }
 
+    // ── Where one arm points ──────────────────────────────────────────────
+    //
+    // A SUBSAMPLE of the base arm's vertices, kept so the axis can be
+    // re-measured without re-walking the turtle. At depth 5 the real buffer
+    // holds 1.57 million floats; a few thousand points fit a line through a
+    // 153-turn helix to well inside a degree. The camera controls live on the
+    // no-rebuild path precisely so they never pay for geometry, and an aiming
+    // control that re-walked the turtle would be the one camera control that
+    // did.
+    const AXIS_SAMPLES_MAX = 6000;
+    let axisSamples = null;
+
+    function recordAxisSamples(positions) {
+      if (!positions || positions.length < 9) { axisSamples = null; return; }
+      const points = Math.floor(positions.length / 3);
+      const stride = Math.max(1, Math.floor(points / AXIS_SAMPLES_MAX));
+      const out    = new Float32Array(Math.ceil(points / stride) * 3);
+      let w = 0;
+      for (let i = 0; i < points; i += stride) {
+        out[w]     = positions[i * 3];
+        out[w + 1] = positions[i * 3 + 1];
+        out[w + 2] = positions[i * 3 + 2];
+        w += 3;
+      }
+      axisSamples = w === out.length ? out : out.subarray(0, w);
+    }
+
+    // The direction arm k runs in, k being 1-based and counted the way
+    // applySymmetry makes the copies. Returns the unit direction, the arm it
+    // settled on, and HOW FAR THE FITTED LINE MISSES THE ORIGIN — which is the
+    // honest measure of the approximation this whole control rests on, since
+    // the camera looks at the origin and not at the line.
+    function armAxisDirection(k) {
+      if (!axisSamples || axisSamples.length < 9) return null;
+      // step_pitch is a LIVE scale on the group, so it is applied to the
+      // samples here rather than baked in when they were taken. Sweeping it
+      // rebuilds no geometry, but it certainly moves the axis.
+      const scaleY = pitchScale();
+      const n = axisSamples.length / 3;
+      let cx = 0, cy = 0, cz = 0;
+      for (let i = 0; i < axisSamples.length; i += 3) {
+        cx += axisSamples[i];
+        cy += axisSamples[i + 1] * scaleY;
+        cz += axisSamples[i + 2];
+      }
+      cx /= n; cy /= n; cz /= n;
+      let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+      for (let i = 0; i < axisSamples.length; i += 3) {
+        const dx = axisSamples[i] - cx;
+        const dy = axisSamples[i + 1] * scaleY - cy;
+        const dz = axisSamples[i + 2] - cz;
+        xx += dx * dx; xy += dx * dy; xz += dx * dz;
+        yy += dy * dy; yz += dy * dz; zz += dz * dz;
+      }
+      // POWER ITERATION for the leading eigenvector of the covariance — the
+      // direction the cloud is longest in, which for a tube is its axis and for
+      // a 153-turn helix is its axis very precisely. Thirty matrix-vector
+      // products rather than an eigensolver: the matrix is 3x3 and symmetric,
+      // and a tube's leading eigenvalue is far clear of the other two, which is
+      // the case power iteration converges on fastest.
+      //
+      // Seeded with the covariance's own widest COLUMN rather than (1,1,1). A
+      // fixed seed can be orthogonal to the answer — unlikely, but a symmetric
+      // figure is exactly where it would happen, and this module is nothing but
+      // symmetric figures.
+      let vx, vy, vz;
+      if (xx >= yy && xx >= zz)      { vx = xx; vy = xy; vz = xz; }
+      else if (yy >= zz)             { vx = xy; vy = yy; vz = yz; }
+      else                           { vx = xz; vy = yz; vz = zz; }
+      for (let it = 0; it < 30; it++) {
+        const nx = xx * vx + xy * vy + xz * vz;
+        const ny = xy * vx + yy * vy + yz * vz;
+        const nz = xz * vx + yz * vy + zz * vz;
+        const len = Math.hypot(nx, ny, nz);
+        if (!(len > 0)) return null;
+        vx = nx / len; vy = ny / len; vz = nz / len;
+      }
+
+      // applySymmetry sets child.rotation.y = i * sector, so arm i's points are
+      // the base arm's turned about Y by that much. The same rotation in the
+      // same sense, applied to the direction and to the centroid alike.
+      const sym = Math.min(Math.max(safeParseInt(symmetrySelect.value, 8), 1), 16);
+      const arm = Math.min(Math.max(k, 1), sym);
+      const th  = (arm - 1) * ((2 * Math.PI) / sym);
+      const ct  = Math.cos(th), st = Math.sin(th);
+      let dirX = vx * ct + vz * st, dirY = vy, dirZ = -vx * st + vz * ct;
+      const rx = cx * ct + cz * st, ry = cy, rz = -cx * st + cz * ct;
+
+      // OUTWARD, because the turtle starts at the origin and the arm grows away
+      // from it: the eye belongs beyond the far end looking back down the
+      // length, so that flying in with a negative cam_distance_speed travels
+      // the tube from its mouth to its root. An eigenvector has no sign of its
+      // own, and the one power iteration happens to land on would otherwise
+      // decide which way the trip went.
+      const outward = dirX * rx + dirY * ry + dirZ * rz;
+      if (outward < 0 || (outward === 0 && dirY < 0)) { dirX = -dirX; dirY = -dirY; dirZ = -dirZ; }
+
+      // How far the fitted line passes from the origin: the part of the
+      // centroid perpendicular to the direction.
+      const along = rx * dirX + ry * dirY + rz * dirZ;
+      const miss  = Math.hypot(rx - along * dirX, ry - along * dirY, rz - along * dirZ);
+
+      // IS THERE A LONG AXIS AT ALL? The leading eigenvalue's share of the
+      // trace: a tube is near 1, a disc about 0.5, a ball about 0.33. MEASURED
+      // on synthetic clouds, and it matters because %%bd_pitch 0 — the setting
+      // that reproduces the 2D kolam, so the one a stored script is most likely
+      // to carry — makes a FLAT figure, and a disc's longest direction is
+      // whichever way round the plane the arithmetic happens to land. The aim
+      // is then arbitrary and the view is edge-on. Measuring this is what lets
+      // the module say so instead of leaving the author to wonder why an aiming
+      // control aimed at nothing.
+      const lead = xx * dirX * dirX + yy * dirY * dirY + zz * dirZ * dirZ +
+                   2 * (xy * dirX * dirY + xz * dirX * dirZ + yz * dirY * dirZ);
+      const trace = xx + yy + zz;
+      const elongation = trace > 0 ? lead / trace : 0;
+      return { x: dirX, y: dirY, z: dirZ, arm: arm, sym: sym, miss: miss,
+               elongation: elongation };
+    }
+
+    function aimAlongArm() {
+      const k = safeParseInt(camAxisSlider.value, 0);
+      if (k <= 0) {
+        // 0 is the figure's own axis — the overhead view that reproduces the 2D
+        // kolam, and the view every other number is a departure from.
+        camAzimuthSlider.value   = '0';
+        camElevationSlider.value = '90';
+        console.log('[module3d] cam_axis 0 — aimed down the figure\'s own axis: ' +
+                    'cam_azimuth 0, cam_elevation 90');
+      } else if (!haveGeometry) {
+        console.log('[module3d] cam_axis ' + k + ' — nothing is built yet, so there is ' +
+                    'no axis to measure; the bearing is unchanged');
+        return;
+      } else {
+        const a = armAxisDirection(k);
+        if (!a) {
+          console.log('[module3d] cam_axis ' + k + ' — could not fit an axis to this ' +
+                      'figure; cam_azimuth and cam_elevation are unchanged');
+          return;
+        }
+        // placeCamera's own convention, inverted. Position is
+        // (d·ce·sa, d·se, d·ce·ca), so the elevation's sine is the y and the
+        // azimuth is atan2 of x over z. asin returns -90..90, across which ce is
+        // never negative — so this always writes the near-side spelling of the
+        // bearing and never needs the far half of the elevation range to say
+        // where it is looking from.
+        //
+        // ROUNDED BEFORE WRAPPING, both of them. An axis a whisker clockwise of
+        // due north gives -0.0001 degrees, which wraps to 359.9999 and rounds
+        // to 360 — a value the azimuth control's range does not contain and
+        // which spells the same view as 0. Wrapping the rounded number instead
+        // sends it back to 0. The module's own discipline, from the elevation
+        // markup: one picture must not have two spellings.
+        const el = Math.asin(Math.min(Math.max(a.y, -1), 1)) / DEG;
+        const az = Math.atan2(a.x, a.z) / DEG;
+        camAzimuthSlider.value   = String(wrapAngle(Math.round(az)));
+        camElevationSlider.value = String(wrapElevation(Math.round(el)));
+        console.log('[module3d] cam_axis ' + a.arm + ' of ' + a.sym + ' — aimed down its ' +
+                    'axis: cam_azimuth ' + camAzimuthSlider.value +
+                    ', cam_elevation ' + camElevationSlider.value +
+                    '. The fitted axis misses the origin by ' + Math.round(a.miss) +
+                    ' units, and the camera looks at the origin — so that is how far ' +
+                    'off centre the tunnel sits in the frame.');
+        if (a.elongation < 0.6) {
+          console.log('[module3d] cam_axis ' + a.arm + ' — but this figure has no ' +
+                      'distinguished long axis (' + a.elongation.toFixed(2) + ' of its ' +
+                      'spread lies along the fitted one, where a tube gives over 0.9), ' +
+                      'so the bearing above is arbitrary within its spread and the view ' +
+                      'will be edge-on. A flat figure — pitch 0, or step_pitch near 0 — ' +
+                      'is the usual cause: there is nothing to fly down.');
+        }
+      }
+      // Re-seed the rotation accumulator for the same reason a hand on the
+      // elevation stepper re-seeds it. This IS a hand on it, one step removed.
+      if (camElevationExact !== null) {
+        camElevationExact = wrapElevation(safeParseNumber(camElevationSlider.value, 60));
+      }
+      updateValueDisplays();
+    }
+
     function curveSegments(depth) {
       // The 2D module draws each F as ONE quadratic bezier and the canvas
       // rasterises the curve for free. A GPU takes line SEGMENTS, so the curve
@@ -2181,6 +2450,9 @@
         geometry.setAttribute('position', new THREE.BufferAttribute(built.positions, 3));
         geometry.setAttribute('color',    new THREE.BufferAttribute(built.colors, 3));
         haveGeometry = true;
+        // Taken from the BASE arm, before applySymmetry: the copies are the
+        // same buffer under a rotation, so one sample set serves all sixteen.
+        recordAxisSamples(built.positions);
         applySymmetry(params.symmetry);
 
         applyPitchScale();

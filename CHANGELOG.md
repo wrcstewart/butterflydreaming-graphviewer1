@@ -6,6 +6,92 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-15 — the tunnel flies itself, and then flies down one strand
+
+Three changes to `V_Kolam3D`, each from a report on the previous one.
+
+### `cam_distance_speed`
+
+Signed world units a second, negative inward, beside `cam_distance` for the same
+reason `step_pitch` sits beside `step`: a rate belongs next to the quantity it
+moves. It rides `cam_elevation_speed`'s existing twenty-a-second clock rather
+than bringing its own — one set of draws, one write-back throttle, one place to
+stop. It CLAMPS AND STOPS rather than wrapping or bouncing, unlike the
+elevation, which must be cyclic because an angle is: a distance is not, and a
+piece that arrives somewhere is a better default than one that never ends. On
+arrival the clock halts altogether, because twenty redraws a second for a
+motionless camera is a real battery cost in a module meant to run for hours.
+
+The arrival hand-back is written inline rather than delegated to
+`manageCamSpin`, whose first test is "is either speed zero" — the speed is still
+set, the traveller having merely run out of road — so reusing it would have
+fallen through to its restart branch and the clock would never have stopped. A
+one-line reuse that is an infinite loop.
+
+### The hand did not win over the clock
+
+Reported as "the cam distance will not adjust when cam speed process is active
+ie when flying". It adjusted perfectly: the slider moved, the script recorded
+it, and `camSpinTick` overwrote it from `camDistanceExact` fifty milliseconds
+later, every time. The accumulator is the authority while the clock runs —
+`placeCamera` says so — so a control that does not re-seed it is a control the
+clock undoes.
+
+The elevation had had that re-seed since the day it got a speed. The distance
+did not, because it was built to RIDE on the elevation's clock and inherited the
+clock without inheriting its one concession to a hand on the wheel. **Sharing a
+mechanism does not share the exceptions written around it** — and the exception
+is where the mechanism meets a person, so it is exactly the part a new rider
+needs most.
+
+### `cam_axis` — aiming by measurement instead of by hunting
+
+Flying in goes down whatever line the camera already looks along, and at
+`cam_elevation` 90 that is the figure's central axis — which at symmetry 6 is
+the gap BETWEEN the strands and at symmetry 1 is alongside the single one. The
+author found `cam_azimuth 325` / `cam_elevation 98` by hand for one structure,
+and **that measurement was the whole answer**: it says the strand's axis passes
+close enough to the ORIGIN that looking at the origin is already looking down
+the strand. Nothing in `placeCamera` needed to change. Only the aim did, and an
+aim can be measured.
+
+So `cam_axis` is a control that writes two other controls. It fits a line to the
+strand by principal axis — power iteration on the covariance of a few thousand
+sampled vertices, seeded with the widest column rather than a fixed vector,
+because a fixed seed can be orthogonal to the answer and this module is nothing
+but symmetric figures — and puts the resulting bearing into `cam_azimuth` and
+`cam_elevation`, where it is visible, is saved with the script, and can be
+nudged. VERIFIED against synthetic helices of known axis: 0.025° of error on a
+153-turn tube, and the arms coming out exactly one sector apart.
+
+It re-aims ON A PRESS AND NOT ON A SCRIPT PUSH, RULE 7's distinction for RULE
+7's reason: if reading the script re-aimed, a reload would throw away a hand
+nudge, and the author's own 325/98 would be unrecoverable from a script that
+recorded it.
+
+Two things the arithmetic settled that reasoning had not:
+
+- **325/98 and 145/82 are the same view**, to six decimal places. `cos 98` is
+  negative, which flips the azimuth; the module writes the spelling that keeps
+  the elevation inside −90..90. So the control answers with different numbers
+  than the hand found, and they are the same aim.
+- **A flat figure has no axis to fly down**, and the fit on one is arbitrary
+  within the plane. Measured: a 153-turn tube puts 0.986 of its spread along the
+  fitted axis, a flat spiral 0.519, a random ball 0.339. So the module measures
+  that share and SAYS SO below 0.6, rather than aiming at nothing and leaving
+  the author to wonder. `%%bd_pitch 0` is the setting that reproduces the 2D
+  kolam, so it is the case a stored script is most likely to carry.
+
+`cam_distance`'s range went to 99000. Framing never needed it — 9900 is ten
+times the largest stored figure's radius — but travelling does: the distance is
+now where you ARE along the line you are flying in on, so the top of the range
+is how far out the trip can start.
+
+`bd_V_Kolam3D_002` carries `cam_axis 0` so the stepper is visible on it, since a
+script that marks any control hides every control it does not mark.
+
+---
+
 ## 2026-10-14 — the collage PLAYS, and the voice stops tripping over itself
 
 Stage 3 of the sequencing design, then a day inside the speech path. The second
