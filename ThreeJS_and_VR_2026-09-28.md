@@ -541,6 +541,11 @@ The author: *"I think it's more interesting and transformative if there is an
 illusion that the viewer is moving — but if there is only one viewer and one
 object, is the distinction that important or real?"*
 
+**THIS SECTION IS CORRECTED BY §5e, ON TWO COUNTS, BOTH THE AUTHOR'S.** The
+argument below holds a head still, and a head is never still; and it treats a
+flat screen as delivering the same percept as stereo, which it does not. Read
+§5e with it.
+
 **With nothing in the field but the figure on black: the author is right, and
 §5c's comfort claim was too strong.** If the pixels are identical then the
 vestibular contradiction is identical. The inner ear cannot see which matrix
@@ -574,10 +579,11 @@ choice of matrix at all:
    illusion of self-motion is what is wanted, and the headset is the medium that
    charges the most for it. On a flat screen vection is FREE: the body knows it
    is sitting still looking at a rectangle, expects no agreement, and takes the
-   illusion as a gift. **For this particular effect the flat screen is the
-   generous medium and the headset is the expensive one** — which is the
-   opposite of the expected order, and worth knowing before buying hardware for
-   it.
+   illusion as a gift. ~~**For this particular effect the flat screen is the
+   generous medium and the headset is the expensive one.**~~ **THE STRUCK
+   SENTENCE IS WRONG — see §5e.** The tension is real, but "generous" compares
+   a cost against a different medium's benefit. The flat screen is cheap in
+   comfort and does not deliver the thing being bought.
 
 2. **Option 3 does NOT cost the illusion.** Expressing self-motion as world
    motion is what every flight simulator does; the illusion lives in the
@@ -597,6 +603,98 @@ choice of matrix at all:
 PLUMBING it is forced. For the BODY it is real only once something static is in
 the field — and putting something there is how you choose between the two
 things the author wants.**
+
+---
+
+## 5e. Two corrections from the author, and the second inverts §8e (2026-10-15)
+
+### 1. Volitional head motion is itself the reference — so §5d analysed a head held still
+
+> *"The distinction is triggered by the volitional motions of the user's head
+> and headset. This makes a distinction that is on top of the otherwise
+> ambiguous viewer–object relationship."*
+
+Correct, and §5d's error is a classic one: it reasoned about a perceptual
+question with the observer held motionless, when the observer is never
+motionless.
+
+**The mechanism.** A self-generated movement comes with an efference copy — a
+motor prediction of what the visual field should do. So the brain can SUBTRACT
+ITS OWN CONTRIBUTION from the flow field, and whatever is left over is
+attributable to the object. That is not a metaphor; separating self-motion from
+object-motion is exactly what the computation is for. The viewer's own
+vestibular and proprioceptive channels supply a reference frame **continuously
+and for free**, with nothing needed in the scene at all.
+
+So **the static reference I proposed in §5d is a CRUTCH for a viewer who cannot
+move** — which is to say, for a flat screen. A headset viewer always has one.
+Two consequences:
+
+- **Option 3 is not an arbitrary choice after all.** It is the only one
+  consistent with head motion. In a session the headset writes the camera from
+  the tracked pose, so the figure IS world-fixed, and every small head movement
+  confirms it. A figure that failed to move correctly against head motion would
+  read as stuck to the viewer's face — not as an object at all, and far worse
+  than uncomfortable.
+- **The comfort question is better stated.** Not "is there a static reference"
+  but: **after the viewer subtracts their own motion, is the remaining flow
+  OBJECT-SHAPED or does it FILL THE FIELD?** A bounded thing moving is fine. A
+  field-filling flow cannot be attributed to an object, so it is attributed to
+  the self, and that is the vection. **Flying INTO a tunnel fills the field by
+  construction** — which is why §5b's caveat survives every refinement of this
+  argument. The tunnel is the bad case for a reason intrinsic to it.
+
+### 2. A flat screen does not deliver the same percept — stereo and reconstruction
+
+> *"The flat screen does not equate to a VR experience because of the stereo
+> vision and 3D reconstruction by the viewer."*
+
+Correct, and this is the more important of the two, because **it inverts §8e's
+conclusion for this particular content.**
+
+§8e weighed the headset on TEXT and concluded against it: 25 PPD, 7–8 px of cap
+height, ~18 characters a line, speech becomes the primary reading mode. All of
+that stands. But the Kolam figure is not text, and for the figure the account
+runs the other way:
+
+**BD's 3D figure has almost no monocular depth cues, by its own design.**
+
+- No shading — `LineBasicMaterial` with vertex colours and no lights.
+- No texture gradient, no ground plane, no cast shadow: the background is a flat
+  `#0a0a0f`.
+- **And no occlusion.** `applyOpacity` sets `material.depthWrite = false`
+  whenever opacity < 1, deliberately, because with depth writing on the nearest
+  line in each pixel hides everything behind it and the figure reads as a solid
+  shell. That is the right call for the look — and it removes the one monocular
+  depth-ordering cue the figure had.
+
+So on a flat screen the figure is a genuinely ambiguous line drawing: eight
+overlapping copies of a folded curve, no shading, no occlusion, depth inferred
+from perspective and motion alone. **Binocular disparity resolves exactly that
+class of ambiguity**, and it is the cue the flat screen cannot supply at any
+resolution.
+
+**THE CONCLUSION, AND IT IS THE STRONGEST ARGUMENT FOR THE HEADSET IN THIS
+DOCUMENT: BD's 3D figures are precisely the content stereo rescues, because
+they have no other depth cue to rely on.** The module's own best design
+decision — translucency so the overlapping copies read as copies — is what makes
+it most dependent on stereo. Not a nice-to-have; the thing that makes the
+structure legible.
+
+**So §8e and this section are not in conflict, they are about different
+content**, and together they say something sharper than either alone:
+
+> **The headset is the wrong medium for BD's TEXT and the right medium for BD's
+> FIGURES.** Which is the same split §8e already reached from the other side when
+> it concluded that speech becomes the primary reading mode — speech carries the
+> words, stereo carries the form, and the headset is then playing to both of its
+> strengths instead of being asked to render prose.
+
+**What this does NOT rescue:** the comfort cost of the fly-through (§5b, and
+§5e.1 above — it fills the field whichever matrix moves), and line weight (§6),
+which stereo makes WORSE rather than better, since a 1px line has to be fused
+between two eyes and a hairline that flickers in one eye is a hairline that
+fails to fuse.
 
 ---
 
@@ -1252,6 +1350,7 @@ to come back with is whether 6.8px node labels resolve at all.
 | question | notes |
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
+| **DOES STEREO MAKE THE FIGURE LEGIBLE? (§5e)** | **The strongest pro-headset item in this table, and it needs measuring first.** BD's figure has almost no monocular depth cues BY DESIGN — no shading, no ground plane, and `depthWrite: false` at opacity < 1 removes occlusion too — so on a flat screen it is an ambiguous line drawing and binocular disparity is the cue that would resolve it. Against which: a 1px line must FUSE between two eyes, and a hairline that flickers in one eye is a hairline that fails to fuse (§6). **So this item and the `weight` item are the same measurement** and should be made in one sitting on real hardware. |
 | **Is there a STATIC REFERENCE in the field? (§5d)** | The real comfort control, and it is a CONTENT decision rather than an architectural one. With nothing but the figure on black, "the viewer moved" and "the figure moved" are the same experience and carry the same cost; a floor, a horizon, or simply not filling the field makes the motion read as the object's. **It is also the dial between the transformative illusion the author wants and the comfort a headset needs** — they pull opposite ways, so it has to be chosen per piece. Nothing built; `%%bd_background` is the only thing in the field today. |
 | **Do the world-transform refactor NOW? (§5c)** | **The one item on this list that needs no headset.** Re-express `cam_azimuth`/`cam_elevation`/`cam_roll`/`cam_distance` as a transform on a root group above `group`, fix the camera, and the flat and immersive paths become one code path — verifiable to the pixel on a flat screen, because camera-roll and content-counter-roll of one rigid figure are identical. Decide the PIVOT explicitly (§5c). Not started. |
 | **ALIGNMENT FROM THE OTHER END (2026-10-15)** | **The author's observation, and it reframes the arcminute work.** If the world is what moves, then in a headset the VIEWER supplies the fine alignment: you lean a fraction of a degree instead of dialling one. Three things follow. **(1) It is finer AND better conditioned.** Inside-out tracking resolves well under a tenth of a degree, against a stepper's one degree — or one arcminute with `cam_azimuth_minutes` / `cam_elevation_minutes` — and it is CLOSED-LOOP: you see the result while you move, where a stepper is dial-then-look. The badly-conditioned bit of the spherical-coordinate aim (§5b: at elevation 82 a degree of azimuth is 0.139° of view and a degree of elevation is a whole one) simply stops being the author's problem, because the head does not work in azimuth and elevation. **(2) It is good for FINDING an alignment and bad for HOLDING one.** A neck held off-axis for a minute-long fly-through is precisely the wrong ergonomics for a long contemplative piece. So the headset wants the inverse of `cam_axis`: not "measure the geometry and write the bearing" but **"take where I am looking and write it"** — the same shape, the other instrument. That is a real control to build, and the thing that makes head alignment persist. **(3) The right primitive is not a group rotation.** WebXR already has this: `XRReferenceSpace.getOffsetReferenceSpace(XRRigidTransform)`, reached in three through `renderer.xr.setReferenceSpace()`. It re-origins the world for the whole session, costs nothing per frame, and composes with the headset's own tracking instead of fighting it. UNVERIFIED on hardware. |
