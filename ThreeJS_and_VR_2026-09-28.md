@@ -412,6 +412,97 @@ to paste. Reload BD to see it.
 
 ---
 
+## 5c. Moving the world instead of the eye — the three mechanisms (2026-10-15)
+
+The author's question: *"given that three.js has this VR capability — is there a
+way of adjusting the world view independent of the camera, if as you say the
+camera is effectively the viewer + headset?"*
+
+Yes, and there are exactly three places to put it. They are not variations on a
+theme; they differ in **what they move** and therefore in what the viewer feels.
+
+### 1. Move the viewer's play space — the DOLLY
+
+Put the camera inside a `Group` and transform the group:
+
+```js
+const dolly = new THREE.Group();
+dolly.add(camera);
+scene.add(dolly);
+// the headset writes the camera's own pose; the dolly says where the
+// play space sits in the world
+dolly.position.set(…); dolly.quaternion.set(…);
+```
+
+This works because three's `WebXRManager` composes the user camera's PARENT
+world matrix when it writes the XR pose each frame — `camera.matrixWorld =
+parent.matrixWorld × camera.matrix`. So the headset still owns the camera and
+the author still owns where the camera's world is. It is the standard pattern in
+three's own XR examples.
+
+**What it feels like: being carried.** The room moves with you, because the
+play space IS the room. Which is the vection case — this is locomotion, and it
+is the mechanism most likely to make someone ill.
+
+### 2. Re-origin the tracking space — the OFFSET REFERENCE SPACE
+
+`XRReferenceSpace.getOffsetReferenceSpace(new XRRigidTransform(pos, quat))`,
+reached in three through `renderer.xr.setReferenceSpace()`. It re-origins the
+whole session once, costs nothing per frame, and composes with the headset's
+tracking rather than fighting it.
+
+**Note the sense: the transform gives the NEW ORIGIN's pose in the OLD space, so
+its effect on the viewer is the inverse of what it reads like.** That is the
+first thing to get wrong.
+
+**What it is for: recentring, not animating.** This is the right mechanism for
+"take where I am looking and write it" (§9) and the wrong one for a fly-through.
+
+### 3. Move the content — the ROOT GROUP
+
+One group above everything the module draws, carrying the pose the camera
+controls used to carry. **This is the one that matters here**, for a reason that
+has nothing to do with VR:
+
+**IT MAKES THE FLAT AND IMMERSIVE PATHS THE SAME CODE.** Re-express
+`cam_azimuth`, `cam_elevation`, `cam_roll` and `cam_distance` as a transform on
+the root group, leave the camera FIXED, and the flat screen becomes a special
+case of the headset rather than a different renderer — one set of directives,
+one code path, no branch on whether a session is running. Today the module has a
+camera model that cannot survive `immersive-vr` at all (§9); after the
+conversion it has none to lose.
+
+**What it feels like: the figure moving in a still room** — the comfortable
+option, and the one §1's standing rule has always been pointing at.
+
+**And the whole conversion is testable on a flat screen TODAY**, which is the
+part worth acting on. Rolling the camera and counter-rolling one rigid figure on
+a plain ground are IDENTICAL PIXELS, so the refactor can be verified to the
+pixel before any headset exists, and the remaining VR work is then a session
+flag and a `setAnimationLoop`.
+
+### What each of them costs, measured against the code as it stands
+
+- The root group must sit **ABOVE** the existing `group`, which carries the
+  `step_pitch` Y scale: a Y scale does not commute with a rotation about an
+  arbitrary axis, so putting the pose on `group` itself would shear the figure.
+- **The pivot becomes a decision that the camera model never had to state.**
+  `cam_azimuth` orbits the eye about the look-at point; the content equivalent
+  is rotating the content about that same point in the opposite sense. Rotating
+  about the content's own centroid instead is a different picture, and both are
+  defensible — so it has to be written down rather than fallen into.
+- `camera.near` / `camera.far` are currently derived from `cam_distance`. In a
+  session the projection belongs to the session (`updateRenderState({ depthNear,
+  depthFar })`), so that logic moves rather than ports.
+- `cam_distance` as a content translation is relatively identical to flying in,
+  and at room scale it means the figure passing THROUGH the viewer. That is a
+  composition question, not a bug.
+
+All three mechanisms are **UNVERIFIED on hardware**. The dolly's parent-matrix
+composition is read from three's source, not measured.
+
+---
+
 ## 6. Line weight, and why VR forces the issue
 
 Current position, as of RULE 9:
@@ -1064,6 +1155,7 @@ to come back with is whether 6.8px node labels resolve at all.
 | question | notes |
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
+| **Do the world-transform refactor NOW? (§5c)** | **The one item on this list that needs no headset.** Re-express `cam_azimuth`/`cam_elevation`/`cam_roll`/`cam_distance` as a transform on a root group above `group`, fix the camera, and the flat and immersive paths become one code path — verifiable to the pixel on a flat screen, because camera-roll and content-counter-roll of one rigid figure are identical. Decide the PIVOT explicitly (§5c). Not started. |
 | **ALIGNMENT FROM THE OTHER END (2026-10-15)** | **The author's observation, and it reframes the arcminute work.** If the world is what moves, then in a headset the VIEWER supplies the fine alignment: you lean a fraction of a degree instead of dialling one. Three things follow. **(1) It is finer AND better conditioned.** Inside-out tracking resolves well under a tenth of a degree, against a stepper's one degree — or one arcminute with `cam_azimuth_minutes` / `cam_elevation_minutes` — and it is CLOSED-LOOP: you see the result while you move, where a stepper is dial-then-look. The badly-conditioned bit of the spherical-coordinate aim (§5b: at elevation 82 a degree of azimuth is 0.139° of view and a degree of elevation is a whole one) simply stops being the author's problem, because the head does not work in azimuth and elevation. **(2) It is good for FINDING an alignment and bad for HOLDING one.** A neck held off-axis for a minute-long fly-through is precisely the wrong ergonomics for a long contemplative piece. So the headset wants the inverse of `cam_axis`: not "measure the geometry and write the bearing" but **"take where I am looking and write it"** — the same shape, the other instrument. That is a real control to build, and the thing that makes head alignment persist. **(3) The right primitive is not a group rotation.** WebXR already has this: `XRReferenceSpace.getOffsetReferenceSpace(XRRigidTransform)`, reached in three through `renderer.xr.setReferenceSpace()`. It re-origins the world for the whole session, costs nothing per frame, and composes with the headset's own tracking instead of fighting it. UNVERIFIED on hardware. |
 | **EYE OR OBJECT? (2026-10-15)** | **The author's question — "are we reversing the roles so that the object is the one moving conceptually?" — and the answer is NO, not yet.** **AND IT IS NOT MERELY A COMFORT CHOICE: in an immersive session the eye-moving model STOPS WORKING.** `renderer.xr` takes the camera pose from the headset every frame, derived from the reference space, so `camera.position.set` and `camera.lookAt` are simply overwritten — the module cannot place its own eye at all. Moving the world is the PRECONDITION for an immersive session, not a concession to the stomach. That is the strongest argument in this table for doing it, and it was reached by the author asking the question rather than by scoping the port. All five camera controls move the EYE: `cam_azimuth`, `cam_elevation`, `cam_roll`, `cam_distance` and their speeds place and point a camera orbiting a target. **On a flat screen that is not a choice at all** — the scene is one rigid figure on a plain ground, so rolling the camera and counter-rolling the object give IDENTICAL pixels, and spending anything on the distinction today buys nothing. **In a headset they are not remotely the same thing**, which is what §1's standing rule already says: move the WORLD, not the eye. Camera roll rolls the viewer's own horizon — the motion the vestibular system has no matching signal for — where rotating the object leaves the room still. `cam_distance` has the same split: an eye flying forward is the vection that makes people ill; an object approaching is far more tolerable. So the conversion is **the whole camera model at once, not one control**, and `cam_roll` is the one to convert first. COST, measured against the code as it stands: the rotation cannot go on `group`, which carries the `step_pitch` Y scale, because a Y scale does not commute with a rotation about an arbitrary axis — it needs an outer wrapper holding the alignment, and the axis moves whenever the aim does. The flat-screen equivalence is what makes this safe to defer; it is **not** an argument that it will not be needed. |
 | **Retire `bd_V_Kolam`?** | The 3D module is a *measured* superset. Costs: `weight` (§6), and the canvas rasterises a bezier for free where three tessellates it. Two stored nodes would need migrating. |
