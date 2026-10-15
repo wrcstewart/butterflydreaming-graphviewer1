@@ -471,8 +471,10 @@ the author still owns where the camera's world is. It is the standard pattern in
 three's own XR examples.
 
 **What it feels like: being carried.** The room moves with you, because the
-play space IS the room. Which is the vection case — this is locomotion, and it
-is the mechanism most likely to make someone ill.
+play space IS the room. Which is the vection case — this is locomotion, and the
+mechanism most likely to make someone ill. **But see §5d: with nothing in the
+field but the figure, it is indistinguishable from option 3, and the difference
+has to be MADE.**
 
 ### 2. Re-origin the tracking space — the OFFSET REFERENCE SPACE
 
@@ -502,8 +504,8 @@ one code path, no branch on whether a session is running. Today the module has a
 camera model that cannot survive `immersive-vr` at all (§9); after the
 conversion it has none to lose.
 
-**What it feels like: the figure moving in a still room** — the comfortable
-option, and the one §1's standing rule has always been pointing at.
+**What it feels like: the figure moving in a still room** — PROVIDED THERE IS A
+STILL ROOM IN THE FIELD. See §5d, which corrects this line.
 
 **And the whole conversion is testable on a flat screen TODAY**, which is the
 part worth acting on. Rolling the camera and counter-rolling one rigid figure on
@@ -530,6 +532,71 @@ flag and a `setAnimationLoop`.
 
 All three mechanisms are **UNVERIFIED on hardware**. The dolly's parent-matrix
 composition is read from three's source, not measured.
+
+---
+
+## 5d. One viewer, one object — when is the distinction real? (2026-10-15)
+
+The author: *"I think it's more interesting and transformative if there is an
+illusion that the viewer is moving — but if there is only one viewer and one
+object, is the distinction that important or real?"*
+
+**With nothing in the field but the figure on black: the author is right, and
+§5c's comfort claim was too strong.** If the pixels are identical then the
+vestibular contradiction is identical. The inner ear cannot see which matrix
+changed. "The figure came to me" and "I went to the figure" are the same
+experience, and they are equally nausea-inducing — or equally fine — whichever
+one the code says.
+
+**The body is not judging which thing moved. It is judging whether the STATIC
+REFERENCE stayed static.** That is the whole of it, and it explains both halves:
+
+- Move the figure while a floor, a horizon, your own hands or the passthrough
+  edges stay put → the field says *an object is moving*. Nobody is sick watching
+  a car go past.
+- Move the camera and that reference moves too → the field says *I am moving*,
+  the inner ear says nothing is, and the contradiction is the sickness.
+
+So **the distinction is not real today, and it can be MADE real** — by putting
+something static in the field. Which means the real design control is not the
+choice of matrix at all:
+
+> **The static reference is the dial between "transformative illusion" and
+> "comfort".** No reference: maximum vection, maximum illusion, maximum cost.
+> A fixed floor or horizon, or simply not filling the field: the motion reads as
+> the object's, the illusion weakens, the cost goes. This is why every VR comfort
+> technique — tunnel vignettes, cockpits, floor grids, teleport-not-glide — is
+> some form of adding a static frame.
+
+### Three consequences worth carrying
+
+1. **The author's artistic aim and the headset are in TENSION, not synergy.** The
+   illusion of self-motion is what is wanted, and the headset is the medium that
+   charges the most for it. On a flat screen vection is FREE: the body knows it
+   is sitting still looking at a rectangle, expects no agreement, and takes the
+   illusion as a gift. **For this particular effect the flat screen is the
+   generous medium and the headset is the expensive one** — which is the
+   opposite of the expected order, and worth knowing before buying hardware for
+   it.
+
+2. **Option 3 does NOT cost the illusion.** Expressing self-motion as world
+   motion is what every flight simulator does; the illusion lives in the
+   imagery, not in the matrix. So choosing option 3 for the plumbing reason —
+   §9: an XR session owns the camera and the current model cannot survive it —
+   gives up nothing aesthetically. The architecture is forced; the comfort
+   remains a CONTENT decision taken per piece (how fast, how much of the field,
+   is there a reference), which is the right place for it.
+
+3. **The roll is still the worst case, and for a reason that survives this
+   argument.** There is no natural static reference for roll — a floor helps a
+   translation far more than it helps a rotation about the view axis — and the
+   vestibular system is most sensitive to exactly that axis. So §5b's doubled
+   caveat stands on its own feet, independent of which matrix moves.
+
+**The honest summary: for the PICTURE the distinction is not real. For the
+PLUMBING it is forced. For the BODY it is real only once something static is in
+the field — and putting something there is how you choose between the two
+things the author wants.**
 
 ---
 
@@ -1185,6 +1252,7 @@ to come back with is whether 6.8px node labels resolve at all.
 | question | notes |
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
+| **Is there a STATIC REFERENCE in the field? (§5d)** | The real comfort control, and it is a CONTENT decision rather than an architectural one. With nothing but the figure on black, "the viewer moved" and "the figure moved" are the same experience and carry the same cost; a floor, a horizon, or simply not filling the field makes the motion read as the object's. **It is also the dial between the transformative illusion the author wants and the comfort a headset needs** — they pull opposite ways, so it has to be chosen per piece. Nothing built; `%%bd_background` is the only thing in the field today. |
 | **Do the world-transform refactor NOW? (§5c)** | **The one item on this list that needs no headset.** Re-express `cam_azimuth`/`cam_elevation`/`cam_roll`/`cam_distance` as a transform on a root group above `group`, fix the camera, and the flat and immersive paths become one code path — verifiable to the pixel on a flat screen, because camera-roll and content-counter-roll of one rigid figure are identical. Decide the PIVOT explicitly (§5c). Not started. |
 | **ALIGNMENT FROM THE OTHER END (2026-10-15)** | **The author's observation, and it reframes the arcminute work.** If the world is what moves, then in a headset the VIEWER supplies the fine alignment: you lean a fraction of a degree instead of dialling one. Three things follow. **(1) It is finer AND better conditioned.** Inside-out tracking resolves well under a tenth of a degree, against a stepper's one degree — or one arcminute with `cam_azimuth_minutes` / `cam_elevation_minutes` — and it is CLOSED-LOOP: you see the result while you move, where a stepper is dial-then-look. The badly-conditioned bit of the spherical-coordinate aim (§5b: at elevation 82 a degree of azimuth is 0.139° of view and a degree of elevation is a whole one) simply stops being the author's problem, because the head does not work in azimuth and elevation. **(2) It is good for FINDING an alignment and bad for HOLDING one.** A neck held off-axis for a minute-long fly-through is precisely the wrong ergonomics for a long contemplative piece. So the headset wants the inverse of `cam_axis`: not "measure the geometry and write the bearing" but **"take where I am looking and write it"** — the same shape, the other instrument. That is a real control to build, and the thing that makes head alignment persist. **(3) The right primitive is not a group rotation.** WebXR already has this: `XRReferenceSpace.getOffsetReferenceSpace(XRRigidTransform)`, reached in three through `renderer.xr.setReferenceSpace()`. It re-origins the world for the whole session, costs nothing per frame, and composes with the headset's own tracking instead of fighting it. UNVERIFIED on hardware. |
 | **EYE OR OBJECT? (2026-10-15)** | **The author's question — "are we reversing the roles so that the object is the one moving conceptually?" — and the answer is NO, not yet.** **AND IT IS NOT MERELY A COMFORT CHOICE: in an immersive session the eye-moving model STOPS WORKING.** `renderer.xr` takes the camera pose from the headset every frame, derived from the reference space, so `camera.position.set` and `camera.lookAt` are simply overwritten — the module cannot place its own eye at all. Moving the world is the PRECONDITION for an immersive session, not a concession to the stomach. That is the strongest argument in this table for doing it, and it was reached by the author asking the question rather than by scoping the port. All five camera controls move the EYE: `cam_azimuth`, `cam_elevation`, `cam_roll`, `cam_distance` and their speeds place and point a camera orbiting a target. **On a flat screen that is not a choice at all** — the scene is one rigid figure on a plain ground, so rolling the camera and counter-rolling the object give IDENTICAL pixels, and spending anything on the distinction today buys nothing. **In a headset they are not remotely the same thing**, which is what §1's standing rule already says: move the WORLD, not the eye. Camera roll rolls the viewer's own horizon — the motion the vestibular system has no matching signal for — where rotating the object leaves the room still. `cam_distance` has the same split: an eye flying forward is the vection that makes people ill; an object approaching is far more tolerable. So the conversion is **the whole camera model at once, not one control**, and `cam_roll` is the one to convert first. COST, measured against the code as it stands: the rotation cannot go on `group`, which carries the `step_pitch` Y scale, because a Y scale does not commute with a rotation about an arbitrary axis — it needs an outer wrapper holding the alignment, and the axis moves whenever the aim does. The flat-screen equivalence is what makes this safe to defer; it is **not** an argument that it will not be needed. |
