@@ -838,13 +838,149 @@ already is — near-black is very nearly transparent. Do not let anything come t
 
 ---
 
+## 8e. Readability on a Quest 3, and Quest 3 against Vision Pro (2026-10-15)
+
+The author asked two things on the same day — which headset, and *"what are we
+anticipating for BD readability on the Quest 3"* — and they turn out to be one
+question, because the answer to the second decides the first.
+
+### The arithmetic, which is the part worth keeping
+
+**Quest 3 is about 25 pixels per degree.** One arcminute — roughly the limit of
+20/20 vision — therefore gets **0.42 pixels**. The headset is *below* the
+resolving power of the eye: its pixel structure is visible. A phone at ~95 PPD
+gives ~1.6 px per arcminute and is above it.
+
+Comfortable **sustained** reading wants a cap height of about 16–20 arcminutes.
+On the Quest that is **7–8 pixels of cap height** — enough to read and not
+enough to be crisp, because antialiasing has almost nothing to work with. Stems
+look soft; thin strokes flicker as the head moves.
+
+**What this does NOT mean is that text is too small.** Window size and distance
+are the user's to set in the Quest browser, so angular size can always be
+bought. What cannot be bought is **characters per line at that size**, which is
+where the earlier measurement came from: **~18 characters per headset-safe line
+against ~50 on a phone** (§8b).
+
+### So BD has three kinds of text, and they fail at different points
+
+| | anticipated on a Quest 3 |
+|---|---|
+| **View's prose** (`clamp(20px, 2.2vw, 28px)`; a collage's `clamp(11px, 4.2cqmin, 24px)`) | **Readable.** A Tao chapter is fine. The cost is line length, so BD's long cards and the module descriptions mean a great deal of scrolling, and sustained reading tires in a way a phone does not. |
+| **Graph node labels, 6.8px** | **The thing that breaks first**, and BD's navigation is label-driven. Tempered by something §9 already knew and the first answer missed: **the graph zooms to 8×**, so a label can be enlarged — at the price of seeing fewer nodes at once, which is precisely what the graph is for. Whether 6.8px is hopeless or merely poor is the single most useful thing to learn from a real device. |
+| **The immersive module** | `weight 0.5` is a hairline, and a one-pixel line at 25 PPD is a flickering thread — multiplied by eight overlapping symmetric copies. Expect to want heavier strokes in a session than on screen, which argues for `weight` becoming **angle-derived** when an immersive session is active rather than staying a fixed number. §6 and §8c already say this; the arithmetic above is the number behind it. |
+
+### The conclusion, and it is not the one expected
+
+**On a headset, speech stops being an accessibility extra and becomes the
+primary reading mode.** Prose at eighteen characters a line is for glancing at;
+the voice is for reading. Which means the speech work of 2026-10-13/14 — the
+synthesis backlog, the serialisation, `maxLen` as a latency budget — **pays off
+more on the headset than anywhere else**, and the Whisper dictation prototype
+matters more too, because typing in a headset is worse than reading in one.
+
+That also promotes two §9 rows from "open question" to "load-bearing": whether
+Piper runs acceptably in the Quest browser, and whether Whisper and
+`getUserMedia` do. They are no longer about convenience.
+
+### Quest 3 against Vision Pro (M5), for BD specifically
+
+| | Quest 3 | Vision Pro (M5) |
+|---|---|---|
+| per-eye resolution | 2064 × 2208, ~25 PPD | ~3680 × 3140, ~34 PPD |
+| optics / FOV | pancake, ~110° | pancake, ~100° |
+| `immersive-vr` in the browser | mature, most-exercised | **enabled by default since visionOS 2** |
+| `immersive-ar` | yes | **not exposed** — no plane/mesh detection |
+| WASM speed | Snapdragon XR2 Gen 2 | M5 — near-desktop |
+| input | controllers + hands | eyes + hands, `transient-pointer` on a pinch |
+| passthrough | colour, camera-mediated | best available |
+| immersion control | passthrough on/off | **Digital Crown: a continuous dial** |
+| dev loop | Chromium, `adb`, `chrome://inspect` | Safari Web Inspector from the Mac |
+
+**The WebXR risk I first stated does not survive checking.** I warned that
+buying the better display might mean discovering a WebXR gap that stops the
+project dead. Safari on visionOS 2+ has `immersive-vr` **on by default**, with
+hand tracking through the WebXR hand-input module; what it withholds is
+`immersive-ar`, plane detection and mesh detection — **none of which BD uses**,
+because under delivery shape C only the module goes immersive and it shows a
+WebGL scene rather than the room. So the gap is in features BD has no use for.
+
+What remains, then, is a genuine trade rather than a risk:
+
+- **Vision Pro wins on the two things BD is made of.** ~34 PPD against ~25 is
+  the difference between "readable with 3–4× glyph sizes" and something close to
+  comfortable prose — and it revises §8b, which says the case for the better
+  headset rests on glare and FOV *rather than* text legibility. That was true
+  comparing Quest models. Against Vision Pro, **text is the biggest
+  differentiator**, because BD is text-heavy. And M5 against XR2 is the
+  difference between Piper and Whisper being usable and not — the ~50 ms per
+  character measured on the Mac is the yardstick.
+- **Quest 3 wins on the development loop**, and that is not a small thing:
+  Chromium, `adb`, and `chrome://inspect` giving a real console for the page
+  running in the headset.
+- Two smaller points for the Vision Pro that are easy to miss: **eye-tracking
+  plus pinch is better for small targets** than a ray, which suits BD's stepper
+  columns; and debugging over Safari Web Inspector from a Mac the author already
+  owns needs no `adb`.
+
+**The recommendation is an order, not a choice:** the Quest is the better place
+to *build* and the Vision Pro looks like the better place to *deliver*. They do
+not conflict.
+
+### A correction to §8d's dial argument
+
+§8d says a continuously adjustable depth of immersion is "a therapeutic
+affordance no headset can offer", reserving it for the optical see-through lane.
+**The Vision Pro's Digital Crown is that dial today** — blended continuously
+between passthrough and the immersive scene. The real distinction is
+**optical versus camera-mediated** transparency, not whether a dial exists. The
+argument for glasses survives, but on the narrower ground: optical see-through
+passes the room through unprocessed, where a camera-mediated dial is still a
+screen. For the facilitated case (§5A) the Crown is already enough to turn a
+participant back toward the room without removing anything.
+
+### Getting a URL into a headset — and a correction I had to make
+
+I told the author a QR code could not open a web page in a headset. **That was
+wrong for the Quest, and his own recollection was right**: BD's Device button has
+generated a QR for exactly this purpose since September.
+
+- **Quest 3 / 3S** — Horizon OS v2.9 adds a **built-in** scanner opened by voice
+  ("Hey Meta, open QR code scanner") or from Quick controls, reading codes
+  through passthrough with an open-link action; currently on the Public Test
+  Channel. Third-party scanners do the same on the release channel today.
+- **Vision Pro** — no native scanner. A third-party app exists, so it works on a
+  device you own and have installed it on.
+- **A demo unit in a shop** — nothing can be installed and no account is yours,
+  so Handoff, iCloud tabs and AirDrop are all out and the URL must be **typed by
+  gaze and pinch**.
+
+So the rule is about **whose device it is**, not about QR codes — which is the
+over-generalisation I made. Two consequences, both built 2026-10-15:
+
+- **`/x`** — the headset check, at the shortest path there is because every
+  character is paid for by hand on a demo unit. It reports `navigator.xr`,
+  `immersive-vr`, `immersive-ar`, threads and the blend mode; shows BD's OWN
+  text sizes (28, 24, 17, 11 and the 6.8px node label) with an 18- and
+  50-character ruler; enters an immersive session with three text sizes on a
+  CanvasTexture plane at 1.6 m and reports input-source kinds and frame rate;
+  and times one 400-character Piper utterance in **ms per character**, directly
+  comparable with the Mac's ~50. Nothing downloads unasked.
+- **`/qr`** — a QR for any BD URL, defaulting to `/x`, reusing BD's own
+  `qrcode.js` so there is one encoder in the project and not two.
+
+**Thirty seconds on a real device beats all of the above**, and the one number
+to come back with is whether 6.8px node labels resolve at all.
+
+---
+
 ## 9. Open, in one place
 
 | question | notes |
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
 | **Retire `bd_V_Kolam`?** | The 3D module is a *measured* superset. Costs: `weight` (§6), and the canvas rasterises a bezier for free where three tessellates it. Two stored nodes would need migrating. |
-| **Is BD's UI legible in the flat window? (§5)** | A TEST ITEM, not a blocker — the earlier framing over-called it. The reading path is 16px; the sub-11px items are chrome whose position a user learns. The only real risk is the 10px / 6.8px node labels, and the graph already zooms to 8x. If a fix is needed it is one or two cytoscape numbers. |
+| **Is BD's UI legible in the flat window? (§5, §8e)** | A TEST ITEM, not a blocker. The reading path is 16px; the sub-11px items are chrome whose position a user learns. The only real risk is the 10px / 6.8px node labels, and the graph already zooms to 8x. **§8e adds the arithmetic**: 25 PPD gives 7–8 px of cap height at a comfortable angular size, so prose reads but at ~18 characters a line. **Measure it with `/x`** — the one number wanted is whether 6.8px resolves. |
 | **Delivery shape (§5)** | Leaning C — BD flat in the Quest browser, module immersive. A (facilitated, two people) stays alongside it; both run the same module. Depends on the iframe/immersive-session question. |
 | **Does the headset carry music and voice (§5a)?** | Under §5C it must, because there is only one device. That makes the Piper question (§8b) load-bearing rather than optional. |
 | **Depth / drift policy inside a session (§3)** | Cap depth, slow drift, or move the L-system off the main thread. |
@@ -854,14 +990,17 @@ already is — near-black is very nearly transparent. Do not let anything come t
 | **Does anything DEPEND on the black background? (§8d)** | The free hedge for additive AR displays, where black is transparent. Keep the figure legible as lines in space. Costs nothing today. |
 | **An AR theme, if glasses ever matter (§8d)** | `?ink=1` is the closer ancestor than the dark default. Not now — FOV and WebXR maturity both trail headsets. |
 | **Which trajectory to watch (§8d)** | Meta is making opaque VR smaller (VR Glasses, spring 2027); Android XR and the glasses makers are making optical see-through better. **BD's dial argument attaches to the second.** Watch that lane, not Meta's. |
-| **Immersion as a DIAL, not a switch (§8d)** | Electrochromic dimming makes depth-of-immersion continuous and adjustable mid-session — a facilitator can raise transparency instead of removing a headset. A therapeutic affordance no headset can offer, and the strongest argument for glasses as an eventual target. |
-| **Does Piper run in the Quest browser? (§8b)** | Compute, not storage. Decides whether the headset carries the voice or only receives audio. |
+| **Immersion as a DIAL, not a switch (§8d, corrected §8e)** | Electrochromic dimming makes depth-of-immersion continuous and adjustable mid-session — a facilitator can raise transparency instead of removing a headset. ~~A therapeutic affordance no headset can offer~~ — **the Vision Pro's Digital Crown is that dial today.** The real distinction is OPTICAL versus CAMERA-MEDIATED transparency, not whether a dial exists. The glasses argument survives on that narrower ground. |
+| **Does Piper run in the Quest browser? (§8b, §8e)** | Compute, not storage. **Promoted from open question to LOAD-BEARING by §8e**: at 25 PPD, speech is the primary reading mode rather than an extra, so this decides whether BD is usable on a Quest at all. The yardstick is ~50 ms per CHARACTER on the Mac, and `/x` measures it in one press. |
 | **Text in the scene — module or MODE? (§7)** | A line-at-a-time 3D text module is the first thing that NEEDS the shared scene: under A its text cannot be occluded by the figure (CSS composites, not a depth buffer). Third resolution: make the text a MODE inside `V_Kolam3D`. Gives up composing text with an arbitrary visual module, which is what B buys. |
 | **How is 3D text sized? (§7)** | `cam_distance` is a live stepper 20–9900, so world-sized text swims. Parent it to the camera (fixed angular size) or slave its scale to the distance. Decide before building. |
 | **Two clocks: speech vs the line interval** | Piper utterance length is not predictable from character count. Default worth assuming: **speech drives, the interval is a floor.** Named, not decided. |
 | **`MODULES.kind` is a binary** | A timed module with visual output is both. Needs a third value or a second axis before a line-at-a-time text module exists. |
 | **Does anything need a TRANSPARENT 3D canvas?** | `V_Kolam3D` has no `alpha: true`, so a dimmed figure is still an opaque near-black rectangle. Fine while the ground is `#0a0a0f`; two stacked visual slots or a light background need `alpha: true` + `setClearAlpha(0)` + `scene.background = null`. A change to the MODULE. |
-| **Does Whisper / `getUserMedia` work there too? (§5a)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. |
+| **Does Whisper / `getUserMedia` work there too? (§5a, §8e)** | Same shape as the Piper question, same test. `sr_editor.html` would run off the built-in mic — note that 3.5mm inline mics are not supported, so there is no wired fallback. **Also load-bearing now**: typing in a headset is worse than reading in one, so dictation is the input method rather than a convenience. |
+| **Which headset (§8e)** | **The WebXR risk is gone**: visionOS 2+ has `immersive-vr` on by default and withholds only the AR modules BD does not use. What is left is a trade — Vision Pro wins on the two things BD is made of (~34 PPD against ~25, and M5 against XR2 for Piper/Whisper); Quest wins on the development loop (Chromium, `adb`, `chrome://inspect`). An ORDER rather than a choice: build on the Quest, deliver on the better display. |
+| **Should `weight` be ANGLE-derived in a session? (§6, §8e)** | At 25 PPD a 1px line is a flickering thread, eight times over. Not built, and §8c's rule already says to size in angle. |
+| **Do the graph's label sizes need a headset case? (§8e)** | 6.8px will not resolve at 25 PPD without zooming, and zooming defeats the graph's purpose. One or two cytoscape numbers behind a device test — but do the test first. |
 
 ---
 

@@ -1377,3 +1377,25 @@ decisions, §9.5 the build order, §9.6–§9.19 what each stage cost. Desktop o
 | **Speak over a sequence** | §9.12 | **BUILT**, but the text-node auto-read fires on every node tap, so browsing is a series of interrupts. The serialisation bounds the damage; a short debounce may still be wanted. |
 | **`check_module.sh` takes FILENAMES** | — | **PROCESS.** `for f in "$@"` — called with no arguments it exits 0 in silence, and every "syntax check passed" over two days was vacuous. Run it as `./check_module.sh viewer.js piper_direct.js` and read for the `ok` lines, not the exit code. |
 | **iOS** | — | **NOT TESTED** for anything in §9. |
+
+---
+
+## Added 2026-10-15 — headset readability, the device choice, and two test pages
+
+`ThreeJS_and_VR_2026-09-28.md` §8e is the authoritative write-up; §9's open list
+is updated in place. Nothing here is a design decision about BD's code — it is
+what a real device has to settle, and the instruments for settling it.
+
+| item | where | note |
+|---|---|---|
+| **The readability arithmetic** | §8e | 25 PPD = **0.42 px per arcminute**, so a Quest 3 is BELOW the eye's resolving power. Sustained reading wants 16–20 arcmin of cap height = **7–8 px** there. Angular size is always buyable by moving the window; characters per line are not — hence **~18 per line against ~50 on a phone**. |
+| **Prose on a Quest** | §8e | **Readable**, at the cost of much scrolling and real fatigue. Not the thing that breaks. |
+| **6.8px graph labels** | §8e | **The thing that breaks first**, and BD's navigation is label-driven. The graph zooms to 8x, at the price of seeing fewer nodes. **Measure before changing anything.** |
+| **`weight` should be angle-derived in a session** | §6, §8c, §8e | A 1px line at 25 PPD is a flickering thread, eight overlapping copies over. NOT BUILT. |
+| **Speech is the PRIMARY reading mode on a headset** | §8e | The conclusion that was not expected, and it promotes two §9 rows from open question to load-bearing: does Piper run acceptably in the Quest browser, and do Whisper / `getUserMedia`. It also means the speech work of 2026-10-13/14 pays off more there than anywhere. |
+| **The Vision Pro WebXR risk is GONE** | §8e | visionOS 2+ Safari has `immersive-vr` **on by default** with WebXR hand input, and withholds only `immersive-ar`, plane and mesh detection — **none of which BD uses**. Checked, not assumed. |
+| **Which headset** | §8e | An ORDER rather than a choice: Quest to BUILD (Chromium, `adb`, `chrome://inspect`), the better display to DELIVER (~34 PPD against ~25; M5 against XR2 for Piper and Whisper). |
+| **§8d's dial claim is too strong** | §8e | The Vision Pro's Digital Crown is a continuous immersion dial today. The distinction is **optical versus camera-mediated**, not whether a dial exists. |
+| **`/x` — the headset check** | `x.html`, `server.js` | **BUILT.** Capabilities, BD's own text sizes with an 18/50-character ruler, an immersive session reporting blend mode, input-source kinds and frame rate, and one 400-character Piper utterance timed in **ms per character** against the Mac's ~50. Nothing downloads unasked. At `/x` because on a demo unit every character of the path is typed by gaze and pinch. |
+| **`/qr` — a QR for any BD URL** | `qr.html`, `server.js` | **BUILT**, reusing BD's own `qrcode.js`. The rule is about **whose device it is**: a Quest can scan (built-in on Horizon OS 2.9's test channel, third-party today), a Vision Pro cannot natively, and a demo unit can install nothing — so a shop means typing. |
+| **Restart needed** | `server.js` | `/x` and `/qr` are explicit routes; `/x.html` and `/qr.html` work without a restart. |
