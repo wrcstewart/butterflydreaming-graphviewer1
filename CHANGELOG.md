@@ -135,6 +135,57 @@ on screen. It hands the exact bearing back when it stops, which is a strict
 improvement: stopping used to move the picture by up to half a degree at the
 moment it stopped.
 
+### `cam_roll` — the third degree of freedom
+
+"How can we make it rotate about the fly axis." It is the one thing the other
+camera controls cannot reach: azimuth and elevation say where the eye is,
+`cam_distance` says how far along, and none of them turns the picture about the
+line of sight. Flying down a tunnel is where that becomes the interesting one —
+a spiral read head-on is a still pattern, and a spiral read head-on while
+turning is a passage.
+
+It costs three lines because of a decision made three weeks ago. `camera.up` was
+already the sphere's north tangent rather than world +Y, and the markup already
+records the check that the tangent stays orthonormal to the view direction at
+every elevation INCLUDING the poles. So `right` is `forward × up`, both are unit
+and perpendicular, the cross product is already the third unit axis, and the
+roll is one rotation in that plane with nothing to normalise. A naive world-+Y
+up would have needed a special case at exactly the elevation this module cares
+about most.
+
+**Roll 0 is bit-for-bit the old vector** — `cos 0` is exactly 1 and `sin 0`
+exactly 0 — so there is no branch that could drift from it, which matters
+because elevation 90 with roll 0 is the 2D invariant the whole module is built
+around. Verified identical at all 21,600 whole-degree bearings.
+
+`cam_roll_speed` is the third rider on the same clock, signed where
+`cam_elevation_speed` is not: both directions of a roll look different and are a
+real choice, where a tumble that only goes one way loses nothing. The arrival
+stop now fires only when neither angle is turning — **a roll continuing after
+the flight has arrived is a perfectly good piece**, and letting the distance's
+arrival kill it would have been a quiet bug. It is also the first of the four
+new controls written with its hand-win from the start rather than discovered as
+a bug afterwards; that is the only difference between it and
+`cam_distance_speed`.
+
+MEASURED, so it can be stated rather than eyeballed: **positive roll turns the
+picture anticlockwise** (at roll 90 the feature at the top of the frame appears
+at the left), and `|up|` and its perpendicularity to the view direction hold to
+2 × 10⁻¹⁶ across every elevation and roll, so `lookAt` never degenerates.
+
+`bd_V_Kolam3D_002` now carries all four of the day's controls in marked form,
+with `cam_roll_speed 3`: a little over half a turn across the minute the flight
+takes.
+
+**One caveat carried forward from `ThreeJS_and_VR_2026-09-28.md` §5b, and it is
+now squared.** A roll about the view axis is the motion a headset tolerates
+least — the vestibular system has no matching signal for it, where a yaw at
+least resembles turning your head. §5b already warns that a slow fly-through is
+the most reliably nausea-inducing motion in VR. A fly-through that also rolls is
+that warning twice. On a flat screen it is simply a good effect; the headset
+question is now two measurements rather than one.
+
+
 ---
 
 ## 2026-10-14 — the collage PLAYS, and the voice stops tripping over itself
