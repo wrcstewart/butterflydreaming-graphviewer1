@@ -692,9 +692,102 @@ content**, and together they say something sharper than either alone:
 
 **What this does NOT rescue:** the comfort cost of the fly-through (§5b, and
 §5e.1 above — it fills the field whichever matrix moves), and line weight (§6),
-which stereo makes WORSE rather than better, since a 1px line has to be fused
-between two eyes and a hairline that flickers in one eye is a hairline that
-fails to fuse.
+which stereo makes WORSE rather than better, since a stroke has to be FUSED
+between two eyes and an aliased hairline in one eye is a hairline that fails to
+fuse. See §5f — my "1px line" was wrong about the default, and the correction
+makes the gap bigger.
+
+---
+
+## 5f. The weight default is 1.5, and the 3D module cannot deliver it (2026-10-15)
+
+The author: *"the default line weight is 1.5 I think."* **Right, and I had been
+saying "a 1px line" throughout §5e and §8e.** CHECKED in both modules:
+
+| | where | value |
+|---|---|---|
+| 2D `V_Kolam` | `#weight-slider`, and the `safeParseNumber` fallback in two places | **1.5**, range 0.5–5 |
+| 3D `V_Kolam3D` | read into `params.weight` with the same 1.5 fallback, then `material.linewidth = params.weight` | **set, and ignored** |
+| stored scripts | `MATCH (n) WHERE n.text CONTAINS 'bd_weight'` | **none** — every figure runs on the default |
+
+**The correction makes the problem larger, not smaller.** The intended stroke is
+1.5 CSS px. Core WebGL ignores `gl.lineWidth` above 1.0 on every platform that
+matters, so the 3D figure draws at exactly **one DEVICE pixel** — and
+`setPixelRatio(Math.min(devicePixelRatio, 2))` means that is **0.5 CSS px on a
+retina phone**. So:
+
+> **The 3D module has been drawing its figures at a THIRD of the intended stroke
+> weight, and a quarter of what the 2D module shows on the same phone.** Nobody
+> noticed because the 3D figure has only ever been judged on its own terms, never
+> side by side with the 2D one at the same `weight`. The module's own comment
+> says `linewidth` "does nothing on the machines this will actually run on" —
+> true, and it does not say what that costs, which is three fifths of the ink.
+
+**And for the headset the sign flips from what §8e's rule would suggest.** At
+~25 PPD one device pixel subtends **2.4 arcminutes** on a Quest 3, against ~0.63
+on a phone at ~95 PPD. A hairline is therefore ANGULARLY LARGER in the headset —
+consistent with §8c's rule that a 1px line gets worse as hardware improves, read
+in the direction nobody reads it in. So **visibility is not the headset's
+problem here**; 2.4 arcmin is well above the eye's ~1 arcmin limit. The problems
+are the two §5e.2 names:
+
+- **Aliasing**: a stroke thinner than the pixel grid samples unevenly and
+  crawls, and the figure is eight overlapping copies of it.
+- **Binocular fusion**: an aliased hairline in each eye is two different aliased
+  hairlines, which is harder to fuse than one clean 2px stroke. **This is the
+  one place where stereo makes BD's figure worse rather than better**, and it
+  sits directly against §5e.2's conclusion — so the two have to be measured
+  together, which is what §9 now says.
+
+**The fix is the one §6 already names** — `Line2` / `LineMaterial` from three's
+`examples/jsm`, which draw strokes as geometry and would honour 1.5 exactly.
+What is new here is the SIZE of the prize: it is not only "VR will want it", it
+is that the flat 3D module is already three fifths short of its own default.
+
+---
+
+## 5g. Sequential 3D text — the limit §8e found is on SIMULTANEOUS text (2026-10-15)
+
+The author: *"as for the text… true, but sequential presentation of shorter rich
+3D text is something we might explore later."*
+
+**This dissolves §8e's text objection rather than disputing it, and the reason
+is worth stating precisely: ~18 characters a line is a limit on how much text
+can be on screen AT ONCE.** It says nothing about how much text can be read. A
+phrase at a time — three to six words — fits inside the headset-safe measure
+with room over, and sequential presentation of short rich text is a recognised
+form for exactly the contemplative register BD works in, not a compromise.
+
+**And BD already has the sequencer.** `splitUtterances(text, { verse, maxLen })`
+in `viewer.js` splits prose into speech chunks. So:
+
+> **The speech chunker IS the text sequencer.** One mechanism, two outputs — and
+> they would be in step BY CONSTRUCTION, because the phrase on screen is the
+> phrase being spoken. Nothing has to be kept in sync, which is the usual cost of
+> a two-channel presentation.
+
+Its `maxLen` is 150 and is a LATENCY budget, not a display measure (see
+`feedback_speech_serialising_and_staleness`), so the display wants its own
+smaller bound rather than that one — but the splitting, the verse handling and
+the punctuation rules are all there.
+
+**This is the same module the author sketched on 2026-10-08** — "lines one at a
+time, in 3D, on a programmable interval" — now with a second reason to exist.
+That sketch is already recorded as **the first thing that NEEDS the shared
+scene** (§7), because under the iframe option the text gets its own canvas and
+is composited with the figure by CSS rather than by a depth buffer. So this is
+not a new item; it is the headset case for an item already on the list, and it
+strengthens the "make it a MODE inside `V_Kolam3D`" resolution of §7.
+
+### One trap to check before building it
+
+**Text occluded by the figure needs depth writing, and `applyOpacity` turns
+depth writing OFF whenever opacity < 1** — which is exactly what a collage does,
+at the 0.45 the author settled on. Occlusion is the ONE thing text in a scene
+offers over a flat DOM overlay, so a collage would lose it precisely where it
+matters. Not a blocker, but it has to be designed for rather than discovered:
+the figure's translucency and the text's depth ordering want the same buffer and
+currently cannot both have it.
 
 ---
 
@@ -1350,6 +1443,8 @@ to come back with is whether 6.8px node labels resolve at all.
 | question | notes |
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
+| **`Line2` — and the prize is bigger than VR (§5f)** | **The 3D module draws at ONE DEVICE PIXEL where the default `weight` is 1.5** — core WebGL ignores `gl.lineWidth` above 1 — so at `devicePixelRatio` 2 it shows 0.5 CSS px, a third of the intent and a quarter of what the 2D module shows on the same phone. No stored script overrides the default, so every figure is affected. `Line2`/`LineMaterial` from `examples/jsm` draw strokes as geometry and would honour it. **Not "VR will want it": the flat module is already three fifths short of its own default.** |
+| **Sequential 3D text (§5g)** | §8e's ~18-character line is a limit on SIMULTANEOUS text, so a phrase at a time sidesteps it entirely — and `splitUtterances` already does the splitting, which makes **the speech chunker the text sequencer**, in step by construction because the phrase on screen is the phrase being spoken. Same module as the 2026-10-08 sketch; strengthens §7's "make it a MODE inside `V_Kolam3D`". **Trap: `applyOpacity` turns `depthWrite` off below opacity 1, so a collage at 0.45 loses the occlusion that is the only reason to put text in the scene at all.** |
 | **DOES STEREO MAKE THE FIGURE LEGIBLE? (§5e)** | **The strongest pro-headset item in this table, and it needs measuring first.** BD's figure has almost no monocular depth cues BY DESIGN — no shading, no ground plane, and `depthWrite: false` at opacity < 1 removes occlusion too — so on a flat screen it is an ambiguous line drawing and binocular disparity is the cue that would resolve it. Against which: a 1px line must FUSE between two eyes, and a hairline that flickers in one eye is a hairline that fails to fuse (§6). **So this item and the `weight` item are the same measurement** and should be made in one sitting on real hardware. |
 | **Is there a STATIC REFERENCE in the field? (§5d)** | The real comfort control, and it is a CONTENT decision rather than an architectural one. With nothing but the figure on black, "the viewer moved" and "the figure moved" are the same experience and carry the same cost; a floor, a horizon, or simply not filling the field makes the motion read as the object's. **It is also the dial between the transformative illusion the author wants and the comfort a headset needs** — they pull opposite ways, so it has to be chosen per piece. Nothing built; `%%bd_background` is the only thing in the field today. |
 | **Do the world-transform refactor NOW? (§5c)** | **The one item on this list that needs no headset.** Re-express `cam_azimuth`/`cam_elevation`/`cam_roll`/`cam_distance` as a transform on a root group above `group`, fix the camera, and the flat and immersive paths become one code path — verifiable to the pixel on a flat screen, because camera-roll and content-counter-roll of one rigid figure are identical. Decide the PIVOT explicitly (§5c). Not started. |
