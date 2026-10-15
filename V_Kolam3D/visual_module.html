@@ -1119,6 +1119,11 @@
     let camDistanceWritten = null;  // the integer this module last put in the script
     let camRollExact       = null;  // null = follow the slider
     let camRollWritten     = null;  // the integer this module last put in the script
+    // Latched, because `arrived` is true on EVERY tick once the distance is
+    // pinned. While the arrival also stopped the clock that did not matter;
+    // the moment the roll could keep the clock running it became the
+    // difference between saying so once and saying so twenty times a second.
+    let camDistanceArrived = false;
 
     const setStatus = (msg) => { statusEl.textContent = msg; };
 
@@ -2138,6 +2143,7 @@
         }
         camDistanceExact  = clampCam(safeParseNumber(camDistanceSlider.value, 260));
         camRollExact      = wrapAngle(safeParseNumber(camRollSlider.value, 0));
+        camDistanceArrived = false;
         camSpinLastWrite  = Date.now();
         camSpinNextDue    = Date.now() + CAM_SPIN_MS;
         camSpinTimer      = setTimeout(camSpinTick, CAM_SPIN_MS);
@@ -2232,21 +2238,27 @@
         }
       }
 
-      // ── ARRIVED: STOP THE CLOCK ────────────────────────────────────────
-      // Twenty redraws a second for a camera that has stopped moving is a real
-      // cost on a battery, and this is a module meant to run for a long time.
-      // Only when NEITHER ANGLE is turning — the elevation and the roll both
-      // have every right to keep the clock, and a roll continuing after the
-      // flight has arrived is a perfectly good piece. Flipping the sign of the
-      // speed is a control change, so manageCamSpin starts it again; nothing is
-      // stuck.
-      if (arrived && !(speed > 0) && !rSpeed) {
+      // ── ARRIVED ────────────────────────────────────────────────────────
+      //
+      // TWO DECISIONS, NOT ONE — and writing them as one was a bug within the
+      // hour. "The travel has finished, say so and tidy up" and "nothing is
+      // moving, so stop the clock" were a single `if` until cam_roll_speed
+      // became a third rider; after that a roll running at the moment of
+      // arrival skipped BOTH, and the author would have flown to the throat
+      // and never been told. Asked as "but will the cam distance still
+      // change?" — it did, and the answer was still a bug.
+      //
+      // The general shape: a condition that happens to be sufficient for two
+      // conclusions is still only ONE of their reasons, and the next
+      // participant separates them whether you do or not.
+      if (arrived && !camDistanceArrived) {
+        camDistanceArrived = true;
         const end = clampCam(Math.round(camDistanceExact));
         console.log('[module3d] cam_distance has reached ' + end +
                     ' and the travel has stopped — reverse the sign of ' +
                     'cam_distance_speed to come back');
         // HANDED BACK HERE, NOT BY CALLING manageCamSpin. That function's first
-        // test is "is either speed zero" — and the distance speed is still set,
+        // test is "is every speed zero" — and the distance speed is still set,
         // the traveller having merely run out of road — so it would fall
         // through to its restart branch and the clock would never stop. A
         // tempting one-line reuse that is an infinite loop.
@@ -2261,6 +2273,25 @@
             try { announce(); } finally { renderingFromDrift = false; }
           }
         }
+        updateValueDisplays();
+      } else if (!arrived) {
+        // It is travelling again — the sign was flipped — so the next arrival
+        // is a new one and deserves saying.
+        camDistanceArrived = false;
+      }
+
+      // ── STOP THE CLOCK, if nothing at all is moving ─────────────────────
+      // Twenty redraws a second for a camera that has stopped moving is a real
+      // cost on a battery, and this is a module meant to run for a long time.
+      // Only when NEITHER ANGLE is turning — the elevation and the roll both
+      // have every right to keep it, and a roll continuing after the flight has
+      // arrived is a perfectly good piece. Flipping the sign of a speed is a
+      // control change, so manageCamSpin starts it again; nothing is stuck.
+      //
+      // camDistanceExact is dropped HERE and not on arrival: while the clock
+      // runs it is the authority placeCamera draws from, so a roll carrying on
+      // after the flight has finished still needs it.
+      if (arrived && !(speed > 0) && !rSpeed) {
         camDistanceExact = null;
         camSpinTimer = null;
         updateValueDisplays();
