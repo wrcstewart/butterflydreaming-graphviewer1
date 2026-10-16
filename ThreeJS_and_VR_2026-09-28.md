@@ -874,9 +874,19 @@ WebXR spec. None of it is measured on hardware.**
 space type — three defaults to `'local-floor'`, settable with
 `renderer.xr.setReferenceSpaceType()`. For `local-floor` the origin is on the
 physical floor at the user's starting place, +Y up, and it stays pinned to the
-room. **So the identity to hold on to is: scene world coordinates ARE the
-reference space, which IS the room.** That single sentence is why §5d's
-static-reference argument and §5e's head-motion argument both work.
+room. ~~**So the identity to hold on to is: scene world coordinates ARE the reference
+space, which IS the room.**~~ **TOO STRONG, and it contradicts point 5 below —
+the author caught it. That identity holds only in the DEFAULT case, where the
+camera has no parent.** The accurate statement, and the one §5j unpacks:
+
+> The reference space is the ROOM's frame, in metres. World coordinates are the
+> SCENE's frame, in whatever units the script uses. **`camera.parent` is the map
+> between them.** With no parent the two frames coincide — which is the default,
+> and is why it is tempting to call them the same thing.
+
+What survives unchanged is the point §5d and §5e rest on: the reference space is
+**pinned to physical space**, so whatever is still in it is still relative to the
+viewer's own body.
 
 **2. Each frame the runtime hands over a pose, not a request for one.**
 `XRFrame.getViewerPose(referenceSpace)` returns the head's transform in that
@@ -971,6 +981,78 @@ lean to figure size — carries the same factor. What it is NOT free of is
 This is §3b's "scale directive — table, room or building" and it stops being a
 design question the moment a session opens. **Decide it before the first
 session, or the first session shows black.**
+
+---
+
+## 5j. Three frames, and where the Kolam sits in them (2026-10-16)
+
+The author, on §5i: *"You said scene world coordinates = the reference space =
+the room. But you also say camera.parent is where your room is standing in the
+virtual world. I'm confused — how is the object, i.e. the Kolam structure,
+coordinated?"*
+
+**Both statements cannot be true, and the first was the loose one.** §5i is
+corrected. Here is the whole thing with nothing collapsed.
+
+### The ground-plan picture
+
+Think of **world coordinates as the ground plan of a building** — a drawing with
+an origin, axes, and its own units. Two things are drawn on that plan:
+
+1. **The Kolam**, at some place and size. Today: centred on the origin, spanning
+   hundreds of units. **This does not change. At all.** It is `group` in the
+   scene, exactly as it is now.
+2. **The viewer's plate** — the movable floor the person stands on, at some
+   place, angle and size. That is `camera.parent`.
+
+The headset's job is to say **where on the plate** the head is. Composing the
+two gives where the head is on the plan:
+
+```
+head on the plate   (the runtime's, in metres, pinned to the real room)
+plate on the plan   (YOURS — camera.parent)
+--------------------------------------------
+head on the plan    → and the Kolam is also on the plan, so now they relate
+```
+
+### So, answering the question directly
+
+**The Kolam is coordinated exactly as it is today: in world coordinates, by
+`group`'s own transform.** Nothing about the figure's placement needs to change
+to enter VR. What is NEW is that the VIEWER also acquires a placement, where
+today the camera is a free-floating eye with coordinates written straight into
+it (`camera.parent` is `null` — the module never adds the camera to the scene).
+
+**On a monitor nobody is standing anywhere, so no plate is needed. In a headset
+somebody is, so they need one — and the plate is the thing the script is allowed
+to move.**
+
+### Why §5i's loose sentence was tempting, and why it is the trap
+
+With no parent, the plate is drawn at the plan's origin, axis-aligned, at 1:1.
+Then "where you are on the plate" and "where you are on the plan" are the SAME
+NUMBERS, and the two frames look like one thing. That is the default.
+
+**And the default is precisely the case that shows you black** — because the
+plan's units are not metres, and the Kolam is drawn hundreds of units across
+(§5i). So the first session with no plate placement puts your room's origin at
+the figure's centre, at 1 unit to the metre, with the figure kilometres wide
+around you. Which is why the scale question is the first one and not a
+refinement.
+
+### Two ways to get the figure in front of you — and they are the eye/object choice again
+
+| | the plate | the Kolam | port cost | feel |
+|---|---|---|---|---|
+| **A — carry the viewer** | placed 600 units out along the strand's axis, facing down it, scaled | left exactly where it is | **cheap** — `placeCamera` already computes this pose; only the destination changes (§5i) | you are carried in; flying slides the plate |
+| **B — place the object** | left at the plan's origin, 1:1 with your room | moved and scaled so it sits a few metres in front of you | more rework — the pose maths inverts | the figure stands in your room; flying brings it to you |
+
+They give the same relative geometry. **B keeps your own movements human-scale
+and your room at 1:1, which is easier to reason about and is the comfortable
+one (§5d/§5e); A is the cheaper port, being what the existing maths already
+produces.** This is the §5c/§5d eye-or-object decision arriving in a concrete
+form — and it is the decision §5h says to defer until after the first
+measurements, which is still the recommendation.
 
 ---
 
