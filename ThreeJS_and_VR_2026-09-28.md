@@ -1056,6 +1056,135 @@ measurements, which is still the recommendation.
 
 ---
 
+## 5k. The frames drawn, in 2-D, with numbers (2026-10-16)
+
+Reduced as the author asked: positions are `x, y`, heading is one angle `theta`,
+and the Kolam is a 1-D strip. Everything below is arithmetic that has been run,
+not sketched.
+
+### There are FOUR frames and THREE mappings, and the PLAN is where they meet
+
+```
+    head  ───── the runtime ─────▶  PLATE ──┐
+          (metres, pinned to the real room)  │ camera.parent
+                                             ├──▶  THE PLAN
+    strip ───────────────────────────────────┘      (world coords,
+          group.matrix                               script units)
+```
+
+So the plan is not one of the frames competing to be "the room" — **it is the
+meeting place.** The head knows where it is on the plate; the plate knows where
+it is on the plan; the strip knows where it is on the plan. That is how a head
+and a figure come to have a distance between them.
+
+### The two mappings, written out
+
+```
+  PLATE ──▶ PLAN        a rigid transform plus one scale
+
+      X = Xp + s·( x·cos(theta_p) − y·sin(theta_p) )
+      Y = Yp + s·( x·sin(theta_p) + y·cos(theta_p) )
+  Theta =      theta_p + theta_h
+
+      (x, y, theta_h)        HEAD ON THE PLATE   ← the runtime's, in METRES
+      (Xp, Yp, theta_p, s)   PLATE ON THE PLAN   ← YOURS: camera.parent
+      (X, Y, Theta)          HEAD ON THE PLAN    ← the composition
+
+  STRIP ──▶ PLAN        group.matrix
+      TODAY THIS IS EFFECTIVELY THE IDENTITY. The strip is already written
+      in plan coordinates, which is exactly why nothing about the figure
+      has to change to enter VR.
+```
+
+### Option A — carry the viewer. Plate placed, strip untouched
+
+```
+  THE PLAN                 strip (0,0)→(0,400)   ·   plan units
+  Y
+  ▲
+  │     ╔══════════════════════════════════╗
+  │     ║  THE PLATE   camera.parent       ║     Xp     =   0
+650 ─   ║  (your real room, in metres)     ║     Yp     = 600
+  │     ║                                  ║     theta_p= 180°
+600 ─   ║         (*)──▶  head             ║     s      = 100 units/m
+  │     ║      plate (0,0), theta_h = 90°  ║
+550 ─   ║                                  ║   the plate is 100× the
+  │     ╚══════════════════════════════════╝   room, and upside down
+  │                     │                      on the plan (180°)
+  │                     │  2 m of air
+400 ─        ▲ far end ─┘
+  │          █
+  │          █   THE KOLAM — a 1-D strip
+200 ─        █   400 plan units long
+  │          █   ( = 4 m once the plate's scale is read back)
+  │          █
+  0 ─        ▼ near end  ────────────────────────────────▶ X
+             0
+```
+
+| what happens | head on the plate | head on the PLAN | who did it |
+|---|---|---|---|
+| start | `(0, 0)`, θ 90° | **`(0, 600)`, 270°** — 2 m back from the mouth, facing it | — |
+| step 0.5 m forward | `(0, 0.5)`, θ 90° | **`(0, 550)`, 270°** — moved **50 plan units** | **you, physically** |
+| turn head 30° left | `(0, 0)`, θ 120° | **`(0, 600)`, 300°** — same place, new bearing | **you, physically** |
+| the flight: `Yp` 600→400 | `(0, 0)`, θ 90° | **`(0, 400)`, 270°** — arrived at the mouth | **the script** |
+
+Note the last two rows. **Turning your head changed `Theta` and nothing else —
+the script was not consulted.** And the flight changed the PLATE, so your room
+arrived somewhere new without you walking. That is the "being carried" of §5d,
+in one row of a table.
+
+### Option B — place the object. Plate left alone, strip moved
+
+```
+  THE PLAN                 plate at the origin, 1:1   ·   plan units = METRES
+  Y
+  ▲
+  6 ─        ▲ far end
+  │          █
+  │          █   THE KOLAM — the SAME strip, now
+  4 ─        █   mapped by group.matrix: scale 1/100,
+  │          █   then translate +2 in y
+  2 ─        ▼ near end            →  (0,2) … (0,6)
+  │
+  │       ╔═════════════════════════╗        Xp = 0   Yp = 0
+0.5 ─     ║ (*)──▶ after a 0.5 m    ║        theta_p = 0°
+  │       ║        step             ║        s = 1
+  0 ─     ║ (*)──▶ head  (0,0) θ90° ║   the plate and the plan
+  │       ╚═════════════════════════╝   are the same numbers
+  │                                      — §5i's "default" case
+  ─────────────────────────────────────────────────────────▶ X
+            0
+```
+
+| what happens | head on the plate | head on the PLAN | who did it |
+|---|---|---|---|
+| start | `(0, 0)`, θ 90° | **`(0, 0)`, 90°** — identical numbers, because `s`=1 and `theta_p`=0 | — |
+| step 0.5 m forward | `(0, 0.5)`, θ 90° | **`(0, 0.5)`, 90°** — moved **0.5 plan units** | **you, physically** |
+| the flight | unchanged | the STRIP's translate goes `+2 → 0`, bringing the mouth to you | **the script** |
+
+### And the two are the same picture — the ratios, computed
+
+A 0.5 m step is **50 plan units in A and 0.5 in B**, which looks like a huge
+difference and is not one, because the strip is 400 units in A and 4 in B. Only
+ratios reach the eye:
+
+| | strip length | gap ÷ length | step ÷ length | eye separation ÷ length |
+|---|---|---|---|---|
+| **A** carry the viewer | 400 units | 0.5000 | 0.1250 | 0.01600 |
+| **B** place the object | 4 units | 0.5000 | 0.1250 | 0.01600 |
+
+**Identical to every digit.** Which settles two things that had been asserted
+rather than shown: the scale factor can sit on either side (§5i), and the
+stereo percept is the same either way — the eye separation is 0.064 m on the
+plate in both cases, and it lands at the same fraction of the figure.
+
+**So the choice between A and B is NOT about geometry. It is about who is moved
+when the script moves something** — and that is §5d/§5e's question, which only
+the body can answer.
+
+---
+
 ## 6. Line weight, and why VR forces the issue
 
 Current position, as of RULE 9:
