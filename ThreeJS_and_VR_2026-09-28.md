@@ -1058,6 +1058,17 @@ measurements, which is still the recommendation.
 
 ## 5k. The frames drawn, in 2-D, with numbers (2026-10-16)
 
+> **A DRAWN VERSION OF THIS SECTION IS SERVED AT `/plate`.** Same frames, same
+> numbers, with three sliders — step forward on the plate, turn your head, run
+> the flight — and a toggle between the two options. The drawing does not change
+> when you toggle; only the legend, the axis direction and the numbers do, which
+> is the finding below made visible. Monospace is a poor instrument for geometry
+> and the figures below are the proof of it.
+>
+> It is a route in `server.js` rather than a hosted artifact, because an artifact
+> is private to the account that published it and that need not be the account
+> the reader's browser is signed in to. Same reasoning as `/x` and `/qr`.
+
 Reduced as the author asked: positions are `x, y`, heading is one angle `theta`,
 and the Kolam is a 1-D strip. Everything below is arithmetic that has been run,
 not sketched.

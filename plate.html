@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  THE PLATE AND THE PLAN — /plate, 2026-10-16.
+
+  A 2-D reduction of the four coordinate frames a headset introduces, drawn
+  because the monospace version in ThreeJS_and_VR_2026-09-28.md §5k is a poor
+  way to show geometry. The author asked for a diagram; this is the diagram.
+
+  WHY IT LIVES HERE rather than as a hosted artifact: an artifact is private to
+  the account that published it, and the CLI session's account was not the one
+  the author's browser was signed in to. Served from BD's own express it needs
+  no account at all — the same reason /x and /qr are routes here. An explicit
+  route, not express.static's `extensions` option, for the reason stated at /x.
+
+  THE ONE THING IT IS NOT: a simulation of the module. Nothing here touches
+  V_Kolam3D. It is a drawing with arithmetic in it, and every number on the page
+  is computed from the two sliders rather than written down.
+
+  REDUCED COLOUR VISION — the author's. So each of the three elements carries a
+  non-colour cue as well as a hue: the plate is DOUBLE-RULED, the strip is
+  CROSS-TICKED, and the head is a disc with a direction wedge. Hue is never the
+  only thing separating them.
+-->
+<title>The Plate and the Plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
+<style>
+  /* ── tokens: complete light palette on bare :root ─────────────────────── */
+  :root {
+    --paper:      #e9edef;   /* cool drafting paper, blue-biased neutral */
+    --paper-2:    #f3f6f7;
+    --ink:        #16202a;
+    --ink-soft:   #4d6373;
+    --ink-faint:  #8aa0ad;
+    --rule:       #c2d0d7;
+    --rule-soft:  #d8e2e7;
+    --blue:       #1f5c8b;   /* the mappings */
+    --gold:       #7d6b00;   /* THE PLATE — BD's own local-mark gold, darkened for contrast */
+    --gold-fill:  #8d790016;
+    --violet:     #5c3496;   /* THE KOLAM strip */
+    --violet-fill:#5c349614;
+    --shadow:     0 1px 0 #ffffff80, 0 1px 3px #16202a1a;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+    --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #101619;
+      --paper-2:    #182126;
+      --ink:        #dfe7ea;
+      --ink-soft:   #93a9b4;
+      --ink-faint:  #5e7480;
+      --rule:       #2b3a42;
+      --rule-soft:  #222e34;
+      --blue:       #74b0dd;
+      --gold:       #cdb034;
+      --gold-fill:  #cdb03418;
+      --violet:     #b093e8;
+      --violet-fill:#b093e816;
+      --shadow:     0 1px 0 #ffffff0a, 0 1px 3px #00000055;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #101619;
+    --paper-2:    #182126;
+    --ink:        #dfe7ea;
+    --ink-soft:   #93a9b4;
+    --ink-faint:  #5e7480;
+    --rule:       #2b3a42;
+    --rule-soft:  #222e34;
+    --blue:       #74b0dd;
+    --gold:       #cdb034;
+    --gold-fill:  #cdb03418;
+    --violet:     #b093e8;
+    --violet-fill:#b093e816;
+    --shadow:     0 1px 0 #ffffff0a, 0 1px 3px #00000055;
+  }
+
+  /* The artifact host supplied a reset; served from BD it must carry its own. */
+  * { box-sizing: border-box; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.6 var(--sans);
+    margin: 0;
+    padding: 30px 22px 72px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+
+  /* ── masthead ─────────────────────────────────────────────────────────── */
+  header { display: flex; flex-direction: column; gap: 9px; }
+  .eyebrow {
+    font: 600 11px/1 var(--cond); letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  h1 {
+    font: 600 clamp(26px, 4.4vw, 38px)/1.1 var(--sans);
+    letter-spacing: -.018em; margin: 0; text-wrap: balance;
+  }
+  .stand { color: var(--ink-soft); max-width: 63ch; margin: 0; }
+  .stand b { color: var(--ink); font-weight: 600; }
+
+  /* ── the chain of frames ──────────────────────────────────────────────── */
+  .chain {
+    display: grid; gap: 0;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    border: 1px solid var(--rule); background: var(--paper-2);
+  }
+  .node { padding: 14px 16px; border-right: 1px solid var(--rule-soft); }
+  .node:last-child { border-right: 0; }
+  .node .who {
+    font: 600 10px/1 var(--cond); letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); display: block; margin-bottom: 5px;
+  }
+  .node .name { font: 600 15px/1.25 var(--sans); }
+  .node .unit { font: 400 12.5px/1.45 var(--mono); color: var(--ink-soft); margin-top: 4px; }
+  .node.owned-you { box-shadow: inset 3px 0 0 var(--blue); }
+  .node .arrowlabel {
+    font: 400 11.5px/1.3 var(--mono); color: var(--blue); margin-top: 7px;
+    display: block; word-break: break-word;
+  }
+
+  /* ── the figure ───────────────────────────────────────────────────────── */
+  .figure {
+    display: grid; gap: 0;
+    grid-template-columns: minmax(300px, 1.08fr) minmax(290px, 1fr);
+    border: 1px solid var(--rule); background: var(--paper-2);
+  }
+  @media (max-width: 760px) { .figure { grid-template-columns: 1fr; } }
+  .plate-stage { border-right: 1px solid var(--rule-soft); padding: 8px; min-width: 0; }
+  @media (max-width: 760px) { .plate-stage { border-right: 0; border-bottom: 1px solid var(--rule-soft); } }
+  svg { display: block; width: 100%; height: auto; }
+  .panel { padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+  /* toggle */
+  .toggle { display: flex; border: 1px solid var(--rule); background: var(--paper); }
+  .toggle button {
+    flex: 1; appearance: none; border: 0; background: transparent; cursor: pointer;
+    padding: 9px 8px 10px; color: var(--ink-soft);
+    font: 600 12px/1.3 var(--cond); letter-spacing: .09em; text-transform: uppercase;
+    border-right: 1px solid var(--rule);
+  }
+  .toggle button:last-child { border-right: 0; }
+  .toggle button[aria-pressed="true"] {
+    background: var(--ink); color: var(--paper);
+  }
+  .toggle button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .whomoves { font-size: 13.5px; color: var(--ink-soft); margin: -8px 0 0; }
+  .whomoves b { color: var(--ink); font-weight: 600; }
+
+  /* controls */
+  .controls { display: flex; flex-direction: column; gap: 13px; }
+  .ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; }
+  .ctl label {
+    font: 600 10.5px/1 var(--cond); letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .ctl output { font: 500 13px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .ctl .agent { font: 400 11px/1 var(--cond); letter-spacing: .1em; text-transform: uppercase; }
+  .ctl input[type=range] { grid-column: 1 / -1; width: 100%; margin: 3px 0 0; accent-color: var(--blue); }
+  .ctl input[type=range]:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+  /* readout */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  caption {
+    text-align: left; font: 600 10.5px/1 var(--cond); letter-spacing: .13em;
+    text-transform: uppercase; color: var(--ink-faint); padding-bottom: 7px;
+  }
+  th, td { text-align: left; padding: 5px 8px 5px 0; border-bottom: 1px solid var(--rule-soft); }
+  th { font-weight: 500; color: var(--ink-soft); }
+  td.num { font: 500 13px/1.4 var(--mono); font-variant-numeric: tabular-nums; text-align: right; padding-right: 0; }
+  tr:last-child th, tr:last-child td { border-bottom: 0; }
+
+  /* ── maths + invariance ───────────────────────────────────────────────── */
+  .two { display: grid; gap: 22px; grid-template-columns: 1fr 1fr; align-items: start; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  section > h2 {
+    font: 600 11px/1 var(--cond); letter-spacing: .15em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 11px;
+  }
+  pre {
+    margin: 0; padding: 15px 16px; overflow-x: auto;
+    background: var(--paper-2); border: 1px solid var(--rule);
+    font: 400 12.5px/1.75 var(--mono); color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  pre b { color: var(--blue); font-weight: 500; }
+  pre i { color: var(--ink-faint); font-style: normal; }
+  .inv { border: 1px solid var(--rule); background: var(--paper-2); padding: 15px 16px; }
+  .inv table { font-size: 13px; }
+  .inv td.num { font-size: 13.5px; }
+  .verdict {
+    margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--rule);
+    font-size: 13.5px; color: var(--ink-soft);
+  }
+  .verdict b { color: var(--ink); font-weight: 600; }
+  footer { font-size: 13px; color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 16px; }
+  footer code { font: 400 12.5px/1 var(--mono); color: var(--ink-soft); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">V_Kolam3D · WebXR · ThreeJS_and_VR §5i–§5k</span>
+  <h1>The Plate and the Plan</h1>
+  <p class="stand">Reduced to two dimensions: positions are <span style="font-family:var(--mono)">x,&nbsp;y</span>,
+  heading is one angle, and the Kolam is a one-dimensional strip. The question it answers is
+  <b>where the figure sits once a headset owns the camera</b> — and the answer is that it sits
+  exactly where it sits today. What is new is that <b>the viewer</b> acquires a placement.</p>
+</header>
+
+<!-- ── the chain: four frames, three mappings ──────────────────────────── -->
+<div class="chain">
+  <div class="node">
+    <span class="who">the runtime's</span>
+    <span class="name">The head</span>
+    <span class="unit">x, y, θ<sub>h</sub></span>
+    <span class="arrowlabel">↓ tracked, in metres</span>
+  </div>
+  <div class="node">
+    <span class="who">the runtime's</span>
+    <span class="name">The plate</span>
+    <span class="unit">your real room<br>reference space</span>
+    <span class="arrowlabel">↓ camera.parent &nbsp;← yours</span>
+  </div>
+  <div class="node owned-you">
+    <span class="who">yours · the meeting place</span>
+    <span class="name">The plan</span>
+    <span class="unit">world coordinates<br>script units</span>
+    <span class="arrowlabel">↑ group.matrix &nbsp;← yours</span>
+  </div>
+  <div class="node">
+    <span class="who">yours</span>
+    <span class="name">The strip</span>
+    <span class="unit">the Kolam</span>
+    <span class="arrowlabel">today: effectively the identity</span>
+  </div>
+</div>
+
+<!-- ── the figure ──────────────────────────────────────────────────────── -->
+<div class="figure">
+  <div class="plate-stage">
+    <svg viewBox="0 0 400 430" role="img" aria-labelledby="figtitle figdesc">
+      <title id="figtitle">Plan view: the plate carrying the head, and the Kolam strip ahead of it</title>
+      <desc id="figdesc">A vertical strip representing the Kolam, with a rectangular plate below
+      it holding a circular head marker that points along the strip's axis.</desc>
+
+      <!-- faint plan grid -->
+      <g stroke="var(--rule-soft)" stroke-width="1" fill="none">
+        <path d="M60 30 V400 M110 30 V400 M160 30 V400 M210 30 V400 M260 30 V400 M310 30 V400 M360 30 V400"/>
+        <path d="M0 60 H400 M0 110 H400 M0 160 H400 M0 210 H400 M0 260 H400 M0 310 H400 M0 360 H400"/>
+      </g>
+
+      <!-- Y axis, direction set per option -->
+      <g id="axis">
+        <line x1="34" y1="34" x2="34" y2="400" stroke="var(--ink-faint)" stroke-width="1.25"/>
+        <polygon id="axisArrow" points="34,26 30,38 38,38" fill="var(--ink-faint)"/>
+        <text id="axisName" x="22" y="22" fill="var(--ink-faint)"
+              font-family="var(--mono)" font-size="12">Y</text>
+        <g id="axisTicks" fill="var(--ink-faint)" font-family="var(--mono)" font-size="11"
+           text-anchor="end" style="font-variant-numeric:tabular-nums"></g>
+      </g>
+
+      <!-- THE KOLAM STRIP — violet, and cross-ticked so hue is never the only cue -->
+      <g id="stripG">
+        <rect id="stripBar" x="194" y="60" width="16" height="160"
+              fill="var(--violet-fill)" stroke="var(--violet)" stroke-width="1.5"/>
+        <g id="stripTicks" stroke="var(--violet)" stroke-width="1.5"></g>
+        <line id="stripAxis" x1="202" y1="60" x2="202" y2="220"
+              stroke="var(--violet)" stroke-width="1" stroke-dasharray="3 4"/>
+        <text id="farLbl" x="220" y="64" fill="var(--violet)"
+              font-family="var(--cond)" font-size="12" font-weight="600">far end</text>
+        <text id="nearLbl" x="220" y="224" fill="var(--violet)"
+              font-family="var(--cond)" font-size="12" font-weight="600">near end · the mouth</text>
+        <text id="stripLbl" x="166" y="140" fill="var(--violet)" text-anchor="end"
+              font-family="var(--cond)" font-size="13" font-weight="600">THE KOLAM</text>
+        <text id="stripLen" x="166" y="156" fill="var(--ink-soft)" text-anchor="end"
+              font-family="var(--mono)" font-size="11">L = 400 units</text>
+      </g>
+
+      <!-- the gap, dimensioned the way a plan dimensions one -->
+      <g id="gapG" stroke="var(--ink-faint)" fill="var(--ink-faint)">
+        <line id="gapLine" x1="252" y1="220" x2="252" y2="300" stroke-width="1"/>
+        <line id="gapT1" x1="246" y1="220" x2="258" y2="220" stroke-width="1"/>
+        <line id="gapT2" x1="246" y1="300" x2="258" y2="300" stroke-width="1"/>
+        <text id="gapLbl" x="264" y="264" font-family="var(--mono)" font-size="11"
+              stroke="none" style="font-variant-numeric:tabular-nums">2.00 m</text>
+      </g>
+
+      <!-- THE PLATE — gold, and DOUBLE-RULED so hue is never the only cue -->
+      <g id="plateG">
+        <rect x="96" y="262" width="212" height="96" fill="var(--gold-fill)"
+              stroke="var(--gold)" stroke-width="1.5"/>
+        <rect x="100" y="266" width="204" height="88" fill="none"
+              stroke="var(--gold)" stroke-width="1" stroke-dasharray="2 3"/>
+        <text x="104" y="281" fill="var(--gold)" font-family="var(--cond)"
+              font-size="12" font-weight="600">THE PLATE · camera.parent</text>
+        <text x="104" y="350" fill="var(--ink-soft)" font-family="var(--mono)" font-size="10.5">
+          <tspan id="plateSpec">Yp 600 · θp 180° · s 100 u/m</tspan>
+        </text>
+      </g>
+
+      <!-- THE HEAD — filled disc plus a direction wedge: shape, not colour -->
+      <g id="headG">
+        <g id="headT" transform="translate(202 300)">
+          <g id="headR">
+            <polygon points="0,-21 8,-4 -8,-4" fill="var(--ink)"/>
+            <circle cx="0" cy="0" r="7.5" fill="var(--ink)"/>
+          </g>
+        </g>
+        <text id="headLbl" x="214" y="318" fill="var(--ink)"
+              font-family="var(--cond)" font-size="12" font-weight="600">head</text>
+      </g>
+
+      <!-- scale bar, drafting convention: the two options differ ONLY here -->
+      <g id="scaleBar">
+        <line x1="34" y1="414" x2="134" y2="414" stroke="var(--ink-soft)" stroke-width="2"/>
+        <line x1="34" y1="409" x2="34" y2="419" stroke="var(--ink-soft)" stroke-width="1"/>
+        <line x1="134" y1="409" x2="134" y2="419" stroke="var(--ink-soft)" stroke-width="1"/>
+        <text id="scaleLbl" x="142" y="418" fill="var(--ink-soft)"
+              font-family="var(--mono)" font-size="11">250 units</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="panel">
+    <div class="toggle" role="group" aria-label="Which thing the script moves">
+      <button id="btnA" aria-pressed="true">A · carry the viewer</button>
+      <button id="btnB" aria-pressed="false">B · place the object</button>
+    </div>
+    <p class="whomoves" id="whoMoves"><b>The script moves the plate.</b> Your room arrives
+      somewhere new without you walking.</p>
+
+    <div class="controls">
+      <div class="ctl">
+        <label for="step">Step forward on the plate</label>
+        <output id="stepOut" class="agent">you, physically</output>
+        <input type="range" id="step" min="0" max="1.5" step="0.05" value="0">
+      </div>
+      <div class="ctl">
+        <label for="turn">Turn your head</label>
+        <output id="turnOut" class="agent">you, physically</output>
+        <input type="range" id="turn" min="-60" max="60" step="1" value="0">
+      </div>
+      <div class="ctl">
+        <label for="fly">The flight</label>
+        <output id="flyOut" class="agent">the script</output>
+        <input type="range" id="fly" min="0" max="1" step="0.01" value="0">
+      </div>
+    </div>
+
+    <table>
+      <caption>Where the head is</caption>
+      <tbody>
+        <tr><th>on the plate <i style="color:var(--ink-faint);font-style:normal">(metres)</i></th>
+            <td class="num" id="onPlate">(0.00, 0.00) θ 90°</td></tr>
+        <tr><th>on the plan <i style="color:var(--ink-faint);font-style:normal">(script units)</i></th>
+            <td class="num" id="onPlan">(0.0, 600.0) Θ 270°</td></tr>
+        <tr><th>to the mouth</th><td class="num" id="toMouth">200.0 units</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── the mapping, with live numbers ──────────────────────────────────── -->
+<div class="two">
+  <section>
+    <h2>Plate → plan · a rigid transform and one scale</h2>
+<pre id="maths">  X = Xp + s·( x·cos θp − y·sin θp )
+  Y = Yp + s·( x·sin θp + y·cos θp )
+  Θ =      θp + θh</pre>
+  </section>
+
+  <section>
+    <h2>The two options are the same drawing</h2>
+    <div class="inv">
+      <table>
+        <thead>
+          <tr><th></th><th class="num" style="text-align:right">A</th>
+              <th class="num" style="text-align:right">B</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>strip length</th><td class="num" id="iLA">400 u</td><td class="num" id="iLB">4 m</td></tr>
+          <tr><th>gap ÷ length</th><td class="num" id="iGA">0.5000</td><td class="num" id="iGB">0.5000</td></tr>
+          <tr><th>step ÷ length</th><td class="num" id="iSA">0.0000</td><td class="num" id="iSB">0.0000</td></tr>
+          <tr><th>eye separation ÷ length</th><td class="num">0.01600</td><td class="num">0.01600</td></tr>
+        </tbody>
+      </table>
+      <p class="verdict">Every ratio that reaches the eye is <b>identical to the last digit</b>, so
+        the drawing above serves both. A 0.5&nbsp;m step is 50 plan units in A and 0.5 in B, which
+        looks like a vast difference and is not one. <b>The choice is not about geometry — it is
+        about who gets moved when the script moves something.</b></p>
+    </div>
+  </section>
+</div>
+
+<footer>
+  Drawn in the <em>relation</em> between head and strip, which is all the eye receives; the legend
+  and the scale bar say which frame the numbers belong to. Eye separation taken as 0.064&nbsp;m.
+  Full working, and what dies with <code>CAM_FOV = 50</code>, in
+  <code>ThreeJS_and_VR_2026-09-28.md</code> §5i–§5k.
+</footer>
+</div>
+
+<script>
+(function () {
+  var L_PX = 160, HEAD_Y = 300, STRIP_X = 194, STRIP_W = 16;
+  var IPD = 0.064, L_M = 4, GAP0_M = 2;          // B's units: the strip is 4 m, 2 m of air
+  var S_A = 100, L_A = L_M * S_A, GAP0_A = GAP0_M * S_A;   // A's units
+
+  var opt = 'A';
+  var el = function (id) { return document.getElementById(id); };
+  var step = el('step'), turn = el('turn'), fly = el('fly');
+
+  function fmt(n, d) {
+    return n.toFixed(d).replace('-0.00', '0.00').replace(/^-0\.0$/, '0.0');
+  }
+
+  function draw() {
+    var s = +step.value, t = +turn.value, f = +fly.value;
+
+    /* The one normalised quantity the picture is built from. Both options give
+       the same number — which is the whole point of the page. */
+    var gapFrac = (GAP0_M - GAP0_M * f - s) / L_M;
+    var gapPx = gapFrac * L_PX;
+
+    /* strip: near end sits gapPx above the head, far end L_PX beyond that */
+    var nearY = HEAD_Y - gapPx, farY = nearY - L_PX;
+    el('stripBar').setAttribute('y', farY);
+    el('stripBar').setAttribute('height', L_PX);
+    el('stripAxis').setAttribute('y1', farY);
+    el('stripAxis').setAttribute('y2', nearY);
+    el('farLbl').setAttribute('y', farY + 4);
+    el('nearLbl').setAttribute('y', nearY + 4);
+    el('stripLbl').setAttribute('y', farY + L_PX / 2);
+    el('stripLen').setAttribute('y', farY + L_PX / 2 + 16);
+
+    /* cross-ticks: a second, non-colour cue for the strip */
+    var ticks = '';
+    for (var i = 1; i < 8; i++) {
+      var y = farY + (L_PX / 8) * i;
+      ticks += '<line x1="' + STRIP_X + '" y1="' + y + '" x2="' + (STRIP_X + STRIP_W) +
+               '" y2="' + y + '" />';
+    }
+    el('stripTicks').innerHTML = ticks;
+
+    /* the head moves ON the plate, so the plate stays put and the marker slides */
+    var headPx = HEAD_Y - (s / L_M) * L_PX;
+    el('headT').setAttribute('transform', 'translate(202 ' + headPx + ')');
+    el('headR').setAttribute('transform', 'rotate(' + (-t) + ')');
+    el('headLbl').setAttribute('y', headPx + 18);
+
+    /* the dimensioned gap, head to mouth */
+    var gTop = Math.min(nearY, headPx), gBot = Math.max(nearY, headPx);
+    el('gapLine').setAttribute('y1', gTop); el('gapLine').setAttribute('y2', gBot);
+    el('gapT1').setAttribute('y1', gTop);   el('gapT1').setAttribute('y2', gTop);
+    el('gapT2').setAttribute('y1', gBot);   el('gapT2').setAttribute('y2', gBot);
+    el('gapLbl').setAttribute('y', (gTop + gBot) / 2 + 4);
+    el('gapG').style.opacity = Math.abs(gBot - gTop) < 16 ? 0 : 1;
+
+    /* ── the numbers, computed per option ───────────────────────────────── */
+    var gapA = GAP0_A - GAP0_A * f - s * S_A;
+    var gapB = GAP0_M - GAP0_M * f - s;
+
+    if (opt === 'A') {
+      /* plate at (0, 600) rotated 180°, 100 units to the metre; strip untouched */
+      var Yp = 600 - GAP0_A * f;
+      var planY = Yp - S_A * s;                 // cos 180° = −1
+      var Theta = (270 + t + 360) % 360;
+      el('onPlan').textContent = '(0.0, ' + fmt(planY, 1) + ') Θ ' + fmt(Theta, 0) + '°';
+      el('toMouth').textContent = fmt(gapA, 1) + ' units';
+      el('gapLbl').textContent = fmt(gapA, 0) + ' u';
+      el('axisArrow').setAttribute('points', '34,408 30,396 38,396');   // +Y points DOWN
+      el('axisName').textContent = 'Y';
+      el('stripLen').textContent = 'L = 400 units';
+      el('scaleLbl').textContent = '250 units';
+      el('plateSpec').textContent = 'Yp ' + fmt(Yp, 0) + ' · θp 180° · s 100 u/m';
+      el('axisTicks').innerHTML =
+        '<text x="28" y="64">600</text><text x="28" y="164">400</text><text x="28" y="264">200</text>';
+      el('maths').innerHTML =
+        '  <i>Xp 0 · Yp ' + fmt(Yp, 0) + ' · θp 180° · s 100</i>\n' +
+        '  X = 0\n' +
+        '  Y = <b>' + fmt(Yp, 0) + '</b> − 100·<b>' + fmt(s, 2) + '</b> = <b>' + fmt(planY, 1) + '</b>\n' +
+        '  Θ = 180° + (90° + <b>' + fmt(t, 0) + '°</b>) = <b>' + fmt(Theta, 0) + '°</b>';
+    } else {
+      /* plate left at the origin at 1:1; the strip is mapped instead */
+      var mouth = GAP0_M - GAP0_M * f;
+      var ThetaB = (90 + t + 360) % 360;
+      el('onPlan').textContent = '(0.00, ' + fmt(s, 2) + ') Θ ' + fmt(ThetaB, 0) + '°';
+      el('toMouth').textContent = fmt(gapB, 2) + ' m';
+      el('gapLbl').textContent = fmt(gapB, 2) + ' m';
+      el('axisArrow').setAttribute('points', '34,26 30,38 38,38');      // +Y points UP
+      el('axisName').textContent = 'Y';
+      el('stripLen').textContent = 'L = 4 m';
+      el('scaleLbl').textContent = '2.5 m';
+      el('plateSpec').textContent = 'Yp 0 · θp 0° · s 1 — plate = plan';
+      el('axisTicks').innerHTML =
+        '<text x="28" y="364">0</text><text x="28" y="264">2</text><text x="28" y="164">4</text>';
+      el('maths').innerHTML =
+        '  <i>Xp 0 · Yp 0 · θp 0° · s 1 &nbsp;— the default</i>\n' +
+        '  X = 0\n' +
+        '  Y = 0 + 1·<b>' + fmt(s, 2) + '</b> = <b>' + fmt(s, 2) + '</b>\n' +
+        '  Θ = 0° + (90° + <b>' + fmt(t, 0) + '°</b>) = <b>' + fmt(ThetaB, 0) + '°</b>' +
+        '\n  <i>the strip\'s mouth is at Y ' + fmt(mouth, 2) + ', moved by group.matrix</i>';
+    }
+
+    el('onPlate').textContent = '(0.00, ' + fmt(s, 2) + ') θ ' + fmt(90 + t, 0) + '°';
+    el('stepOut').textContent = fmt(s, 2) + ' m · you';
+    el('turnOut').textContent = (t > 0 ? '+' : '') + fmt(t, 0) + '° · you';
+    el('flyOut').textContent = fmt(f * 100, 0) + '% · the script';
+
+    el('iGA').textContent = fmt(gapA / L_A, 4);
+    el('iGB').textContent = fmt(gapB / L_M, 4);
+    el('iSA').textContent = fmt((s * S_A) / L_A, 4);
+    el('iSB').textContent = fmt(s / L_M, 4);
+  }
+
+  function setOpt(o) {
+    opt = o;
+    el('btnA').setAttribute('aria-pressed', String(o === 'A'));
+    el('btnB').setAttribute('aria-pressed', String(o === 'B'));
+    el('whoMoves').innerHTML = o === 'A'
+      ? '<b>The script moves the plate.</b> Your room arrives somewhere new without you walking.'
+      : '<b>The script moves the strip.</b> Your room stays at 1:1 and the figure comes to you.';
+    draw();
+  }
+
+  el('btnA').addEventListener('click', function () { setOpt('A'); });
+  el('btnB').addEventListener('click', function () { setOpt('B'); });
+  [step, turn, fly].forEach(function (r) { r.addEventListener('input', draw); });
+  setOpt('A');
+})();
+</script>
+</body>
+</html>

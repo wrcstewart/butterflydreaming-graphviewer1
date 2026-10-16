@@ -165,6 +165,19 @@ app.get('/qr', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'qr.html'));
 });
 
+// /plate — "The Plate and the Plan": the coordinate frames a headset
+// introduces, drawn in 2-D with live arithmetic. The monospace figure in
+// ThreeJS_and_VR_2026-09-28.md §5k says the same thing and says it worse.
+//
+// Served from here rather than as a hosted artifact because an artifact is
+// private to the account that published it, and that need not be the account
+// the reader's browser is signed in to. A page explaining a diagram should not
+// have a sign-in between it and the diagram.
+app.get('/plate', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(require('path').join(__dirname, 'plate.html'));
+});
+
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
     // 2026-09-04 — .js too. The bench imports piper_direct.js as a module.
