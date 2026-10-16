@@ -1,0 +1,437 @@
+# From the figure to the headset screens — from scratch
+
+**2026-10-16.** Written because a diagram did not help, and a diagram that does
+not help is usually one that assumes the thing it was meant to explain. This
+starts from nothing and defines every term the first time it is used.
+
+It answers one question: **when a headset is on, how does a number the turtle
+wrote become a lit pixel in front of someone's eye?** Everything else here is in
+service of that.
+
+`ThreeJS_and_VR_2026-09-28.md` §5c–§5k covers the same ground for a reader who
+already has the vocabulary. This document is the one to read first.
+
+---
+
+## How to read the "degree of virtuality" labels
+
+The author asked that each thing be marked for how real it is, which turns out to
+be the most useful organising idea in the whole subject — because the confusion
+comes almost entirely from treating things of different kinds as if they were the
+same kind of thing. Five kinds appear:
+
+| label | what it means | can it be wrong? |
+|---|---|---|
+| **PHYSICAL** | exists in the world whether or not any software runs | no — it just is |
+| **MEASURED** | a physical fact the hardware estimates, in metres, with error | **yes** — drift, noise, loss of tracking |
+| **DECLARED** | a decision somebody wrote down; no physical counterpart at all | not wrong, but it can be *unwise* |
+| **PURE NUMBER** | digits with no unit and no meaning until something maps them | meaningless rather than wrong |
+| **DERIVED** | computed this frame from the above, thrown away, recomputed | wrong only if the inputs are |
+
+A sentence to keep: **the room is PHYSICAL, the figure is PURE NUMBER, and
+everything difficult happens in the DECLARED layer between them.**
+
+---
+
+## Step 1 · The room
+
+> **THE ROOM** — the actual physical space the person is standing in. Floor,
+> walls, a chair they might bark their shin on.
+
+**Degree of virtuality: PHYSICAL.**
+
+**Coordinates: none.** This is the point. The room has no coordinates, in the
+same way that Tuesday has no colour. Coordinates are something we *impose* on
+the room in the next step, and a different choice would have done as well.
+
+It belongs in this list because it is the only thing here that can hurt you, and
+because every comfort question in this project is a question about the
+relationship between the room and everything else.
+
+---
+
+## Step 2 · The plate
+
+> **THE PLATE** — a coordinate frame laid over the room, so that positions in
+> the room can be stated as numbers. Its proper name in the standard is an
+> **XRReferenceSpace**; "the plate" is this project's word for it, because once
+> it exists it can be picked up and set down somewhere in a virtual world, like
+> a movable floor plate with the person standing on it.
+
+**Degree of virtuality: a DECLARED frame over a PHYSICAL thing.** The room is
+real; where we decide to put the origin is not.
+
+**Coordinates: metres, and this is not negotiable.** The standard fixes the unit.
+Several kinds of plate exist; the one three.js asks for by default is
+`local-floor`:
+
+- origin **on the floor**, directly below where the person's head was when the
+  session started
+- **+Y up**, away from the floor
+- **−Z the direction they were facing** at that moment
+- +X to their right
+
+So a person standing still at the start is at about **`(0, 1.6, 0)`** — the 1.6
+being their eye height in metres. Take one step forward and they are at about
+`(0, 1.6, −0.7)`. Negative Z, because forward is −Z. That sign catches everyone
+once.
+
+**The thing to hold on to: the plate is pinned to the room.** It does not move
+when the virtual world moves. That single fact is why a person's own body is a
+reliable reference for them and why moving the world around them is the
+uncomfortable option.
+
+---
+
+## Step 3 · The head pose
+
+> **POSE** — a position *and* an orientation together. Six numbers: three for
+> where, three for which way round.
+>
+> **THE HEAD POSE** — where the person's head is, stated in the plate's
+> coordinates, as estimated by the headset's cameras and sensors.
+
+**Degree of virtuality: MEASURED.** It is an estimate of a physical fact. It has
+noise, it drifts, and it can be lost entirely if the cameras are covered.
+
+**Coordinates: metres, in the plate's frame.** For example:
+
+```
+  position     (0, 1.62, -0.10)      leaning 10 cm forward, eye height 1.62 m
+  orientation  identity               facing the way they started
+```
+
+**Nobody writes this.** It arrives. Each frame the browser hands it over and the
+only correct response is to use it. There is no supported way to set it, and
+wanting to set it is the single most common misunderstanding about VR
+programming — it is the equivalent of wanting to decide where someone's head is.
+
+---
+
+## Step 4 · Is there a headset virtual camera?
+
+The author's question, and the honest answer is **no — there are two, and you do
+not own either of them.**
+
+> **A VIEW** — one eye's worth of seeing: a pose, plus a description of the
+> shape of what that eye can see. The standard calls it an **XRView** and hands
+> over one per eye, normally two.
+
+**Degree of virtuality: DERIVED, from a MEASURED head pose.** Each eye's pose is
+the head pose with that eye's offset applied — about 32 mm either side of centre
+for a 64 mm separation.
+
+**Coordinates, continuing the example above:**
+
+```
+  left eye   (-0.032, 1.620, -0.100)
+  right eye  ( 0.032, 1.620, -0.100)
+```
+
+Each view also carries a **projection matrix** — the exact shape of its visible
+cone:
+
+> **PROJECTION MATRIX** — the arithmetic that turns "where something is in front
+> of the eye" into "where it lands on the picture". It encodes the field of view.
+
+**And this is the part worth knowing: the projection matrix comes from the
+headset, not from you.** It is **asymmetric** — the visible cone is not centred
+on the eye's axis, because the lens is not. On a Quest you can see more towards
+your temple than towards your nose. A camera with a single "field of view"
+setting cannot describe that, which is why the runtime supplies the matrix ready
+made and why `CAM_FOV = 50` in `V_Kolam3D` has no meaning in a session.
+
+In three.js these two appear as `cameraL` and `cameraR` inside an **ArrayCamera**
+obtained from `renderer.xr.getCamera()`. **three creates them, not you.** They
+are the cameras that actually render.
+
+---
+
+## Step 5 · The figure, in pure numbers
+
+> **THE FIGURE** — in this project, the Kolam: the output of the turtle walk. A
+> long list of vertex positions, held in a `Float32Array` on the GPU.
+
+**Degree of virtuality: PURE NUMBER.** This is the most abstract thing in the
+document and the easiest to mistake for something concrete. The turtle was told
+`step 9900`, `angle 54`, `depth 5`, and it produced numbers. **Those numbers have
+no unit.** They are not metres, not centimetres, not anything. `step 9900` is not
+9900 of something; it is 9900.
+
+**Coordinates: a sample vertex, chosen for this document:**
+
+```
+  (12, 400, 0)          12 across the tube, 400 along it
+```
+
+Nothing about that is a length until Step 6 says what it is a length *of*. The
+whole figure is like this: `bd_V_Kolam3D_002` spans several hundred of these
+unitless numbers, and a figure "600 across" is 600 across *of nothing in
+particular*.
+
+This is also where the module's own `group` lives, so one definition more:
+
+> **`group`** — a three.js `Object3D` holding the figure. The symmetry copies
+> hang off it as children, each turned about Y, and `group` itself carries the
+> `step_pitch` scale in Y.
+
+---
+
+## Step 6 · The plan, or world coordinates
+
+> **WORLD COORDINATES**, which this project calls **THE PLAN** — the single
+> frame the scene is described in. Everything drawable has a position in it.
+
+**Degree of virtuality: DECLARED, and entirely so.** There is no fact of the
+matter about where the world's origin is. Somebody picked it.
+
+**Coordinates: whatever units the author decides** — and the decision is made by
+the transform that maps the figure into it. Two choices, with wildly different
+consequences:
+
+**(a) Leave it alone.** `group` is effectively the identity, which is what
+`V_Kolam3D` does today. Then the figure's unitless numbers become world
+coordinates unchanged, and because the plate's numbers are metres, **a vertex at
+400 is 400 metres away.** On a flat monitor this is harmless — the camera is
+placed in the same units and nothing else in the scene disagrees. **In a session
+it means you see nothing**, because the figure is kilometres wide and starts
+hundreds of metres off.
+
+**(b) Map it deliberately.** For this document, make the tunnel four metres long
+and float it at eye height, two metres in front of where the person started:
+
+```
+  group.matrix  =  translate(0, 1.6, -2)  ·  rotate -90° about X  ·  scale 0.01
+```
+
+Then, computed:
+
+| | figure numbers | world coordinates |
+|---|---|---|
+| the mouth | `(0, 0, 0)` | `(0.00, 1.60, -2.00)` |
+| the far end | `(0, 400, 0)` | `(0.00, 1.60, -6.00)` |
+| our sample vertex | `(12, 400, 0)` | `(0.12, 1.60, -6.00)` |
+
+Read in order, the three parts of that transform say: **scale 0.01** — one
+hundred figure units is a metre; **rotate −90° about X** — the tube ran up the
+figure's own Y, lay it down along −Z so it runs away from the viewer; **translate
+(0, 1.6, −2)** — lift it to eye height and push it two metres out.
+
+**World coordinates are now in metres**, because that transform decided so. They
+were not before and nothing forced it.
+
+---
+
+## Step 7 · `.parent` — where the plate stands on the plan
+
+> **`camera.parent`** — an ordinary three.js `Object3D` that has the camera as a
+> child. Nothing about it is special. It is a scene object like any other.
+
+**Degree of virtuality: DECLARED.**
+
+Its one distinction is a convention: **three.js looks at `camera.parent` when it
+writes the headset's pose, and treats that object's transform as the map from
+the plate's frame into the plan's.** So:
+
+```
+  where an eye is on the plan  =  the .parent's transform     ← yours, DECLARED
+                                ×  the head pose              ← the runtime's, MEASURED
+                                ×  that eye's offset          ← the runtime's, DERIVED
+```
+
+**Coordinates, for the two useful cases:**
+
+```
+  (i)  no .parent at all, or an identity one       ← the default
+       position (0,0,0)  ·  no rotation  ·  scale 1
+       The plate's numbers and the plan's numbers are THE SAME NUMBERS.
+       This is why it is tempting to say "world coordinates are the room" —
+       true here, and false the moment anyone places the plate.
+
+  (ii) the plate set down inside the figure
+       position (0, 1.6, 600)  ·  rotation 180° about Y  ·  scale 100
+       The plan is now in figure units, and one metre of real walking
+       covers a hundred of them.
+```
+
+**In `V_Kolam3D` today there is no `.parent`.** The camera is never added to the
+scene at all; `placeCamera` writes coordinates straight into it. On a monitor
+that is correct and complete — nobody is standing anywhere, so no plate is
+needed. **A headset is the situation where somebody *is* standing somewhere**, so
+the plate exists whether or not the code acknowledges it, and `.parent` is where
+the code gets to say where it stands.
+
+---
+
+## Step 8 · The three.js camera, and what becomes of it
+
+> **THE THREE.JS CAMERA** — the `PerspectiveCamera` the module creates:
+> `new THREE.PerspectiveCamera(CAM_FOV, 1, 1, 100000)`.
+
+**Outside a session it is the whole story.** `placeCamera` sets its position, its
+up vector and what it looks at; its field of view and aspect build the
+projection; the picture follows.
+
+**Inside a session it becomes a readout.** After each frame three writes the
+head's pose into it, so `camera.position` and `camera.quaternion` **report where
+the person's head is.** They are outputs. Writing to them achieves nothing,
+because the next frame overwrites them.
+
+Precisely what survives, and what does not:
+
+| | in a session |
+|---|---|
+| `camera.position`, `.quaternion`, `.up` | **overwritten every frame** — a readout |
+| `camera.fov`, `.aspect` | **unused** — the runtime's projection matrix replaces them |
+| `camera.near`, `.far` | **still yours.** three forwards them to the session as `depthNear` / `depthFar` — **in metres**, so a value derived from a figure-unit distance will be wrong by whatever Step 6 chose |
+| `camera.parent` | **yours, and now load-bearing** |
+| `renderer.render(scene, camera)` | still called with your camera; three quietly substitutes the ArrayCamera |
+| the render loop | becomes `renderer.setAnimationLoop(fn)`, driven by the headset at 72–120 Hz |
+
+**So the two cameras of Step 4 and Step 8 are different things with the same
+name**, which is most of why this is confusing: *your* camera is a request on a
+monitor and a report in a headset, while *three's* two cameras are the ones that
+actually draw and are never yours at all.
+
+---
+
+## Step 9 · The whole sequence, one vertex, figure to pixel
+
+Every number below is computed, not illustrative. The example is Step 6's
+option (b): a four-metre tunnel at eye height two metres ahead, with the plate
+left as the identity, and the person leaning 10 cm forward.
+
+```
+ ─────────────────────────────────────────────────────────────────────────────
+ 1.  THE FIGURE'S OWN NUMBERS                                    PURE NUMBER
+     (12, 400, 0)
+     What the turtle wrote. No unit. Means nothing yet.
+ ─────────────────────────────────────────────────────────────────────────────
+         × the symmetry child's rotation about Y  (copy 0: identity)
+         × group's step_pitch scale in Y          (step_pitch = step: identity)
+         × group.matrix: scale 0.01, rotate -90° about X, translate (0,1.6,-2)
+ ─────────────────────────────────────────────────────────────────────────────
+ 2.  WORLD COORDINATES — THE PLAN                                   DECLARED
+     (0.1200, 1.6000, -6.0000)      metres, because step 6 said so
+     The tunnel runs from (0,1.6,-2) to (0,1.6,-6).
+ ─────────────────────────────────────────────────────────────────────────────
+         × the inverse of ( .parent  ×  head pose  ×  eye offset )
+           .parent  identity                                       DECLARED
+           head     (0, 1.62, -0.10), facing as they started       MEASURED
+           left eye (-0.032, 1.620, -0.100)                        DERIVED
+ ─────────────────────────────────────────────────────────────────────────────
+ 3.  VIEW SPACE, LEFT EYE                                            DERIVED
+     (0.1520, -0.0200, -5.9000)
+     Where the vertex is relative to that eye. Reading it: 15.2 cm to the
+     right, 2 cm below, and 5.90 m in front — the -Z being "in front".
+ ─────────────────────────────────────────────────────────────────────────────
+         × the projection matrix supplied by the headset       the runtime's
+           (illustrated here with a symmetric 90° cone; the real one is
+            ASYMMETRIC, which no single fov number can express)
+ ─────────────────────────────────────────────────────────────────────────────
+ 4.  CLIP SPACE, then NORMALISED DEVICE COORDINATES                  DERIVED
+     (0.02576, -0.00339)
+     A square from -1 to +1 covering what the eye can see. Just right of
+     centre and a whisker low. Anything outside the square is not visible.
+ ─────────────────────────────────────────────────────────────────────────────
+         × the viewport of the layer's framebuffer
+           (Quest 3 native, 2064 x 2208 per eye)
+ ─────────────────────────────────────────────────────────────────────────────
+ 5.  A PIXEL IN THE LEFT EYE'S IMAGE                                 DERIVED
+     (1058.6, 1107.7)        centre of that image is (1032, 1104)
+     26.6 px right of centre, 3.7 px down.
+ ─────────────────────────────────────────────────────────────────────────────
+         the same arithmetic again for the right eye
+ ─────────────────────────────────────────────────────────────────────────────
+ 6.  THE SAME VERTEX IN THE RIGHT EYE                                DERIVED
+     1047.4        — so the two images differ by 11.2 PIXELS
+     THAT DIFFERENCE IS THE STEREO. It is the only reason the vertex is
+     seen at 5.9 m rather than painted flat, and it is the cue the figure
+     has almost nothing else to offer (see §5e: no shading, no ground
+     plane, and depthWrite off below opacity 1, so no occlusion either).
+ ─────────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+## Step 10 · The stage after yours
+
+> **THE COMPOSITOR** — the headset's own software, which takes the two images
+> and puts them on the panels.
+
+**Degree of virtuality: PHYSICAL at the far end, and entirely out of reach.**
+
+It does at least two things worth knowing about:
+
+- **Lens distortion.** The lens bends the image, so the compositor pre-bends it
+  the opposite way. **The picture on the panel is not the picture you rendered**,
+  and it is not meant to be.
+- **Reprojection**, also called timewarp. If the head moved between the pose you
+  were given and the moment of display, the compositor shifts the finished image
+  to compensate. **So the headset corrects for your frame being slightly late**,
+  which is why a dropped frame is a judder rather than a lurch — and why
+  `V_Kolam3D`'s 20-a-second camera clock against a 90 Hz display needs measuring
+  rather than reasoning about: the compositor's correction and a deliberately
+  slow camera may or may not fight.
+
+---
+
+## Everything, in one table
+
+| the thing | its name in the code | degree of virtuality | coordinates | whose |
+|---|---|---|---|---|
+| the room | — | **PHYSICAL** | **none — that is the point** | nobody's |
+| the plate | `XRReferenceSpace` | DECLARED frame on a PHYSICAL thing | metres; floor origin, −Z forward | the standard's |
+| the head pose | from `getViewerPose()` | **MEASURED** | `(0, 1.62, -0.10)` m | the runtime's |
+| each eye's view | `XRView` ×2 | DERIVED | `(±0.032, 1.620, -0.100)` m | the runtime's |
+| each eye's projection | `view.projectionMatrix` | the device's own optics | asymmetric; no `fov` describes it | the runtime's |
+| the figure | the `Float32Array` | **PURE NUMBER** | `(12, 400, 0)` — **no unit** | yours |
+| the figure's placement | `group.matrix` | DECLARED | the transform that gives the plan its units | **yours** |
+| the plan | world coordinates | DECLARED | `(0.12, 1.60, -6.00)` m in the example | **yours** |
+| the plate's placement | `camera.parent` | DECLARED | identity in the example | **yours** |
+| your camera | `camera` | request on a monitor, **readout in a session** | reports the head pose | yours in name |
+| three's two cameras | `cameraL`, `cameraR` | DERIVED | the eye poses | three's |
+| view space | — | DERIVED, per frame | `(0.152, -0.020, -5.900)` m | transient |
+| NDC | — | DERIVED, per frame | `(0.0258, -0.0034)`, a −1…+1 square | transient |
+| the pixel | the layer's framebuffer | DERIVED, per frame | `(1059, 1108)` of 2064×2208 | transient |
+| the panel | the compositor's output | **PHYSICAL** | distorted and reprojected | the headset's |
+
+**Four rows are yours**, and they are consecutive: how the figure is placed, what
+the plan's units are, where the plate stands, and the near/far pair. Everything
+above them is the person's body and everything below them is the device. **That
+is the whole of the authoring surface, and it is smaller than it looks from
+inside the current module.**
+
+---
+
+## What this means for `V_Kolam3D` as it stands
+
+1. **The figure needs no change.** Its numbers are already in world coordinates
+   and `group` is already the place a placement would go. Nothing about the
+   turtle, the symmetry copies or the score is affected.
+2. **One decision is unavoidable before a first session: the scale.** Step 6
+   (a) is the default and it shows black. This is the "scale directive — table,
+   room, or building" already on the open list, and it stops being a design
+   question the moment a session opens.
+3. **`placeCamera`'s arithmetic survives; only its destination changes.** It
+   already computes an eye position and an orientation. Writing those to a
+   `.parent` instead of to the camera needs the orientation as a quaternion
+   rather than via `lookAt` — one line of three.js.
+4. **`CAM_FOV = 50` dies, and two calibrations die with it**: `fitDistance`'s
+   sphere fit, and the measured "world height ≈ 0.64 × cap height in CSS px"
+   that any text work would have leaned on.
+5. **`camera.near` / `.far` keep working and change units.** The most easily
+   missed item on this list, because it will not error — it will just clip.
+
+And the standing recommendation is unchanged: **none of this should be built
+yet.** The current module is the baseline every headset measurement will be read
+against. See §5h.
+
+---
+
+## Related
+
+- `ThreeJS_and_VR_2026-09-28.md` §5c–§5k — the same material for a reader who
+  already has the vocabulary, plus the comfort argument and the open list.
+- `/plate` — the 2-D drawing of the frames, served from BD itself.
+- `/x` — the headset capability check, to be run on the device.

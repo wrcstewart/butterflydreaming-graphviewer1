@@ -414,6 +414,12 @@ to paste. Reload BD to see it.
 
 ## 5c. Moving the world instead of the eye — the three mechanisms (2026-10-15)
 
+> **IF ANY OF §5c–§5k IS HEAVY GOING, READ
+> `VR_FromScratch_2026-10-16.md` FIRST.** It assumes no background, defines every
+> term on first use, marks each thing for how real it is, and carries one real
+> vertex from the turtle's output to a pixel in the left eye. These sections
+> assume the vocabulary that document builds.
+
 The author's question: *"given that three.js has this VR capability — is there a
 way of adjusting the world view independent of the camera, if as you say the
 camera is effectively the viewer + headset?"*
