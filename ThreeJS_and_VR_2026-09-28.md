@@ -862,6 +862,118 @@ and wants the author's eye before it ships.
 
 ---
 
+## 5i. How WebXR and three relate the camera to the headset (2026-10-16)
+
+The author's question, asked with the headset about to arrive. **Everything below
+is read from three's own source at the 0.160.0 the module loads, and from the
+WebXR spec. None of it is measured on hardware.**
+
+### The chain, outside in
+
+**1. The reference space is the ROOM.** A session is requested with a reference
+space type — three defaults to `'local-floor'`, settable with
+`renderer.xr.setReferenceSpaceType()`. For `local-floor` the origin is on the
+physical floor at the user's starting place, +Y up, and it stays pinned to the
+room. **So the identity to hold on to is: scene world coordinates ARE the
+reference space, which IS the room.** That single sentence is why §5d's
+static-reference argument and §5e's head-motion argument both work.
+
+**2. Each frame the runtime hands over a pose, not a request for one.**
+`XRFrame.getViewerPose(referenceSpace)` returns the head's transform in that
+space, plus one `XRView` per eye. Each view carries its own `transform` (head
+pose plus that eye's offset) **and its own `projectionMatrix`** — asymmetric,
+because the lens is.
+
+**3. three turns that into cameras.** `renderer.xr.getCamera()` returns an
+`ArrayCamera` holding `cameraL` and `cameraR`. Per frame, per view, three writes
+`view.transform.matrix` into the sub-camera's `matrix` and copies
+`view.projectionMatrix` verbatim. For the two-eye case it then computes a
+combined frustum (`setProjectionFromUnion`) for culling.
+
+**4. It writes the result BACK onto your camera.** `updateUserCamera` sets your
+camera's local matrix so that its world matrix equals the XR camera's, then
+decomposes it and copies the projection across. **So after each frame
+`camera.position` and `camera.quaternion` REPORT the headset. They are outputs,
+not inputs.** `renderer.render(scene, camera)` still takes your camera; three
+substitutes the `ArrayCamera` internally while `xr.isPresenting`.
+
+**5. And here is the hinge — the PARENT matrix.** three's `updateCamera` reads
+`camera.parent` and composes:
+
+```
+camera.matrixWorld = parent.matrixWorld × camera.matrix
+```
+
+So the full composition for one eye is:
+
+```
+eye in world  =  parent.matrixWorld        ← YOURS (the dolly)
+              ×  head pose in ref space    ← the runtime's
+              ×  that eye's offset         ← the runtime's
+```
+
+**That is the whole answer to "how do I move the view if the headset owns the
+camera": you move the camera's PARENT.** It is not a trick, it is the documented
+seam, and it is what three's own XR examples use.
+
+### Who owns what, as a table
+
+| | owner | in V_Kolam3D today |
+|---|---|---|
+| head pose, eye offsets | the runtime | — |
+| per-eye projection matrix | the runtime | `CAM_FOV = 50` becomes dead |
+| `camera.position` / `.quaternion` / `.up` | **the runtime, overwritten each frame** | `placeCamera` writes all three |
+| `camera.near` / `.far` | **still yours** — three forwards them to `session.updateRenderState({ depthNear, depthFar })` | `placeCamera` derives them from `cam_distance` |
+| `camera.parent.matrixWorld` — the DOLLY | **yours** | does not exist yet; `camera` has no parent |
+| every object's transform | **yours** | `group` + the symmetry children |
+
+### What that means for this module, concretely
+
+- **`placeCamera`'s pose maths all survives; only its DESTINATION changes.** It
+  already computes an eye position and an orientation. Writing that to a `rig`
+  group rather than to `camera` needs the orientation as a quaternion instead of
+  via `lookAt` — `Matrix4.lookAt(eye, target, up)` then
+  `Quaternion.setFromRotationMatrix`. That is the whole port, and it is small.
+  **This is why §5h says there is no hurry**: the work is a destination change,
+  not a redesign.
+- **`CAM_FOV = 50` dies, and it takes two calibrations with it.** `fitDistance`
+  frames a sphere using `sin(CAM_FOV/2)`, and §7's glyph note measured "world
+  height ≈ 0.64 × cap height in CSS px" at FOV 50 on a square canvas. **Both
+  constants are void in a session**, where the field of view is the device's
+  ~100°+ and is not square. Any text sizing done for the flat module has to be
+  re-derived, not carried over.
+- **`updateCanvasSize`'s square canvas stops applying** — the framebuffer is the
+  XR layer, and `setPixelRatio` is ignored while presenting.
+- **The loop becomes `renderer.setAnimationLoop(fn)`**, because XR frames come
+  from the session at the display's rate — 72/90/120 Hz on a Quest — not from
+  `requestAnimationFrame`. The module's own clocks (`CAM_SPIN_MS` at 20 a
+  second, the drift timer) are `setTimeout`-based and would keep running
+  independently, which is fine but means the camera moves on a different clock
+  from the frames. **Worth checking on hardware**: a 20 Hz camera update against
+  a 90 Hz display is visible judder in a headset in a way it is not on a
+  monitor.
+
+### The one thing that will stop you seeing anything at all
+
+**REFERENCE SPACE IS IN METRES. The module's units are not.** `step` goes to
+9900, `cam_distance` to 99000, and `bd_V_Kolam3D_002` sits at 600. Enter a
+session with no scale factor and the figure is six hundred metres away and
+kilometres across — you would see nothing, or be inside it with no way to tell.
+
+**So a scale factor is mandatory, not a refinement.** It is one number and it can
+sit on the rig or on the content; the stereo geometry works out the same either
+way, because every ratio that matters — eye separation to figure size, your own
+lean to figure size — carries the same factor. What it is NOT free of is
+`camera.near` / `camera.far`: those reach the session in metres, and
+`placeCamera` currently derives them from a world-unit `cam_distance`
+(`near = d/1000`, `far = d*20 + 1000`). **The logic ports; the units do not.**
+
+This is §3b's "scale directive — table, room or building" and it stops being a
+design question the moment a session opens. **Decide it before the first
+session, or the first session shows black.**
+
+---
+
 ## 6. Line weight, and why VR forces the issue
 
 Current position, as of RULE 9:
@@ -1514,6 +1626,8 @@ to come back with is whether 6.8px node labels resolve at all.
 | question | notes |
 |---|---|
 | **The collage fork (§7)** | The one that must be settled first. |
+| **SCALE — decide before the first session (§5i)** | **The one that makes the difference between seeing the figure and seeing black.** Reference space is in METRES; `step` reaches 9900 and `cam_distance` 99000, and the tunnel node sits at 600 — so with no scale factor the figure is 600 m away and kilometres across. One number, on the rig or the content (the stereo works out the same either way), but `camera.near`/`.far` reach the session in metres and `placeCamera` derives them from world units, so that logic ports and its units do not. This is §3b made urgent. |
+| **Camera clock against display rate (§5i)** | `CAM_SPIN_MS` is 20 a second and a Quest runs 72–120 Hz. On a monitor that is invisible; in a headset a camera moving at a fifth of the frame rate may read as judder. Measure early — it is cheap to check and would change how the flight is driven. |
 | **`Line2` — and the prize is bigger than VR (§5f)** | **The 3D module draws at ONE DEVICE PIXEL where the default `weight` is 1.5** — core WebGL ignores `gl.lineWidth` above 1 — so at `devicePixelRatio` 2 it shows 0.5 CSS px, a third of the intent and a quarter of what the 2D module shows on the same phone. No stored script overrides the default, so every figure is affected. `Line2`/`LineMaterial` from `examples/jsm` draw strokes as geometry and would honour it. **Not "VR will want it": the flat module is already three fifths short of its own default.** |
 | **Sequential 3D text (§5g)** | §8e's ~18-character line is a limit on SIMULTANEOUS text, so a phrase at a time sidesteps it entirely — and `splitUtterances` already does the splitting, which makes **the speech chunker the text sequencer**, in step by construction because the phrase on screen is the phrase being spoken. Same module as the 2026-10-08 sketch; strengthens §7's "make it a MODE inside `V_Kolam3D`". **Trap: `applyOpacity` turns `depthWrite` off below opacity 1, so a collage at 0.45 loses the occlusion that is the only reason to put text in the scene at all.** |
 | **DOES STEREO MAKE THE FIGURE LEGIBLE? (§5e)** | **The strongest pro-headset item in this table, and it needs measuring first.** BD's figure has almost no monocular depth cues BY DESIGN — no shading, no ground plane, and `depthWrite: false` at opacity < 1 removes occlusion too — so on a flat screen it is an ambiguous line drawing and binocular disparity is the cue that would resolve it. Against which: a 1px line must FUSE between two eyes, and a hairline that flickers in one eye is a hairline that fails to fuse (§6). **So this item and the `weight` item are the same measurement** and should be made in one sitting on real hardware. |
