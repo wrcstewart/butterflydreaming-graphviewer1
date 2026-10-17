@@ -33,6 +33,74 @@ everything difficult happens in the DECLARED layer between them.**
 
 ---
 
+## Step 0 · Who are the players? — "the runtime", defined
+
+This document used **"the runtime"** from Step 3 onwards without ever saying what
+it is, which in a document premised on defining every term is simply a hole. The
+author stopped it: *"I don't understand what you mean by the runtime, and
+therefore its assumption of floor height."* Fair.
+
+**There are five pieces of software between a vertex and an eye, and you wrote
+one of them.**
+
+```
+  5  THE PAGE            BD's visual_module.html. YOURS.
+         │ calls
+  4  THREE.JS            a library, running inside the page. Yours to choose,
+         │ calls          not yours to have written.
+  3  THE BROWSER          Chromium on a Quest, Safari on a Vision Pro.
+         │ talks to       Exposes the WebXR Device API to the page.
+  2  THE XR RUNTIME       ◀── "THE RUNTIME" MEANS THIS ONE
+         │ drives         The HEADSET'S OWN SYSTEM SOFTWARE. Part of Horizon OS
+         │                on a Quest; visionOS on a Vision Pro.
+  1  SENSORS AND PANELS   cameras, inertial sensors, the two screens. Hardware.
+```
+
+> **THE XR RUNTIME** — the headset's own system software. It fuses the sensor
+> data into poses, holds the device's model of the room, supplies the per-eye
+> projection matrices, and runs the compositor that puts images on the panels.
+> It is not part of the browser and not part of the web at all; a native headset
+> app talks to the same thing.
+
+So when this document says "the runtime's, not yours", it means **layer 2** — and
+the practical force of that is: it is configured in the headset's own menus, not
+by anything BD can do.
+
+### Where the floor actually lives in that stack
+
+Now §2a's answer can be said properly, because "the device's room knowledge" was
+standing in for something specific:
+
+- **Room setup is a layer-2 thing.** On a Quest you run **Space Setup** in the
+  system interface — not in the browser, not in BD. It scans or asks for the
+  floor, and **the runtime stores that height** as part of its persistent model
+  of the room. It is per-device and per-room, and it survives between sessions.
+- **The browser (layer 3) reads it** and reports it through WebXR as the origin
+  of a `local-floor` space.
+- **And the estimate, when there is no floor, is the BROWSER's licence, not the
+  runtime's.** The specification allows the *user agent* to supply an estimated
+  floor if the device cannot. So in branch 2 of §2a the assumption is being made
+  one layer higher than the words "the runtime" suggested. **Corrected here.**
+
+### Which gives the one practically useful consequence
+
+> **If the floor is wrong, it is not a code problem.** Run Space Setup on the
+> headset. Nothing in BD, three.js, or the page can fix a floor the system
+> software has wrong, and nothing in BD needs to: §2a's cancellation means a
+> figure placed relative to the read eye height does not care either way.
+
+### And two more terms this document leans on
+
+> **THE COMPOSITOR** — the part of the runtime that takes your two finished
+> images and puts them on the panels, pre-distorting for the lens and
+> reprojecting for any head movement since the pose you were given. Step 10.
+>
+> **THE USER AGENT** — the specifications' word for the browser. Where it appears
+> in a standard, it usually marks a point at which browsers are *allowed to
+> differ*, which is exactly what the floor estimate is.
+
+---
+
 ## Step 1 · The room
 
 > **THE ROOM** — the actual physical space the person is standing in. Floor,
@@ -162,9 +230,11 @@ child and an adult standing in the same room get **the same floor** and
 **different `camera.position.y`** — which is the whole point, and what makes the
 reading worth having.
 
-**Branch 2 — ASSUMED, and here the author is right.** If no floor is known, the
-runtime has nothing to measure, and the documented behaviour is that it **may
-estimate**. The estimate works precisely as suspected: assume a standing eye
+**Branch 2 — ASSUMED, and here the author is right.** If no floor is known,
+there is nothing to measure, and the documented behaviour is that **the BROWSER
+may estimate** — the specification gives that licence to the user agent rather
+than to the headset's system software, so this branch happens one layer up from
+where Step 0's "the runtime" sits. The estimate works precisely as suspected: assume a standing eye
 height and put the floor that far below the head. Values around 1.5–1.6 m are
 commonly quoted. **IMPLEMENTATION-DEPENDENT, AND UNVERIFIED HERE** — it has not
 been read off a device.
