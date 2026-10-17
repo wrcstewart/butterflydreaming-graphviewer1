@@ -536,6 +536,70 @@ numbers that decide what the figure looks like also decide whether it is
 touchable**, and that only becomes visible once both the figure and the room are
 in metres — §7a's third reason, arriving again.
 
+### Does the plate have to be positioned before or after the session starts?
+
+The author: *"the headset is set up before or after the plate is positioned — I
+guess it doesn't matter?"* **Correct, it does not** — and the reason is worth
+having, because it is not "either order works out in the end":
+
+> **The plate's placement is read EVERY FRAME, not applied once.** three.js
+> composes `parent.matrixWorld × camera.matrix` on each frame, so moving the
+> plate at any moment takes effect on the next one. There is no setup step to get
+> in the right order, and no difference between placing it and animating it.
+
+**But one ordering does matter, and it is a different one.** `local-floor`'s
+origin is fixed **at the instant the session starts** — on the floor, below
+wherever the person's head happened to be at that moment, facing wherever they
+happened to face. So:
+
+- **the plate's PLACEMENT** (yours): order-free, live, change it whenever.
+- **the plate's ORIGIN in the real room** (the runtime's): fixed once, by where
+  the person was standing when they pressed the button.
+
+Which is why headsets have a recentre gesture, and why
+`getOffsetReferenceSpace()` (§5c.2) exists as its programmatic equivalent. If
+someone starts a session facing the wrong way, no amount of plate placement
+undoes it — it shifts them relative to the figure, but their "forward" is still
+the direction they were facing.
+
+### NOT `camera.position`. That is the one to get right.
+
+The author's second half: *"and that is done using `camera.position` and
+`camera.orientation`."* **No — and this is the single most important correction
+in this document.**
+
+Positioning the plate is:
+
+```js
+  plate.position.set(0, 0, 3);        // ✓  yours, read every frame
+  plate.rotation.y = Math.PI / 2;     // ✓  yours   (three calls it .rotation /
+                                      //     .quaternion — there is no .orientation)
+```
+
+Writing to the camera is:
+
+```js
+  camera.position.set(0, 0, 3);       // ✗  silently overwritten on the next frame
+  camera.lookAt(0, 0, 0);             // ✗  likewise
+```
+
+Not an error. Not a warning. **It simply has no effect**, because three writes
+the head pose into `camera` after every frame — Step 8. The camera's position
+stops being something you say and becomes something you can ask.
+
+**The migration, in one table.** This is the whole of what changes:
+
+| | on a monitor | in a session |
+|---|---|---|
+| `camera.position` / `.quaternion` | **yours — this is how you aim** | the runtime's **readout** |
+| `plate.position` / `.rotation` | not needed; there is no plate | **yours — this is how you aim** |
+| `camera.near` / `.far` | yours | **yours**, and now in metres |
+
+**The aiming moves from the camera to the plate, and nothing else moves at all.**
+Which is the concrete form of the claim made elsewhere that `placeCamera`'s
+arithmetic survives and only its destination changes: the same computed position
+and orientation, written one object further out.
+
 ---
 
 ## Step 8 · The three.js camera, and what becomes of it
