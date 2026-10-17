@@ -83,6 +83,77 @@ uncomfortable option.
 
 ---
 
+## Step 2a · Where does the floor come from, and is the eye height set or read?
+
+The author: *"you had some explanation about choosing origin floor and then
+`camera.position` was 1.2 m up the Y axis — are you saying that coordinate is
+just read in some way, or that it determines the floor, i.e. the headset
+constitutes the origin in reality and the 1.2 sets the floor?"*
+
+**It is READ, and it is not one measurement but the difference between two.**
+Pulling the origin apart axis by axis is what makes this clear, because the three
+axes do not come from the same place:
+
+| | what fixes it | when | kind |
+|---|---|---|---|
+| the origin's **X and Z** | **the headset** — where the viewer was standing | once, at session start | MEASURED |
+| the origin's **Y** | **the room** — the floor, as the device knows it from room setup or its own floor estimate | once | MEASURED |
+| the origin's **facing** | **the headset** — where the viewer was looking, levelled to gravity so only the yaw survives | once, at session start | MEASURED |
+| the head's position | **tracking** | **every frame** | MEASURED |
+
+So the author's phrase is right about half of it: **the headset does constitute
+the origin in reality — horizontally. The room constitutes it vertically.**
+
+And then:
+
+```
+  camera.position.y   =   where the head is   −   where the floor is
+                          (tracked, per frame)    (the device's room knowledge)
+```
+
+**Nothing anywhere chose 1.6, or 1.2.** It is a *subtraction of two measurements*,
+and its value is a fact about the person: how tall they are and how they are
+holding their head. That is what the MEASURED label in this document is for —
+and this is the clearest example of it in the whole chain, because it looks so
+much like a setting.
+
+### Which has a consequence worth acting on
+
+**You cannot assume an eye height.** Plausible values for the same code:
+
+```
+  1.75   a tall adult standing
+  1.60   an average adult standing
+  1.20   a child, or a short adult        ← the author's number, and a real one
+  1.10   anybody sitting down
+  0.30   somebody lying on a sofa
+```
+
+So a figure placed on the assumption of a 1.6 m eye is **seen from below by a
+child and from well below by a seated viewer**. The fix costs nothing:
+
+> **Read `camera.position.y` on the first frame and place things relative to
+> that**, rather than hard-coding a height. §8a establishes why that reading is
+> available and what frame it is in — it is the head in the ROOM's metres, which
+> is exactly the number wanted here.
+
+### And this is the whole reason to ask for `local-floor` rather than `local`
+
+> **`local`** — origin at the viewer's head position at session start.
+> **`local-floor`** — the same, moved down to the floor.
+
+Under `local`, the head starts at about `(0, 0, 0)` and **eye height is simply
+not available**: there is no floor in the frame to measure from. Under
+`local-floor` the floor is `y = 0`, so `camera.position.y` *is* the eye height,
+free, every frame.
+
+three.js asks for `local-floor` by default, which is the right default and worth
+knowing is a default rather than a law — `renderer.xr.setReferenceSpaceType()`
+changes it, and changing it to `local` would silently remove the one number this
+section is about.
+
+---
+
 ## Step 3 · The head pose
 
 > **POSE** — a position *and* an orientation together. Six numbers: three for
