@@ -137,6 +137,80 @@ child and from well below by a seated viewer**. The fix costs nothing:
 > available and what frame it is in — it is the head in the ROOM's metres, which
 > is exactly the number wanted here.
 
+### But how does it know where the floor IS?
+
+The author, pressing on the weak part of the above: *"how does the software know
+the vertical level of the room, i.e. how does it know where the viewer's feet
+are? If it's not deduced from the 1.2 below the level of the eyes…"*
+
+**"The device's room knowledge" was doing a lot of work in that sentence, and the
+honest answer has two branches — in one of which the author's suspected
+circularity is exactly what happens.**
+
+**Branch 1 — MEASURED, and this is the normal case.** The headset knows the floor
+independently of the person:
+
+- **Room setup.** Every Quest asks for it. On earlier models you pointed a
+  controller at the floor and confirmed the height; on a Quest 3 the Space Setup
+  scan uses the depth sensor to find the floor plane. That height is **stored**
+  and persists between sessions.
+- **Plane detection.** The dominant horizontal plane below the viewer, found by
+  the same depth sensing that keeps the guardian honest.
+
+In this branch the floor is a **fact about the room**, not about the person. A
+child and an adult standing in the same room get **the same floor** and
+**different `camera.position.y`** — which is the whole point, and what makes the
+reading worth having.
+
+**Branch 2 — ASSUMED, and here the author is right.** If no floor is known, the
+runtime has nothing to measure, and the documented behaviour is that it **may
+estimate**. The estimate works precisely as suspected: assume a standing eye
+height and put the floor that far below the head. Values around 1.5–1.6 m are
+commonly quoted. **IMPLEMENTATION-DEPENDENT, AND UNVERIFIED HERE** — it has not
+been read off a device.
+
+> **So in branch 2 the circularity is real, and it has a nasty property: you
+> cannot tell from the number.** `camera.position.y` comes back as 1.6 either
+> because the person's eyes are 1.6 m above a measured floor, or because the
+> runtime assumed 1.6 and derived the floor from it. The same reading, two
+> completely different meanings.
+
+**One indirect test exists:** `bounded-floor` is only available when the device
+has a real, traced room boundary. **If a request for `bounded-floor` succeeds,
+room setup has been done** and branch 1 is in force. That is evidence rather than
+proof, and it is cheap — a line in `/x`.
+
+### And the fix makes the question stop mattering
+
+This is the part worth taking away, because it dissolves the problem rather than
+answering it:
+
+> **Anything placed relative to the READ eye height is immune to floor error.
+> Anything placed relative to `y = 0` inherits it in full.**
+
+The arithmetic, since it is not obvious. Let the true eye height be `H` and let
+the runtime's floor be wrong by `e` — too high, say. Then the origin is `e` above
+the real floor, and `camera.position.y` reads `H − e`: wrong, by `e`.
+
+Now place the figure at `camera.position.y − 0.3`, i.e. 30 cm below the eye. In
+the runtime's coordinates that is `H − e − 0.3`. Measured from the **real** floor
+it is `(H − e − 0.3) + e = H − 0.3`. **The error cancels exactly** — the figure
+ends up 30 cm below the person's actual eye, whatever the runtime believed about
+the floor, and whether it measured or guessed.
+
+Place the same figure at a literal `y = 1.3` instead and it sits `1.3 + e` above
+the real floor: wrong by the full error, silently.
+
+**So the rule from the previous section gets a second and better reason.** Read
+`camera.position.y` and place relative to it — not only because people are
+different heights, but because **it is the only placement that survives a floor
+the device merely assumed.** The floor's accuracy becomes something you no longer
+need to know.
+
+The one thing that genuinely wants a trustworthy floor is a floor-like object —
+a ground plane, a static reference frame for comfort (§5d). Those are the things
+to put under a `bounded-floor` check.
+
 ### And this is the whole reason to ask for `local-floor` rather than `local`
 
 > **`local`** — origin at the viewer's head position at session start.
