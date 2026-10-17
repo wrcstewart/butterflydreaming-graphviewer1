@@ -491,6 +491,51 @@ the difference between stereo working and stereo idling.
   forced     everything after that is arithmetic
 ```
 
+### And this is what choice 2 looks like as code
+
+The author, checking: *"I was sort of expecting that the plate would now get
+positioned some way away from the figure — that would be done by
+`camera.parent`?"* **Yes. That is exactly it, and it is four lines.**
+
+```js
+  const plate = new THREE.Group();   // THIS IS THE PLATE. An ordinary Group.
+  plate.position.set(0, 0, 3);       // CHOICE 2: three metres back from the figure
+  plate.add(camera);                 // now camera.parent === plate
+  scene.add(plate);
+```
+
+That is the entire mechanism. **There is no special plate class, no API to call,
+nothing to register.** `camera.parent` is a `Group` with a position, and its only
+distinction is the convention that three.js maps the headset's pose through
+whatever object the camera happens to be a child of.
+
+Note what is NOT in those lines: nothing is done to `camera` itself. The camera
+is put inside the plate and then left alone, because from the moment a session
+starts its position is a readout (Step 8).
+
+### Two consequences of choice 2 that are easy to miss
+
+**Standing somewhere other than due +Z needs a rotation after all.** The viewer's
+starting facing is fixed by the standard — they face the plate's −Z — so to put
+them anywhere else *and still have them looking at the figure*, the plate must be
+turned as well as moved:
+
+```js
+  plate.position.set(3, 0, 0);          // off to one side
+  plate.rotation.y = Math.PI / 2;       // turned to face back at the figure
+```
+
+That is why rotations reappear the moment the viewpoint is not straight down the
+axis. It is a rotation about Y — turning on the spot — which is the mild kind.
+
+**And the plate's placement is secretly a statement about the real room.** Put
+the figure three metres away and a person with two metres of floor **can never
+reach it by walking**; they would need the flight. Put it one metre away and they
+can walk round it, reach into it, put their head inside it. **The same two
+numbers that decide what the figure looks like also decide whether it is
+touchable**, and that only becomes visible once both the figure and the room are
+in metres — §7a's third reason, arriving again.
+
 ---
 
 ## Step 8 · The three.js camera, and what becomes of it
