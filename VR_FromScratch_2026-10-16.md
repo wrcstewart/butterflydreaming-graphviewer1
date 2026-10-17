@@ -263,6 +263,114 @@ the code gets to say where it stands.
 
 ---
 
+## Step 7a · So what actually *determines* any of these numbers?
+
+The author, having read the above: *"so the scale is set by us? After that, in
+case (b), what actually determines the world coordinates, and what determines
+the coordinates of the plate in the world coordinates — assuming it is that way
+round?"*
+
+Taking the easy half first. **Yes, it is that way round.** `camera.parent`'s
+transform maps **plate coordinates → world coordinates**, so it holds the
+plate's position, orientation and scale *expressed in world coordinates*. Its
+inverse runs the other way and answers "where is that vertex relative to the
+room".
+
+Now the hard half, and the answer is uncomfortable but it is the truth:
+
+> **NOTHING DETERMINES WORLD COORDINATES. They are a free choice — a gauge, in
+> the physicist's sense. Any choice works provided everything is described
+> consistently in it, and no measurement anywhere can tell you which one was
+> picked.**
+
+That is why Step 6 is labelled DECLARED and not MEASURED. There is no fact of
+the matter.
+
+### The one real constraint: the two transforms are a single decision
+
+What you actually have is **one** thing to decide and **two** places to write it:
+
+```
+   how the figure is placed        (group.matrix)
+   where the plate stands          (camera.parent)
+                                   ─────────────────
+   the viewer's relation to the figure     ← the ONLY thing that has consequences
+```
+
+§5k of `ThreeJS_and_VR` proves it with numbers: every ratio that reaches the eye
+is identical whichever of the two carries the work. So the question "what
+determines the plate's coordinates" has this answer: **the plate's placement is
+the residue.** Decide the relationship you want, decide how much of it to put in
+the figure's transform, and what is left over is the plate's. It is not an
+independent fact and there is nothing to look up.
+
+**In case (b) I put the whole mapping in `group.matrix` and left the plate as
+the identity.** So the plate's coordinates in the world are `(0,0,0)`, no
+rotation, scale 1 — and world coordinates came out in metres as a *consequence*
+of that, not as a separate decision. The plate's numbers are metres, the identity
+map preserves them, so the world's numbers are metres too.
+
+### The practical rule, then
+
+**Decide the relationship in physical words first.** "The viewer stands two
+metres back from a four-metre tunnel, at eye height, looking down its axis."
+*That* is the real content. The two matrices are bookkeeping that follows from
+it, and either can carry the work.
+
+### And three reasons to make world coordinates metres anyway
+
+Nothing forces the gauge, but one choice is much better and it is worth knowing
+why rather than taking it on trust:
+
+1. **`camera.near` / `.far` reach the session in metres.** If world coordinates
+   are something else, those two must be converted by hand — and getting it
+   wrong does not raise an error, it silently clips the figure.
+2. **Everything added later is naturally specified in metres.** Text at a 2 cm
+   cap height, a floor, a static reference frame for comfort (§5d). If world
+   coordinates are figure units, every one of those needs the conversion applied
+   by hand, every time, forever.
+3. **The deep one: your own body is in metres.** Eye separation 0.064. A lean,
+   0.1. Eye height, 1.6. **The entire design question in VR is "how big is this
+   thing relative to a person", and that question is only easy to ask when both
+   are in the same units.**
+
+### Reason 3 earning its keep immediately
+
+Ask that question of case (b) and it answers back something unwelcome. The
+example vertex `(12, 400, 0)` makes the tube **33 times longer than it is
+wide**. In metres:
+
+| scale | tunnel length | bore diameter | your eyes, as a share of the bore | what it actually is |
+|---|---|---|---|---|
+| **0.01** — case (b) | 4.0 m | **0.24 m** | 27% | **a drainpipe** |
+| 0.05 | 20.0 m | 1.20 m | 5% | a culvert you could crawl into |
+| **0.083** | **33.3 m** | **2.00 m** | 3% | a tunnel you can stand in |
+| 0.25 | 100.0 m | 6.00 m | 1% | architecture |
+
+**So case (b) is wrong for the thing it was meant to show.** A four-metre tunnel
+at these proportions has a 24 cm bore — your head does not fit, and with your
+eyes 27% of the bore apart the stereo would be grotesque. To fly *through* it the
+bore wants two metres or more, and at these proportions that makes the figure
+**33 metres long**.
+
+Three consequences, none of which were visible before the units were metres:
+
+- **The figure is LANDSCAPE-scale, not room-scale.** Virtual space does not care
+  that 33 m exceeds the room — but §3b's "table, room, or building" question has
+  an answer now, and the answer is none of the three.
+- **`depthFar` must cover 33 m, not 10.** Which is Step 8's near/far row turning
+  from a note into a number.
+- **The proportions are a parameter, not a given.** `step_pitch` below `step`
+  squashes the tunnel shorter and fatter — which is listed in
+  `bd_V_Kolam3D_002`'s own prose as a thing to try, and is now the control that
+  decides whether a person fits inside the figure at all.
+
+**That is what the metres gauge buys**, and it is the honest answer to "what
+determines the world coordinates": nothing does — but choosing metres is what
+let the arithmetic tell us the tunnel was a drainpipe.
+
+---
+
 ## Step 8 · The three.js camera, and what becomes of it
 
 > **THE THREE.JS CAMERA** — the `PerspectiveCamera` the module creates:
