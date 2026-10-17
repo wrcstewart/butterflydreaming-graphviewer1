@@ -245,6 +245,35 @@ been read off a device.
 > runtime assumed 1.6 and derived the floor from it. The same reading, two
 > completely different meanings.
 
+### So when is the floor actually missing?
+
+The author's obvious next question: *"how could the floor height not be there?"*
+Which reframes the whole thing, because **the estimate is not there to paper over
+a fault. It is there so that the API never has to say no.**
+
+The specification allows `local-floor` to be granted with an estimated floor
+precisely so that a page asking for one is not refused. A browser would rather
+hand over a plausible floor than fail the request and make every page handle its
+absence. **So branch 2 is a deliberate design decision in the standard, not a
+broken device**, and the circularity the author spotted is the price of that
+decision.
+
+When it actually bites, in rough order of likelihood for this project:
+
+| situation | floor | note |
+|---|---|---|
+| **a WebXR emulator** — a browser extension, or DevTools' XR emulation | **synthetic** | **the likeliest one by far**, because it is how any of this gets tested before hardware arrives |
+| a phone, or any 3DoF device | **none at all** | no position tracking, so no floor to have |
+| a headset whose room setup was never completed | estimated | a fresh device, or a new room |
+| PC VR calibrated seated-only | approximate | the floor is where the setup said, which may be the chair |
+| **a Quest 3 that has been through Space Setup** | **measured** | **the case that matters here, and it is fine** |
+
+So for BD's actual target the question is close to moot. **Where it is not moot
+is in testing**: an eye height read in an emulator is the emulator's number and
+says nothing about any person, so no placement rule should ever be *validated*
+there. Which is worth knowing now rather than after an afternoon of tuning a
+figure against a synthetic 1.6 m viewer.
+
 **One indirect test exists:** `bounded-floor` is only available when the device
 has a real, traced room boundary. **If a request for `bounded-floor` succeeds,
 room setup has been done** and branch 1 is in force. That is evidence rather than
