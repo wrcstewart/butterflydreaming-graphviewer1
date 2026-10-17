@@ -621,7 +621,9 @@ Precisely what survives, and what does not:
 | | in a session |
 |---|---|
 | `camera.position`, `.quaternion`, `.up` | **overwritten every frame** — a readout |
-| `camera.fov`, `.aspect` | **unused** — the runtime's projection matrix replaces them |
+| `camera.fov` | ~~unused~~ — **OVERWRITTEN**, see §8a. Not an input, but not ignored either |
+| `camera.aspect` | unused — the runtime's projection matrix replaces it |
+| `camera.scale` | **overwritten**, and non-unit if the plate is scaled (§8a) |
 | `camera.near`, `.far` | **still yours.** three forwards them to the session as `depthNear` / `depthFar` — **in metres**, so a value derived from a figure-unit distance will be wrong by whatever Step 6 chose |
 | `camera.parent` | **yours, and now load-bearing** |
 | `renderer.render(scene, camera)` | still called with your camera; three quietly substitutes the ArrayCamera |
@@ -631,6 +633,100 @@ Precisely what survives, and what does not:
 name**, which is most of why this is confusing: *your* camera is a request on a
 monitor and a report in a headset, while *three's* two cameras are the ones that
 actually draw and are never yours at all.
+
+---
+
+## Step 8a · "Surely `camera.position` and `.quaternion` fix the headset?"
+
+The author, having set aside the word "position" in its informal sense: *"but
+`camera.position` and `.quaternion` do fix the headset and its direction of
+facing, surely?"*
+
+**No — they report it.** And the reason is not an API restriction, it is physics:
+**the headset is a physical object on somebody's head, and nothing written in
+JavaScript can move it.** Outside a session those two properties are a request;
+inside one they are an answer. Same properties, opposite causality, and **nothing
+in the API signals the change** — which is exactly why this is the easy mistake.
+
+### Verified against three 0.160.0's own source
+
+The code that does it, verbatim from the build this module loads:
+
+```js
+  function updateUserCamera( camera, cameraXR, parent ) {
+    if ( parent === null ) {
+      camera.matrix.copy( cameraXR.matrixWorld );
+    } else {
+      camera.matrix.copy( parent.matrixWorld );
+      camera.matrix.invert();
+      camera.matrix.multiply( cameraXR.matrixWorld );
+    }
+    camera.matrix.decompose( camera.position, camera.quaternion, camera.scale );
+    …
+  }
+```
+
+Three things fall out of that, two of which correct statements made earlier in
+this document.
+
+**1. `camera.position` is the head's pose IN THE PLATE'S FRAME — not in world
+coordinates.** It is decomposed from `camera.matrix`, the camera's *local*
+transform, which that code sets to `parent⁻¹ × (the XR pose)`. So:
+
+```js
+  camera.position            // the head in the ROOM. metres. e.g. (0, 1.62, -0.10)
+  camera.getWorldPosition(v) // the head on the PLAN. whatever units step 6 chose.
+```
+
+A real trap, and a useful one once known: **`camera.position` is the one place the
+room's own metres are handed back to you**, whatever gauge the world is in.
+
+**2. `camera.fov` is OVERWRITTEN, not ignored.** This document said "unused".
+Wrong — three back-computes a nominal vertical field of view from the runtime's
+projection matrix and writes it in:
+
+```js
+  camera.fov = RAD2DEG * 2 * Math.atan( 1 / camera.projectionMatrix.elements[5] );
+```
+
+So after one frame, **`camera.fov` tells you the headset's own vertical field of
+view.** Nominal rather than exact, because the real frustum is asymmetric and a
+single number cannot describe one — but it is a reading, not a leftover. `CAM_FOV
+= 50` does not merely stop working: the variable it feeds would come back holding
+the device's figure.
+
+**3. `camera.scale` is written too**, and a plate carrying a scale makes it
+non-unit — a plate at scale 100 leaves `camera.scale` at 0.01, because the
+inverse is in that product. Harmless, and baffling if encountered without
+knowing why.
+
+### And `near` / `far` confirmed
+
+The claim made twice elsewhere, now read from source rather than remembered:
+
+```js
+  cameraXR.near = cameraR.near = cameraL.near = camera.near;
+  cameraXR.far  = cameraR.far  = cameraL.far  = camera.far;
+  if ( _currentDepthNear !== cameraXR.near || … ) {
+    session.updateRenderState( { depthNear: cameraXR.near, depthFar: cameraXR.far } );
+  }
+```
+
+**Yours, and forwarded.** With one detail three's own comment supplies: *"the new
+renderState won't apply until the next frame"* — so a change to `near` or `far`
+lands one frame late. Immaterial for a setting, worth knowing if anything ever
+animates them.
+
+### So what DOES determine where the viewer is?
+
+```
+   where the viewer is on the plan  =  the plate's placement   ← YOURS
+                                     × the head's pose         ← THEIRS, measured
+```
+
+**Two factors, one of them yours, and neither of them is `camera.position`.** The
+author's intuition is right that something fixes the viewer's pose and that part
+of it is the author's to set — it is simply one object further out than it looks.
 
 ---
 

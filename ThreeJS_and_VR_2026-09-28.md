@@ -937,7 +937,7 @@ seam, and it is what three's own XR examples use.
 | | owner | in V_Kolam3D today |
 |---|---|---|
 | head pose, eye offsets | the runtime | — |
-| per-eye projection matrix | the runtime | `CAM_FOV = 50` becomes dead |
+| per-eye projection matrix | the runtime | `CAM_FOV = 50` becomes dead as an INPUT — and `camera.fov` is then **overwritten** with the device's own nominal vertical FOV, read from source: see `VR_FromScratch` §8a |
 | `camera.position` / `.quaternion` / `.up` | **the runtime, overwritten each frame** | `placeCamera` writes all three |
 | `camera.near` / `.far` | **still yours** — three forwards them to `session.updateRenderState({ depthNear, depthFar })` | `placeCamera` derives them from `cam_distance` |
 | `camera.parent.matrixWorld` — the DOLLY | **yours** | does not exist yet; `camera` has no parent |
