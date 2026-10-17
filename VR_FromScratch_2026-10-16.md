@@ -327,6 +327,79 @@ section is about.
 
 ---
 
+## Step 2b · Checking the summary — three "positions" that are easy to conflate
+
+The author, consolidating: *"so the plate is a coordinate frame at reported
+(stored measurement or default) floor level, with one of its axes positioned
+along the gaze direction of the headset. Its position is determined by
+`camera.position`, and it is in units of metres?"*
+
+**Two of those are right, one is nearly right, and one is inverted.** Taking them
+in turn, because each error is worth more than the correct parts.
+
+### ✓ "at reported floor level" — yes
+
+Stored measurement where room setup has been done, the browser's estimate where
+it has not (§2a, §0).
+
+### ✓ "in units of metres" — yes
+
+Fixed by the standard, not a choice. And by §8a, `camera.position` is in this
+frame, so **that reading is in metres too, whatever units the world is in.**
+
+### ✗ "along the gaze direction" — along the gaze AT SESSION START, then frozen
+
+This is the one worth stopping on. The plate's −Z is aligned to where the viewer
+was facing **at the instant the session began**, and then **it never moves
+again.**
+
+> **If the plate tracked the gaze, nothing would ever appear to move when you
+> turned your head.** The whole figure would swing round with you and stay dead
+> centre — the "stuck to your face" failure of §7. The plate must be frozen for
+> the world to stay still.
+
+Two details inside that:
+
+- **Levelled to gravity.** If the person was looking up or down when they
+  started, that pitch is discarded. **Only the yaw survives**, so the plate's +Y
+  is gravity-up and never head-up.
+- **It is a measurement you did not take, of a moment you did not choose.** If
+  someone opens a session facing a wall, the plate's −Z points at that wall and
+  the figure is off to one side.
+
+### ✗✗ "its position is determined by `camera.position`" — inverted
+
+**`camera.position` is the head's position INSIDE the plate.** It says nothing
+about where the plate is. Three different things are being run together here, and
+separating them is most of understanding this:
+
+| the question | the answer | kind | whose |
+|---|---|---|---|
+| where did the plate's origin land **in the real room**? | **no JavaScript value at all** — it is where the person was standing when the session started | MEASURED, once | the runtime's |
+| where does the plate sit **on the plan**? | **`camera.parent.position`** / `.rotation` — §7b's four lines | DECLARED | **yours** |
+| where is the head **inside the plate**? | **`camera.position`** — metres, read after each frame | MEASURED, every frame | the runtime's |
+
+So the plate has, in a sense, two positions: one in the room that nobody wrote
+and nobody can read as a number, and one on the plan that is entirely yours.
+`camera.position` is neither of them — it is the person moving about on top.
+
+### And the rule the two errors have in common
+
+The eye height (§2a) and the starting facing are **the same kind of problem**:
+both are facts about the person and the moment, both are unknowable in advance,
+and both have the same fix.
+
+> **Read them on the first frame and place relative to what you read.** Eye
+> height from `camera.position.y`; starting facing from `camera.quaternion`'s
+> yaw. Then a short viewer, a seated viewer, and a viewer who began facing the
+> wrong way all get the composition you intended.
+
+**Assume either one and roughly half your viewers get something you did not
+design.** It is the same discipline as §2a's floor cancellation, applied to the
+other two unknowns — and it costs one frame's delay before placing anything.
+
+---
+
 ## Step 3 · The head pose
 
 > **POSE** — a position *and* an orientation together. Six numbers: three for
