@@ -371,6 +371,128 @@ let the arithmetic tell us the tunnel was a drainpipe.
 
 ---
 
+## Step 7b · The same thing again, with one line and no rotations
+
+§7a answered "what determines these numbers" philosophically. The author meant
+something more practical: **which upstream choices fix them?** So here is the
+whole chain again with everything removable removed — **one straight line, two
+endpoints, no symmetry children, no rotations anywhere.**
+
+### The figure
+
+```
+  a line from  (0, 0, 0)  to  (10, 5, 1)       figure-local, PURE NUMBER
+  its length: 11.225 of whatever those are
+```
+
+### There are exactly TWO upstream choices
+
+Everything else follows from them. That is the answer to the question.
+
+> **CHOICE 1 — how big should the figure be for a person?**
+> This fixes the scale in `group.matrix`, and nothing else does. Say "the line
+> should be about a metre": `scale 0.1`, because 11.225 × 0.1 = 1.12 m.
+>
+> **CHOICE 2 — where should the person be, relative to the figure?**
+> This fixes the plate's placement, and nothing else does. Say "standing three
+> metres back from it": the plate goes to `(0, 0, 3)`.
+
+Two sentences of plain English, two numbers. **Nothing downstream is a decision
+at all** — view space, the projection, the pixels, all of it is arithmetic.
+
+### "Wouldn't the world origin be the same as the figure's local origin?"
+
+**Yes — and leaving it that way is the right default.** With `group.matrix`
+carrying nothing but a scale:
+
+```
+  figure (0, 0, 0)   →  world (0.000, 0.000, 0.000)     ← the same point
+  figure (10, 5, 1)  →  world (1.000, 0.500, 0.100)
+```
+
+A scale fixes the origin. So the figure's origin *is* the world's origin, and the
+only difference between the two frames is how long a unit is. That is as simple
+as this can get, and it is what `V_Kolam3D` does today (with the scale at 1, so
+the frames are not merely sharing an origin, they are identical).
+
+**Keeping the figure at the origin and moving the plate** is therefore the
+natural choice — and worth noticing: it is Option A of §5k, *carry the viewer*,
+which is also the cheap port, because `placeCamera` already computes a position
+relative to a figure sitting at the origin. The simplest choice and the cheapest
+choice are the same one. **It is also the less comfortable one** (§5d), which is
+a tension to know about rather than resolve here.
+
+### But the simple choice forces two things nobody chose
+
+**(a) The figure lands on the floor.** The plate's origin is on the floor — that
+is what `local-floor` means — so putting the figure's origin there puts the
+figure's origin *on the floor*. The head is 1.6 m up, so **the line is seen from
+above, and anything with a negative Y is underground.** The figure has no idea
+there is a floor; its origin is just wherever the turtle started. Nothing
+reconciles those two facts except a decision.
+
+**(b) +Z is behind the viewer.** The figure runs into positive X, Y and Z, and
+the viewer faces −Z. That is *why* Choice 2 put the plate at `(0, 0, +3)`: it
+steps the person backwards so the figure is in front of them. Had the plate been
+left at the origin, the person would be standing at the figure's root with it
+behind them.
+
+### Now the arithmetic, both endpoints, both eyes
+
+```
+  CHOICES      group.matrix = scale 0.1          ← choice 1
+               plate at (0, 0, 3), no rotation   ← choice 2
+  MEASURED     head on the plate (0, 1.6, 0), facing as they started
+  DERIVED      head in world (0, 1.6, 3) · left eye (-0.032, 1.600, 3.000)
+```
+
+| | A — figure `(0,0,0)` | B — figure `(10,5,1)` |
+|---|---|---|
+| world | `(0.000, 0.000, 0.000)` | `(1.000, 0.500, 0.100)` |
+| view space, **left** eye | `(0.032, -1.600, -3.000)` | `(1.032, -1.100, -2.900)` |
+| …read in words | 3.00 m ahead, 1.60 m **below** eye | 2.90 m ahead, 1.10 m below, 1.03 m right |
+| NDC, left | `(0.01067, -0.53333)` | `(0.35586, -0.37931)` |
+| **pixel, left eye** | **`(1043.0, 1692.8)`** | **`(1399.2, 1522.8)`** |
+| pixel, right eye | `(1021.0, 1692.8)` | `(1376.5, 1522.8)` |
+| **disparity** | **22.0 px** | **22.8 px** |
+
+Image centre is `(1032, 1104)`, so both endpoints are **well below centre** —
+consequence (a), the figure on the floor, showing up as a number. On screen the
+line runs **356 px across and 170 px up**, which on a 2064-wide image is a clear,
+comfortably long stroke.
+
+### And one thing the numbers say that was not obvious
+
+**The disparity barely changes along the line: 22.0 px at one end, 22.8 at the
+other — 0.76 px across the whole thing.** Because the line spans only 0.10 m of
+depth out of about 3 m: it is very nearly *fronto-parallel*, flat-on to the
+viewer.
+
+> **So for this line, stereo contributes almost nothing.** Under a pixel of
+> disparity gradient is below what anyone can use. The two eyes agree about its
+> shape, and a flat screen would convey it just as well.
+
+Which sharpens §5e's claim rather than contradicting it. Stereo does not reward
+3D content; **it rewards DEPTH DIFFERENCES.** A figure spread across the view at
+roughly one distance gets nothing from a headset. A tunnel receding away from you
+gets everything, because its far end and its near end are metres apart in depth.
+
+**And that is what `cam_axis` is for**, seen from a new angle: aiming down a
+strand's axis is precisely the act of turning a fronto-parallel figure into a
+receding one — which on a flat screen is a composition choice and in a headset is
+the difference between stereo working and stereo idling.
+
+### The whole of it, in four lines
+
+```
+  choice 1   how big, for a person          →  group.matrix's scale
+  choice 2   where the person stands        →  the plate's placement
+  forced     the figure sits at the origin, so it sits on the FLOOR
+  forced     everything after that is arithmetic
+```
+
+---
+
 ## Step 8 · The three.js camera, and what becomes of it
 
 > **THE THREE.JS CAMERA** — the `PerspectiveCamera` the module creates:
