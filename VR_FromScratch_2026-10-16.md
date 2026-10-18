@@ -625,17 +625,83 @@ Why this is better than redenominating anything:
   in metres, world coordinates ARE metres, the plate can be the identity, and
   §5i's "the first session shows black" cannot happen.
 
-### Two things to settle before building it
+### Two things to settle — and the author has settled the first
 
-- **For a tunnel the bore matters more than the length** (§7a: a 4 m tunnel has
-  a 24 cm bore). So "longest extent" may be the wrong handle for exactly the
-  figure that prompted all this, and an axis-aware form — the bore, or the
-  extent across the aim — may be wanted instead or as well.
+> *"Probably an approximate overall size is okay — to set the rig distance, then
+> the user should be able to position the rig."*
+
+**SETTLED, and it lowers the bar usefully.** `%%bd_size` is a FRAMING AID
+followed by adjustment, not a precision instrument. Which disposes of the bore
+objection: it does not matter that a tunnel's longest extent is the wrong handle
+for its bore, because the number only has to land the viewer somewhere sensible
+before they move. "Longest extent" is then the right choice precisely because it
+is the crudest one — it can never put the viewer inside the figure by accident,
+which is the only failure that matters at this stage.
+
+- ~~For a tunnel the bore matters more than the length~~ — **withdrawn, above.**
 - **A live `size` rescales the figure as other controls move.** Sweep `angle`
   and the figure stays four metres while its proportions change. That is
   probably the desired behaviour, and it is a change of character for controls
   that currently grow the figure, so it should be chosen rather than fallen
-  into.
+  into. **Still open.**
+
+### And the terminology the author asks for
+
+> *"We will need some sort of neutral terminology that covers camera distance
+> for non-XR and rig distance for XR?"*
+
+**Yes — but the need is for a word to THINK with, not a directive to rename.**
+The proposal, in three parts.
+
+**1. The concept is THE STANDPOINT.** Where the viewing is done from.
+
+> **THE STANDPOINT** — the place the view is taken from, relative to the figure.
+> In a flat window it is the camera; in a headset it is the rig, and the person
+> standing on it. One word for both, because it names the RELATIONSHIP and not
+> the apparatus.
+
+"Standpoint" is chosen over the alternatives for being ordinary English that
+needs no gloss, for carrying the bodily sense a headset actually has, and for
+being honest about a flat window too — a camera at `cam_distance 600` is a
+standpoint 600 units out.
+
+**2. The directives do not need renaming, and should not be.** Four reasons,
+and the first is the substantial one:
+
+- **`cam_distance` already names the relationship rather than the mechanism.**
+  "The viewpoint is 600 from the figure" is true in both modes; §5i's finding was
+  that the arithmetic is identical and only its destination changes. The word
+  "cam" is then slightly inaccurate in a session — there is no single camera —
+  but nothing it *says* becomes false.
+- **The `cam_` prefix is load-bearing in the column.** The markup says so
+  explicitly: it exists so the camera controls sort and read as one group.
+  Renaming one of them breaks the group; renaming all of them is a much larger
+  change than the problem.
+- The 13-character label limit. `standpoint_distance` is 19 and wraps;
+  `viewpoint_distance` is 18. The only neutral name that fits is **`standoff`**
+  (8) or `cam_standoff` (12) — recorded in case it is ever wanted, not
+  recommended now.
+- Four stored scripts would need rewriting. A weak reason, as §6a already
+  conceded, but not a zero one.
+
+**3. And the real distinction the question exposes is not camera-versus-rig.**
+It is this:
+
+> **In a flat window the standpoint is MAINTAINED. In a headset it is only the
+> OPENING POSITION.**
+>
+> `cam_distance 600` on a monitor means the eye is at 600 and stays there. In a
+> session it means the viewer *begins* 600 out — and then walks, leans, and sits
+> down. **Every camera directive becomes an initial condition rather than a
+> continuing state**, and no renaming fixes that, because it is a change in what
+> the number can promise rather than in what it refers to.
+
+That is the thing to carry into any XR work, and it is worth more than the
+vocabulary: a directive that was a setting becomes a **starting** setting, and
+anything relying on it to stay true needs rethinking. `cam_distance_speed` is the
+clearest case — a flight that assumes it owns the distance is a flight the viewer
+can simply walk out of.
+
 
 **This is §3b's "scale directive — table, room, or building" with a shape at
 last**, and the author's framing is what gave it one.
