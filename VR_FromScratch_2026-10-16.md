@@ -539,6 +539,109 @@ were not before and nothing forced it.
 
 ---
 
+## Step 6a · "Why not calibrate `step` and distances in metres from the word go?"
+
+The author's proposal, and **the instinct is right: metres is the correct gauge,
+and "easy for the user to understand" is the correct reason.** It is the same
+conclusion §7a reached from the arithmetic, arrived at from the better end.
+
+But it does not survive contact with `step`, and the reason is worth knowing
+because it is a fact about the module rather than about units.
+
+### `step` is not a length
+
+```js
+  params.effectiveStep = params.step / Math.pow(3, Math.max(0, params.depth - 1));
+```
+
+**`step` is a nominal number divided by depth.** At depth 5 it is divided by 81,
+so the stored `step 9900` draws segments of **122 units**, not 9900. Denominate
+that in metres and `step 9.9` would draw 12 cm segments.
+
+> **A metric-looking number that is not the length of anything visible is WORSE
+> than a frankly arbitrary one, because it invites belief.** "Step 9.9 metres"
+> reads as a promise the figure does not keep; "step 9900" at least announces
+> that it is a dial.
+
+The division is not an accident either — it is what keeps the figure roughly the
+same overall size as depth changes, since the segment count goes as 4^depth.
+Removing it to make `step` a true length would make depth a size control, which
+is worse.
+
+**And the stored scripts show how little `step` corresponds to anything.** All
+four of them:
+
+| script | depth | `step` | segment actually drawn |
+|---|---|---|---|
+| `bd_V_Kolam_001` | 2 | 299 | 99.7 |
+| `bd_V_Kolam_002` | 3 | 40 | 4.4 |
+| `bd_V_Kolam3D_001` | 2 | 50 | 16.7 |
+| `bd_V_Kolam3D_002` | 5 | **9900** | **122.2** |
+
+`step` spans a factor of 247 across those; the thing drawn spans 28. There is no
+exchange rate to state.
+
+### Two smaller costs, and one objection that turned out to be weak
+
+- **The 2D and 3D modules share the vocabulary.** `bd_V_Kolam3D` is a *measured*
+  superset of `bd_V_Kolam` — pitch 0 and `cam_elevation 90` reproduce the flat
+  figure to Float32Array precision — and that property is what lets a script
+  move between them. A `step` in metres in one and in canvas units in the other
+  ends it.
+- **The steppers assume largish integers.** `step` runs 1–9900 with a coarse
+  step above 1000, and the hold-repeat rate is derived from the range. A
+  metre-denominated range of 0.001–100 wants fractional stepping, which changes
+  the feel of every press on every control.
+- **MIGRATION IS NOT A REAL OBJECTION, and I nearly treated it as one.**
+  Counted rather than assumed: **four stored scripts**, two per module. Whatever
+  is decided here, rewriting four nodes is an afternoon's nothing.
+
+### The better form of the same idea: say the SIZE, not the unit
+
+What the author actually wants is to think in metres, and §7a established what
+the useful metric question is: **how big is this thing relative to a person?**
+So state *that*, once, and let the module do the conversion:
+
+```
+  %%bd_size 4          the figure's longest extent is four metres
+```
+
+**The module already measures its own extent** — `render()` computes
+`Math.hypot(built.maxXZ, built.maxY * pitchScale())` for the camera's auto-fit —
+so the scale is one division: `wanted ÷ measured`, applied on the root group
+(§5c.3). Absent, it defaults to 1 and today's behaviour is unchanged to the bit.
+
+Why this is better than redenominating anything:
+
+- **The author states the number they care about**, not a conversion factor
+  nobody can picture.
+- **It is independent of how the figure is made.** Change `step`, `angle`,
+  `depth`, or the score and the figure is still four metres. The parameters go
+  back to being compositional, which is what they are.
+- **`step` stops needing to mean anything**, which is just as well, since it
+  does not.
+- **Both modules keep one vocabulary**, so a script still travels.
+- **And it answers the VR question in passing.** With the figure's size stated
+  in metres, world coordinates ARE metres, the plate can be the identity, and
+  §5i's "the first session shows black" cannot happen.
+
+### Two things to settle before building it
+
+- **For a tunnel the bore matters more than the length** (§7a: a 4 m tunnel has
+  a 24 cm bore). So "longest extent" may be the wrong handle for exactly the
+  figure that prompted all this, and an axis-aware form — the bore, or the
+  extent across the aim — may be wanted instead or as well.
+- **A live `size` rescales the figure as other controls move.** Sweep `angle`
+  and the figure stays four metres while its proportions change. That is
+  probably the desired behaviour, and it is a change of character for controls
+  that currently grow the figure, so it should be chosen rather than fallen
+  into.
+
+**This is §3b's "scale directive — table, room, or building" with a shape at
+last**, and the author's framing is what gave it one.
+
+---
+
 ## Step 7 · `.parent` — where the plate stands on the plan
 
 > **`camera.parent`** — an ordinary three.js `Object3D` that has the camera as a
