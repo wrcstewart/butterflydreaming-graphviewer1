@@ -766,6 +766,52 @@ flight is an offer rather than a trajectory, and §5d's comfort argument becomes
 sharper still: a viewer who dislikes it can step out of it, which is a far better
 safety valve than anything the script could provide.
 
+### The author's prediction, recorded so it can be checked
+
+> *"I would guess the rig is approximately on the tunnel but slightly off centre
+> maybe. Will need to try this out."*
+
+**Almost certainly right, and the arithmetic says which term will cause it.**
+Computed at a 3 m vantage distance:
+
+| source of off-centre | size | |
+|---|---|---|
+| the bearing, rounded to the arcminute (§5f) | **0.35 mm** | negligible |
+| the fitted axis missing the origin | **0** | already handled — the camera looks at the axis, not the origin |
+| a lean forward | **~100 mm** | |
+| **half a step sideways on the plate** | **~250 mm** | **DOMINATES, by three orders of magnitude** |
+
+So the aim is not what will be off. **The person is**, and that is the vantage /
+eye distinction showing up as a number rather than an argument.
+
+**And one part of it is irreducible: a perfect aim cannot put BOTH eyes on the
+axis.** Each sits 32 mm either side of it, always — so whether that matters is
+set entirely by the bore:
+
+| bore | each eye off-axis | reads as |
+|---|---|---|
+| 0.24 m (§7a's drainpipe) | **27% of the radius** | each eye looking down a different part of the wall |
+| 0.50 m | 13% | noticeably asymmetric |
+| 1.00 m | 6% | effectively centred |
+| 2.00 m | 3% | effectively centred |
+
+Which is §7a's bore finding arriving by a second route: **a tunnel wide enough to
+fly through is also a tunnel wide enough for two eyes to agree about.**
+
+### What can actually be tried, and when
+
+Worth separating, so the test is not waited on longer than necessary:
+
+- **Testable now, flat, and already was**: the aim itself, the axis-miss fix, the
+  hole sitting centred.
+- **Needs the headset**: whether the fly-through is bearable, whether a hairline
+  fuses, whether stereo rescues the figure.
+- **Needs the headset AND an immersive session in the module, which does not yet
+  exist**: everything about the vantage / eye split, including this prediction.
+  There is no `immersive-vr` request in `V_Kolam3D` — §5h's recommendation is
+  still to wait, so the prediction stands unchecked on purpose.
+
+
 
 **This is §3b's "scale directive — table, room, or building" with a shape at
 last**, and the author's framing is what gave it one.
