@@ -702,6 +702,70 @@ anything relying on it to stay true needs rethinking. `cam_distance_speed` is th
 clearest case — a flight that assumes it owns the distance is a flight the viewer
 can simply walk out of.
 
+### **4. Corrected by the author: it is TWO QUANTITIES, not one weakened**
+
+> *"But the rig distance, which is what is controlled, isn't the cam distance,
+> because the user can move about on the rig. Maybe 'vantage' gives the hint that
+> it is a point external to the user's headset."*
+
+**Right, and part 3 above understates it.** "An opening position" treats it as
+one quantity whose promise has weakened. It is not. **There are two distances in
+a headset, and they are different kinds of thing:**
+
+| | what it is | who sets it | kind |
+|---|---|---|---|
+| **the vantage's** distance from the figure | where the plate is placed — a property of the PLATE | **the script** | DECLARED |
+| **the eye's** distance from the figure | the vantage combined with where the person is standing on it | **the person** | MEASURED |
+
+```
+  the eye   =   the vantage          ← the script's, settable
+              + where they stand on it   ← the person's, readable only
+
+  On a flat screen the second term does not exist — there is no plate and
+  nobody standing on it — so the two collapse into one number. WHICH IS WHY
+  ONE WORD HAS SUFFICED UNTIL NOW.
+```
+
+**And "vantage" is the better word, for exactly the reason given.** A vantage is
+a place *prepared* for viewing — a hide, a viewing platform, an emplacement. **It
+exists before anyone occupies it, and it stays where it is when they move about
+on it.** That is precisely the plate. "Standpoint", which this section proposed
+a moment ago, says *where you stand*, which is the person — the very thing that
+is not under control. **Withdrawn in favour of the author's term.**
+
+> **THE VANTAGE** — the place prepared for viewing, external to the viewer and
+> set by the script. In a headset it is the plate's placement; in a flat window
+> it is the camera, there being nobody to stand anywhere else. **The EYE is where
+> the viewer has put themselves within the vantage** — readable, never settable.
+
+As a rename candidate the arithmetic of the label limit is: `vantage` 7 fits,
+`vantage_dist` 12 fits but abbreviates, `vantage_distance` 16 wraps. Still not
+recommended — §6a's reasons stand — but `vantage` now replaces `standoff` as the
+name to use if one is ever wanted.
+
+### The consequence that matters, and it is not about naming
+
+**`cam_axis` can only aim the VANTAGE.** It measures a strand's axis and points
+the viewing position down it — and then the person takes one step sideways and
+their eye is no longer on that axis at all. The aim this module computes to a
+fortieth of a degree (§5f) is an aim of the platform, not of the eye.
+
+Three ways that can go, recorded rather than chosen:
+
+- **Accept it.** The person can look at the tunnel from beside it if they like.
+  Probably correct, and it is what every room-scale piece does.
+- **Re-aim continuously on the head's position.** Keeps the eye on the axis and
+  is the nausea case — the world would swing whenever they leaned.
+- **Invite rather than enforce**: place the vantage so that the axis runs through
+  where a person naturally stands, and let the figure's own shape do the
+  persuading. The only one of the three that treats the viewer as a participant.
+
+**And the same correction applies to `cam_distance_speed`.** It flies the
+*vantage* in. The eye arrives too, as long as the person stays put — so the
+flight is an offer rather than a trajectory, and §5d's comfort argument becomes
+sharper still: a viewer who dislikes it can step out of it, which is a far better
+safety valve than anything the script could provide.
+
 
 **This is §3b's "scale directive — table, room, or building" with a shape at
 last**, and the author's framing is what gave it one.
