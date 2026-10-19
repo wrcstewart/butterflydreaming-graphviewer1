@@ -317,8 +317,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #27ae60;
-      color: #27ae60;
+      border: 1px solid #2980b9;
+      color: #2980b9;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -981,7 +981,20 @@
         <button class="step-btn" type="button" data-target="colour-speed-slider" data-delta="1">+</button>
       </div>
       <label>colour_speed</label>
-      <input id="colour-speed-slider" class="stepper-source" type="number" min="-2" max="4" step="1" value="2">
+      <!-- The control holds the EXPONENT; %%bd_colour_speed holds 2^exponent.
+           2026-10-19 — opened from -2..4 (0.25 to 16) to -10..10, which is
+           0.000977 to 1024, because the author is "getting interesting
+           effects" and the old ends were arbitrary rather than principled.
+           What the extremes do: hue follows ACCUMULATED YAW, through
+           `hue = (yawDeg mod 360·cs) / cs`, so a LARGE cs stretches one hue
+           cycle over more yaw than the figure contains — 1024 spans 368,640°
+           against the tunnel's 55,000, so the whole piece becomes a narrow
+           gradient. A SMALL cs bands faster than one turtle step, which is
+           where the interesting effects live, and also where RESONANCES do:
+           at cs 0.15 and angle 54 the yaw advances an exact whole number of
+           cycles per step and the figure comes out one flat colour. That is
+           the control behaving, not failing. -->
+      <input id="colour-speed-slider" class="stepper-source" type="number" min="-10" max="10" step="1" value="2">
     </div>
 
     <div class="control-row">
@@ -1144,7 +1157,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-19d';
+    const K3D_BUILD = '2026-10-19e';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -1295,6 +1308,16 @@
     }
     function formatDirectiveNumber(value) {
       if (!Number.isFinite(value)) return String(value);
+      // BELOW 1, THREE SIGNIFICANT FIGURES RATHER THAN TWO DECIMAL PLACES.
+      // 2026-10-19, needed before colour_speed's range could be opened
+      // downward: two decimals turn 2^-8 into the string "0", and
+      // %%bd_colour_speed 0 is a divide by zero in the hue — `hue = yawDeg
+      // mod (360*cs) / cs`. It also made the round trip lossy well before
+      // that, 2^-5 writing 0.03 and reading back as 2^-5 only by luck of
+      // rounding. Above 1 the old behaviour is kept exactly.
+      if (value !== 0 && Math.abs(value) < 1) {
+        return parseFloat(value.toPrecision(3)).toString();
+      }
       return (Math.round(value * 100) / 100).toString();
     }
 
@@ -1391,8 +1414,11 @@
       manageDriftInterval();
       manageCamSpin();
 
-      const colourSpeedValueParsed = Math.min(Math.max(safeParseNumber(directives.colour_speed, 4), 0.25), 16);
-      colourSpeedSlider.value = String(Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -2), 4));
+      // Clamped to the exponent's range as 2^-10 .. 2^10, in step with the
+      // control above — these were 0.25 and 16 and had to move with it.
+      const colourSpeedValueParsed = Math.min(Math.max(
+        safeParseNumber(directives.colour_speed, 4), Math.pow(2, -10)), Math.pow(2, 10));
+      colourSpeedSlider.value = String(Math.min(Math.max(Math.round(Math.log2(colourSpeedValueParsed)), -10), 10));
       saturationSlider.value  = String(Math.min(Math.max(safeParseNumber(directives.saturation, 100), 0), 100));
       lightnessSlider.value   = String(Math.min(Math.max(safeParseNumber(directives.lightness, 65), 0), 100));
       // Falls back to 1 — fully opaque — so a script that has never heard of
@@ -1418,7 +1444,7 @@
             ? String(Math.round(n * 100) / 100).replace(/^0\./, '.')
             : input.value;
         } else if (targetId === 'colour-speed-slider') {
-          // The hidden input holds the EXPONENT (-2..4); %%bd_colour_speed
+          // The hidden input holds the EXPONENT (-10..10); %%bd_colour_speed
           // holds 2^exponent. Showing the directive's own number keeps the
           // readout, the label and the script saying the same thing. The
           // leading zero goes for width only (".25" is the same number as
@@ -3292,7 +3318,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are BLUE #2980b9, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
