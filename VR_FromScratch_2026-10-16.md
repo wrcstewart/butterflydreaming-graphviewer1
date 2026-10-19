@@ -899,10 +899,29 @@ length.** `pitch` holds the length to within 4% over an eightfold range; `angle`
 gives a bore going as roughly 1/angle, less tidily because the small-angle
 approximation frays by 108°.
 
-So expressing pitch as a fraction of angle would **couple two controls that are
-currently orthogonal in the only thing that matters** — how wide against how
-long. Which is why holding `pitch/angle` fixed preserves nothing: at a constant
-ratio of 0.148, angle 13.5 gives a shell at 1:2 and angle 108 gives 1:116.
+Each leaves the other's dimension alone to within **4%**: sweeping `angle` at
+fixed pitch moves the bore 508 → 268 → 151 while the length stirs only from 8376
+to 8711; sweeping `pitch` at fixed angle moves the length 4353 → 16786 while the
+bore holds at 270 → 258. **One knob, one dimension** — about as orthogonal as a
+pair of controls can be.
+
+### Said precisely, because the first version of this was sloppy
+
+The author: *"how can adjusting the ratio of A and B affect whether they are
+orthogonal? It's because they are doing different jobs that adjusting their
+relative strengths makes sense."* **Both halves right, and this section had said
+it badly.**
+
+Adjusting a ratio changes nothing about orthogonality. What changes it is
+**adopting the ratio as a COORDINATE** — a change of variables, not an
+adjustment — and the cost lands on the OTHER knob:
+
+| knob | with `pitch` held | with `r = pitch/angle` held |
+|---|---|---|
+| `angle` | moves the **bore** only | `pitch = r·angle` moves too → **bore AND length** |
+
+So "the ratio would couple them" was the wrong sentence. `angle` is what stops
+being clean.
 
 ### The invariant is the PRODUCT, not the ratio
 
@@ -918,7 +937,27 @@ Holding `pitch × angle = 432`:
 Constant to within 13% across an eightfold range of angle. **So the
 aspect-preserving move is to scale `angle` and `pitch` INVERSELY** — halve one
 and double the other for the same proportions at a different winding density.
-That is the thing a ratio was hoped to give and the product actually gives.
+
+### And the ratio IS meaningful — it is the other half of the pair
+
+Measured the same way. **The product and the ratio turn out to be exactly the
+(aspect, scale) coordinates:**
+
+| hold | vary | what happens |
+|---|---|---|
+| `pitch × angle` | the ratio | aspect holds at ~1:29–33 while length and bore **grow together** — a SCALE change |
+| `pitch / angle` | the product | aspect runs 1:2 → 1:8 → 1:32 → 1:116 — an ASPECT change |
+
+So the author's instinct was sound and only mis-assigned: the ratio is the scale
+coordinate, not the aspect one.
+
+**Which leaves a real gap worth naming rather than filling now.** "Keep this
+shape, make it bigger" and "keep this size, make it thinner" are both natural
+wants, and **neither is a single knob today** — each needs two coordinated
+moves. `(pitch × angle, pitch / angle)` is exactly those two knobs. It is a
+SECOND coordinate system rather than a better one, and the raw pair should stay
+primary because one-knob-one-dimension cannot be improved on for *building* a
+figure. Worth offering as an alternative pair someday; not worth a replacement.
 
 ### And it corrects a claim written into the node the same day
 
