@@ -6,6 +6,181 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-16/19 — the module goes metric, and three bugs of one kind
+
+Two strands. An explainer written because a diagram did not help, and then the
+units work that explainer made possible. The second strand produced three
+faults of a single shape, and all three were found by the author reporting a
+symptom rather than by me checking my own change — which is the most useful
+thing to come out of the week.
+
+### `VR_FromScratch_2026-10-16.md`, and why it exists
+
+The author asked for a diagram of the coordinate frames a headset introduces,
+got a description, asked again, got monospace in a markdown file, and said *"the
+diagram didn't help"*. **A diagram that does not help is usually one that
+assumes the thing it was meant to explain** — §5k started from frames and
+mappings, which are the answer rather than the question.
+
+So: a document from nothing, defining every term on first use, built around the
+author's own request that each thing be **marked for how real it is**. That
+request turned out to be the organising idea. Five degrees — PHYSICAL, MEASURED,
+DECLARED, PURE NUMBER, DERIVED — and one sentence falls out of the labelling:
+**the room is physical, the figure is pure number, and everything difficult
+happens in the declared layer between them.**
+
+Ten steps, and the piece a diagram cannot do: **one vertex, every number
+computed.** `(12, 400, 0)` with no unit, through `group`'s transform to world
+metres, through the inverse of parent × head pose × eye offset to view space, to
+NDC, to pixel `(1059, 1108)` of a 2064×2208 framebuffer — and **11.2 px of
+disparity against the other eye, which IS the stereo.**
+
+The document was corrected seven times by the author in the course of a day, and
+every correction is in it rather than quietly rewritten. The substantial ones:
+
+- **`camera.position` reports the headset, it does not fix it** — and it reports
+  it **in the plate's frame, not the world's**, read from three 0.160.0's own
+  `updateUserCamera`. `camera.fov` is *overwritten* too, not merely unused.
+- **Volitional head motion is itself the reference**, so §5d's static-reference
+  argument was reasoning about an observer held still. An observer is never
+  still.
+- **A flat screen does not deliver the same percept.** BD's figure has almost no
+  monocular depth cues *by its own design* — no shading, no ground plane, and
+  `depthWrite: false` below opacity 1 removes occlusion — so **BD's figures are
+  precisely the content stereo rescues.** Which inverts §8e for this content and
+  gives the sharpest statement yet: **the headset is the wrong medium for BD's
+  text and the right medium for BD's figures.**
+- **It is two quantities, not one weakened.** The **vantage**'s distance from
+  the figure is the script's; the **eye**'s is the vantage plus where the person
+  is standing on it. The author's word, and the better one, because a vantage is
+  a place *prepared* for viewing that stays put when someone moves about on it.
+- **I overstated the forcing twice** and both are struck: a dolly carries the
+  present camera model into XR by mechanical translation, so moving the *world*
+  is an aesthetic choice rather than a precondition.
+
+`/plate` serves a drawn version from BD's own express, after a hosted artifact
+turned out to be private to the account that published it. Same reasoning as
+`/x` and `/qr`: **a page explaining a diagram should not have a sign-in between
+it and the diagram.**
+
+### What `angle` and `pitch` actually govern
+
+Measured by simulating the stored script's own turtle, after the author
+suggested expressing pitch as a fraction of angle:
+
+```
+  pitch  ->  LENGTH     len/pitch  = 1090, 1088, 1080, 1049   (pitch 2 → 16, 4%)
+  angle  ->  BORE       bore×angle ≈ 12200 … 16300            (angle 13.5 → 108)
+```
+
+**One knob, one dimension, to within 4%** — so a ratio would couple two controls
+that are currently orthogonal. And the aspect-preserving combination is the
+**product**: at `pitch × angle = 432` the length-to-bore ratio holds within 13%
+across an eightfold range of angle. The author then pointed out, correctly, that
+**the ratio is meaningful too — it is the scale coordinate**, the other half of
+an (aspect, scale) pair. Both recorded; neither built, because the raw pair
+stays primary.
+
+This also corrected a claim written into the node the same morning: `step_pitch`
+does **not** decide whether a person fits inside the figure. **`angle` does.**
+
+### Metric units, by two routes
+
+The author's aim, stated plainly: *"full metric is what I have been trying to
+achieve so as to achieve a minimum of changes when user hits xr button on a
+headset."*
+
+**First attempt: `%%bd_size` in metres**, with `step` kept in arbitrary units
+and the figure post-scaled. It worked — proven a no-op on a flat canvas to
+3 × 10⁻¹⁶ of NDC — and had to be abandoned on the author's judgement: two
+controls for one degree of freedom, one invisible, and a scale factor threaded
+through `placeCamera`, the auto-fit and the arm-axis target.
+
+**Second attempt, and the one that stands: `step` in metres.** World units *are*
+metres with no scale factor anywhere. The cost, accepted explicitly: `step` is
+not the length of anything visible — 74.06 draws 0.91 at depth 5 — and the
+working view has to be found as a combination of step and distance.
+
+Kept from the abandoned attempt because they earn their place either way:
+**proportional stepping** (5% a press, so 1 cm to 200 m is 203 presses against
+`angle`'s 359 — physical quantities span decades where an integer stepper spans
+one or two), metric `cam_distance` and `cam_distance_speed`, a true bounding box,
+and a span readout that answers a question the module never answered: *how big
+is this figure?*
+
+**`step_pitch` became `stretch`, a plain ratio**, and that is the change that
+fixed a real fault rather than tidying a name. The old form divided by `step`,
+so `step` carried two jobs — and the second was invisible: with a size declared,
+`step` cancelled out of the figure's size entirely and survived only as half of
+a hidden aspect control.
+
+Both stored 3D scripts converted by their own measured spans at every stage, so
+framing and flight were preserved exactly. `_001` is a 2 m figure seen from
+3.37 m; `_002` is 64 m seen from 4.49 m, and **64 is measured rather than
+chosen** — a bore wide enough to fly a person through puts that figure at
+sixty-four metres, which answers §3b's "table, room or building" with none of
+the three.
+
+### Three bugs of one shape — the week's real lesson
+
+| the author reported | the cause |
+|---|---|
+| "after being reduced it only shows black" | `camera.near = Math.max(0.1, d/1000)`. The `0.1` was chosen when `cam_distance` was in units of several hundred; in metres it is a **10 cm near plane**. |
+| "they stick on a particular value… around 1 or 2" | four `Math.round(camDistanceExact)` calls. Invisible at several hundred; in metres it **quantises the control to 1 m**, so every 5% press below ~10 m was undone. |
+| "I see no change when altering new values" | `colour_speed`'s range lives in **two** clamps. I moved one. The other still said `0.25..16`, so the control moved, the script recorded it, and the figure ignored it. |
+
+> **A LIMIT WRITTEN TWICE WILL BE CHANGED ONCE.** A units or range change is
+> thought of as *one* decision so it gets *one* edit, and the duplicate is
+> always structurally distant from where the diff is being read. Grepping for
+> the quantity's NAME found none of these three. **Grepping for the old bound's
+> digits, and for every `Math.round`/`toFixed`/`toPrecision` on the quantity,
+> would have found all three.**
+
+So the duplication was removed rather than fixed twice: `clampToControl` reads a
+control's own `min`/`max`, making the markup the single source of a bound, and
+`camRound` is the one definition of the distance's precision. The module already
+had that pattern in `CAM_DIST_MIN = parseFloat(camDistanceSlider.min)` and I did
+not reach for it until the third time. Recorded in memory as
+`feedback_a_limit_written_twice`.
+
+Auditing the rest found a fourth, latent: `cam_distance_speed` still clamped to
+±300 from before it became metres, while its control says ±5.
+
+### `colour_speed` opened to 2⁻¹⁰ … 2¹⁰
+
+Because the author was "getting interesting effects" at ends that were arbitrary
+rather than principled. **One thing had to be fixed first:**
+`formatDirectiveNumber` rounded to two *decimal places*, which turns 2⁻⁸ into the
+string `"0"` — and `colour_speed 0` is a divide by zero in the hue. Below 1 it
+now keeps three significant figures; all 21 exponents round-trip.
+
+Two properties of the extremes, recorded so the ends read as deliberate: a large
+value stretches one hue cycle over more yaw than the figure contains, and a small
+one bands faster than a single turtle step — which is where the interesting
+effects are, and also where **resonances** are, when the yaw per step is a whole
+number of hue cycles and the figure comes out one flat colour.
+
+### `V_Kolam3D` gets a canary, and all four move together
+
+Three module-only commits in a row had left BD's own canary saying nothing about
+whether the module was fresh. A width-based tell was tried and rejected by the
+author — **a canary must be unmissable at load time, not something you compare
+against a remembered previous state** — so the stepper +/− buttons now carry the
+standard colour cycle.
+
+And the instruction that mattered more: **bump on a DB write too.** A script-only
+change used to move nothing, so after a `bd_tool write` there was no way to tell
+whether a reload had picked the new text up — the one case the colour was never
+bumped for was the one case it was most needed. All four sites now share one
+build token and one colour.
+
+Also: steppers 94 → 102px, paid for from the column's left padding, after the
+discovery that **trimming the right padding does nothing** — `align-items:
+flex-start` means the rows hug the left edge and all the slack already sits
+unused on the right.
+
+---
+
 ## 2026-10-15 — the tunnel flies itself, and then flies down one strand
 
 Three changes to `V_Kolam3D`, each from a report on the previous one.
