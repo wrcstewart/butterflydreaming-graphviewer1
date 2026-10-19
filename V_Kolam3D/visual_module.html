@@ -2095,7 +2095,11 @@
       // CENTIMETRE near plane, so any view closer than about 20 cm clips the
       // whole figure and a view at 10 cm shows nothing at all. A units change
       // that leaves a bare constant behind is a units change half done.
-      camera.near = Math.max(0.01, d / 1000);
+      // The floor exists ONLY to keep near off zero, which would break the
+      // projection — it is not a viewing decision, and any value large enough
+      // to be one is large enough to clip. Half a millimetre is 2.5% of the
+      // closest the camera can get, so d/1000 governs everywhere it matters.
+      camera.near = Math.max(0.0005, d / 1000);
       // And the far plane in metres too: +1000 was generous in figure units
       // and is a kilometre of empty space here. Twenty times the distance plus
       // ten metres covers a figure far bigger than the eye is from it.
