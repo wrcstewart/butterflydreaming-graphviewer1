@@ -1951,14 +1951,21 @@
       // Same indirection as the elevation above, and for the same reason: the
       // slider holds whole units, so drawing from it would step the camera a
       // unit at a time however fast the clock ticked.
+      // cam_distance stays in FIGURE units — the stepper's range, the stored
+      // scripts and cam_distance_speed all depend on that — and the size scale
+      // is applied here, to the eye and the target together with the figure.
+      // That is what makes %%bd_size invisible on a flat canvas.
+      const k  = sizeScale();
       const d  = clampCam(camSpinTimer !== null && camDistanceExact !== null
         ? camDistanceExact
-        : safeParseNumber(camDistanceSlider.value, 260));
+        : safeParseNumber(camDistanceSlider.value, 260)) * k;
       const ce = Math.cos(el), se = Math.sin(el);
       const ca = Math.cos(az), sa = Math.sin(az);
       // The orbit's centre: the origin, or the arm's own axis if one is named.
+      // The arm axis is measured from the UNSCALED samples, so it scales here
+      // too — or the eye would orbit a point the figure no longer occupies.
       const t  = camTarget();
-      const tx = t ? t.x : 0, ty = t ? t.y : 0, tz = t ? t.z : 0;
+      const tx = t ? t.x * k : 0, ty = t ? t.y * k : 0, tz = t ? t.z * k : 0;
       camera.position.set(tx + d * ce * sa, ty + d * se, tz + d * ce * ca);
       // The up vector is the sphere's NORTH TANGENT, not world +Y. World +Y is
       // parallel to the view direction at the poles, where lookAt degenerates
@@ -2026,6 +2033,79 @@
     //
     // The depth factor cancels — both lengths carry the same /3^(depth-1) — so
     // the ratio is all that is needed and step_pitch reads in step's units.
+    // ── %%bd_size — HOW BIG THE FIGURE IS IN METRES ──────────────────────
+    //
+    // A directive with NO STEPPER, like %%bd_background, because it is a
+    // statement about the scene rather than something to sweep. It declares the
+    // figure's greatest span in metres, and the module divides by the span it
+    // already measures for the camera's auto-fit.
+    //
+    // WHY A SIZE AND NOT A UNIT. The author's first proposal was to denominate
+    // `step` in metres. `step` is not a length — effectiveStep is step divided
+    // by 3^(depth-1), so the stored `step 9900` draws segments of 122 — and a
+    // metric-looking number that is not the length of anything visible invites
+    // belief. A size is independent of how the figure is made: change step,
+    // angle, depth or the score and it is still four metres, which puts those
+    // controls back to being purely compositional.
+    //
+    // IT IS A NO-OP FOR THE FLAT VIEW, BY CONSTRUCTION, and that is the whole
+    // reason it is safe to add now. The figure is scaled by k and the camera's
+    // distance by the same k, so every vertex's view-space position scales by k
+    // and the perspective division cancels it: the picture is identical to the
+    // pixel. What changes is only that WORLD UNITS BECOME METRES — which is
+    // what an XR session needs and a flat canvas does not care about. See
+    // VR_FromScratch_2026-10-16.md §6a.
+    //
+    // UNIFORM, so it can ride on `group` rather than needing a parent: a
+    // uniform scale commutes with step_pitch's scale in y and with the symmetry
+    // children's rotations about y, so nothing is sheared and no new object is
+    // introduced.
+    // The RAW extents are stored and the span computed live, not the other way
+    // round: step_pitch is a no-rebuild control, so a span that baked in the y
+    // scale at build time would go stale the moment it was swept, and a figure
+    // declared four metres would quietly stop being four metres.
+    let builtMaxXZ = 0, builtMaxY = 0;
+    let sizeMetres = 0;     // what %%bd_size asked for. 0 = absent, no scaling
+
+    function figureSpan() {
+      // The greatest SPAN, twice the bounding radius — "the figure is four
+      // metres" reads as its overall extent, not its radius. An upper bound,
+      // since the two extrema need not occur at the same point, which is the
+      // same approximation fitDistance already makes.
+      return 2 * Math.hypot(builtMaxXZ, builtMaxY * pitchScale());
+    }
+
+    function sizeScale() {
+      if (!(sizeMetres > 0)) return 1;
+      const span = figureSpan();
+      return span > 0 ? (sizeMetres / span) : 1;
+    }
+
+    // A NO-OP IS INVISIBLE, SO IT NEEDS A READOUT OR IT CANNOT BE TESTED AT
+    // ALL. %%bd_size deliberately leaves the flat picture identical, which
+    // means the only way to see that it worked is to be told. This also answers
+    // a question the module has never answered: how big IS this figure? The
+    // span has always been measured for the auto-fit and never reported.
+    //
+    // Throttled on the SCALE rather than called from the build, because the
+    // drift timer rebuilds up to five times a second and each rebuild moves the
+    // span slightly. One per cent is well below anything a person chose and
+    // well above drift's creep.
+    let sizeLogged = 0;
+    function reportSize() {
+      if (!(sizeMetres > 0)) return;
+      const span = figureSpan(), k = sizeScale();
+      if (!(span > 0)) return;
+      if (sizeLogged > 0 && Math.abs(k - sizeLogged) / sizeLogged < 0.01) return;
+      sizeLogged = k;
+      console.log('[module3d] %%bd_size ' + sizeMetres + ' m — this figure measures ' +
+                  span.toFixed(1) + ' units across, so it is scaled by ' + k.toPrecision(4) +
+                  '. World units are now METRES. The flat picture is unchanged by design ' +
+                  '(the eye moves with the figure); the scale is what an XR session needs. ' +
+                  'cam_distance ' + camDistanceSlider.value + ' is therefore ' +
+                  (safeParseNumber(camDistanceSlider.value, 0) * k).toFixed(2) + ' m.');
+    }
+
     function pitchScale() {
       const st = safeParseNumber(stepSlider.value, 50);
       const sp = clampStepPitch(safeParseNumber(stepPitchSlider.value, st));
@@ -2033,7 +2113,11 @@
     }
 
     function applyPitchScale() {
-      if (group) group.scale.set(1, pitchScale(), 1);
+      // Both scales, in one call: step_pitch's in y, and %%bd_size's uniformly.
+      // Named for the first because that is what every caller is reacting to —
+      // size changes only on a rebuild, and a rebuild calls this anyway.
+      const k = sizeScale();
+      if (group) group.scale.set(k, k * pitchScale(), k);
     }
 
     // ── Opacity ───────────────────────────────────────────────────────────
@@ -2751,6 +2835,9 @@
           + (safeParseNumber(directives.pitch_minutes, 0) / 60)
           + (safeParseNumber(pitchSecondsSlider.value, 0) / 3600);
         params.effectiveStep = params.step / Math.pow(3, Math.max(0, params.depth - 1));
+        // Metres. Clamped only against nonsense: 1 mm to 1 km of figure.
+        const askedSize = safeParseNumber(directives.size, 0);
+        sizeMetres = (askedSize > 0) ? Math.min(Math.max(askedSize, 0.001), 1000) : 0;
 
         initThree();
         updateCanvasSize();
@@ -2795,10 +2882,13 @@
         // Taken from the BASE arm, before applySymmetry: the copies are the
         // same buffer under a rotation, so one sample set serves all sixteen.
         recordAxisSamples(built.positions);
+        builtMaxXZ = built.maxXZ;
+        builtMaxY  = built.maxY;
         applySymmetry(params.symmetry);
 
         applyPitchScale();
         applyOpacity();
+        reportSize();
 
         if (!camDistanceExplicit) {
           // An upper bound on the scaled figure's radius, which is what
