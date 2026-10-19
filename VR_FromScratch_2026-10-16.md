@@ -818,6 +818,69 @@ last**, and the author's framing is what gave it one.
 
 ---
 
+## Step 6b · Adopting "vantage" throughout — what the mode switch must actually do
+
+The author: *"I thought the idea re vantage would be to adopt that terminology
+all the way through, not just for XR. When the context changes, non-XR or XR, the
+code will take necessary action to switch from camera to rig distance?"*
+
+**Agreed on the principle, which is the project's own: the script is the source
+of truth and should not have to know which mode it is in.** A script written
+flat should work in a headset. "cam" becomes a lie in a session — there are two
+cameras and neither is the author's — where "vantage" stays true in both.
+
+Two costs, checked rather than assumed:
+
+- **The 2D module shares NOTHING here.** `grep` finds no `cam_*` directive in
+  `V_Kolam/visual_module.html` at all — the flat module has no camera. So the
+  "a script must travel between the modules" objection does not apply, and it
+  was the only substantial one.
+- **Label widths worsen.** 5 of the 10 camera labels already wrap; after a
+  `vantage_*` rename, 8 would. `vantage_roll` (12) and `vantage_axis` (12) fit;
+  `vantage_distance` (16) and `vantage_elevation` (17) do not. A real cost, but
+  the same kind the column already carries, not a new one.
+- Two stored 3D scripts to migrate, and an alias so old spellings still read —
+  which the module's RULE 1 machinery (`setDirectiveValue` reconstructs the form
+  it read) already has the shape for.
+
+### But the switch is not one branch, because three of the five change MEANING
+
+This is the part the proposal does not yet account for. "Write it to the rig
+instead of the camera" is right for the distance and wrong for the rest, and the
+reason is the same one throughout: **the viewer has a body.**
+
+| directive | flat | in a session | why |
+|---|---|---|---|
+| **distance** | the camera's position | **the rig's position** | a clean transfer. the eye's distance is then this plus where they stand |
+| **azimuth** | position *and* orientation | **position, and yaw only** | a yaw of the rig turns their world about the vertical — the mildest of the rotations, and it composes with wherever they happen to be looking |
+| **elevation** | position *and* orientation | **POSITION ONLY — no tilt** | the flat camera must tilt to look down because it has no neck. **A person has a neck.** Place the vantage above the figure and leave the viewer upright; they will look down by themselves |
+| **roll** | the camera's up vector | **must NOT go to the rig** | rolling a rig tilts the horizon of someone who can feel which way is down, and **no neck movement can compensate for a tilted world.** Apply it to the FIGURE instead — visually near-identical for one object, and it leaves the viewer level |
+| **axis** | aims the camera | aims the **vantage** | §6a: the person can step off the axis it computed |
+
+**So the honest form of the author's proposal is: one vocabulary, and a
+per-directive translation rather than a single redirect.** The directive names
+stop caring about the mode; the *implementations* differ in three places out of
+five, and each difference is the vantage/eye split showing up again — in the
+distance first, and then in the bearing, which §6a had not followed through.
+
+**The elevation row is the one worth keeping hold of.** It is the clearest case
+in this whole document of a flat-screen idiom being a workaround for a missing
+body: a camera tilts because it cannot turn its head. Carrying that tilt into a
+headset would be reproducing a limitation as if it were a feature.
+
+### Order of work, if it is wanted
+
+1. **`%%bd_size` first.** It buys something today — a figure whose size is
+   stated in metres — and it is what makes a first session show anything at all.
+2. **The rename second.** Safe, testable flat (behaviour identical by
+   construction), and it buys nothing until the port — but it stops the
+   vocabulary being wrong, and every script written after it is written in the
+   right terms.
+3. **The translation table above last**, with the port, since it cannot be
+   tested without a session.
+
+---
+
 ## Step 7 · `.parent` — where the plate stands on the plan
 
 > **`camera.parent`** — an ordinary three.js `Object3D` that has the camera as a
