@@ -338,7 +338,11 @@
        which is the one thing a canary must never be. White text because the
        canary colours are dark and .big-btn's near-black label would be
        unreadable on them — and luminance, not hue, has to carry it. */
-    background: #c0392b !important;      /* CANARY — red, matching BD's */
+    /* CANARY — green, matching BD's. 2026-10-19: the author asked that this
+       one move on EVERY change, "including scripts" — a canary that stays put
+       after a DB write leaves no way to tell a reload picked the new text up,
+       which is the one case the colour was never being bumped for. */
+    background: #27ae60 !important;
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
