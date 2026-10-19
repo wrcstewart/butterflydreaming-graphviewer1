@@ -225,24 +225,6 @@
          it is visible at a glance. */
       background: rgba(75, 54, 0, 0.9);
       border: 1px solid rgba(74, 155, 142, 0.2);
-      /* ── THIS MODULE'S CANARY (2026-10-19) ───────────────────────────────
-         V_Kolam3D had none, and three module-only commits in a row left BD's
-         own canary saying nothing about whether this file was fresh — the
-         author asked for one.
-
-         READ BY WIDTH, NOT BY HUE. The project's other canaries rotate red →
-         green → blue, and red against green is the one discrimination this
-         author's colour vision cannot be asked to make. So the tell is the
-         THICKNESS of a bar down the left edge of the stepper column: 2px, then
-         5px, then 9px, cycling. Unmistakable at a glance and unmistakable in a
-         photograph. The colour stays put so it cannot be mistaken for a state
-         change.
-
-         K3D_BUILD in the script carries the same rotation as a STRING, logged
-         once at startup, which is the authoritative form — the bar is for a
-         glance and the log line is for certainty. Bump BOTH on every change to
-         this file. */
-      border-left: 2px solid rgba(74, 155, 142, 0.85);
       padding: 6px 8px;
       border-radius: 0.4rem;
       min-height: 0;
@@ -299,8 +281,18 @@
 
     .step-btn {
       background: #0f0f18;
-      border: 1px solid #4a9b8e;
-      color: #4a9b8e;
+      /* ── THIS MODULE'S CANARY (2026-10-19) ───────────────────────────────
+         V_Kolam3D had none, and three module-only commits in a row left BD's
+         own canary saying nothing about whether this file was fresh.
+         The SAME mechanism BD and DroneFrac use — a frame colour cycling red →
+         green → blue on every change to this file — because it is visible the
+         instant the module loads, with no interaction and nothing to hunt for.
+         Both the border and the glyph take it, so the whole stepper column
+         reads as one colour at a glance.
+         K3D_BUILD in the script carries the same rotation as a string and is
+         logged at startup; bump BOTH on every change. */
+      border: 1px solid #c0392b;
+      color: #c0392b;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1124,10 +1116,9 @@
 
     const canvas         = document.getElementById('kolam-canvas');
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
-    // The canary's authoritative half. Bumped on every change to this file,
-    // together with the border-left width in the CSS above — the letter is the
-    // rotation (a=2px, b=5px, c=9px, repeating).
-    const K3D_BUILD = '2026-10-19a';
+    // The canary's authoritative half, bumped on every change to this file
+    // together with the .step-btn colour above: red, then green, then blue.
+    const K3D_BUILD = '2026-10-19-red';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3256,8 +3247,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper column carries a 2px bar down its left edge. ' +
-                'Width is the tell, not colour: 2px, then 5px, then 9px.');
+                ' — the stepper +/- buttons are RED #c0392b.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
