@@ -881,6 +881,72 @@ headset would be reproducing a limitation as if it were a feature.
 
 ---
 
+## Step 6c · What `angle` and `pitch` actually govern — measured
+
+Raised while settling the `size`/`step` question: *"isn't the natural place for
+pitch to be pitch per angle? That would be easier, wouldn't it?"*
+
+**Measured, and the answer is the opposite — a ratio would make it worse.**
+Simulating `bd_V_Kolam3D_002`'s own script and varying one parameter at a time:
+
+| | holds | across |
+|---|---|---|
+| **`pitch` sets the LENGTH** | `length / pitch` = 1090, 1088, 1080, 1049 | pitch 2 → 16 |
+| **`angle` sets the BORE** | `bore × angle` ≈ 12200 … 16300 | angle 13.5 → 108 |
+
+**The two are already nearly independent, one governing width and one governing
+length.** `pitch` holds the length to within 4% over an eightfold range; `angle`
+gives a bore going as roughly 1/angle, less tidily because the small-angle
+approximation frays by 108°.
+
+So expressing pitch as a fraction of angle would **couple two controls that are
+currently orthogonal in the only thing that matters** — how wide against how
+long. Which is why holding `pitch/angle` fixed preserves nothing: at a constant
+ratio of 0.148, angle 13.5 gives a shell at 1:2 and angle 108 gives 1:116.
+
+### The invariant is the PRODUCT, not the ratio
+
+Holding `pitch × angle = 432`:
+
+| angle | pitch | length : bore |
+|---|---|---|
+| 13.5 | 32 | 1:33.2 |
+| 27 | 16 | 1:33.1 |
+| 54 | 8 | 1:32.3 |
+| 108 | 4 | 1:28.8 |
+
+Constant to within 13% across an eightfold range of angle. **So the
+aspect-preserving move is to scale `angle` and `pitch` INVERSELY** — halve one
+and double the other for the same proportions at a different winding density.
+That is the thing a ratio was hoped to give and the product actually gives.
+
+### And it corrects a claim written into the node the same day
+
+`bd_V_Kolam3D_002`'s prose called `step_pitch` "the one control that decides
+whether a person fits inside the piece at all". **Wrong.** `step_pitch`
+stretches the figure along its own near-vertical axis, so it changes the LENGTH
+and reaches the bore only indirectly, by enlarging the span that `%%bd_size`
+divides by. **`angle` is the direct bore control**, and therefore the one that
+decides whether a person fits. Node corrected.
+
+### Which completes a clean three-way decomposition
+
+Worth having in one place, because it is what the `size`/`step` work was
+reaching for:
+
+```
+  SIZE   (or step)   ->  the overall scale
+  ANGLE              ->  the bore          — how wide
+  PITCH              ->  the length        — how long
+```
+
+Three controls, three nearly-separable properties. **`step` is the only one of
+the four that governs nothing of its own** — it is a pure uniform scale, which
+is exactly why `size` can replace it (§6a) and why a ratio for `pitch` would be
+solving a problem that `angle` and `pitch` do not have.
+
+---
+
 ## Step 7 · `.parent` — where the plate stands on the plan
 
 > **`camera.parent`** — an ordinary three.js `Object3D` that has the camera as a
