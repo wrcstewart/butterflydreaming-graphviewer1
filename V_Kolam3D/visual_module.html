@@ -2064,15 +2064,21 @@
     // round: step_pitch is a no-rebuild control, so a span that baked in the y
     // scale at build time would go stale the moment it was swept, and a figure
     // declared four metres would quietly stop being four metres.
-    let builtMaxXZ = 0, builtMaxY = 0;
+    let builtBoxX = 0, builtBoxY = 0, builtBoxZ = 0;
     let sizeMetres = 0;     // what %%bd_size asked for. 0 = absent, no scaling
 
     function figureSpan() {
-      // The greatest SPAN, twice the bounding radius — "the figure is four
-      // metres" reads as its overall extent, not its radius. An upper bound,
-      // since the two extrema need not occur at the same point, which is the
-      // same approximation fitDistance already makes.
-      return 2 * Math.hypot(builtMaxXZ, builtMaxY * pitchScale());
+      // THE GREATEST EXTENT, from a true bounding box — not twice a radius.
+      //
+      // 2026-10-19. The first version of this used 2 x the bounding radius and
+      // was 2.03x too big on bd_V_Kolam3D_002, so %%bd_size 4 would have given
+      // a two-metre figure. The turtle starts AT the origin and walks away from
+      // it, so the bounding radius is already nearly the whole figure and
+      // doubling it double-counts. Found only because the author went looking
+      // for the directive in a stored script and noticed it was not there.
+      //
+      // step_pitch scales y after the walk, so it applies to that side only.
+      return Math.max(builtBoxX, builtBoxY * pitchScale(), builtBoxZ);
     }
 
     function sizeScale() {
@@ -2093,17 +2099,28 @@
     // well above drift's creep.
     let sizeLogged = 0;
     function reportSize() {
-      if (!(sizeMetres > 0)) return;
-      const span = figureSpan(), k = sizeScale();
+      const span = figureSpan();
       if (!(span > 0)) return;
-      if (sizeLogged > 0 && Math.abs(k - sizeLogged) / sizeLogged < 0.01) return;
-      sizeLogged = k;
-      console.log('[module3d] %%bd_size ' + sizeMetres + ' m — this figure measures ' +
-                  span.toFixed(1) + ' units across, so it is scaled by ' + k.toPrecision(4) +
-                  '. World units are now METRES. The flat picture is unchanged by design ' +
-                  '(the eye moves with the figure); the scale is what an XR session needs. ' +
-                  'cam_distance ' + camDistanceSlider.value + ' is therefore ' +
-                  (safeParseNumber(camDistanceSlider.value, 0) * k).toFixed(2) + ' m.');
+      // REPORTED WHETHER OR NOT A SIZE IS SET. The first version only logged
+      // when %%bd_size was present, which gated the one reading an author needs
+      // in order to CHOOSE a size — chicken and egg, and the author hit it
+      // immediately by looking for the directive in a stored script.
+      if (sizeLogged > 0 && Math.abs(span - sizeLogged) / sizeLogged < 0.01) return;
+      sizeLogged = span;
+      if (sizeMetres > 0) {
+        const k = sizeScale();
+        console.log('[module3d] %%bd_size ' + sizeMetres + ' m — this figure measures ' +
+                    span.toFixed(0) + ' units across its longest axis, so it is scaled by ' +
+                    k.toPrecision(4) + ' and WORLD UNITS ARE NOW METRES. The flat picture is ' +
+                    'unchanged by design — the eye moves with the figure — and the scale is ' +
+                    'what an XR session needs. cam_distance ' + camDistanceSlider.value +
+                    ' is therefore ' + (safeParseNumber(camDistanceSlider.value, 0) * k).toFixed(2) + ' m.');
+      } else {
+        console.log('[module3d] this figure measures ' + span.toFixed(0) + ' units across its ' +
+                    'longest axis. No %%bd_size is set, so it has no real-world size — add ' +
+                    '%%bd_size <metres> to give it one. Nothing on a flat screen changes ' +
+                    'either way.');
+      }
     }
 
     function pitchScale() {
@@ -2654,6 +2671,15 @@
       // not be corrected for it afterwards.
       let maxXZ = 0;
       let maxY  = 0;
+      // A TRUE BOUNDING BOX as well, because the radii above cannot give an
+      // EXTENT. The turtle starts at the origin and walks AWAY from it, so the
+      // bounding radius is already nearly the whole figure and doubling it
+      // double-counts — MEASURED on bd_V_Kolam3D_002: 2 x the radius is 17,330
+      // where the true greatest extent is 8,555, so 2.03x too big. %%bd_size
+      // divides by this; fitDistance keeps using the radii, which are right for
+      // framing a sphere about the point the camera looks at.
+      let minBX =  Infinity, minBY =  Infinity, minBZ =  Infinity;
+      let maxBX = -Infinity, maxBY = -Infinity, maxBZ = -Infinity;
 
       const stack = [];
       const yawRad   = params.effectiveAngle * DEG;
@@ -2714,6 +2740,9 @@
             if (rXZ > maxXZ) maxXZ = rXZ;
             const aY = Math.abs(p.y);
             if (aY > maxY) maxY = aY;
+            if (p.x < minBX) minBX = p.x;  if (p.x > maxBX) maxBX = p.x;
+            if (p.y < minBY) minBY = p.y;  if (p.y > maxBY) maxBY = p.y;
+            if (p.z < minBZ) minBZ = p.z;  if (p.z > maxBZ) maxBZ = p.z;
             prev.copy(p);
           }
           pos.copy(next);
@@ -2745,7 +2774,12 @@
         positions: w === positions.length ? positions : positions.subarray(0, w),
         colors:    w === colors.length    ? colors    : colors.subarray(0, w),
         maxXZ:     maxXZ,
-        maxY:      maxY
+        maxY:      maxY,
+        // The box, for %%bd_size. Separate from the radii on purpose — see the
+        // note where they are declared.
+        boxX: (maxBX > minBX) ? maxBX - minBX : 0,
+        boxY: (maxBY > minBY) ? maxBY - minBY : 0,
+        boxZ: (maxBZ > minBZ) ? maxBZ - minBZ : 0
       };
     }
 
@@ -2882,8 +2916,7 @@
         // Taken from the BASE arm, before applySymmetry: the copies are the
         // same buffer under a rotation, so one sample set serves all sixteen.
         recordAxisSamples(built.positions);
-        builtMaxXZ = built.maxXZ;
-        builtMaxY  = built.maxY;
+        builtBoxX = built.boxX; builtBoxY = built.boxY; builtBoxZ = built.boxZ;
         applySymmetry(params.symmetry);
 
         applyPitchScale();
