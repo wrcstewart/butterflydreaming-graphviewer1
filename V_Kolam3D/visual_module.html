@@ -515,39 +515,39 @@
 
     <div class="control-row">
       <div class="stepper">
-        <button class="step-btn" type="button" data-target="size-slider" data-delta="-1">&minus;</button>
-        <span class="stepper-value" data-target="size-slider">2</span>
-        <button class="step-btn" type="button" data-target="size-slider" data-delta="1">+</button>
+        <button class="step-btn" type="button" data-target="step-slider" data-delta="-1">&minus;</button>
+        <span class="stepper-value" data-target="step-slider">1</span>
+        <button class="step-btn" type="button" data-target="step-slider" data-delta="1">+</button>
       </div>
-      <label>size</label>
-      <!-- HOW BIG THE FIGURE IS, IN METRES, along its longest axis. Replaced
-           `step` here on 2026-10-19, at the author's request and for the
-           author's reason: so that hitting an XR button changes as little as
-           possible. World units ARE metres once this is set, which is what a
-           headset needs and what `step`'s arbitrary units could never give.
+      <label>step</label>
+      <!-- THE TURTLE'S STEP LENGTH, IN METRES. 2026-10-19, second attempt.
+           `step` is the nominal length: the segment actually drawn is
+           step / 3^(depth-1), so at depth 5 a step of 74 m draws 91 cm. That
+           division keeps the figure roughly one size as depth changes, since
+           the segment count goes as 4^depth.
 
-           WHY `step` HAD TO GO RATHER THAN SIT BESIDE IT. `step` is a PURE
-           UNIFORM SCALE — measured: span/step is constant to twelve figures
-           across step 1 to 9900, and the normalised shapes are identical. So
-           it and `size` are the SAME DEGREE OF FREEDOM, and with both present
-           `step` cancelled out of the figure's size entirely while surviving
-           as half of a hidden aspect control through step_pitch's division.
-           `stretch` removed the second job; this removes the first.
+           METRES FROM THE WORD GO, which is the author's aim and the whole
+           reason for this revision: world units are metres with no scale
+           factor anywhere, so a script that works on a flat screen works in a
+           headset with nothing to translate.
 
-           `%%bd_step` IS STILL READ, so the two stored scripts and anything
-           pasted from the 2D module still parse. It simply has no effect once
-           a size is set, since the scaling divides it out.
+           WHAT THIS REPLACED, AND WHY IT CAME BACK. A %%bd_size directive in
+           metres was tried first, with `step` kept in arbitrary units and the
+           figure post-scaled to the declared size. It worked and was abandoned
+           on the author's judgement: two controls for one degree of freedom,
+           one of them invisible, and the scale factor had to be carried
+           through placeCamera, the auto-fit and the arm-axis target. Setting
+           the step in metres needs none of that. The cost is that `step` is
+           not the length of anything you can see — 74 draws 0.91 — and the
+           author accepts it: "the trick is going to be to find a combination
+           of rig distance and step size that gives a workable view."
 
-           IT DOES NOT CHANGE HOW BIG THE FIGURE LOOKS, and that is correct
-           rather than a shortcoming: how big a thing IS and how big it LOOKS
-           are different questions, and the second is answered by cam_distance
-           — you move closer. Pressing this does carry cam_distance with it, so
-           the view holds while both stay honest metre readings.
-
-           PROPORTIONAL: each press is five per cent, so 2 cm to 500 m is 208
-           presses end to end — the same feel as angle's 359. -->
-      <input id="size-slider" class="stepper-source" type="number"
-             min="0.02" max="500" step="0.01" data-proportional="0.05" value="2">
+           PROPORTIONAL: five per cent a press, because a physical length spans
+           decades. 1 cm to 200 m is 203 presses, the same feel as angle's 359.
+           REBUILDS the geometry, unlike the post-scale it replaced — that is
+           the price of having no scale factor. -->
+      <input id="step-slider" class="stepper-source" type="number"
+             min="0.01" max="200" step="0.01" data-proportional="0.05" value="1">
     </div>
 
     <div class="control-row">
@@ -1055,21 +1055,12 @@
     const waitingEl      = document.getElementById('waiting');
     const symmetrySelect = document.getElementById('symmetry-select');
     const depthSelect    = document.getElementById('depth-select');
-    // `step` has no control any more — %%bd_size took its slot (2026-10-19).
-    // The DIRECTIVE is still read, because the two stored scripts carry it and
-    // anything pasted from the 2D module will too; it simply divides out once a
-    // size is set. NOMINAL_STEP is what a script that names no step walks with,
-    // and its value cannot matter for the same reason.
-    const NOMINAL_STEP = 50;
-    const sizeSlider     = document.getElementById('size-slider');
+    const stepSlider     = document.getElementById('step-slider');
     // ONE ceiling per control, read from the input's own max attribute — the
     // 2D module's lesson, where the attribute was raised to 9900 and two
     // hard-coded 999s pulled every render back.
-    const STEP_MIN = 1;
-    const STEP_MAX = 9900;
-    const SIZE_MIN = parseFloat(sizeSlider.min) || 0.02;
-    const SIZE_MAX = parseFloat(sizeSlider.max) || 500;
-    const clampSize = (v) => Math.min(Math.max(v, SIZE_MIN), SIZE_MAX);
+    const STEP_MIN = parseFloat(stepSlider.min) || 0.01;
+    const STEP_MAX = parseFloat(stepSlider.max) || 200;
     const clampStep = (v) => Math.min(Math.max(v, STEP_MIN), STEP_MAX);
 
     const stretchSlider = document.getElementById('stretch-slider');
@@ -1272,15 +1263,7 @@
       if (!symmetrySelect) return;
       symmetrySelect.value = String(Math.min(Math.max(safeParseInt(directives.symmetry, 8), 1), 16));
       depthSelect.value    = String(Math.min(Math.max(safeParseInt(directives.depth, 2), 1), 5));
-      // %%bd_size, in metres. ABSENT MEANS "no real size yet", and the module
-      // then declares the figure to be its own measured span in metres — which
-      // leaves the scale at 1 and renders a pre-2026-10-19 script exactly as it
-      // always rendered, with its numbers simply relabelled as metres. The
-      // slider is filled in from the measurement in render(), since the span is
-      // not known until the turtle has walked.
-      sizeFromScript = (directives.size !== undefined)
-        ? clampSize(safeParseNumber(directives.size, 2)) : null;
-      if (sizeFromScript !== null) sizeSlider.value = String(sizeFromScript);
+      stepSlider.value     = String(clampStep(safeParseNumber(directives.step, 1)));
       // Defaults to `step`, not to a number of its own. A script that has
       // never heard of step_pitch — a 2D Kolam script, or anything written
       // before today — then renders ISOTROPICALLY, which is the only default
@@ -1292,7 +1275,7 @@
       if (directives.stretch !== undefined) {
         stretchSlider.value = String(clampStretch(safeParseNumber(directives.stretch, 1)));
       } else if (directives.step_pitch !== undefined) {
-        const st = safeParseNumber(directives.step, NOMINAL_STEP);
+        const st = safeParseNumber(directives.step, safeParseNumber(stepSlider.value, 1));
         const sp = safeParseNumber(directives.step_pitch, st);
         stretchSlider.value = String(clampStretch(st > 0 ? sp / st : 1));
       } else {
@@ -1453,9 +1436,7 @@
       const controlValues = {
         symmetry:      symmetrySelect.value,
         depth:         depthSelect.value,
-        // `step` is NOT written: it has no control to write from, and an
-        // existing line is left where it is and ignored, as %%bd_weight is.
-        size:          sizeSlider.value,
+        step:          stepSlider.value,
         // %%bd_step_pitch is NOT written. A legacy line is left where it is and
         // ignored, exactly as %%bd_weight is — deleting an author's directive
         // is not a value update's business.
@@ -1497,8 +1478,9 @@
     // which is a transform on the object and not a different walk — see
     // applyPitchScale for why those are the same thing.
     const NO_REBUILD_INPUT_IDS = new Set([
-      // size among them: it is a scale on the group, not a different walk.
-      'size-slider',
+      // `step` is NOT among them: in metres it is the walk itself, so it
+      // rebuilds. That is the price of having no scale factor between the
+      // turtle's units and the world's.
       'cam-azimuth-slider', 'cam-elevation-slider', 'cam-distance-slider',
       'stretch-slider', 'opacity-slider', 'cam-elevation-speed-slider',
       'cam-distance-speed-slider', 'cam-axis-slider',
@@ -1523,30 +1505,6 @@
       // applyControlDirectives had read those sliders the script would keep the
       // old bearing while the picture showed the new one.
       if (id === 'cam-axis-slider') aimAlongArm();
-      // ── SIZE CARRIES THE DISTANCE WITH IT ────────────────────────────────
-      // Declaring the figure bigger does not change how big it LOOKS — that is
-      // cam_distance's job, and correctly so — but a press that changed the
-      // apparent size while claiming not to be about apparent size would be
-      // indefensible. So the eye steps back by the same factor and the view
-      // holds, while both numbers stay honest metre readings.
-      //
-      // Before applyControlDirectives, for manageCamSpin's reason: the script
-      // must record the distance this press leaves behind, not the one before.
-      if (id === 'size-slider') {
-        const now = clampSize(safeParseNumber(sizeSlider.value, 2));
-        if (lastSize > 0 && now > 0 && Math.abs(now - lastSize) > 1e-9) {
-          const ratio = now / lastSize;
-          const d = safeParseNumber(camDistanceSlider.value, 4) * ratio;
-          camDistanceSlider.value = String(parseFloat(clampCam(d).toPrecision(3)));
-          camDistanceExplicit = true;
-          // And the flight's accumulator, which is in the same metres.
-          if (camDistanceExact !== null) {
-            camDistanceExact = clampCam(camDistanceExact * ratio);
-            camDistanceWritten = safeParseNumber(camDistanceSlider.value, NaN);
-          }
-        }
-        lastSize = now;
-      }
       updateValueDisplays();
       if (!storedText) return;
       const updatedText = applyControlDirectives(storedText);
@@ -1606,7 +1564,7 @@
     }
 
     const controlInputs = [
-      symmetrySelect, depthSelect, sizeSlider, stretchSlider,
+      symmetrySelect, depthSelect, stepSlider, stretchSlider,
       angleSlider, pitchSlider,
       angleMinutesSlider, pitchMinutesSlider,
       angleSecondsSlider, pitchSecondsSlider,
@@ -1627,7 +1585,7 @@
     const CONTROL_FOR = {
       symmetry:      symmetrySelect,
       depth:         depthSelect,
-      size:          sizeSlider,
+      step:          stepSlider,
       stretch:       stretchSlider,
       angle:         angleSlider,
       pitch:         pitchSlider,
@@ -2081,17 +2039,14 @@
       // cam_distance is in METRES, which is to say in world units, because the
       // figure is scaled into metres before the camera is placed. So it is used
       // as it stands — no size scaling here. 2026-10-19.
-      const k  = sizeScale();
       const d  = clampCam(camSpinTimer !== null && camDistanceExact !== null
         ? camDistanceExact
         : safeParseNumber(camDistanceSlider.value, 4));
       const ce = Math.cos(el), se = Math.sin(el);
       const ca = Math.cos(az), sa = Math.sin(az);
       // The orbit's centre: the origin, or the arm's own axis if one is named.
-      // The arm axis is measured from the UNSCALED samples, so it scales here
-      // too — or the eye would orbit a point the figure no longer occupies.
       const t  = camTarget();
-      const tx = t ? t.x * k : 0, ty = t ? t.y * k : 0, tz = t ? t.z * k : 0;
+      const tx = t ? t.x : 0, ty = t ? t.y : 0, tz = t ? t.z : 0;
       camera.position.set(tx + d * ce * sa, ty + d * se, tz + d * ce * ca);
       // The up vector is the sphere's NORTH TANGENT, not world +Y. World +Y is
       // parallel to the view direction at the poles, where lookAt degenerates
@@ -2133,8 +2088,18 @@
       camera.lookAt(tx, ty, tz);
       // Depth range follows the distance, so precision does not fall away when
       // the camera pulls back to 9900.
-      camera.near = Math.max(0.1, d / 1000);
-      camera.far  = d * 20 + 1000;
+      // THE FLOOR IS 1 cm, NOT 0.1 m. 2026-10-19 — reported as "it initialises
+      // okay but then after being reduced it only shows black", and that was
+      // this line: 0.1 was chosen when cam_distance was in arbitrary units,
+      // where it floored a near plane at 0.1 of 600. In metres it is a TEN
+      // CENTIMETRE near plane, so any view closer than about 20 cm clips the
+      // whole figure and a view at 10 cm shows nothing at all. A units change
+      // that leaves a bare constant behind is a units change half done.
+      camera.near = Math.max(0.01, d / 1000);
+      // And the far plane in metres too: +1000 was generous in figure units
+      // and is a kilometre of empty space here. Twenty times the distance plus
+      // ten metres covers a figure far bigger than the eye is from it.
+      camera.far  = d * 20 + 10;
       camera.updateProjectionMatrix();
     }
 
@@ -2192,9 +2157,7 @@
     // declared four metres would quietly stop being four metres.
     let builtBoxX = 0, builtBoxY = 0, builtBoxZ = 0;
     // null while a script has named no size; see setControlValues.
-    let sizeFromScript = null;
-    // What the size was before this press, so the distance can follow it.
-    let lastSize = 0;
+
 
     function figureSpan() {
       // THE GREATEST EXTENT, from a true bounding box — not twice a radius.
@@ -2210,11 +2173,7 @@
       return Math.max(builtBoxX, builtBoxY * pitchScale(), builtBoxZ);
     }
 
-    function sizeScale() {
-      const span = figureSpan();
-      const want = clampSize(safeParseNumber(sizeSlider.value, 2));
-      return (span > 0 && want > 0) ? (want / span) : 1;
-    }
+
 
     // A NO-OP IS INVISIBLE, SO IT NEEDS A READOUT OR IT CANNOT BE TESTED AT
     // ALL. %%bd_size deliberately leaves the flat picture identical, which
@@ -2230,17 +2189,14 @@
     function reportSize() {
       const span = figureSpan();
       if (!(span > 0)) return;
-      const k = sizeScale();
       if (sizeLogged > 0 && Math.abs(span - sizeLogged) / sizeLogged < 0.01) return;
       sizeLogged = span;
-      console.log('[module3d] this figure walks out ' + span.toPrecision(4) + ' nominal units ' +
-                  'across its longest axis and %%bd_size calls that ' + sizeSlider.value +
-                  ' m, so world units are metres at a scale of ' + k.toPrecision(4) + '. ' +
-                  'cam_distance ' + camDistanceSlider.value + ' m is ' +
-                  (safeParseNumber(camDistanceSlider.value, 0) / Math.max(1e-9, safeParseNumber(sizeSlider.value, 1))).toPrecision(3) +
-                  ' of the figure away. Changing size does not change how big it LOOKS — ' +
-                  'cam_distance does that — but the stepper carries cam_distance with it ' +
-                  'so the view holds.');
+      const d = safeParseNumber(camDistanceSlider.value, 4);
+      console.log('[module3d] this figure is ' + span.toPrecision(4) + ' m across its longest ' +
+                  'axis, from step ' + stepSlider.value + ' m. The eye is ' + d + ' m away, ' +
+                  'which is ' + (d / span).toPrecision(3) + ' of the figure. World units ARE ' +
+                  'metres — there is no scale factor — so this script needs no translation for ' +
+                  'a headset.');
     }
 
     function pitchScale() {
@@ -2251,8 +2207,7 @@
       // Both scales, in one call: step_pitch's in y, and %%bd_size's uniformly.
       // Named for the first because that is what every caller is reacting to —
       // size changes only on a rebuild, and a rebuild calls this anyway.
-      const k = sizeScale();
-      if (group) group.scale.set(k, k * pitchScale(), k);
+      if (group) group.scale.set(1, pitchScale(), 1);
     }
 
     // ── Opacity ───────────────────────────────────────────────────────────
@@ -2966,7 +2921,7 @@
         const params = {
           symmetry:    Math.min(Math.max(safeParseInt(directives.symmetry, 8), 1), 16),
           depth:       Math.min(Math.max(safeParseInt(directives.depth, 2), 1), 5),
-          step:        clampStep(safeParseNumber(directives.step, NOMINAL_STEP)),
+          step:        clampStep(safeParseNumber(directives.step, 1)),
           angle:       Math.min(Math.max(safeParseNumber(directives.angle, 90), ANGLE_MIN), ANGLE_MAX),
           pitch:       Math.min(Math.max(safeParseNumber(directives.pitch, 0), ANGLE_MIN), ANGLE_MAX),
           background:  directives.background || '#0a0a0f',
@@ -3035,13 +2990,7 @@
         // same buffer under a rotation, so one sample set serves all sixteen.
         recordAxisSamples(built.positions);
         builtBoxX = built.boxX; builtBoxY = built.boxY; builtBoxZ = built.boxZ;
-        // A script that named no size gets one here, now the span is known:
-        // its own span, in metres, which leaves the scale at exactly 1.
-        if (sizeFromScript === null) {
-          sizeSlider.value = String(clampSize(figureSpan()));
-          sizeFromScript = safeParseNumber(sizeSlider.value, 2);
-        }
-        lastSize = clampSize(safeParseNumber(sizeSlider.value, 2));
+
         applySymmetry(params.symmetry);
 
         applyPitchScale();
@@ -3052,9 +3001,9 @@
           // An upper bound on the scaled figure's radius, which is what
           // framing wants — the two extrema need not occur at the same point,
           // so this never frames too tightly.
-          // The SCALED radius, so the answer is in metres like the control.
+          // Already in metres: the turtle walks in them.
           camDistanceSlider.value = String(fitDistance(
-            Math.hypot(built.maxXZ, built.maxY * pitchScale()) * sizeScale()));
+            Math.hypot(built.maxXZ, built.maxY * pitchScale())));
           updateValueDisplays();
           // Deliberately NOT announced and NOT written into storedText. An
           // auto-fit is not a human action, and announcing on a script push is
