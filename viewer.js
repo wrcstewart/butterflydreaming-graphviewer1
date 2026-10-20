@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-20c' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-20d' };
 
 let bdViewTitleText = '';
 
@@ -16138,12 +16138,31 @@ async function init() {
           // named rather than let pass: BD leans on seeing where a thing is.
           // Some degree of auto-navigation is the eventual answer and is not
           // this change.
-          if (node && currentModuleId !== moduleId) {
-            // Load it on demand. The cost is a short delay and an empty frame
-            // on the first press in a fresh Browse session, where it used to
-            // be instant — accepted, because the alternative is the variable
-            // behaviour this replaces. onReady re-sends the outputOnly flags.
-            console.log('[view] no ' + moduleId + ' loaded yet — loading it for View');
+          // ── THE TEST IS THE NODE, NOT THE MODULE ──────────────────────
+          // 2026-10-20, reported within the hour of the change above: "View
+          // Kolam3D_002 correct. Back to Kolam3D_001. View still shows the
+          // 002" — and symmetrically the other way round.
+          //
+          // The guard was `currentModuleId !== moduleId`, which asks whether
+          // the right MODULE is loaded. Both of those nodes are
+          // bd_V_Kolam3D, so it never fired and the iframe kept whichever
+          // SCRIPT it already had. Two nodes sharing one module need the
+          // script pushed, not the module loaded — and a test on the module
+          // cannot tell them apart. `avNodeId` is the variable that records
+          // which NODE the module is showing, and it is declared saying so.
+          //
+          // loadModuleForNode is safe to call whenever the node differs: it
+          // merges any recorded exploration onto the saved script rather than
+          // discarding it, and sets avNodeId itself. Same node already
+          // showing → no call, so a live exploration is never snapped back.
+          if (node && avNodeId !== node.id()) {
+            // The cost is a short delay and an empty frame when the module has
+            // to be fetched, where it used to be instant — accepted, because
+            // the alternative is the variable behaviour this replaces. The
+            // fast path, which is this case, is a postMessage. onReady
+            // re-sends the outputOnly flags when a real load was needed.
+            console.log('[view] module is showing ' + (avNodeId || 'nothing') +
+                        ', not ' + node.id() + ' — loading this node for View');
             try { loadModuleForNode(node.id()); }
             catch (e) { console.warn('[view] could not load the module: ' + e.message); }
           }
