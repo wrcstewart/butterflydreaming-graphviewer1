@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-20a' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-20b' };
 
 let bdViewTitleText = '';
 
@@ -12083,6 +12083,28 @@ async function init() {
     console.log('[collage] preview furniture down');
   }
 
+  // ── "ONLY YOUR OUTPUT", IN ONE PLACE (2026-10-20) ───────────────────────
+  //
+  // bdViewEnter sent this itself, which was fine while View could only ever
+  // show a module that was ALREADY loaded. Now that View loads one on demand,
+  // the message can arrive before the module has a listener — and a module
+  // that never hears it shows its FULL interface in View, which is the silent
+  // failure this project keeps meeting. So it lives here, at init()'s own
+  // block level, where loadModuleForNode's onReady can send it the moment
+  // readiness is known. bdViewEnter is nested deeper and can see it.
+  //
+  // ALL THREE FLAGS, not just outputOnly: see the note at the call site. A
+  // module not yet taught outputOnly degrades to "controls hidden, no chrome"
+  // rather than showing its whole interface.
+  function tellModuleOutputOnly(frame) {
+    if (!frame || !frame.contentWindow) return false;
+    try {
+      frame.contentWindow.postMessage({ type: 'bd_ui_config',
+        outputOnly: true, hideControls: true, hostChrome: false }, '*');
+      return true;
+    } catch (_) { return false; }
+  }
+
   function loadModuleForNode(nodeId) {
     if (!nodeId || !visualIframe) return;
     const node = cy.getElementById(nodeId);
@@ -12217,6 +12239,12 @@ async function init() {
         pushToAV(text);   // mirror to any open Ancillary Viewer
         enableCopyUp();
         console.log('[MM1.6] onReady: bd_script_update posted');
+        // If View is what asked for this load, the module was not listening
+        // when bdViewEnter sent its bd_ui_config. Send it again now.
+        if (document.body.classList.contains('view-active')) {
+          tellModuleOutputOnly(visualIframe);
+          console.log('[view] module ready — re-sent outputOnly');
+        }
         // 2026-08-09 — module (and its abc-pane) is now up; re-anchor
         // the extend panel. Delay one frame so the abc-pane has done
         // its first layout pass.
@@ -16079,7 +16107,46 @@ async function init() {
           // race the one-off loading above.
           try { collageSeqStart(text, live); }
           catch (e) { console.warn('[collage] sequencer failed to start: ' + e.message); }
-        } else if (moduleId && f && f.src) {
+        } else if (moduleId && f) {
+          // ── VIEW ALWAYS SHOWS THE GRAPHIC (author, 2026-10-20) ─────────
+          // The test used to be `moduleId && f && f.src`, and `f.src` was
+          // doing duty for "a module is available" when it really means "a
+          // module has already been loaded at some point". Entering Create
+          // mode calls loadModuleForNode, which sets the src, and it persists
+          // — so View showed the PROSE in a fresh Browse session and the
+          // GRAPHIC in Browse re-entered after Create. Reported as *"the
+          // effect of View in browse mode is variable"*, and nobody chose it:
+          // it is the iframe's loaded state leaking into a presentation
+          // decision.
+          //
+          // The rule is now deterministic — VIEW SHOWS THE RICHEST THING THE
+          // NODE HAS: the graphic where its script names a module, the prose
+          // otherwise — and Back returns to the card either way. The author's
+          // reasoning for preferring the graphic, which is the part worth
+          // keeping: in Browse the text is ALREADY on screen, so View-of-text
+          // is a bigger copy of what you can see, where View-of-graphic is the
+          // only way to see the figure in Browse at all.
+          //
+          // WHAT THIS GIVES UP, decided rather than overlooked: a module
+          // node's prose is no longer readable full-screen, and no longer read
+          // aloud. The author: *"I don't think hearing the module prose is
+          // very important as it has little artistic value — if we need
+          // artistic it can go in collage. Thus the content will be technical
+          // and that's suitable for reading."* A plain text node keeps both.
+          //
+          // AND BADLY SIGHTED USERS ARE NOT SERVED BY THIS, which the author
+          // named rather than let pass: BD leans on seeing where a thing is.
+          // Some degree of auto-navigation is the eventual answer and is not
+          // this change.
+          if (node && currentModuleId !== moduleId) {
+            // Load it on demand. The cost is a short delay and an empty frame
+            // on the first press in a fresh Browse session, where it used to
+            // be instant — accepted, because the alternative is the variable
+            // behaviour this replaces. onReady re-sends the outputOnly flags.
+            console.log('[view] no ' + moduleId + ' loaded yet — loading it for View');
+            try { loadModuleForNode(node.id()); }
+            catch (e) { console.warn('[view] could not load the module: ' + e.message); }
+          }
           // Clear the inline rect positionCyEl stamped, so the stylesheet can
           // own it. See the note at the top of positionCyEl.
           f.style.top = f.style.left = f.style.width = f.style.height = '';
@@ -16095,10 +16162,7 @@ async function init() {
           // stronger set means such a module degrades to "controls hidden, no
           // chrome": not the Output, but not broken either. Every one of the
           // three is a true statement about what BD is doing here.
-          try {
-            f.contentWindow.postMessage({ type: 'bd_ui_config',
-              outputOnly: true, hideControls: true, hostChrome: false }, '*');
-          } catch (_) {}
+          tellModuleOutputOnly(f);
           if (tp) tp.hidden = true;
           // No Speak over a module: a music one has its own sound and a visual
           // one has no text to read.
