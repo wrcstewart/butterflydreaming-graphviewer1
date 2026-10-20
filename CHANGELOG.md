@@ -6,6 +6,121 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-20 — View stops being variable, and a pasted script reaches the camera
+
+Three pieces, and the first two were the author checking behaviour rather than
+reporting a crash — which is how both faults were found.
+
+### A pasted script now reaches `cam_distance`
+
+The author asked what happens when a whole new script is pasted over the old
+one, and asked for the code to be read rather than described. **Every control
+handles a wholesale replacement correctly except the distance**, because every
+other one is written as `safeParseNumber(directives.x, DEFAULT)` and so resets
+when its directive is absent. The distance was written three ways and all three
+were wrong:
+
+- **`cam_distance_speed` was nested inside `if (directives.cam_distance !== undefined)`**,
+  so a script carrying only the speed had its flight silently dropped — the one
+  directive whose whole purpose is to move the distance was conditional on the
+  distance being stated.
+- **`camDistanceExplicit` was a one-way set.** Nothing cleared it, so after any
+  script with a distance, pasting one *without* kept the old figure's distance
+  **and** suppressed the auto-fit — the thing that exists precisely because "a
+  3D scene whose camera is inside the geometry shows literally nothing".
+- **`camDistanceExact` had no re-seed on a script arrival**, where
+  `camElevationExact` and `camRollExact` both do. On a paste *while a clock is
+  running*, `manageCamSpin` takes neither branch and `placeCamera` keeps drawing
+  from the stale accumulator.
+
+**Third time `cam_distance_speed` has inherited `cam_elevation_speed`'s clock
+without inheriting an exception written around it.** With three data points the
+rule is worth trusting: when a quantity joins an existing mechanism, grep the
+*original* quantity's name across the whole file and account for every site. The
+first rider's exceptions are where the mechanism meets a person or a script,
+which is the part that fails visibly.
+
+### View always shows the graphic
+
+> *"The effect of View in browse mode is variable. Initially it displays the
+> text but if Browse is re-engaged after create mode then it maintains the
+> expanded graphic View."*
+
+Exactly right, and **nobody chose it.** The branch test was
+`moduleId && f && f.src`, where `f.src` was doing duty for "a module is
+available" and actually means "a module has already been loaded at some point".
+Entering Create mode sets the src and it persists. The iframe's loaded state
+leaking into a presentation decision.
+
+Now deterministic: **View shows the richest thing the node has** — the graphic
+where its script names a module, the prose otherwise — and Back returns to the
+card either way. The author's reasoning settled the direction: **in Browse the
+text is already on screen**, so View-of-text was a bigger copy of what you can
+see, where View-of-graphic is the only way to see the figure at all.
+
+Given up deliberately: a module node's prose is no longer readable full-screen
+or read aloud. *"I don't think hearing the module prose is very important as it
+has little artistic value — if we need artistic it can go in collage."* Plain
+text nodes keep both.
+
+**And the author named a limitation rather than letting it pass:** BD leans on
+seeing where a thing is, and badly sighted users are not served by it. Some
+degree of auto-navigation is the eventual answer. Recorded in the code, because
+that is the kind of thing that otherwise goes unwritten and gets rediscovered as
+a surprise.
+
+Loading on demand exposed a second thing. `bdViewEnter` sent the `outputOnly`
+`bd_ui_config` itself, safe only while View could show an *already loaded*
+module — on demand, that message can arrive before the module has a listener,
+and a module that never hears it **shows its full interface in View.** Extracted
+as `tellModuleOutputOnly` at the level `loadModuleForNode`'s `onReady` can reach,
+and re-sent there.
+
+### …and then View showed the wrong node, which was mine
+
+Reported within the hour: *"View Kolam3D_002 correct. Back to Kolam3D_001. View
+still shows the 002"*, and symmetrically.
+
+The on-demand load was guarded by `currentModuleId !== moduleId` — **which asks
+whether the right MODULE is loaded.** Both nodes *are* `bd_V_Kolam3D`, so it
+never fired and the iframe kept whichever script it had. Two nodes sharing one
+module need the script pushed, not the module loaded.
+
+> **Two bugs in two days from the same habit: reaching for a nearby variable
+> that ALMOST answers the question.** `f.src` for "is a module available";
+> `currentModuleId` for "is the right node showing". In both cases the variable
+> that does answer it existed — and `avNodeId` is literally declared *"node
+> whose script the module is showing"*. **Read the declaration of the thing you
+> are about to test.**
+
+`loadModuleForNode` turned out to be safe to call whenever the node differs: it
+merges recorded exploration onto the saved script rather than discarding it. Same
+node showing → no call, which is what protects a live exploration from a View
+press.
+
+### Both Kolam3D scripts: five times out, flying slowly in
+
+```
+  _001   3.37 -> 16.85 m,  -0.07 m/s,  4.0 min
+  _002   4.49 -> 22.45 m,  -0.09 m/s,  4.2 min
+```
+
+They read very differently and it is worth knowing which is which. `_001`'s
+figure has a radius of **1.3 m**, so 3.37 already framed the whole of it and
+16.85 shows it at about a fifth of the frame — that piece now **opens small and
+grows past full frame.** `_002`'s has a radius of **64.8 m**, so both distances
+are *inside* its bounding sphere and the move is from deep in the tunnel to less
+deep. Seeing the whole of `_002` from outside would want about 172 m.
+
+`_002`'s prose was also brought up to date — it still said *"cam_distance_speed
+is -8, eight units a second, the passage from 600 takes about a minute"*, every
+number of which had changed twice. **A node's prose is the first thing its reader
+sees, so a stale paragraph there is worse than a stale comment.** The roll figure
+was wrong too: three degrees a second over four minutes is six revolutions, not
+the half-revolution it was over one.
+
+---
+
 ## 2026-10-16/19 — the module goes metric, and three bugs of one kind
 
 Two strands. An explainer written because a diagram did not help, and then the
