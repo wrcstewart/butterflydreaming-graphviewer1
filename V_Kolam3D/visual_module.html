@@ -317,8 +317,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1183,7 +1183,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-19f';
+    const K3D_BUILD = '2026-10-20a';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -1430,11 +1430,38 @@
       // the author's number. aimAlongArm clamps to the live symmetry at the
       // moment it aims, which is the only moment the number has to be real.
       camAxisSlider.value = String(Math.min(Math.max(safeParseInt(directives.cam_axis, 0), 0), 16));
+      // THE DISTANCE IS SET ONLY WHEN THE SCRIPT NAMES IT, unlike every other
+      // control here, which takes a default when its directive is absent. That
+      // is deliberate: a script naming no distance is a script asking the
+      // module to frame the figure itself, and render()'s auto-fit does that —
+      // see camDistanceExplicit, which is now cleared in the same breath so
+      // the auto-fit actually gets its turn.
       if (directives.cam_distance !== undefined) {
         camDistanceSlider.value = String(clampCam(safeParseNumber(directives.cam_distance, 260)));
-        // Signed, so clamped on both sides rather than at zero.
-        camDistanceSpeedSlider.value = String(clampToControl(camDistanceSpeedSlider,
-          safeParseNumber(directives.cam_distance_speed, 0)));
+      }
+      // BUT THE SPEED IS NOT NESTED INSIDE THAT TEST ANY MORE. 2026-10-20 —
+      // it was, so a script carrying %%bd_cam_distance_speed and no
+      // %%bd_cam_distance had its flight silently dropped: the one directive
+      // whose whole purpose is to move the distance was conditional on the
+      // distance being stated. Signed, so clamped on both sides, not at zero.
+      camDistanceSpeedSlider.value = String(clampToControl(camDistanceSpeedSlider,
+        safeParseNumber(directives.cam_distance_speed, 0)));
+      // ── AND THE DISTANCE'S OWN RE-SEED ────────────────────────────────
+      // The elevation and the roll have had this since the day each got a
+      // speed; the distance never did, and the gap only shows on a WHOLESALE
+      // SCRIPT REPLACEMENT while a clock is running. camSpinTimer is then
+      // non-null, so manageCamSpin below takes neither its stop branch nor its
+      // start branch, camDistanceExact keeps the old figure's value, and
+      // placeCamera draws from the accumulator rather than the slider — so the
+      // new cam_distance is ignored until the clock happens to stop.
+      //
+      // Third time cam_distance_speed has inherited cam_elevation_speed's
+      // clock without inheriting an exception written around it. The
+      // exceptions are where the mechanism meets a person or a script, which
+      // is exactly the part a new rider needs.
+      if (camDistanceWritten === null ||
+          safeParseNumber(directives.cam_distance, NaN) !== camDistanceWritten) {
+        camDistanceExact = null;
       }
 
       manageDriftInterval();
@@ -3026,9 +3053,25 @@
         const score = parseScore(scoreRaw);
         if (!score.axiom) throw new Error('No axiom found in score');
 
-        // A script that names the distance is authority, and the module stops
-        // framing for itself from then on.
-        if (directives.cam_distance !== undefined) camDistanceExplicit = true;
+        // A script that names the distance is the authority and the module
+        // stops framing for itself. A script that does NOT name it is asking to
+        // be framed — so this is an ASSIGNMENT, not a one-way set.
+        //
+        // 2026-10-20. It was `if (…) camDistanceExplicit = true;` and nothing
+        // ever cleared it, so after any script with a distance, pasting one
+        // WITHOUT a distance left the slider holding the old figure's value AND
+        // suppressed the auto-fit. A figure of any size was then viewed from
+        // the previous figure's distance, with the framing that exists to
+        // prevent exactly that never running — "a 3D scene whose camera is
+        // inside the geometry shows literally nothing", as the auto-fit's own
+        // note says.
+        //
+        // Safe against the drift timer: a human press writes cam_distance into
+        // storedText through applyControlDirectives, so every later render sees
+        // it and this stays true. Only a script that genuinely never names the
+        // distance is re-framed, which is the behaviour a fresh script has
+        // always had.
+        camDistanceExplicit = (directives.cam_distance !== undefined);
 
         const params = {
           symmetry:    Math.min(Math.max(safeParseInt(directives.symmetry, 8), 1), 16),
@@ -3343,7 +3386,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are RED #c0392b, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
