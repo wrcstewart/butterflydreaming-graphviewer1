@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-20d' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-20e' };
 
 let bdViewTitleText = '';
 
@@ -16718,7 +16718,35 @@ async function init() {
       if (collageBtnEl) collageBtnEl.addEventListener('pointerdown', () => {
         try { refreshCollageBtn(); } catch (e) { console.warn('[collage] refresh threw: ' + e.message); }
       });
+      // ── COLLAGE IS A CREATE-MODE ACTION (author, 2026-10-20) ─────────
+      //
+      // The same test the stylesheet uses to hide #chat-panel, because it is
+      // the same question: is there a visible card? Collage writes into the top
+      // CARD, and in Browse the card stack is not on screen — so a press there
+      // succeeded and modified something the author could not see, with no
+      // feedback at all. Worse than a button that fails, which at least says
+      // something; it would be discovered later in Create, with nothing to
+      // explain where the collage came from.
+      //
+      // HIDDEN *AND* GUARDED, as the author asked: "take out the collage
+      // button in browse mode or make it non functional and hidden". The CSS
+      // is what you see and this is what protects the card — a rule that only
+      // hides is one stale pointer event or one overridden selector away from
+      // firing anyway, and every other authoring control in that row
+      // (#chat-send-btn, #chat-new-card-btn, #sr-mic-btn, the arrows) is
+      // gated in CSS alone because none of them WRITES on a single press.
+      const collageModeOk = () =>
+        document.body.classList.contains('edit-active') ||
+        document.body.classList.contains('player-active');
+
       if (collageBtnEl) collageBtnEl.addEventListener('click', () => {
+        if (!collageModeOk()) {
+          // EVERY EXIT SAYS SO — the file's own rule, and the third silent
+          // guard here cost a round.
+          console.log('[collage] v2 press declined: Browse mode has no visible ' +
+                      'card to write a collage into. Switch to Create first.');
+          return;
+        }
         // ══ COLLAGE v2 STEPS 4 AND 5 — ONE PRESS, FIVE THINGS ════════════
         // Plan §6.4. Nothing navigates and no module is reloaded: the steppers
         // stay exactly where they are, which is the point of making this an

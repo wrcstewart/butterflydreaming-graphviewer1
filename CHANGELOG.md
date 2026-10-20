@@ -98,6 +98,30 @@ merges recorded exploration onto the saved script rather than discarding it. Sam
 node showing → no call, which is what protects a live exploration from a View
 press.
 
+### Collage is hidden AND guarded in Browse mode
+
+The author: *"I don't think the Collage button should be visible in Browse
+mode."* Agreed, and for a sharper reason than tidiness — **the press
+succeeded.** It works off `bdViewNode()`, the node being read, not off a loaded
+module, so in Browse it built a block and wrote it into the top card quite
+happily. But `#chat-panel` is hidden in Browse, so **a press modified something
+invisible with no feedback at all** — worse than a button that fails, which at
+least says something, and discoverable only later in Create with nothing to
+explain where the collage came from.
+
+Two things made it an oversight rather than a decision. **Every other authoring
+control in that row is already mode-gated** — `#chat-send-btn`,
+`#chat-new-card-btn`, `#sr-mic-btn`, the ↑↓ arrows — and Collage, the one that
+writes to a card, was the one left exposed. And **the right condition was
+already in the file**: not `body.edit-active` alone but
+`body:not(.edit-active):not(.player-active)`, the same test that hides the chat
+panel, which keeps Collage where it is actually used (looking at a module in
+Create or Player).
+
+Hidden **and** guarded, as asked. The CSS is what you see; the JS guard is what
+protects the card. Every other control in that row is gated in CSS alone because
+none of them writes on a single press — a stylesheet is not a safety mechanism.
+
 ### Both Kolam3D scripts: five times out, flying slowly in
 
 ```
