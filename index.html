@@ -415,6 +415,18 @@
          text, so this appears for the text panel and nowhere else. -->
     <button id="bd-view-speak" type="button" hidden title="Read this aloud from the start">Speak</button>
     <span id="bd-view-title"></span>
+    <!-- 2026-10-20 — HOW TO REACH THE CONTROLS, and only from Browse: in
+         Create the Back button lands you on the card with the steppers
+         already there, so the hint would be noise. Author: "it's not
+         necessary at all from Create."
+
+         ITS OWN ELEMENT RATHER THAN APPENDED TO THE TITLE, for three reasons
+         found by looking: the title is `white-space: nowrap` with an ellipsis,
+         and the node name comes first, so an appended hint is exactly what
+         gets cut off on a phone; the title doubles as the SPEECH STATUS line,
+         so "preparing…" would blank the hint with it; and the title is
+         deliberately empty over a collage, where Back still applies. -->
+    <span id="bd-view-hint" hidden></span>
   </div>
   <!-- Text nodes present here rather than through an iframe: there is no text
        module, and the collage will render text itself for the same reason.

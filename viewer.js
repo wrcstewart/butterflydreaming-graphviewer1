@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-20e' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-20f' };
 
 let bdViewTitleText = '';
 
@@ -16233,6 +16233,24 @@ async function init() {
         // still shows and the line simply returns to blank when it clears.
         bdViewTitleText = collage ? '' : (name || moduleId || '');
         if (title) title.textContent = bdViewTitleText;
+
+        // ── HOW TO REACH THE CONTROLS, FROM BROWSE ONLY (2026-10-20) ────
+        // In Create the Back button lands on the card with the steppers
+        // already there, so the hint would be noise — the author's call, and
+        // right: guidance that is sometimes unnecessary is guidance people
+        // stop reading.
+        //
+        // "Back, THEN Create", not "Back | Create". The pipe reads as a
+        // choice and this is a sequence. And "Create" without "press",
+        // because it is a RADIO in a pair with Browse, not a button — a
+        // reader sent hunting for a Create button will not find one.
+        const hint = document.getElementById('bd-view-hint');
+        if (hint) {
+          const fromBrowse = !document.body.classList.contains('edit-active') &&
+                             !document.body.classList.contains('player-active');
+          hint.textContent = fromBrowse ? 'To control: Back, then Create' : '';
+          hint.hidden = !fromBrowse;
+        }
         if (bar) bar.hidden = false;
         body.classList.add('view-active');
         console.log('[view] entered — ' +

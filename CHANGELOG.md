@@ -122,6 +122,29 @@ Hidden **and** guarded, as asked. The CSS is what you see; the JS guard is what
 protects the card. Every other control in that row is gated in CSS alone because
 none of them writes on a single press — a stylesheet is not a safety mechanism.
 
+### View's top line says how to reach the controls — from Browse only
+
+The author proposed *"To control: press Back | Create"*. Three changes, one of
+them a correctness fix:
+
+- **The pipe reads as a choice and this is a sequence.** `Back, then Create`.
+- **"press Create" promises a button that does not exist.** Create is a RADIO
+  in a pair with Browse. "then Create" sends nobody hunting.
+- **It is only true from Browse.** In Create, Back lands on the card with the
+  steppers already there — so the hint is shown in Browse alone. The author's
+  call, and right: guidance that is sometimes unnecessary is guidance people
+  stop reading.
+
+**Its own element rather than appended to the title**, for three reasons found
+by looking rather than guessed: the title is `white-space: nowrap` with an
+ellipsis and the node name comes first, so an appended hint is exactly what gets
+cut on a phone; the title doubles as the **speech status line**, so "preparing…"
+would blank the hint along with it; and the title is deliberately empty over a
+collage, where Back still applies. `margin-left: auto` puts it at the right-hand
+end and `flex: 0 0 auto` keeps it whole — the node name is the one that should
+give way, because a truncated name still reads where a truncated instruction
+does not.
+
 ### Both Kolam3D scripts: five times out, flying slowly in
 
 ```

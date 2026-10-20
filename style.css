@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-20e";
+  --bd-css-build: "2026-10-20f";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1928,7 +1928,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2980b9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -3180,6 +3180,20 @@ body.view-active #bd-view-bar:not([hidden]) { display: flex; }
   color: #9e9e90;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* How to reach the controls — Browse only, set by bdViewEnter (2026-10-20).
+   `margin-left: auto` pushes it to the right-hand end of the flex bar, and
+   `flex: 0 0 auto` keeps it whole: the title beside it has the ellipsis and
+   is the one that should give way, because a truncated node name still reads
+   while a truncated instruction does not. Dimmer than the title, because it
+   is standing guidance rather than information about this node. */
+#bd-view-hint {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font: 11px/1 system-ui, sans-serif;
+  color: #6f6f66;
   white-space: nowrap;
 }
 
