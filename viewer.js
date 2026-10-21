@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-21b' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-21c' };
 
 let bdViewTitleText = '';
 
@@ -17597,6 +17597,22 @@ async function init() {
   document.addEventListener('bd:force-nodes-mode', () => setModuleLayout(false));
   const copyDownBtnBoot = document.getElementById('copy-down-btn');
   if (copyDownBtnBoot) copyDownBtnBoot.disabled = false;
+  // ── `auto` IS ALWAYS ON NOW (author, 2026-10-21) ──────────────────────
+  // The control is retired and hidden — see the note in style.css — and the
+  // four `box.checked` guards are left in place reading a constant true.
+  //
+  // FORCED HERE RATHER THAN TRUSTED TO THE `checked` ATTRIBUTE, because a
+  // browser may restore form state across a reload or a back/forward step:
+  // Firefox and Safari both do in some cases. An unticked box that nothing
+  // can now reach would strand the coupling off with no control to turn it
+  // back on, and the symptom would be "the steppers stopped talking to the
+  // card" with nothing on screen to explain it.
+  const autoBoxBoot = document.getElementById('auto-echo-box');
+  if (autoBoxBoot && !autoBoxBoot.checked) {
+    autoBoxBoot.checked = true;
+    console.log('[auto] the retired tick box came back unchecked from a ' +
+                'restored form state — forced on');
+  }
   ws.emit('msg', { type: 'enter_chat' });
   requestAnimationFrame(() => {
     positionCyEl();

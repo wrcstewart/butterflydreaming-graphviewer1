@@ -92,6 +92,12 @@
          ticked or not — briefly getting that wrong made the viewer stop
          updating altogether while unticked.
          Positioned with the arrows by positionExtendPanel, not by CSS. -->
+    <!-- RETIRED 2026-10-21, NOT DELETED, and hidden in style.css. Unticking
+         cut both couplings and left no manual way across, the arrows having
+         been repurposed to carry cards — so the box switched between "works"
+         and "works less". The input stays here and stays `checked` so the
+         four guards in viewer.js read true; viewer.js also forces it on at
+         boot, against a browser restoring an unticked form state. -->
     <label id="auto-echo" title="Keep the card and the steppers in step, both ways: stepper changes are written into the script, and edits to the script move the steppers. Unticked, the two go their own ways — the viewer follows the script either way.">
       <input type="checkbox" id="auto-echo-box" checked>
       <span>auto</span>
