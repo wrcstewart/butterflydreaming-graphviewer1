@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-21c";
+  --bd-css-build: "2026-10-21d";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -890,8 +890,40 @@ body:not(.edit-active):not(.player-active) #action-bar {
   white-space: pre-wrap;
   /* 2026-08-17 — reading/partner text shrunk 20% (16px → 12.8px) to reclaim
      vertical room for #cy. These bodies are divs, so unlike the editable
-     local textarea (kept at 16px) they don't trip iOS's <16px auto-zoom. */
+     local textarea (kept at 16px) they don't trip iOS's <16px auto-zoom.
+     ── THAT LAST CLAUSE WAS ALREADY FALSE WHEN IT WAS WRITTEN (2026-10-21).
+     The divs were made `contentEditable = 'true'` on 2026-07-25 — "all card
+     bodies editable by default" — and this shrink came three weeks later,
+     reasoning from the state before that. A CONTENTEDITABLE DIV TRIPS iOS's
+     AUTO-ZOOM EXACTLY AS AN INPUT DOES: it is focus that triggers it, not the
+     tag name. Reported by the author as the page zooming on going to edit in
+     the panel, "and if one is careless everything is properly messed up".
+     The 12.8px is kept for bodies that are genuinely not editable — Helper and
+     notice cards, which are created with contentEditable 'false' and cannot
+     be focused — and overridden below for the ones that can. */
   font-size: 12.8px;
+}
+
+/* ── AN EDITABLE BODY IS 16px, WHATEVER TAG IT IS (2026-10-21) ───────────
+   The project's rule is "every focusable thing is at least 16px or iOS Safari
+   zooms the page on focus", and it had been applied by TAG — textareas got
+   16px, divs were assumed safe. The discriminator is FOCUSABILITY, not the
+   tag, so it is written here as the attribute that actually decides:
+   contenteditable. A Helper card keeps 12.8px because it is contentEditable
+   'false' and cannot be focused at all.
+
+   The selectors mirror the ones above with the attribute appended, so they win
+   on specificity rather than on !important — (1,4,0) against (1,3,0).
+
+   THE COST, which is real and was the point of the shrink: the node's own text
+   in Create is one of these bodies, so it returns to 16px and reclaims the 20%
+   of vertical room that was taken from #cy. Worth it — a page that zooms on
+   every edit and has to be pinched back is a worse tax than a shorter graph,
+   and a mis-pinch leaves the whole layout wrong. */
+#chat-stack .card.system .card-body[contenteditable="true"],
+#current-stack .card.system .card-body[contenteditable="true"],
+.card.received .card-body[contenteditable="true"] {
+  font-size: 16px;
 }
 
 /* 2026-07-24 — chunked node-message cards (system-kind, one per chunk).
@@ -1928,7 +1960,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
