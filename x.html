@@ -95,6 +95,13 @@
 
 <h2>3 · Immersive session</h2>
 <p class="lede">
+  Also reports, from the device and not from a spec sheet: <strong>eye height
+  above the recorded floor</strong>, whether <strong>the floor was measured or
+  may be an estimate</strong> (via <code>bounded-floor</code>), the
+  <strong>device's own field of view</strong> read back from the camera, and the
+  <strong>eye separation</strong> — which governs whether a hairline fuses, and
+  which a mis-set IPD slider corrupts. Seated, the eye height should read about
+  1.1–1.2 m.
   Enters <code>immersive-vr</code> with a figure and three text panels at
   different sizes, 1.6&nbsp;m away. Pulls three.js from a CDN on first press.
 </p>
@@ -283,8 +290,37 @@ xrBtn.addEventListener('click', async () => {
     });
     say('session started');
     say('blend mode: ' + (session.environmentBlendMode || 'unreported'));
+
+    // ── WAS THE FLOOR MEASURED, OR GUESSED? ─────────────────────────────
+    // The one question a spec sheet cannot answer and the arithmetic cannot
+    // either. `local-floor` is granted even when the device does not know the
+    // floor — the user agent is allowed to ESTIMATE one, so that a page asking
+    // for it is never refused — and the estimate works by assuming a standing
+    // eye height and putting the floor that far below the head. The eye height
+    // then reports the assumption rather than the person, and the two cases are
+    // indistinguishable from the number.
+    //
+    // `bounded-floor` is the tell: it exists only where there is a real traced
+    // boundary, which means Space Setup has actually run. Evidence rather than
+    // proof, and it is the only evidence available.
+    // See VR_FromScratch_2026-10-16.md §2a.
+    let bounded = null;
+    try {
+      bounded = await session.requestReferenceSpace('bounded-floor');
+      say('bounded-floor GRANTED — Space Setup has run, so the floor is a real ' +
+          'measurement of this room');
+      if (bounded.boundsGeometry && bounded.boundsGeometry.length) {
+        say('  boundary: ' + bounded.boundsGeometry.length + ' points');
+      }
+    } catch (e) {
+      say('bounded-floor REFUSED — no traced boundary, so the floor below may be ' +
+          'an ESTIMATE from an assumed standing height rather than a measurement');
+    }
+
     await renderer.xr.setSession(session);
     xrEnd.disabled = false;
+    say('reference space in use: ' + (renderer.xr.getReferenceSpaceType ?
+        renderer.xr.getReferenceSpaceType() : 'local-floor (three\'s default)'));
 
     // WHAT THE INPUT LOOKS LIKE HERE is the thing worth knowing: visionOS
     // reports `transient-pointer` on a pinch, Quest reports `tracked-pointer`
@@ -300,11 +336,50 @@ xrBtn.addEventListener('click', async () => {
     session.addEventListener('inputsourceschange', reportInputs);
     setTimeout(reportInputs, 1200);
 
+    // ── THREE NUMBERS THAT ARE ONLY AVAILABLE ON THE DEVICE ─────────────
+    // Reported once, a second in, so the pose has settled.
+    //
+    // EYE HEIGHT is camera.position.y — the head's height above the recorded
+    // floor, and NOT a setting: it is the difference between two measurements,
+    // one of them possibly a guess (above). Seated it should read about 1.1 to
+    // 1.2 m where standing reads 1.6 to 1.75. Anything suspiciously close to a
+    // round 1.6 while seated is the estimate showing itself.
+    //
+    // FOV is read BACK from the camera, because three writes it: it
+    // back-computes a nominal vertical field of view from the runtime's own
+    // projection matrix. Nominal, since the real frustum is asymmetric and one
+    // number cannot describe it — but it is the device's figure, not a guess.
+    //
+    // EYE SEPARATION is the two sub-cameras' positions differenced. It governs
+    // whether a hairline FUSES, which is the project's biggest open question
+    // about this device, and it is also the thing a mis-set physical IPD slider
+    // corrupts — so it is worth seeing before judging any of the stereo.
+    let posed = false;
+    const reportPose = () => {
+      if (posed) return;
+      const xrCam = renderer.xr.getCamera();
+      if (!xrCam || !xrCam.cameras || !xrCam.cameras.length) return;
+      posed = true;
+      say('eye height: ' + camera.position.y.toFixed(3) + ' m above the recorded floor' +
+          (bounded ? '  (floor measured)' : '  (floor possibly estimated — see above)'));
+      say('device FOV, read back: ' + camera.fov.toFixed(1) + ' deg vertical (nominal — ' +
+          'the real frustum is asymmetric)');
+      if (xrCam.cameras.length >= 2) {
+        const a = xrCam.cameras[0].position, b = xrCam.cameras[1].position;
+        const ipd = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+        say('eye separation: ' + (ipd * 1000).toFixed(1) + ' mm  (set the physical IPD ' +
+            'slider before judging any stereo)');
+      } else {
+        say('eye separation: only ' + xrCam.cameras.length + ' view reported — no stereo');
+      }
+    };
+
     let frames = 0, t0 = performance.now(), reported = false;
     renderer.setAnimationLoop(() => {
       knot.rotation.x += 0.004; knot.rotation.y += 0.007;
       renderer.render(scene, camera);
       frames += 1;
+      if (!posed && performance.now() - t0 > 1000) reportPose();
       const dt = performance.now() - t0;
       if (!reported && dt > 4000) {
         reported = true;
