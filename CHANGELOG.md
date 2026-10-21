@@ -6,6 +6,133 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-21 — four stale assumptions, each outliving the thing it described
+
+A day of small changes with one theme running through them: **every fault was a
+statement that had been true when written.** None was a mistake at the time; all
+four were facts that stopped being facts while the words stayed put.
+
+### The ↓↑ arrows on a narrow screen — a stylesheet asserting what only JS can finish
+
+> *"Only the up arrow showing and that has landed on top of the microphone
+> yellow button at the wrong end of the strip entirely. It is fine on the
+> desktop until you resize down to a narrow width."*
+
+Both symptoms are one fault, and **the desktop clue is what identifies it.** The
+mobile rule fired on nothing more than the media query and `player-active`, so
+it set the arrows `position: fixed` while only `positionExtendPanel` can supply a
+`left` and a `top`. When that measurement fails — and it reaches through **two
+nested iframes** to find the module's canvas and stepper column — the arrows are
+fixed and **unplaced**: both land at the same viewport point, which is why one
+hides the other, and the point is wherever the flow had them, which on a narrow
+screen is the top row with the radios and the mic.
+
+Above 767px the rule does not apply at all, so **the narrow case is the only one
+where the JS placement has to work** — a failure there had nowhere to surface,
+and may have been broken for as long as the rule has existed.
+
+**Fixed structurally rather than by correcting the arithmetic**, which has
+several ways to come back empty. `body.arrows-docked` is now the JS's promise
+that it has stamped both buttons: the media rule is gated on it, it is withdrawn
+before anything is measured, and only a path that stamps may re-make it. **Worst
+case is now "they stay in the control bar"** — visible, both, in the right place.
+A stylesheet should not assert a layout it cannot finish.
+
+Two further guards: the Kolam path refuses the promise when the module reports a
+**zero-size** canvas or column, because a `display:none` element returns an
+all-zero rect and the arithmetic would place the arrows at the iframe's left edge
+and call that success. And the reason is **logged**, naming which lookup failed.
+
+### The Helper card, wrong twice — and the second time invited by the first fix
+
+> *"It says sync the steppers and script with the up down arrows. The arrows
+> don't do that anymore."*
+
+The pair was repurposed on 2026-10-13 to carry **cards**. But this text had
+already been rewritten once, in September, *about this very sentence*: that
+rewrite trimmed the arrows from being the ONLY way across down to being a
+**second** way, when `auto` arrived. They then stopped being a second way too,
+and the trimmed remnant sailed on making a smaller version of the same false
+claim.
+
+> **A sentence trimmed is a sentence still making a claim.** The instinct when a
+> fact changes is to soften the sentence rather than ask whether it still
+> belongs. The comment at the call site now says so.
+
+And the same claim was in **three more places the author could not have looked**:
+the `auto` tooltip's *"Unticked, use ↑ and ↓"*, and two comments calling the pair
+"the script-exchange controls" and explaining `auto` as *"no ↑ needed"*. Five
+instances of one retired fact across four files.
+
+### `auto` retired — the switch had become "works" versus "works less"
+
+Tracing the previous item turned up that **unticking `auto` cut both couplings
+and left no manual way across**, the arrows having been taken. Worse, re-ticking
+fired `publishCard`, silently pushing the **card over the module** — so untick,
+explore for ten minutes, tick to "capture", and the exploration is gone. The
+author: *"not transparent to the user and a bit arcane."*
+
+What made it safe to remove is the author's own point: **an exploration is not
+lost by having no card to sit in.** It is remembered per node in
+`explorationByNode`, by a listener *outside* the auto gate, and merged back on
+return.
+
+**Retired, not deleted.** The input stays, stays `checked`, and the four
+`box.checked` guards read a constant true — deleting it would have meant editing
+four live paths to remove a condition that is now constant. viewer.js forces it
+on at boot, because a browser may restore an unticked form state across a reload
+and nothing could then reach it.
+
+### Editing a card zoomed iOS — the 16px rule applied by tag, not by focusability
+
+> *"I thought we had chosen the font size in the panel to prevent that
+> happening?"*
+
+We had. Local cards are `<textarea>` and were kept at 16px; system and received
+bodies are `<div>`s and were shrunk 20% to 12.8px in August to reclaim vertical
+room — under a comment reading *"These bodies are divs, so unlike the editable
+local textarea they don't trip iOS's <16px auto-zoom."*
+
+**That clause was already false when it was written.** The divs were made
+`contentEditable = 'true'` on 2026-07-25 — *"all card bodies editable by
+default"* — three weeks BEFORE the shrink, which reasoned from the state before
+it. **iOS zooms on FOCUS, and the tag name has nothing to do with it.** The
+node's own text in Create is one of these bodies.
+
+Fixed on the discriminator that decides:
+`.card-body[contenteditable="true"]` is 16px, selectors mirroring the originals
+with the attribute appended so they win on specificity rather than `!important`.
+Helper cards keep 12.8px, correctly — `contentEditable 'false'` cannot be
+focused. **The cost is the 20% of vertical room the shrink was for**, judged
+worth it: a page that zooms on every edit and must be pinched back is a worse
+tax than a shorter graph, and a mis-pinch leaves the whole layout wrong.
+
+**Four more sub-16px focusable fields were found and deliberately left**, each
+in a layout the author had not asked about: `.spinner-group input` and
+`#clone-name-input` at 14px in the cluster editor, `#copy-link-fallback
+textarea` at 12, `.mp-select` at 11.
+
+### `/x` now measures the floor, the eye height, the FOV and the IPD
+
+Built while the Quest charged, closing a §9 item. `local-floor` is granted even
+when the device does not know the floor — the user agent may **estimate** one, by
+assuming a standing eye height and deriving the floor from the head, so the eye
+height then reports the assumption rather than the person and **the two cases are
+indistinguishable from the number.** `bounded-floor` is the only evidence
+available: it exists only where a boundary has been traced, which means Space
+Setup has run.
+
+Also reports the **eye height**, the **device's own FOV** read back from
+`camera.fov` (three writes it, back-computed from the runtime's projection), and
+the **eye separation** — which governs whether a hairline fuses and which a
+mis-set physical IPD slider corrupts.
+
+**And the setup consequence, for a seated user: run Space Setup STANDING, then
+sit.** A space set up seated can put the floor at seat level, or fall through to
+the estimate.
+
+---
+
 ## 2026-10-20 — View stops being variable, and a pasted script reaches the camera
 
 Three pieces, and the first two were the author checking behaviour rather than
