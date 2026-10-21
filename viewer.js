@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-20f' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-21a' };
 
 let bdViewTitleText = '';
 
@@ -12775,6 +12775,26 @@ async function init() {
   // panel sits *beside* it, not on top). Falls back to CSS defaults
   // when the loaded module has no #abc-pane (e.g. V_Kolam).
   let dockWhy = null;   // last geometry logged, so a resize does not flood
+  // ── THE ARROWS' DOCKING PROMISE (2026-10-21) ────────────────────────────
+  // `body.arrows-docked` gates the media rule that makes the ↓↑ pair
+  // `position: fixed`. Only a path that has stamped a left and a top may set
+  // it; everything else must clear it, so the fallback is the bar's own flow.
+  //
+  // THE REASON IS LOGGED, on change and every 50th repeat. A silent guard here
+  // has cost a round three times in this file, and this particular one hid a
+  // broken layout on every narrow screen for as long as the rule has existed.
+  let arrowsDockWhy = '', arrowsDockN = 0;
+  function arrowsDocked(why) {
+    const on = why === true;
+    document.body.classList.toggle('arrows-docked', on);
+    const said = on ? 'docked' : String(why);
+    if (arrowsDockWhy === said) { arrowsDockN += 1; if (arrowsDockN % 50) return; }
+    else { arrowsDockWhy = said; arrowsDockN = 0; }
+    if (!on) console.log('[arrows] not docked: ' + said +
+                         (arrowsDockN ? ' (x' + arrowsDockN + ')' : '') +
+                         ' — they stay in the control bar');
+  }
+
   function positionExtendPanel() {
     const panel = document.getElementById('bd-invite-panel-viewer');
     if (!panel) return;
@@ -12797,6 +12817,9 @@ async function init() {
     // clearing it a box positioned for one layout keeps those coordinates into
     // the next one — which is how it came to sit on top of the arrows on
     // desktop.
+    // The promise is withdrawn before anything is measured, and re-made only
+    // by a path that actually stamps. See the note in style.css.
+    arrowsDocked('reset — nothing measured yet');
     ['copy-up-btn', 'copy-down-btn', 'auto-echo'].forEach((id) => {
       const b = document.getElementById(id);
       if (b) { b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.width = ''; b.style.height = ''; b.style.right = ''; b.style.zIndex = ''; }
@@ -12902,6 +12925,7 @@ async function init() {
 
           dock(document.getElementById('copy-up-btn'),   y,            half, sbw, ax);
           dock(document.getElementById('copy-down-btn'), y + half + 4, half, sbw, ax);
+          arrowsDocked(true);
 
           // The tick box sits left of the arrows with a deliberately generous
           // gap: on a phone these are adjacent targets doing unrelated things,
@@ -13053,6 +13077,15 @@ async function init() {
             const cDown = document.getElementById('copy-down-btn');
             const cAuto = document.getElementById('auto-echo');
             const cpEl  = innerDoc && innerDoc.querySelector('.control-panel');
+            if (!cUp || !cDown || !cpEl) {
+              // WHICH of the three is missing, because "the arrows are in the
+              // wrong place" and "this branch never ran" look identical on
+              // screen. cpEl reaches through two nested iframes.
+              arrowsDocked('kolam path: ' +
+                [!cUp && '#copy-up-btn', !cDown && '#copy-down-btn',
+                 !cpEl && '.control-panel inside the module'].filter(Boolean).join(', ') +
+                ' not found');
+            }
             if (cUp && cDown && cpEl) {
               const cpRect = cpEl.getBoundingClientRect();
               const bw = Math.ceil(cUp.getBoundingClientRect().width) || 30;
@@ -13092,6 +13125,17 @@ async function init() {
               if (cAuto) {
                 const aw = Math.ceil(cAuto.getBoundingClientRect().width) || bw;
                 cAuto.style.left = Math.round(x + (bw - aw) / 2) + 'px';
+              }
+              // A ZERO-WIDTH COLUMN IS NOT A MEASUREMENT. A display:none
+              // element reports an all-zero rect, so the arithmetic above
+              // would place the arrows at the iframe's left edge and call it
+              // a success. Refuse rather than dock somewhere arbitrary.
+              if (cpRect.width > 0 && cRect.width > 0) {
+                arrowsDocked(true);
+              } else {
+                arrowsDocked('kolam path: the module reports a zero-size ' +
+                  (cpRect.width > 0 ? 'canvas' : 'stepper column') +
+                  ' — its layout has not settled, or it is hidden');
               }
             }
           }

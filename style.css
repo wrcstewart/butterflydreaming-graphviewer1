@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-20f";
+  --bd-css-build: "2026-10-21a";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1928,7 +1928,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -2017,10 +2017,34 @@ body:not(.edit-active) #copy-up-btn {
    the top stepper. `right` places them left of the ~108px column; `top` is set
    per-button by positionExtendPanel to the canvas top. z-index above the iframe
    (1) and History pane (2). The control bar keeps its space for pairing/edit. */
+/* ── `arrows-docked` IS THE JS'S PROMISE THAT IT HAS PLACED THEM ─────────
+   2026-10-21, reported as: on iOS "only the up arrow showing and that has
+   landed on top of the microphone yellow button at the wrong end of the strip
+   entirely. It is fine on the desktop until you resize down to a narrow
+   width."
+
+   Both symptoms are one fault. This rule used to fire on nothing more than
+   the media query and `player-active`, so it made the arrows `position: fixed`
+   while only positionExtendPanel can supply a `left` and a `top`. When that
+   measurement fails — and it reaches through TWO nested iframes to find the
+   module's canvas and stepper column, so it has several ways to — the arrows
+   are fixed and UNPLACED: both land at the same viewport spot, which is why
+   one hides the other, and that spot is wherever the flow had them, which on a
+   narrow screen is the top row with the radios and the mic.
+
+   Desktop never showed it because above 767px this rule does not apply at all
+   and the arrows sit in the bar's normal flow. The narrow case is the ONLY one
+   where the JS placement has to work, so a failure there had nowhere to
+   surface.
+
+   The class is added by positionExtendPanel only after it has stamped both
+   buttons, and removed whenever it cannot — so the worst case is now "they
+   stay in the bar", which is visible, correct and complete. A stylesheet
+   should not assert a layout it cannot finish. */
 @media (max-width: 767px) {
-  body.player-active #auto-echo,
-  body.player-active #copy-up-btn,
-  body.player-active #copy-down-btn {
+  body.player-active.arrows-docked #auto-echo,
+  body.player-active.arrows-docked #copy-up-btn,
+  body.player-active.arrows-docked #copy-down-btn {
     position: fixed;
     /* 2026-08-19 — `right: 116px` removed. It assumed the module's SMALL
        layout (108px stepper column), but the module switches layout on its own
