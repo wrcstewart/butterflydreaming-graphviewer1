@@ -73,12 +73,17 @@
     <button id="chat-new-card-btn" type="button" title="Create a new Local card at the top of the stack and focus it for editing">New</button>
     <button id="copy-link-btn" type="button" title="Copy a link back to this BD state (current node + top card) to the clipboard">Copy Link</button>
     <span id="default-save-status"></span>
-    <!-- Copy Down (↓) and Copy Up (↑) hidden until Player mode is active
-         (body.player-active). Positioned adjacent to the Nodes/Player radio
-         so the script-exchange controls sit next to the mode switch. -->
+    <!-- Copy Down (↓) and Copy Up (↑). 2026-10-21 — this said "the
+         script-exchange controls", which they have not been since 2026-10-13:
+         they carry CARDS. Their own titles below are correct; this one
+         outlived them. Shown in Create (body.edit-active), docked beside the
+         stepper column on a narrow screen only once positionExtendPanel has
+         actually placed them — see body.arrows-docked in style.css. -->
     <!-- 2026-09-18 — auto. Ticked, the card and the module stay in step BOTH
-         ways: every stepper change is written into the script (no ↑ needed),
-         and an edit to the script moves the steppers (no ↓ needed).
+         ways: every stepper change is written into the script, and an edit to
+         the script moves the steppers. (This once read "no ↑ needed" and "no
+         ↓ needed", which was true when the arrows still moved scripts; since
+         2026-10-13 they carry cards and there is nothing to not need.)
          TICKED by default as of 2026-09-18 phase 2, when the script became
          what BD pushes to a viewer.
 
@@ -87,7 +92,7 @@
          ticked or not — briefly getting that wrong made the viewer stop
          updating altogether while unticked.
          Positioned with the arrows by positionExtendPanel, not by CSS. -->
-    <label id="auto-echo" title="Keep the card and the steppers in step, both ways: stepper changes are written into the script, and edits to the script move the steppers. Unticked, use ↑ and ↓ — the viewer follows the script either way.">
+    <label id="auto-echo" title="Keep the card and the steppers in step, both ways: stepper changes are written into the script, and edits to the script move the steppers. Unticked, the two go their own ways — the viewer follows the script either way.">
       <input type="checkbox" id="auto-echo-box" checked>
       <span>auto</span>
     </label>

@@ -2319,7 +2319,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-21a' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-21b' };
 
 let bdViewTitleText = '';
 
@@ -12664,9 +12664,20 @@ async function init() {
         // true when `auto` arrived and made the card and the steppers one
         // thing in both directions.
         //
+        // 2026-10-21 — "Or manually through the up down arrows" removed. That
+        // rewrite trimmed the arrows from being the ONLY way across and left
+        // them as a second way, which they then stopped being too: on
+        // 2026-10-13 the pair was repurposed to carry CARDS, and they have
+        // had nothing to do with the steppers since. Reported by the author,
+        // who met it as the Helper card on a Kolam node.
+        //
+        // The lesson for the next edit here: a sentence trimmed is a sentence
+        // still making a claim. This one survived a rewrite that was ABOUT its
+        // subject.
+        //
         // "View" capitalised because that is the button's own label; the
         // wording is otherwise the author's.
-        prependSystemCard('The script controls the pattern and the steppers can synchronise automatically with the script. Or manually through the up down arrows. Press View to better visualise the pattern.', { toHistory: true });
+        prependSystemCard('The script controls the pattern and the steppers can synchronise automatically with the script. Press View to better visualise the pattern.', { toHistory: true });
         playerHelperShown = true;
       }
       // 2026-08-18 — re-anchor the iframe now that player-active is set and the
