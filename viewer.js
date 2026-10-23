@@ -1040,13 +1040,26 @@ function showCopyScopeNotice(opts) {
   try {
     document.getElementById('copy-scope-notice')?.remove();
 
-    // PAIRING IS GATED, so the sentence about it is too. pairAllowed requires
-    // pairCodePresent(), which a public visitor does not have — their Pair
-    // button is hidden outright. Promising them a way to save would be worse
-    // than saying nothing. Asked of the BUTTON rather than re-deriving the
-    // rule, so this cannot drift from what updateBackBtn actually decided.
-    const pb = document.getElementById('chat-btn');
-    const pairing = !!(pb && pb.style.display !== 'none' && !pb.disabled);
+    // SAVING IS GATED BY THE CURATION CODE, NOT BY PAIRING — corrected
+    // 2026-10-23 when the author asked whether the option would be flagged for
+    // a paired user. It would not have been, and the question exposed two
+    // errors at once:
+    //
+    //   · WRONG MECHANISM. Every write handler in server.js checks
+    //     curationCodeOk(msg.code) — the curation code. Pairing uses a
+    //     DIFFERENT code via pairCodePresent(). So a paired user without
+    //     curation access cannot save, and someone with curation access can
+    //     save whether paired or not. Pairing is about sharing a position with
+    //     another reader; it is not a write credential.
+    //   · WRONG ACT. There is no "save my exploration as a new node": the
+    //     author's own words, "nothing will be savable in the originating
+    //     node". The write path for a script is Sv, which saves TEXT where Wr
+    //     saves LAYOUT.
+    //
+    // A public visitor has neither code, so they still see nothing extra —
+    // which was the point of gating it. Promising a route that does not exist
+    // is worse than silence.
+    const canSave = (typeof curationCodePresent === 'function') && curationCodePresent();
 
     const box = document.createElement('div');
     box.id = 'copy-scope-notice';
@@ -1069,7 +1082,7 @@ function showCopyScopeNotice(opts) {
       : 'Your edits live only in this browser. ') +
       (inView ? 'To keep them, press Back and copy the script from the card.'
               : 'To keep them, copy the script from the card itself.') +
-      (pairing ? ' Or, while paired, you can save it as your own node.' : '');
+      (canSave ? ' Or, with curation access, Sv saves the script to the node itself.' : '');
 
     const ok = document.createElement('button');
     ok.type = 'button';
@@ -2536,7 +2549,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-23i' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-23j' };
 
 let bdViewTitleText = '';
 

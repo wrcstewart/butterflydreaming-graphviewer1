@@ -145,12 +145,16 @@ A notice now says so. Three decisions in it, each argued rather than assumed:
   exists to produce. `withUpdatePrompt` had been removed from this very button
   hours earlier for being friction, and an unconditional dialog would have walked
   straight back.
-- **The sentence about saving while paired is GATED on pairing being possible.**
-  `pairAllowed` requires `pairCodePresent()`, so a public visitor's Pair button
-  is hidden outright — and these URLs are about to be public. Promising them a
-  way to save would be worse than saying nothing. Asked of the button rather
-  than re-deriving the rule, so it cannot drift from what `updateBackBtn`
-  decided.
+- **The sentence about saving is gated on the CURATION code** — and that was
+  wrong first. It originally said "while paired", gated on pairing being
+  possible. The author asked whether a paired user would see it, which exposed
+  two errors: **pairing is not a write credential** (every write handler checks
+  `curationCodeOk`, a *different* code from `pairCodePresent()`, so a paired
+  user without curation access cannot save and someone with it can save
+  unpaired), and **there is no "save as a new node" at all** — the write path
+  for a script is **Sv**, which saves TEXT where Wr saves LAYOUT. A public
+  visitor has neither code and still sees nothing extra, which was the point of
+  gating it: promising a route that does not exist is worse than silence.
 
 Wired for **both** Copy Link buttons, on the author's extension: the question
 belongs to the LINK, not to whichever button produced it.
