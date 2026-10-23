@@ -1040,26 +1040,23 @@ function showCopyScopeNotice(opts) {
   try {
     document.getElementById('copy-scope-notice')?.remove();
 
-    // SAVING IS GATED BY THE CURATION CODE, NOT BY PAIRING — corrected
-    // 2026-10-23 when the author asked whether the option would be flagged for
-    // a paired user. It would not have been, and the question exposed two
-    // errors at once:
+    // NO THIRD SENTENCE ABOUT SAVING, and the reason is worth keeping so it is
+    // not re-added as a plausible-sounding promise. The author wanted the
+    // notice to point at the POSSIBILITY of creating a node of your own.
+    // Checked against the code: THAT CAPABILITY DOES NOT EXIST.
     //
-    //   · WRONG MECHANISM. Every write handler in server.js checks
-    //     curationCodeOk(msg.code) — the curation code. Pairing uses a
-    //     DIFFERENT code via pairCodePresent(). So a paired user without
-    //     curation access cannot save, and someone with curation access can
-    //     save whether paired or not. Pairing is about sharing a position with
-    //     another reader; it is not a write credential.
-    //   · WRONG ACT. There is no "save my exploration as a new node": the
-    //     author's own words, "nothing will be savable in the originating
-    //     node". The write path for a script is Sv, which saves TEXT where Wr
-    //     saves LAYOUT.
+    //   · `edit_clone_cluster` matches `(c:Cluster {name: $newName})` and the
+    //     client sends `sourceCluster` — Cluster-only. A module node, or any
+    //     content node, cannot be cloned into one of your own.
+    //   · Sv writes over THIS node's text, which is the opposite of what an
+    //     explorer wants and is not "your own node" either.
+    //   · Pairing is not a write credential at all: every write handler checks
+    //     curationCodeOk, a different code from pairCodePresent(). Pairing
+    //     shares a position with another reader.
     //
-    // A public visitor has neither code, so they still see nothing extra —
-    // which was the point of gating it. Promising a route that does not exist
-    // is worse than silence.
-    const canSave = (typeof curationCodePresent === 'function') && curationCodePresent();
+    // So the honest notice has two sentences. Add a third only when a
+    // save-as-new-node path actually exists — and then gate it on that path's
+    // own availability, not on pairing and not on the curation code alone.
 
     const box = document.createElement('div');
     box.id = 'copy-scope-notice';
@@ -1081,8 +1078,7 @@ function showCopyScopeNotice(opts) {
       ? 'Your stepper settings live only in this browser. '
       : 'Your edits live only in this browser. ') +
       (inView ? 'To keep them, press Back and copy the script from the card.'
-              : 'To keep them, copy the script from the card itself.') +
-      (canSave ? ' Or, with curation access, Sv saves the script to the node itself.' : '');
+              : 'To keep them, copy the script from the card itself.');
 
     const ok = document.createElement('button');
     ok.type = 'button';
@@ -2549,7 +2545,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-23j' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-23k' };
 
 let bdViewTitleText = '';
 
