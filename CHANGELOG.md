@@ -6,6 +6,184 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-23 — every node gets a working permanent URL, on a domain that says ButterflyDreaming
+
+Two halves that only make sense together: a **domain** worth putting in front of
+people, and a **URL shape** worth putting on that domain. The prompt was the
+info site's own promise, quoted by the author — *"Every node in the Text-Graph is
+assigned a permanent, stable public URL"* — which turned out to be half true in
+the most awkward way: **the id existed and nothing served it.**
+
+### The id was already there; the address was not
+
+Every node has carried `url: 'butterflydreaming.org/n/<uuid>'` since the MM1
+migration — `URL_PREFIX` in `bd_tool.js`, both create handlers in `server.js`,
+`migrate_mm1.js`, `apply_mm.js`. So `/n/<uuid>` is **not a shape invented this
+week**; it is the project's own durable identity, deliberately not the DB's
+`elementId`, which regenerates on reimport. Coverage is complete for everything
+navigable: TextNode 218/218, Cluster 128/128, Family 46/46, HelperMessage 5/5,
+Entry 3/3, Root 1/1. The 84 without a `url` hold only timestamps and no label —
+the url-less orphan edge endpoints already on record, 42 edges × 2.
+
+What was missing was anything that *resolved* it. BD's only deep links were
+**state blobs** (`?data=` / `#data=` / `?j=`) carrying a script — which name a
+*reading* of a node rather than the node.
+
+`server.js` now has `app.get('/n/:uuid', …)`, and `viewer.js` resolves the uuid
+against `cy` on arrival. **Matched on the path and never the host**, because
+`.org` is stored, `.net` and `graph.virtualfictions.uk` serve, and all three name
+the same node. Nothing rewrites the stored `url`: it is identity, and a migration
+"correcting" the stem would break every link in the wild to fix a cosmetic
+mismatch.
+
+### The state link is retired as a user-facing product
+
+The author's call, and the measurements justify it plainly. `DeepLinking.md` had
+already measured Apple's data detector — the thing that governs any link
+*clicked* in Messages, Mail or Notes — at **659 characters**, against a **median
+1,042** for BD's state links (mean 1,090, longest 2,708). So **the median link
+was 1.6× over the ceiling**: past it the detector matches 57 characters, stopping
+before the `=`, and the payload is silently gone. The symptom chased for a week
+in September — *"the link opens the default script"* — was exactly this, and was
+never caused by the `#data=` move; `?data=` truncated identically at the same
+length.
+
+A node URL is **68 characters**. Nine times under the ceiling, with nothing in it
+to lose and nothing to go stale against an edited script.
+
+So **Copy Link now copies `/n/<uuid>`**. Three consequences worth recording:
+
+- **`withUpdatePrompt` is gone from that button**, and that is not a trim. It
+  existed only to ask the module to sync its live script into the card *before
+  the link was built*. With no script in the link there is nothing to sync, so
+  the dialog was pure friction.
+- **`buildBdSelfUrl` is kept, RETIRED NOT DELETED.** The *receiving* half
+  (`handleReturnFromStandalone`) has to stay regardless — for links already in
+  the wild and for `V_Kolam/preview.html`'s "Enter BD" return leg — so its codec
+  is still load-bearing in one direction.
+- **`BD_MODULE_COPY_LINK_REQUEST` turned out to have no sender.** It survives in
+  three wrapper allowlists (`M_Music`, `M_Fractal`, `M_DroneFrac`) and one stale
+  CSS comment, and no module posts it. A mechanism that *looks* live in four
+  places and has none. Worth checking before assuming Copy Link's change of
+  meaning reached the modules: it reached nothing.
+
+### The address bar as the artefact — and the author's correction
+
+`syncAddressBar` runs in `advanceOrNavigate`'s fresh-open branch, so the bar
+always names the node in front of you. `replaceState`, never `pushState`: BD has
+its own Back button and breadcrumb stack, and a history entry per node would put
+the browser's Back in competition with them, walking a second invisible trail.
+
+Two corrections came from the author testing it, and both were right.
+
+**The bar is a LINK, not a status display.** The first cut stripped `?view=1` on
+arrival, reasoning that a flag in the bar would contradict the screen once View
+was closed. But *"this link opens the graphic"* stays true after you press Back,
+and a flag left in the bar is what lets someone copy-paste the graphic to another
+person — the entire point of a permanent URL. The bar now carries the flag
+whenever `view-active` is set, re-synced by two extra listeners on
+`#jump-to-ext-btn` and `#bd-view-exit`.
+
+**And plain Root behaviour must stay plain.** Asked whether the bare domain still
+worked normally, and it would not have: Root has a `url` of its own, and boot
+opens Root through the same function, so loading `butterflydreaming.net` would
+have silently rewritten the bar to `/n/8ff97087-…` *during load*. The sync now
+stands aside while `bootPriming` is set. **The address bar names deliberate
+navigation, never a boot step.**
+
+### `?view=1`, and a control built into a surface that hides controls
+
+A module node shows its **prose in Browse** and its **graphic only with the
+flag** — the author's rule, so a bare node link is always text and the flag is
+the opt-in. Bounded state in a URL, which is not what was just retired: what made
+the old links unreliable was an *unbounded* payload, and six characters leaves
+this one eight times under the ceiling.
+
+Then the author tried to test it and found the design broken: **View hides the
+whole action bar**, so the `?view=1` branch added to Copy Link could not be
+pressed by anybody. A path nobody could walk. The view bar therefore gains its
+own **Copy Link** button — two lines at 10px, which ends up *narrower* than the
+one-word version it replaced (~38px against ~56), the full label buying width
+back because the bar's height was the dimension going spare.
+
+Two details found by measuring rather than assuming: the hint now **truncates**
+(`flex: 0 1 auto`) because at 390px Back + Speak + hint + Copy overflow by about
+35px and the hint is the one item describing a gesture rather than naming
+content; and the **clipboard fallback is exempted from View's whitelist**, or the
+one case where copying *fails* would be the one case where the text offered
+instead cannot be seen — with `!important`, because that whitelist carries seven
+ids inside its `:not()`s and a tidier selector loses by a wide margin.
+
+### A sub-path breaks relative URLs — found before it bit
+
+`index.html` referenced `style.css`, `module_wire_tables.js` and `viewer.js`
+**relatively**, and `viewer.js` fetched `speech_lexicon.json` the same way. At
+`/n/<uuid>` all four would have 404'd as `/n/…` — **a blank page, not a degraded
+one.** All four are now absolute. A `<base href="/">` would have been one line
+and was declined: it rewrites every relative URL in the document for the sake of
+four that are countable.
+
+### `butterflydreaming.net` commissioned
+
+Full operational detail in the new **`Hosting_and_Domains_2026-10-23.md`**; the
+headlines:
+
+The original plan — forward `.net` to the tunnel with a Hostinger 302 — was
+**abandoned on evidence**: that forwarder **drops the path**, so `/n/<uuid>`
+arrived as bare `/` and the id was lost. A redirect can never carry an id.
+(Hostinger's own panel then confirmed the plan was doubly dead: *"Redirects only
+work with Hostinger nameservers"*, which we had just moved away.) So `.net` joins
+the existing tunnel instead and the address bar keeps saying ButterflyDreaming.
+
+**The tunnel is locally managed** — ingress rules live in
+`~/.cloudflared/config.yml`, which is why Zero Trust offers no Service field and
+why a round of dashboard instructions was wrong. **`cert.pem` is scoped to one
+zone**, so `cloudflared tunnel route dns` did not fail but *succeeded in the
+wrong zone*, creating `butterflydreaming.net.virtualfictions.uk`. **Proxied is
+mandatory**, not a preference: `<tunnel-id>.cfargotunnel.com` returns
+`ANSWER: 0`, so a grey-cloud record is dead rather than merely unaccelerated.
+
+`cloudflared` was restarted with **zero downtime** by registering the new
+instance before draining the old — one tunnel holds several replicas, and
+`graph.virtualfictions.uk` answered 200 in 105 ms throughout. It also writes a
+log now, which it never did.
+
+**One header did all the diagnostic work.** `server: hcdn` meant Hostinger
+answered and our configuration was never consulted; `server: cloudflare` plus a
+`cf-ray` meant ours. That separated two different causes wearing the same 302:
+first the zone sitting Pending, then — after activation — a **stale FRITZ!Box
+resolver that re-cached the old record with a fresh 1800-second TTL**, so it
+renewed rather than expired. The TTL *rising* between two observations is the
+tell that the staleness is upstream of the router. Safari worked throughout
+because iCloud Private Relay resolves names itself and bypasses the router;
+Firefox and Chrome use the system resolver and did not.
+
+`curl --resolve host:443:<authoritative-ip>` is the instrument that settled it,
+bypassing every cache between here and the edge — and proving the site correct
+while the author's own browsers still showed the redirect.
+
+### The recurring lesson, third time in one project
+
+**Read a URL parameter AT LOAD, because the thing that consumes it runs later
+than the thing that destroys it.** `?view=1` landed on the text with the flag
+stripped from the bar — reported as two faults, and one cause:
+`syncAddressBar` replaces the URL *during* the open, so the handler reading
+`location.search` afterwards found nothing and never pressed View. The file
+already says this four hundred lines above, about `ARRIVED_VIA_LINK`: *"Read at
+load, because the boot card is built before the arrival handler runs."*
+
+Also met again: **two sites at the same indentation are not in the same scope.**
+`openNodeAsTap` lives in `setupInteractions`, not `init()`, and reaches the
+arrival only through the destructure at `viewer.js:13938` — checked rather than
+assumed, as was `bdViewEnter`, which is nested too deep to call and so is
+*pressed* instead.
+
+And the uuid pattern was **consolidated before it was written a fourth time** —
+one `UUID_SRC` with two regexes derived from it, `server.js` keeping its own copy
+for the route guard with each comment naming the other.
+
+---
+
 ## 2026-10-21 — four stale assumptions, each outliving the thing it described
 
 A day of small changes with one theme running through them: **every fault was a

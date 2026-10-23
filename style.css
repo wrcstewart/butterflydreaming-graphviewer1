@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-23a";
+  --bd-css-build: "2026-10-23f";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1263,6 +1263,73 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-23f: GREEN (the view bar's button says COPY LINK, on two lines at
+   10px — the author's instruction was the full name without widening the bar,
+   and height was the dimension going spare: the bar is 44px and two 10px lines
+   take 23. It ends up NARROWER than the one-word version it replaces, ~38px
+   against ~56, so the full label buys width back. innerHTML is cached for the
+   Copied! flash, because a textContent round-trip would collapse the <br> and
+   leave "CopyLink" on one line ever after — the trap #copy-link-btn documents
+   for its own two-line label, met again on a button of the same shape).
+   Next = blue.
+
+   2026-10-23e: RED (COPY IN THE VIEW BAR — I had built a path nobody could
+   walk. Copy Link grew a ?view=1 branch that no user could reach, because View
+   hides the whole action bar: everything but a seven-item whitelist. The author
+   found it by trying to run the test. So the view bar gains a Copy button,
+   wired in the scope that already owns copyLinkText and showFallback rather
+   than at init()'s level, which would have meant a second clipboard
+   implementation. Space was MEASURED, not assumed: at 390px Back + Speak + the
+   hint + Copy overflow by ~35px, so the hint now truncates (flex 0 1 auto — it
+   describes a gesture, the one thing a reader can lose half of) and the title
+   goes below 430px on the author's offer, needing min-width:0 or a flex child
+   refuses to shrink below its content and pushes Copy off instead. And the
+   clipboard FALLBACK is exempted from View's whitelist, or the one case where
+   copying fails would be the one case where its text cannot be seen —
+   !important because that whitelist carries seven ids inside its :not()s).
+   Next = green.
+
+   2026-10-23d: BLUE (THE ADDRESS BAR IS A LINK, NOT A STATUS DISPLAY — the
+   author's correction, and it overturns the reasoning one rotation old. I had
+   stripped ?view=1 on arrival because a flag in the bar would contradict the
+   screen once View was closed. But "this link opens the graphic" stays TRUE
+   after Back is pressed, and a flag left in the bar is what lets someone
+   copy-paste the graphic to another person, which is the entire point of a
+   permanent URL. So canonicalNodeUrl now carries the flag whenever view-active
+   is set, and two extra listeners on #jump-to-ext-btn and #bd-view-exit re-sync
+   the bar on the way in and out — deferred one frame, because the class being
+   read is the one the press is about to toggle. Wired as listeners rather than
+   inside bdViewEnter, which is nested far below init()'s block level). Next =
+   red.
+
+   2026-10-23c: GREEN (?view=1 LANDED ON THE TEXT, and the flag vanished from
+   the address bar — ONE cause wearing two symptoms. syncAddressBar replaces the
+   URL with the bare /n/<uuid> DURING the open, so the handler that read
+   location.search afterwards found nothing and never pressed View. The flag is
+   now captured at load beside NODE_URL_UUID, which is what this file already
+   says about ARRIVED_VIA_LINK four hundred lines above: read it at load,
+   because the thing that consumes it runs later than the thing that destroys
+   it. The bar stays bare on purpose — a flag there would have to track View
+   being toggled, in a scope the arrival cannot reach, and would soon state the
+   opposite of the truth; Copy Link supplies it from the live class instead.
+   Also: the bar no longer rewrites itself at BOOT, because Root has a url of
+   its own and typing the plain domain must leave the plain domain showing).
+   Next = blue.
+
+   2026-10-23b: RED (EVERY NODE NOW HAS A WORKING PERMANENT URL. `/n/<uuid>` is
+   served by server.js and resolved by viewer.js against cy, and the address bar
+   FOLLOWS THE READING via replaceState in advanceOrNavigate's fresh branch — so
+   the browser's own URL is the canonical link and copying it needs no button.
+   The id is not new: every node has carried url='butterflydreaming.org/n/<uuid>'
+   since MM1, and nothing ever resolved it, because BD's deep links are state
+   blobs naming a SCRIPT. Matched on the path and never the host, since .org is
+   stored, .net is now tunnelled and graph.virtualfictions.uk serves — three
+   names, one node, and the stored url untouched because it is identity. The
+   sub-path also forced four relative URLs absolute (style.css,
+   module_wire_tables.js, viewer.js, speech_lexicon.json): at /n/<uuid> each
+   would have 404'd as /n/..., which is a blank page rather than a degraded
+   one). Next = green.
+
    2026-10-14m: RED (UNHANDLED REJECTION FROM THE PREFETCH. "Unhandled rejection:
    run@viewer.js:1993" — `run` is the stale check inside prepareUtterance, and
    the prefetch promise is parked in speakAhead where an interrupt nulls the
@@ -1960,7 +2027,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2980b9;             /* CANARY — blue (was green) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -3226,6 +3293,21 @@ body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):no
   box-sizing: border-box;
 }
 body.view-active #bd-view-bar:not([hidden]) { display: flex; }
+
+/* THE CLIPBOARD FALLBACK MUST SURVIVE VIEW (2026-10-23). showFallback appends
+   its box to document.body, so the whitelist above hides it — which would make
+   the one case where copying FAILS also the one case where the user cannot see
+   the text offered instead.
+
+   !important rather than a tidier selector, and for a measurable reason: that
+   whitelist is `body.view-active > *:not(#a):not(#b)…` with seven ids inside
+   the :not()s, and :not() carries its argument's specificity. So it scores
+   seven ids where `body.view-active > #copy-link-fallback` scores one, and
+   loses by a wide margin. */
+body.view-active > #copy-link-fallback {
+  display: block !important;
+  z-index: 70;
+}
 #bd-view-exit {
   background: #1c1c26;
   border: 1px solid #8d7900;          /* local gold — see the mark palette */
@@ -3254,12 +3336,54 @@ body.view-active #bd-view-bar:not([hidden]) { display: flex; }
 }
 #bd-view-speak:hover { background: #20202a; color: #fff; }
 #bd-view-speak.speaking { border-color: #8d7900; color: #fff; }
+/* Copy, in the view bar (2026-10-23). Same language as #bd-view-speak but
+   10px of side padding rather than 14, because the bar is measured: at 390px
+   with Back + Speak + the hint there are about 35 pixels to find. */
+#bd-view-copy {
+  background: #16161e;
+  border: 1px solid #3a3a46;
+  color: #d8d8d0;
+  /* TWO LINES AND SMALLER TYPE, so the full name costs LESS width than the
+     one-word version did: "Copy" at 10px is ~24px of glyphs against ~32px at
+     13px, and the 7px side padding takes the button to about 38px where single-
+     line "Copy" was 56. The bar is 44px tall and two 10px lines occupy 23, so
+     the height is free — this is width bought with a dimension that was going
+     spare. The author asked for the full label and for it not to grow the bar;
+     both are satisfied by spending the height instead.
+
+     Not a focusable input, so sub-16px type carries no iOS zoom risk — the same
+     reasoning the 13px on #bd-view-exit and #bd-view-speak rests on. The 32px
+     min-height keeps the touch target. */
+  font: 10px/1.15 system-ui, sans-serif;
+  text-align: center;
+  min-height: 32px;
+  padding: 0 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+#bd-view-copy:hover { background: #22222c; color: #fff; }
+
 #bd-view-title {
   font: 12px/1 system-ui, sans-serif;
   color: #9e9e90;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* The shrinkable item. Without min-width:0 a flex child refuses to go below
+     its content's intrinsic width, so the ellipsis never engages and the bar
+     overflows instead — the title would push Copy off the end. */
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* NARROW SCREENS: the title goes, on the author's offer — "the Node title is
+   not vital". The view bar names one node and the card behind it says which,
+   so the title is the one item here that repeats information. Keeps Back,
+   Speak, Copy and the hint whole on a portrait phone. */
+@media (max-width: 430px) {
+  #bd-view-bar { gap: 8px; }
+  #bd-view-title { display: none; }
 }
 
 /* How to reach the controls — Browse only, set by bdViewEnter (2026-10-20).
@@ -3270,7 +3394,13 @@ body.view-active #bd-view-bar:not([hidden]) { display: flex; }
    is standing guidance rather than information about this node. */
 #bd-view-hint {
   margin-left: auto;
-  flex: 0 0 auto;
+  /* 2026-10-23 — was `flex: 0 0 auto`, which kept it whole and pushed the new
+     Copy button off the bar on a narrow screen. It now truncates: of everything
+     in this bar the hint is the one thing a reader can afford to lose half of,
+     since it describes a gesture rather than naming content. */
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font: 11px/1 system-ui, sans-serif;
   color: #6f6f66;
   white-space: nowrap;

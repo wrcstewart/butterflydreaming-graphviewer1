@@ -178,6 +178,39 @@ app.get('/plate', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'plate.html'));
 });
 
+// /n/<uuid> — THE PERMANENT PUBLIC URL OF A NODE.
+//
+// Every node has carried `url: 'butterflydreaming.org/n/<uuid>'` since the MM1
+// migration — see URL_PREFIX in bd_tool.js, the create-cluster/create-subfamily
+// handlers below, and migrate_mm1.js. That is the project's durable identity,
+// deliberately NOT the DB's elementId, which regenerates on reimport.
+//
+// Until now nothing SERVED that shape. The id was an identity without an
+// address: every link BD could produce was a state blob (?data= / #data= / ?j=)
+// carrying a script, which names a reading of a node rather than the node. This
+// route is the whole of the server side — hand back the single-page app and
+// leave the uuid in the address bar for viewer.js to resolve against cy.
+//
+// THE STEM IS COSMETIC; THE PATH IS NOT. Stored urls say .org, the tunnel
+// serves graph.virtualfictions.uk and now butterflydreaming.net, and all three
+// name the same node. So this matches on the PATH ONLY and never on the host,
+// and nothing rewrites the stored `url` values — those are identity, and a
+// migration that "corrected" the stem would break every link already in the
+// wild to fix a cosmetic mismatch.
+//
+// A malformed id is a 404 here rather than a blank app. Once the SPA has
+// booted it cannot distinguish "no such node" from "not a node link at all",
+// and a mistyped link should fail where saying so is cheap.
+app.get('/n/:uuid', (req, res) => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID.test(req.params.uuid)) {
+    res.status(404).type('text/plain').send('Not a node id.\n');
+    return;
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(require('path').join(__dirname, 'index.html'));
+});
+
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
     // 2026-09-04 — .js too. The bench imports piper_direct.js as a module.

@@ -918,12 +918,132 @@ function pushToAV(script, moduleId) {
 }
 
 
+// ── THE PERMANENT NODE URL — /n/<uuid> ───────────────────────────────────────
+//
+// Every node has carried `url: 'butterflydreaming.org/n/<uuid>'` since MM1
+// (bd_tool.js URL_PREFIX), and until 2026-10-23 nothing resolved it. BD's own
+// deep links are STATE BLOBS — ?data= / #data= / ?j= carry a script, naming a
+// reading of a node rather than the node — so the project had a durable
+// identity with no address. server.js now serves the SPA for this path and
+// leaves the uuid in the bar; these three functions read and write it.
+//
+// MATCHED ON THE PATH, NEVER THE HOST. The stored stem says .org, the tunnel
+// serves graph.virtualfictions.uk and butterflydreaming.net, and all three name
+// the same node. Nothing rewrites the stored `url` — that is identity, and
+// "correcting" the stem would break every link already in the wild.
+// ONE definition of the uuid shape. It is wanted in three places here — the
+// path on arrival, the uuid inside a stored url, and the link builder — and a
+// pattern written three times is a pattern that gets corrected once. server.js
+// holds a fourth copy for its route guard and cannot share this one; each
+// comment names the other.
+const UUID_SRC     = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const UUID_IN_PATH = new RegExp('^/n/(' + UUID_SRC + ')$', 'i');
+const UUID_AT_END  = new RegExp('(' + UUID_SRC + ')\\s*$', 'i');
+
+const NODE_URL_UUID = (() => {
+  try {
+    const m = String(location.pathname || '').match(UUID_IN_PATH);
+    return m ? m[1].toLowerCase() : null;
+  } catch (_) { return null; }
+})();
+
+// ?view=1, READ AT LOAD — and it has to be, for the same reason
+// ARRIVED_VIA_LINK is: by the time the arrival handler acts, the flag is gone.
+// syncAddressBar replaces the URL with the bare /n/<uuid> during the open, so a
+// handler reading location.search afterwards finds nothing and View never
+// fires. Symptom: a ?view=1 link lands on the text with the flag stripped from
+// the bar — one cause, looking like two faults.
+//
+// The bar is left bare deliberately. A flag in the address bar would have to
+// track View being toggled afterwards, which happens in a scope the arrival
+// cannot reach, so it would soon be telling the opposite of the truth. Copy
+// Link supplies the flag instead, from the live view-active class.
+const NODE_URL_VIEW = (() => {
+  try { return new URLSearchParams(location.search).get('view') === '1'; }
+  catch (_) { return false; }
+})();
+
+// The uuid out of a node's stored url — the LAST path segment, for the
+// host-independence reason above.
+function nodeUuid(node) {
+  try {
+    const u = node && node.data && node.data('url');
+    if (typeof u !== 'string') return null;
+    const m = u.match(UUID_AT_END);
+    return m ? m[1].toLowerCase() : null;
+  } catch (_) { return null; }
+}
+
+// The permanent URL of a node built from a STORED url STRING rather than a cy
+// node — the shape the card and payload builders already have to hand.
+//
+// `view` appends the one flag a public link may carry: ?view=1 arrives with the
+// graphic showing, and without it a module node shows its prose in Browse (the
+// author's rule, 2026-10-23). That is state in a URL, which BD has just
+// retired — but BOUNDED state. What made the old links unreliable was an
+// UNBOUNDED payload crossing Apple's 659-character data-detector ceiling, which
+// the median BD state link did at 1,042 chars. Six characters leaves this one
+// nine times under it.
+function canonicalUrlFromStored(storedUrl, opts) {
+  if (typeof storedUrl !== 'string') return null;
+  const m = storedUrl.match(UUID_AT_END);
+  if (!m) return null;
+  return window.location.origin + '/n/' + m[1].toLowerCase() +
+         (opts && opts.view ? '?view=1' : '');
+}
+
+// The link a reader can copy, in the host they are ACTUALLY using — built from
+// location.origin, so .net and graph.virtualfictions.uk each hand out their own
+// name and neither is hardcoded here.
+function canonicalNodeUrl(node) {
+  const id = nodeUuid(node);
+  if (!id) return null;
+  // THE BAR IS A LINK, NOT A STATUS DISPLAY — the author's correction,
+  // 2026-10-23. The first cut stripped ?view=1 on arrival, reasoning that a
+  // flag in the bar would contradict the screen once View was closed. But
+  // "this link opens the graphic" stays TRUE after you press Back, and leaving
+  // the flag in the bar is what lets someone copy-paste the graphic to another
+  // person — the whole point of a permanent URL. So the bar carries the flag
+  // while View is open and drops it on the way out.
+  const view = document.body.classList.contains('view-active');
+  return window.location.origin + '/n/' + id + (view ? '?view=1' : '');
+}
+
+// Keep the address bar on the node being read, so the browser's own URL IS the
+// permanent link and copying it needs no button.
+//
+// replaceState, NOT pushState. BD has its own Back button and its own
+// breadcrumb stack; a history entry per node would put the browser's Back in
+// competition with them, walking a second invisible trail. This changes what
+// the bar SAYS without touching what Back DOES.
+//
+// Silent on a node with no url — the corpus holds 84 label-less orphan edge
+// endpoints with none. Leaving the previous canonical URL in the bar beats
+// replacing it with something that resolves to nothing.
+function syncAddressBar(node) {
+  try {
+    // NOT AT BOOT. primeRootReading opens Root without the user asking, and
+    // Root HAS a url (butterflydreaming.org/n/8ff97087-…), so without this the
+    // bar rewrote itself from `butterflydreaming.net` to a uuid during load,
+    // before the visitor had touched anything. Typing the plain domain must
+    // leave the plain domain in the bar: it is the canonical way in, and the
+    // address bar should name DELIBERATE navigation, not a boot step.
+    if (bootPriming) return;
+    const url = canonicalNodeUrl(node);
+    if (!url || window.location.href === url) return;
+    history.replaceState({}, '', url);
+  } catch (_) { /* a tidy address bar is never a reason to break navigation */ }
+}
+
+// A /n/<uuid> arrival counts as a deep link: see the ROOT_ARRIVAL_MESSAGE note
+// above — this visitor has not had Root's opening either.
 const ARRIVED_VIA_LINK = (() => {
   try {
     const p = new URLSearchParams(location.search);
     return !!(p.get('j') || p.get('data')) ||
-           String(location.hash || '').startsWith('#data=');
-  } catch (_) { return false; }
+           String(location.hash || '').startsWith('#data=') ||
+           NODE_URL_UUID !== null;
+  } catch (_) { return NODE_URL_UUID !== null; }
 })();
 const HALO_THIN = 0.8;   // px — the base ring width; selected states step off it (SEL_WIDTH_MUL)
 const HALO_FAT  = 4;     // px
@@ -1927,7 +2047,7 @@ async function speakReady() {
   }
   if (!speakLexicon) {
     try {
-      const r = await fetch('speech_lexicon.json');
+      const r = await fetch('/speech_lexicon.json');
       speakLexicon = r.ok ? await r.json() : {};
     } catch (_) { speakLexicon = {}; }
   }
@@ -2330,7 +2450,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-23a' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-23f' };
 
 let bdViewTitleText = '';
 
@@ -8241,6 +8361,10 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // rather than continue from it.
     if (readingState && readingState.primed) readingState = null;
     if (!readingState || readingState.nodeId !== nid) {
+      // THE ADDRESS BAR FOLLOWS THE READING, so the URL a visitor copies is
+      // always the node in front of them. This is the fresh-open branch, which
+      // a Back reaches too (textOnly), so one call covers both routes in.
+      syncAddressBar(node);
       // Breadcrumb chip: add once per node visited, on the FRESH tap only —
       // subsequent chunk-advance taps on the same node don't duplicate the chip.
       const type = node.data('type');
@@ -15059,6 +15183,18 @@ async function init() {
     // Media-module Deep Link request. Module has already pushed its live script
     // to the focused card via BD_UPDATE; simulate a click on the action-bar's
     // Copy Link button so the existing URL-build + clipboard flow runs unchanged.
+    //
+    // 2026-10-23 — NOTHING SENDS THIS ANY MORE. Checked across the repo while
+    // retiring the state link: the type survives only in the three wrapper
+    // allowlists (M_Music, M_Fractal, M_DroneFrac index.html) and one stale CSS
+    // comment in M_Music/music_module.html; no module posts it. So the mechanism
+    // LOOKS live in four places and has no sender, and Copy Link's change of
+    // meaning reaches no module.
+    //
+    // Left wired rather than deleted: if a module revives a Deep Link button it
+    // would now copy a NODE URL, losing the live score the button existed to
+    // share. That is a decision to take then, with the author, not a silent
+    // consequence of this change.
     window.addEventListener('message', (e) => {
       const d = e && e.data;
       if (!d || d.type !== 'BD_MODULE_COPY_LINK_REQUEST') return;
@@ -17326,6 +17462,11 @@ async function init() {
     // script, and (currently, always) engages Player mode via the
     // enabled Player radio. Auto-Player behaviour may want a smarter
     // gate later (only if parseModuleId(script) is non-null) — deferred.
+    // RETIRED NOT DELETED (2026-10-23) — no longer reachable from any button.
+    // The author retired the state link as a user-facing product; its RECEIVER
+    // (handleReturnFromStandalone) stays regardless, for links already in the
+    // wild and for V_Kolam/preview.html's "Enter BD" return leg, so the codec
+    // this builds against is still load-bearing in one direction.
     function buildBdSelfUrl() {
       // Reuse buildExternalWebsiteUrl's payload builder by extracting
       // just the payload, then re-encoding for the BD-origin URL.
@@ -17350,16 +17491,98 @@ async function init() {
       // flash can restore it. textContent would collapse the <br> to a
       // space and break the two-line layout after the flash.
       const originalLabel = copyLinkBtn.innerHTML;
+
+      // ── COPY LINK GIVES THE PERMANENT NODE URL (2026-10-23) ───────────────
+      //
+      // It used to give a STATE BLOB — buildBdSelfUrl, the whole script and the
+      // top card base64'd into the query — and the author retired that as the
+      // thing a user button produces, because it is unreliable at exactly the
+      // moment it is used. MEASURED in DeepLinking.md: Apple's data detector,
+      // which governs any link CLICKED in Messages, Mail or Notes, matches at
+      // most 659 characters, and BD's state links run to a median of 1,042
+      // (mean 1,090, longest 2,708). Past the ceiling the detector returns 57
+      // characters, stopping before the `=`, so the payload is silently gone
+      // and the page opens the default script. The symptom we chased for a week
+      // — "the link opens the default script" — was this, and it was never the
+      // #data= move: ?data= truncated identically at the same length.
+      //
+      // A node URL is ~70 characters. There is nothing in it to lose, it cannot
+      // go stale against an edited script, and it is the thing the info site
+      // already promises: "every node is assigned a permanent, stable public
+      // URL". ?view=1 rides along when the graphic is on screen, so what you
+      // copy is what you are looking at.
+      //
+      // withUpdatePrompt is GONE from this button, and that is not a trim: it
+      // existed only to ask the module to sync its live script into the card
+      // BEFORE the link was built. With no script in the link there is nothing
+      // to sync and the dialog is pure friction.
+      //
+      // buildBdSelfUrl is kept, RETIRED NOT DELETED — the receiving half
+      // (handleReturnFromStandalone) must stay regardless, for links already in
+      // the wild and for V_Kolam/preview.html's "Enter BD" return leg.
       copyLinkBtn.addEventListener('click', () => {
-        withUpdatePrompt(() => {
-          const { url } = buildBdSelfUrl();
-          copyLinkText(url).then(() => {
-            copyLinkBtn.textContent = 'Copied!';
-            setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
-          }).catch((err) => {
-            console.warn('Copy Link (BD-self): clipboard write failed, showing fallback', err);
-            showFallback(url);
-          });
+        const { payload } = buildExternalWebsiteUrl();
+        const url = canonicalUrlFromStored(payload && payload.node_url,
+                      { view: document.body.classList.contains('view-active') });
+        if (!url) {
+          // A node with no `url` cannot be linked at all. The corpus has 218 of
+          // 218 TextNodes covered, so this is the 84 label-less orphan edge
+          // endpoints or something newly created — say so on the button rather
+          // than copying a broken link or appearing to do nothing.
+          console.warn('[copy-link] this node carries no url — nothing permanent to copy');
+          copyLinkBtn.textContent = 'No URL';
+          setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1800);
+          return;
+        }
+        console.log('[copy-link] ' + url + '  (' + url.length + ' chars, ceiling 659)');
+        copyLinkText(url).then(() => {
+          copyLinkBtn.textContent = 'Copied!';
+          setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
+        }).catch((err) => {
+          console.warn('Copy Link: clipboard write failed, showing fallback', err);
+          showFallback(url);
+        });
+      });
+    }
+
+    // ── COPY, IN THE VIEW BAR (2026-10-23) ──────────────────────────────────
+    //
+    // View hides the whole action bar, so #copy-link-btn cannot be pressed from
+    // there and the only route to a View link was knowing to reach for the
+    // address bar. On a headset there may be no visible address bar at all.
+    //
+    // Wired HERE, beside Copy Link, because this is the scope holding
+    // copyLinkText, showFallback and buildExternalWebsiteUrl. At init()'s block
+    // level it would have needed a second clipboard implementation, and a
+    // mechanism written twice is a mechanism fixed once.
+    //
+    // The flag is READ from view-active rather than hardcoded, even though this
+    // button only exists inside View: one place decides what a canonical URL
+    // looks like, and that place is canonicalUrlFromStored.
+    const viewCopyBtn = document.getElementById('bd-view-copy');
+    if (viewCopyBtn) {
+      // Cache innerHTML, not textContent — the label is two lines carrying a
+      // <br>, and a textContent round-trip collapses it to "CopyLink" on one
+      // line after the first flash. Exactly the trap #copy-link-btn documents
+      // a few lines above; same label shape, same precaution.
+      const viewCopyLabel = viewCopyBtn.innerHTML;
+      viewCopyBtn.addEventListener('click', () => {
+        const { payload } = buildExternalWebsiteUrl();
+        const url = canonicalUrlFromStored(payload && payload.node_url,
+                      { view: document.body.classList.contains('view-active') });
+        if (!url) {
+          console.warn('[view-copy] this node carries no url — nothing to copy');
+          viewCopyBtn.textContent = 'No URL';
+          setTimeout(() => { viewCopyBtn.innerHTML = viewCopyLabel; }, 1800);
+          return;
+        }
+        console.log('[view-copy] ' + url + '  (' + url.length + ' chars, ceiling 659)');
+        copyLinkText(url).then(() => {
+          viewCopyBtn.textContent = 'Copied!';
+          setTimeout(() => { viewCopyBtn.innerHTML = viewCopyLabel; }, 1500);
+        }).catch((err) => {
+          console.warn('[view-copy] clipboard write failed, showing fallback', err);
+          showFallback(url);
         });
       });
     }
@@ -17709,6 +17932,112 @@ async function init() {
   window.addEventListener('hashchange', () => {
     if (window.location.hash.startsWith('#data=')) window.location.reload();
   });
+  // ARRIVING BY A PERMANENT NODE URL — /n/<uuid>.
+  //
+  // The counterpart to syncAddressBar: that writes the bar, this reads it. BD
+  // holds the WHOLE corpus in cy from boot (no simulated edges — navigation is
+  // pure hide/show), so by the time this runs the node is either resident or
+  // does not exist, and no fetch is needed to tell which.
+  //
+  // Runs BEFORE handleReturnFromStandalone and stands aside when a payload is
+  // present: /n/<uuid>?data=... is a state blob that names its own node AND
+  // carries a possibly-edited script, which is strictly more specific than a
+  // path naming the node alone.
+  // THE ADDRESS BAR FOLLOWS VIEW, both ways.
+  //
+  // advanceOrNavigate is the choke point for OPENING A NODE and is not involved
+  // in a View toggle at all, so without this the bar would only ever gain the
+  // flag by arriving with it. Wired as two extra listeners on the existing
+  // buttons rather than inside bdViewEnter/exit, which sit well below init()'s
+  // block level and are not reachable from here.
+  //
+  // Deferred one frame because the class is what is being read: on the press
+  // itself view-active has not been toggled yet, so reading it now would give
+  // the state we are leaving rather than the one we are entering. This also
+  // covers the ?view=1 arrival, which presses the same button.
+  ['jump-to-ext-btn', 'bd-view-exit'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', () => {
+      requestAnimationFrame(() => {
+        try {
+          const n = cy.getElementById(getLastReadNodeId() || '');
+          if (n && n.length) syncAddressBar(n);
+        } catch (err) { console.warn('[/n] could not re-sync the bar for View', err); }
+      });
+    });
+  });
+
+  (function handleNodeIdArrival() {
+    if (!NODE_URL_UUID) return;
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('data') || q.get('j') ||
+          String(window.location.hash || '').startsWith('#data=')) {
+        console.log('[/n] ' + NODE_URL_UUID + ' — standing aside, the URL also carries a payload');
+        return;
+      }
+    } catch (_) { /* fall through and open the node */ }
+
+    const target = cy.nodes().filter(n => nodeUuid(n) === NODE_URL_UUID).first();
+    if (!target || !target.length) {
+      // SAY SO ON SCREEN, not only in the console. A permanent URL is the one
+      // kind of link that outlives what it points at — a node deleted, or a
+      // corpus reimported without it — and someone who followed one is owed an
+      // explanation rather than a silent Root that looks like a broken app.
+      console.warn('[/n] no node carries uuid ' + NODE_URL_UUID + ' — showing Root');
+      try {
+        prependSystemCard('That link points to a node this ButterflyDreaming does not ' +
+                          'hold. You are at Root instead.');
+      } catch (err) { console.warn('[/n] could not post the not-found card', err); }
+      return;
+    }
+    // RECORD ROOT AS A REAL STEP FIRST, so the route the system believes in is
+    // "Root pressed -> this node clicked" and the Local button has a trail to
+    // walk. Without it restoreState() finds an empty history and does nothing,
+    // which would make this arrival's OWN card a lie — ROOT_ARRIVAL_MESSAGE
+    // tells the visitor to press Local to reach Root. Same reason and the same
+    // call as the ?data= arrival's step 2b below.
+    //
+    // jumpToNode marks, dispatches by type and saves state but creates NO
+    // card, which is what is wanted: an arriving visitor should see the node
+    // they were sent to, not the panel history of a visit they never made.
+    try {
+      const rootForTrail = cy.nodes().filter(n => n.data('type') === 'root').first();
+      if (rootForTrail && rootForTrail.length && rootForTrail.id() !== target.id()) {
+        jumpToNode(rootForTrail);
+      }
+    } catch (err) {
+      console.warn('[/n] could not record Root as a step', err);
+    }
+
+    console.log('[/n] arriving at ' + (target.data('name') || target.id()));
+    openNodeAsTap(target, { fresh: true });
+
+    // ?view=1 — ARRIVE WITH THE GRAPHIC SHOWING, and only then. A bare node
+    // link is always text in Browse; the flag is the opt-in.
+    //
+    // PRESSED rather than called: bdViewEnter is nested well below init()'s own
+    // block level and is not reachable from here, and a press goes through the
+    // identical path a user's press takes — including the module load that View
+    // itself triggers. Two frames, so the card and the radio have settled
+    // first; View reads the node and the card on screen, and neither exists
+    // until the open above has finished.
+    if (NODE_URL_VIEW) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const vb = document.getElementById('jump-to-ext-btn');
+        if (vb) { console.log('[/n] ?view=1 — pressing View'); vb.click(); }
+        else console.warn('[/n] ?view=1 — no View button to press');
+      }));
+    }
+
+    // ROOT STILL OWES THIS VISITOR ITS OPENING — the development notice and the
+    // speech offer both live on Root, and a link bypasses them. Armed AFTER the
+    // open, because the markRead inside it is what clears the flag: armed
+    // earlier it would be set and cleared in the same breath.
+    rootIntroPending = true;
+  })();
+
   (function handleReturnFromStandalone() {
     const params = new URLSearchParams(window.location.search);
 

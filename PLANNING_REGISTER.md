@@ -224,6 +224,31 @@ acting on any of it.
 
 ---
 
+## Added 2026-10-23 — permanent node URLs, and butterflydreaming.net
+
+| Design | Doc | Status | Evidence |
+|---|---|---|---|
+| **Permanent public node URL `/n/<uuid>`** | `Hosting_and_Domains_2026-10-23.md` | **Built** | `app.get('/n/:uuid'` in `server.js`; `NODE_URL_UUID`, `handleNodeIdArrival`, `canonicalUrlFromStored` in `viewer.js`. Verified end to end on both hostnames: 200, zero redirects, path intact, `/n/garbage` 404. |
+| **The address bar names the current node** | same | **Built** | `syncAddressBar` called from `advanceOrNavigate`'s fresh-open branch and from listeners on `#jump-to-ext-btn` / `#bd-view-exit`. `replaceState` only — it must not compete with BD's own Back. Suppressed while `bootPriming`. |
+| **Copy Link gives the node URL, not a state blob** | `DeepLinking.md` for the measurements | **Built** | `#copy-link-btn` handler calls `canonicalUrlFromStored`; `withUpdatePrompt` removed from it; `#bd-view-copy` added for View, which hides the action bar. |
+| **The `?data=` state link as a user-facing product** | `DeepLinking.md` | **Retired** | Median 1,042 chars against Apple's measured 659-char data-detector ceiling. `buildBdSelfUrl` kept but unreachable from any button; `handleReturnFromStandalone` RETAINED for links in the wild and for `V_Kolam/preview.html`'s return leg. |
+| **`butterflydreaming.net` as the canonical stem** | `Hosting_and_Domains_2026-10-23.md` | **Built** | Third ingress rule in `~/.cloudflared/config.yml`; proxied apex CNAME to the tunnel; zone Active; full verification suite passing. |
+| **Hostinger 302 forwarding of `.net`** | same | **Abandoned on evidence** | The forwarder drops the path, so `/n/<uuid>` arrived as bare `/`. A redirect cannot carry an id. Also requires Hostinger nameservers, which we moved away from. |
+
+### Open items from this work
+
+| Item | Why it matters | Status |
+|---|---|---|
+| **launchd for `cloudflared` and `node server.js`** | Both sit at PPID 1 with no supervisor, so the public site dies on reboot and nothing brings it back. | Not started |
+| **Public read/write split review** | These URLs are about to be published. `curationCodeOk()` is the one gate and **every tunnel visitor arrives as `127.0.0.1`**, so nothing can be granted by address. | Not started — do before publishing widely |
+| **The development notice on arrival** | A visitor reaching a mid-corpus node is not told this is a development version until their first Local press (`rootIntroPending`). Deliberate, but worth revisiting now the links are public. | Decision open |
+| **`www.butterflydreaming.net`** | In ingress, but no DNS record exists, so the name does not resolve. | Not done |
+| **Should `.org` serve node URLs?** | It is the domain that *makes* the promise, and `butterflydreaming.org/n/<uuid>` currently 404s on GitHub Pages. Would mean putting `.org` on Cloudflare and routing only `/n/*` to the tunnel. | Decision open |
+| **iOS check of the view bar** | The layout arithmetic (Back + Speak + truncated hint + two-line Copy Link, no title below 430px) is measured but unverified on a phone. | Pending |
+| **`/private/tmp/bd_server.log` is 31 MB** | Only grows. | Not addressed |
+
+---
+
 ## Added 2026-10-04 — eleven pads, and the generated one
 
 | item | where | note |

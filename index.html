@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="style.css?v=484">
+  <link rel="stylesheet" href="/style.css?v=489">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -71,7 +71,12 @@
          at boot). Label reads "New / Edit" — press creates a Local at top
          and focuses it for editing. -->
     <button id="chat-new-card-btn" type="button" title="Create a new Local card at the top of the stack and focus it for editing">New</button>
-    <button id="copy-link-btn" type="button" title="Copy a link back to this BD state (current node + top card) to the clipboard">Copy Link</button>
+    <!-- 2026-10-23 — this copies the node's PERMANENT URL (/n/<uuid>), not a
+         state blob. The old link carried the whole script and top card in the
+         query and ran to a median 1,042 characters, over Apple's 659-character
+         data-detector ceiling, so a link clicked in Messages or Mail silently
+         lost its payload and opened the default script. See DeepLinking.md. -->
+    <button id="copy-link-btn" type="button" title="Copy this node's permanent link (about 70 characters, stable, always shows the node as stored). With the graphic on screen it copies the View link.">Copy Link</button>
     <span id="default-save-status"></span>
     <!-- Copy Down (↓) and Copy Up (↑). 2026-10-21 — this said "the
          script-exchange controls", which they have not been since 2026-10-13:
@@ -425,6 +430,14 @@
     <!-- Text only. A music module has its own sound and a visual one has no
          text, so this appears for the text panel and nowhere else. -->
     <button id="bd-view-speak" type="button" hidden title="Read this aloud from the start">Speak</button>
+    <!-- 2026-10-23 — COPY THE LINK TO WHAT YOU ARE LOOKING AT. View hides the
+         whole action bar (style.css: everything but a short whitelist), so
+         #copy-link-btn is not reachable from here and the only way to send
+         someone the graphic was to know to reach for the address bar. On a
+         headset there may be no visible address bar at all, which makes this
+         more than a convenience. Copies /n/<uuid>?view=1, because the flag is
+         read from the live view-active class. -->
+    <button id="bd-view-copy" type="button" title="Copy a link to this node as you are seeing it now">Copy<br>Link</button>
     <span id="bd-view-title"></span>
     <!-- 2026-10-20 — HOW TO REACH THE CONTROLS, and only from Browse: in
          Create the Back button lands you on the card with the steppers
@@ -469,7 +482,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <!-- JSP wire table — authored here, copied to the standalones by
        sync_module_tables.sh. Must load before viewer.js. -->
-  <script src="module_wire_tables.js"></script>
-  <script type="module" src="viewer.js?v=838"></script>
+  <script src="/module_wire_tables.js"></script>
+  <script type="module" src="/viewer.js?v=843"></script>
 </body>
 </html>

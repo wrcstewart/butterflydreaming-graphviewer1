@@ -41,6 +41,7 @@ Keep this current when adding a doc. One line is enough.
 | **ink_mode.md** | 08-28 | The state-colour scheme. **Now the default** (`?ink=0` returns the coloured model). Written because three of its decisions were reached by being wrong first. |
 | **stable_id_spec.md** | 08-21 | `url` as the durable node id, replacing Memgraph elementId. Built. |
 | **unified_focus_spec.md** | 08-16 | One-tap focus (text + neighbourhood together). Default ON; `?uf=0` restores legacy. |
+| **Hosting_and_Domains_2026-10-23.md** | 10-23 | **How BD reaches the public internet.** One tunnel, three hostnames, one Mac. Read FIRST before touching the tunnel or a zone: the tunnel is locally managed (so the dashboard cannot configure it), `cert.pem` is scoped to one zone (so `route dns` guesses wrong), and Proxied is mandatory rather than preferred. Carries the zero-downtime restart method, the `server: hcdn` vs `server: cloudflare` discriminator, the stale-resolver trap, and a copy-paste verification suite. |
 | **DeepLinking.md** | 09-12 | **Deep-link sizing and transport.** Opens with a START HERE summary — the rest is chronological and includes two reverted experiments. The 659-char Apple data-detector limit, the anchor-vs-plain-text rule, and the JSP design. |
 | **voice_training_pipeline.md** | 09-06 | As-built record of the voice-training pipeline — rig, first fine-tune, seven toolchain breakages with fixes, re-runnable commands. Read before any further voice work. |
 | **controls_panels_iframe_map.md** | 07-02 | Controls / panels / iframe relations. |
