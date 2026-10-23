@@ -1458,6 +1458,17 @@ function speechTextFrom(raw) {
 // hash. What matters here is everything around it, which a fine-tuned voice
 // will inherit unchanged.
 let speakEnabled = false;
+// ── WHAT IS CURRENTLY THERE TO BE READ (2026-10-23) ─────────────────────
+// The last passage the reading path put on screen, whether or not it was
+// spoken. Kept so that TICKING Speak can read what is already there instead
+// of waiting for the next node — the author: "it does not speak till the next
+// node."
+//
+// A plain variable rather than a DOM read, because the card's text is not the
+// passage: insertNodeChunkAsCard normalises bot blocks, strips or unwraps them
+// by curator view, and prepends a head label. `chunkBody` is what the speech
+// path itself uses, so this cannot drift from what a tap would have said.
+let speakCurrentText = '';
 let speakBusy    = false;
 let speakGen     = 0;          // bumped by an interrupt; a fetch from an older
 const speakQueue = [];         // generation lands after and must be discarded
@@ -2319,7 +2330,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-21d' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-23a' };
 
 let bdViewTitleText = '';
 
@@ -8098,6 +8109,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   }
 
   function insertNodeChunkAsCard(chunkBody, hint, node, chunkIndex) {
+    // Recorded BEFORE the speak call and unconditionally — the point is to
+    // know what is on screen even when speech was off at the time.
+    speakCurrentText = chunkBody || '';
     speak(chunkBody, { interrupt: true });
     let text = chunkBody;
     // Bot-context handling — paragraph-normalise, then strip/unnormalise
@@ -14035,6 +14049,39 @@ async function init() {
       // Warm the model now rather than on the first tap, so the wait lands on
       // the tick the user just made instead of on a node they were reading.
       speakReady().catch(err => console.warn('[BD] voice load failed', err));
+
+      // ── AND READ WHAT IS ALREADY ON SCREEN (author, 2026-10-23) ────────
+      // *"If the speak button is off and it is ticked on then at the moment it
+      // does not read out the current node's text — it does not speak till the
+      // next node."* Right, and the asymmetry was the oddity: UNticking
+      // silences the passage in progress, so ticking should start the one in
+      // front of you. A control that only takes effect on the NEXT thing reads
+      // as not working.
+      //
+      // IN VIEW THE TEXT PANEL IS THE AUTHORITY, not the card: View may be
+      // showing a collage's text block, which is not any node's chunk. Read
+      // from the panel when it is actually displaying something — over a module
+      // it is hidden, there is no text, and the Speak button is hidden too, so
+      // falling through to silence is correct.
+      //
+      // `interrupt` for the same reason the reading path uses it: whatever a
+      // previous tick left queued is not what is on screen now.
+      let nowText = speakCurrentText;
+      try {
+        const tp = document.getElementById('bd-view-text');
+        const tb = document.getElementById('bd-view-text-body');
+        if (document.body.classList.contains('view-active') && tp && !tp.hidden && tb) {
+          nowText = tb.textContent || '';
+        }
+      } catch (_) {}
+      if (nowText && nowText.trim()) {
+        console.log('[speak] ticked on — reading what is already on screen (' +
+                    nowText.trim().length + ' chars)');
+        try { speak(nowText, { interrupt: true }); }
+        catch (e) { console.warn('[speak] reading the current passage threw: ' + e.message); }
+      } else {
+        console.log('[speak] ticked on — nothing on screen to read yet');
+      }
     });
   })();
 
