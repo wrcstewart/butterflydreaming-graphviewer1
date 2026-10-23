@@ -1009,6 +1009,73 @@ function canonicalNodeUrl(node) {
   return window.location.origin + '/n/' + id + (view ? '?view=1' : '');
 }
 
+// ── IS WHAT YOU ARE LOOKING AT STILL THE SAVED NODE? ────────────────────────
+//
+// A node URL names the node AS STORED. Someone who has worked the steppers is
+// looking at their own exploration, so a button saying "copy link" is lying by
+// omission — technically accurate, and useless to the person who shares it.
+// The author's catch, 2026-10-23.
+//
+// Compared rather than assumed: the payload's script is the CURRENT card text,
+// and its own tier-3 fallback is the node's `text`, so a node with no card text
+// compares equal and raises nothing. Normalised per line, because trailing
+// space and blank lines are not changes a reader made.
+function scriptsDiffer(a, b) {
+  const norm = (t) => String(t || '')
+    .split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+  const na = norm(a), nb = norm(b);
+  if (!na || !nb) return false;     // nothing to compare is not a divergence
+  return na !== nb;
+}
+
+// The notice itself — shown ONLY when something has actually diverged, so it is
+// never noise. Deliberately NOT a blocking alert: View is where someone sits
+// and watches the figure move, and a modal demanding OK interrupts exactly the
+// state the module exists to produce. withUpdatePrompt was removed from this
+// button hours earlier for being friction; an unconditional dialog would be
+// walking straight back.
+function showCopyScopeNotice(opts) {
+  const isModule = !!(opts && opts.isModule);
+  try {
+    document.getElementById('copy-scope-notice')?.remove();
+
+    // PAIRING IS GATED, so the sentence about it is too. pairAllowed requires
+    // pairCodePresent(), which a public visitor does not have — their Pair
+    // button is hidden outright. Promising them a way to save would be worse
+    // than saying nothing. Asked of the BUTTON rather than re-deriving the
+    // rule, so this cannot drift from what updateBackBtn actually decided.
+    const pb = document.getElementById('chat-btn');
+    const pairing = !!(pb && pb.style.display !== 'none' && !pb.disabled);
+
+    const box = document.createElement('div');
+    box.id = 'copy-scope-notice';
+
+    const head = document.createElement('p');
+    head.className = 'csn-head';
+    head.textContent = 'Copied — this link points to the saved node, not to your changes.';
+
+    const body = document.createElement('p');
+    body.textContent = (isModule
+      ? 'Your stepper settings live only in this browser. '
+      : 'Your edits live only in this browser. ') +
+      'To keep them, press Back, switch to Create, and copy the script itself.' +
+      (pairing ? ' Or, while paired, you can save it as your own node.' : '');
+
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = 'Got it';
+    ok.addEventListener('click', () => box.remove());
+
+    box.appendChild(head);
+    box.appendChild(body);
+    box.appendChild(ok);
+    document.body.appendChild(box);
+  } catch (err) {
+    // A notice is an extra. Never let it cost the copy that just succeeded.
+    console.warn('[copy-scope] could not show the notice', err);
+  }
+}
+
 // Keep the address bar on the node being read, so the browser's own URL IS the
 // permanent link and copying it needs no button.
 //
@@ -2450,7 +2517,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-23f' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-23g' };
 
 let bdViewTitleText = '';
 
@@ -17485,6 +17552,19 @@ async function init() {
       return { url, payload };
     }
 
+
+    // Shared by both Copy Link buttons: the divergence question belongs to the
+    // LINK, not to whichever button produced it. The graph-side button is the
+    // less acute case (Create shows the script) but is just as silent about it.
+    const noticeIfDiverged = (payload) => {
+      try {
+        if (!payload || !payload.node_url) return;
+        const n = cy.nodes().filter(x => x.data('url') === payload.node_url).first();
+        const stored = (n && n.length) ? (n.data('text') || '') : '';
+        if (!scriptsDiffer(payload.script, stored)) return;
+        showCopyScopeNotice({ isModule: !!parseModuleId(payload.script) });
+      } catch (err) { console.warn('[copy-scope] divergence check failed', err); }
+    };
     const copyLinkBtn = document.getElementById('copy-link-btn');
     if (copyLinkBtn) {
       // Cache the original innerHTML (contains <br>) so the "Copied!"
@@ -17536,6 +17616,7 @@ async function init() {
         }
         console.log('[copy-link] ' + url + '  (' + url.length + ' chars, ceiling 659)');
         copyLinkText(url).then(() => {
+          noticeIfDiverged(payload);
           copyLinkBtn.textContent = 'Copied!';
           setTimeout(() => { copyLinkBtn.innerHTML = originalLabel; }, 1500);
         }).catch((err) => {
@@ -17578,6 +17659,7 @@ async function init() {
         }
         console.log('[view-copy] ' + url + '  (' + url.length + ' chars, ceiling 659)');
         copyLinkText(url).then(() => {
+          noticeIfDiverged(payload);
           viewCopyBtn.textContent = 'Copied!';
           setTimeout(() => { viewCopyBtn.innerHTML = viewCopyLabel; }, 1500);
         }).catch((err) => {

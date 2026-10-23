@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-23f";
+  --bd-css-build: "2026-10-23g";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1263,6 +1263,23 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-23g: BLUE (A NODE URL NAMES THE NODE AS STORED, and a reader who has
+   worked the steppers is looking at their own exploration — so the button was
+   lying by omission, technically accurate and useless to whoever shares it. The
+   author's catch. A notice now says so, but ONLY when the card's script has
+   actually diverged from the node's: COMPARED, not assumed, and the payload's
+   own tier-3 fallback is the node's text so a node with no card text raises
+   nothing. Normalised per line, since trailing space and blank lines are not
+   changes a reader made — eight cases unit-tested. Not a blocking alert: View is
+   where someone sits and watches the figure move, and withUpdatePrompt had just
+   been removed from this very button for being friction. Wired for BOTH Copy
+   Link buttons, because the question belongs to the LINK and not to whichever
+   button made it. And the sentence about saving while paired is GATED on
+   pairing being possible — pairAllowed needs pairCodePresent(), so a public
+   visitor's Pair button is hidden outright and promising them a way to save
+   would be worse than silence; asked of the button rather than re-deriving the
+   rule, so it cannot drift). Next = red.
+
    2026-10-23f: GREEN (the view bar's button says COPY LINK, on two lines at
    10px — the author's instruction was the full name without widening the bar,
    and height was the dimension going spare: the bar is 44px and two 10px lines
@@ -2027,7 +2044,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #27ae60;             /* CANARY — green (was red) */
+  border: 2px solid #2980b9;             /* CANARY — blue (was green) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -3293,6 +3310,54 @@ body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):no
   box-sizing: border-box;
 }
 body.view-active #bd-view-bar:not([hidden]) { display: flex; }
+
+/* THE COPY-SCOPE NOTICE (2026-10-23) — "this link is the saved node, not your
+   changes". Shown only when the card's script has actually diverged from the
+   node's, so it is never noise.
+
+   GOLD border, from the mark palette, where gold means "mine": the message is
+   about the reader's own work. Never hue alone — the bold first line and the
+   panel's own luminance carry it too.
+
+   Bottom-centred so it clears the view bar at the top, and exempted from
+   View's whitelist below for the same reason the clipboard fallback is: it is
+   appended to document.body, and a notice about copying that cannot be seen
+   after a copy is worse than none. */
+#copy-scope-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 80;
+  max-width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box;
+  background: #15151d;
+  border: 1px solid #8d7900;
+  border-radius: 5px;
+  padding: 12px 14px;
+  color: #e8e8e0;
+  font: 13px/1.45 system-ui, sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+}
+#copy-scope-notice .csn-head {
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: #f2f2ec;
+}
+#copy-scope-notice p { margin: 0 0 10px; color: #c8c8c0; }
+#copy-scope-notice button {
+  background: #1c1c26;
+  border: 1px solid #3a3a46;
+  color: #e8e8e0;
+  font: 13px/1 system-ui, sans-serif;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#copy-scope-notice button:hover { background: #26262f; color: #fff; }
+
+body.view-active > #copy-scope-notice { display: block !important; }
 
 /* THE CLIPBOARD FALLBACK MUST SURVIVE VIEW (2026-10-23). showFallback appends
    its box to document.body, so the whitelist above hides it — which would make

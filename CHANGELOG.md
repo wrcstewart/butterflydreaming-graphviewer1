@@ -114,6 +114,40 @@ one case where copying *fails* would be the one case where the text offered
 instead cannot be seen — with `!important`, because that whitelist carries seven
 ids inside its `:not()`s and a tidier selector loses by a wide margin.
 
+### The button was lying by omission
+
+The author's catch, and the sharpest observation of the session: a node URL names
+the node **as stored**, but someone who has worked the steppers is looking at
+**their own exploration**. So "Copy Link" is technically accurate and useless to
+the person who shares it — they send a link, and the recipient sees something
+else.
+
+A notice now says so. Three decisions in it, each argued rather than assumed:
+
+- **It fires only on real divergence.** The payload's script is the current card
+  text and its own tier-3 fallback is the node's `text`, so a node with no card
+  text compares equal and raises nothing. Normalised per line, because trailing
+  space and blank lines are not changes a reader made — eight cases unit-tested,
+  including "stepper moved" (fires) against "trailing space only" (silent).
+- **It is not a blocking alert.** View is where someone sits and watches the
+  figure move; a modal demanding OK interrupts exactly the state the module
+  exists to produce. `withUpdatePrompt` had been removed from this very button
+  hours earlier for being friction, and an unconditional dialog would have walked
+  straight back.
+- **The sentence about saving while paired is GATED on pairing being possible.**
+  `pairAllowed` requires `pairCodePresent()`, so a public visitor's Pair button
+  is hidden outright — and these URLs are about to be public. Promising them a
+  way to save would be worse than saying nothing. Asked of the button rather
+  than re-deriving the rule, so it cannot drift from what `updateBackBtn`
+  decided.
+
+Wired for **both** Copy Link buttons, on the author's extension: the question
+belongs to the LINK, not to whichever button produced it. The graph-side case is
+less acute, since Create shows the script, but the link is just as silent.
+
+Gold border from the mark palette, where gold means *mine* — and never hue
+alone: the bold first line carries it too.
+
 ### A sub-path breaks relative URLs — found before it bit
 
 `index.html` referenced `style.css`, `module_wire_tables.js` and `viewer.js`
