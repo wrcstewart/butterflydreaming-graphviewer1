@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-10-23g";
+  --bd-css-build: "2026-10-23h";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -1263,6 +1263,19 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
    #5a5a62 was 2.94:1 and failed both WCAG thresholds, so "dim grey" had
    become unreadable; 13px rather than 11). Next = green.
 
+   2026-10-23h: RED (!important DOES NOT BEAT SPECIFICITY WHEN BOTH SIDES HAVE
+   IT — and I was wrong about this twice in one day, in a comment asserting the
+   opposite. View's whitelist is `display: none !important`, so an exemption
+   marked !important does not win; the two compete on specificity and the
+   whitelist's SEVEN :not()-carried ids beat the exemption's one. Both
+   exemptions added today were silently losing. The author found it from the
+   one symptom that identifies it: the copy notice appeared only AFTER leaving
+   View — an element that existed all along and was merely hidden. Fixed where
+   it belonged all along, by naming #copy-link-fallback and #copy-scope-notice
+   in the whitelist itself, which IS the single statement of what survives
+   View. A LIST WRITTEN TWICE WILL BE CHANGED ONCE: a second rule arguing with
+   the list is not an addition to it, it is a competitor). Next = green.
+
    2026-10-23g: BLUE (A NODE URL NAMES THE NODE AS STORED, and a reader who has
    worked the steppers is looking at their own exploration — so the button was
    lying by omission, technically accurate and useless to whoever shares it. The
@@ -2044,7 +2057,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #2980b9;             /* CANARY — blue (was green) */
+  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -3276,7 +3289,7 @@ body.collage-bar #collage-playbar {
 body.view-active {
   background: #07070c;
 }
-body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):not(#collage-playbar):not(#collage-sound-reserve):not(#session-expired):not(#loading-overlay) {
+body.view-active > *:not(#bd-view-bar):not(#bd-view-text):not(#visual-iframe):not(#collage-playbar):not(#collage-sound-reserve):not(#session-expired):not(#loading-overlay):not(#copy-link-fallback):not(#copy-scope-notice) {
   display: none !important;
 }
 
@@ -3357,22 +3370,25 @@ body.view-active #bd-view-bar:not([hidden]) { display: flex; }
 }
 #copy-scope-notice button:hover { background: #26262f; color: #fff; }
 
-body.view-active > #copy-scope-notice { display: block !important; }
+/* Survives View via the whitelist above, not via a competing display rule —
+   see the correction on #copy-link-fallback below. */
 
-/* THE CLIPBOARD FALLBACK MUST SURVIVE VIEW (2026-10-23). showFallback appends
-   its box to document.body, so the whitelist above hides it — which would make
-   the one case where copying FAILS also the one case where the user cannot see
-   the text offered instead.
+/* Stacking only. Surviving View is handled where it belongs — in the whitelist
+   above, which now names #copy-link-fallback and #copy-scope-notice.
 
-   !important rather than a tidier selector, and for a measurable reason: that
-   whitelist is `body.view-active > *:not(#a):not(#b)…` with seven ids inside
-   the :not()s, and :not() carries its argument's specificity. So it scores
-   seven ids where `body.view-active > #copy-link-fallback` scores one, and
-   loses by a wide margin. */
-body.view-active > #copy-link-fallback {
-  display: block !important;
-  z-index: 70;
-}
+   CORRECTED 2026-10-23, having been wrong twice in one day. The first cut added
+   a separate `body.view-active > #copy-link-fallback { display: block
+   !important }` and a comment claiming !important was enough. It is not: the
+   whitelist's declaration is ALSO !important, so the two compete on specificity
+   and the whitelist's seven :not()-carried ids beat this selector's one. Both
+   exemptions were silently losing — the author found it by watching the copy
+   notice appear only AFTER leaving View, which is the signature of an element
+   that existed all along and was merely hidden.
+
+   The general lesson, met again: A LIST WRITTEN TWICE WILL BE CHANGED ONCE.
+   The whitelist is the single statement of what survives View; a second rule
+   arguing with it is not an addition to the list, it is a competitor to it. */
+body.view-active > #copy-link-fallback { z-index: 70; }
 #bd-view-exit {
   background: #1c1c26;
   border: 1px solid #8d7900;          /* local gold — see the mark palette */

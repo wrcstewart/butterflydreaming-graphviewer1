@@ -111,8 +111,19 @@ Two details found by measuring rather than assuming: the hint now **truncates**
 35px and the hint is the one item describing a gesture rather than naming
 content; and the **clipboard fallback is exempted from View's whitelist**, or the
 one case where copying *fails* would be the one case where the text offered
-instead cannot be seen — with `!important`, because that whitelist carries seven
-ids inside its `:not()`s and a tidier selector loses by a wide margin.
+instead cannot be seen.
+
+**That exemption was then wrong, and corrected the same day.** The first cut
+used a separate rule with `!important`, and a comment asserting that was
+sufficient. It is not: the whitelist's own declaration is **also** `!important`,
+so the two compete on **specificity**, and its seven `:not()`-carried ids beat
+the exemption's one. Both of the day's exemptions were silently losing. The
+author found it from the one symptom that identifies it — the copy notice
+appearing only *after* leaving View, the signature of an element that existed
+all along and was merely hidden. Fixed by naming the two ids **in the whitelist
+itself**, which is the single statement of what survives View. **A list written
+twice will be changed once:** a second rule arguing with the list is not an
+addition to it, it is a competitor.
 
 ### The button was lying by omission
 
