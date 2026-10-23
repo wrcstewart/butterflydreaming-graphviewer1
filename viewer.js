@@ -1036,6 +1036,7 @@ function scriptsDiffer(a, b) {
 // walking straight back.
 function showCopyScopeNotice(opts) {
   const isModule = !!(opts && opts.isModule);
+  const inView   = !!(opts && opts.inView);
   try {
     document.getElementById('copy-scope-notice')?.remove();
 
@@ -1054,11 +1055,20 @@ function showCopyScopeNotice(opts) {
     head.className = 'csn-head';
     head.textContent = 'Copied — this link points to the saved node, not to your changes.';
 
+    // "SWITCH TO CREATE" IS REDUNDANT — the author's point, and it follows from
+    // this notice's own trigger. The steppers and the card are only reachable in
+    // Create, so anyone whose script has diverged from the node was ALREADY in
+    // Create; pressing Back from View returns them there. Telling someone to go
+    // where they are standing reads as not knowing where they are.
+    //
+    // The rest is context-sensitive for the same reason: from View there is a
+    // Back to press, and from the graph side there is not.
     const body = document.createElement('p');
     body.textContent = (isModule
       ? 'Your stepper settings live only in this browser. '
       : 'Your edits live only in this browser. ') +
-      'To keep them, press Back, switch to Create, and copy the script itself.' +
+      (inView ? 'To keep them, press Back and copy the script from the card.'
+              : 'To keep them, copy the script from the card itself.') +
       (pairing ? ' Or, while paired, you can save it as your own node.' : '');
 
     const ok = document.createElement('button');
@@ -1074,6 +1084,15 @@ function showCopyScopeNotice(opts) {
     // A notice is an extra. Never let it cost the copy that just succeeded.
     console.warn('[copy-scope] could not show the notice', err);
   }
+}
+
+// A NOTICE MUST NOT OUTLIVE THE STATE IT DESCRIBES. Reported by the author: it
+// was still sitting there after Back from View, over the Create preview, where
+// its own words ("press Back") had stopped being true. So it is dismissed on
+// every View toggle and on opening another node — the three ways out of the
+// situation it is talking about.
+function dismissCopyScopeNotice() {
+  try { document.getElementById('copy-scope-notice')?.remove(); } catch (_) {}
 }
 
 // Keep the address bar on the node being read, so the browser's own URL IS the
@@ -2517,7 +2536,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-23h' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-23i' };
 
 let bdViewTitleText = '';
 
@@ -8432,6 +8451,9 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // always the node in front of them. This is the fresh-open branch, which
       // a Back reaches too (textOnly), so one call covers both routes in.
       syncAddressBar(node);
+      // A copy-scope notice names the node it was copied from, so it cannot
+      // survive moving to a different one.
+      dismissCopyScopeNotice();
       // Breadcrumb chip: add once per node visited, on the FRESH tap only —
       // subsequent chunk-advance taps on the same node don't duplicate the chip.
       const type = node.data('type');
@@ -17562,7 +17584,10 @@ async function init() {
         const n = cy.nodes().filter(x => x.data('url') === payload.node_url).first();
         const stored = (n && n.length) ? (n.data('text') || '') : '';
         if (!scriptsDiffer(payload.script, stored)) return;
-        showCopyScopeNotice({ isModule: !!parseModuleId(payload.script) });
+        showCopyScopeNotice({
+          isModule: !!parseModuleId(payload.script),
+          inView:   document.body.classList.contains('view-active'),
+        });
       } catch (err) { console.warn('[copy-scope] divergence check failed', err); }
     };
     const copyLinkBtn = document.getElementById('copy-link-btn');
@@ -18041,6 +18066,7 @@ async function init() {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('click', () => {
+      dismissCopyScopeNotice();
       requestAnimationFrame(() => {
         try {
           const n = cy.getElementById(getLastReadNodeId() || '');

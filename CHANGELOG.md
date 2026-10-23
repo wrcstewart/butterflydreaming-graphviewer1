@@ -153,7 +153,17 @@ A notice now says so. Three decisions in it, each argued rather than assumed:
   decided.
 
 Wired for **both** Copy Link buttons, on the author's extension: the question
-belongs to the LINK, not to whichever button produced it. The graph-side case is
+belongs to the LINK, not to whichever button produced it.
+
+Two corrections from the author testing it. **A notice must not outlive the
+state it describes** — it sat on over the Create preview after Back from View,
+where its own words ("press Back") had stopped being true; it is now dismissed
+on either View toggle and on opening another node. And **"switch to Create" is
+gone from the wording**, which follows from the notice's own trigger: the
+steppers and the card are only reachable in Create, so anyone whose script has
+diverged was already there. Telling someone to go where they are standing reads
+as not knowing where they are. The sentence is context-sensitive for the same
+reason — from View there is a Back to press, from the graph side there is not. The graph-side case is
 less acute, since Create shows the script, but the link is just as silent.
 
 Gold border from the mark palette, where gold means *mine* — and never hue
