@@ -91,6 +91,27 @@ stepper groups share one lane, which is the tightest it ever gets. One
 panels are different structures (static `.control-row`s against a JS-filled
 `#control-panel`).
 
+### Extended to every media module
+
+At the author's request, for consistency: `V_Kolam`, `M_Fractal` and `M_Music`
+join `V_Kolam3D` and `M_DroneFrac`. All five now carry `overflow-y: scroll`, a
+12px styled bar with a 32px minimum thumb, a `scrollbar-color` for Firefox, and
+the sticky "scroll" label.
+
+**Row widths are left as each module has them** — V_Kolam's 94px is its own
+tuning, not an error — EXCEPT where they stretched. `M_Fractal` and `M_Music`
+both carried `width: 100%` on `.control-row` inside a stretch container, so a
+row filled the panel and left no slack, and slack is what the runway and the
+label both need. They become `width: 102px; max-width: 100%` — the 102 matching
+the other modules so every stepper column reads as one list, and the max-width
+preserving what `100%` guaranteed on a narrow track: shrink rather than
+overflow.
+
+`V_Kolam` takes the same shape as `V_Kolam3D` — 130 → 162px with the runway as
+content-box slack rather than padding — and its children are capped at the
+content width, since the sideways-scroll defect was structural and not specific
+to the 3D module.
+
 **Two other things the probe corrected, both premises rather than details.**
 `phone-rule false` in every early sample: the probe runs inside the module
 iframe, whose width equals the window's content width below 767px, so the

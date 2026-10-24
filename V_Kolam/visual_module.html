@@ -179,7 +179,10 @@
          (stop the canvas squeezing the panel to zero in the preview harness)
          and left ~90px dead, which is what made the column look twice the
          width it needs. */
-      flex: 0 0 130px;
+      /* 2026-10-24 — 130 → 162, matching V_Kolam3D, to make room for the
+         scroll runway below. The canvas is height-limited on a wide screen, so
+         it gives up nothing there; on a narrow one it yields these 32px. */
+      flex: 0 0 162px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;             /* controls hug the left edge, − on the left */
@@ -189,11 +192,19 @@
          it is visible at a glance. */
       background: rgba(75, 54, 0, 0.9);
       border: 1px solid rgba(74, 155, 142, 0.2);
-      padding: 6px 8px;
+      /* 2026-10-24 — the runway is SLACK INSIDE THE CONTENT BOX, not padding.
+         Measured in V_Kolam3D: `align-self: flex-end` aligns to the content
+         edge, so a padding lane is somewhere the "scroll" label cannot reach.
+         6px 4px 6px 7px leaves content 137 against a 94px row — 43px of lane. */
+      padding: 6px 4px 6px 7px;
       border-radius: 0.4rem;
       min-height: 0;
       min-width: 0;
-      overflow-y: auto;
+      /* `scroll`, not `auto`: auto reserves the gutter only when there is
+         something to scroll, so the runway's width would change under the
+         reader as rows came and went. */
+      overflow-y: scroll;
+      scrollbar-color: rgba(255, 255, 255, 0.45) rgba(0, 0, 0, 0.30);
     }
 
     /* Control cell — one stepper (or select) above, label immediately below.
@@ -330,6 +341,41 @@
     }
 
     /* Selects retain their native appearance for iOS/mobile compatibility. */
+    /* Nothing in the column may exceed it — without this the panel scrolls
+       sideways, overflow-x computing to auto because overflow-y is not
+       visible. Found by measurement in V_Kolam3D (scrollWidth 147 vs client
+       128). min-width: 0 too, since a min-content floor beats a max-width. */
+    .control-panel > * { max-width: 100%; min-width: 0; }
+
+    /* ── THE SCROLL RUNWAY, as V_Kolam3D and M_DroneFrac got it (2026-10-24) ──
+       Consistency across the media modules, at the author's request. The
+       reasoning, once, in V_Kolam3D: a stepper column is easy to scroll BY
+       ACCIDENTALLY ALTERING A STEPPER, so it needs blank space a finger can
+       drag. Styling the bar is also what turns macOS's invisible OVERLAY
+       scrollbar into a permanent one — but it is a DESKTOP mechanism only,
+       since iOS Safari ignores ::-webkit-scrollbar. The runway is what works
+       on a phone: empty space inside the scroller, with no control to knock. */
+    .control-panel::-webkit-scrollbar { width: 12px; }
+    .control-panel::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.30); border-radius: 6px; }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.45); border-radius: 6px; min-height: 32px;
+    }
+
+    /* "scroll" over the runway. Sticky, so it stays while the column scrolls
+       under it; pointer-events: none, so it can never intercept the drag it
+       advertises; and no negative margin, which clipped in DroneFrac. */
+    .control-panel::before {
+      content: 'scroll';
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      align-self: flex-end;
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.55);
+      pointer-events: none;
+    }
+
     .control-panel select {
       width: 100%;
       background: #0f0f18;
