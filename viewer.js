@@ -2557,7 +2557,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-24r' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-24s' };
 
 let bdViewTitleText = '';
 
@@ -12153,8 +12153,34 @@ async function init() {
         // need. Page coordinates would have to be converted twice and could
         // disagree once.
         const barRect = (g) => {
-          const width = Math.round(Math.max(COLLAGE_BAR_MIN_W,
-                          (g && g.width > 40) ? g.width : (w0 - 130 - 44)));
+          // THE BAR MUST NOT BE WIDER THAN THE THING IT SITS UNDER (2026-10-24).
+          //
+          // Reported by the author: on a phone the transport frame's right edge
+          // overhangs the graphic's by two or three pixels, while on a desktop
+          // the two align exactly. One cause: `left` tracks the graphic but the
+          // width was clamped to COLLAGE_BAR_MIN_W, so on a desktop — graphic
+          // far wider than 240 — the clamp never binds and they agree, and on a
+          // phone the clamp wins by precisely the few pixels by which the
+          // graphic falls short of 240.
+          //
+          // A MINIMUM THAT OVERRIDES A MEASUREMENT IS NOT A MINIMUM, IT IS A
+          // MISALIGNMENT. So the floor now applies only to the UNMEASURED
+          // branch, where there is no graphic rect to align with and 240 is a
+          // sensible guess. Where the graphic has been measured, its width is
+          // the answer.
+          //
+          // The author's suspicion that the buttons force it out is the right
+          // instinct one step removed: 240 exists because the transport needs
+          // 108 + 108 + 10 gap + 6 padding = 232. At the ~237px a phone graphic
+          // actually measures they still fit, so nothing has to shrink — and
+          // the desktop is untouched, because the clamp was never reached there.
+          // Should a graphic ever be narrower than 232, the transport will clip
+          // rather than overhang, and the fix then is to let .big-btn shrink;
+          // that is deliberately not done now, since it would change the
+          // desktop the author reports as correct.
+          const measured = (g && g.width > 40);
+          const width = Math.round(measured ? g.width
+                                            : Math.max(COLLAGE_BAR_MIN_W, w0 - 130 - 44));
           const left  = Math.round((g && g.width > 40) ? (g.left - l0) : 0);
           // Flush with the frame's bottom, or just under the square when the
           // square is tall enough to reach into that band. 52 == the reserve
