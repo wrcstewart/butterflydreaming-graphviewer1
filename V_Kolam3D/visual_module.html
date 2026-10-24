@@ -236,8 +236,33 @@
          padding, border and a scrollbar it needs ~122. The 220 was defensive
          (stop the canvas squeezing the panel to zero in the preview harness)
          and left ~90px dead, which is what made the column look twice the
-         width it needs. */
-      flex: 0 0 130px;
+         width it needs.
+
+         2026-10-24 — 130 → 168. The author's instruction: move the column's
+         left edge left by about 90% of the View button's width, and change
+         nothing else this step.
+
+         WHERE 38px COMES FROM. The View button is #jump-to-ext-btn, but its own
+         `width: 50px` does NOT apply: it sits inside #jb-right, and
+         `#jb-right button` scores 101 against that rule's 100, so `width: auto`
+         wins. Auto resolves to 10px bold "View" (~24px of glyphs) + 14px
+         padding + 4px border ≈ 42px. 90% ≈ 38px.
+
+         The RIGHT edge does not move — the panel is the last item in a
+         flex-direction: row layout, so growing its basis extends it leftward
+         into the gap the author identified. Nothing else is touched: the 44px
+         canvas/column band, the 102px row, the padding, the phone rule and the
+         scroll hint are all as they were.
+
+         BD's ↓↑ arrows need no change either: positionExtendPanel places them
+         from the column's LIVE rect, never from a constant, so they follow.
+
+         The one cost, measured rather than assumed: the canvas is
+         HEIGHT-limited (its width tracked the viewport height exactly — 403,
+         399, 396, 406 against heights 403, 399, 396, 407). So above roughly a
+         620px iframe there is spare room and the graphic does not shrink at
+         all. Below that the spare is gone and the canvas gives up these 38px. */
+      flex: 0 0 168px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;             /* controls hug the left edge, − on the left */
@@ -372,8 +397,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1238,7 +1263,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-24f';
+    const K3D_BUILD = '2026-10-24g';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3441,7 +3466,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are RED #c0392b, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
