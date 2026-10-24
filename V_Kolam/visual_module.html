@@ -153,11 +153,26 @@
       .control-row { width: 100px; }
     }
 
-    /* Default (landscape) control panel — fixed 220 px column on the right.
-       Fixed width prevents the canvas from squeezing the panel to zero when
-       the iframe is nearly square (as in the preview harness).
-       Portrait media query above overrides to a bottom band.
-       The <canvas> keeps itself square via its own aspect-ratio + max-*. */
+    /* The WIDE control panel — a fixed column on the right. Fixed width
+       prevents the canvas from squeezing the panel to zero when the iframe is
+       nearly square (as in the preview harness). The <canvas> keeps itself
+       square via its own aspect-ratio + max-*.
+
+       TWO CORRECTIONS, 2026-10-24, both from the author's reminder that BD
+       ONLY ALLOWS PORTRAIT ON MOBILES — enforced in style.css by a blocker at
+       `(orientation: landscape) and (pointer: coarse)`, which tells the reader
+       to rotate back.
+
+         · This was headed "Default (landscape)". On a phone landscape is not
+           reachable at all, so "landscape" here can only ever have meant
+           DESKTOP, and naming an orientation for a case that is decided by
+           width was the misleading half.
+         · It also said the media query "overrides to a bottom band". IT DOES
+           NOT: that rule sets `flex: 0 0 108px` inside a `flex-direction: row`
+           layout, so 108px is a WIDTH and the panel stays a narrower side
+           column with the canvas beside it. The identical sentence sits in
+           V_Kolam/visual_module.html with the identical 108px, so it was true
+           of a layout neither file has any more and was copied into both. */
     .control-panel {
       /* 2026-08-19 — 220 → 130. A control-row is 94px; with the panel's
          padding, border and a scrollbar it needs ~122. The 220 was defensive
