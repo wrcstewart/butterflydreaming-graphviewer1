@@ -82,6 +82,31 @@
         // seeing no scroll shadow, and a `background` SHORTHAND overriding
         // background-image is exactly how that happens.
         const layers = String(px(el, 'background-image')).split('gradient(').length - 1;
+        // WHAT IS ACTUALLY TOO WIDE. The widest DIRECT child cannot explain a
+        // 19px horizontal overflow in V_Kolam3D's panel (scrollWidth 147 against
+        // clientWidth 128, while the widest child measured 113), so the culprit
+        // is a descendant — a <select> at its intrinsic option width is the
+        // likely one. Name it rather than guess: every descendant whose right
+        // edge passes the panel's content edge, with enough of its identity to
+        // find it in the file.
+        try {
+          const pr = el.getBoundingClientRect();
+          const over = [];
+          el.querySelectorAll('*').forEach((d) => {
+            const db = d.getBoundingClientRect();
+            if (db.width > 0 && Math.round(db.right - pr.left) > el.clientWidth) {
+              over.push(d.tagName.toLowerCase() +
+                (d.id ? '#' + d.id : '') +
+                (d.className ? '.' + String(d.className).trim().split(/\s+/).join('.') : '') +
+                ' w' + Math.round(db.width) +
+                ' right+' + Math.round(db.right - pr.left));
+            }
+          });
+          if (over.length) {
+            console.log('[spacing]    !! ' + sel + ' OVERFLOWING descendants (' +
+                        over.length + '): ' + over.slice(0, 6).join(' // '));
+          }
+        } catch (_) {}
         console.log('[spacing]    ' + sel.padEnd(22) +
           ' box ' + Math.round(b.width) + 'x' + Math.round(b.height) +
           ' | client ' + el.clientWidth + 'x' + el.clientHeight +
