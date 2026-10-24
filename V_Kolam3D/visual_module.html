@@ -372,8 +372,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #27ae60;
-      color: #27ae60;
+      border: 1px solid #2980b9;
+      color: #2980b9;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1238,7 +1238,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-24d';
+    const K3D_BUILD = '2026-10-24e';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3440,73 +3440,18 @@
       }
     });
 
-    // ── TEMPORARY MEASUREMENT PROBE (2026-10-24) — REMOVE WHEN SETTLED ──────
-    //
-    // The author asked for the stepper column's spacings to be looked at, and
-    // warned that "what has appeared an easy slight adjustment has caused a lot
-    // of iterations". This project has already paid for that lesson once: one
-    // real log line settled what five rounds of modelling a GUESSED canvas
-    // could not. So nothing is adjusted until the real rects are in hand.
-    //
-    // Measures only; changes nothing. The module's console reaches
-    // /private/tmp/bd_server.log through BD, so these numbers can be read back
-    // without the author transcribing anything.
-    function logSpacing(why) {
-      try {
-        const r  = (el) => { const b = el && el.getBoundingClientRect(); return b ? Math.round(b.width) : -1; };
-        const cs = (el, prop) => el ? getComputedStyle(el).getPropertyValue(prop) : '?';
-        const layout = document.querySelector('.module-layout');
-        const wrap   = document.querySelector('.canvas-wrapper');
-        const cvs    = document.querySelector('canvas');
-        const panel  = document.querySelector('.control-panel');
-        const row    = document.querySelector('.control-row');
-        const phone  = window.matchMedia('(max-width: 500px)').matches;
-        // offsetWidth - clientWidth is the only honest way to get the scrollbar:
-        // it is 0 for an overlay scrollbar and 8-17 for a classic one, and which
-        // you get depends on the OS and the browser, not on the CSS.
-        const sbV = panel ? (panel.offsetWidth - panel.clientWidth) : -1;
-        console.log('[spacing] ' + why +
-          ' | viewport ' + window.innerWidth + 'x' + window.innerHeight +
-          ' | phone-rule ' + phone +
-          ' | layout w' + r(layout) + ' padL ' + cs(layout, 'padding-left') +
-          ' | wrapper w' + r(wrap) + ' padR ' + cs(wrap, 'padding-right') +
-          ' | canvas w' + r(cvs) +
-          ' | panel w' + r(panel) + ' client ' + (panel ? panel.clientWidth : -1) +
-            ' scrollW ' + (panel ? panel.scrollWidth : -1) +
-            ' scrollH ' + (panel ? panel.scrollHeight : -1) +
-            ' pad ' + cs(panel, 'padding-left') + '/' + cs(panel, 'padding-right') +
-            ' bar ' + sbV + 'px' +
-          ' | row w' + r(row) +
-          // Vertical: does it ACTUALLY overflow? scrollHeight alone cannot say
-          // so without the client height beside it, and "is there anything to
-          // scroll" is the premise of the whole scroll-hint question.
-          ' | panel clientH ' + (panel ? panel.clientHeight : -1) +
-            ' overflows-y ' + (panel ? (panel.scrollHeight > panel.clientHeight) : '?') +
-          // And whether the scroll-shadow layers survived the cascade at all —
-          // the author reports seeing no shadow, and a shorthand overriding
-          // background-image is exactly how that happens. 4 layers expected.
-          ' | bg-layers ' + (panel ? String(cs(panel, 'background-image')).split('gradient(').length - 1 : '?') +
-          ' | overflows-x ' + (panel ? (panel.scrollWidth > panel.clientWidth) : '?') +
-          ' | slack ' + (panel && row ? (panel.clientWidth - Math.round(row.getBoundingClientRect().width)) : -1) + 'px');
-      } catch (err) { console.warn('[spacing] probe failed', err); }
-    }
-    // Two frames, so flex has settled and the canvas has been sized; then once
-    // more a moment later, because BD posts bd_ui_config AFTER first paint and
-    // that is what adds or removes the host-chrome reserve.
-    requestAnimationFrame(() => requestAnimationFrame(() => logSpacing('settled')));
-    setTimeout(() => logSpacing('after-host-config'), 900);
-    let spacingT = null;
-    window.addEventListener('resize', () => {
-      clearTimeout(spacingT);
-      spacingT = setTimeout(() => logSpacing('resize'), 250);
-    });
-
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are BLUE #2980b9, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
   </script>
 
+<!-- TEMPORARY (2026-10-24) — stepper-spacing measurement. Measures only;
+     delete this line and spacing_probe.js when the spacings are settled.
+     One shared file because the music and visual panels are different
+     structures needing the same answer, and a collage is where both
+     share one lane. 404s harmlessly in a standalone. -->
+<script src="/spacing_probe.js"></script>
 </body>
 </html>

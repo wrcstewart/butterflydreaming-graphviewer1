@@ -342,7 +342,7 @@
        one move on EVERY change, "including scripts" — a canary that stays put
        after a DB write leaves no way to tell a reload picked the new text up,
        which is the one case the colour was never being bumped for. */
-    background: #27ae60 !important;
+    background: #2980b9 !important;
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -2330,5 +2330,11 @@ regenerate();
 // unheard.
 postToParent({ type: 'BD_READY' });
 </script>
+<!-- TEMPORARY (2026-10-24) — stepper-spacing measurement. Measures only;
+     delete this line and spacing_probe.js when the spacings are settled.
+     One shared file because the music and visual panels are different
+     structures needing the same answer, and a collage is where both
+     share one lane. 404s harmlessly in a standalone. -->
+<script src="/spacing_probe.js"></script>
 </body>
 </html>
