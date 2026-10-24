@@ -397,6 +397,28 @@
       pointer-events: none;
     }
 
+    /* ── NOTHING IN THE COLUMN MAY EXCEED IT (2026-10-24) ─────────────────
+       The author: the music module's "scroll" sits over the runway while this
+       one sits above the rightmost stepper, and asked for them to match. Both
+       use the identical ::before rule, so the difference is not the label.
+       
+       It is this panel's HORIZONTAL OVERFLOW, measured before any of this
+       began: scrollWidth 147 against clientWidth 128, so a child is ~132px wide
+       in a 113px box. In a column flex container an oversized item sets the
+       line's cross size, and `align-self: flex-end` then aligns against THAT
+       rather than against the content edge — which drags the label left, onto
+       the steppers. DroneFrac has no such child, which is why it looked right.
+       
+       So cap every direct child at the content width. That squares the label
+       with the music module's AND clears a defect older than this work: the
+       panel has been scrollable sideways, with overflow-x computing to auto
+       because overflow-y is not visible. min-width: 0 as well, since a
+       min-content floor beats a max-width on a flex item. */
+    .control-panel > * {
+      max-width: 100%;
+      min-width: 0;
+    }
+
     .control-panel::-webkit-scrollbar { width: 12px; }
     .control-panel::-webkit-scrollbar-track {
       background: rgba(0, 0, 0, 0.30);
@@ -489,8 +511,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1355,7 +1377,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-24l';
+    const K3D_BUILD = '2026-10-24m';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3558,7 +3580,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are RED #c0392b, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
