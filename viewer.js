@@ -2557,7 +2557,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-24s' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-24t' };
 
 let bdViewTitleText = '';
 
@@ -12181,7 +12181,10 @@ async function init() {
           const measured = (g && g.width > 40);
           const width = Math.round(measured ? g.width
                                             : Math.max(COLLAGE_BAR_MIN_W, w0 - 130 - 44));
-          const left  = Math.round((g && g.width > 40) ? (g.left - l0) : 0);
+          // `measured`, not the test repeated. left and width MUST agree about
+          // whether there is a graphic rect: that is the whole of the alignment,
+          // and two copies of one condition is how they would come to disagree.
+          const left  = Math.round(measured ? (g.left - l0) : 0);
           // Flush with the frame's bottom, or just under the square when the
           // square is tall enough to reach into that band. 52 == the reserve
           // `.canvas-wrapper` keeps, so the two usually coincide exactly.
