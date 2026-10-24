@@ -372,8 +372,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1238,7 +1238,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-24c';
+    const K3D_BUILD = '2026-10-24d';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3477,6 +3477,15 @@
             ' pad ' + cs(panel, 'padding-left') + '/' + cs(panel, 'padding-right') +
             ' bar ' + sbV + 'px' +
           ' | row w' + r(row) +
+          // Vertical: does it ACTUALLY overflow? scrollHeight alone cannot say
+          // so without the client height beside it, and "is there anything to
+          // scroll" is the premise of the whole scroll-hint question.
+          ' | panel clientH ' + (panel ? panel.clientHeight : -1) +
+            ' overflows-y ' + (panel ? (panel.scrollHeight > panel.clientHeight) : '?') +
+          // And whether the scroll-shadow layers survived the cascade at all —
+          // the author reports seeing no shadow, and a shorthand overriding
+          // background-image is exactly how that happens. 4 layers expected.
+          ' | bg-layers ' + (panel ? String(cs(panel, 'background-image')).split('gradient(').length - 1 : '?') +
           ' | overflows-x ' + (panel ? (panel.scrollWidth > panel.clientWidth) : '?') +
           ' | slack ' + (panel && row ? (panel.clientWidth - Math.round(row.getBoundingClientRect().width)) : -1) + 'px');
       } catch (err) { console.warn('[spacing] probe failed', err); }
@@ -3493,7 +3502,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are RED #c0392b, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
