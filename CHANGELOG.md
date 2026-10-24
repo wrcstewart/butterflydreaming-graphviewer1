@@ -112,6 +112,45 @@ content-box slack rather than padding — and its children are capped at the
 content width, since the sideways-scroll defect was structural and not specific
 to the 3D module.
 
+### And a rollout bug that was mine, with a worse verification behind it
+
+The rollout script inserted its block before `.control-panel select {` where
+that selector existed and otherwise **appended to the end of the file**.
+`M_Fractal` and `M_Music` have no such selector, so a stylesheet landed after
+`</html>` — outside `<style>`, where a browser renders it as **body text**. The
+author: *"the Fractal and Score music modules have gone crazy with text all over
+the bottom part of the screen"*, and pasted the CSS back as evidence.
+
+**The verification was the real fault.** I checked the block's LOCAL SHAPE — a
+closing brace above it, a comment, well-formed declarations — every one of which
+the appended text supplies for itself. So it read as correct from three lines
+away while sitting in entirely the wrong place. **Position is the thing to
+check, and position needs a second landmark:** the label must come before
+`</style>`, and nothing may follow `</html>`. Both are now asserted, and the
+V_Kolam commit that followed was verified that way.
+
+### The 2D Kolam, and withholding something for a bad reason
+
+The author: the 2D column *"has not moved over to the left and there is no nice
+runway"*. The slack was there from the rollout — `162 − 2 − 7 − 4 − 12 = 137px`
+of content against a 94px row, so 43px — but I had withheld the **40px shift**
+as "bespoke to the 3D module". That was wrong: the two modules share this layout
+exactly, same borders and same 44px canvas/column band, so there was no reason
+to differ, and without the shift the runway sits hard against the right edge
+where it does not read as a lane at all. `spacing_probe.js` is now loaded there
+too, so the module can be measured rather than reasoned about.
+
+### Both collage scripts dimmed further
+
+`bd_Collage_001` 0.28 → **0.07** and `bd_Collage_002` 0.2 → **0.07**, at the
+author's request. The directive is **`%%bd_p_opacity`** — the `p_` prefix,
+because it is stepper-backed; matching the bare name would have found nothing,
+inserted a second line, and let the parser take the last, so the old value would
+have won while the log claimed success. Backed up first, since `bd_tool cypher`
+does not auto-backup, edited with a targeted replace on the exact line, and both
+nodes read back. `COLLAGE_GRAPHIC_OPACITY` (0.45) is untouched: that is what a
+NEWLY assembled collage gets, and these are stored scripts.
+
 **Two other things the probe corrected, both premises rather than details.**
 `phone-rule false` in every early sample: the probe runs inside the module
 iframe, whose width equals the window's content width below 767px, so the

@@ -235,7 +235,23 @@ acting on any of it.
 | **`butterflydreaming.net` as the canonical stem** | `Hosting_and_Domains_2026-10-23.md` | **Built** | Third ingress rule in `~/.cloudflared/config.yml`; proxied apex CNAME to the tunnel; zone Active; full verification suite passing. |
 | **Hostinger 302 forwarding of `.net`** | same | **Abandoned on evidence** | The forwarder drops the path, so `/n/<uuid>` arrived as bare `/`. A redirect cannot carry an id. Also requires Hostinger nameservers, which we moved away from. |
 
+### Added 2026-10-24 — the stepper scroll runway
+
+| Design | Status | Evidence |
+|---|---|---|
+| **A finger runway on every stepper column** | **Built, all five modules** | `overflow-y: scroll`, a 12px `::-webkit-scrollbar`, a sticky `::before` reading "scroll", and ~35-43px of content-box slack in `V_Kolam3D`, `V_Kolam`, `M_DroneFrac`, `M_Fractal`, `M_Music`. |
+| **40px left shift of the column** | **Built, both visual modules** | `position: relative; right: 40px` — paints without entering layout, so the canvas does not move. Not applied to the music modules, whose panels are grid items. |
+| **A usable scrollbar on iOS** | **NOT possible as CSS** | Safari uses overlay scrollbars and ignores `::-webkit-scrollbar`; a declared width never arrives. The runway is the mechanism there. A visible wide handle would need a custom element and JS. |
+
 ### Open items from this work
+
+| Item | Why it matters | Status |
+|---|---|---|
+| **Remove `spacing_probe.js`** | Temporary diagnostic, loaded by `V_Kolam3D`, `V_Kolam` and `M_DroneFrac` with a `<script src="/spacing_probe.js">` tag in each. It logs four samples per load into `/private/tmp/bd_server.log`, which is already 31 MB. | **Delete when the spacings are settled** — 4 edits: the file plus three tags |
+| **`M_Fractal` / `M_Music` are unmeasured** | Neither handles `bd_collage_layout`, so they cannot share a lane and the probe is not installed in them. Their runway was applied from the CSS alone. | Verify on a phone |
+| **The phone rule cannot be tested from a desktop** | Below 767px BD sets the module iframe to the window's content width, and a browser window will not go below ~574 — so a module's `@media (max-width: 500px)` has only ever run on real phones. | Standing constraint |
+
+
 
 | Item | Why it matters | Status |
 |---|---|---|
