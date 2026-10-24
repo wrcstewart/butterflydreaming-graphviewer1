@@ -342,7 +342,23 @@
          overlay scrollbars and generally ignores ::-webkit-scrollbar, so the
          bar below may never render on a phone. The lane works either way,
          needs no JS, and costs no row width. */
-      padding: 6px 28px 6px 7px;
+      /* 2026-10-24 — right padding 28 → 4, and the lane becomes SLACK INSIDE
+         THE CONTENT BOX instead. MEASURED, after two wrong theories:
+         
+             Kolam3D   client 148, pad 7/28 → content 113, row 102 → slack 11
+             DroneFrac client 148, pad 4/4  → content 140, row 102 → slack 38
+         
+         `align-self: flex-end` aligns to the CONTENT edge, so the label landed
+         11px right of the steppers here and 38px right there — which is the
+         whole of the difference the author reported. DroneFrac's 28px never
+         applied at all: in a collage its panel is governed by a `body.overlay`
+         rule that positions it from BD's --bd-col-* variables with padding 4px.
+         
+         The runway is unaffected in kind — 35px of empty content box scrolls
+         under a finger exactly as 28px of padding did, both being inside the
+         scroller. What changes is that the label can now reach it, because
+         flex-end now sits at 137 rather than 113. */
+      padding: 6px 4px 6px 7px;
       border-radius: 0.4rem;
       min-height: 0;
       min-width: 0;
@@ -511,8 +527,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #27ae60;
-      color: #27ae60;
+      border: 1px solid #2980b9;
+      color: #2980b9;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1377,7 +1393,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-24m';
+    const K3D_BUILD = '2026-10-24n';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3580,7 +3596,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are GREEN #27ae60, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are BLUE #2980b9, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
