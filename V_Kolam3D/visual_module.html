@@ -237,7 +237,17 @@
          (stop the canvas squeezing the panel to zero in the preview harness)
          and left ~90px dead, which is what made the column look twice the
          width it needs.
-      flex: 0 0 130px;
+      /* 2026-10-24 — 130 → 162, spending 32 of the 40px the author freed.
+         THE ARITHMETIC, so nobody has to re-derive it:
+
+             2 border + 7 padL + 113 content + 28 lane + 12 bar = 162
+
+         113 is the measured widest child (the strip-title; a control-row is
+         102), so the CONTENT BOX IS UNCHANGED — no row moves and nothing that
+         fitted before stops fitting. The 28px lane plus the 12px bar give a
+         40px safe zone on the right, and `right: 40px` below still leaves 8px
+         clear of the edge. */
+      flex: 0 0 162px;
       /* 2026-10-24 — shifted 40px LEFT, and nothing else. `position: relative`
          with `right` offsets where the panel PAINTS without touching the
          layout, so the width stays 130, the canvas does not move, and no other
@@ -281,23 +291,70 @@
         linear-gradient(var(--panel-amber) 35%, rgba(75, 54, 0, 0)),
         linear-gradient(rgba(75, 54, 0, 0), var(--panel-amber) 65%),
         radial-gradient(farthest-side at 50% 0,    rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)),
-        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
-      background-position: 50% 0, 50% 100%, 50% 0, 50% 100%;
+        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)),
+        /* 2026-10-24 — a 1px rail at the lane's inner edge, so the 28px reads
+           as "drag here" rather than as dead space. A background layer rather
+           than a pseudo-element because an absolutely-positioned child of a
+           scroller SCROLLS WITH THE CONTENT, while a `scroll`-attached
+           background stays put. */
+        linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16));
+      background-position: 50% 0, 50% 100%, 50% 0, 50% 100%, right 28px top;
       background-repeat: no-repeat;
-      background-size: 100% 22px, 100% 22px, 100% 9px, 100% 9px;
-      background-attachment: local, local, scroll, scroll;
+      background-size: 100% 22px, 100% 22px, 100% 9px, 100% 9px, 1px 100%;
+      background-attachment: local, local, scroll, scroll, scroll;
       border: 1px solid rgba(74, 155, 142, 0.2);
       /* 2026-10-19 — left padding 8 → 7, which is the only half of "steal 3px
          on the right and 1px on the left" that does anything: see the note on
          .control-row's width. The right padding is left at 8 because the space
          beyond it was never occupied — and because overflow-y is auto, so a
          desktop set to show real scrollbars needs somewhere to put one. */
-      padding: 6px 8px 6px 7px;
+      /* 2026-10-24 — right padding 8 → 28: A FINGER LANE, and the reason is
+         not tidiness. The author: *"the current scrolling system is unreliable
+         on the phone in that it is very easy to touch the actual steppers and
+         alter them by mistake"*. A control altered by someone trying to scroll
+         past it is the worst kind of fault — invisible, and it looks like the
+         module misbehaving.
+         
+         Padding is INSIDE the scrolling box, so a drag anywhere in this 28px
+         scrolls the panel natively, with nothing in it to knock. That matters
+         because a styled scrollbar is a DESKTOP mechanism: iOS Safari uses
+         overlay scrollbars and generally ignores ::-webkit-scrollbar, so the
+         bar below may never render on a phone. The lane works either way,
+         needs no JS, and costs no row width. */
+      padding: 6px 28px 6px 7px;
       border-radius: 0.4rem;
       min-height: 0;
       min-width: 0;
-      overflow-y: auto;
+      /* 2026-10-24 — `scroll`, not `auto`. auto reserves the gutter only when
+         there is something to scroll, so the lane's width would change under
+         the reader as rows were added or the lane became unnecessary. */
+      overflow-y: scroll;
+      /* Firefox: a colour is all it accepts — width is `thin` or `auto` only. */
+      scrollbar-color: rgba(255, 255, 255, 0.45) rgba(0, 0, 0, 0.30);
     }
+
+    /* ── A SCROLLBAR WIDE ENOUGH TO GRAB (2026-10-24) ──────────────────────
+       12px rather than the 6-8px a desktop usually gets, because the author
+       asked for one a finger can use. Styling ::-webkit-scrollbar is also what
+       turns macOS's INVISIBLE OVERLAY scrollbar into a permanent one — measured
+       before this change: `bars v2` on the panel was the two 1px borders alone,
+       so there was zero scrollbar width and nothing to see until you scrolled.
+       That is why no warning arrived in time, and why the scroll-shadow was the
+       wrong instrument.
+
+       min-height on the thumb so a 900px column does not reduce it to a sliver
+       that cannot be hit. */
+    .control-panel::-webkit-scrollbar { width: 12px; }
+    .control-panel::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.30);
+      border-radius: 6px;
+    }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.45);
+      border-radius: 6px;
+      min-height: 32px;
+    }
+    .control-panel::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.70); }
 
     /* ── A WHITE FRAME WHILE SHARING THE LANE ─────────────────────────────
        Matching the music module's own `.panel` border, so two stacked groups
@@ -379,8 +436,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #2980b9;
-      color: #2980b9;
+      border: 1px solid #c0392b;
+      color: #c0392b;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1245,7 +1302,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-24h';
+    const K3D_BUILD = '2026-10-24i';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3448,7 +3505,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are BLUE #2980b9, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are RED #c0392b, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
