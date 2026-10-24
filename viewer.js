@@ -1040,23 +1040,34 @@ function showCopyScopeNotice(opts) {
   try {
     document.getElementById('copy-scope-notice')?.remove();
 
-    // NO THIRD SENTENCE ABOUT SAVING, and the reason is worth keeping so it is
-    // not re-added as a plausible-sounding promise. The author wanted the
-    // notice to point at the POSSIBILITY of creating a node of your own.
-    // Checked against the code: THAT CAPABILITY DOES NOT EXIST.
+    // THE THIRD SENTENCE ADVERTISES A DIRECTION, NOT A FEATURE — the author's
+    // decision, 2026-10-24: *"although pairing in order to save a new node is
+    // not currently onstream i think it is useful for current visitors to see
+    // what the system is moving towards."*
+    //
+    // What does NOT exist, checked against the code and recorded so a later
+    // session does not promote this to an instruction:
     //
     //   · `edit_clone_cluster` matches `(c:Cluster {name: $newName})` and the
     //     client sends `sourceCluster` — Cluster-only. A module node, or any
     //     content node, cannot be cloned into one of your own.
-    //   · Sv writes over THIS node's text, which is the opposite of what an
-    //     explorer wants and is not "your own node" either.
-    //   · Pairing is not a write credential at all: every write handler checks
+    //   · Sv writes over THIS node's text — the opposite of what an explorer
+    //     wants, and not "your own node" either.
+    //   · Pairing is not a write credential: every write handler checks
     //     curationCodeOk, a different code from pairCodePresent(). Pairing
     //     shares a position with another reader.
     //
-    // So the honest notice has two sentences. Add a third only when a
-    // save-as-new-node path actually exists — and then gate it on that path's
-    // own availability, not on pairing and not on the curation code alone.
+    // So it is worded as PLANNED. The author's draft said "consider saving new
+    // work as a node", which reads as an instruction — a paired reader would go
+    // looking for a control that is not there, and a notice whose whole purpose
+    // is to correct a false expectation must not create a second one.
+    //
+    // Shown to EVERYONE and not gated, deliberately: the point is to show where
+    // the system is going, and a public visitor is exactly the reader that is
+    // meant for. Gating it on pairing would also be the third different gate
+    // tried on one sentence — see [the two above] — and the sentence is
+    // self-conditional anyway. When the capability lands, this becomes an
+    // instruction and gains a real gate: the availability of that path.
 
     const box = document.createElement('div');
     box.id = 'copy-scope-notice';
@@ -1078,7 +1089,8 @@ function showCopyScopeNotice(opts) {
       ? 'Your stepper settings live only in this browser. '
       : 'Your edits live only in this browser. ') +
       (inView ? 'To keep them, press Back and copy the script from the card.'
-              : 'To keep them, copy the script from the card itself.');
+              : 'To keep them, copy the script from the card itself.') +
+      ' Planned: readers working in a pair will be able to save new work as a node of its own.';
 
     const ok = document.createElement('button');
     ok.type = 'button';
@@ -2545,7 +2557,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-23k' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-24a' };
 
 let bdViewTitleText = '';
 
