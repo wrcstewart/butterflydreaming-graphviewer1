@@ -150,13 +150,23 @@
      means it can never intercept the very drag it is advertising.
      A ::before rather than markup, so the visual module (static rows) and
      the music module (rows built by JS) take the same line unchanged. */
-    #control-panel::before {
+  #control-panel::before {
     content: 'scroll';
     position: sticky;
     top: 0;
     z-index: 2;
     align-self: flex-end;
-    margin-right: -26px;
+    /* NO NEGATIVE MARGIN. The first cut used margin-right: -26px to sit the
+       word over the lane, and HERE only the "s" survived: this panel inherits
+       overflow-x: hidden from .panel (only overflow-y is overridden), and
+       `overflow-y: scroll` takes its 12px gutter from INSIDE the padding box —
+       so the usable right edge is 28 - 12 = 16px and a label at 26px was
+       clipped. V_Kolam3D escaped it only because its overflow-x computes to
+       auto, so the label sat in overflow rather than being cut.
+       Tuning the offset per module would be two numbers drifting apart, over a
+       gutter that is 12px on a desktop and 0 on iOS. So the label sits at the
+       content edge, immediately left of the lane, where neither panel can clip
+       it and no arithmetic is needed. */
     font-size: 8px;
     letter-spacing: 0.06em;
     color: rgba(255, 255, 255, 0.55);
@@ -388,7 +398,7 @@
        one move on EVERY change, "including scripts" — a canary that stays put
        after a DB write leaves no way to tell a reload picked the new text up,
        which is the one case the colour was never being bumped for. */
-    background: #2980b9 !important;
+    background: #c0392b !important;
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
