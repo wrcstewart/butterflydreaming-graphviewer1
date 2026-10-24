@@ -80,7 +80,10 @@
        modules' stepper columns land, so BD's furniture lines up across all of
        them. It is a shared dimension, not a free one — widening it to give
        the readout room was tried and reverted for exactly that reason. */
-    grid-template-columns: minmax(0, 1fr) 150px;
+    /* 2026-10-24 — 150 → 162, matching V_Kolam3D's column so the two line up
+       in a collage. Needs 102 row + 5 padL + 28 lane + 2 border = 137, so 162
+       leaves 25px of margin rather than the 13 that 150 would. */
+    grid-template-columns: minmax(0, 1fr) 162px;
     /* minmax(0, 1fr), never 1fr: a grid item's automatic minimum is its
        CONTENT, so a scrolling stepper column grows past the grid and is
        clipped rather than scrolling. Fractal shipped with that bug. */
@@ -97,7 +100,10 @@
   .visual-panel { grid-area: visual; }
   .player-panel { grid-area: player; }
   .output-panel { grid-area: output; }
-  #control-panel { grid-area: steppers; overflow-y: auto; }
+  /* 2026-10-24 — `scroll`, not `auto`, as in V_Kolam3D: auto reserves the
+     gutter only when there is something to scroll, so the lane's width
+     would change under the reader as rows came and went. */
+  #control-panel { grid-area: steppers; overflow-y: scroll; }
   #bd-arrows-slot { grid-area: arrows; }
 
   .panel {
@@ -115,7 +121,47 @@
                      selector came to be absent rather than merely clipped. */
                   flex-wrap: nowrap; }
   .player-panel { flex-direction: row; align-items: center; justify-content: center; }
-  #control-panel { flex-direction: column; flex-wrap: nowrap; }
+  /* 2026-10-24 — THE LANE AND THE ROW WIDTH, matching V_Kolam3D.
+     The author: the music steppers "are currently occupying the whole width of
+     the expanded width column", then asked for the same trick as the graphic's.
+     They stretched because this is a column flex container and align-items
+     defaults to STRETCH while .control-row carries no width — so a row grew to
+     whatever the panel offered, and widening the column made that visible.
+     align-items: flex-start stops the stretch; the 28px right padding is the
+     finger lane, inside the scroller so a drag there scrolls natively and
+     touches no control. */
+  #control-panel {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    padding: 5px 28px 5px 5px;
+    scrollbar-color: rgba(255, 255, 255, 0.45) rgba(0, 0, 0, 0.30);
+  }
+  #control-panel::-webkit-scrollbar { width: 12px; }
+  #control-panel::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.30); border-radius: 6px; }
+  #control-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.45); border-radius: 6px; min-height: 32px;
+  }
+
+  /* ── "scroll" OVER THE LANE (2026-10-24) ──────────────────────────────
+     The author: the bar "does not appear until the user starts a scroll
+     gesture", so the lane needs saying out loud. `position: sticky` keeps it
+     at the top while the column scrolls under it, and pointer-events: none
+     means it can never intercept the very drag it is advertising.
+     A ::before rather than markup, so the visual module (static rows) and
+     the music module (rows built by JS) take the same line unchanged. */
+    #control-panel::before {
+    content: 'scroll';
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    align-self: flex-end;
+    margin-right: -26px;
+    font-size: 8px;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.55);
+    pointer-events: none;
+  }
 
   /* dock-slot — reserved for BD's ↓↑ arrows. Faint frame so the reserved
      area is visible even before BD stamps into it. */
@@ -342,13 +388,18 @@
        one move on EVERY change, "including scripts" — a canary that stays put
        after a DB write leaves no way to tell a reload picked the new text up,
        which is the one case the colour was never being bumped for. */
-    background: #27ae60 !important;
+    background: #2980b9 !important;
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
   .big-btn:hover:not(:disabled) { filter: brightness(1.08); }
 
-  .control-row { display: flex; flex-direction: column; align-items: stretch;
+  /* 2026-10-24 — 102px, the figure V_Kolam3D uses, so the two stepper groups
+     in a collage read as one list rather than two widths. flex: 0 0 auto with
+     an explicit width, because align-items: flex-start alone leaves a row free
+     to size to its content and they would not agree with each other. */
+  .control-row { width: 102px; flex: 0 0 auto;
+                 display: flex; flex-direction: column; align-items: stretch;
                  gap: 1px; margin-bottom: 4px; }
   .stepper { display: flex; align-items: stretch; gap: 2px; }
   .step-btn {
