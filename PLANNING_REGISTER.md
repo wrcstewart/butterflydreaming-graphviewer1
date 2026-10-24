@@ -235,6 +235,34 @@ acting on any of it.
 | **`butterflydreaming.net` as the canonical stem** | `Hosting_and_Domains_2026-10-23.md` | **Built** | Third ingress rule in `~/.cloudflared/config.yml`; proxied apex CNAME to the tunnel; zone Active; full verification suite passing. |
 | **Hostinger 302 forwarding of `.net`** | same | **Abandoned on evidence** | The forwarder drops the path, so `/n/<uuid>` arrived as bare `/`. A redirect cannot carry an id. Also requires Hostinger nameservers, which we moved away from. |
 
+### Added 2026-10-24 — lazy fetch, when the boot payload binds
+
+**The author's direction, not a queue item yet:** *"if that becomes a limitation
+then we will need a lazy fetch system — that might build into the navigation."*
+
+**Measured 2026-10-24**, so the headroom is known: 486 nodes, 2,731 edges, 250
+carrying text, 140,118 chars in all — **560 bytes of text per node and ~1.63 KB
+all-in** including edges and properties. A 10 KB-per-node planning allowance is
+therefore about **6× conservative**, and on storage alone 10 GB of Memgraph
+would hold ~6 M nodes.
+
+**Storage is not the constraint.** BD loads the whole corpus into cytoscape at
+boot and the graph query returns each node ONCE PER INCIDENT EDGE — **11.2×
+measured** at today's density. So the boot payload grows roughly eleven times
+faster than storage, and binds perhaps 10× sooner. See `BD_Viewer_Scaling_Brief.md`
+(19.7 KB transferred per TextNode against 1,598 B stored) and the perf-knob
+trigger already on record: iPhone load exceeding ~3 s.
+
+**Two notes for whoever builds it:**
+
+- **The navigation already computes the fetch boundary.** Every tap decides a
+  neighbourhood; that boundary is the fetch unit, so navigation needs no new
+  concept — only to stop assuming what it needs is resident.
+- **Fetch EDGES lazily before text.** The 11.2× duplication is an edge effect,
+  not a text one, so the obvious framing (lazy *text* fetch) addresses the
+  smaller half. Node identity is the durable `url` rather than a DB elementId,
+  so a partially-loaded graph cannot confuse nodes or strand an edge endpoint.
+
 ### Added 2026-10-24 — the stepper scroll runway
 
 | Design | Status | Evidence |
