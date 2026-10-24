@@ -6,6 +6,102 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-24 — a runway for the finger, and four wrong theories about one label
+
+The request was small and the diagnosis was not: **make it possible to scroll a
+stepper column without altering a stepper.** The author's words are the whole
+specification — *"the current scrolling system is unreliable on the phone in
+that it is very easy to touch the actual steppers and alter them by mistake"* —
+and a control changed by someone trying to scroll past it is the worst kind of
+fault, because it is invisible and reads as the module misbehaving.
+
+### What the column got
+
+**A 40px left shift, then a finger lane.** The author asked first for a pure
+translation — *"just simply move the columns to the left … do not resize it"* —
+which is `position: relative; right: 40px`: it offsets where the panel PAINTS
+without entering layout, so nothing is recalculated and the canvas does not
+move. That freed a strip on the right, which then paid for everything else.
+
+**A runway, not a scrollbar.** `::-webkit-scrollbar` is a desktop mechanism:
+iOS Safari uses overlay scrollbars and ignores it, so a declared width simply
+does not arrive on a phone, which is where it was needed. What works on iOS
+without any JavaScript is **empty space inside the scroller** — a drag anywhere
+in a scrolling box scrolls it, and empty space contains nothing to knock. So
+the column carries ~35px of blank lane, a 12px styled bar for the desktop
+(where styling it is also what converts macOS's invisible OVERLAY scrollbar
+into a permanent one), `overflow-y: scroll` so the gutter cannot change width
+under the reader, and a sticky `::before` reading **"scroll"**, because the
+author observed the bar "does not appear until the user starts a scroll
+gesture". `pointer-events: none` on it, so the label can never intercept the
+drag it advertises.
+
+**And the phone got it without losing any graphic.** `flex: 0 0 140px` with
+`margin-right: -32px`: the negative margin makes the item's OUTER width 108, so
+the container allocates exactly what it did before — the canvas is untouched —
+while the border box paints 140 wide, extending into the strip the shift
+created.
+
+### Three faults found on the way, none of them the one being fixed
+
+**`padding: 6px 4px` in the phone rule had never applied.** Equal specificity to
+the base `.control-panel` — a media query adds none — and the base comes later,
+so its padding won. The phone therefore already had a 28px lane inside a 108px
+panel: content `108 − 2 − 7 − 28 = 71px` holding a **100px** row, a 29px
+overflow. That was the "untidy" the author reported, and it predates this work.
+
+**The column had been horizontally scrollable all along.** `scrollWidth 147`
+against `clientWidth 128` — a child some 132px wide in a 113px box, with
+`overflow-x` computing to `auto` because `overflow-y` is not `visible`. Capping
+every direct child at the content width cleared it.
+
+**The music steppers had always stretched.** `#control-panel` is a column flex
+container, `align-items` defaults to **stretch**, and `.control-row` carried no
+width — so a row grew to whatever the panel offered. Widening the column merely
+made it visible. They are now a fixed 102px, the figure `V_Kolam3D` uses, so two
+stepper groups in a collage read as one list rather than two widths.
+
+### The label that moved four times, and the lesson
+
+The author asked for one thing repeatedly — *"get the graphic stepper bar
+'scroll' the same as the music one"* — and I offered a wrong cause three times:
+a clipping theory, then a flex cross-size theory, then a horizontal-overflow
+theory. Each was plausible. **The probe settled it in a single reading:**
+
+```
+Kolam3D    client 148, pad 7/28 → content 113, row 102 → slack 11px
+DroneFrac  client 148, pad 4/4  → content 140, row 102 → slack 38px
+```
+
+`align-self: flex-end` aligns to the **content edge**. So the label sat 11px
+right of the steppers in one module and 38px right in the other, and that was
+the entire difference — nothing to do with the label rule, the clip, or the
+overflow. DroneFrac's own 28px never applied either: in a collage its panel is
+governed by a `body.overlay` rule positioning it from BD's `--bd-col-*`
+variables with `padding: 4px`, so its runway has always been slack inside the
+content box. Kolam3D now spends its 28px the same way.
+
+**The instrument was the author's idea and it was the better one.** Asked to
+look at the spacings, I instrumented `V_Kolam3D` alone; the author's reply —
+*"we will need a similar solution for the music steppers so would not a collage
+be better to instrument?"* — is right for a stronger reason than coverage: a
+**collage** is where `--bd-col-max` and `body.sharing-lane` apply, so two
+stepper groups share one lane, which is the tightest it ever gets. One
+`spacing_probe.js` loaded by both modules, probing by selector because the two
+panels are different structures (static `.control-row`s against a JS-filled
+`#control-panel`).
+
+**Two other things the probe corrected, both premises rather than details.**
+`phone-rule false` in every early sample: the probe runs inside the module
+iframe, whose width equals the window's content width below 767px, so the
+module's `max-width: 500px` rule **cannot fire from a desktop window at all** —
+it has only ever been exercised on real phones. And `bars v2` was the two 1px
+borders, not a scrollbar: macOS reserves **zero** width for an overlay
+scrollbar, which is exactly why no warning arrived before scrolling and why the
+scroll shadow was the wrong instrument from the start.
+
+---
+
 ## 2026-10-23 — every node gets a working permanent URL, on a domain that says ButterflyDreaming
 
 Two halves that only make sense together: a **domain** worth putting in front of
