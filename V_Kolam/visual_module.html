@@ -183,6 +183,17 @@
          scroll runway below. The canvas is height-limited on a wide screen, so
          it gives up nothing there; on a narrow one it yields these 32px. */
       flex: 0 0 162px;
+      /* 2026-10-24 — shifted 40px LEFT, as V_Kolam3D is. Withheld in the first
+         rollout as "bespoke to the 3D module"; the author asked for it here
+         too, and the two modules share this layout exactly — same 1px borders,
+         same 44px canvas/column band — so there was no reason to differ.
+         
+         `position: relative` with `right` offsets where the panel PAINTS
+         without entering layout, so the width stays 162, the canvas does not
+         move and nothing is recalculated. BD's arrows follow because
+         positionExtendPanel reads the column's live rect. */
+      position: relative;
+      right: 40px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;             /* controls hug the left edge, − on the left */
@@ -1832,5 +1843,9 @@
     postToParent({ type: 'BD_READY' });
   </script>
 
+<!-- TEMPORARY (2026-10-24) — stepper-spacing measurement, as in
+     V_Kolam3D and M_DroneFrac. Measures only; delete with
+     spacing_probe.js when the spacings are settled. -->
+<script src="/spacing_probe.js"></script>
 </body>
 </html>
