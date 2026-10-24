@@ -140,6 +140,37 @@ to differ, and without the shift the runway sits hard against the right edge
 where it does not read as a lane at all. `spacing_probe.js` is now loaded there
 too, so the module can be measured rather than reasoned about.
 
+### The transport frame stopped overhanging the graphic
+
+The author: on a collage the Play/Stop frame aligns perfectly under the graphic
+on a desktop, but on a phone its right edge is two or three pixels too wide.
+
+One cause, in `barRect`: `left` tracked the graphic while `width` was clamped to
+`COLLAGE_BAR_MIN_W` (240). On a desktop the graphic is far wider than 240, the
+clamp never binds, and the two edges agree — which is why it looked correct
+there. On a phone the graphic measures about 237, the clamp wins, and the bar
+overhangs by exactly the shortfall.
+
+**A minimum that overrides a measurement is not a minimum, it is a
+misalignment.** The floor now applies only to the UNMEASURED branch, where
+there is no graphic rect to align with and 240 is a reasonable guess; where the
+graphic has been measured, its width is the answer.
+
+The author's suspicion that the buttons forced it out was the right instinct one
+step removed. 240 exists BECAUSE of them — `108 + 108 + 10 gap + 6 padding =
+232` — but at ~237 they already fit, so nothing had to shrink and the desktop
+was untouched, the clamp never having been reached there. Noted in the code:
+should a graphic ever be narrower than 232 the transport will clip rather than
+overhang, and the fix then is to let `.big-btn` shrink — not done now, because
+it would change the desktop that is correct.
+
+A follow-up closed a duplicated condition the fix had just introduced: `left`
+was re-testing `(g && g.width > 40)` inline while `width` used the new
+`measured` const. The whole of the alignment is those two agreeing about whether
+a graphic rect exists, so two copies of one condition is precisely how the
+overhang would return in a new form. The fifth instance in this project of a
+test written twice.
+
 ### Both collage scripts dimmed further
 
 `bd_Collage_001` 0.28 → **0.07** and `bd_Collage_002` 0.2 → **0.07**, at the
