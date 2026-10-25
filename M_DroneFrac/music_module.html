@@ -398,7 +398,7 @@
        one move on EVERY change, "including scripts" — a canary that stays put
        after a DB write leaves no way to tell a reload picked the new text up,
        which is the one case the colour was never being bumped for. */
-    background: #c0392b !important;
+    background: #27ae60 !important;
     color: #fff !important;
   }
   .big-btn.stop { background: #e59b9b !important; }
@@ -427,7 +427,32 @@
        padding and border are taken off. Short values fit; `min_pent` does not.
        The column cannot grow (see the layout note), so if more are wanted the
        lever is button size or the readout's own font, not the column. */
-    flex: 0 0 52px; min-width: 0;
+    /* 2026-10-25 — 52px → 34px. The author: the steppers are too wide, leaving
+       no space for the parameter printout between them.
+
+       MEASURED across the four modules, at the shared 102px row:
+
+           V_Kolam3D   34px buttons + 2 gap = 70  -> 32px of readout
+           M_Fractal   39px buttons + 3 gap = 81  -> 21px
+           M_Music     39px buttons + 3 gap = 81  -> 21px
+           M_DroneFrac 52px buttons + 2 gap = 106 -> MINUS 4px
+
+       So this module was the outlier by half again, and the fault is mine: its
+       row was `width: 100%` and fluid at about 140px until 2026-10-24, which
+       left ~34px for the value. Fixing the row at 102px to create the scroll
+       runway squeezed the readout to nothing and overflowed the row by 4px.
+
+       WIDENING THE ROW IS NOT THE FIX. In a collage this panel's content box is
+       140px, so a 140px row fills it exactly and leaves no slack — and slack is
+       the runway, measured yesterday as the whole reason the "scroll" label
+       could reach the lane. The buttons have to come down instead.
+
+       34px, not 39px, because this module's values include ENUM WORDS (hence
+       .stepper-value.is-enum below) and so needs the MOST readout space, not
+       the least. 34 is also the figure the author already chose in both visual
+       modules for mobile taps, so it is vetted rather than invented. The glyph
+       is safe at 0.85rem, well under the 1.25rem a 34px button carries there. */
+    flex: 0 0 34px; min-width: 0;
     border: 1px solid #3a4a48; background: #0d1a18;
     color: #9fe8d8; font-family: inherit; font-size: 0.85rem;
     border-radius: 3px; cursor: pointer; min-height: 24px;
