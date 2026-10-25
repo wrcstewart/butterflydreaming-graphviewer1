@@ -2557,7 +2557,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-25a' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-25b' };
 
 let bdViewTitleText = '';
 
@@ -11575,7 +11575,34 @@ async function init() {
     }
   }
 
-  overlay.classList.remove('active');
+  // ── A NODE LINK SHOULD LOOK LIKE A DESTINATION, NOT A BOOT SEQUENCE ──────
+  //
+  // The author: arriving by a copied View link briefly shows BD's load screens,
+  // and "this will discourage external creators from pasting a node View in".
+  // Right — and the flash is everything that happens AFTER this line: the graph
+  // is built, Root is primed, its card is made, and only then does
+  // handleNodeIdArrival jump to the node and press View. The curtain was going
+  // up before the stage was set.
+  //
+  // So for a /n/<uuid> arrival the overlay STAYS, and is dismissed by the
+  // arrival itself. Only for that case: a ?data= return is the author's own
+  // round-trip, where watching it work is reassurance rather than noise.
+  if (NODE_URL_UUID) {
+    setMsg('Opening…');
+    // THE DEAD MAN'S HANDLE IS ARMED HERE, where the decision to hold is taken,
+    // and NOT inside the arrival handler. Anything that throws between this
+    // line and that handler's own timer would otherwise arm nothing at all, and
+    // an overlay that never lifts is a black screen — worse than the flash it
+    // was added to hide.
+    setTimeout(() => {
+      if (!overlay.classList.contains('active')) return;
+      overlay.classList.remove('active');
+      console.warn('[/n] overlay lifted by the safety timeout — the arrival ' +
+                   'did not complete, so something above failed');
+    }, 6000);
+  } else {
+    overlay.classList.remove('active');
+  }
   // Build element maps (deduplicate nodes and edges by ID)
   const nodesById = new Map();
   const edgesById = new Map();
@@ -18133,6 +18160,10 @@ async function init() {
       if (q.get('data') || q.get('j') ||
           String(window.location.hash || '').startsWith('#data=')) {
         console.log('[/n] ' + NODE_URL_UUID + ' — standing aside, the URL also carries a payload');
+        // Standing aside still RETURNS, and the overlay is being held for this
+        // uuid — so hand it to the payload flow uncovered rather than leaving
+        // the reader behind a curtain nothing will lift but the timeout.
+        overlay.classList.remove('active');
         return;
       }
     } catch (_) { /* fall through and open the node */ }
@@ -18148,6 +18179,9 @@ async function init() {
         prependSystemCard('That link points to a node this ButterflyDreaming does not ' +
                           'hold. You are at Root instead.');
       } catch (err) { console.warn('[/n] could not post the not-found card', err); }
+      // This branch RETURNS, so it never reaches the dismissal below. A link to
+      // a node BD does not hold must not leave the reader behind a curtain.
+      overlay.classList.remove('active');
       return;
     }
     // RECORD ROOT AS A REAL STEP FIRST, so the route the system believes in is
@@ -18181,13 +18215,36 @@ async function init() {
     // itself triggers. Two frames, so the card and the radio have settled
     // first; View reads the node and the card on screen, and neither exists
     // until the open above has finished.
+    // THE CURTAIN COMES DOWN HERE, not when the graph finished loading. Two
+    // frames plus a moment: the frames let the card and the radio settle, and
+    // the delay covers the text-to-View switch for a ?view=1 link so the reader
+    // does not see the prose flick past on the way to the graphic.
+    //
+    // The module's own first paint may land just after this. That is accepted:
+    // the complaint is about BD's load screens, and holding the overlay until a
+    // module reports ready would mean reaching into loadModuleForNode's nested
+    // onReady from here, for a few milliseconds of polish.
+    const dropCurtain = (why) => {
+      if (!overlay.classList.contains('active')) return;
+      overlay.classList.remove('active');
+      console.log('[/n] arrival complete, overlay dismissed (' + why + ')');
+    };
+
     if (NODE_URL_VIEW) {
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const vb = document.getElementById('jump-to-ext-btn');
         if (vb) { console.log('[/n] ?view=1 — pressing View'); vb.click(); }
         else console.warn('[/n] ?view=1 — no View button to press');
+        setTimeout(() => dropCurtain('view'), 320);
       }));
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(() => dropCurtain('text')));
     }
+
+    // AND A DEAD MAN'S HANDLE. An overlay that fails to lift is a black screen,
+    // which is worse than the flash it was added to hide — so it lifts anyway,
+    // whatever happened above, including a throw before either branch ran.
+    setTimeout(() => dropCurtain('safety timeout'), 6000);
 
     // ROOT STILL OWES THIS VISITOR ITS OPENING — the development notice and the
     // speech offer both live on Root, and a link bypasses them. Armed AFTER the
