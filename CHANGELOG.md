@@ -6,6 +6,50 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-25 — the readout gets its space back, and a row width that had no business being shared
+
+A short entry, and a consequence of yesterday's work rather than a new fault.
+The author: the DroneFrac steppers are too wide, leaving no space for the
+parameter printout between them.
+
+**Measured across the four modules at the 102px row yesterday imposed on all of
+them:**
+
+| module | button | gap | buttons + gap | readout |
+|---|---|---|---|---|
+| `V_Kolam3D` | 34px | 2 | 70 | **32px** |
+| `M_Fractal` | 39px | 3 | 81 | 21px |
+| `M_Music` | 39px | 3 | 81 | 21px |
+| `M_DroneFrac` | **52px** | 2 | **106** | **−4px** |
+
+**The fault was mine, and it was in sharing a number rather than a rule.**
+DroneFrac's row was `width: 100%` — fluid at about 140px — until the rollout,
+which left ~34px for the value. Fixing every module's row at 102px to create the
+scroll runway was right for the three whose buttons are 34–39px and wrong for
+the one whose buttons are 52px: the readout went to nothing and the row
+overflowed by 4px. **A shared width is only shared if what sits inside it
+agrees.**
+
+**Widening the row back was not available.** In a collage DroneFrac's panel has
+a 140px content box, so a 140px row fills it exactly and leaves no slack — and
+that slack IS the runway, which yesterday's measurement showed to be the whole
+reason the "scroll" label can reach the lane. So the buttons came down to
+**34px**, the figure already vetted in both visual modules for mobile taps.
+
+**34 rather than 39, for a reason specific to this module:** its values include
+enum WORDS, not only numbers — `.stepper-value.is-enum` exists for exactly that
+— so it needs the most readout space of the four, not the least. Its glyph is
+0.85rem against the 1.25rem a 34px button already carries in the visual
+modules, so there was headroom. In the collage overlay the gap is 0, so the
+readout gets a full 34px there.
+
+**Left alone, and worth watching:** `M_Fractal` and `M_Music` now have the
+LEAST readout space of the four at 21px. Nothing was reported about them, so
+they are untouched — but if their numbers look cramped on a phone the same
+change applies.
+
+---
+
 ## 2026-10-24 — a runway for the finger, and four wrong theories about one label
 
 The request was small and the diagnosis was not: **make it possible to scroll a
