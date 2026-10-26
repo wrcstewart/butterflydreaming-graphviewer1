@@ -248,6 +248,34 @@ already built and switched off**, not a new mechanism.
 
 ---
 
+## Found in testing: once per session, not once per visit
+
+The author, on first use: Arriving *"reissues the dialog"* when selected again
+after visiting Information, or Settling.
+
+**An intent that stopped fitting rather than an oversight.** The notices fired
+on every fresh open, which was deliberate while they lived on **Root** — a place
+you start from, visited once or twice — and `showSpeechIntro`'s own note defends
+it: a refusal is *not* persisted, so the offer returns next time rather than
+being lost for ever.
+
+**Arriving is a junction.** Settling and Information both hang off it, so a
+reader passes back through it repeatedly and "every visit" becomes nagging.
+
+So `introShownThisSession` gates it: **once per session, nothing written to
+storage.** That keeps the original principle — a refusal is still not remembered
+across visits, and a new session asks again — while a single reader is asked
+once. And the flag is set **before** the dialogs open, not in their `.then()`:
+they are promises, so a second tap on Arriving while the first notice was still
+on screen would otherwise stack a second pair behind it.
+
+The structural diagnostic beside it was taught to stay quiet for this reason.
+It exists to catch a node that is *wrong* — "if this ever prints again it is the
+node that is wrong" — and having been shown already is not that, so it would
+have cried wolf on every return to Arriving and stopped being read.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first

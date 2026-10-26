@@ -277,6 +277,23 @@ const ROOT_ARRIVAL_MESSAGE =
 // Honoured wherever Root is reached: a direct tap already runs the opening via
 // advanceOrNavigate; restoreState (ordinary Back) did not, which was the gap.
 let rootIntroPending = false;
+// ── ONCE PER SESSION, NOT ONCE PER VISIT (2026-10-26) ────────────────────────
+//
+// Reported by the author: Arriving "reissues the dialog" when selected again
+// after visiting Information, or Settling. True, and it is an intent that
+// stopped fitting rather than an oversight. The notices fired on EVERY fresh
+// open, which was deliberate while they lived on ROOT — a place you start from,
+// visited once or twice — and the comment above showSpeechIntro defends it:
+// declining is not persisted, so the offer returns next time rather than being
+// lost for ever.
+//
+// Arriving is a JUNCTION. Settling and Information both hang off it, so a
+// reader passes back through it repeatedly and "every visit" becomes nagging.
+//
+// So: once per SESSION. Nothing is written to storage, which keeps the original
+// principle intact — a refusal is still not remembered across visits, and a new
+// session asks again — while a single reader is asked once.
+let introShownThisSession = false;
 
 // --- Ancillary Viewer (AV) — 2026-09-14 -------------------------------------
 //
@@ -2557,7 +2574,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-26c' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-26d' };
 
 let bdViewTitleText = '';
 
@@ -8596,8 +8613,14 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Every visit — see the note above showSpeechIntro. The only conditions
       // left are structural: a real click on Root, the whole text in one card,
       // and somewhere to go afterwards.
-      const introWillShow = isArriving && isLast && !bootPriming && hasNavDescendants(node);
-      if (isArriving && !bootPriming && !introWillShow) {
+      const introWillShow = isArriving && isLast && !bootPriming &&
+                            hasNavDescendants(node) && !introShownThisSession;
+      // The diagnostic below exists to catch a STRUCTURAL reason the dialogs
+      // did not appear, and says so: "if this ever prints again it is the node
+      // that is wrong". Having been shown already is not such a reason, so it
+      // must not print for that — or it would cry wolf on every return to
+      // Arriving and stop being read.
+      if (isArriving && !bootPriming && !introWillShow && !introShownThisSession) {
         // Only structural causes remain. If this ever prints again it is the
         // node that is wrong, not anything remembered about the user.
         console.log('[BD] speech intro not shown — isLast=' + isLast +
@@ -8644,7 +8667,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         // First real click on Root: offer speech BEFORE opening the graph, so
         // the dialog is not competing with a layout animation.
         if (introWillShow) {
-          rootIntroPending = false;   // consumed — however Root was reached
+          rootIntroPending = false;   // consumed — however Arriving was reached
+          // Set BEFORE the dialogs open, not in their .then(). They are
+          // promises, so a second tap on Arriving while the first notice is
+          // still on screen would otherwise pass the test again and stack a
+          // second pair of dialogs behind the first.
+          introShownThisSession = true;
           // The development notice first: it explains why a control is missing,
           // and that belongs before a question about a different subject.
           showDevNotice().then(() => {
