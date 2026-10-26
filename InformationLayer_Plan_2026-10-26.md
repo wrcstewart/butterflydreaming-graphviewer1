@@ -98,7 +98,7 @@ ever be added on purpose.
 |---|---|
 | label | `Entry` |
 | shape | **inverted triangle** — `shape: polygon` with `shape-polygon-points` |
-| text | "Now choose Settling to begin the ButterflyDreaming or choose Information to learn more about the system." |
+| text | "Now choose Settling to begin the ButterflyDreaming. (Or choose Information to learn more about the system.)" — split into two sentences 2026-10-26, the second bracketed, so the wording carries the same hierarchy as the smaller node and the dotted edge |
 
 **Why `Entry` and not a new label:** Entries are already styled individually by
 name — `node[type="Entry"][name="Settling"]`, `[name="Gateways"]`,
