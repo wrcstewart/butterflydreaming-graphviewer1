@@ -2557,7 +2557,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-25b' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-26a' };
 
 let bdViewTitleText = '';
 
@@ -9178,8 +9178,18 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
           textNodeForView = !!(nodeProse(rn.data('text') || '') || '').trim();
         }
       }
-      document.body.classList.toggle('text-node',
-                                     textNodeForView && bdViewMode === 'create');
+      // 2026-10-26 — NO LONGER GATED ON CREATE. The author: "I don't see why we
+      // can't have the text nodes renderable by View". Nothing in View needs
+      // Create: it reads the node's prose into a full-screen panel, which is a
+      // reading surface rather than an authoring one, and the Browse reader is
+      // the one most likely to want it.
+      //
+      // Collage does NOT come along, which is the author's other requirement:
+      // #collage-btn sits inside #jb-right but carries its own
+      // `body:not(.edit-active):not(.player-active)` rule, so revealing the
+      // group in Browse still leaves Collage hidden. Device is likewise hidden
+      // on a text node by `body.text-node #send-to-device-btn`.
+      document.body.classList.toggle('text-node', textNodeForView);
 
       // 2026-09-29 — ONE-SHOT GEOMETRY PROBE for the Jump Bar.
       //
@@ -16652,8 +16662,15 @@ async function init() {
         if (hint) {
           const fromBrowse = !document.body.classList.contains('edit-active') &&
                              !document.body.classList.contains('player-active');
-          hint.textContent = fromBrowse ? 'To control: Back, then Create' : '';
-          hint.hidden = !fromBrowse;
+          // AND ONLY WHERE THERE IS SOMETHING TO CONTROL (2026-10-26). Text
+          // nodes became View-able from Browse in the same change; a plain
+          // passage has no steppers, so "To control: Back, then Create" would
+          // send its reader to look for controls that do not exist. `moduleId`
+          // is the test because it is what decides whether View shows a module
+          // at all, a few lines above.
+          const show = fromBrowse && !!moduleId;
+          hint.textContent = show ? 'To control: Back, then Create' : '';
+          hint.hidden = !show;
         }
         if (bar) bar.hidden = false;
         body.classList.add('view-active');
