@@ -584,6 +584,16 @@ hints, so fcose places them until `Wr` saves a layout.
 
 ## Open, deliberately
 
+- **`aside` is binary, and the corpus already has two degrees of it.** Decided
+  2026-10-26 to leave `Settling ─CONTAINS→ Conversations` undotted, on the
+  author's reading: *"tricky because it's less of an aside than the former
+  Information route."* Right — Information is a **side door into a different
+  mode of reading**, while that edge is a **shortcut past a recommended step**.
+  Both are bracketed in prose, and only one is dotted, so the graph and the
+  words disagree there on purpose. If the Information layer grows enough
+  secondary links to need it, the flag wants to become a degree rather than a
+  boolean — but a distinction with two instances does not yet need a mechanism.
+
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
   real illustration edge, not before.
 - **Whether the layer ever earns the `Info` label.** Revisit when its content
