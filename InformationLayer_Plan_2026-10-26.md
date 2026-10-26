@@ -542,6 +542,46 @@ and well once. It does not, and the reason it does not is one regex.
 
 ---
 
+## Settling is the main road; Information is the side door
+
+The author: *"the main route from Arriving will be Settling — I would like to
+signal that with a smaller node and reduced brightness and ideally a dotted grey
+edge. I can position it to the side myself."*
+
+**The node: 76×60 → 56×44, label dimmed to `text-opacity: 0.6`, font 9px.**
+Size is the loudest status signal on this canvas — the Gateways note in
+`buildStyle` says so, having been *enlarged* for precisely that reason — so a
+smaller node reads as secondary with no words spent on it.
+
+**`text-opacity`, not a dimmer colour, and the reason is ink mode.** It is the
+default, and in it node bodies are transparent (`INK_BG` at
+`INK_BODY_OPACITY`) with identity carried by the **label**, coloured through
+`inkify()`. So "brightness" here is the label's, and `text-opacity` is the one
+lever that dims it in **both** modes — `inkModeOverrides()` sets `color` but
+never `text-opacity`.
+
+**`inkPurity` would have been the wrong dial**, which is worth recording because
+it looks like the right one: it drives chroma toward neutral rather than
+changing lightness. It would have made Information **greyer**, not quieter — and
+greyness is not a hierarchy a reader with reduced colour vision can see.
+
+**The edge is DATA-DRIVEN.** The edge carries `aside: true` in the DB,
+`buildEdgeData` passes unknown properties straight through, and
+`edge[?aside]` matches whatever is flagged. So further secondary links in the
+Information layer can be marked without touching a stylesheet — the same
+reasoning as holding the curation in the relation type rather than in a list of
+node names. One edge is flagged today.
+
+**Placed LAST in `base`** on purpose: the ink-mode edge rule recolours lines
+from their target's ink and later rules win, so this has to follow it.
+`inkModeOverrides()` appends after everything but styles **nodes only**, so none
+of it reaches the edge.
+
+Positioning is left to the author, as asked — the new edges carry no layout
+hints, so fcose places them until `Wr` saves a layout.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first

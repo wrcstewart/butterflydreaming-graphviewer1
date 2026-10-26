@@ -2624,7 +2624,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-26o' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-26p' };
 
 let bdViewTitleText = '';
 
@@ -4844,10 +4844,30 @@ function buildStyle() {
       // be a bug here.
       selector: 'node[type="Entry"][name="Information"]',
       style: {
-        'width': 76,
-        'height': 60,
+        // 2026-10-26 — SMALLER AND DIMMER THAN SETTLING, on the author's
+        // instruction: "the main route from Arriving will be Settling".
+        //
+        // 76x60 -> 56x44 and the label dimmed. Size is the loudest status
+        // signal on this canvas — the Gateways note above says so, having been
+        // enlarged for exactly that reason — so a smaller node reads as the
+        // side door without a word of explanation.
+        //
+        // text-opacity, NOT a dimmer colour. In ink mode, which is the default,
+        // node bodies are transparent (INK_BG at INK_BODY_OPACITY) and identity
+        // lives in the LABEL, coloured through inkify(). So brightness here IS
+        // the label's, and text-opacity is the one lever that dims it in both
+        // modes: inkModeOverrides sets `color` but never text-opacity.
+        //
+        // inkPurity would have been the wrong dial — it drives CHROMA toward
+        // neutral, not lightness, so it would have made Information greyer
+        // rather than quieter, and greyness is not a hierarchy a reader with
+        // reduced colour vision can see.
+        'width': 56,
+        'height': 44,
         'shape': 'cut-rectangle',
-        'text-max-width': '66px',
+        'font-size': '9px',
+        'text-opacity': 0.6,
+        'text-max-width': '52px',
         'border-width': 2,
         'border-color': function(node) {
           const hex = (node.data('colour') || '#666666').replace('#', '');
@@ -5459,6 +5479,31 @@ function buildStyle() {
          latest chip black and lose the marker entirely. */
       selector: 'node.breadcrumb-chip.latest',
       style: { 'border-width': 1.5, 'border-color': '#ffffff', 'border-opacity': 1 }
+    },
+    // ── A SIDE DOOR'S EDGE (2026-10-26) ────────────────────────────────────
+    // Dotted and grey, so the route to Information reads as secondary to the
+    // one into Settling. The author will place the node by hand; this says
+    // which way the main road goes.
+    //
+    // DATA-DRIVEN, not hard-coded to these two nodes: the edge carries
+    // `aside: true` in the DB, buildEdgeData passes unknown properties
+    // straight through, and `edge[?aside]` matches whatever is flagged. So the
+    // Information layer can mark further secondary links without touching a
+    // stylesheet — the same reasoning as holding the curation in the relation
+    // type rather than in a list of node names.
+    //
+    // LAST in `base` on purpose. The ink-mode edge rule above recolours lines
+    // from their target's ink, and later rules win — so this has to follow it.
+    // inkModeOverrides() appends after all of this but styles NODES only, so
+    // nothing of it reaches here.
+    {
+      selector: 'edge[?aside]',
+      style: {
+        'line-style': 'dotted',
+        'line-color': '#6a6a72',
+        'width': 1,
+        'opacity': 0.45,
+      }
     },
   ];
   // Later rules win in cytoscape, so the experiment is an APPEND and touches
