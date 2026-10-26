@@ -513,6 +513,35 @@ separate decision from whether the step exists.
 
 ---
 
+## The meditation node's card, in full
+
+Two lines, at the author's wording:
+
+```
+Press View to begin the meditation.
+Click 'Conversations' to start browsing
+```
+
+**And the meditation's own words are NOT in the card**, which is worth recording
+because it is easy to assume otherwise and I did, briefly. `nodeProse` skips
+block CONTENTS as well as directive lines — `BD_BLOCK_OPEN_RE` matches
+`%%bd_text [` — so the Browse card carries the instructions alone.
+
+That makes the whole arrangement behave properly rather than by luck:
+
+| surface | what it shows |
+|---|---|
+| Browse card | the two instructions only |
+| Speak, on arrival | the two instructions only — **not** a flat reading of the meditation |
+| View | the meditation, with its silences |
+
+Had `nodeProse` kept block contents, landing on the node with Speak ticked
+would have read the whole meditation **without pauses** before the reader
+pressed View, and then read it again properly — the words performed badly once
+and well once. It does not, and the reason it does not is one regex.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
