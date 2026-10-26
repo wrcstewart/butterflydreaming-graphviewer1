@@ -220,12 +220,29 @@ already built and switched off**, not a new mechanism.
    (`hint_x_<parentUuid>`, `hint_y_…`, `hint_scale_…`), so Settling's stored
    placement under Root is gone with it. Recoverable from the backup; not wanted,
    since Root now contains Arriving instead.
-4. **the two style rules — inverted triangle, `cut-rectangle` — NOT YET DONE.**
-   Until then both render with the default Entry appearance, since Entries are
-   styled individually by name and these two have no rule.
-5. **the notice move, and `rootIntroPending` with it — NOT YET DONE.** The
-   notices still fire on Root, so Root's text is still unreadable until they are
-   dismissed: the untidiness this change exists to fix is still present.
+4. **the two style rules** ✔ — `shape: polygon` with points `-1 -1 1 -1 0 1`
+   for Arriving, `cut-rectangle` for Information. Arriving's label needed
+   `text-margin-y: -13`, the mirror of Settling's `+13`: at the vertical centre
+   a triangle is half its width, so a centred word overhangs the slanted sides —
+   and this triangle is wide at the TOP, so the label moves up where Settling's
+   moves down. Information needs no such correction, a cut rectangle being full
+   width at its centre.
+5. **the notice move, and `rootIntroPending` with it** ✔ — `isArriving` matches
+   on the NAME, since Arriving is an ordinary Entry. Three details that were not
+   obvious from the plan:
+   
+   - **the gate takes `isRoot || isArriving`, not Arriving alone.** That block
+     does two jobs — fire the dialogs and reveal the node's children — and Root
+     still needs the second, or tapping Root leaves a card telling you to choose
+     something that was never shown.
+   - **the early `navigateInto` is now suppressed for Arriving too.** The card
+     path navigates before the dialog block, so without this Arriving would open
+     the graph and THEN show the notices, which is exactly what that block's own
+     comment forbids: the dialog would compete with a layout animation. Root was
+     already excluded for that reason.
+   - **`rootIntroPending` retargets to Arriving**, or a visitor arriving by a
+     `/n/<uuid>` link and pressing Local would reach Root, read its text, and
+     never meet the development notice.
 
 **BD loads node text at BOOT, so every DB step needs a reload to be seen.**
 

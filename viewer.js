@@ -2557,7 +2557,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-26b' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-26c' };
 
 let bdViewTitleText = '';
 
@@ -4685,6 +4685,70 @@ function buildStyle() {
         'height': 68,
         'font-size': '10px',
         'text-max-width': '62px',
+      }
+    },
+    {
+      // ── ARRIVING (2026-10-26) — the mirror of Settling ────────────────────
+      // An INVERTED triangle, base at the top, so it reads as a pair with
+      // Settling's upright one and points down into it. Cytoscape has no
+      // inverted triangle among its named shapes, so `polygon` supplies the
+      // points: (-1,-1) (1,-1) (0,1) in its -1..1 box — flat edge on top, apex
+      // at the bottom.
+      //
+      // The label problem is Settling's, mirrored. At the vertical centre a
+      // triangle is half its width, so a centred word overhangs the slanted
+      // sides — but THIS triangle is wide at the TOP, so the label moves UP
+      // rather than down. -13px puts it at about 33% of the height, where the
+      // shape is ~51px across at 76px wide: the same clearance Settling gets
+      // from +13.
+      selector: 'node[type="Entry"][name="Arriving"]',
+      style: {
+        'width': 76,
+        'height': 76,
+        'shape': 'polygon',
+        'shape-polygon-points': '-1 -1 1 -1 0 1',
+        'text-max-width': '70px',
+        'text-margin-y': -13,
+        'border-width': 2,
+        'border-color': function(node) {
+          const hex = (node.data('colour') || '#666666').replace('#', '');
+          const r = Math.round(parseInt(hex.slice(0,2), 16) / 3).toString(16).padStart(2,'0');
+          const g = Math.round(parseInt(hex.slice(2,4), 16) / 3).toString(16).padStart(2,'0');
+          const b = Math.round(parseInt(hex.slice(4,6), 16) / 3).toString(16).padStart(2,'0');
+          return `#${r}${g}${b}`;
+        },
+        'border-opacity': 0.5,
+      }
+    },
+    {
+      // ── INFORMATION (2026-10-26) — a page, not a triangle ─────────────────
+      // `cut-rectangle` reads as a page with a clipped corner, which is what
+      // this door leads to. Deliberately NOT a second inverted triangle: shape
+      // carries real identity load here since state went achromatic, and two
+      // triangles side by side at the same point in the spine would stop
+      // carrying any. Unused elsewhere — the taken shapes are round-triangle
+      // (Settling), ellipse (Gateways), octagon (Conversations, section
+      // titles), round-rectangle (Cluster, TextNode, chip) and diamond
+      // (gateways).
+      //
+      // No text-margin-y: a cut rectangle is full width at its centre, so the
+      // ordinary centring is correct and the Settling/Arriving correction would
+      // be a bug here.
+      selector: 'node[type="Entry"][name="Information"]',
+      style: {
+        'width': 76,
+        'height': 60,
+        'shape': 'cut-rectangle',
+        'text-max-width': '66px',
+        'border-width': 2,
+        'border-color': function(node) {
+          const hex = (node.data('colour') || '#666666').replace('#', '');
+          const r = Math.round(parseInt(hex.slice(0,2), 16) / 3).toString(16).padStart(2,'0');
+          const g = Math.round(parseInt(hex.slice(2,4), 16) / 3).toString(16).padStart(2,'0');
+          const b = Math.round(parseInt(hex.slice(4,6), 16) / 3).toString(16).padStart(2,'0');
+          return `#${r}${g}${b}`;
+        },
+        'border-opacity': 0.5,
       }
     },
     {
@@ -8461,6 +8525,16 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // 0 → tap → message 1 + Settling revealed). So the unified one-tap expand
     // never applies to Root, even when UNIFIED_FOCUS is on.
     const isRoot = node.data('type') === 'root';
+    // 2026-10-26 — THE NOTICES MOVE FROM ROOT TO ARRIVING. The author: the
+    // development notice and the speech offer firing on Root meant Root's own
+    // text could not be READ until both dialogs were dismissed. Arriving exists
+    // partly to carry them, so Root reads immediately.
+    //
+    // Matched on the NAME and not a new type, because Arriving is an ordinary
+    // Entry — see InformationLayer_Plan_2026-10-26.md for why a new label would
+    // have cost six sites, one of them making the node's text unsaveable.
+    const isArriving = node.data('type') === 'Entry' &&
+                       node.data('name') === 'Arriving';
 
     // Different node → reset reading state to fresh chunks of the new node.
     // A PRIMED state counts as different: the card was placed at boot without
@@ -8522,8 +8596,8 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // Every visit — see the note above showSpeechIntro. The only conditions
       // left are structural: a real click on Root, the whole text in one card,
       // and somewhere to go afterwards.
-      const introWillShow = isRoot && isLast && !bootPriming && hasNavDescendants(node);
-      if (isRoot && !bootPriming && !introWillShow) {
+      const introWillShow = isArriving && isLast && !bootPriming && hasNavDescendants(node);
+      if (isArriving && !bootPriming && !introWillShow) {
         // Only structural causes remain. If this ever prints again it is the
         // node that is wrong, not anything remembered about the user.
         console.log('[BD] speech intro not shown — isLast=' + isLast +
@@ -8544,7 +8618,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       if (introWillShow) speechSuppressed = false;
       if (c0Card) readingState.cardsByIdx[0] = c0Card;
       // Unified focus: text + neighbourhood together, one tap (spec §3).
-      if (!textOnly && UNIFIED_FOCUS && nav && !isRoot) navigateInto(node);
+      // `!isArriving` as well as `!isRoot` (2026-10-26). This fires BEFORE the
+      // dialog block below, so without it Arriving would open the graph and
+      // THEN show the notices — precisely what that block's own comment says
+      // must not happen, since the dialog would compete with a layout
+      // animation. Root was already excluded for the same reason; Arriving now
+      // inherits it, and the block below does the navigating for both.
+      if (!textOnly && UNIFIED_FOCUS && nav && !isRoot && !isArriving) navigateInto(node);
       // Suppressed while priming: see primeRootReading.
       // 2026-09-01 — Root boot, when Root's FIRST chunk is also its LAST.
       //
@@ -8554,7 +8634,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // here and the rule below can never fire — leaving Root a dead end with
       // a card telling you to tap a node that was never shown. Same rule, both
       // ends of the function; keep them together if either changes.
-      if (isRoot && isLast && hasNavDescendants(node) && !bootPriming) {
+      // `isRoot || isArriving`, and the pair is deliberate: this block does TWO
+      // jobs — fire the dialogs (via introWillShow, now Arriving's alone) and
+      // reveal the node's children. Root still needs the second, or tapping it
+      // would leave a card telling you to choose something that was never
+      // shown. Narrowing the whole gate to Arriving would have taken Root's
+      // reveal away with the dialogs.
+      if ((isRoot || isArriving) && isLast && hasNavDescendants(node) && !bootPriming) {
         // First real click on Root: offer speech BEFORE opening the graph, so
         // the dialog is not competing with a layout animation.
         if (introWillShow) {
@@ -9530,7 +9616,12 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // card, no dev notice, no speech offer, because in ordinary use you saw
       // all three on the way out. Run it now, so reaching Root is the same
       // experience however you got there.
-      if (rootIntroPending && dest.data('type') === 'root') {
+      // 2026-10-26 — ARRIVING, not Root, now that the notices live there. Left
+      // pointing at Root, a visitor who arrived by a /n/<uuid> link and pressed
+      // Local would reach Root, see its text, and never meet the development
+      // notice at all — they would have to click on into Arriving for it.
+      if (rootIntroPending && dest.data('type') === 'Entry' &&
+          dest.data('name') === 'Arriving') {
         rootIntroPending = false;
         advanceOrNavigate(dest);
       }
