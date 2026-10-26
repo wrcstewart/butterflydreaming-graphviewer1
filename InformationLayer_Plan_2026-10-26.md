@@ -484,6 +484,35 @@ tuned figure. A conversion wants eyes on the before and after, not a migration.
 
 ---
 
+## A forward edge from the meditation
+
+The author: *"there is no reason to rout users back through Settling."* So
+`Settling Meditation ─CONTAINS→ Conversations`, and a reader who has finished
+the meditation goes straight on.
+
+**`CONTAINS`, not `CHILD`, and the distinction matters.** `edge[type="CHILD"]`
+is the only edge style that draws a **triangle arrowhead** — every other edge has
+`target-arrow-shape: none` — so `CHILD` is the tempting answer to "a forward
+arrow". But `hasNavDescendants` routes an `Entry` to
+`[type="DESCENDS_FROM"], edge[type="CONTAINS"]` and ignores `CHILD` entirely. A
+`CHILD` edge would have drawn a handsome arrow that **the meditation could not
+follow** — the arrowhead without the passage.
+
+So the link is navigable and, like every other `CONTAINS`, drawn without an
+arrowhead. If the visual cue is wanted it is a one-line style rule, and a
+separate decision from whether the step exists.
+
+**Two consequences worth seeing before judging it:**
+
+- The meditation now has **two** neighbours — `Settling` behind, `Conversations`
+  ahead — so tapping it reveals both. The way back is still there; it is no
+  longer the only way on.
+- Viewing `Settling` shows Conversations and the Meditation together, and this
+  new edge joins them, so that view draws a **triangle**. Informative rather
+  than wrong, but it is a change to a view the author has looked at often.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
