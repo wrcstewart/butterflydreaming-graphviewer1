@@ -449,6 +449,41 @@ So the predicate consults **every** module line.
 
 ---
 
+## Staleness audit, 2026-10-26
+
+The author: *"everything needs to be maximally up to date as we have time to
+correct these things before the site is much looked at."*
+
+**Corrected.** `Settling` said *"Use the player at the screen bottom to hear"* —
+true until the meditation moved into a node earlier the same day. It now says
+*"Tap the Settling Meditation node to hear one."* That phrase was the only
+genuinely stale interface claim in 253 nodes of reader-facing prose, found by
+sweeping for the UI changes of the last two months: the retired `auto` tick box,
+the arrows that carry cards rather than scripts since 2026-10-13, and
+one-tap unified focus.
+
+**Checked and found CORRECT**, so recorded rather than touched:
+
+- **"stamped eight times"** on `bd_V_Kolam3D` — the module's default `symmetry`
+  is **8**.
+- **"every one of five hundred steps"** — the default `depth` is **2**, and with
+  an eight-symbol axiom and an eight-symbol production that is 8 × 8² = **512**.
+- **`helper-nav-hint`'s "there is no second tap to make"** — correct, and the
+  opposite of a stale claim: it tells the reader the retired behaviour is gone.
+- **`bd_V_Kolam3D` carries zero directives**, which looked alarming and is
+  right: it is a DESCRIPTION node for the module family, with the scripts on its
+  children. The module would throw "No score found in node text" if it were
+  asked to render, and it is never asked to.
+
+**Left alone, with the reason:** `bd_Collage_001` and `_002` still use
+`%%bd_p_step_pitch` in their scripts. The module reads that as `step_pitch /
+step` on purpose, so both render correctly. `001` converts cleanly to
+`stretch 0.5`; `002` is `step=358 step_pitch=4`, i.e. **stretch 0.0112** against
+a control whose increment is 0.05 — writing it risks a snap that changes a
+tuned figure. A conversion wants eyes on the before and after, not a migration.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
