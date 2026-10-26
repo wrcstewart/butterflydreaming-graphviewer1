@@ -235,6 +235,15 @@ acting on any of it.
 | **`butterflydreaming.net` as the canonical stem** | `Hosting_and_Domains_2026-10-23.md` | **Built** | Third ingress rule in `~/.cloudflared/config.yml`; proxied apex CNAME to the tunnel; zone Active; full verification suite passing. |
 | **Hostinger 302 forwarding of `.net`** | same | **Abandoned on evidence** | The forwarder drops the path, so `/n/<uuid>` arrived as bare `/`. A redirect cannot carry an id. Also requires Hostinger nameservers, which we moved away from. |
 
+## Added 2026-10-26 — the Information layer
+
+| Design | Doc | Status | Evidence |
+|---|---|---|---|
+| **`Arriving` node between Root and Settling** | `InformationLayer_Plan_2026-10-26.md` | **Plan agreed, step 1 of 5** | Spine measured as `Root -CONTAINS-> Settling -CONTAINS-> Conversations`; Root has exactly one child. |
+| **`Information` as a third entry point** | same | **Plan agreed** | `Entry` label, not a new `Info` one: a new label costs six enumerating matchers and `server.js:2120`'s whitelist would make the node's text unsaveable. |
+| **The notices move from Root to Arriving** | same | **Plan agreed** | `introWillShow = isRoot && …` at `viewer.js:8525`; `rootIntroPending` retargets with it, or a deep-link visitor never meets the development notice. |
+| **`ILLUSTRATES` relation for illustration edges** | same | **Design only — build with the first real edge** | Traversals filter by TYPE and use undirected `connectedEdges()`, so direction protects nothing but an unnamed type matches nothing. The load query is untyped, so such an edge arrives in cytoscape without registration and is inert until a traversal names it. |
+
 ### Added 2026-10-24 — lazy fetch, when the boot payload binds
 
 **The author's direction, not a queue item yet:** *"if that becomes a limitation
