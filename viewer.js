@@ -1302,6 +1302,9 @@ const EDGE_COLOURS = {
 let bdViewMode     = 'browse';   // the radio
 let bdModuleLayout = false;      // is the module iframe showing
 let bdNodeHasModule = false;     // does the node in play carry a module script
+// ...and does that module actually HAVE steppers? `%%bd_module text` carries no
+// controls, so the two questions are different — see where this is computed.
+let bdNodeHasSteppers = false;
 let bdModeBeforeView = null;     // the mode View was pressed from — see av_return
 
 function moduleLayoutActive() { return bdModuleLayout; }
@@ -2621,7 +2624,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-26f' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-10-26g' };
 
 let bdViewTitleText = '';
 
@@ -9308,6 +9311,35 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         }
       }
       const hasModule = cardHasModule || nodeHasModule;
+      // ── DOES IT HAVE STEPPERS? (2026-10-26) ─────────────────────────────
+      //
+      // `hasModule` is too loose to answer that, and the Settling Meditation
+      // showed why: MODULE_RE matches ANY `%%bd_module`, including
+      // `%%bd_module text`, so a text-only collage counts as having a module.
+      // The Player helper card then told the author that "the script controls
+      // the pattern and the steppers can synchronise" — on a node with no
+      // pattern and no steppers — and prependSystemCard SPEAKS, so with Speak
+      // on it read that out at the end of a meditation.
+      //
+      // getModuleKind is the discriminator: it answers 'visual' or 'music' for
+      // a real module and nothing for `text`. Both sources are consulted, since
+      // a pasted script and the node itself can disagree.
+      //
+      // EVERY module line, not parseModuleId's FIRST. bd_Collage_002 opens with
+      // `%%bd_module text` and carries Kolam3D and DroneFrac after it, so
+      // asking only the first block would have called that collage
+      // stepper-less and taken its helper away — a fix introducing the
+      // mirror of the bug it fixed.
+      {
+        const anyStepperModule = (t) => (String(t || '').match(/^%%bd_module[ \t]+\S+/gm) || [])
+          .some(line => !!getModuleKind(line.replace(/^%%bd_module[ \t]+/, '')));
+        let nodeText = '';
+        if (moduleNodeId) {
+          const rn2 = cy.getElementById(moduleNodeId);
+          if (rn2 && rn2.length) nodeText = rn2.data('text') || '';
+        }
+        bdNodeHasSteppers = anyStepperModule(text) || anyStepperModule(nodeText);
+      }
       // The module went away while its layout was showing — drop back to the
       // graph, keeping whatever mode the user is in.
       if (!hasModule && moduleLayoutActive()) {
@@ -13180,7 +13212,12 @@ async function init() {
       // HISTORY (toHistory) explaining the ↓↑ arrows and the Copy button, so the
       // node's script card keeps the Current pane. Once only (like
       // gatewayHelperShown) so it doesn't spam on every Player toggle.
-      if (enteringLayout && !playerHelperShown) {
+      // `bdNodeHasSteppers`, not merely entering the layout. Reported by the
+      // author on the Settling Meditation: pressing Back from View displayed
+      // AND READ this card, which describes steppers the node does not have.
+      // prependSystemCard speaks, so a helper about a pattern arrived at the
+      // end of a meditation.
+      if (enteringLayout && !playerHelperShown && bdNodeHasSteppers) {
         // 2026-09-26 — rewritten. The old text described the Copy button,
         // retired on 2026-09-15 when the standalone-URL path was frozen, and
         // it named the arrows as the only way across — which stopped being

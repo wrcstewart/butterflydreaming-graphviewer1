@@ -398,6 +398,57 @@ rhythm too (a blank line, a faint mark) is still open below.
 
 ---
 
+## Two from testing the meditation
+
+### "Press View to begin the meditation."
+
+Placed **above** `%%bd_collage 1`, not inside the text block, and the placement
+is the whole trick:
+
+- `nodeProse` keeps non-directive lines, so the **Browse card shows it**;
+- `parseCollage` starts with `cur = null` and only collects lines **after** a
+  `%%bd_module` header, so the collage **drops it**;
+- `collageTextBody` reads only inside `%%bd_text [ … %%bd_]`, so it is **not in
+  the meditation** and is never read aloud as part of it.
+
+Verified against the stored text: the Browse card opens "Press View to begin the
+meditation." while the meditation still opens "Settle where you are."
+
+### The Player helper card was being read out at the end of a meditation
+
+The author: *"for some reason it displays then reads the following helper
+message when pressing the back button."*
+
+**Two faults in one.** `prependSystemCard` **speaks** its text, and the card in
+question describes *"the script controls the pattern and the steppers can
+synchronise"* — on a node with no pattern and no steppers. Its gate was
+`mode === 'player' && enteringLayout && !playerHelperShown`: **nothing asked
+whether the node had steppers at all.**
+
+`bdNodeHasModule` could not answer it either, and the reason is worth keeping:
+`MODULE_RE` matches **any** `%%bd_module`, `%%bd_module text` included, so a
+text-only collage counts as carrying a module. *Having a module* and *having
+controls* are different questions, and only the first had a name. Now
+`bdNodeHasSteppers` answers the second, via `getModuleKind`, which returns
+'visual' or 'music' for a real module and nothing for `text`.
+
+**And the first version of that fix contained the mirror of the bug.** Using
+`parseModuleId` would have consulted only the FIRST `%%bd_module` line — and
+`bd_Collage_002` opens with `%%bd_module text` before its Kolam3D and DroneFrac
+blocks, so that collage would have been judged stepper-less and lost a helper it
+should have. Checked against the four real stored scripts before shipping:
+
+| node | module blocks | first-only | all blocks |
+|---|---|---|---|
+| `bd_Collage_001` | `bd_V_Kolam3D, text` | true | true |
+| **`bd_Collage_002`** | `text, bd_V_Kolam3D, bd_M_DroneFrac` | **false** | **true** |
+| `bd_V_Kolam3D_002` | `bd_V_Kolam3D` | true | true |
+| `Settling Meditation` | `text` | false | false |
+
+So the predicate consults **every** module line.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
