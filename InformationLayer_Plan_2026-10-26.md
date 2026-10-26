@@ -276,6 +276,68 @@ have cried wolf on every return to Arriving and stopped being read.
 
 ---
 
+## Stage one of the meditation: the node exists, the directive does not
+
+The author's design question — inline directive, module type, or collage —
+answered by what the code already does:
+
+**Not a module.** BD's speech lives in the HOST: Piper, `speak()`, the queue and
+its gaps are all in `viewer.js`. A module is an iframe that would have to ask BD
+to speak, inverting the relationship — and a new module costs four registries. A
+meditation's substance is words and silence, which the host owns.
+
+**Pause inline, not meditation-specific**, so any passage can breathe: a
+Settling text, a gateway, a poem. Same cost, broader gain.
+
+**Meditation as a collage**, because that is already the composition the author
+described — words now, a graphic or music later, all three working together. And
+one piece is better than hoped: a collage step ALREADY ends when the reading
+ends (`viewer.js:16180` — *"0.5s a word is an ESTIMATE, needed only because the
+real length was unknowable. With the voice running it is knowable"*). That is a
+meditation's timing, built.
+
+### What the check found
+
+`collageTextBody` **strips nothing** — it pushes every line between `%%bd_text [`
+and `%%bd_]` verbatim. So a `%%bd_pause 4` inside a text block **survives into
+`blk.body`** intact, and is destroyed only at the last step, by
+`speechTextFrom`'s `replace(/^%%bd_\w*.*$/gm, '')`. **One function owns the
+fix**, and it is the function that already owns how text becomes speech — it
+already normalises spaced dashes *because* the phonemiser turns them into
+pauses.
+
+Two sites, then: `speechTextFrom` must turn the line into a gap instead of
+deleting it, and the collage's **display** must strip it, since
+`collageTextBody` will not.
+
+### `Settling Meditation` — created, label `Entry`
+
+| | |
+|---|---|
+| label | `Entry`, via `Settling ─CONTAINS→` |
+| url | `butterflydreaming.org/n/e8888d97-af6a-43a0-a908-b746cf53d907` |
+| text | a text-only collage: `%%bd_collage 1`, one `%%bd_module text`, six `%%bd_pause` lines of 4–6 s |
+
+**Why `Entry` and not `TextNode`,** though the existing collages are TextNodes:
+the corpus has `Entry ─CONTAINS→ Entry` four times over and **no**
+`Entry ─CONTAINS→ TextNode` anywhere. A TextNode under Settling would be a
+label/relation pair the renderer has never been asked to draw — the kind of
+untested shape that costs rounds. It carries a collage script regardless, since
+`parseCollage` reads text and ignores type.
+
+**It has no style rule**, so it renders with the default Entry appearance until
+one is written.
+
+**The words are a draft**, in Settling's own idiom — *"starting points, not a
+map"* — and meant to be replaced.
+
+**Until the directive is coded, the pause lines are inert**: `speechTextFrom`
+deletes them, so the meditation currently reads as continuous prose, and the
+lines are *visible* in the collage's displayed text because `collageTextBody`
+does not strip them. Both are expected at this stage.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
