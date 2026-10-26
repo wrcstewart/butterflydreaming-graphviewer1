@@ -204,12 +204,28 @@ already built and switched off**, not a new mechanism.
 ## Build order
 
 1. **this plan, committed** ✔ — the author's instruction: write it up first
-2. **a full DB backup** — `bd_tool cypher` does **not** auto-backup
-3. **the two nodes and the rewired spine** — matching `Settling`'s property shape
-   exactly (`colour`, `created_at`, `created_at_estimated`, `n_r`, `name`,
-   `text`, `updated_at`, `url` as `butterflydreaming.org/n/<uuid>`)
-4. the two style rules — inverted triangle, `cut-rectangle`
-5. the notice move, and `rootIntroPending` with it
+2. **a full DB backup** ✔ — `backups/memgraph_2026-10-26_113345.cypher`, 3,234
+   statements, 792,792 bytes. `bd_tool cypher` does **not** auto-backup.
+3. **the two nodes and the rewired spine** ✔ — verified by walking
+   `(:Root)-[:CONTAINS*1..3]->(n)`:
+   `ButterflyDreaming → Arriving → Settling → Conversations` and
+   `ButterflyDreaming → Arriving → Information`, with Root back to exactly one
+   child. Both nodes carry `colour`, `created_at`, `n_r`, `name`, `text`,
+   `updated_at`, `url` — Settling's set apart from `created_at_estimated`,
+   omitted on purpose because these timestamps are real rather than guessed at
+   import. Urls: Arriving `…/n/3a82e24d-78e3-4b88-b478-646af9077e73`,
+   Information `…/n/69217cc2-2bb8-4098-a8b2-4ec16c3dbba9`.
+   
+   The deleted `Root → Settling` edge carried **view-scoped layout hints**
+   (`hint_x_<parentUuid>`, `hint_y_…`, `hint_scale_…`), so Settling's stored
+   placement under Root is gone with it. Recoverable from the backup; not wanted,
+   since Root now contains Arriving instead.
+4. **the two style rules — inverted triangle, `cut-rectangle` — NOT YET DONE.**
+   Until then both render with the default Entry appearance, since Entries are
+   styled individually by name and these two have no rule.
+5. **the notice move, and `rootIntroPending` with it — NOT YET DONE.** The
+   notices still fire on Root, so Root's text is still unreadable until they are
+   dismissed: the untidiness this change exists to fix is still present.
 
 **BD loads node text at BOOT, so every DB step needs a reload to be seen.**
 
