@@ -338,6 +338,66 @@ does not strip them. Both are expected at this stage.
 
 ---
 
+## Stage two: `%%bd_pause N` is built
+
+**Seconds, not milliseconds** — a meditation is written in breaths —
+and fractions work: `%%bd_pause 2.5`. **No `p_` prefix**, because it is not
+stepper-backed.
+
+**It needed almost no machinery**, which is why it was worth checking first.
+Each queue item already carried its own `gap`, honoured as
+`setTimeout(playNextSpeech, next.gap)`; verse lines and sentence ends already
+used it. A pause is **not a new kind of thing — it is a longer value for a
+number the player already waits on.**
+
+**Three sites:**
+
+1. **`speechTextFrom`** converts `%%bd_pause N` into a marker in a private-use
+   character, **before** its own blanket `replace(/^%%bd_\w*.*$/gm, '')`. That
+   ordering is the whole reason a marker is needed: directives must not reach
+   the phonemiser, so the pause has to leave the `%%bd_` form before the strip
+   and be recovered after it.
+2. **`speak`** splits on the marker and puts each segment's silence on the
+   **last utterance before it**, so the reading says its line and then waits.
+   The gap rides on a real utterance rather than becoming an empty one, which
+   would have been handed to both the synthesiser and the prefetch, neither of
+   which has any use for one.
+3. **the three display sites** wrap the collage body in `nodeProse`. This is
+   necessary *because* `collageTextBody` strips nothing — the property that
+   lets the directive survive to speech is the same property that would
+   otherwise print `%%bd_pause 7` in the middle of a meditation.
+
+### A leading pause, and why unit-testing earned its keep
+
+Six shapes were tested without a browser, and one was **wrong**: a pause before
+any words landed *after* the first line, because gaps sit BETWEEN utterances and
+the carry-forward attached it to the next one. **Silently moving a meditation's
+silence is worse than ignoring it.** A leading pause now delays the first
+`playNextSpeech` instead, which is what it actually means — generation-checked,
+so an interrupt during the lead silence cannot be followed by a timer starting
+the reading it cancelled.
+
+| shape | result |
+|---|---|
+| `Settle…` / pause 4 / `Let…` / pause 7 | gaps 4000, 7000 ✔ |
+| pause 3 then pause 5, consecutive | **added** → 8000 ✔ |
+| pause before any words | lead 9000, first line keeps its normal gap ✔ |
+| pause after the last words | 6000 on the last ✔ |
+| no pauses | unchanged, 504 ✔ |
+| a pause and nothing else | nothing queued, nothing scheduled ✔ |
+
+**Capped at 60 s** (`PAUSE_MAX_MS`), so a typo'd `%%bd_pause 600` cannot freeze
+a reading.
+
+### Known limit
+
+A pause is only honoured **where speech is**. With Speak off, the written
+silences are invisible and the meditation reads as continuous prose — so the
+shape of it exists only when heard. Whether the written form should carry the
+rhythm too (a blank line, a faint mark) is still open below.
+
+---
+
 ## Open, deliberately
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first

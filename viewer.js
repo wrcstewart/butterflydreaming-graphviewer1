@@ -1671,6 +1671,11 @@ function speechTextFrom(raw) {
   if (!raw || typeof raw !== 'string') return '';
   const mod = raw.search(/^%%bd_module\b/m);
   let t = mod === -1 ? raw : raw.slice(0, mod);
+  // BEFORE the blanket strip below, which would otherwise delete it. Seconds,
+  // not milliseconds: a meditation is written in breaths. Fractions allowed, so
+  // `%%bd_pause 2.5` works.
+  t = t.replace(/^[ \t]*%%bd_pause[ \t]+([\d.]+)[ \t]*$/gm,
+                (_m, secs) => PAUSE_MARK + Math.round(parseFloat(secs) * 1000) + PAUSE_MARK);
   t = t.replace(/^%%bd_\w*.*$/gm, '');
   t = t.replace(/<<([a-z]+)>>([\s\S]*?)<<\/>>/g, '$2');
   // 2026-09-04 — a SPACED dash is a pause; a word-internal hyphen is not.
@@ -1970,6 +1975,48 @@ const SPEAK_GAP_MS = 504;
 // the ratio and lost the distinction; the gap between them is now 180:504
 // rather than 180:420, which strengthens it.
 const SPEAK_LINE_GAP_MS = 180;
+
+// ── %%bd_pause N — A WRITTEN SILENCE (2026-10-26) ────────────────────────────
+//
+// The author, for the Settling Meditation: *"it is important to have pauses in a
+// meditation."* And a meditation's silences are not decoration — they are half
+// of its content, so they belong in the TEXT where they can be written and
+// edited, not in a recording.
+//
+// It needed almost no machinery, because three pieces were already in place.
+// `nodeProse` drops every `%%bd_*` line, so the directive is invisible in an
+// ordinary card for free. Each queue item ALREADY carries its own `gap`, honoured
+// as `setTimeout(playNextSpeech, next.gap)` — verse lines and sentence ends
+// already use it. And `collageTextBody` strips nothing, so the directive
+// survives a collage's text block intact.
+//
+// So a pause is not a new kind of thing: it is a longer value for a number the
+// player already waits on.
+//
+// THE MARKER EXISTS BECAUSE OF AN ORDERING PROBLEM. `speechTextFrom` deletes
+// every `%%bd_*` line on its way to the phonemiser, and it has to — a directive
+// read aloud would be absurd. So the pause is converted to a marker BEFORE that
+// strip, in a private-use character no corpus text contains, and split out
+// afterwards.
+const PAUSE_MARK   = '\uE000';
+const PAUSE_MAX_MS = 60000;   // a typo'd "%%bd_pause 600" must not freeze a reading
+
+// Splits marked text into segments, each carrying the silence that FOLLOWS it.
+//
+// The gap rides on the PRECEDING utterance rather than becoming an utterance of
+// its own, which matters: an empty utterance would be handed to the synthesiser
+// and to the prefetch, and neither has any use for one.
+function splitPauseSegments(text) {
+  const re = new RegExp(PAUSE_MARK + '(\\d+)' + PAUSE_MARK, 'g');
+  const out = [];
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ text: text.slice(last, m.index), gapMs: Math.min(PAUSE_MAX_MS, parseInt(m[1], 10)) });
+    last = m.index + m[0].length;
+  }
+  out.push({ text: text.slice(last), gapMs: null });
+  return out;
+}
 // Verse is read more slowly than prose. 8% on top of the existing scale —
 // 15% first, reduced by ear on 2026-09-30.
 const SPEAK_VERSE_SCALE = SPEAK_LENGTH_SCALE * 1.08;
@@ -2574,7 +2621,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-26e' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-10-26f' };
 
 let bdViewTitleText = '';
 
@@ -2657,10 +2704,51 @@ function speak(raw, { interrupt = false } = {}) {
   const scale = verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE;
   if (verse) console.log('[speak] verse: line gaps ' + SPEAK_LINE_GAP_MS +
                          'ms, scale ' + scale.toFixed(2));
-  for (const u of splitUtterances(text, { verse })) {
-    speakQueue.push({ text: u.text, gap: u.gap, scale });
+  // A written pause lands on the LAST utterance of the segment before it, so
+  // the reading says its line and then waits. `pendingGap` carries a pause that
+  // had nothing before it — two in a row, or one at the very start — forward
+  // onto whatever is queued next, instead of losing it.
+  //
+  // A LEADING pause is the one case a gap cannot express, and it must not be
+  // fudged. Gaps sit BETWEEN utterances, so carrying a leading pause onto the
+  // first line would put the silence AFTER the words instead of before them —
+  // caught by unit-testing the six shapes, and silently moving a meditation's
+  // silence is worse than ignoring it. It becomes a delay on the first play
+  // instead, which is what it actually means.
+  let leadGapMs = 0;
+  for (const seg of splitPauseSegments(text)) {
+    const us = splitUtterances(seg.text, { verse });
+    us.forEach((u, i) => {
+      const isLastOfSeg = (i === us.length - 1);
+      speakQueue.push({
+        text: u.text,
+        gap: (isLastOfSeg && seg.gapMs != null) ? seg.gapMs : u.gap,
+        scale,
+      });
+    });
+    if (!us.length && seg.gapMs != null) {
+      if (speakQueue.length) {
+        // Two pauses in a row, or one after the last words: ADD, so
+        // `%%bd_pause 3` then `%%bd_pause 5` is eight seconds rather than five.
+        const tail = speakQueue[speakQueue.length - 1];
+        tail.gap = (tail.gap || 0) + seg.gapMs;
+      } else {
+        leadGapMs += seg.gapMs;   // still before any words
+      }
+    }
   }
-  playNextSpeech();
+
+  if (leadGapMs > 0 && speakQueue.length) {
+    // Generation-checked, like prepareUtterance: an interrupt during the lead
+    // silence must not be followed by this timer starting the reading it
+    // cancelled.
+    const gen = speakGen;
+    console.log('[speak] leading pause ' + leadGapMs + 'ms before the first line');
+    setTimeout(() => { if (gen === speakGen) playNextSpeech(); },
+               Math.min(PAUSE_MAX_MS, leadGapMs));
+  } else {
+    playNextSpeech();
+  }
 }
 
 function stopSpeech() {
@@ -12583,7 +12671,9 @@ async function init() {
       const txtC = collageSlot(liveC, 'text');
       const tl   = document.getElementById('collage-preview-text');
       const tlb  = document.getElementById('collage-preview-text-body');
-      if (tlb) tlb.textContent = (txtC && txtC.body) || '';
+      // nodeProse — see the note at the View text body: the pause directive
+      // must not be shown, and collageTextBody does not remove it.
+      if (tlb) tlb.textContent = nodeProse((txtC && txtC.body) || '');
       // HIDDEN UNTIL PLACED, not shown and then positioned. A `position: fixed`
       // element with no insets falls back to its STATIC position — in the flow,
       // beside the script panel — so showing it before the square has been
@@ -16167,7 +16257,13 @@ async function init() {
           if (typeof loadCollageViewPlayer === 'function') loadCollageViewPlayer(blk.moduleId, blk.script);
         } else if (kind === 'text') {
           const bodyEl = document.getElementById('bd-view-text-body');
-          if (bodyEl) bodyEl.textContent = blk.body || '';
+          // nodeProse, because collageTextBody deliberately strips NOTHING —
+          // that is what lets %%bd_pause survive as far as speech. So the
+          // directive has to be removed HERE, at the one place the words are
+          // shown, or a reader sees "%%bd_pause 7" in the middle of a
+          // meditation. nodeProse is the existing, tested stripper for exactly
+          // this, and a text block contains no block forms for it to trip on.
+          if (bodyEl) bodyEl.textContent = nodeProse(blk.body || '');
           bdViewProse = blk.body || '';
           // ── SPEAK IT AS IT ARRIVES (author, 2026-10-14) ─────────────────
           // *"If speak is ticked it should commence the read of the text
@@ -16583,7 +16679,13 @@ async function init() {
           const txt    = txtB;
           const bodyEl = document.getElementById('bd-view-text-body');
           const refEl  = document.getElementById('bd-view-text-ref');
-          if (bodyEl) bodyEl.textContent = (txt && txt.body) || '';
+          // nodeProse, because collageTextBody deliberately strips NOTHING —
+          // that is what lets %%bd_pause survive as far as speech. So the
+          // directive has to be removed HERE, at the one place the words are
+          // shown, or a reader sees "%%bd_pause 7" in the middle of a
+          // meditation. nodeProse is the existing, tested stripper for exactly
+          // this, and a text block contains no block forms for it to trip on.
+          if (bodyEl) bodyEl.textContent = nodeProse((txt && txt.body) || '');
           // NO reference line over a picture. It exists so a reader can tell
           // which node they are looking at while browsing; in a collage it is
           // a monospace address sitting on the artwork.
