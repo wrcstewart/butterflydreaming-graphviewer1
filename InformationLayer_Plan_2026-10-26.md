@@ -584,15 +584,20 @@ hints, so fcose places them until `Wr` saves a layout.
 
 ## Open, deliberately
 
-- **`aside` is binary, and the corpus already has two degrees of it.** Decided
-  2026-10-26 to leave `Settling ─CONTAINS→ Conversations` undotted, on the
-  author's reading: *"tricky because it's less of an aside than the former
-  Information route."* Right — Information is a **side door into a different
-  mode of reading**, while that edge is a **shortcut past a recommended step**.
-  Both are bracketed in prose, and only one is dotted, so the graph and the
-  words disagree there on purpose. If the Information layer grows enough
-  secondary links to need it, the flag wants to become a degree rather than a
-  boolean — but a distinction with two instances does not yet need a mechanism.
+- **`aside` is binary, and there are arguably two degrees of it.** The author
+  first left `Settling ─CONTAINS→ Conversations` solid — *"tricky because it's
+  less of an aside than the former Information route"* — then, on seeing it
+  drawn, dotted it after all. The distinction stands even though the flag no
+  longer records it: Information is a **side door into a different mode of
+  reading**, that edge a **shortcut past a recommended step**. If the layer
+  grows enough secondary links the flag may want to become a degree rather than
+  a boolean; two instances do not yet need a mechanism.
+
+  **What dotting it bought, and it is more than the one edge:** the solid edges
+  now trace exactly ONE continuous route —
+  `Arriving → Settling → Settling Meditation → Conversations` — with both dotted
+  edges being ways to skip part of it. A reader can follow the solid line
+  without being told to, which neither edge could signal on its own.
 
 - **`ILLUSTRATES` is unbuilt and unnamed in code.** Introduce it with the first
   real illustration edge, not before.

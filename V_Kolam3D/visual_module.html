@@ -527,8 +527,8 @@
          reads as one colour at a glance.
          K3D_BUILD in the script carries the same rotation as a string and is
          logged at startup; bump BOTH on every change. */
-      border: 1px solid #2980b9;
-      color: #2980b9;
+      border: 1px solid #c0392b;
+      color: #c0392b;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      /* 2026-08-17 — glyph scales with the bigger button */
       padding: 0;
@@ -1393,7 +1393,7 @@
     const canvasWrapper  = document.querySelector('.canvas-wrapper');
     // The canary's authoritative half, bumped on every change to this file
     // together with the .step-btn colour above: red, then green, then blue.
-    const K3D_BUILD = '2026-10-26r';
+    const K3D_BUILD = '2026-10-26s';
     const controlPanel   = document.querySelector('.control-panel');
     const moduleLayout   = document.querySelector('.module-layout');
 
@@ -3596,7 +3596,7 @@
     });
 
     console.log('[module3d] V_Kolam3D build ' + K3D_BUILD +
-                ' — the stepper +/- buttons are BLUE #2980b9, in step with BD and DroneFrac.');
+                ' — the stepper +/- buttons are RED #c0392b, in step with BD and DroneFrac.');
     try { document.body.dataset.k3dBuild = K3D_BUILD; } catch (_) {}
 
     postToParent({ type: 'BD_READY' });
