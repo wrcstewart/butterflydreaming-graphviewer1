@@ -184,14 +184,40 @@ transliterations espeak has never seen.
 | Gautama | `ɡɔːtˈɑːmɐ` | `ɡˈaʊtəmə` | stress on the second syllable |
 | Siddhartha | `sɪdˈɑːθɐ` | `sɪdˈɑːtə` | the `th` is an aspirated t, not /θ/ |
 
-**Left for the author to settle — the Pali short `a`, where usage genuinely
-differs and a mindfulness teacher's habit should decide:**
+**The three I had called a matter of taste — looked up 2026-10-28 at the
+author's suggestion, and two of them are not.**
 
-| word | espeak | the alternative |
-|---|---|---|
-| Dhamma | `dˈæmɐ` DAM-a | `dˈʌmə` DUM-ma |
-| Kamma | `kˈæmɐ` KAM-a | `kˈʌmə` KUM-ma |
-| Sangha | `sˈæŋhɐ` SANG-ha | `sˈʌŋhə` SUNG-ha, or `sˈæŋɡə` SANG-ga |
+| word | espeak | dictionaries | entry |
+|---|---|---|---|
+| Sangha | `sˈæŋhɐ` SANG-**ha** | OED Br `/ˈsaŋɡə/`, `/ˈsʌŋɡə/`; M-W `ˈsəŋgə`; Collins Br `ˈsɑːŋɡə`, US `ˈsʌŋɡə` | `sˈæŋɡə` |
+| Dhamma | `dˈæmɐ` DAM-a | OED Br `/ˈdɑːmə/`, `/ˈdʌmə/` | `dˈɑːmə` |
+| Kamma | `kˈæmɐ` KAM-a | **no English entry found** in OED, Collins, M-W or Wiktionary | still open |
+
+**Sangha was a straight error, not a preference.** Four dictionaries, a hard
+`ɡ` in every one, and an `/h/` in none. espeak's `sˈæŋhɐ` is wrong. Wikipedia's
+Sanskrit `[sɐŋɡʱɐ]` says the same — an aspirated **g**.
+
+**Dhamma: espeak's vowel is not among the attested ones.** OED British gives
+`/ˈdɑːmə/` or `/ˈdʌmə/`, never `æ`. The first is used. **Note the consequence:**
+in non-rhotic British, `/ˈdɑːmə/` makes *dhamma* a homophone of *dharma*, which
+is correct English but erases the Sanskrit/Pali distinction in speech. If a text
+uses both words deliberately, `dˈʌmə` (DUM-ma) keeps them apart — and is what is
+more often heard in Theravada settings. One edit either way.
+
+**Kamma has no English dictionary entry at all.** By exact parallel with dhamma
+it would be `kˈɑːmə` or `kˈʌmə`, but that is an inference from a neighbouring
+word and is left to the author rather than applied.
+
+### Why the source IPA cannot simply be copied
+
+Wikipedia and Wiktionary give the **Sanskrit and Pali** transcriptions, which is
+not what this file is for — the convention here is deliberate anglicisation,
+"what a careful English reader would say". And they are unusable as written:
+checked against the voice's `phoneme_id_map`, `[sɐŋɡʱɐ]` and `[d̪ʱɐm.mɐ]` both
+contain **`ʱ`**, which the table lacks and `toIds` would **drop**. The
+aspiration would silently vanish — in the sangha case landing on "sang-ga",
+the right answer by accident. **Take the dictionaries' English IPA, not the
+encyclopaedia's source-language IPA.**
 
 ### Two constraints that govern what an entry may contain
 
