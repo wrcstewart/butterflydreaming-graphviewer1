@@ -206,8 +206,24 @@ current entries pass.
 (`piper_direct.js:322`) wraps rather than growing. Verified: from the 11th
 matching key in one sentence, holders repeat — and two keys sharing a holder
 cannot both be found by `findRun`, so the loser is left as a nonsense word in
-the output. That is **the reason not to pin terms espeak already says
-correctly.** A deliberately dense glossary sentence — *"Buddha taught dharma to
-the sangha: dukkha, anicca, anatta, karma, samsara, nirvana, shunyata, and the
-Tao of Siddhartha Gautama"* — currently matches 6 of the 10 slots. Pinning the
-seven correct terms as well would take it to 13 and break it.
+the output.
+
+**But the ceiling is PER UTTERANCE, not per node, and BD already splits.** The
+author asked the right question — *"why not make separate sentences?"* —
+and the answer is that `splitUtterances` does it for him: `playNextSpeech` →
+`prepareUtterance` → `synthOne` → `synthesise`, one call per sentence, with
+sentences over `maxLen` 150 split further at commas and semicolons. Measured
+with the real `splitUtterances` and `segment` sliced out of the source, assuming
+**all sixteen** terms pinned:
+
+| text | utterances | worst single call |
+|---|---|---|
+| *"Buddha taught dharma to the sangha: dukkha, anicca, anatta, karma, samsara, nirvana, shunyata, and the Tao of Siddhartha Gautama."* (129 ch) | 1 | **13 of 10 — over** |
+| the same seven terms as one sentence each (505 ch) | 7 | **2 of 10** |
+
+So the failure needs a *single* sentence under 150 characters carrying eleven or
+more distinct pinned terms — hard to write by accident, and gone the moment the
+glossary is one term per sentence. **The ceiling is therefore not a reason to
+leave espeak's correct renderings unpinned**; the only reason is that pinning
+what already works adds entries to verify for no gain. Earlier wording in this
+file put it too strongly.
