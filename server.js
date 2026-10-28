@@ -570,7 +570,7 @@ function readPromptSet(id) {
     const p = JSON.parse(fs.readFileSync(entry.file, 'utf8'));
     return { id, label: entry.label, version: p.version || 0,
              count: (p.prompts || []).length, complete_at: p.complete_at || null,
-             prompts: p.prompts || [] };
+             reading_notes: p.reading_notes || [], prompts: p.prompts || [] };
   } catch (_) { return null; }
 }
 

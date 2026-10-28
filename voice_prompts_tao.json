@@ -504,5 +504,12 @@
    "id": "0125",
    "text": "Embrace simplicity. Put others first. Desire little."
   }
+ ],
+ "reading_notes": [
+  {
+   "match": "tao",
+   "say": "Say \"Tao\" as TOW — rhyming with now, with a hard T.",
+   "why": "Not DOW. The training pairs your voice with espeak’s phonemes, and espeak says tˈaʊ."
+  }
  ]
 }

@@ -92,6 +92,61 @@ Lengths run 45–131 characters, 2.7–7.8 s at the author's measured 16.7 chars
 The reader picks the set from a dropdown when the session opens, and the
 session is then **bound** to it — see the next section.
 
+### A LEXICON WORD IN THE TRAINING SET (2026-10-28)
+
+The author asked the question, and it had not arisen before: *"if a lexicon
+entry appears in the training set, what happens?"*
+
+**The two paths never meet.** Verified rather than asserted: piper's loader
+imports `EspeakPhonemizer` and is handed only `espeak_voice`
+(`vits/dataset.py:25,172`) — there is no lexicon parameter anywhere in it, and
+the phonemes cached by the completed run match raw `espeak-ng` output character
+for character. So:
+
+- **Training** pairs the reader's audio with **espeak's** phonemes.
+- **Synthesis** applies the lexicon, through `piper_direct.js`, to decide what
+  BD *says*.
+
+**The basic set contains no lexicon word at all** — measured, zero of 63, which
+is why this never came up. **The Tao set contains "Tao" 13 times across 10
+prompts** (0001, 0022, 0033, 0039, 0073, 0089, 0090, 0109, 0110, 0117).
+
+**The consequence, if read correctly: BD says the word differently from how the
+reader read it.** She says "TOW" (espeak's `tˈaʊ`), the /t/ phoneme is trained
+correctly, and BD later says "dow" from the lexicon's `dˈaʊ`, using the /d/ it
+learned from 235 instances elsewhere. A divergence, not a defect.
+
+**The hazard is the REVERSE, and this is the rule to carry:**
+
+> **A training set is read the way ESPEAK says, never the way the LEXICON says.**
+
+If she reads it "DOW" — the pronunciation she knows — her [d] audio is paired
+with espeak's /t/, and /t/ is everywhere in English. Those 13 instances are only
+3.1% of the set's 417 /t/ tokens, so the damage would be small; but the rule
+matters more as sets grow, and nothing about the spelling on screen warns a
+reader which way to go.
+
+**Closed by carrying the instruction in the set itself.** `voice_prompts_tao.json`
+has a `reading_notes` array (`match`, `say`, `why`); `/api/prompts` passes it
+through; and the rig shows the note **above** the sentence on exactly the
+prompts that contain the word — word-boundary and case-insensitive, so "tao" and
+"Tao" in one sentence both trigger it while *tautology* and *Taoism* do not.
+Verified: 10 prompts contain the word, 10 show the note.
+
+**When adding a lexicon entry, check both prompt sets for it.** One line:
+
+```sh
+python3 - <<'EOF'
+import json, re
+lex = json.load(open('speech_lexicon.json'))
+for f in ['voice_prompts_basic.json', 'voice_prompts_tao.json']:
+    for p in json.load(open(f))['prompts']:
+        for k in lex:
+            if re.search(r'\b' + re.escape(k) + r'\b', p['text'], re.I):
+                print(f, p['id'], k, lex[k])
+EOF
+```
+
 ### Choosing a set, and the session being BOUND to it (2026-10-28)
 
 The rig has a dropdown — **Basic** or **Tao Te Ching** — live until a session

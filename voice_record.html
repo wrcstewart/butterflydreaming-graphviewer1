@@ -31,6 +31,10 @@
                 display:flex; flex-direction:column; justify-content:center; }
   .counter { font-size:12px; color:#8a8a95; letter-spacing:.05em; text-transform:uppercase; margin:0 0 10px; }
   .prompt { font-size:25px; line-height:1.45; margin:0; }
+  /* A pronunciation note for THIS prompt. Amber and above the sentence,
+     because it has to be read before the sentence is, not after. */
+  .say-note { font-size:14px; color:#f0c674; margin:0 0 10px; line-height:1.4; }
+  .say-note b { color:#ffd98a; }
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
   button { font:600 16px/1 inherit; padding:14px 18px; border-radius:6px; cursor:pointer;
            background:#2a2a34; color:#e8e8ea; border:1px solid #4a4a58; }
@@ -106,6 +110,18 @@
 
 <div class="prompt-box">
   <p class="counter" id="counter">loading…</p>
+  <!--
+    2026-10-28 — a pronunciation note, shown only on the prompts that need it.
+    The author asked the question that produced it: what happens when a word
+    with a LEXICON entry appears in the TRAINING set? The two paths never meet
+    — training pairs the reader's audio with ESPEAK's phonemes, while the
+    lexicon only governs what BD says later. So the reader must use espeak's
+    pronunciation. If they use the one they know instead, their audio trains
+    the WRONG phoneme, and in the "Tao" case that phoneme is /t/, which recurs
+    throughout English. The note carries the instruction to the one moment it
+    can be acted on.
+  -->
+  <p class="say-note" id="say-note" hidden></p>
   <p class="prompt" id="prompt">&nbsp;</p>
 </div>
 
@@ -150,7 +166,7 @@ const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; }
 const status = (m, cls) => { const el = $('status'); el.textContent = m; el.className = 'status ' + (cls || ''); };
 
 let prompts = [], idx = 0, recorded = new Set();
-let promptSets = [], setId = null, setMeta = null;
+let promptSets = [], setId = null, setMeta = null, readingNotes = [];
 let ctx = null, stream = null, node = null, chunks = [], recording = false, sampleRate = 48000;
 let lastWav = null;
 let session = null;
@@ -190,6 +206,7 @@ async function loadPrompts(id) {
   const d = await (await fetch('/api/prompts?set=' + encodeURIComponent(id))).json();
   if (d.error) throw new Error(d.error);
   prompts = d.prompts || [];
+  readingNotes = d.reading_notes || [];
   setId = d.id;
   setMeta = { id: d.id, label: d.label, version: d.version, count: d.count,
               complete_at: d.complete_at };
@@ -377,8 +394,17 @@ $('set').addEventListener('change', async () => {
 
 function render() {
   const p = prompts[idx];
-  if (!p) { $('prompt').textContent = 'All prompts recorded.'; $('counter').textContent = 'done'; return; }
+  if (!p) {
+    $('prompt').textContent = 'All prompts recorded.'; $('counter').textContent = 'done';
+    $('say-note').hidden = true;
+    return;
+  }
   $('prompt').textContent = p.text;
+  // Word-boundary, case-insensitive — "tao" and "Tao" both appear, sometimes
+  // in the same sentence, and "tautology" must not match.
+  const note = readingNotes.find(n => new RegExp('\\b' + n.match + '\\b', 'i').test(p.text));
+  $('say-note').hidden = !note;
+  if (note) $('say-note').innerHTML = '<b>' + note.say + '</b> ' + (note.why || '');
   $('counter').textContent =
     `prompt ${idx + 1} of ${prompts.length}  ·  ${recorded.size} recorded` +
     (recorded.has(p.id) ? '  ·  ALREADY RECORDED' : '');
