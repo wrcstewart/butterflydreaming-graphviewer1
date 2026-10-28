@@ -231,7 +231,59 @@ disagree. Extraction verified line by line: all 126 removed lines present
 verbatim, the only additions the import and three pointers, imports matching
 exports exactly.
 
-## 8. What is still open
+## 8. THE REPO ROOT WAS PUBLIC — found at the end of the day
+
+The author asked whether to give the voice a pseudonym. Checking what the files
+actually carry led somewhere else entirely.
+
+**`express.static('.')` serves the whole checkout.** Verified over the tunnel,
+every one returning **200**:
+
+| path | what it is |
+|---|---|
+| `/config.js` | **`CURATION_CODE`, `NEO4J_PASSWORD`, `PAIR_CODE`** |
+| `/config.js.bak-20260908-091842` | the same secrets, older |
+| `/voice_sessions/*/wav/*.wav` | every raw recording, 515 kB each |
+| `/voice_sessions/*/metadata.csv` | the transcripts |
+| `/backups/*.bak` | database dumps |
+| `/MEMORY_SNAPSHOT.md` | the mirrored agent memory, 749 kB |
+
+**Gitignoring protects the repository, not the server.** Every one of those is
+in `.gitignore` and every one was being handed to anyone who asked. The two
+lists are unrelated and must be maintained separately — that is the lesson, and
+it is the same shape as *"no safe folder inside the checkout"* from the sample
+pads, arriving from the other direction.
+
+**And the voice API was an open write primitive.** Not supposed — proved: one
+unauthenticated POST from the public internet to
+`/api/voice-session?label=anonproof` created a directory on the machine, with
+`/api/voice-clip` accepting 80 MB per request behind it. `/api/voice-sessions`
+enumerated the directory names, so nothing had to be guessed. **My own
+`/api/voice-sessions`, added this morning, is what removed the guessing.**
+
+**Fixed in two parts.** A `PRIVATE_PATHS` deny list ahead of `express.static`
+(deny rather than allow, because an allow list that misses an asset breaks the
+site silently while a deny list that misses a file merely fails to protect it);
+and `voiceGate` — `curationCodeOk()`, the project's one check, timing-safe — on
+all eight voice endpoints. **Not an IP test: cloudflared makes every visitor
+127.0.0.1, so a loopback check grants the whole internet.**
+
+`voice_code.js` holds the code once in `localStorage` for both pages, never in
+the URL. Verified: eight endpoints 403 from outside with nothing created, all
+200 with the code, 403 on a wrong one, and BD itself — root, `viewer.js`,
+`style.css`, `voices/`, a node URL, the Socket.IO handshake — untouched.
+
+> **`voices/` is deliberately NOT denied.** The reader's browser does the
+> synthesis, so the model must reach the client. That is the standing
+> consequence recorded in §7 and below.
+
+**The three secrets must be treated as compromised and changed.** They were
+fetchable for as long as the tunnel has been up. Nothing suggests anyone looked
+— the URL was not circulated and `/config.js` is not linked from anywhere — but
+that is not evidence, and the `/n/` work exists precisely to start circulating
+links.
+
+## 9. What is still open
 
 - **`Dhamma` now sounds identical to `dharma`** in non-rhotic British — correct
   English and OED's first form, but it erases the Sanskrit/Pali distinction.

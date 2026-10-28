@@ -211,6 +211,54 @@ app.get('/n/:uuid', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'index.html'));
 });
 
+// ── NOT EVERYTHING IN THE REPO ROOT IS PUBLIC (2026-10-28) ────────────────
+//
+// `express.static('.')` below serves the WHOLE CHECKOUT, and the checkout holds
+// things that must never leave this machine. Found by looking, after the author
+// asked about naming a voice: `https://butterflydreaming.net/config.js`
+// returned **200**, and that file holds CURATION_CODE, NEO4J_PASSWORD and
+// PAIR_CODE. Its `.bak` copies did too. So did `backups/` (database dumps) and
+// every raw recording under `voice_sessions/` — and `/api/voice-sessions`
+// ENUMERATED the directory names, so nothing even had to be guessed.
+//
+// Gitignoring protects the REPOSITORY, not the SERVER. Every path here is in
+// .gitignore and every one was being handed to anyone who asked. The two lists
+// are unrelated and must be maintained separately.
+//
+// A DENY LIST, not an allow list, because an allow list that misses an asset
+// breaks the site silently while a deny list that misses a file only fails to
+// protect it — and this had to go in immediately. Reviewing it is cheap:
+// anything added to .gitignore should be considered for this list too.
+//
+// voices/ is DELIBERATELY NOT HERE. The reader's browser does the synthesis, so
+// the model must reach the client; see session_notes_2026-10-28.md.
+const PRIVATE_PATHS = [
+  /^\/config\.js(\.bak[-\w.]*)?$/i,   // secrets, and its timestamped backups
+  /^\/backups(\/|$)/i,                // database dumps + .md copies
+  /^\/voice_sessions(\/|$)/i,          // a real person's recordings and transcripts
+  /^\/voice_dataset[^\/]*(\/|$)/i,    // the pre-2026-10-28 layout, same content
+  /^\/voice_models(\/|$)/i,            // trained weights ARE someone's voice
+  /^\/bd_voices_private(\/|$)/i,
+  /^\/speech_cache(\/|$)/i,
+  /^\/\.claude(\/|$)/i,               // agent settings and hooks
+  /^\/\.git(\/|$)/i,
+  /^\/node_modules(\/|$)/i,
+  /^\/MEMORY_SNAPSHOT\.md$/i,         // the mirrored agent memory
+  /\.(bak|ckpt|pem|key|env)$/i,
+];
+
+app.use((req, res, next) => {
+  let p;
+  try { p = decodeURIComponent(req.path); } catch (_) { p = req.path; }
+  if (PRIVATE_PATHS.some(re => re.test(p))) {
+    console.warn('[BD] refused private path: ' + p + ' from ' +
+                 (req.headers['cf-connecting-ip'] || req.ip));
+    res.status(404).type('text/plain').send('Not found.\n');
+    return;
+  }
+  next();
+});
+
 app.use(express.static('.', {
   setHeaders: (res, filePath) => {
     // 2026-09-04 — .js too. The bench imports piper_direct.js as a module.
@@ -541,6 +589,27 @@ app.get('/api/section', async (req, res) => {
 // set takes. That distinction is load-bearing: resume works by finding the
 // first prompt WITHOUT audio, so splitting one speaker across two directories
 // would make both of them restart from the beginning.
+// ── THE VOICE RIG IS AUTHORING, AND AUTHORING MUST BE GATED (2026-10-28) ──
+//
+// These endpoints WRITE TO DISK. Proved rather than supposed: a single
+// unauthenticated POST from the public internet to
+// `https://butterflydreaming.net/api/voice-session?label=anonproof` created
+// `voice_sessions/2026-10-28_1804_anonproof` on this machine. With
+// /api/voice-clip accepting 80 MB per request, that is an open write primitive,
+// and /api/voice-sessions enumerated the directory names besides.
+//
+// `curationCodeOk()` is this project's ONE check and is timing-safe. It is used
+// here rather than any IP test, because **cloudflared makes every visitor
+// 127.0.0.1** — a loopback check grants the whole internet.
+//
+// The rig and voice_compare.html ask for the code once and keep it in
+// localStorage. A 403 tells them to ask again.
+function voiceGate(req, res, next) {
+  if (curationCodeOk(String(req.query.code || ''))) return next();
+  console.warn('[BD] voice API refused (no/bad code): ' + req.path);
+  res.status(403).json({ error: 'code required', needsCode: true });
+}
+
 const VOICE_ROOT = './voice_sessions';
 
 // THE PROMPT SETS ON OFFER. Two texts with different purposes, so the reader
@@ -582,7 +651,7 @@ function readPromptSet(id) {
 // cannot be spoken at all. So this lists PAIRS, never a lone .onnx — a
 // half-installed voice offered in a dropdown fails at synthesis with nothing
 // on screen to say why.
-app.get('/api/local-voices', (req, res) => {
+app.get('/api/local-voices', voiceGate, (req, res) => {
   try {
     const dir = './voices';
     const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
@@ -602,7 +671,7 @@ app.get('/api/local-voices', (req, res) => {
 });
 
 // What the rig needs to build the dropdown: every set, without the prompts.
-app.get('/api/prompt-sets', (req, res) => {
+app.get('/api/prompt-sets', voiceGate, (req, res) => {
   const out = [];
   for (const id of Object.keys(PROMPT_SETS)) {
     const p = readPromptSet(id);
@@ -613,7 +682,7 @@ app.get('/api/prompt-sets', (req, res) => {
 
 // One set in full. The rig asks for the set its SESSION is bound to, so a
 // resumed session always gets the text its ids were recorded against.
-app.get('/api/prompts', (req, res) => {
+app.get('/api/prompts', voiceGate, (req, res) => {
   const p = readPromptSet(String(req.query.set || ''));
   if (!p) return res.status(404).json({ error: 'no such prompt set' });
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -660,7 +729,7 @@ function normaliseStamp(st) {
 
 // Every session on disk, newest first, so a set can be resumed by picking it
 // rather than by remembering what it was called.
-app.get('/api/voice-sessions', (req, res) => {
+app.get('/api/voice-sessions', voiceGate, (req, res) => {
   try {
     const names = fs.existsSync(VOICE_ROOT)
       ? fs.readdirSync(VOICE_ROOT).filter(n => VOICE_SESSION_RE.test(n)).sort().reverse()
@@ -676,7 +745,7 @@ app.get('/api/voice-sessions', (req, res) => {
 
 // Open a session. The label is whose voice it is; the timestamp makes it unique
 // and tells you later which set came from which evening.
-app.post('/api/voice-session', (req, res) => {
+app.post('/api/voice-session', voiceGate, (req, res) => {
   const label = String(req.query.label || '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
   if (!label) return res.status(400).json({ error: 'a session needs a name - whose voice is this?' });
@@ -703,7 +772,7 @@ app.post('/api/voice-session', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/voice-clip', express.raw({ type: 'audio/wav', limit: '80mb' }),
+app.post('/api/voice-clip', voiceGate, express.raw({ type: 'audio/wav', limit: '80mb' }),
   (req, res) => {
     const id   = String(req.query.id   || '').replace(/[^0-9A-Za-z_-]/g, '');
     const text = String(req.query.text || '');
@@ -757,7 +826,7 @@ app.post('/api/voice-clip', express.raw({ type: 'audio/wav', limit: '80mb' }),
 //
 // The ratio test: a word espeak spells out produces far more phonemes than it
 // has letters.
-app.get('/api/check-prompt', (req, res) => {
+app.get('/api/check-prompt', voiceGate, (req, res) => {
   const text = String(req.query.text || '');
   if (!text.trim()) return res.json({ suspect: [] });
   const { execFileSync } = require('child_process');
@@ -779,7 +848,7 @@ app.get('/api/check-prompt', (req, res) => {
 
 // Which prompts already have audio — so the page can resume rather than
 // restart, and so a session can be done in more than one sitting.
-app.get('/api/voice-status', (req, res) => {
+app.get('/api/voice-status', voiceGate, (req, res) => {
   const name = String(req.query.session || '');
   if (!voiceSessionDir(name)) return res.status(400).json({ error: 'no session' });
   try {

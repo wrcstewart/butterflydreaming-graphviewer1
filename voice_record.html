@@ -86,6 +86,20 @@
   as the set takes. The rig remembers the open session across reloads, so
   closing the laptop and coming back tomorrow continues the same set.
 -->
+<!--
+  2026-10-28 — the curation code. The voice endpoints write to disk and were
+  open to the internet until today; they are now behind curationCodeOk(). Asked
+  once per browser and kept in localStorage, never in the URL.
+-->
+<div class="session" id="code-bar" hidden>
+  <div class="row">
+    <label for="code">Curation code</label>
+    <input id="code" type="password" inputmode="numeric" autocomplete="off" style="max-width:120px">
+    <button class="go" id="code-ok">Unlock</button>
+  </div>
+  <p class="note" id="code-note">The recording endpoints are protected. Enter the code to continue.</p>
+</div>
+
 <div class="session" id="session-bar">
   <div class="row" id="session-open-row" hidden>
     <span class="who" id="session-name">—</span>
@@ -161,6 +175,8 @@
 </details>
 
 <script type="module">
+import { getCode, verifyCode, codedJson, codedFetch, withCode } from '/voice_code.js';
+
 const $ = id => document.getElementById(id);
 const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; };
 const status = (m, cls) => { const el = $('status'); el.textContent = m; el.className = 'status ' + (cls || ''); };
@@ -188,7 +204,7 @@ const REMEMBER = 'bd_voice_session';
 // give a set that looks complete and is half one and half the other.
 async function loadSetList() {
   try {
-    const d = await (await fetch('/api/prompt-sets')).json();
+    const d = await codedJson('/api/prompt-sets');
     promptSets = d.sets || [];
     const sel = $('set');
     sel.innerHTML = '';
@@ -199,12 +215,16 @@ async function loadSetList() {
       if (st.id === d.default) o.selected = true;
       sel.appendChild(o);
     }
-  } catch (e) { log('could not list prompt sets: ' + e.message); }
+  } catch (e) {
+    // A 403 must NOT be swallowed here — it is the one error the caller can act
+    // on, by asking for the code.
+    if (e && e.needsCode) throw e;
+    log('could not list prompt sets: ' + e.message);
+  }
 }
 
 async function loadPrompts(id) {
-  const d = await (await fetch('/api/prompts?set=' + encodeURIComponent(id))).json();
-  if (d.error) throw new Error(d.error);
+  const d = await codedJson('/api/prompts?set=' + encodeURIComponent(id));
   prompts = d.prompts || [];
   readingNotes = d.reading_notes || [];
   setId = d.id;
@@ -255,8 +275,7 @@ async function useSession(name, how) {
   recorded = new Set();
   let problem = null;
   try {
-    const s = await (await fetch('/api/voice-status?session=' + encodeURIComponent(name))).json();
-    if (s.error) throw new Error(s.error);
+    const s = await codedJson('/api/voice-status?session=' + encodeURIComponent(name));
     (s.recorded || []).forEach(id => recorded.add(id));
     // LOAD THE SET THE SESSION IS BOUND TO, not whatever the dropdown shows.
     // A prompt id is a POSITION: `0042` is a different sentence in each text,
@@ -315,7 +334,7 @@ async function primeMic() {
 async function loadSessions() {
   let list = [];
   try {
-    const d = await (await fetch('/api/voice-sessions')).json();
+    const d = await codedJson('/api/voice-sessions');
     list = d.sessions || [];
   } catch (_) {}
   const pick = $('pick');
@@ -328,6 +347,40 @@ async function loadSessions() {
   }
   return list;
 }
+
+// ---- the code gate ---------------------------------------------------------
+function askForCode(msg) {
+  $('code-bar').hidden = false;
+  $('session-bar').hidden = true;
+  if (msg) { $('code-note').textContent = msg; $('code-note').className = 'note warn'; }
+  gateControls();
+  $('rec').disabled = true;
+  $('rec').textContent = 'Locked';
+  $('code').focus();
+}
+
+$('code-ok').addEventListener('click', async () => {
+  const v = $('code').value.trim();
+  if (!v) return;
+  $('code-ok').disabled = true;
+  try {
+    if (await verifyCode(v)) {
+      $('code').value = '';
+      $('code-bar').hidden = true;
+      $('session-bar').hidden = false;
+      log('unlocked');
+      await boot();
+    } else {
+      $('code-note').textContent = 'That code was not accepted.';
+      $('code-note').className = 'note warn';
+    }
+  } catch (e) {
+    $('code-note').textContent = 'Could not check the code: ' + e.message;
+    $('code-note').className = 'note warn';
+  } finally { $('code-ok').disabled = false; }
+});
+// Enter submits, so a four-digit code needs no mouse.
+$('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('code-ok').click(); });
 
 // ---- prompts + resume ------------------------------------------------------
 async function boot() {
@@ -357,10 +410,8 @@ $('session-start').addEventListener('click', async () => {
   $('session-start').disabled = true;
   try {
     const chosen = $('set').value;
-    const d = await (await fetch('/api/voice-session?label=' + encodeURIComponent(label) +
-                                 '&set=' + encodeURIComponent(chosen),
-                                 { method: 'POST' })).json();
-    if (d.error) throw new Error(d.error);
+    const d = await codedJson('/api/voice-session?label=' + encodeURIComponent(label) +
+                              '&set=' + encodeURIComponent(chosen), { method: 'POST' });
     await loadSessions();
     await useSession(d.session, 'new session');
   } catch (e) {
@@ -542,8 +593,8 @@ $('keep').addEventListener('click', async () => {
   $('keep').disabled = true;
   status('Saving…');
   try {
-    const r = await fetch(`/api/voice-clip?session=${encodeURIComponent(session)}` +
-                          `&id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}`,
+    const r = await codedFetch(`/api/voice-clip?session=${encodeURIComponent(session)}` +
+                               `&id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}`,
       { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: lastWav.blob });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
@@ -561,7 +612,15 @@ $('keep').addEventListener('click', async () => {
 $('skip').addEventListener('click', () => { idx = Math.min(idx + 1, prompts.length - 1); render(); });
 $('prev').addEventListener('click', () => { idx = Math.max(idx - 1, 0); render(); });
 
-boot().catch(e => status('Could not load prompts: ' + e.message, 'bad'));
+// Nothing loads without the code, so ask first and only boot once it is good.
+if (!getCode()) {
+  askForCode();
+} else {
+  boot().catch(e => {
+    if (e && e.needsCode) askForCode('The stored code is no longer accepted. Enter it again.');
+    else status('Could not load prompts: ' + e.message, 'bad');
+  });
+}
 </script>
 </body>
 </html>

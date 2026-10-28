@@ -77,6 +77,9 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
     <option value="en_GB-alba-medium">alba, the voice it was fine-tuned from</option>
   </select>
   <button id="refresh">Refresh list</button>
+  <input id="code" type="password" inputmode="numeric" autocomplete="off"
+         placeholder="code" style="max-width:90px" hidden>
+  <button id="code-ok" hidden>Unlock</button>
 </div>
 
 <div class="card seen">
@@ -141,6 +144,8 @@ import { synthesise, loadVoice } from '/piper_direct.js';
 // tuned by ear against the others, and a second copy would be adjusted once.
 import { SPEAK_LENGTH_SCALE, SPEAK_GAP_MS, SPEAK_LINE_GAP_MS, splitUtterances }
   from '/speech_timing.js';
+// The voice endpoints are gated as of 2026-10-28 — see voice_code.js.
+import { getCode, verifyCode, codedJson } from '/voice_code.js';
 
 const $ = id => document.getElementById(id);
 const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; };
@@ -167,10 +172,27 @@ try {
   log(`lexicon: ${Object.keys(lexicon).length} entries`);
 } catch (_) { log('lexicon unavailable — espeak only'); }
 
+function askForCode(msg) {
+  $('code').hidden = false; $('code-ok').hidden = false;
+  note(msg || 'The voice list is protected. Enter the curation code.', 'bad');
+  $('code').focus();
+}
+$('code-ok').addEventListener('click', async () => {
+  const v = $('code').value.trim();
+  if (!v) return;
+  try {
+    if (await verifyCode(v)) {
+      $('code').value = ''; $('code').hidden = true; $('code-ok').hidden = true;
+      await listVoices();
+    } else note('That code was not accepted.', 'bad');
+  } catch (e) { note('Could not check the code: ' + e.message, 'bad'); }
+});
+$('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('code-ok').click(); });
+
 async function listVoices() {
   const sel = $('voice');
   try {
-    const d = await (await fetch('/api/local-voices')).json();
+    const d = await codedJson('/api/local-voices');
     const vs = d.voices || [];
     sel.innerHTML = '';
     if (!vs.length) {
@@ -187,11 +209,12 @@ async function listVoices() {
     log(`${vs.length} local voice(s): ${vs.map(v => v.name).join(', ')}`);
     note(' ');
   } catch (e) {
-    sel.innerHTML = '<option value="">could not list voices</option>';
-    note('Could not list voices: ' + e.message, 'bad');
+    sel.innerHTML = '<option value="">locked</option>';
+    if (e && e.needsCode) askForCode();
+    else note('Could not list voices: ' + e.message, 'bad');
   }
 }
-await listVoices();
+if (!getCode()) askForCode(); else await listVoices();
 $('refresh').addEventListener('click', listVoices);
 
 // ONE FILE, NOT A SEQUENCE OF PLAYS. BD synthesises each sentence separately
