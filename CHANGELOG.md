@@ -44,6 +44,63 @@ Two existing sets were migrated in: `voice_dataset_will_01/` → `2026-09-06_120
 archive had been resting on the `*.wav` line alone, which left its transcripts
 visible to git.
 
+### Prompt set v3 — the Tao Te Ching, measured against the objection to it
+
+The author: *"other than the word Tao, which she knows how to pronounce, the
+first five chapters of the Tao Te Ching have no Chinese or obscure words — maybe
+if they covered all the phonemes they could be used instead of the current set,
+as they are more likely to elicit a generally relaxing voice."*
+
+The register argument is right, and it is the strongest argument available: a
+fine-tune learns **delivery** more stubbornly than timbre, and v2's 63 prompts
+are deliberately plain narrative that would train a plain reading. But this
+file's standing rule says literary sources are the *worst* candidates, because
+espeak mispronounces archaic and foreign words and so pairs the reader's audio
+with the wrong phonemes. Measured rather than argued: **all 210 distinct words
+in chapters 1–12 pass the ratio test.** The McDonald translation is plain modern
+English. The objection does not apply to this text.
+
+**Chapters 1–5 alone do not work, for two independent reasons.** 39 utterances,
+2,231 characters — **2.2 minutes of speech** against the 4.7 that trained a
+usable voice. And five phonemes under the floor of five occurrences, including
+`ʊ` at three, the vowel in *book, put, could*.
+
+**Three phonemes are absent at any length.** Chapters 1–25 — 12.3 minutes —
+still leave `ɔɪ`, `ʒ` and `ɪə` thin, because the vocabulary does not contain
+them. `ʒ` appears in **six sentences in all 81 chapters**, three of them already
+inside chapters 1–12. So rather than write ten sentences in the Tao's register,
+which would have had her reading invented pseudo-scripture mixed with the real
+text, the gap-fillers were **drawn from later chapters** — same voice, same
+book, nothing fabricated — and chosen for register as well as phonemes, since
+half the ʒ and ɔɪ candidates are about weapons and slaughter.
+
+**The structure trap turned out to be a chunking problem, not a cutting one.**
+Epigram rate is 51% against v2's 54% — no worse. But chapter 2 has five
+consecutive *"X and Y … each other"* lines and chapter 15 five one-clause
+similes, each sharing one contour. Merging consecutive short sentences into one
+take breaks the uniform rhythm, keeps the text intact, and removes clips too
+short to train on. The five-fold run became three utterances of 81, 65 and 116
+characters.
+
+**The ordering carries the author's requirement.** He asked for the long set with
+a break: *"after she gets to 90 utterances I can ask if she can do another 30."*
+So the gap-fillers sit **inside the first 73**, and the set is verified complete
+at three cut points — 73 (5.4 min), 90 (6.5 min) and 125 (9.0 min), none with a
+phoneme below five.
+
+**One pronunciation warning, and it is the reverse of the obvious one.** espeak
+says `tˈaʊ` — *"TOW"*, rhyming with *now*, hard T. A reader who knows the
+authentic *"DOW"* pairs their [d] with espeak's /t/, which recurs throughout
+English. Knowing how to say it correctly is the hazard.
+
+**And a trap the change itself created, closed in the same commit.** A prompt id
+is a POSITION, not a sentence: `0042` means different things in v2 and v3.
+Sessions are now stamped with their prompt set, and the rig refuses to add to one
+that does not match rather than handing the reader new text under old numbers.
+The five existing sessions were stamped v2 after checking them row by row
+against the archived v2 file — 63/63, 3/3, 2/2, 6/6, 3/3 — not inferred from
+their dates.
+
 ### A level threshold does not find speech — my own measurement was wrong
 
 Having asked the author to leave half a second at each end, I measured his next

@@ -1,303 +1,508 @@
 {
-  "version": 2,
-  "notes": [
-    "Prompts for fine-tuning a Piper voice. Read one per recording.",
-    "",
-    "ORIGINAL sentences, shaped by three constraints that pull against each other.",
-    "",
-    "REGISTER. A fine-tune learns DELIVERY most stubbornly of all. The standard",
-    "phonetic sets (CMU Arctic, Harvard) are plain narrative and would train a plain",
-    "reading, so these are written to invite an unhurried, attentive one.",
-    "",
-    "STRUCTURE. An earlier draft was mostly EPIGRAMS — two members with a pivot,",
-    "'say less and mean it more'. That shape has one characteristic contour, and a",
-    "model trained on it learns the contour as the default shape of a sentence,",
-    "imposing a knowing sing-song cadence on flat prose. Most are now plain",
-    "declaratives that CONTINUE rather than turn: warm in content, not construction.",
-    "A few epigrams are kept deliberately, so the contour is available without being",
-    "the default. Test for each: remove the second half — does the first still stand?",
-    "",
-    "LENGTH is mixed on purpose. Prosody spans clauses, and BD's corpus is full of",
-    "long sentences, so a voice trained only on short ones would be least practised",
-    "at what it most often does.",
-    "",
-    "NO NAMES, NO ARCHAIC DICTION. The model never sees words, only phoneme ids",
-    "espeak derives from spelling — which is why it can say words it has never",
-    "heard. But where espeak mispronounces one, the reader will not say what the",
-    "label claims, and the model learns that those phonemes sound like something",
-    "else. They occur throughout ordinary English, so it corrupts far more than the",
-    "word. Hence no literary source texts, and no Chinese names: the lexicon handles",
-    "those at synthesis time.",
-    "",
-    "2241 tokens, none below five occurrences, no word tripping the",
-    "spelling-out check.",
-    "",
-    "Each is one utterance. Read at the pace you want back.",
-    "",
-    "2026-09-06 — the author reworked 33 sentences so they flow better when read",
-    "aloud, which is worth more than any property measured here: a sentence that",
-    "fights the reader gives a worse take than a duller one that flows. Six typos",
-    "were corrected because a prompt is READ AS WRITTEN, so a slip becomes a slip in",
-    "the training data; one 40-word sentence was split, being well past the range",
-    "where alignment stays reliable.",
-    "",
-    "Re-counted after: 63 sentences, 44 distinct phonemes over 2,977 tokens, none",
-    "below five occurrences, no word tripping the spelling-out check. The balance",
-    "shifted from mostly-short to mostly-medium, which suits BD better than the",
-    "original did."
-  ],
-  "prompts": [
-    {
-      "id": "0001",
-      "text": "The kettle was still warm when she came back down."
-    },
-    {
-      "id": "0002",
-      "text": "There were three chairs by the window and nobody in them."
-    },
-    {
-      "id": "0003",
-      "text": "He hung his coat on the hook and went through to the kitchen."
-    },
-    {
-      "id": "0004",
-      "text": "The dog slept in the same square of sunlight all afternoon, you could hear him snoring."
-    },
-    {
-      "id": "0005",
-      "text": "Someone had left the gate open again and the horses had gone missing."
-    },
-    {
-      "id": "0006",
-      "text": "The bread was still warm from the oven, melting the golden yellow butter."
-    },
-    {
-      "id": "0007",
-      "text": "She wrote the address on the back of an envelope, if only it were legible."
-    },
-    {
-      "id": "0008",
-      "text": "It rained steadily from lunchtime until dark, then the clouds parted and the moon came out."
-    },
-    {
-      "id": "0009",
-      "text": "Why are the apples so small and sweet this year?"
-    },
-    {
-      "id": "0010",
-      "text": "There is a footpath winding along the top of the hill."
-    },
-    {
-      "id": "0011",
-      "text": "A blackbird was singing somewhere behind the shed."
-    },
-    {
-      "id": "0012",
-      "text": "The bus comes twice a day and stops at the corner but today it didn't arrive."
-    },
-    {
-      "id": "0013",
-      "text": "She keeps her mother's photographs in a wooden box but her father's she throws away."
-    },
-    {
-      "id": "0014",
-      "text": "The paint on the door has faded to a soft grey tinged with vermillion."
-    },
-    {
-      "id": "0015",
-      "text": "He reads the same page over several times someone should give him a book."
-    },
-    {
-      "id": "0016",
-      "text": "Two boats were moored at the far end of the harbour bobbing together."
-    },
-    {
-      "id": "0017",
-      "text": "The children were playing in the field behind the church."
-    },
-    {
-      "id": "0018",
-      "text": "Her voice on the telephone sounded a little tired and exasperated."
-    },
-    {
-      "id": "0019",
-      "text": "The floorboards creak in the same three places and I knew exactly where he was creeping."
-    },
-    {
-      "id": "0020",
-      "text": "We walked as far as the bridge and turned back, the other side was forbidden on Mondays."
-    },
-    {
-      "id": "0021",
-      "text": "There was a smell of woodsmoke on the cold air taking me back to my childhood."
-    },
-    {
-      "id": "0022",
-      "text": "The lamp in the hall stays on all night and sometimes a lone traveller will knock at the door."
-    },
-    {
-      "id": "0023",
-      "text": "She has kept every letter he ever sent her, wrapped in pink tissue paper."
-    },
-    {
-      "id": "0024",
-      "text": "The garden wall is covered in moss and small ferns."
-    },
-    {
-      "id": "0025",
-      "text": "A train went by while they were talking and I saw their lips pause awhile."
-    },
-    {
-      "id": "0026",
-      "text": "He learned the names of all the birds that visit."
-    },
-    {
-      "id": "0027",
-      "text": "The water in the bay was completely still this morning."
-    },
-    {
-      "id": "0028",
-      "text": "She sat down and took her shoes off. \"That's better,\" she said."
-    },
-    {
-      "id": "0029",
-      "text": "The clock in the kitchen runs four minutes fast so hopefully we will get the train."
-    },
-    {
-      "id": "0030",
-      "text": "The room was stone cold because the fire had gone out during the night."
-    },
-    {
-      "id": "0031",
-      "text": "He waited at the window until the car appeared then dashed crazily out of the house."
-    },
-    {
-      "id": "0032",
-      "text": "A boy was throwing stones into the water skimming them as best he could."
-    },
-    {
-      "id": "0033",
-      "text": "She could hear voices in the next room rising and falling."
-    },
-    {
-      "id": "0034",
-      "text": "He pointed at the far side of the field. Beyond towards the mountain fading in the mist."
-    },
-    {
-      "id": "0035",
-      "text": "The coins were still in his coat pocket, jingling and jangling."
-    },
-    {
-      "id": "0036",
-      "text": "It was a pleasure to see them again after so long but Fred was hard to recognise beneath his white beard."
-    },
-    {
-      "id": "0037",
-      "text": "The usual bus was late and nobody seemed to mind. Why not?"
-    },
-    {
-      "id": "0038",
-      "text": "She measured the white flour into a blue bowl and slid in the yellow butter."
-    },
-    {
-      "id": "0039",
-      "text": "There was a garage at the end of the lane and from time to time you could hear clanking and clunking."
-    },
-    {
-      "id": "0040",
-      "text": "They watched television together until quite late, in those days the picture would shrink to a dot."
-    },
-    {
-      "id": "0041",
-      "text": "They say some of that interference was the microwave background radiation, left over from the big bang."
-    },
-    {
-      "id": "0042",
-      "text": "Some questions are better carried than answered but can you agree?"
-    },
-    {
-      "id": "0043",
-      "text": "Joy is quieter than people expect."
-    },
-    {
-      "id": "0044",
-      "text": "Who taught you to be gentle with yourself?"
-    },
-    {
-      "id": "0045",
-      "text": "What would you keep, if you could keep only one thing?"
-    },
-    {
-      "id": "0046",
-      "text": "She listened more than she spoke, and heard more than she said."
-    },
-    {
-      "id": "0047",
-      "text": "He forgave himself slowly, the way frost leaves a field."
-    },
-    {
-      "id": "0048",
-      "text": "The road bends, and the house is gone from view."
-    },
-    {
-      "id": "0049",
-      "text": "The river is the same river, and never the same water."
-    },
-    {
-      "id": "0050",
-      "text": "A small window is enough if the view is good."
-    },
-    {
-      "id": "0051",
-      "text": "What would you keep, if you could keep only one thing?"
-    },
-    {
-      "id": "0052",
-      "text": "The bell sounds once, and the silence afterwards is larger."
-    },
-    {
-      "id": "0053",
-      "text": "He wondered whether the answer had been there all along."
-    },
-    {
-      "id": "0054",
-      "text": "The world asks very little, and gives a great deal."
-    },
-    {
-      "id": "0055",
-      "text": "The chair by the window catches the last of the light."
-    },
-    {
-      "id": "0056",
-      "text": "When the rain finally stopped, the whole valley seemed to be listening, and nobody in the house wanted to be the first to speak."
-    },
-    {
-      "id": "0057",
-      "text": "She had meant to say something kinder, but the moment passed the way such moments do, quietly and without warning."
-    },
-    {
-      "id": "0058",
-      "text": "There is a particular hour, late in the afternoon, when the light lies flat across the fields and everything looks older than it is."
-    },
-    {
-      "id": "0059",
-      "text": "He kept the letter for years without reading it again, partly from respect and partly because he already knew what it would say."
-    },
-    {
-      "id": "0060",
-      "text": "If you sit long enough beside any water, the noise in your head settles, and what remains is usually simpler than you feared."
-    },
-    {
-      "id": "0061",
-      "text": "The old woman told the story slowly, stopping whenever she liked, and nobody thought to hurry her along."
-    },
-    {
-      "id": "0062",
-      "text": "What we call patience is mostly a willingness to stay uncertain for longer than is comfortable, without pretending otherwise."
-    },
-    {
-      "id": "0063",
-      "text": "Snow began before dawn and went on all morning, softening the roofs, the walls, and the long road out of the village."
-    }
-  ]
+ "version": 3,
+ "source": "Tao Te Ching, chapters 1-19, tr. John H. McDonald (public domain)",
+ "note": "Utterance 73 completes phoneme coverage; everything after it adds margin.",
+ "complete_at": 73,
+ "prompts": [
+  {
+   "id": "0001",
+   "text": "The tao that can be described is not the eternal Tao."
+  },
+  {
+   "id": "0002",
+   "text": "The name that can be spoken is not the eternal Name."
+  },
+  {
+   "id": "0003",
+   "text": "The nameless is the boundary of Heaven and Earth."
+  },
+  {
+   "id": "0004",
+   "text": "The named is the mother of creation. Freed from desire, you can see the hidden mystery."
+  },
+  {
+   "id": "0005",
+   "text": "By having desire, you can only see what is visibly real."
+  },
+  {
+   "id": "0006",
+   "text": "Yet mystery and reality emerge from the same source."
+  },
+  {
+   "id": "0007",
+   "text": "This source is called darkness. Darkness born from darkness. The beginning of all understanding."
+  },
+  {
+   "id": "0008",
+   "text": "When people see things as beautiful, ugliness is created."
+  },
+  {
+   "id": "0009",
+   "text": "When people see things as good, evil is created."
+  },
+  {
+   "id": "0010",
+   "text": "Being and non-being produce each other. Difficult and easy complement each other."
+  },
+  {
+   "id": "0011",
+   "text": "Long and short define each other. High and low oppose each other."
+  },
+  {
+   "id": "0012",
+   "text": "Fore and aft follow each other. Therefore the Master can act without doing anything and teach without saying a word."
+  },
+  {
+   "id": "0013",
+   "text": "Things come her way and she does not stop them; things leave and she lets them go."
+  },
+  {
+   "id": "0014",
+   "text": "She has without possessing, and acts without any expectations."
+  },
+  {
+   "id": "0015",
+   "text": "When her work is done, she takes no credit. That is why it will last forever."
+  },
+  {
+   "id": "0016",
+   "text": "If you overly esteem talented individuals, people will become overly competitive."
+  },
+  {
+   "id": "0017",
+   "text": "If you overvalue possessions, people will begin to steal."
+  },
+  {
+   "id": "0018",
+   "text": "Do not display your treasures or people will become envious."
+  },
+  {
+   "id": "0019",
+   "text": "The Master leads by emptying people's minds; filling their bellies, weakening their ambitions, and making them become strong."
+  },
+  {
+   "id": "0020",
+   "text": "Preferring simplicity and freedom from desires, avoiding the pitfalls of knowledge and wrong action."
+  },
+  {
+   "id": "0021",
+   "text": "For those who practice not-doing, everything will fall into place."
+  },
+  {
+   "id": "0022",
+   "text": "The Tao is like an empty container: it can never be emptied and can never be filled."
+  },
+  {
+   "id": "0023",
+   "text": "Infinitely deep, it is the source of all things."
+  },
+  {
+   "id": "0024",
+   "text": "It dulls the sharp, unties the knotted, shades the lighted, and unites all of creation with dust."
+  },
+  {
+   "id": "0025",
+   "text": "It is hidden but always present. I don't know who gave birth to it. It is older than the concept of God."
+  },
+  {
+   "id": "0026",
+   "text": "Heaven and Earth are impartial; they treat all of creation as straw dogs."
+  },
+  {
+   "id": "0027",
+   "text": "The Master doesn't take sides; she treats everyone like a straw dog."
+  },
+  {
+   "id": "0028",
+   "text": "The space between Heaven and Earth is like a bellows; it is empty, yet has not lost its power."
+  },
+  {
+   "id": "0029",
+   "text": "The more it is used, the more it produces; the more you talk of it, the less you comprehend."
+  },
+  {
+   "id": "0030",
+   "text": "It is better not to speak of things you do not understand."
+  },
+  {
+   "id": "0031",
+   "text": "The spirit of emptiness is immortal. It is called the Great Mother because it gives birth to Heaven and Earth."
+  },
+  {
+   "id": "0032",
+   "text": "It is like a vapor, barely seen but always present. Use it effortlessly."
+  },
+  {
+   "id": "0033",
+   "text": "The Tao of Heaven is eternal, and the earth is long enduring."
+  },
+  {
+   "id": "0034",
+   "text": "Why are they long enduring? They do not live for themselves; thus they are present for all beings."
+  },
+  {
+   "id": "0035",
+   "text": "The Master puts herself last; And finds herself in the place of authority."
+  },
+  {
+   "id": "0036",
+   "text": "She detaches herself from all things; Therefore she is united with all things."
+  },
+  {
+   "id": "0037",
+   "text": "She gives no thought to self. She is perfectly fulfilled."
+  },
+  {
+   "id": "0038",
+   "text": "The supreme good is like water, which benefits all of creation without trying to compete with it."
+  },
+  {
+   "id": "0039",
+   "text": "It gathers in unpopular places. Thus it is like the Tao."
+  },
+  {
+   "id": "0040",
+   "text": "The location makes the dwelling good. Depth of understanding makes the mind good."
+  },
+  {
+   "id": "0041",
+   "text": "A kind heart makes the giving good. Integrity makes the government good."
+  },
+  {
+   "id": "0042",
+   "text": "Accomplishments make your labors good. Proper timing makes a decision good."
+  },
+  {
+   "id": "0043",
+   "text": "Only when there is no competition will we all live in peace."
+  },
+  {
+   "id": "0044",
+   "text": "It is easier to carry an empty cup than one that is filled to the brim."
+  },
+  {
+   "id": "0045",
+   "text": "The sharper the knife the easier it is to dull."
+  },
+  {
+   "id": "0046",
+   "text": "The more wealth you possess the harder it is to protect."
+  },
+  {
+   "id": "0047",
+   "text": "Pride brings its own trouble. When you have accomplished your goal simply walk away. This is the pathway to Heaven."
+  },
+  {
+   "id": "0048",
+   "text": "Nurture the darkness of your soul until you become whole."
+  },
+  {
+   "id": "0049",
+   "text": "Can you do this and not fail? Can you focus your life-breath until you become supple as a newborn child?"
+  },
+  {
+   "id": "0050",
+   "text": "While you cleanse your inner vision will you be found without fault?"
+  },
+  {
+   "id": "0051",
+   "text": "Can you love people and lead them without forcing your will on them?"
+  },
+  {
+   "id": "0052",
+   "text": "When Heaven gives and takes away can you be content with the outcome?"
+  },
+  {
+   "id": "0053",
+   "text": "When you understand all things can you step back from your own understanding?"
+  },
+  {
+   "id": "0054",
+   "text": "Giving birth and nourishing, making without possessing, expecting nothing in return."
+  },
+  {
+   "id": "0055",
+   "text": "To grow, yet not to control: This is the mysterious virtue."
+  },
+  {
+   "id": "0056",
+   "text": "Thirty spokes are joined together in a wheel, but it is the center hole that allows the wheel to function."
+  },
+  {
+   "id": "0057",
+   "text": "We mold clay into a pot, but it is the emptiness inside that makes the vessel useful."
+  },
+  {
+   "id": "0058",
+   "text": "We fashion wood for a house, but it is the emptiness inside that makes it livable."
+  },
+  {
+   "id": "0059",
+   "text": "We work with the substantial, but the emptiness is what we use."
+  },
+  {
+   "id": "0060",
+   "text": "Five colors blind the eye. Five notes deafen the ear."
+  },
+  {
+   "id": "0061",
+   "text": "Five flavors make the palate go stale. Too much activity deranges the mind."
+  },
+  {
+   "id": "0062",
+   "text": "Too much wealth causes crime. The Master acts on what she feels and not what she sees."
+  },
+  {
+   "id": "0063",
+   "text": "She shuns the latter, and prefers to seek the former."
+  },
+  {
+   "id": "0064",
+   "text": "All creatures in the universe return to the point where they began."
+  },
+  {
+   "id": "0065",
+   "text": "Other people are joyous, as though they were at a spring festival."
+  },
+  {
+   "id": "0066",
+   "text": "Where there is music and good food, people will stop to enjoy it."
+  },
+  {
+   "id": "0067",
+   "text": "This is how she is able to make appropriate choices."
+  },
+  {
+   "id": "0068",
+   "text": "What is a bad person but raw material for his teacher?"
+  },
+  {
+   "id": "0069",
+   "text": "This is called the dark and mysterious virtue."
+  },
+  {
+   "id": "0070",
+   "text": "To unnaturally try to extend life is not appropriate."
+  },
+  {
+   "id": "0071",
+   "text": "The left side is a place of honour on happy occasions."
+  },
+  {
+   "id": "0072",
+   "text": "This is spoken of as the deep root and the firm trunk, the Way to a long life and great spiritual vision."
+  },
+  {
+   "id": "0073",
+   "text": "The Tao is the tabernacle of creation, it is a treasure for those who are good, and a place of refuge for those who are not."
+  },
+  {
+   "id": "0074",
+   "text": "Success is as dangerous as failure, and we are often our own worst enemy."
+  },
+  {
+   "id": "0075",
+   "text": "What does it mean that success is as dangerous as failure?"
+  },
+  {
+   "id": "0076",
+   "text": "He who is superior is also someone's subordinate."
+  },
+  {
+   "id": "0077",
+   "text": "Receiving favor and losing it both cause alarm."
+  },
+  {
+   "id": "0078",
+   "text": "That is what is meant by success is as dangerous as failure."
+  },
+  {
+   "id": "0079",
+   "text": "What does it mean that we are often our own worst enemy?"
+  },
+  {
+   "id": "0080",
+   "text": "The reason I have an enemy is because I have self."
+  },
+  {
+   "id": "0081",
+   "text": "If I no longer had a self, I would no longer have an enemy."
+  },
+  {
+   "id": "0082",
+   "text": "Love the whole world as if it were your self; then you will truly care for all things."
+  },
+  {
+   "id": "0083",
+   "text": "Look for it, and it can not be seen. Listen for it, and it can not be heard."
+  },
+  {
+   "id": "0084",
+   "text": "Grasp for it, and it can not be caught. These three cannot be further described, so we treat them as The One."
+  },
+  {
+   "id": "0085",
+   "text": "Its highest is not bright. Its depths are not dark."
+  },
+  {
+   "id": "0086",
+   "text": "Unending, unnamable, it returns to nothingness."
+  },
+  {
+   "id": "0087",
+   "text": "Formless forms, and imageless images, subtle, beyond all understanding."
+  },
+  {
+   "id": "0088",
+   "text": "Approach it and you will not see a beginning; follow it and there will be no end."
+  },
+  {
+   "id": "0089",
+   "text": "When we grasp the Tao of the ancient ones, we can use it to direct our life today."
+  },
+  {
+   "id": "0090",
+   "text": "To know the ancient origin of Tao: this is the beginning of wisdom."
+  },
+  {
+   "id": "0091",
+   "text": "The Sages of old were profound and knew the ways of subtlety and discernment."
+  },
+  {
+   "id": "0092",
+   "text": "Their wisdom is beyond our comprehension. Because their knowledge was so far superior I can only give a poor description."
+  },
+  {
+   "id": "0093",
+   "text": "They were careful as someone crossing a frozen stream in winter."
+  },
+  {
+   "id": "0094",
+   "text": "Alert as if surrounded on all sides by the enemy."
+  },
+  {
+   "id": "0095",
+   "text": "Courteous as a guest. Fluid as melting ice. Whole as an uncarved block of wood."
+  },
+  {
+   "id": "0096",
+   "text": "Receptive as a valley. Turbid as muddied water."
+  },
+  {
+   "id": "0097",
+   "text": "Who can be still until their mud settles and the water is cleared by itself?"
+  },
+  {
+   "id": "0098",
+   "text": "Can you remain tranquil until right action occurs by itself?"
+  },
+  {
+   "id": "0099",
+   "text": "The Master does not seek fulfillment. For only those who are not full are able to be used which brings the feeling of completeness."
+  },
+  {
+   "id": "0100",
+   "text": "If you can empty your mind of all thoughts your heart will embrace the tranquility of peace."
+  },
+  {
+   "id": "0101",
+   "text": "Watch the workings of all of creation, but contemplate their return to the source."
+  },
+  {
+   "id": "0102",
+   "text": "Returning to the source is tranquility because we submit to Heavens mandate."
+  },
+  {
+   "id": "0103",
+   "text": "Returning to Heavens mandate is called being constant."
+  },
+  {
+   "id": "0104",
+   "text": "Knowing the constant is called enlightenment."
+  },
+  {
+   "id": "0105",
+   "text": "Not knowing the constant is the source of evil deeds because we have no roots."
+  },
+  {
+   "id": "0106",
+   "text": "By knowing the constant we can accept things as they are."
+  },
+  {
+   "id": "0107",
+   "text": "By accepting things as they are, we become impartial."
+  },
+  {
+   "id": "0108",
+   "text": "By being impartial, we become one with Heaven."
+  },
+  {
+   "id": "0109",
+   "text": "By being one with Heaven, we become one with Tao."
+  },
+  {
+   "id": "0110",
+   "text": "Being one with Tao, we are no longer concerned about losing our life because we know the Tao is constant and we are one with Tao."
+  },
+  {
+   "id": "0111",
+   "text": "The best leaders are those the people hardly know exist."
+  },
+  {
+   "id": "0112",
+   "text": "The next best is a leader who is loved and praised."
+  },
+  {
+   "id": "0113",
+   "text": "Next comes the one who is feared. The worst one is the leader that is despised."
+  },
+  {
+   "id": "0114",
+   "text": "If you do not trust the people, they will become untrustworthy."
+  },
+  {
+   "id": "0115",
+   "text": "The best leaders value their words, and use them sparingly."
+  },
+  {
+   "id": "0116",
+   "text": "When she has accomplished her task, the people say, Amazing: we did it, all by ourselves!"
+  },
+  {
+   "id": "0117",
+   "text": "When the great Tao is abandoned, charity and righteousness appear."
+  },
+  {
+   "id": "0118",
+   "text": "When intellectualism arises, hypocrisy is close behind."
+  },
+  {
+   "id": "0119",
+   "text": "When there is strife in the family unit, people talk about brotherly love."
+  },
+  {
+   "id": "0120",
+   "text": "When the country falls into chaos, politicians talk about patriotism."
+  },
+  {
+   "id": "0121",
+   "text": "Forget about knowledge and wisdom, and people will be a hundred times better off."
+  },
+  {
+   "id": "0122",
+   "text": "Throw away charity and righteousness, and people will return to brotherly love."
+  },
+  {
+   "id": "0123",
+   "text": "Throw away profit and greed, and there will not be any thieves."
+  },
+  {
+   "id": "0124",
+   "text": "These three are superficial and are not enough to keep us at the center of the circle, so we must also:"
+  },
+  {
+   "id": "0125",
+   "text": "Embrace simplicity. Put others first. Desire little."
+  }
+ ]
 }

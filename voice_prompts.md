@@ -1,207 +1,190 @@
-# Recording prompts
+# Recording prompts — Tao Te Ching, chapters 1–19
 
-63 sentences to be read aloud, one per clip, for fine-tuning a Piper voice.
+125 utterances to be read aloud, one per clip, for fine-tuning a Piper voice.
 
 **Read them at the pace you want the finished voice to read at.** A fine-tune
 learns delivery more stubbornly than timbre: read briskly and everything the
 voice ever says will be brisk, whatever is done to it afterwards.
 
-Reworked by the author so they flow when spoken — which matters more than any
-property measured below, because a sentence that fights the reader gives a worse
-take than a duller one that flows.
+**Hold the button, wait about half a second, speak, wait again, release.** That
+half-second is measured, not a nicety — piper's trimmer keeps 0.25 s of silence
+either side of the speech and can only keep silence that is actually there.
+
+## Why this text
+
+The previous set (voice_prompts_v2.json, 63 prompts) was plain modern narrative, chosen to avoid
+espeak traps and cover phonemes evenly. It would train a plain reading. The
+author wanted an unhurried voice for ButterflyDreaming, and a fine-tune learns
+delivery most stubbornly of all — so the text itself has to be unhurried.
+
+The usual objection to literary sources is that espeak mispronounces archaic and
+foreign words, which pairs the reader's audio with the WRONG phonemes. Measured
+against this translation: **every distinct word passes the ratio test.** The
+McDonald translation is plain modern English, and chapters 1–19 contain no
+Chinese terms but *Tao* itself.
+
+## One pronunciation that must be agreed before recording
+
+**espeak says `tˈaʊ` — "TOW", rhyming with *now*, with a hard T.** A reader who
+says the authentic "DOW" pairs their [d] with espeak's /t/, and /t/ recurs
+throughout English. Either read it espeak's way or add a lexicon entry; do not
+leave it to chance.
 
 ## Shape
 
-Mostly plain declaratives that continue rather than turn — warm in what they
-notice rather than in how they are built. An earlier draft was mostly epigrams
-pivoting on a contrast, and that shape has one characteristic contour a model
-would learn as *the* shape of a sentence. A few are kept so the contour is
-available without being the default.
-
-Lengths: 3 short, 38 medium, 22 long. Prosody spans clauses, and BD's own
-corpus is full of long sentences.
-
-## Why no names and no archaic diction
-
-The model never sees words, only phoneme ids espeak derives from the spelling —
-which is why it can say words it has never heard. But where espeak mispronounces
-one, you will not say what the label claims, and the model learns that those
-phonemes sound like something else. They occur throughout ordinary English, so it
-corrupts far more than the word itself.
-
-## Counted, not assumed
-
-No word trips the spelling-out check. 44 distinct phonemes across 2,977 tokens,
-**none below five occurrences**. Longest utterance about ten seconds.
-
-## Recording sessions, and taking breaks
-
-**Progress is saved on the server after every clip you Keep**, so closing the
-tab, sleeping the machine or losing the connection costs at most the take you
-were on. Reopening the page drops you at the first prompt without audio.
-
-One quirk: it resumes at the first **gap**, not where you stopped. Skip prompt 12
-and carry on to 30, and next time you will start back at 12. That is deliberate,
-but it looks like it has lost your place when it has not.
-
-**Breaks are fine — the risk is acoustic, not mechanical.** A fine-tune learns
-whatever stays consistent across the set, including things nobody meant to teach
-it. If half the sentences are recorded before a break and half after, any
-difference between the two sittings becomes structure the model can see. In order
-of how much damage it does:
-
-- **Microphone position.** By far the largest. A few centimetres changes level
-  and low-end audibly. If it is on a stand, leave it; if you hold it, that is the
-  thing to fix before starting.
-- **Your chair.** The same problem from the other end.
-- **The room.** Heating cycling on, a window opened, traffic building through the
-  afternoon. The noise floor is in every clip.
-- **Your voice.** An hour after eating it genuinely differs — often warmer and
-  slower. That one you can only notice, not control.
-
-So **short breaks are nearly free; long ones are where the risk lives.** Twenty
-minutes with the setup untouched will not show. Resuming the next morning with
-the microphone re-placed is effectively two datasets.
-
-If you do break for long, the cheap insurance is to **re-record two or three
-sentences you had already kept, and listen to them against the originals.** If
-they match, carry on. If they do not, you have found it while it is still
-fixable rather than at training time.
-
-**Sixty-three sentences is about forty minutes** including retakes, so this set
-does not need a break at all. That changes at scale: an hour of finished audio is
-roughly 600 utterances, or something over two hours of sitting, where breaks stop
-being optional and the discipline above starts to matter.
-
----
-
-**1.**  The kettle was still warm when she came back down.
-
-**2.**  There were three chairs by the window and nobody in them.
-
-**3.**  He hung his coat on the hook and went through to the kitchen.
-
-**4.**  The dog slept in the same square of sunlight all afternoon, you could hear him snoring.
-
-**5.**  Someone had left the gate open again and the horses had gone missing.
-
-**6.**  The bread was still warm from the oven, melting the golden yellow butter.
-
-**7.**  She wrote the address on the back of an envelope, if only it were legible.
-
-**8.**  It rained steadily from lunchtime until dark, then the clouds parted and the moon came out.
-
-**9.**  Why are the apples so small and sweet this year?
-
-**10.**  There is a footpath winding along the top of the hill.
-
-**11.**  A blackbird was singing somewhere behind the shed.
-
-**12.**  The bus comes twice a day and stops at the corner but today it didn't arrive.
-
-**13.**  She keeps her mother's photographs in a wooden box but her father's she throws away.
-
-**14.**  The paint on the door has faded to a soft grey tinged with vermillion.
-
-**15.**  He reads the same page over several times someone should give him a book.
-
-**16.**  Two boats were moored at the far end of the harbour bobbing together.
-
-**17.**  The children were playing in the field behind the church.
-
-**18.**  Her voice on the telephone sounded a little tired and exasperated.
-
-**19.**  The floorboards creak in the same three places and I knew exactly where he was creeping.
-
-**20.**  We walked as far as the bridge and turned back, the other side was forbidden on Mondays.
-
-**21.**  There was a smell of woodsmoke on the cold air taking me back to my childhood.
-
-**22.**  The lamp in the hall stays on all night and sometimes a lone traveller will knock at the door.
-
-**23.**  She has kept every letter he ever sent her, wrapped in pink tissue paper.
-
-**24.**  The garden wall is covered in moss and small ferns.
-
-**25.**  A train went by while they were talking and I saw their lips pause awhile.
-
-**26.**  He learned the names of all the birds that visit.
-
-**27.**  The water in the bay was completely still this morning.
-
-**28.**  She sat down and took her shoes off. "That's better," she said.
-
-**29.**  The clock in the kitchen runs four minutes fast so hopefully we will get the train.
-
-**30.**  The room was stone cold because the fire had gone out during the night.
-
-**31.**  He waited at the window until the car appeared then dashed crazily out of the house.
-
-**32.**  A boy was throwing stones into the water skimming them as best he could.
-
-**33.**  She could hear voices in the next room rising and falling.
-
-**34.**  He pointed at the far side of the field. Beyond towards the mountain fading in the mist.
-
-**35.**  The coins were still in his coat pocket, jingling and jangling.
-
-**36.**  It was a pleasure to see them again after so long but Fred was hard to recognise beneath his white beard.
-
-**37.**  The usual bus was late and nobody seemed to mind. Why not?
-
-**38.**  She measured the white flour into a blue bowl and slid in the yellow butter.
-
-**39.**  There was a garage at the end of the lane and from time to time you could hear clanking and clunking.
-
-**40.**  They watched television together until quite late, in those days the picture would shrink to a dot.
-
-**41.**  They say some of that interference was the microwave background radiation, left over from the big bang.
-
-**42.**  Some questions are better carried than answered but can you agree?
-
-**43.**  Joy is quieter than people expect.
-
-**44.**  Who taught you to be gentle with yourself?
-
-**45.**  What would you keep, if you could keep only one thing?
-
-**46.**  She listened more than she spoke, and heard more than she said.
-
-**47.**  He forgave himself slowly, the way frost leaves a field.
-
-**48.**  The road bends, and the house is gone from view.
-
-**49.**  The river is the same river, and never the same water.
-
-**50.**  A small window is enough if the view is good.
-
-**51.**  What would you keep, if you could keep only one thing?
-
-**52.**  The bell sounds once, and the silence afterwards is larger.
-
-**53.**  He wondered whether the answer had been there all along.
-
-**54.**  The world asks very little, and gives a great deal.
-
-**55.**  The chair by the window catches the last of the light.
-
-**56.**  When the rain finally stopped, the whole valley seemed to be listening, and nobody in the house wanted to be the first to speak.
-
-**57.**  She had meant to say something kinder, but the moment passed the way such moments do, quietly and without warning.
-
-**58.**  There is a particular hour, late in the afternoon, when the light lies flat across the fields and everything looks older than it is.
-
-**59.**  He kept the letter for years without reading it again, partly from respect and partly because he already knew what it would say.
-
-**60.**  If you sit long enough beside any water, the noise in your head settles, and what remains is usually simpler than you feared.
-
-**61.**  The old woman told the story slowly, stopping whenever she liked, and nobody thought to hurry her along.
-
-**62.**  What we call patience is mostly a willingness to stay uncertain for longer than is comfortable, without pretending otherwise.
-
-**63.**  Snow began before dawn and went on all morning, softening the roofs, the walls, and the long road out of the village.
-
-
----
-
-If any of these still fights you when read aloud, say so and it will be changed.
+Sentences are chunked, not taken raw. Two runs in the text are the structure
+trap in its purest form — chapter 2's five consecutive *"X and Y … each other"*
+lines, and chapter 15's five one-clause similes. Both share a single contour,
+which a model learns as *the* shape of a sentence. Merging consecutive short
+sentences into one take breaks the uniform rhythm while leaving the text intact,
+and avoids one-second clips that are too short to train on.
+
+Lengths: median 68 characters, range 45–131 — about 4.1 s median, 2.7–7.8 s.
+
+## Coverage, and where it is safe to stop
+
+**The set is complete at utterance 73** — 44 distinct phonemes, none below five
+occurrences, 5.4 minutes of speech, which is more than the 4.7 minutes that
+trained a usable voice. Everything after 73 adds margin, not coverage.
+
+| stopping at | utterances | speech | phonemes below 5 |
+|---|---|---|---|
+| 73 | 73 | 5.4 min | none |
+| 90 | 90 | 6.5 min | none |
+| all | 125 | 9.0 min | none |
+
+Three phonemes are not in this text in useful numbers at any length — `ɔɪ`
+(*voice, choice, point*), `ʒ` (*vision, measure, pleasure*) and `ɪə` (*here,
+near, clear*). Chapters 1–25 still leave all three thin. Utterances carrying
+them were therefore drawn from later chapters and placed **inside** the first
+73, so stopping early never loses coverage. `ʒ` appears in only six sentences in
+all 81 chapters; three are in chapters 1–12 and the other three are here.
+
+
+## The prompts
+
+0001. The tao that can be described is not the eternal Tao.
+0002. The name that can be spoken is not the eternal Name.
+0003. The nameless is the boundary of Heaven and Earth.
+0004. The named is the mother of creation. Freed from desire, you can see the hidden mystery.
+0005. By having desire, you can only see what is visibly real.
+0006. Yet mystery and reality emerge from the same source.
+0007. This source is called darkness. Darkness born from darkness. The beginning of all understanding.
+0008. When people see things as beautiful, ugliness is created.
+0009. When people see things as good, evil is created.
+0010. Being and non-being produce each other. Difficult and easy complement each other.
+0011. Long and short define each other. High and low oppose each other.
+0012. Fore and aft follow each other. Therefore the Master can act without doing anything and teach without saying a word.
+0013. Things come her way and she does not stop them; things leave and she lets them go.
+0014. She has without possessing, and acts without any expectations.
+0015. When her work is done, she takes no credit. That is why it will last forever.
+0016. If you overly esteem talented individuals, people will become overly competitive.
+0017. If you overvalue possessions, people will begin to steal.
+0018. Do not display your treasures or people will become envious.
+0019. The Master leads by emptying people's minds; filling their bellies, weakening their ambitions, and making them become strong.
+0020. Preferring simplicity and freedom from desires, avoiding the pitfalls of knowledge and wrong action.
+0021. For those who practice not-doing, everything will fall into place.
+0022. The Tao is like an empty container: it can never be emptied and can never be filled.
+0023. Infinitely deep, it is the source of all things.
+0024. It dulls the sharp, unties the knotted, shades the lighted, and unites all of creation with dust.
+0025. It is hidden but always present. I don't know who gave birth to it. It is older than the concept of God.
+0026. Heaven and Earth are impartial; they treat all of creation as straw dogs.
+0027. The Master doesn't take sides; she treats everyone like a straw dog.
+0028. The space between Heaven and Earth is like a bellows; it is empty, yet has not lost its power.
+0029. The more it is used, the more it produces; the more you talk of it, the less you comprehend.
+0030. It is better not to speak of things you do not understand.
+0031. The spirit of emptiness is immortal. It is called the Great Mother because it gives birth to Heaven and Earth.
+0032. It is like a vapor, barely seen but always present. Use it effortlessly.
+0033. The Tao of Heaven is eternal, and the earth is long enduring.
+0034. Why are they long enduring? They do not live for themselves; thus they are present for all beings.
+0035. The Master puts herself last; And finds herself in the place of authority.
+0036. She detaches herself from all things; Therefore she is united with all things.
+0037. She gives no thought to self. She is perfectly fulfilled.
+0038. The supreme good is like water, which benefits all of creation without trying to compete with it.
+0039. It gathers in unpopular places. Thus it is like the Tao.
+0040. The location makes the dwelling good. Depth of understanding makes the mind good.
+0041. A kind heart makes the giving good. Integrity makes the government good.
+0042. Accomplishments make your labors good. Proper timing makes a decision good.
+0043. Only when there is no competition will we all live in peace.
+0044. It is easier to carry an empty cup than one that is filled to the brim.
+0045. The sharper the knife the easier it is to dull.
+0046. The more wealth you possess the harder it is to protect.
+0047. Pride brings its own trouble. When you have accomplished your goal simply walk away. This is the pathway to Heaven.
+0048. Nurture the darkness of your soul until you become whole.
+0049. Can you do this and not fail? Can you focus your life-breath until you become supple as a newborn child?
+0050. While you cleanse your inner vision will you be found without fault?
+0051. Can you love people and lead them without forcing your will on them?
+0052. When Heaven gives and takes away can you be content with the outcome?
+0053. When you understand all things can you step back from your own understanding?
+0054. Giving birth and nourishing, making without possessing, expecting nothing in return.
+0055. To grow, yet not to control: This is the mysterious virtue.
+0056. Thirty spokes are joined together in a wheel, but it is the center hole that allows the wheel to function.
+0057. We mold clay into a pot, but it is the emptiness inside that makes the vessel useful.
+0058. We fashion wood for a house, but it is the emptiness inside that makes it livable.
+0059. We work with the substantial, but the emptiness is what we use.
+0060. Five colors blind the eye. Five notes deafen the ear.
+0061. Five flavors make the palate go stale. Too much activity deranges the mind.
+0062. Too much wealth causes crime. The Master acts on what she feels and not what she sees.
+0063. She shuns the latter, and prefers to seek the former.
+0064. All creatures in the universe return to the point where they began.
+0065. Other people are joyous, as though they were at a spring festival.
+0066. Where there is music and good food, people will stop to enjoy it.
+0067. This is how she is able to make appropriate choices.
+0068. What is a bad person but raw material for his teacher?
+0069. This is called the dark and mysterious virtue.
+0070. To unnaturally try to extend life is not appropriate.
+0071. The left side is a place of honour on happy occasions.
+0072. This is spoken of as the deep root and the firm trunk, the Way to a long life and great spiritual vision.
+0073. The Tao is the tabernacle of creation, it is a treasure for those who are good, and a place of refuge for those who are not.
+0074. Success is as dangerous as failure, and we are often our own worst enemy.
+0075. What does it mean that success is as dangerous as failure?
+0076. He who is superior is also someone's subordinate.
+0077. Receiving favor and losing it both cause alarm.
+0078. That is what is meant by success is as dangerous as failure.
+0079. What does it mean that we are often our own worst enemy?
+0080. The reason I have an enemy is because I have self.
+0081. If I no longer had a self, I would no longer have an enemy.
+0082. Love the whole world as if it were your self; then you will truly care for all things.
+0083. Look for it, and it can not be seen. Listen for it, and it can not be heard.
+0084. Grasp for it, and it can not be caught. These three cannot be further described, so we treat them as The One.
+0085. Its highest is not bright. Its depths are not dark.
+0086. Unending, unnamable, it returns to nothingness.
+0087. Formless forms, and imageless images, subtle, beyond all understanding.
+0088. Approach it and you will not see a beginning; follow it and there will be no end.
+0089. When we grasp the Tao of the ancient ones, we can use it to direct our life today.
+0090. To know the ancient origin of Tao: this is the beginning of wisdom.
+0091. The Sages of old were profound and knew the ways of subtlety and discernment.
+0092. Their wisdom is beyond our comprehension. Because their knowledge was so far superior I can only give a poor description.
+0093. They were careful as someone crossing a frozen stream in winter.
+0094. Alert as if surrounded on all sides by the enemy.
+0095. Courteous as a guest. Fluid as melting ice. Whole as an uncarved block of wood.
+0096. Receptive as a valley. Turbid as muddied water.
+0097. Who can be still until their mud settles and the water is cleared by itself?
+0098. Can you remain tranquil until right action occurs by itself?
+0099. The Master does not seek fulfillment. For only those who are not full are able to be used which brings the feeling of completeness.
+0100. If you can empty your mind of all thoughts your heart will embrace the tranquility of peace.
+0101. Watch the workings of all of creation, but contemplate their return to the source.
+0102. Returning to the source is tranquility because we submit to Heavens mandate.
+0103. Returning to Heavens mandate is called being constant.
+0104. Knowing the constant is called enlightenment.
+0105. Not knowing the constant is the source of evil deeds because we have no roots.
+0106. By knowing the constant we can accept things as they are.
+0107. By accepting things as they are, we become impartial.
+0108. By being impartial, we become one with Heaven.
+0109. By being one with Heaven, we become one with Tao.
+0110. Being one with Tao, we are no longer concerned about losing our life because we know the Tao is constant and we are one with Tao.
+0111. The best leaders are those the people hardly know exist.
+0112. The next best is a leader who is loved and praised.
+0113. Next comes the one who is feared. The worst one is the leader that is despised.
+0114. If you do not trust the people, they will become untrustworthy.
+0115. The best leaders value their words, and use them sparingly.
+0116. When she has accomplished her task, the people say, Amazing: we did it, all by ourselves!
+0117. When the great Tao is abandoned, charity and righteousness appear.
+0118. When intellectualism arises, hypocrisy is close behind.
+0119. When there is strife in the family unit, people talk about brotherly love.
+0120. When the country falls into chaos, politicians talk about patriotism.
+0121. Forget about knowledge and wisdom, and people will be a hundred times better off.
+0122. Throw away charity and righteousness, and people will return to brotherly love.
+0123. Throw away profit and greed, and there will not be any thieves.
+0124. These three are superficial and are not enough to keep us at the center of the circle, so we must also:
+0125. Embrace simplicity. Put others first. Desire little.

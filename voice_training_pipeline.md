@@ -43,6 +43,65 @@ audio can read a corpus of any size, and the corpus can grow without retraining.
 `voices/`, `*.wav` are gitignored. The repository is public, and a fine-tune
 *is* someone's voice.
 
+### Prompt set v3 — Tao Te Ching chapters 1–19 (2026-10-28)
+
+**Why change the text at all.** v2's 63 prompts were plain modern narrative,
+chosen to dodge espeak traps and cover phonemes evenly. They would train a plain
+reading, and **a fine-tune learns delivery most stubbornly of all.** BD wants an
+unhurried voice, so the text has to be unhurried itself. The author's proposal.
+
+**Why this text survives the standing objection.** "Literary source texts are
+the worst candidates" because espeak mispronounces archaic and foreign words,
+pairing the reader's audio with the wrong phonemes. Measured, not assumed:
+**every distinct word in chapters 1–19 passes the ratio test.** The McDonald
+translation is plain modern English and contains no Chinese term but *Tao*.
+
+**The one pronunciation that must be settled before recording, and it is the
+reverse of the obvious.** espeak says **`tˈaʊ` — "TOW", rhyming with *now*, hard
+T.** A reader who knows the authentic "DOW" pairs their [d] with espeak's /t/,
+and /t/ recurs throughout English. Either read it espeak's way, or add a lexicon
+entry. "Tao" appears 5 times in chapters 1–12.
+
+**Three phonemes are absent from this text at any length.** `ɔɪ` (*voice,
+choice, point*), `ʒ` (*vision, measure*) and `ɪə` (*here, near, clear*) are
+still below five occurrences at chapter 25 — 12.3 minutes of text. `ʒ` occurs in
+only **six sentences in all 81 chapters**. Utterances carrying the three were
+drawn from later chapters and placed **inside the first 73**, so stopping early
+never costs coverage.
+
+**Chunking, not raw sentences.** Two runs are the structure trap in pure form —
+chapter 2's five consecutive *"X and Y … each other"* lines and chapter 15's
+five one-clause similes. Merging consecutive short sentences into one take
+breaks the uniform contour while leaving the text intact, and avoids
+one-second clips too short to train on. A colon introducing a list is also a
+break.
+
+**Where it is safe to stop.** The author asked for a long set he could end
+early. Verified at three cut points:
+
+| stopping at | utterances | chars | speech | phonemes below 5 |
+|---|---|---|---|---|
+| **73** | 73 | 5,395 | **5.4 min** | none — complete |
+| 90 | 90 | 6,517 | 6.5 min | none |
+| all | 125 | 9,021 | 9.0 min | none |
+
+Lengths run 45–131 characters, 2.7–7.8 s at the author's measured 16.7 chars/s.
+v2 is archived as `voice_prompts_v2.json` / `.md`.
+
+### A prompt id is a POSITION, not a sentence (2026-10-28)
+
+`0042` in v2 and `0042` in v3 are different sentences, so a session's clips only
+mean anything alongside the set that produced them. `/api/voice-session` now
+stamps `prompt_set.json` into each session directory, `/api/voice-status`
+returns it beside the current one, and **the rig refuses to add to a session
+whose set does not match**, saying which is which. Without that, resuming an
+older session hands the reader the new text under the old numbers and the set
+ends up half one text and half another, looking complete throughout.
+
+The five pre-existing sessions were stamped `{"version":2,"count":63}` — checked
+row by row against `voice_prompts_v2.json` first, 63/63 and 3/3 and so on, not
+assumed from their dates.
+
 ### One directory per speaker (2026-10-28)
 
 A session is named `YYYY-MM-DD_HHMM_<label>` — the label is whose voice it is —

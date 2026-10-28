@@ -194,10 +194,22 @@ async function useSession(name, how) {
   session = name;
   try { localStorage.setItem(REMEMBER, name); } catch (_) {}
   recorded = new Set();
+  let mismatch = null;
   try {
     const s = await (await fetch('/api/voice-status?session=' + encodeURIComponent(name))).json();
     if (s.error) throw new Error(s.error);
     (s.recorded || []).forEach(id => recorded.add(id));
+    // A PROMPT ID IS A POSITION, NOT A SENTENCE. Resuming a session recorded
+    // against a different prompt set would hand the reader prompt 42 of the
+    // new set while the session already holds prompt 42 of the old one — two
+    // different sentences under one id. Say so loudly; the alternative is a
+    // set that looks complete and is half one text and half another.
+    const was = s.promptSet, now = s.current;
+    if (recorded.size && now && (!was || was.version !== now.version)) {
+      mismatch = was
+        ? `recorded against prompt set v${was.version} (${was.count} prompts); the rig now has v${now.version} (${now.count})`
+        : `recorded against an unknown prompt set; the rig now has v${now.version} (${now.count} prompts)`;
+    }
   } catch (e) { log('could not read session status: ' + e.message); }
   // Start at the first prompt without audio, so a second sitting continues
   // rather than re-treading what is already done.
@@ -205,6 +217,16 @@ async function useSession(name, how) {
   idx = firstGap === -1 ? 0 : firstGap;
   log(`${how} ${name} — ${recorded.size} clip(s) already recorded`);
   render();
+  if (mismatch) {
+    log('!! ' + mismatch);
+    renderSession('This session was ' + mismatch +
+                  '. Its clips are safe, but the numbers no longer match the text — ' +
+                  'start a new session rather than adding to this one.', 'warn');
+    gateControls();
+    $('rec').disabled = true;
+    $('rec').textContent = 'Prompt set does not match';
+    return;
+  }
   renderSession();
   await primeMic();
 }

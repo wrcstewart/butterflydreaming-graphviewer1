@@ -560,7 +560,24 @@ function voiceSessionStat(name) {
     ids = fs.readdirSync(wav).filter(f => f.endsWith('.wav')).map(f => f.slice(0, -4)).sort();
     for (const id of ids) { try { bytes += fs.statSync(`${wav}/${id}.wav`).size; } catch (_) {} }
   } catch (_) {}
-  return { session: name, recorded: ids, bytes };
+  // WHICH PROMPT SET THESE CLIPS BELONG TO. The prompt ids are positions in
+  // voice_prompts.json, so they only mean anything alongside the set that
+  // produced them: `0042` in the v2 narrative set and `0042` in the v3 Tao set
+  // are different sentences. Without this, resuming an older session shows the
+  // new text under the old numbers and the mismatch is invisible — the audio
+  // and its metadata.csv stay correct, but the reader is handed the wrong line.
+  let promptSet = null;
+  try { promptSet = JSON.parse(fs.readFileSync(`${VOICE_ROOT}/${name}/prompt_set.json`, 'utf8')); }
+  catch (_) {}
+  return { session: name, recorded: ids, bytes, promptSet };
+}
+
+// The prompt set as it stands right now, stamped into a session when it opens.
+function currentPromptSet() {
+  try {
+    const p = JSON.parse(fs.readFileSync('./voice_prompts.json', 'utf8'));
+    return { version: p.version || 0, count: (p.prompts || []).length };
+  } catch (_) { return null; }
 }
 
 // Every session on disk, newest first, so a set can be resumed by picking it
@@ -592,6 +609,10 @@ app.post('/api/voice-session', (req, res) => {
   if (!dir) return res.status(400).json({ error: 'cannot build a valid session name from that label' });
   try {
     fs.mkdirSync(`${dir}/wav`, { recursive: true });
+    const ps = currentPromptSet();
+    if (ps && !fs.existsSync(`${dir}/prompt_set.json`)) {
+      fs.writeFileSync(`${dir}/prompt_set.json`, JSON.stringify(ps) + '\n');
+    }
     // Report what is THERE, not zero. Two sessions opened in the same minute
     // under the same label are the same directory, and the rig should show the
     // real count rather than claim an empty set over existing clips.
@@ -681,7 +702,7 @@ app.get('/api/voice-status', (req, res) => {
   const name = String(req.query.session || '');
   if (!voiceSessionDir(name)) return res.status(400).json({ error: 'no session' });
   try {
-    res.json(voiceSessionStat(name));
+    res.json({ ...voiceSessionStat(name), current: currentPromptSet() });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
