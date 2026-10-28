@@ -153,3 +153,61 @@ eternal Tao"* — one lowercase, one capital, in one sentence. Verified against
 the real `segment()` sliced out of the module: both match, `Tao Te Ching` still
 beats bare `Tao`, `Taoism` matches separately, and *tautology* and *tap* are
 untouched.
+
+## Buddhist terms — checked 2026-10-28
+
+The author supplied ten terms with their Pali variants. Measured against espeak
+`en-gb-x-rp` before proposing anything, because espeak turned out to be right
+about more than half of them — these are established English loanwords, not
+transliterations espeak has never seen.
+
+**Already correct; deliberately NOT given entries:**
+
+| word | espeak | reads as |
+|---|---|---|
+| Buddha | `bˈʊdɐ` | BOOD-uh |
+| Dharma | `dˈɑːmɐ` | DAR-ma |
+| Dukkha | `dˈʌkɐ` | DUK-uh |
+| Karma | `kˈɑːmɐ` | KAR-ma |
+| Samsara | `sæmsˈɑːɹɐ` | sam-SAR-a |
+| Nirvana | `nɜːvˈɑːnɐ` | nur-VAH-na |
+| Nibbana | `nɪbˈɑːnɐ` | ni-BAH-na |
+
+**Corrected, entries added:**
+
+| word | espeak gave | entry | what was wrong |
+|---|---|---|---|
+| Anicca | `ˈænɪkɐ` | `əˈnɪtʃə` | Pali `cc` is /tʃtʃ/; read as /k/ |
+| Shunyata | `ʃˌʌnɪˈɑːtɐ` | `ʃuːnˈjɑːtə` | "nya" split into two syllables |
+| Anatta | `ˈænætɐ` | `əˈnætə` | stress on the first syllable |
+| Anatman | `ˈænætmən` | `əˈnɑːtmən` | stress, and anātman's long first `a` |
+| Gautama | `ɡɔːtˈɑːmɐ` | `ɡˈaʊtəmə` | stress on the second syllable |
+| Siddhartha | `sɪdˈɑːθɐ` | `sɪdˈɑːtə` | the `th` is an aspirated t, not /θ/ |
+
+**Left for the author to settle — the Pali short `a`, where usage genuinely
+differs and a mindfulness teacher's habit should decide:**
+
+| word | espeak | the alternative |
+|---|---|---|
+| Dhamma | `dˈæmɐ` DAM-a | `dˈʌmə` DUM-ma |
+| Kamma | `kˈæmɐ` KAM-a | `kˈʌmə` KUM-ma |
+| Sangha | `sˈæŋhɐ` SANG-ha | `sˈʌŋhə` SUNG-ha, or `sˈæŋɡə` SANG-ga |
+
+### Two constraints that govern what an entry may contain
+
+**The phoneme map is PER CHARACTER.** `synthesise` spreads the IPA string
+(`...u.ipa`), so `ɑː` enters as `ɑ` + `ː` and `tʃ` as `t` + `ʃ` — both pairs are
+in the table. A symbol the table lacks is **dropped silently** by `toIds`, not
+approximated, so every entry is checked against
+`voices/alba_int8dp.onnx.json`'s `phoneme_id_map` before being added. All 64
+current entries pass.
+
+**There are only TEN placeholders**, and `PLACEHOLDERS[used.length % 10]`
+(`piper_direct.js:322`) wraps rather than growing. Verified: from the 11th
+matching key in one sentence, holders repeat — and two keys sharing a holder
+cannot both be found by `findRun`, so the loser is left as a nonsense word in
+the output. That is **the reason not to pin terms espeak already says
+correctly.** A deliberately dense glossary sentence — *"Buddha taught dharma to
+the sangha: dukkha, anicca, anatta, karma, samsara, nirvana, shunyata, and the
+Tao of Siddhartha Gautama"* — currently matches 6 of the 10 slots. Pinning the
+seven correct terms as well would take it to 13 and break it.
