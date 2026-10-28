@@ -150,6 +150,11 @@ let prompts = [], idx = 0, recorded = new Set();
 let ctx = null, stream = null, node = null, chunks = [], recording = false, sampleRate = 48000;
 let lastWav = null;
 let session = null;
+// Is the button STILL held? A hold can outlive its own release: startRec awaits
+// the microphone, and whatever happens during that await — a permission dialog,
+// a worklet compile, an AudioContext resume — happens after pointerdown and can
+// finish after pointerup. See the check in startRec.
+let holdActive = false;
 
 // Remembered across reloads so that resuming is the DEFAULT and opening a new
 // session is a deliberate act. The other way round, a reload mid-set would
@@ -201,6 +206,29 @@ async function useSession(name, how) {
   log(`${how} ${name} — ${recorded.size} clip(s) already recorded`);
   render();
   renderSession();
+  await primeMic();
+}
+
+// Ask for the microphone when the session opens, NOT on the first hold.
+//
+// 2026-10-28, the author: *"the first record asks for microphone permission but
+// is actually recording during that time."* It was worse than mistimed. The
+// permission dialog opened inside the hold; he released the button to answer it,
+// `stopRec` ran while `recording` was still false and returned having done
+// nothing, and then the await resumed and set `recording = true` — with the
+// release already spent. The first take ran away and could not be stopped.
+//
+// Permission is now settled before any hold, and it is only ever a dialog once
+// per browser. A failure here is reported and not fatal: the first hold will
+// ask again.
+async function primeMic() {
+  try {
+    await ensureMic();
+    renderSession(`Microphone ready at ${sampleRate} Hz. Every clip goes into this session.`);
+  } catch (e) {
+    renderSession('Microphone not available yet: ' + e.message +
+                  ' — it will be asked for again on the first recording.', 'warn');
+  }
 }
 
 async function loadSessions() {
@@ -345,14 +373,27 @@ function encodeWav(parts, rate) {
 async function startRec() {
   if (recording) return;
   if (!sessionActive()) { status('Open a session first — whose voice is this?', 'warn'); return; }
-  try { await ensureMic(); } catch (e) { status('Microphone refused: ' + e.message, 'bad'); return; }
+  holdActive = true;
+  try { await ensureMic(); }
+  catch (e) { holdActive = false; status('Microphone refused: ' + e.message, 'bad'); return; }
   if (ctx.state === 'suspended') await ctx.resume();
+  // THE BUTTON MAY ALREADY BE RELEASED. Everything above can await, and a
+  // release during an await has nothing to stop — `recording` is still false,
+  // so stopRec returns and the recording that starts here would never end.
+  // Start only if the hold is still live, and say so rather than failing mute.
+  if (!holdActive) {
+    status('Microphone ready — hold the button again to record.', 'warn');
+    return;
+  }
   chunks = []; recording = true;
   $('rec').classList.add('on'); $('rec').textContent = 'Recording — release to stop';
   status('Recording…');
 }
 
 function stopRec() {
+  // Cleared FIRST and unconditionally, so a release during startRec's awaits
+  // cancels the pending start even though there is no recording to stop yet.
+  holdActive = false;
   if (!recording) return;
   recording = false;
   $('rec').classList.remove('on'); $('rec').textContent = 'Hold to record';
@@ -374,7 +415,9 @@ function stopRec() {
 const rec = $('rec');
 rec.addEventListener('pointerdown', e => { e.preventDefault(); startRec(); });
 rec.addEventListener('pointerup', stopRec);
-rec.addEventListener('pointerleave', () => { if (recording) stopRec(); });
+// Unconditional: dragging off the button cancels a pending start as well as
+// stopping a live recording, and stopRec is a no-op when there is neither.
+rec.addEventListener('pointerleave', stopRec);
 document.addEventListener('keydown', e => {
   // INPUT and SELECT as well as BUTTON: the session name is typed on this page,
   // and a space in "mary ann" must put a space in the field, not start a take.

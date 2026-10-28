@@ -44,6 +44,43 @@ Two existing sets were migrated in: `voice_dataset_will_01/` → `2026-09-06_120
 archive had been resting on the `*.wav` line alone, which left its transcripts
 visible to git.
 
+### The permission dialog inside the hold (found by the author, same day)
+
+Testing the new session bar, the author: *"the first record asks for microphone
+permission but is actually recording during that time. I think it should get
+permission as soon as session started?"* Right on both counts, and the fault was
+worse than mistimed.
+
+`startRec` **awaited** `ensureMic()`. The dialog opened inside the hold; he
+released the button to answer it; `stopRec` ran while `recording` was still
+`false` and returned having done nothing; then the await resumed and set
+`recording = true` — with the release already spent. **The first take ran away
+and nothing could stop it.** His clip `0001` is the evidence: 8.39 s long with
+2.00 s of leading and 2.41 s of trailing silence around about four seconds of
+speech.
+
+Two fixes, because the second holds whatever the first does not cover:
+
+- **The microphone is acquired when the session opens**, so permission is
+  settled before any hold — his suggestion, and the right primary fix.
+- **`holdActive`** records whether the button is still down. `stopRec` clears it
+  first and unconditionally, and `startRec` checks it after every await before
+  starting. A release during *any* slow await — permission, worklet compile,
+  `AudioContext.resume` — now cancels the pending start and says "hold the
+  button again" instead of starting a recording that cannot end. `pointerleave`
+  became unconditional so dragging off the button cancels too.
+
+**Tested by slicing the real `startRec`/`stopRec` out of the page** and driving
+them through four orderings with a stubbed `ensureMic`. The same harness run
+against the pre-fix backup fails three of the seven assertions, including the
+reported one — so the test is not vacuous.
+
+**And a correction to this morning's figures.** The noise floor measured −58 dB
+then and −78 dB now. The room did not change: the earlier clips had almost no
+silence in them, so the quietest 100 ms window was catching quiet *speech*
+rather than the room. −78 dB is the real floor and the room is better than
+reported.
+
 ### Two things measured while assessing the mic test
 
 **48 kHz is correct.** All three test clips read 48000 against a training
