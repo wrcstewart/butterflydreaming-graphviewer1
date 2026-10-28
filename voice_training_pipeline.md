@@ -128,12 +128,22 @@ with espeak's /t/, and /t/ is everywhere in English. Those 13 instances are only
 matters more as sets grow, and nothing about the spelling on screen warns a
 reader which way to go.
 
-**Closed by carrying the instruction in the set itself.** `voice_prompts_tao.json`
-has a `reading_notes` array (`match`, `say`, `why`); `/api/prompts` passes it
-through; and the rig shows the note **above** the sentence on exactly the
-prompts that contain the word — word-boundary and case-insensitive, so "tao" and
-"Tao" in one sentence both trigger it while *tautology* and *Taoism* do not.
-Verified: 10 prompts contain the word, 10 show the note.
+**The MECHANISM for carrying such an instruction exists and is currently
+unused.** A set may carry a `reading_notes` array (`match`, `say`, `why`);
+`/api/prompts` passes it through; and the rig shows the note **above** the
+sentence on exactly the prompts matching it — word-boundary and
+case-insensitive, so "tao" and "Tao" in one sentence would both trigger while
+*tautology* and *Taoism* would not.
+
+**No set carries a note today.** One was added for "Tao" and withdrawn the same
+day at the author's request — *"I don't want the warning about Tao, it's not
+necessary"* — and he is right: once the lexicon entries went and `Tao` is read
+as spelled by reader, trainer and synthesiser alike, there is no divergence to
+warn about. The note was mitigating a hazard that the rule had already removed.
+
+The mechanism is kept because **the rule above will recur**: any future set
+containing a word espeak gets wrong, which the reader must nonetheless read
+espeak's way, needs exactly this. An empty array shows nothing.
 
 **When adding a lexicon entry, check both prompt sets for it.** One line:
 
