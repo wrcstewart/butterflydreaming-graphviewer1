@@ -49,7 +49,8 @@ Keep this updated when a design moves. A stale register is worse than none.
 | `convergence_node.md` | 06-28 | **Design only — idea absorbed** | 12 `convergence` hits in `viewer.js`, but all are Explore vocabulary ("a recorded convergence" = a GN mark). This doc's own design was never built. *Corrected 09-12: the earlier "zero hits" evidence is stale and reads misleadingly.* |
 | `BD_Viewer_Scaling_Brief.md` | 08-23 | **Planning only** | nothing scheduled, by intent |
 | `speech_plan.md` | 09-04 | **Built** (stages 0–1, shipped) | `piper_direct.js`, `speakReady` ×7 in `viewer.js` |
-| `voice_training_pipeline.md` | 09-06 | **Built** (first fine-tune) | `voices/bd_will_01.onnx` present |
+| `voice_training_pipeline.md` | 10-28 | **Built**, second reader ready | `voice_sessions/<speaker>/` per-speaker dirs; two prompt sets with a dropdown; 14-clip mechanism run exported and heard |
+| `session_notes_2026-10-28.md` | 10-28 | **Built** | the rig made safe for a second reader; `speech_timing.js` shared by `viewer.js` + `voice_compare.html` |
 | `ink_mode.md` | 08-28 | **Built, now DEFAULT** | `get('ink') !== '0'` — `?ink=0` is the escape |
 | `ink_promotion_plan.md` | 09-04 | **Partly built** | stage 1 done (above); stage 2, walking every view, open |
 | `remote_view_spec.md` | 08-31 | **Built**, colour scheme superseded | `gn_mark`/`#gn-btn` ×13; achromatic model replaced its ladder |
