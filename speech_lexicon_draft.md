@@ -115,3 +115,41 @@ currently says with no entry — the column that shows why this is worth doing.
   `dˌaʊdədʒˈɪŋ` is one name.
 - **Every symbol must exist in the voice's `phoneme_id_map`** or it is silently
   dropped, leaving a hole in the word rather than an error.
+
+---
+
+## The Tao family — added 2026-10-28
+
+The author asked for *Tao* and *Dao* to be pinned, "a word that may well crop
+up". Measured first, because the direction of the error was not the obvious one.
+
+| word | espeak `en-gb-x-rp` | lexicon entry | why |
+|---|---|---|---|
+| `Tao` | `tˈaʊ` — "TOW" | `dˈaʊ` | **corrected** |
+| `Dao` | `dˈaʊ` | `dˈaʊ` | already right, pinned so the pair cannot drift |
+| `Taoism` | `tˈaʊɪzəm` | `dˈaʊɪzəm` | corrected |
+| `Taoist`, `Taoists` | `tˈaʊɪst(s)` | `dˈaʊɪst(s)` | corrected |
+| `Daoism`, `Daoist(s)` | already `d…` | same | pinned |
+
+**The decision was already made in this file's own data.** `Tao Te Ching` has
+been `dˌaʊdədʒˈɪŋ` — "dow de jing" — since the lexicon was written, while bare
+`Tao` fell through to espeak's "tow". So BD was saying the word two different
+ways depending on whether the rest of the title followed it, 93 times across the
+corpus. Following the existing entry is the consistent choice; one edit reverses
+it if "tow" is preferred.
+
+**Why `Tao` needs an entry even though the reader says it with a T.** Training
+and synthesis take different paths. Fine-tuning phonemises with espeak directly
+(`--data.espeak_voice en-gb-x-rp`), so a take of "Tao" read with a T correctly
+pairs with espeak's /t/ — nothing is corrupted. The lexicon applies only at
+**synthesis**, through `piper_direct.js`, and governs what BD *says*. The two
+can differ without harm: the /d/ it substitutes is a phoneme the model has
+learned thoroughly from everywhere else.
+
+**Matching is case-insensitive and longest-key-first** (the `gi` flag and the
+length sort in both `segment` and `synthesise`), which matters here because
+chapter 1 of the training text reads *"The tao that can be described is not the
+eternal Tao"* — one lowercase, one capital, in one sentence. Verified against
+the real `segment()` sliced out of the module: both match, `Tao Te Ching` still
+beats bare `Tao`, `Taoism` matches separately, and *tautology* and *tap* are
+untouched.
