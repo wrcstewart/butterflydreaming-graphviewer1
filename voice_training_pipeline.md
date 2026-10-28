@@ -5,7 +5,8 @@ own reading. This is the as-built record: what exists, what broke, how to run it
 again, and what to do differently when the real recording happens.
 
 Companion documents: `speech_plan.md` (the staged plan), `session_notes_2026-09-03…05.md`
-(how the engine was chosen), `voice_prompts.md` (the prompt set and its reasoning).
+(how the engine was chosen), `voice_prompts_basic.md` and `voice_prompts_tao.md`
+(the two prompt sets and their reasoning).
 
 ---
 
@@ -31,7 +32,9 @@ audio can read a corpus of any size, and the corpus can grow without retraining.
 | piece | where | what it does |
 |---|---|---|
 | `voice_record.html` | repo root | recording rig — AudioWorklet direct PCM, resumable, warns on clipping/quiet/short |
-| `voice_prompts.json` / `.md` | repo root | 63 prompts, 45 phonemes, none below five occurrences |
+| `voice_prompts_basic.json` / `.md` | repo root | **Basic** — 63 plain sentences, 45 phonemes, none below five |
+| `voice_prompts_tao.json` / `.md` | repo root | **Tao Te Ching** — 125 utterances from chapters 1–19, complete at 73 |
+| `/api/prompt-sets`, `/api/prompts` | `server.js` | lists the sets for the rig's dropdown; serves one in full |
 | `/api/voice-session{,s}`, `/api/voice-clip`, `/api/voice-status` | `server.js` | opens and lists sessions; writes each take into the named one |
 | `voice_sessions/<session>/` | repo root, gitignored | `wav/NNNN.wav` + `metadata.csv` in LJSpeech layout, **one directory per speaker** |
 | `~/bd_voice_train/venv` | outside the repo | Python 3.12, torch 2.14 + MPS, piper-tts 1.8 |
@@ -86,7 +89,26 @@ early. Verified at three cut points:
 | all | 125 | 9,021 | 9.0 min | none |
 
 Lengths run 45–131 characters, 2.7–7.8 s at the author's measured 16.7 chars/s.
-v2 is archived as `voice_prompts_v2.json` / `.md`.
+The reader picks the set from a dropdown when the session opens, and the
+session is then **bound** to it — see the next section.
+
+### Choosing a set, and the session being BOUND to it (2026-10-28)
+
+The rig has a dropdown — **Basic** or **Tao Te Ching** — live until a session
+opens, so the reader can look at both texts before committing. Switching it
+reloads the prompts immediately.
+
+**The choice is made when the session opens and cannot be changed afterwards.**
+`/api/voice-session` takes `&set=<id>`, stamps it into `prompt_set.json`, and
+the dropdown is then disabled. On resume the rig loads **the set the session is
+bound to** rather than whatever the dropdown shows — which is the whole point:
+otherwise prompt 42 of the new text would be offered to a session that already
+holds prompt 42 of the old one.
+
+A session carrying no set, or one naming a set no longer on disk, is **refused
+for further recording** rather than guessed at: its clips stay safe and the
+reader is told to start a new session. Sessions stamped before the sets were
+named are read as `basic` (version 3 as `tao`) and the inference is logged.
 
 ### A prompt id is a POSITION, not a sentence (2026-10-28)
 
@@ -99,7 +121,7 @@ older session hands the reader the new text under the old numbers and the set
 ends up half one text and half another, looking complete throughout.
 
 The five pre-existing sessions were stamped `{"version":2,"count":63}` — checked
-row by row against `voice_prompts_v2.json` first, 63/63 and 3/3 and so on, not
+row by row against `voice_prompts_basic.json` first, 63/63 and 3/3 and so on, not
 assumed from their dates.
 
 ### One directory per speaker (2026-10-28)
@@ -410,7 +432,7 @@ rather than optional:
   prompt sends you back to it next sitting. That is deliberate.
 
 The same guidance, written for whoever is actually at the microphone rather than
-for the pipeline, is in `voice_prompts.md` under *Recording sessions, and taking
+for the pipeline, is in `voice_prompts_basic.md` under *Recording sessions, and taking
 breaks* — that is the document the reader has in front of them, so it belongs
 there too.
 

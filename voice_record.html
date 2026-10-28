@@ -86,11 +86,14 @@
   <div class="row" id="session-open-row" hidden>
     <span class="who" id="session-name">—</span>
     <span id="session-count" style="color:#9a9aa4;font-size:13px"></span>
+    <span id="session-set" style="color:#9a9aa4;font-size:13px"></span>
     <button class="linky" id="session-change">change</button>
   </div>
   <div class="row" id="session-new-row">
     <label for="who">Whose voice is this?</label>
     <input id="who" placeholder="first name" autocomplete="off" spellcheck="false">
+    <label for="set">reading</label>
+    <select id="set"></select>
     <button class="go" id="session-start">Start a new session</button>
   </div>
   <div class="row" id="session-resume-row" hidden>
@@ -147,6 +150,7 @@ const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; }
 const status = (m, cls) => { const el = $('status'); el.textContent = m; el.className = 'status ' + (cls || ''); };
 
 let prompts = [], idx = 0, recorded = new Set();
+let promptSets = [], setId = null, setMeta = null;
 let ctx = null, stream = null, node = null, chunks = [], recording = false, sampleRate = 48000;
 let lastWav = null;
 let session = null;
@@ -161,6 +165,39 @@ let holdActive = false;
 // quietly start a second directory and both halves would resume from zero.
 const REMEMBER = 'bd_voice_session';
 
+// ---- prompt sets -----------------------------------------------------------
+// A SESSION IS BOUND TO ITS SET, because a prompt id is a POSITION: `0042` is a
+// different sentence in each text. So the set is chosen when the session opens
+// and the dropdown is then locked — mixing two texts in one directory would
+// give a set that looks complete and is half one and half the other.
+async function loadSetList() {
+  try {
+    const d = await (await fetch('/api/prompt-sets')).json();
+    promptSets = d.sets || [];
+    const sel = $('set');
+    sel.innerHTML = '';
+    for (const st of promptSets) {
+      const o = document.createElement('option');
+      o.value = st.id;
+      o.textContent = `${st.label} (${st.count})`;
+      if (st.id === d.default) o.selected = true;
+      sel.appendChild(o);
+    }
+  } catch (e) { log('could not list prompt sets: ' + e.message); }
+}
+
+async function loadPrompts(id) {
+  const d = await (await fetch('/api/prompts?set=' + encodeURIComponent(id))).json();
+  if (d.error) throw new Error(d.error);
+  prompts = d.prompts || [];
+  setId = d.id;
+  setMeta = { id: d.id, label: d.label, version: d.version, count: d.count,
+              complete_at: d.complete_at };
+  $('set').value = d.id;
+  log(`prompt set: ${d.label} — ${d.count} utterances` +
+      (d.complete_at ? `, complete at ${d.complete_at}` : ''));
+}
+
 // ---- session ---------------------------------------------------------------
 function sessionActive() { return !!session; }
 
@@ -170,9 +207,14 @@ function renderSession(note, cls) {
   $('session-open-row').hidden = !open;
   $('session-new-row').hidden = open;
   $('session-resume-row').hidden = open || !$('pick').options.length;
+  $('set').disabled = open;
   if (open) {
     $('session-name').textContent = session;
     $('session-count').textContent = `· ${recorded.size} of ${prompts.length} recorded`;
+    $('session-set').textContent = setMeta
+      ? `· ${setMeta.label}` + (setMeta.complete_at && recorded.size < setMeta.complete_at
+          ? ` (complete at ${setMeta.complete_at})` : '')
+      : '';
   }
   const el = $('session-note');
   el.textContent = note || (open ? 'Every clip is written into this session.'
@@ -194,21 +236,22 @@ async function useSession(name, how) {
   session = name;
   try { localStorage.setItem(REMEMBER, name); } catch (_) {}
   recorded = new Set();
-  let mismatch = null;
+  let problem = null;
   try {
     const s = await (await fetch('/api/voice-status?session=' + encodeURIComponent(name))).json();
     if (s.error) throw new Error(s.error);
     (s.recorded || []).forEach(id => recorded.add(id));
-    // A PROMPT ID IS A POSITION, NOT A SENTENCE. Resuming a session recorded
-    // against a different prompt set would hand the reader prompt 42 of the
-    // new set while the session already holds prompt 42 of the old one — two
-    // different sentences under one id. Say so loudly; the alternative is a
-    // set that looks complete and is half one text and half another.
-    const was = s.promptSet, now = s.current;
-    if (recorded.size && now && (!was || was.version !== now.version)) {
-      mismatch = was
-        ? `recorded against prompt set v${was.version} (${was.count} prompts); the rig now has v${now.version} (${now.count})`
-        : `recorded against an unknown prompt set; the rig now has v${now.version} (${now.count} prompts)`;
+    // LOAD THE SET THE SESSION IS BOUND TO, not whatever the dropdown shows.
+    // A prompt id is a POSITION: `0042` is a different sentence in each text,
+    // so resuming against the wrong set would hand the reader a sentence the
+    // session already holds under that number.
+    const want = (s.promptSet && s.promptSet.id) || null;
+    if (want) {
+      try { await loadPrompts(want); }
+      catch (_) { problem = `its prompt set "${want}" is no longer available`; }
+      if (s.promptSet.inferred) log(`(this session predates named sets; read as "${want}")`);
+    } else if (recorded.size) {
+      problem = 'it carries no record of which prompt set it was read from';
     }
   } catch (e) { log('could not read session status: ' + e.message); }
   // Start at the first prompt without audio, so a second sitting continues
@@ -217,14 +260,13 @@ async function useSession(name, how) {
   idx = firstGap === -1 ? 0 : firstGap;
   log(`${how} ${name} — ${recorded.size} clip(s) already recorded`);
   render();
-  if (mismatch) {
-    log('!! ' + mismatch);
-    renderSession('This session was ' + mismatch +
-                  '. Its clips are safe, but the numbers no longer match the text — ' +
-                  'start a new session rather than adding to this one.', 'warn');
+  if (problem) {
+    log('!! ' + problem);
+    renderSession('Cannot safely add to this session: ' + problem +
+                  '. Its clips are safe — start a new session instead.', 'warn');
     gateControls();
     $('rec').disabled = true;
-    $('rec').textContent = 'Prompt set does not match';
+    $('rec').textContent = 'Prompt set unavailable';
     return;
   }
   renderSession();
@@ -272,8 +314,11 @@ async function loadSessions() {
 
 // ---- prompts + resume ------------------------------------------------------
 async function boot() {
-  const p = await (await fetch('voice_prompts.json')).json();
-  prompts = p.prompts || [];
+  await loadSetList();
+  // Show SOMETHING before a session exists, so the page is not blank while the
+  // reader decides. A resumed session replaces this with its own bound set.
+  const first = ($('set').value) || (promptSets[0] && promptSets[0].id);
+  if (first) await loadPrompts(first);
   render();
   const list = await loadSessions();
   // Resume only a remembered session that STILL EXISTS. A name in localStorage
@@ -294,7 +339,9 @@ $('session-start').addEventListener('click', async () => {
   if (!label) { renderSession('Type a name first — this is what the folder is called.', 'warn'); $('who').focus(); return; }
   $('session-start').disabled = true;
   try {
-    const d = await (await fetch('/api/voice-session?label=' + encodeURIComponent(label),
+    const chosen = $('set').value;
+    const d = await (await fetch('/api/voice-session?label=' + encodeURIComponent(label) +
+                                 '&set=' + encodeURIComponent(chosen),
                                  { method: 'POST' })).json();
     if (d.error) throw new Error(d.error);
     await loadSessions();
@@ -318,6 +365,14 @@ $('session-change').addEventListener('click', async () => {
   await loadSessions();
   render();
   renderSession('Pick an existing session, or name a new one.');
+});
+
+// Before a session exists the dropdown is live, so switching it shows the new
+// text immediately — the reader can look at both before committing.
+$('set').addEventListener('change', async () => {
+  if (sessionActive()) return;
+  try { await loadPrompts($('set').value); idx = 0; render(); renderSession(); }
+  catch (e) { renderSession('Could not load that set: ' + e.message, 'warn'); }
 });
 
 function render() {

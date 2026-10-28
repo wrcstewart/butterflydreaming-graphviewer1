@@ -44,6 +44,38 @@ Two existing sets were migrated in: `voice_dataset_will_01/` → `2026-09-06_120
 archive had been resting on the `*.wav` line alone, which left its transcripts
 visible to git.
 
+### A dropdown to choose the reading, and the session bound to its choice
+
+The author: *"can we have the new training spp — maybe you can make a dropdown
+to select the set to use — Basic | Tao Te Ching."*
+
+Files renamed so each set has a name rather than a version:
+`voice_prompts.json`/`.md` → **`voice_prompts_tao.json`/`.md`**,
+`voice_prompts_v2.*` → **`voice_prompts_basic.*`**. Two new endpoints,
+`/api/prompt-sets` (what the dropdown needs, no prompt text) and
+`/api/prompts?set=<id>` (one set in full).
+
+**The choice is made when the session opens, and the session is then bound to
+it.** That is not a restriction for its own sake — a prompt id is a POSITION,
+so resuming a session against the other text would offer prompt 42 of one while
+the directory already holds prompt 42 of the other. So the dropdown is live
+until a session exists (switching it reloads the text, so both can be looked at
+before committing) and disabled afterwards, and **resume loads the set the
+session names** rather than whatever is selected. A session carrying no set, or
+naming one no longer on disk, is refused for further recording rather than
+guessed at.
+
+This replaces the mismatch *warning* added earlier today with something that
+simply works — the warning was the right diagnosis and the wrong remedy.
+
+**Tested on a second instance, live server untouched:** both sets listed with
+true counts and the Tao set's `complete_at: 73`; `?set=bogus` and
+`?set=../etc` both refused at session creation as well as at fetch; a session
+created on each set stamped correctly; and a clip written to one left the others
+alone. The five existing sessions were re-verified against the renamed files and
+stamped `basic` — 63/63, 3/3, 2/2, 6/6, 3/3 against basic and 0 against tao, so
+the id is measured rather than inferred from a date.
+
 ### Prompt set v3 — the Tao Te Ching, measured against the objection to it
 
 The author: *"other than the word Tao, which she knows how to pronounce, the

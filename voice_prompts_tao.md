@@ -12,7 +12,7 @@ either side of the speech and can only keep silence that is actually there.
 
 ## Why this text
 
-The previous set (voice_prompts_v2.json, 63 prompts) was plain modern narrative, chosen to avoid
+The previous set (voice_prompts_basic.json, 63 prompts) was plain modern narrative, chosen to avoid
 espeak traps and cover phonemes evenly. It would train a plain reading. The
 author wanted an unhurried voice for ButterflyDreaming, and a fine-tune learns
 delivery most stubbornly of all — so the text itself has to be unhurried.

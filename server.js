@@ -543,6 +543,56 @@ app.get('/api/section', async (req, res) => {
 // would make both of them restart from the beginning.
 const VOICE_ROOT = './voice_sessions';
 
+// THE PROMPT SETS ON OFFER. Two texts with different purposes, so the reader
+// picks one when the session opens rather than taking whatever happens to be
+// the default:
+//
+//   basic — 63 plain modern sentences, written to dodge espeak traps and cover
+//           the phonemes evenly. Trains a plain, neutral reading.
+//   tao   — Tao Te Ching chapters 1-19, 125 utterances. Same coverage, but the
+//           text is unhurried, and a fine-tune learns DELIVERY most stubbornly
+//           of all. Complete at utterance 73; the rest is margin.
+//
+// A SESSION IS BOUND TO ITS SET and the choice cannot be changed afterwards,
+// because a prompt id is a POSITION: `0042` is a different sentence in each.
+// Mixing them inside one directory would give a set that looks complete and is
+// half one text and half another.
+const PROMPT_SETS = {
+  basic: { label: 'Basic',        file: './voice_prompts_basic.json' },
+  tao:   { label: 'Tao Te Ching', file: './voice_prompts_tao.json'   },
+};
+const DEFAULT_PROMPT_SET = 'tao';
+
+function readPromptSet(id) {
+  const entry = PROMPT_SETS[id];
+  if (!entry) return null;
+  try {
+    const p = JSON.parse(fs.readFileSync(entry.file, 'utf8'));
+    return { id, label: entry.label, version: p.version || 0,
+             count: (p.prompts || []).length, complete_at: p.complete_at || null,
+             prompts: p.prompts || [] };
+  } catch (_) { return null; }
+}
+
+// What the rig needs to build the dropdown: every set, without the prompts.
+app.get('/api/prompt-sets', (req, res) => {
+  const out = [];
+  for (const id of Object.keys(PROMPT_SETS)) {
+    const p = readPromptSet(id);
+    if (p) { const { prompts, ...meta } = p; out.push(meta); }
+  }
+  res.json({ sets: out, default: DEFAULT_PROMPT_SET });
+});
+
+// One set in full. The rig asks for the set its SESSION is bound to, so a
+// resumed session always gets the text its ids were recorded against.
+app.get('/api/prompts', (req, res) => {
+  const p = readPromptSet(String(req.query.set || ''));
+  if (!p) return res.status(404).json({ error: 'no such prompt set' });
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.json(p);
+});
+
 // Whole-string match with no dots and no separators, so a name arriving in a
 // query string cannot climb out of VOICE_ROOT however it is spelled.
 const VOICE_SESSION_RE = /^\d{4}-\d{2}-\d{2}_\d{4}_[a-z0-9-]{1,24}$/;
@@ -567,17 +617,18 @@ function voiceSessionStat(name) {
   // new text under the old numbers and the mismatch is invisible — the audio
   // and its metadata.csv stay correct, but the reader is handed the wrong line.
   let promptSet = null;
-  try { promptSet = JSON.parse(fs.readFileSync(`${VOICE_ROOT}/${name}/prompt_set.json`, 'utf8')); }
+  try { promptSet = normaliseStamp(JSON.parse(
+          fs.readFileSync(`${VOICE_ROOT}/${name}/prompt_set.json`, 'utf8'))); }
   catch (_) {}
   return { session: name, recorded: ids, bytes, promptSet };
 }
 
-// The prompt set as it stands right now, stamped into a session when it opens.
-function currentPromptSet() {
-  try {
-    const p = JSON.parse(fs.readFileSync('./voice_prompts.json', 'utf8'));
-    return { version: p.version || 0, count: (p.prompts || []).length };
-  } catch (_) { return null; }
+// A session stamped before the sets were named has no `id`. Everything written
+// before 2026-10-28 was the basic set, verified row by row at the time.
+function normaliseStamp(st) {
+  if (!st) return null;
+  if (st.id) return st;
+  return { ...st, id: st.version === 3 ? 'tao' : 'basic', inferred: true };
 }
 
 // Every session on disk, newest first, so a set can be resumed by picking it
@@ -602,6 +653,9 @@ app.post('/api/voice-session', (req, res) => {
   const label = String(req.query.label || '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
   if (!label) return res.status(400).json({ error: 'a session needs a name - whose voice is this?' });
+  const setId = String(req.query.set || DEFAULT_PROMPT_SET);
+  const set = readPromptSet(setId);
+  if (!set) return res.status(400).json({ error: 'no such prompt set: ' + setId });
   const d = new Date(), pad = n => String(n).padStart(2, '0');
   const name = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
                `_${pad(d.getHours())}${pad(d.getMinutes())}_${label}`;
@@ -609,9 +663,9 @@ app.post('/api/voice-session', (req, res) => {
   if (!dir) return res.status(400).json({ error: 'cannot build a valid session name from that label' });
   try {
     fs.mkdirSync(`${dir}/wav`, { recursive: true });
-    const ps = currentPromptSet();
-    if (ps && !fs.existsSync(`${dir}/prompt_set.json`)) {
-      fs.writeFileSync(`${dir}/prompt_set.json`, JSON.stringify(ps) + '\n');
+    if (!fs.existsSync(`${dir}/prompt_set.json`)) {
+      fs.writeFileSync(`${dir}/prompt_set.json`, JSON.stringify(
+        { id: set.id, label: set.label, version: set.version, count: set.count }) + '\n');
     }
     // Report what is THERE, not zero. Two sessions opened in the same minute
     // under the same label are the same directory, and the rig should show the
@@ -702,7 +756,7 @@ app.get('/api/voice-status', (req, res) => {
   const name = String(req.query.session || '');
   if (!voiceSessionDir(name)) return res.status(400).json({ error: 'no session' });
   try {
-    res.json({ ...voiceSessionStat(name), current: currentPromptSet() });
+    res.json(voiceSessionStat(name));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
