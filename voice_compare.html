@@ -35,6 +35,7 @@
   .card.seen   { border-left:3px solid #6a8f6f; }
   .card.unseen { border-left:3px solid #b09e3b; }
   .card.fresh  { border-left:3px solid #8f6a7a; }
+  .card.long   { border-left:3px solid #6a7a8f; }
   .card h2 { font-size:14px; margin:0 0 4px; font-weight:600; }
   .card .why { font-size:13px; color:#9a9aa4; margin:0 0 10px; }
   textarea { width:100%; box-sizing:border-box; min-height:84px; resize:vertical;
@@ -62,7 +63,10 @@
 
 <h1>Voice compare</h1>
 <p class="sub">One voice, on text it was trained on and text it has never seen.
-The pair is the point &mdash; either alone is easy to misread.</p>
+The pair is the point &mdash; either alone is easy to misread.<br>
+Delivered exactly as BD delivers it: pace <b>1.571</b>, <b>504&nbsp;ms</b> after a full
+stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
+<code>speech_timing.js</code>, the same definitions BD itself uses.</p>
 
 <div class="bar">
   <label for="voice">Voice</label>
@@ -111,12 +115,32 @@ The pair is the point &mdash; either alone is easy to misread.</p>
   </div>
 </div>
 
+<div class="card long">
+  <h2>A long sentence &mdash; where the comma pause actually appears</h2>
+  <p class="why">BD reads a sentence whole up to <b>150 characters</b>, and only breaks a
+  longer one at a comma or semicolon. So the three passages above have
+  <b>no comma pauses to hear</b> &mdash; every gap in them is a full stop's 504&nbsp;ms.
+  This one is 254 characters from BD's own corpus, and splits into several
+  fragments with the shorter 180&nbsp;ms gap between them. Unseen by the voice.</p>
+  <textarea id="t-long"></textarea>
+  <div class="row">
+    <button class="go" data-src="t-long">Speak this</button>
+    <button data-src="t-long" data-ref="1">Speak in the reference voice</button>
+  </div>
+</div>
+
 <p class="note" id="note">&nbsp;</p>
 <audio id="audio" controls style="width:100%;margin-top:6px"></audio>
 <div id="log">ready.</div>
 
 <script type="module">
 import { synthesise, loadVoice } from '/piper_direct.js';
+// 2026-10-28 — the author: "It would nice to slow it down to the same pace as
+// BD and put in the end sentence pause and comma pauses. That will make
+// comparison better later." IMPORTED, not copied: every number in there was
+// tuned by ear against the others, and a second copy would be adjusted once.
+import { SPEAK_LENGTH_SCALE, SPEAK_GAP_MS, SPEAK_LINE_GAP_MS, splitUtterances }
+  from '/speech_timing.js';
 
 const $ = id => document.getElementById(id);
 const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; };
@@ -131,6 +155,10 @@ $('t-unseen').value = 'If you overly esteem talented individuals, people will be
                       'competitive. If you overvalue possessions, people will begin to steal.';
 $('t-fresh').value  = 'The kettle was still warm when she came back down, and there were ' +
                       'three chairs by the window with nobody in them.';
+$('t-long').value   = 'Some are meant to lead, and others are meant to follow; Some must ' +
+                      'always strain, and others have an easy time; Some are naturally big ' +
+                      'and strong, and others will always be small; Some will be protected ' +
+                      'and nurtured, and others will meet with destruction.';
 
 let lexicon = {};
 try {
@@ -166,6 +194,29 @@ async function listVoices() {
 await listVoices();
 $('refresh').addEventListener('click', listVoices);
 
+// ONE FILE, NOT A SEQUENCE OF PLAYS. BD synthesises each sentence separately
+// and waits `gap` between them, so a faithful rendition is several clips with
+// silence spliced in. Building that into a single buffer — rather than firing
+// setTimeout plays — means the <audio> element holds the whole passage: it can
+// be scrubbed, replayed and compared against another voice's rendition of the
+// same text, which is the entire purpose of this page.
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function encodeWav(samples, rate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2), dv = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+  dv.setUint16(22, 1, true); dv.setUint32(24, rate, true);
+  dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    dv.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
 // Serialised: two overlapping synth calls on MPS-backed WASM contend for the
 // same session, and the second's audio can arrive first.
 let busy = false;
@@ -176,24 +227,48 @@ async function speak(text, voiceId) {
   busy = true;
   document.querySelectorAll('button').forEach(b => b.disabled = true);
   const t0 = performance.now();
-  note(`Synthesising ${text.length} characters in ${voiceId}…`, 'busy');
   try {
     await loadVoice(voiceId, u => log('fetched ' + u.split('/').pop()));
-    const out = await synthesise({ voiceId, text, lexicon });
-    if (!out || !out.blob) throw new Error('synthesise returned no audio');
-    $('audio').src = URL.createObjectURL(out.blob);
+    // BD's own split: one utterance per sentence, and a sentence over maxLen
+    // broken at a comma or semicolon — which is where the "comma pauses" come
+    // from. They are not inserted here; they are what BD already does.
+    const utts = splitUtterances(text);
+    note(`Synthesising ${utts.length} utterance(s) in ${voiceId}…`, 'busy');
+    const parts = [], missing = [];
+    let rate = 22050;
+    for (let i = 0; i < utts.length; i++) {
+      const u = utts[i];
+      const out = await synthesise({ voiceId, text: u.text, lexicon,
+                                     lengthScale: SPEAK_LENGTH_SCALE });
+      if (!out || !out.blob) throw new Error('synthesise returned no audio');
+      const decoded = await audioCtx.decodeAudioData(await out.blob.arrayBuffer());
+      rate = decoded.sampleRate;
+      parts.push({ pcm: decoded.getChannelData(0),
+                   // The LAST utterance gets no trailing gap — BD's gap is the
+                   // wait BEFORE the next one, and there is no next one.
+                   gap: i === utts.length - 1 ? 0 : (u.gap != null ? u.gap : SPEAK_GAP_MS) });
+      (out.missing || []).forEach(m => missing.push(m));
+      note(`Synthesised ${i + 1} of ${utts.length}…`, 'busy');
+    }
+    const total = parts.reduce((n, p) => n + p.pcm.length + Math.round(p.gap * rate / 1000), 0);
+    const all = new Float32Array(total);
+    let at = 0;
+    for (const p of parts) { all.set(p.pcm, at); at += p.pcm.length + Math.round(p.gap * rate / 1000); }
+    $('audio').src = URL.createObjectURL(encodeWav(all, rate));
     await $('audio').play().catch(() => {});
     const ms = performance.now() - t0;
     // `missing` is the list of phoneme symbols the voice's table does not have.
     // toIds DROPS them rather than approximating, so a sound simply vanishes
     // with nothing audible to say it was meant to be there. Report it.
-    const miss = (out.missing || []).length
-      ? `  ·  DROPPED ${out.missing.length} symbol(s): ${[...new Set(out.missing)].join(' ')}` : '';
-    note(`${voiceId} — ${out.seconds.toFixed(1)} s of audio from ${text.length} characters ` +
-         `in ${(ms / 1000).toFixed(1)} s (${(ms / text.length).toFixed(0)} ms/char)${miss}`,
-         miss ? 'bad' : 'done');
-    log(`${voiceId}: ${text.length} ch -> ${out.seconds.toFixed(1)}s audio, ` +
-        `synth ${(ms / 1000).toFixed(1)}s${miss}`);
+    const miss = missing.length
+      ? `  ·  DROPPED ${missing.length} symbol(s): ${[...new Set(missing)].join(' ')}` : '';
+    const gaps = parts.slice(0, -1).map(p => p.gap);
+    note(`${voiceId} — ${utts.length} utterance(s), ${(total / rate).toFixed(1)} s of audio ` +
+         `at pace ${SPEAK_LENGTH_SCALE.toFixed(2)}, gaps ${gaps.join('/') || 'none'} ms ` +
+         `(synth ${(ms / 1000).toFixed(1)} s)${miss}`, miss ? 'bad' : 'done');
+    log(`${voiceId}: ${utts.length} utt, ${(total / rate).toFixed(1)}s audio, ` +
+        `gaps ${gaps.join('/') || '-'}ms, synth ${(ms / 1000).toFixed(1)}s${miss}`);
+    utts.forEach((u, i) => log(`   [${i + 1}] ${u.gap}ms after: ${u.text.slice(0, 58)}`));
   } catch (e) {
     note('Failed: ' + e.message, 'bad');
     log('ERROR ' + e.message);
