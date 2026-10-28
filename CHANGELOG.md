@@ -44,6 +44,41 @@ Two existing sets were migrated in: `voice_dataset_will_01/` → `2026-09-06_120
 archive had been resting on the `*.wav` line alone, which left its transcripts
 visible to git.
 
+### A level threshold does not find speech — my own measurement was wrong
+
+Having asked the author to leave half a second at each end, I measured his next
+takes and reported the head silence as unchanged at 0.00–0.04 s. He said he
+*was* pausing for about half a second. He was right, and every number I had
+given him on that column since the morning was wrong.
+
+**The detector was "the first sample above 2% of the file's peak".** At a 40%
+peak that threshold sits at −42 dB — which low-level content in the first few
+hundredths of a second clears easily, while the room floor proper is near
+−60 dB. It was finding the start of the **file**, not the start of the
+**voice**.
+
+Remeasured with 10 ms RMS windows, a threshold relative to the loudest window,
+and 50 ms of consecutive windows required before calling it speech — roughly
+what the Silero VAD itself does, so it answers the question actually being
+asked:
+
+| session | reported | actually |
+|---|---|---|
+| mic test (morning) | head 0.03–0.05 s | **head 0.75–1.06 s** |
+| `1156_bill` `0002` | tail 0.00 s, "last word cut off" | **tail 0.92 s** |
+| `1208_bill` all six | head 0.00–0.04 s | **head 0.75–1.10 s** |
+
+Only one clip in eleven was ever genuinely short — the morning's `0001`, at a
+0.15 s tail. The proposed pre-roll buffer, which existed to solve this, is not
+needed.
+
+**The lesson is the one already in the file about rendering and its inverse, in
+a new costume: a measurement needs its own control.** A threshold set relative
+to a signal's peak says nothing about what that signal IS. The runaway clip was
+the control available all along — its 2.5 s of genuine silence read −78 dB
+against the −58 dB I was quoting elsewhere, and that 20 dB gap was the
+measurement telling me it was looking at the wrong thing.
+
 ### The permission dialog inside the hold (found by the author, same day)
 
 Testing the new session bar, the author: *"the first record asks for microphone
@@ -56,7 +91,7 @@ released the button to answer it; `stopRec` ran while `recording` was still
 `false` and returned having done nothing; then the await resumed and set
 `recording = true` — with the release already spent. **The first take ran away
 and nothing could stop it.** His clip `0001` is the evidence: 8.39 s long with
-2.00 s of leading and 2.41 s of trailing silence around about four seconds of
+2.53 s of leading and 2.59 s of trailing silence around about three seconds of
 speech.
 
 Two fixes, because the second holds whatever the first does not cover:
@@ -93,9 +128,13 @@ better order.
 **The breath of silence at each end is 0.25 s, and it is in the code.** The same
 loader trims with a Silero VAD keeping `keep_seconds_before_silence = 0.25` /
 `..._after_silence = 0.25`, clamped by `max(0, …)` — so it can only keep silence
-that is actually there. The test clips measured 0.03–0.05 s of head silence, a
-quarter-second tighter than training wants. The rig's own instructions now say
-"hold, wait about half a second, speak, wait again, release" and say why.
+that is actually there. The rig's own instructions now say "hold, wait about
+half a second, speak, wait again, release" and say why.
+
+> **Corrected later the same day.** I also reported the test clips as having
+> 0.03–0.05 s of head silence and asked the author to pause longer. He already
+> was — remeasured, every take had 0.68–1.10 s. The detector was wrong, not the
+> takes. See the entry below.
 
 ---
 

@@ -81,14 +81,27 @@ truncated. Median RMS 0.049.
 > Recording at 48 k and coming down beats capturing at 22 k. All 63 takes of the
 > first fine-tune were 48 kHz.
 
-> **Leave about half a second of silence at each end of a take** — measured, not
-> a nicety. The same loader trims each clip with a Silero VAD and keeps
-> `keep_seconds_before_silence = 0.25` / `..._after_silence = 0.25`
-> (`dataset.py:70-71`), clamped by `max(0, …)` and `min(audio_seconds, …)`: it
-> can only keep silence that is **actually there**. A 2026-10-28 mic test
-> measured 0.03–0.05 s of head silence, a quarter-second tighter than training
-> wants. A full second is harmless — it is trimmed back to 0.25 s — just slower
-> to record.
+> **Leave about half a second of silence at each end of a take.** The loader
+> trims each clip with a Silero VAD and keeps `keep_seconds_before_silence =
+> 0.25` / `..._after_silence = 0.25` (`dataset.py:70-71`), clamped by
+> `max(0, …)` and `min(audio_seconds, …)`: it can only keep silence that is
+> **actually there**. A full second is harmless — trimmed back to 0.25 s — just
+> slower to record.
+
+> **MEASURING that margin: a level threshold does not find speech.** On
+> 2026-10-28 I reported a reader's takes as having 0.03–0.05 s of head silence
+> and asked him to pause longer. He already was: remeasured, every take had
+> **0.68–1.10 s**. The detector was "first sample above 2% of the file's peak",
+> and at a 40% peak that threshold sits at −42 dB — which low-level room content
+> in the first few hundredths of a second clears easily, while the room floor
+> proper is around −60 dB. It was finding the start of the *file*, not the start
+> of the *voice*.
+>
+> **Use sustained energy**: 10 ms RMS windows, a threshold relative to the
+> loudest window, and require ~50 ms of consecutive windows above it. Run it
+> over the reversed signal for the tail. That is also roughly what the Silero
+> VAD does, so it answers the question actually being asked — what will the
+> trimmer call speech.
 
 **One clip excluded.** `0001` was a level-finding take at **0.35× the median
 RMS** — a third the level of everything else. The author chose to exclude rather
