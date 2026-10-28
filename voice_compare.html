@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice compare</title>
+<!--
+  2026-10-28 — hear a fine-tuned voice on text it WAS trained on, and on text it
+  was not.
+
+  The author asked for exactly this after the first mechanism run: "can you give
+  me a way to hear on the recorded passage and on a fresh passage". It is the
+  one comparison that tells you what a small training set has actually bought,
+  because a VITS fine-tune on a minute of audio will reproduce its own sentences
+  far better than anything else — and only the pair reveals that. A single
+  sample of either on its own is easy to misread as "the voice works" or "the
+  voice is broken".
+
+  Separate from speech_bench.html deliberately. The bench measures engines
+  against each other and its voice list is a hardcoded set of HuggingFace ids;
+  this compares ONE voice against ITSELF on seen and unseen text, and lists the
+  locally installed voices from /api/local-voices.
+
+  It synthesises through piper_direct.js — the same path BD uses, including the
+  lexicon — so what is heard here is what BD will say.
+-->
+<style>
+  :root { color-scheme: dark; }
+  body { background:#14141a; color:#e8e8ea; font:16px/1.55 system-ui,-apple-system,sans-serif;
+         margin:0; padding:18px 16px 48px; max-width:840px; margin-inline:auto; }
+  h1 { font-size:17px; margin:0 0 3px; font-weight:600; }
+  .sub { color:#9a9aa4; font-size:13px; margin:0 0 18px; }
+  .card { background:#1c1c24; border:1px solid #33333e; border-radius:8px;
+          padding:14px 16px; margin:0 0 14px; }
+  .card.seen   { border-left:3px solid #6a8f6f; }
+  .card.unseen { border-left:3px solid #b09e3b; }
+  .card.fresh  { border-left:3px solid #8f6a7a; }
+  .card h2 { font-size:14px; margin:0 0 4px; font-weight:600; }
+  .card .why { font-size:13px; color:#9a9aa4; margin:0 0 10px; }
+  textarea { width:100%; box-sizing:border-box; min-height:84px; resize:vertical;
+             font:16px/1.5 inherit; background:#101015; color:#e8e8ea;
+             border:1px solid #33333c; border-radius:6px; padding:9px 10px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0 0; }
+  button { font:600 15px/1 inherit; padding:11px 16px; border-radius:6px; cursor:pointer;
+           background:#2a2a34; color:#e8e8ea; border:1px solid #4a4a58; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.go { background:#b09e3b; border-color:#a07820; color:#1a1a20; }
+  select { font:16px/1.2 inherit; padding:9px 10px; border-radius:6px;
+           background:#101015; color:#e8e8ea; border:1px solid #4a4a58; }
+  label { font-size:13px; color:#9a9aa4; }
+  .note { font-size:13px; color:#9a9aa4; min-height:19px; margin:8px 0 0; }
+  .note.busy { color:#f0c674; } .note.done { color:#7fe08f; } .note.bad { color:#ff9a9a; }
+  #log { white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+         background:#101015; border:1px solid #2c2c36; border-radius:6px; padding:10px;
+         color:#9a9aa4; max-height:170px; overflow:auto; margin-top:14px; }
+  .bar { display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+         background:#1c1c24; border:1px solid #33333e; border-radius:8px;
+         padding:12px 14px; margin:0 0 16px; }
+</style>
+</head>
+<body>
+
+<h1>Voice compare</h1>
+<p class="sub">One voice, on text it was trained on and text it has never seen.
+The pair is the point &mdash; either alone is easy to misread.</p>
+
+<div class="bar">
+  <label for="voice">Voice</label>
+  <select id="voice"><option>loading…</option></select>
+  <label for="ref">against</label>
+  <select id="ref">
+    <option value="">— nothing, just the voice —</option>
+    <option value="en_GB-alba-medium">alba, the voice it was fine-tuned from</option>
+  </select>
+  <button id="refresh">Refresh list</button>
+</div>
+
+<div class="card seen">
+  <h2>Trained on this</h2>
+  <p class="why">Prompts 0001&ndash;0003 of the Tao set, read into the session itself.
+  A fine-tune reproduces its own sentences best, so this is the <b>upper bound</b> &mdash;
+  the most the voice can do, not what it will usually do.</p>
+  <textarea id="t-seen"></textarea>
+  <div class="row">
+    <button class="go" data-src="t-seen">Speak this</button>
+    <button data-src="t-seen" data-ref="1">Speak in the reference voice</button>
+  </div>
+</div>
+
+<div class="card unseen">
+  <h2>Never heard, same text and register</h2>
+  <p class="why">Prompts 0016&ndash;0017 &mdash; further into the same translation, in the same
+  voice and rhythm, but not recorded. This is the <b>honest</b> test: it isolates
+  generalisation from memorisation, because nothing but the training set differs.</p>
+  <textarea id="t-unseen"></textarea>
+  <div class="row">
+    <button class="go" data-src="t-unseen">Speak this</button>
+    <button data-src="t-unseen" data-ref="1">Speak in the reference voice</button>
+  </div>
+</div>
+
+<div class="card fresh">
+  <h2>Never heard, different register</h2>
+  <p class="why">Ordinary modern prose with none of the Tao's cadence. Where a thin
+  fine-tune usually falls down hardest, and the closest of the three to what BD
+  actually reads aloud.</p>
+  <textarea id="t-fresh"></textarea>
+  <div class="row">
+    <button class="go" data-src="t-fresh">Speak this</button>
+    <button data-src="t-fresh" data-ref="1">Speak in the reference voice</button>
+  </div>
+</div>
+
+<p class="note" id="note">&nbsp;</p>
+<audio id="audio" controls style="width:100%;margin-top:6px"></audio>
+<div id="log">ready.</div>
+
+<script type="module">
+import { synthesise, loadVoice } from '/piper_direct.js';
+
+const $ = id => document.getElementById(id);
+const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; };
+const note = (m, cls) => { $('note').textContent = m; $('note').className = 'note ' + (cls || ''); };
+
+// Prefilled from the real set rather than typed out here, so the "trained on
+// this" box cannot drift away from what was actually recorded.
+$('t-seen').value   = 'The tao that can be described is not the eternal Tao. ' +
+                      'The name that can be spoken is not the eternal Name. ' +
+                      'The nameless is the boundary of Heaven and Earth.';
+$('t-unseen').value = 'If you overly esteem talented individuals, people will become overly ' +
+                      'competitive. If you overvalue possessions, people will begin to steal.';
+$('t-fresh').value  = 'The kettle was still warm when she came back down, and there were ' +
+                      'three chairs by the window with nobody in them.';
+
+let lexicon = {};
+try {
+  const r = await fetch('/speech_lexicon.json');
+  if (r.ok) lexicon = await r.json();
+  log(`lexicon: ${Object.keys(lexicon).length} entries`);
+} catch (_) { log('lexicon unavailable — espeak only'); }
+
+async function listVoices() {
+  const sel = $('voice');
+  try {
+    const d = await (await fetch('/api/local-voices')).json();
+    const vs = d.voices || [];
+    sel.innerHTML = '';
+    if (!vs.length) {
+      sel.innerHTML = '<option value="">no local voice installed</option>';
+      note('Nothing in voices/ yet — install a pair <name>.onnx and <name>.onnx.json.', 'bad');
+      return;
+    }
+    for (const v of vs) {
+      const o = document.createElement('option');
+      o.value = v.id;
+      o.textContent = `${v.name}  (${(v.bytes / 1048576).toFixed(1)} MB)`;
+      sel.appendChild(o);
+    }
+    log(`${vs.length} local voice(s): ${vs.map(v => v.name).join(', ')}`);
+    note(' ');
+  } catch (e) {
+    sel.innerHTML = '<option value="">could not list voices</option>';
+    note('Could not list voices: ' + e.message, 'bad');
+  }
+}
+await listVoices();
+$('refresh').addEventListener('click', listVoices);
+
+// Serialised: two overlapping synth calls on MPS-backed WASM contend for the
+// same session, and the second's audio can arrive first.
+let busy = false;
+async function speak(text, voiceId) {
+  if (busy) { note('Still working on the last one.', 'busy'); return; }
+  if (!voiceId) { note('Pick a voice first.', 'bad'); return; }
+  if (!text.trim()) { note('Nothing to say.', 'bad'); return; }
+  busy = true;
+  document.querySelectorAll('button').forEach(b => b.disabled = true);
+  const t0 = performance.now();
+  note(`Synthesising ${text.length} characters in ${voiceId}…`, 'busy');
+  try {
+    await loadVoice(voiceId, u => log('fetched ' + u.split('/').pop()));
+    const out = await synthesise({ voiceId, text, lexicon });
+    if (!out || !out.blob) throw new Error('synthesise returned no audio');
+    $('audio').src = URL.createObjectURL(out.blob);
+    await $('audio').play().catch(() => {});
+    const ms = performance.now() - t0;
+    // `missing` is the list of phoneme symbols the voice's table does not have.
+    // toIds DROPS them rather than approximating, so a sound simply vanishes
+    // with nothing audible to say it was meant to be there. Report it.
+    const miss = (out.missing || []).length
+      ? `  ·  DROPPED ${out.missing.length} symbol(s): ${[...new Set(out.missing)].join(' ')}` : '';
+    note(`${voiceId} — ${out.seconds.toFixed(1)} s of audio from ${text.length} characters ` +
+         `in ${(ms / 1000).toFixed(1)} s (${(ms / text.length).toFixed(0)} ms/char)${miss}`,
+         miss ? 'bad' : 'done');
+    log(`${voiceId}: ${text.length} ch -> ${out.seconds.toFixed(1)}s audio, ` +
+        `synth ${(ms / 1000).toFixed(1)}s${miss}`);
+  } catch (e) {
+    note('Failed: ' + e.message, 'bad');
+    log('ERROR ' + e.message);
+  } finally {
+    busy = false;
+    document.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+}
+
+for (const b of document.querySelectorAll('button[data-src]')) {
+  b.addEventListener('click', () => {
+    const text = $(b.dataset.src).value;
+    const voiceId = b.dataset.ref ? $('ref').value : $('voice').value;
+    if (b.dataset.ref && !voiceId) { note('Pick a reference voice first.', 'bad'); return; }
+    speak(text, voiceId);
+  });
+}
+</script>
+</body>
+</html>

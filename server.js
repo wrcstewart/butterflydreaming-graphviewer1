@@ -574,6 +574,33 @@ function readPromptSet(id) {
   } catch (_) { return null; }
 }
 
+// 2026-10-28 — which fine-tuned voices are actually on disk.
+//
+// `local/<name>` in piper_direct.js resolves to voices/<name>.onnx plus
+// voices/<name>.onnx.json, and BOTH must be present: the config carries
+// phoneme_id_map and the inference scales, so a model without its config
+// cannot be spoken at all. So this lists PAIRS, never a lone .onnx — a
+// half-installed voice offered in a dropdown fails at synthesis with nothing
+// on screen to say why.
+app.get('/api/local-voices', (req, res) => {
+  try {
+    const dir = './voices';
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+    const out = [];
+    for (const f of files) {
+      if (!f.endsWith('.onnx')) continue;
+      const name = f.slice(0, -5);
+      if (!files.includes(f + '.json')) continue;      // no config, not speakable
+      let bytes = 0, mtime = null;
+      try { const st = fs.statSync(`${dir}/${f}`); bytes = st.size; mtime = st.mtime; } catch (_) {}
+      out.push({ id: 'local/' + name, name, bytes, mtime });
+    }
+    out.sort((a, b) => String(b.mtime).localeCompare(String(a.mtime)));
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.json({ voices: out });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // What the rig needs to build the dropdown: every set, without the prompts.
 app.get('/api/prompt-sets', (req, res) => {
   const out = [];
