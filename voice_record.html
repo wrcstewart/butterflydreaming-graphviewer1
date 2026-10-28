@@ -49,12 +49,57 @@
          max-height:150px; overflow:auto; }
   details { margin:14px 0 0; } summary { cursor:pointer; color:#9a9aa4; font-size:13px; }
   details p, details li { font-size:14px; color:#c2c2ca; }
+  /* Session bar. Amber, not grey: until a session is open nothing can be
+     recorded, so this is the active instruction on the page, not chrome. */
+  .session { background:#1c1c24; border:1px solid #33333e; border-radius:8px;
+             padding:12px 14px; margin:0 0 14px; }
+  .session.open { border-color:#3c5a3e; background:#171d18; }
+  .session .row { margin:0; }
+  .session label { font-size:13px; color:#9a9aa4; }
+  /* 16px minimum: below it iOS Safari zooms the page on focus. */
+  .session input, .session select { font:16px/1.2 inherit; padding:10px 10px; border-radius:6px;
+            background:#101015; color:#e8e8ea; border:1px solid #4a4a58; min-width:140px; }
+  .session button { padding:10px 14px; font-size:15px; }
+  .session .who { font-weight:600; color:#e8e8ea; }
+  .session .note { font-size:13px; color:#9a9aa4; margin:8px 0 0; }
+  .session .note.live { color:#7fe08f; }
+  .linky { background:none; border:none; color:#9a9aa4; text-decoration:underline;
+           padding:0; font-size:13px; font-weight:400; }
 </style>
 </head>
 <body>
 
 <h1>Voice recording</h1>
 <p class="sub">One prompt per clip. Read at the pace you want the finished voice to read at.</p>
+
+<!--
+  WHOSE VOICE IS THIS. Every clip is written into a named session directory, and
+  nothing can be recorded until one is open. Before 2026-10-28 there was one
+  fixed folder, so a second reader's takes overwrote the first reader's,
+  filename for filename, without a word of warning.
+
+  A session is a SPEAKER'S SET, not a sitting: open it once, resume it as often
+  as the set takes. The rig remembers the open session across reloads, so
+  closing the laptop and coming back tomorrow continues the same set.
+-->
+<div class="session" id="session-bar">
+  <div class="row" id="session-open-row" hidden>
+    <span class="who" id="session-name">—</span>
+    <span id="session-count" style="color:#9a9aa4;font-size:13px"></span>
+    <button class="linky" id="session-change">change</button>
+  </div>
+  <div class="row" id="session-new-row">
+    <label for="who">Whose voice is this?</label>
+    <input id="who" placeholder="first name" autocomplete="off" spellcheck="false">
+    <button class="go" id="session-start">Start a new session</button>
+  </div>
+  <div class="row" id="session-resume-row" hidden>
+    <label for="pick">or resume:</label>
+    <select id="pick"></select>
+    <button id="session-resume">Resume</button>
+  </div>
+  <p class="note" id="session-note">&nbsp;</p>
+</div>
 
 <div class="prompt-box">
   <p class="counter" id="counter">loading…</p>
@@ -81,8 +126,10 @@
   and don't move between clips. Inconsistent conditions poison a fine-tune, because the
   model learns the room as part of the voice.</p>
   <ul>
-    <li><b>Hold the button</b> while speaking, release when finished. Leave a breath of
-        silence at each end — don't clip the first or last word.</li>
+    <li><b>Hold the button</b>, wait about half a second, speak, wait again, release.
+        That half-second is a measured number, not a nicety: training trims each clip
+        with a voice detector that keeps 0.25&nbsp;s of silence either side of the
+        speech, and it can only keep silence that is actually there.</li>
     <li><b>Read at the pace you want back.</b> The model learns delivery, not just
         timbre: read briskly and everything it ever says will be brisk.</li>
     <li><b>Play back the first two or three</b> and listen for room echo, hum, or
@@ -102,22 +149,126 @@ const status = (m, cls) => { const el = $('status'); el.textContent = m; el.clas
 let prompts = [], idx = 0, recorded = new Set();
 let ctx = null, stream = null, node = null, chunks = [], recording = false, sampleRate = 48000;
 let lastWav = null;
+let session = null;
+
+// Remembered across reloads so that resuming is the DEFAULT and opening a new
+// session is a deliberate act. The other way round, a reload mid-set would
+// quietly start a second directory and both halves would resume from zero.
+const REMEMBER = 'bd_voice_session';
+
+// ---- session ---------------------------------------------------------------
+function sessionActive() { return !!session; }
+
+function renderSession(note, cls) {
+  const open = sessionActive();
+  $('session-bar').classList.toggle('open', open);
+  $('session-open-row').hidden = !open;
+  $('session-new-row').hidden = open;
+  $('session-resume-row').hidden = open || !$('pick').options.length;
+  if (open) {
+    $('session-name').textContent = session;
+    $('session-count').textContent = `· ${recorded.size} of ${prompts.length} recorded`;
+  }
+  const el = $('session-note');
+  el.textContent = note || (open ? 'Every clip is written into this session.'
+                                 : 'Name the session before recording — nothing can be saved without one.');
+  el.className = 'note ' + (cls || (open ? 'live' : ''));
+  gateControls();
+}
+
+// The gate. Without a session the server refuses the clip anyway, but a reader
+// should never get as far as recording a take that cannot be saved.
+function gateControls() {
+  const open = sessionActive();
+  $('rec').disabled = !open;
+  $('rec').textContent = open ? 'Hold to record' : 'Open a session first';
+  if (!open) { $('play').disabled = true; $('keep').disabled = true; }
+}
+
+async function useSession(name, how) {
+  session = name;
+  try { localStorage.setItem(REMEMBER, name); } catch (_) {}
+  recorded = new Set();
+  try {
+    const s = await (await fetch('/api/voice-status?session=' + encodeURIComponent(name))).json();
+    if (s.error) throw new Error(s.error);
+    (s.recorded || []).forEach(id => recorded.add(id));
+  } catch (e) { log('could not read session status: ' + e.message); }
+  // Start at the first prompt without audio, so a second sitting continues
+  // rather than re-treading what is already done.
+  const firstGap = prompts.findIndex(x => !recorded.has(x.id));
+  idx = firstGap === -1 ? 0 : firstGap;
+  log(`${how} ${name} — ${recorded.size} clip(s) already recorded`);
+  render();
+  renderSession();
+}
+
+async function loadSessions() {
+  let list = [];
+  try {
+    const d = await (await fetch('/api/voice-sessions')).json();
+    list = d.sessions || [];
+  } catch (_) {}
+  const pick = $('pick');
+  pick.innerHTML = '';
+  for (const s of list) {
+    const o = document.createElement('option');
+    o.value = s.session;
+    o.textContent = `${s.session}  (${s.recorded} clips)`;
+    pick.appendChild(o);
+  }
+  return list;
+}
 
 // ---- prompts + resume ------------------------------------------------------
 async function boot() {
   const p = await (await fetch('voice_prompts.json')).json();
   prompts = p.prompts || [];
-  try {
-    const s = await (await fetch('/api/voice-status')).json();
-    (s.recorded || []).forEach(id => recorded.add(id));
-    if (recorded.size) log(`resuming — ${recorded.size} clip(s) already recorded`);
-  } catch (_) {}
-  // Start at the first prompt without audio, so a second sitting continues
-  // rather than re-treading what is already done.
-  const firstGap = prompts.findIndex(x => !recorded.has(x.id));
-  idx = firstGap === -1 ? 0 : firstGap;
   render();
+  const list = await loadSessions();
+  // Resume only a remembered session that STILL EXISTS. A name in localStorage
+  // whose directory has been moved or renamed would otherwise write clips into
+  // a session the server would have to recreate, under a name nobody chose.
+  let remembered = null;
+  try { remembered = localStorage.getItem(REMEMBER); } catch (_) {}
+  if (remembered && list.some(s => s.session === remembered)) {
+    await useSession(remembered, 'resuming');
+  } else {
+    if (remembered) log(`previous session "${remembered}" is no longer on disk`);
+    renderSession();
+  }
 }
+
+$('session-start').addEventListener('click', async () => {
+  const label = $('who').value.trim();
+  if (!label) { renderSession('Type a name first — this is what the folder is called.', 'warn'); $('who').focus(); return; }
+  $('session-start').disabled = true;
+  try {
+    const d = await (await fetch('/api/voice-session?label=' + encodeURIComponent(label),
+                                 { method: 'POST' })).json();
+    if (d.error) throw new Error(d.error);
+    await loadSessions();
+    await useSession(d.session, 'new session');
+  } catch (e) {
+    renderSession('Could not open a session: ' + e.message, 'warn');
+  } finally { $('session-start').disabled = false; }
+});
+
+$('session-resume').addEventListener('click', async () => {
+  const name = $('pick').value;
+  if (name) await useSession(name, 'resuming');
+});
+
+// Changing session is deliberate and reversible — it only forgets which one is
+// open, and never touches a clip.
+$('session-change').addEventListener('click', async () => {
+  session = null;
+  try { localStorage.removeItem(REMEMBER); } catch (_) {}
+  recorded = new Set();
+  await loadSessions();
+  render();
+  renderSession('Pick an existing session, or name a new one.');
+});
 
 function render() {
   const p = prompts[idx];
@@ -193,6 +344,7 @@ function encodeWav(parts, rate) {
 
 async function startRec() {
   if (recording) return;
+  if (!sessionActive()) { status('Open a session first — whose voice is this?', 'warn'); return; }
   try { await ensureMic(); } catch (e) { status('Microphone refused: ' + e.message, 'bad'); return; }
   if (ctx.state === 'suspended') await ctx.resume();
   chunks = []; recording = true;
@@ -224,7 +376,12 @@ rec.addEventListener('pointerdown', e => { e.preventDefault(); startRec(); });
 rec.addEventListener('pointerup', stopRec);
 rec.addEventListener('pointerleave', () => { if (recording) stopRec(); });
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'BUTTON') { e.preventDefault(); startRec(); }
+  // INPUT and SELECT as well as BUTTON: the session name is typed on this page,
+  // and a space in "mary ann" must put a space in the field, not start a take.
+  const t = (document.activeElement || {}).tagName;
+  if (e.code === 'Space' && !e.repeat && t !== 'BUTTON' && t !== 'INPUT' && t !== 'SELECT') {
+    e.preventDefault(); startRec();
+  }
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') { e.preventDefault(); stopRec(); } });
 
@@ -235,10 +392,12 @@ $('play').addEventListener('click', () => {
 $('keep').addEventListener('click', async () => {
   const p = prompts[idx];
   if (!lastWav || !p) return;
+  if (!sessionActive()) { status('No session open — the clip cannot be saved.', 'bad'); return; }
   $('keep').disabled = true;
   status('Saving…');
   try {
-    const r = await fetch(`/api/voice-clip?id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}`,
+    const r = await fetch(`/api/voice-clip?session=${encodeURIComponent(session)}` +
+                          `&id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}`,
       { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: lastWav.blob });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
@@ -246,6 +405,7 @@ $('keep').addEventListener('click', async () => {
     log(`saved ${p.id}  (${(d.bytes / 1024).toFixed(0)} kB)  ${d.recorded} recorded`);
     idx = Math.min(idx + 1, prompts.length);
     render();
+    renderSession();
   } catch (e) {
     status('Save FAILED: ' + e.message + ' — the take is still here, try Keep again.', 'bad');
     $('keep').disabled = false;

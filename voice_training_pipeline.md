@@ -32,15 +32,38 @@ audio can read a corpus of any size, and the corpus can grow without retraining.
 |---|---|---|
 | `voice_record.html` | repo root | recording rig — AudioWorklet direct PCM, resumable, warns on clipping/quiet/short |
 | `voice_prompts.json` / `.md` | repo root | 63 prompts, 45 phonemes, none below five occurrences |
-| `/api/voice-clip`, `/api/voice-status` | `server.js` | writes each take to disk; reports what is already recorded |
-| `voice_dataset/` | repo root, gitignored | `wav/NNNN.wav` + `metadata.csv` in LJSpeech layout |
+| `/api/voice-session{,s}`, `/api/voice-clip`, `/api/voice-status` | `server.js` | opens and lists sessions; writes each take into the named one |
+| `voice_sessions/<session>/` | repo root, gitignored | `wav/NNNN.wav` + `metadata.csv` in LJSpeech layout, **one directory per speaker** |
 | `~/bd_voice_train/venv` | outside the repo | Python 3.12, torch 2.14 + MPS, piper-tts 1.8 |
 | `~/bd_voice_train/train_bd.py` | outside the repo | training launcher — see §5.5 |
 | `~/bd_voice_train/export_bd.py` | outside the repo | ONNX export — see §5.6 |
 | `voices/<name>.onnx{,.json}` | repo root, gitignored | what BD loads via `?voice=local/<name>` |
 
-**Nothing voice-related is committed.** `voice_dataset/`, `voices/`, `*.wav` are
-gitignored. The repository is public, and a fine-tune *is* someone's voice.
+**Nothing voice-related is committed.** `voice_sessions/`, `voice_dataset*/`,
+`voices/`, `*.wav` are gitignored. The repository is public, and a fine-tune
+*is* someone's voice.
+
+### One directory per speaker (2026-10-28)
+
+A session is named `YYYY-MM-DD_HHMM_<label>` — the label is whose voice it is —
+and the rig **refuses to record until one is open**. Until this change there was
+a single hardcoded `voice_dataset/`, so a second reader's takes would have
+landed on the first reader's, filename for filename, without warning.
+
+**A session is a speaker's set, not a sitting.** It is opened once and resumed
+across as many sittings as the set takes; the rig remembers the open session in
+`localStorage` and reopening the page continues it. That distinction is
+load-bearing — resume works by finding the first prompt *without* audio, so
+splitting one speaker across two directories would make both halves restart from
+the beginning. "Start a new session" is therefore a deliberate act, and changing
+session never touches a clip.
+
+Existing sets were migrated into the scheme:
+
+| was | is now |
+|---|---|
+| `voice_dataset_will_01/` | `voice_sessions/2026-09-06_1209_will/` (63 takes, the first fine-tune) |
+| `voice_dataset/` | `voice_sessions/2026-10-28_1103_will-mictest/` (3 takes, a mic test) |
 
 ---
 
@@ -50,11 +73,28 @@ gitignored. The repository is public, and a fine-tune *is* someone's voice.
 16-bit, mean 5.9 s, range 3.4–10.0 s. Nothing clipped, nothing silent, nothing
 truncated. Median RMS 0.049.
 
+> **48 kHz is correct, and `--model.sample_rate 22050` does not contradict it.**
+> Checked 2026-10-28 when a mic test read 48000 and looked like a fault. The rig
+> captures at whatever rate the device gives (it only warns *below* 22050), and
+> piper's loader resamples on the way into the cache:
+> `librosa.load(path, sr=self.sample_rate)` at `piper/train/vits/dataset.py:370`.
+> Recording at 48 k and coming down beats capturing at 22 k. All 63 takes of the
+> first fine-tune were 48 kHz.
+
+> **Leave about half a second of silence at each end of a take** — measured, not
+> a nicety. The same loader trims each clip with a Silero VAD and keeps
+> `keep_seconds_before_silence = 0.25` / `..._after_silence = 0.25`
+> (`dataset.py:70-71`), clamped by `max(0, …)` and `min(audio_seconds, …)`: it
+> can only keep silence that is **actually there**. A 2026-10-28 mic test
+> measured 0.03–0.05 s of head silence, a quarter-second tighter than training
+> wants. A full second is harmless — it is trimmed back to 0.25 s — just slower
+> to record.
+
 **One clip excluded.** `0001` was a level-finding take at **0.35× the median
 RMS** — a third the level of everything else. The author chose to exclude rather
 than re-record.
 
-> **Exclude in a staged copy, never in `voice_dataset/metadata.csv`.** The
+> **Exclude in a staged copy, never in the session's own `metadata.csv`.** The
 > recorder REWRITES that manifest on every Keep, so a filter applied there is
 > silently undone by the next take. `~/bd_voice_train/dataset/metadata.csv` holds
 > the filtered list; the WAV directory is symlinked so there is still one copy of
@@ -86,8 +126,10 @@ cd ~/bd_voice_train
 
 # 1. Stage the dataset (exclude any takes you do not want)
 mkdir -p dataset
-grep -v '^0001|' ~/butterflydreaming_graphviewer1/voice_dataset/metadata.csv > dataset/metadata.csv
-ln -sfn ~/butterflydreaming_graphviewer1/voice_dataset/wav dataset/wav
+SESSION=2026-09-06_1209_will        # which speaker's set to train on
+SRC=~/butterflydreaming_graphviewer1/voice_sessions/$SESSION
+grep -v '^0001|' $SRC/metadata.csv > dataset/metadata.csv
+ln -sfn $SRC/wav dataset/wav
 
 # 2. Base checkpoint (846 MB, once)
 mkdir -p base && cd base

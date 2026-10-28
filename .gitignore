@@ -8,7 +8,12 @@ speech_cache/
 # The dataset is a real person's voice, it is the one irreplaceable artefact in
 # the speech work, and it is gigabytes. None of those three belong in git.
 # Trained model weights are excluded for the same reason: they ARE the voice.
-voice_dataset/
+# 2026-10-28 — one directory per speaker, so BOTH patterns stay: the old
+# single folder in case anything recreates it, and the new session root. The
+# `*.wav` line was carrying the archive on its own, which left the transcripts
+# beside it visible to git.
+voice_dataset*/
+voice_sessions/
 voice_models/
 *.wav
 

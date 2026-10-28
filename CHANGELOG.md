@@ -6,6 +6,62 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-28 — one voice-dataset directory per speaker, and two measured facts about takes
+
+The author's wife records her training set tomorrow. He asked the question that
+mattered: *"Would it not be better if each session ended up in its own file with
+say a time stamp in the name — then we can test again and be absolutely sure my
+wife's ends up in a file of its own?"*
+
+**It was worse than untidy.** `VOICE_DIR = './voice_dataset'` was one hardcoded
+path with no concept of a speaker, and the prompt ids are fixed (`0001`…`0063`).
+A second reader sitting down at the rig would have written over the first
+reader's set **filename for filename, silently** — and a voice dataset is the
+one artefact in the speech work that cannot be regenerated. The three mic-test
+clips recorded this morning were already sitting where her first take would land.
+
+**What was built.** Clips now go to `voice_sessions/<YYYY-MM-DD_HHMM_label>/`,
+the label being whose voice it is. Two new endpoints open and list sessions;
+`/api/voice-clip` and `/api/voice-status` both now **require** a valid session
+and refuse without one — the refusal is the feature, not a guard around it. The
+rig grew a session bar, disables Hold-to-record until a session is open, and
+remembers the open one across reloads.
+
+**A session is a speaker's SET, not a sitting.** Resume works by finding the
+first prompt without audio, so splitting one speaker across two directories
+would make both halves restart from the beginning. Opening a new session is
+therefore deliberate; a reload continues the existing one.
+
+**Verified against a second instance on port 8099 rather than by reading the
+diff** — the live server was left serving throughout. Both migrated sets listed
+with their true counts; a clip written to `mary-ann/0001` left `will/0001`
+untouched; and `../../etc`, `…/../../tmp`, `voice_dataset` and a
+wrong-case name were all refused by the whole-string pattern.
+
+Two existing sets were migrated in: `voice_dataset_will_01/` → `2026-09-06_1209_will`
+(63 takes, the first fine-tune) and `voice_dataset/` → `2026-10-28_1103_will-mictest`
+(3 takes). `.gitignore` gained `voice_sessions/` and `voice_dataset*/`; the
+archive had been resting on the `*.wav` line alone, which left its transcripts
+visible to git.
+
+### Two things measured while assessing the mic test
+
+**48 kHz is correct.** All three test clips read 48000 against a training
+command that passes `--model.sample_rate 22050`, which looked like a fault and
+is not: piper's loader resamples on the way into the cache
+(`librosa.load(path, sr=self.sample_rate)`, `dataset.py:370`), and all 63 takes
+of the first fine-tune were 48 kHz too. Capturing high and coming down is the
+better order.
+
+**The breath of silence at each end is 0.25 s, and it is in the code.** The same
+loader trims with a Silero VAD keeping `keep_seconds_before_silence = 0.25` /
+`..._after_silence = 0.25`, clamped by `max(0, …)` — so it can only keep silence
+that is actually there. The test clips measured 0.03–0.05 s of head silence, a
+quarter-second tighter than training wants. The rig's own instructions now say
+"hold, wait about half a second, speak, wait again, release" and say why.
+
+---
+
 ## 2026-10-25 — the readout gets its space back, and a row width that had no business being shared
 
 A short entry, and a consequence of yesterday's work rather than a new fault.

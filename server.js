@@ -522,31 +522,107 @@ app.get('/api/section', async (req, res) => {
 // no place in the deployed system.
 //
 // LJSpeech layout, which is what piper's preprocessing expects:
-//   voice_dataset/wav/0001.wav        one file PER PROMPT
-//   voice_dataset/metadata.csv        0001|exact transcript
+//   voice_sessions/<session>/wav/0001.wav   one file PER PROMPT
+//   voice_sessions/<session>/metadata.csv   0001|exact transcript
 //
 // One file per prompt rather than one long take: training pairs each clip with
 // its text, so recording prompt-by-prompt buys the alignment for free instead of
 // requiring it to be recovered by hand afterwards.
-const VOICE_DIR = './voice_dataset';
-const VOICE_WAV = `${VOICE_DIR}/wav`;
+//
+// 2026-10-28 — ONE DIRECTORY PER SPEAKER. This was a single hardcoded
+// `voice_dataset/`, which meant the next person to sit at the rig recorded ON
+// TOP of the last person's set: same prompts, same ids, same filenames,
+// silently replaced. The author asked for this before his wife's session, for
+// exactly that reason. A clip can no longer be written without naming a
+// session, and the rig refuses to record until one is chosen.
+//
+// A SESSION IS A SPEAKER'S SET, NOT A SITTING. It is created once, carries the
+// date and time it was created, and is resumed across as many sittings as the
+// set takes. That distinction is load-bearing: resume works by finding the
+// first prompt WITHOUT audio, so splitting one speaker across two directories
+// would make both of them restart from the beginning.
+const VOICE_ROOT = './voice_sessions';
+
+// Whole-string match with no dots and no separators, so a name arriving in a
+// query string cannot climb out of VOICE_ROOT however it is spelled.
+const VOICE_SESSION_RE = /^\d{4}-\d{2}-\d{2}_\d{4}_[a-z0-9-]{1,24}$/;
+
+const voiceSessionDir = (raw) =>
+  VOICE_SESSION_RE.test(String(raw || '')) ? `${VOICE_ROOT}/${raw}` : null;
+
+// What is actually on disk for one session. Counting the WAVS rather than the
+// manifest rows is deliberate: audio is the thing that cannot be regenerated,
+// and the rig resumes on what it can hear, not on what a csv claims.
+function voiceSessionStat(name) {
+  const wav = `${VOICE_ROOT}/${name}/wav`;
+  let ids = [], bytes = 0;
+  try {
+    ids = fs.readdirSync(wav).filter(f => f.endsWith('.wav')).map(f => f.slice(0, -4)).sort();
+    for (const id of ids) { try { bytes += fs.statSync(`${wav}/${id}.wav`).size; } catch (_) {} }
+  } catch (_) {}
+  return { session: name, recorded: ids, bytes };
+}
+
+// Every session on disk, newest first, so a set can be resumed by picking it
+// rather than by remembering what it was called.
+app.get('/api/voice-sessions', (req, res) => {
+  try {
+    const names = fs.existsSync(VOICE_ROOT)
+      ? fs.readdirSync(VOICE_ROOT).filter(n => VOICE_SESSION_RE.test(n)).sort().reverse()
+      : [];
+    res.json({
+      sessions: names.map(n => {
+        const s = voiceSessionStat(n);
+        return { session: n, recorded: s.recorded.length, bytes: s.bytes };
+      })
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Open a session. The label is whose voice it is; the timestamp makes it unique
+// and tells you later which set came from which evening.
+app.post('/api/voice-session', (req, res) => {
+  const label = String(req.query.label || '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+  if (!label) return res.status(400).json({ error: 'a session needs a name - whose voice is this?' });
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const name = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+               `_${pad(d.getHours())}${pad(d.getMinutes())}_${label}`;
+  const dir = voiceSessionDir(name);
+  if (!dir) return res.status(400).json({ error: 'cannot build a valid session name from that label' });
+  try {
+    fs.mkdirSync(`${dir}/wav`, { recursive: true });
+    // Report what is THERE, not zero. Two sessions opened in the same minute
+    // under the same label are the same directory, and the rig should show the
+    // real count rather than claim an empty set over existing clips.
+    const stat = voiceSessionStat(name);
+    console.log(`[BD] voice session open: ${name} (${stat.recorded.length} clip(s) present)`);
+    res.json({ ok: true, ...stat });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.post('/api/voice-clip', express.raw({ type: 'audio/wav', limit: '80mb' }),
   (req, res) => {
     const id   = String(req.query.id   || '').replace(/[^0-9A-Za-z_-]/g, '');
     const text = String(req.query.text || '');
+    // A clip with no session has nowhere safe to go. Refusing is the whole
+    // point of the change: the old unscoped write is how one speaker's set
+    // would land on top of another's.
+    const dir  = voiceSessionDir(req.query.session);
+    if (!dir)  return res.status(400).json({ error: 'no session - open one before recording' });
     if (!id)   return res.status(400).json({ error: 'no id' });
     if (!text) return res.status(400).json({ error: 'no text' });
     if (!req.body || !req.body.length) return res.status(400).json({ error: 'no audio' });
     try {
-      fs.mkdirSync(VOICE_WAV, { recursive: true });
-      fs.writeFileSync(`${VOICE_WAV}/${id}.wav`, req.body);
+      const wavDir = `${dir}/wav`;
+      fs.mkdirSync(wavDir, { recursive: true });
+      fs.writeFileSync(`${wavDir}/${id}.wav`, req.body);
 
       // Rewrite the whole manifest rather than appending: a re-take must REPLACE
       // its line, and appending would leave two rows for one clip — which
       // preprocessing would read as two examples, one of them pointing at audio
       // that no longer matches.
-      const csv = `${VOICE_DIR}/metadata.csv`;
+      const csv = `${dir}/metadata.csv`;
       const rows = new Map();
       if (fs.existsSync(csv)) {
         for (const line of fs.readFileSync(csv, 'utf8').split('\n')) {
@@ -559,8 +635,9 @@ app.post('/api/voice-clip', express.raw({ type: 'audio/wav', limit: '80mb' }),
         .map(([k, v]) => `${k}|${v}`).join('\n');
       fs.writeFileSync(csv, out + '\n');
 
-      console.log(`[BD] voice clip ${id} (${(req.body.length / 1024).toFixed(0)} kB), ${rows.size} recorded`);
-      res.json({ ok: true, id, recorded: rows.size, bytes: req.body.length });
+      console.log(`[BD] voice clip ${id} -> ${req.query.session} ` +
+                  `(${(req.body.length / 1024).toFixed(0)} kB), ${rows.size} recorded`);
+      res.json({ ok: true, id, session: String(req.query.session), recorded: rows.size, bytes: req.body.length });
     } catch (err) {
       console.error('[BD] voice-clip failed:', err.message);
       res.status(500).json({ error: err.message });
@@ -601,13 +678,10 @@ app.get('/api/check-prompt', (req, res) => {
 // Which prompts already have audio — so the page can resume rather than
 // restart, and so a session can be done in more than one sitting.
 app.get('/api/voice-status', (req, res) => {
+  const name = String(req.query.session || '');
+  if (!voiceSessionDir(name)) return res.status(400).json({ error: 'no session' });
   try {
-    const ids = fs.existsSync(VOICE_WAV)
-      ? fs.readdirSync(VOICE_WAV).filter(f => f.endsWith('.wav')).map(f => f.slice(0, -4))
-      : [];
-    let bytes = 0;
-    for (const id of ids) { try { bytes += fs.statSync(`${VOICE_WAV}/${id}.wav`).size; } catch (_) {} }
-    res.json({ recorded: ids.sort(), bytes });
+    res.json(voiceSessionStat(name));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
