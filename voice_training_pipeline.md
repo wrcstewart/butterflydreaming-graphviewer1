@@ -111,10 +111,12 @@ for character. So:
 is why this never came up. **The Tao set contains "Tao" 13 times across 10
 prompts** (0001, 0022, 0033, 0039, 0073, 0089, 0090, 0109, 0110, 0117).
 
-**The consequence, if read correctly: BD says the word differently from how the
-reader read it.** She says "TOW" (espeak's `tˈaʊ`), the /t/ phoneme is trained
-correctly, and BD later says "dow" from the lexicon's `dˈaʊ`, using the /d/ it
-learned from 235 instances elsewhere. A divergence, not a defect.
+**That divergence has since been removed, by the author's rule:** *"These are
+not different pronunciations of the same word but different words for the same
+concept."* `Tao` is read with a T and `Dao` with a D, each as spelled — which is
+what espeak does unaided, so the nine lexicon entries for the family were
+deleted. Reading, training and synthesis now all agree, and the question below
+is left standing because the RULE it produced outlives this particular word.
 
 **The hazard is the REVERSE, and this is the rule to carry:**
 

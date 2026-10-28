@@ -118,7 +118,36 @@ currently says with no entry — the column that shows why this is worth doing.
 
 ---
 
-## The Tao family — added 2026-10-28
+## The Tao family — added, then REMOVED, 2026-10-28
+
+**Removed the same day on the author's rule, which is better than mine:**
+
+> *"If it says Tao and she pronounces with a T as she will, then BD should say
+> Tao. If it reads, on another piece, Dao she will say with D and BD should
+> pronounce with a D. These are not different pronunciations of the same word
+> but different words for the same concept."*
+
+**espeak already does exactly that** — `Tao` → `tˈaʊ`, `Dao` → `dˈaʊ`,
+`Taoism` → `tˈaʊɪzəm`, `Daoism` → `dˈaʊɪzəm`, and the plurals alike. So the nine
+entries below were not merely redundant: they **forced a /d/ onto the
+T-spellings**, which is the opposite of what is wanted. Where espeak is right,
+the entry *is* the mistake. All nine deleted.
+
+The same rule settles the titles without an entry either:
+`Tao Te Ching` → `tˈaʊ tˈiː tʃˈɪŋ` and `Dao De Jing` → `dˈaʊ dɐ dʒˈɪŋ`, each
+read as spelled. The pre-existing `Tao Te Ching` → `dˌaʊdədʒˈɪŋ`
+("dow-de-jing") was a decision from the Zhuangzi work and is overruled by this
+one; the phrase occurs twice in readable node text.
+
+**One tension deliberately NOT resolved.** The Zhuangzi name entries follow a
+different convention — a deliberate anglicisation of Mandarin, so Wade-Giles
+`Tzu` is `dzə` rather than "tsoo". Read-as-spelled would change those too. That
+was a separate, considered exercise on transliterated proper names rather than
+on English loanwords, and it is left alone until the author says otherwise.
+
+### What was added, for the record
+
+
 
 The author asked for *Tao* and *Dao* to be pinned, "a word that may well crop
 up". Measured first, because the direction of the error was not the obvious one.

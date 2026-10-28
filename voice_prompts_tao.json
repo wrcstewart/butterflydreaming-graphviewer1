@@ -509,7 +509,7 @@
   {
    "match": "tao",
    "say": "Say \"Tao\" as TOW — rhyming with now, with a hard T.",
-   "why": "Not DOW. The training pairs your voice with espeak’s phonemes, and espeak says tˈaʊ."
+   "why": "Not DOW. Tao and Dao are different words; each is read as spelled, so your reading, the training and what BD says all agree."
   }
  ]
 }
