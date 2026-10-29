@@ -40,7 +40,20 @@
 // 1/0.7 = 1.4286 became 1.5714, i.e. an effective rate of 0.636.
 // SPEAK_VERSE_SCALE is derived from this, so verse stays 8% slower than prose
 // and both move together — which is what you want from one dial.
-const SPEAK_LENGTH_SCALE = (1 / 0.7) * 1.10;
+//
+// 2026-10-29 — 30% FASTER, on first hearing the fine-tuned `ringlet` voice:
+// *"It needs to speak faster — can you increase by 30%."* 1.5714 / 1.30 =
+// 1.2088, an effective rate of 0.827. A median 5.5 s utterance becomes 4.2 s.
+//
+// The division is kept in the expression rather than folded into a literal, so
+// the three decisions that produced this number stay legible: the original
+// 1/0.7, the 10% slowing of 2026-10-02, and this.
+//
+// NOTE THAT THIS IS GLOBAL. Every voice reads at this scale, alba included, on
+// top of whatever pace the voice itself was trained at — and a fine-tune learns
+// the reader's own delivery. If the two ever need different settings, the right
+// change is a per-voice scale here, not two copies of this constant.
+const SPEAK_LENGTH_SCALE = (1 / 0.7) * 1.10 / 1.30;
 // 2026-09-04 — an explicit gap between utterances.
 //
 // Each sentence is synthesised separately, so the only pause between them was
