@@ -36,6 +36,7 @@
   .card.unseen { border-left:3px solid #b09e3b; }
   .card.fresh  { border-left:3px solid #8f6a7a; }
   .card.long   { border-left:3px solid #6a7a8f; }
+  .card.verse  { border-left:3px solid #7a6a8f; }
   .card h2 { font-size:14px; margin:0 0 4px; font-weight:600; }
   .card .why { font-size:13px; color:#9a9aa4; margin:0 0 10px; }
   .verdict { display:block; margin-top:6px; font-weight:600; }
@@ -148,6 +149,22 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
   </div>
 </div>
 
+<div class="card verse">
+  <h2>Thomas Hardy &mdash; verse, which BD reads differently</h2>
+  <p class="why" id="why-verse">The opening stanza of <i>His Visitor</i>, node
+  <code>bcfa0635</code>, from BD's own Hardy material. <b>BD detects verse and changes
+  how it reads</b> &mdash; line by line rather than sentence by sentence, at
+  <code>SPEAK_VERSE_SCALE</code>, 8% slower than prose, with the short 180&nbsp;ms gap
+  between lines. This card uses the same <code>looksLikeVerse</code> BD uses, so what
+  you hear is what a stanza will sound like in the graph. Unseen by the voice, and in a
+  register the training set has none of.</p>
+  <textarea id="t-verse" style="min-height:120px"></textarea>
+  <div class="row">
+    <button class="go" data-src="t-verse">Speak this</button>
+    <button data-src="t-verse" data-ref="1">Speak in the reference voice</button>
+  </div>
+</div>
+
 <p class="note" id="note">&nbsp;</p>
 <audio id="audio" controls style="width:100%;margin-top:6px"></audio>
 <div id="log">ready.</div>
@@ -158,8 +175,8 @@ import { synthesise, loadVoice } from '/piper_direct.js';
 // BD and put in the end sentence pause and comma pauses. That will make
 // comparison better later." IMPORTED, not copied: every number in there was
 // tuned by ear against the others, and a second copy would be adjusted once.
-import { SPEAK_LENGTH_SCALE, SPEAK_GAP_MS, SPEAK_LINE_GAP_MS, splitUtterances }
-  from '/speech_timing.js';
+import { SPEAK_LENGTH_SCALE, SPEAK_VERSE_SCALE, SPEAK_GAP_MS, SPEAK_LINE_GAP_MS,
+         splitUtterances, looksLikeVerse } from '/speech_timing.js';
 // The voice endpoints are gated as of 2026-10-28 — see voice_code.js.
 import { getCode, verifyCode, codedJson } from '/voice_code.js';
 
@@ -230,6 +247,7 @@ async function checkProvenance() {
     ['t-unseen', 'why-unseen', false, 'Confirmed outside every prompt set.'],
     ['t-fresh',  'why-fresh',  false, 'Confirmed outside every prompt set.'],
     ['t-long',   'why-long',   false, 'Confirmed outside every prompt set.'],
+    ['t-verse',  'why-verse',  false, 'Confirmed outside every prompt set.'],
   ];
   for (const [ta, why, wantIn, okMsg] of cards) {
     const found = hits($(ta).value);
@@ -243,6 +261,16 @@ async function checkProvenance() {
     if (!ok) log('PROVENANCE FAIL: ' + ta);
   }
 }
+
+// Verbatim from node bcfa0635. THE LINE BREAKS ARE THE CONTENT: looksLikeVerse
+// keys on them, and a stanza pasted as one wrapped paragraph would be read as
+// prose at the wrong scale with the wrong gaps.
+$('t-verse').value =
+  'I come across from Mellstock while the moon wastes weaker\n' +
+  'To behold where I lived with you for twenty years and more:\n' +
+  'I shall go in the gray, at the passing of the mail-train,\n' +
+  'And need no setting open of the long familiar door\n' +
+  'As before.';
 
 let lexicon = {};
 try {
@@ -397,14 +425,17 @@ async function speak(text, voiceId) {
     // BD's own split: one utterance per sentence, and a sentence over maxLen
     // broken at a comma or semicolon — which is where the "comma pauses" come
     // from. They are not inserted here; they are what BD already does.
-    const utts = splitUtterances(text);
-    note(`Synthesising ${utts.length} utterance(s) in ${voiceId}…`, 'busy');
+    // BD's own decision, imported rather than reimplemented: verse is read line
+    // by line at a slower scale, prose by sentence.
+    const verse = looksLikeVerse(text);
+    const scale = verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE;
+    const utts = splitUtterances(text, { verse });
+    note(`Synthesising ${utts.length} ${verse ? 'line' : 'utterance'}(s) in ${voiceId}…`, 'busy');
     const parts = [], missing = [];
     let rate = 22050;
     for (let i = 0; i < utts.length; i++) {
       const u = utts[i];
-      const out = await synthesise({ voiceId, text: u.text, lexicon,
-                                     lengthScale: SPEAK_LENGTH_SCALE });
+      const out = await synthesise({ voiceId, text: u.text, lexicon, lengthScale: scale });
       if (!out || !out.blob) throw new Error('synthesise returned no audio');
       const decoded = await audioCtx.decodeAudioData(await out.blob.arrayBuffer());
       rate = decoded.sampleRate;
@@ -430,8 +461,9 @@ async function speak(text, voiceId) {
     const miss = missing.length
       ? `  ·  DROPPED ${missing.length} symbol(s): ${[...new Set(missing)].join(' ')}` : '';
     const gaps = parts.slice(0, -1).map(p => p.gap);
-    note(`${voiceId} — ${utts.length} utterance(s)${$('trim').checked ? ', margins trimmed' : ', margins AS GENERATED'}, ${(total / rate).toFixed(1)} s of audio ` +
-         `at pace ${SPEAK_LENGTH_SCALE.toFixed(2)}, gaps ${gaps.join('/') || 'none'} ms ` +
+    note(`${voiceId} — ${verse ? 'VERSE, ' : ''}${utts.length} ${verse ? 'line' : 'utterance'}(s)` +
+         `${$('trim').checked ? ', margins trimmed' : ', margins AS GENERATED'}, ${(total / rate).toFixed(1)} s of audio ` +
+         `at pace ${scale.toFixed(2)}, gaps ${gaps.join('/') || 'none'} ms ` +
          `(synth ${(ms / 1000).toFixed(1)} s)${miss}`, miss ? 'bad' : 'done');
     log(`${voiceId}: ${utts.length} utt, ${(total / rate).toFixed(1)}s audio, ` +
         `gaps ${gaps.join('/') || '-'}ms, synth ${(ms / 1000).toFixed(1)}s${miss}`);

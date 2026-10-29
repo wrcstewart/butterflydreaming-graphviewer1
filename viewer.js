@@ -16,6 +16,7 @@ import {
 // 2026-10-28 — pace, gaps and sentence-breaking, shared with voice_compare.html
 // so a fine-tuned voice can be judged as BD will actually deliver it.
 import {
+  looksLikeVerse,
   SPEAK_LENGTH_SCALE,
   SPEAK_VERSE_SCALE,
   SPEAK_GAP_MS,
@@ -1981,54 +1982,7 @@ function splitPauseSegments(text) {
 // 15% first, reduced by ear on 2026-09-30.
 // SPEAK_VERSE_SCALE — moved to speech_timing.js, imported above.
 
-// ── Is this passage VERSE? ──────────────────────────────────────────────
-//
-// The author proposed capitalised line starts, which is the traditional
-// convention. MEASURED across the corpus before building on it, and it is not
-// sufficient on its own:
-//
-//   Thomas Hardy      100% capitalised   mean line 38
-//   Leaves of Grass   100% capitalised   mean line 59
-//   Poems of Du Fu     33% capitalised   mean line 42
-//
-// Du Fu is a modern translation that does not capitalise every line, so the
-// capital rule alone would miss two thirds of its line breaks — and it is
-// poetry the pause is wanted in. Whitman's long lines defeat a length rule just
-// as squarely. TOGETHER they cover each other's blind spot, which is why both
-// are here rather than one.
-//
-// The ceiling matters as much as either: hard-wrapped PROSE is the thing this
-// has to exclude, and it sits near a fixed wrap width with lines that start
-// mid-sentence in lower case. A mean below 70 rules it out whatever its
-// capitals do, which also keeps the module gateways (mean ~400) out.
-//
-// Single-line nodes never reach this — there is no line break to pause at. In
-// this corpus that is every prose work: Tao Te Ching, Zhuangzi and Grimm's hold
-// ZERO newlines between them.
-//
-// Known exception, accepted: verse that is both long-lined and uncapitalised —
-// e e cummings and much modern free verse — reads as prose. One rule cannot
-// have everything, and being wrong towards prose is the quieter failure.
-function looksLikeVerse(text) {
-  if (typeof text !== 'string') return false;
-  // A module SCRIPT is a stack of short lines and reads as verse on every
-  // measure — MEASURED: all four module nodes came out as verse before this
-  // guard. Nobody is likely to speak one, but "%%bd_ is never verse" is one
-  // line and true.
-  if (text.indexOf('%%bd_') !== -1) return false;
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length < 2) return false;
-  const mean = lines.reduce((a, l) => a + l.length, 0) / lines.length;
-  if (mean >= 70) return false;                       // wrapped prose, or a gateway
-  if (mean < 55) return true;                         // short lines: Hardy, Du Fu
-  // 55-70: long-lined, so it must earn it on capitals — Whitman.
-  const after = lines.slice(1);
-  const caps = after.filter(l => {
-    const m = l.match(/^["\u201c\u2018'(\[\u2014\u2013\s]*(.)/);
-    return m && m[1] === m[1].toUpperCase() && m[1] !== m[1].toLowerCase();
-  }).length;
-  return after.length > 0 && caps / after.length >= 0.7;
-}
+// looksLikeVerse — moved to speech_timing.js (2026-10-29), imported above.
 // ── WHAT A FIRST USE ACTUALLY DOWNLOADS (corrected 2026-10-09) ──────────
 // This was SPEAK_MODEL_MB = 60 and was wrong in both directions. It named the
 // MODEL, so nobody updated it when the voice became a 19.4 MB quantised build
