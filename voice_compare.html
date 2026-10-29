@@ -129,12 +129,18 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
 </div>
 
 <div class="card long">
-  <h2>A long sentence &mdash; where the comma pause actually appears</h2>
-  <p class="why" id="why-long">BD reads a sentence whole up to <b>150 characters</b>, and only breaks a
-  longer one at a comma or semicolon. So the three passages above have
-  <b>no comma pauses to hear</b> &mdash; every gap in them is a full stop's 504&nbsp;ms.
-  This one is 254 characters from BD's own corpus, and splits into several
-  fragments with the shorter 180&nbsp;ms gap between them. Unseen by the voice.</p>
+  <h2>Snow White &mdash; the opening of the tale, as BD holds it</h2>
+  <p class="why" id="why-long">The author's choice of test case: the first two sentences
+  of Snow White from BD's own Grimm material, node
+  <code>f796c44e</code>. <b>Four clauses chained on "and"</b>, two hyphenated compounds,
+  and a narrative cadence nothing like the Tao's &mdash; so it tests register and
+  phrasing at once.
+  <br>It is also <b>the only card where a comma pause is audible</b>: BD reads a
+  sentence whole up to 150 characters and only breaks a longer one at a comma. At 300
+  characters this splits into three, giving one <b>180&nbsp;ms</b> comma break and one
+  <b>504&nbsp;ms</b> full stop. Listen to where the first split falls &mdash; it strands
+  <i>"and her embroidery-frame was of ebony"</i> as its own 38-character fragment, which
+  is the splitter working as designed and may or may not sound right.</p>
   <textarea id="t-long"></textarea>
   <div class="row">
     <button class="go" data-src="t-long">Speak this</button>
@@ -182,10 +188,16 @@ $('t-unseen').value = 'Other people have more than they need; I alone seem to po
 // for one voice and false for another. Written fresh, so it is true for all.
 $('t-fresh').value  = 'She left the back door open while the bread was in the oven, and by four ' +
                       'o\'clock the whole house smelled of it.';
-$('t-long').value   = 'Some are meant to lead, and others are meant to follow; Some must ' +
-                      'always strain, and others have an easy time; Some are naturally big ' +
-                      'and strong, and others will always be small; Some will be protected ' +
-                      'and nurtured, and others will meet with destruction.';
+// 2026-10-29 — the author asked for this in place of the Tao sentence that was
+// here: "The opening text of the Snow White node in the Grimms fairy tales
+// stuff - thats an interesting test case." Taken verbatim from the node, not
+// retyped from memory. espeak handles every word, including the two hyphenated
+// compounds: snow-flakes -> snˈəʊflˈeɪks, embroidery-frame -> ɪmbɹˈɔɪdəɹɪfɹˈeɪm.
+$('t-long').value   = 'It was the middle of winter, and the snow-flakes were falling like ' +
+                      'feathers from the sky, and a queen sat at her window working, and her ' +
+                      'embroidery-frame was of ebony. And as she worked, gazing at times out ' +
+                      'on the snow, she pricked her finger, and there fell from it three drops ' +
+                      'of blood on the snow.';
 
 // ── THE PAGE CHECKS ITS OWN CLAIMS (2026-10-29) ───────────────────────────
 // The "never heard" card held prompts 0016-0017 for a day. They were unseen by
