@@ -283,7 +283,33 @@ fetchable for as long as the tunnel has been up. Nothing suggests anyone looked
 that is not evidence, and the `/n/` work exists precisely to start circulating
 links.
 
-## 9. What is still open
+## 9. "Is the never-heard card still never heard?" — 2026-10-29
+
+The author, on first using the compare page against her trained voice:
+*"Is the Never heard same text same register still 'never heard' — did you
+invent it?"*
+
+**No invention, and no excuse: it was prompts 0016–0017 of the real text.**
+Unseen by `bd_mech_01`, which trained on 0001–0014 — and she recorded **125 of
+125**, so for `ringlet` that card was reading back its own training data while
+claiming the opposite. The one thing asserting otherwise was a label I wrote.
+
+Replaced with chapters 20 and 22. **The prompt set stops at chapter 19**, so
+anything beyond it is outside by construction, whatever a reader got through.
+
+**Then the fix found a second instance I had missed.** The "different register"
+card was two sentences spliced from the BASIC set — unseen by `ringlet`, who
+never read it, but **training data for `bd_will_01` and `bd_mech_01`**. True for
+one voice and false for another. Rewritten from scratch so it holds for all.
+
+**A label is not a mechanism, so the page now checks its own claims.** On load
+it fetches every prompt set and tests each card's sentences against them,
+writing the verdict into the card: ✓ for the first card being *in* a set, ✓ for
+the other three being outside one, ✗ and a log line otherwise. Verified against
+the real sets — the old text fails, which is the proof the check works, and the
+second instance is exactly what it caught.
+
+## 10. What is still open
 
 - **`Dhamma` now sounds identical to `dharma`** in non-rhotic British — correct
   English and OED's first form, but it erases the Sanskrit/Pali distinction.

@@ -38,6 +38,9 @@
   .card.long   { border-left:3px solid #6a7a8f; }
   .card h2 { font-size:14px; margin:0 0 4px; font-weight:600; }
   .card .why { font-size:13px; color:#9a9aa4; margin:0 0 10px; }
+  .verdict { display:block; margin-top:6px; font-weight:600; }
+  .verdict.ok  { color:#7fe08f; }
+  .verdict.bad { color:#ff9a9a; }
   textarea { width:100%; box-sizing:border-box; min-height:84px; resize:vertical;
              font:16px/1.5 inherit; background:#101015; color:#e8e8ea;
              border:1px solid #33333c; border-radius:6px; padding:9px 10px; }
@@ -84,7 +87,7 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
 
 <div class="card seen">
   <h2>Trained on this</h2>
-  <p class="why">Prompts 0001&ndash;0003 of the Tao set, read into the session itself.
+  <p class="why" id="why-seen">Prompts 0001&ndash;0003 of the Tao set, read into the session itself.
   A fine-tune reproduces its own sentences best, so this is the <b>upper bound</b> &mdash;
   the most the voice can do, not what it will usually do.</p>
   <textarea id="t-seen"></textarea>
@@ -96,9 +99,11 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
 
 <div class="card unseen">
   <h2>Never heard, same text and register</h2>
-  <p class="why">Prompts 0016&ndash;0017 &mdash; further into the same translation, in the same
-  voice and rhythm, but not recorded. This is the <b>honest</b> test: it isolates
-  generalisation from memorisation, because nothing but the training set differs.</p>
+  <p class="why" id="why-unseen">Chapters 20 and 22 &mdash; <b>beyond the prompt set, which stops at
+  chapter&nbsp;19</b>, so no voice trained from it can have heard these however many
+  prompts the reader got through. Same translation, same unhurried rhythm. This is
+  the <b>honest</b> test: it isolates generalisation from memorisation, because
+  nothing but the training set differs.</p>
   <textarea id="t-unseen"></textarea>
   <div class="row">
     <button class="go" data-src="t-unseen">Speak this</button>
@@ -108,9 +113,10 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
 
 <div class="card fresh">
   <h2>Never heard, different register</h2>
-  <p class="why">Ordinary modern prose with none of the Tao's cadence. Where a thin
-  fine-tune usually falls down hardest, and the closest of the three to what BD
-  actually reads aloud.</p>
+  <p class="why" id="why-fresh">Ordinary modern prose with none of the Tao's cadence,
+  <b>written for this page</b> rather than taken from a prompt set &mdash; so it is unseen
+  by every voice, not just the latest one. Where a thin fine-tune usually falls down
+  hardest, and the closest of the four to what BD actually reads aloud.</p>
   <textarea id="t-fresh"></textarea>
   <div class="row">
     <button class="go" data-src="t-fresh">Speak this</button>
@@ -120,7 +126,7 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
 
 <div class="card long">
   <h2>A long sentence &mdash; where the comma pause actually appears</h2>
-  <p class="why">BD reads a sentence whole up to <b>150 characters</b>, and only breaks a
+  <p class="why" id="why-long">BD reads a sentence whole up to <b>150 characters</b>, and only breaks a
   longer one at a comma or semicolon. So the three passages above have
   <b>no comma pauses to hear</b> &mdash; every gap in them is a full stop's 504&nbsp;ms.
   This one is 254 characters from BD's own corpus, and splits into several
@@ -156,14 +162,71 @@ const note = (m, cls) => { $('note').textContent = m; $('note').className = 'not
 $('t-seen').value   = 'The tao that can be described is not the eternal Tao. ' +
                       'The name that can be spoken is not the eternal Name. ' +
                       'The nameless is the boundary of Heaven and Earth.';
-$('t-unseen').value = 'If you overly esteem talented individuals, people will become overly ' +
-                      'competitive. If you overvalue possessions, people will begin to steal.';
-$('t-fresh').value  = 'The kettle was still warm when she came back down, and there were ' +
-                      'three chairs by the window with nobody in them.';
+// 2026-10-29 — WAS prompts 0016-0017, and the author caught the mistake: those
+// were unseen only by bd_mech_01, which trained on 0001-0014. He recorded 125
+// of 125, so for `ringlet` they were TRAINING DATA and the card was a lie.
+//
+// Chapters 20 and 22 instead. The prompt set stops at chapter 19, so these are
+// outside it by construction — unseen by any voice trained from the set, no
+// matter how far through the reader got. The check below enforces that rather
+// than trusting this comment.
+$('t-unseen').value = 'Other people have more than they need; I alone seem to possess nothing. ' +
+                      'If you want to become whole, first let yourself become broken.';
+// 2026-10-29 — WAS two sentences spliced from the BASIC set, which the page's
+// own provenance check then flagged. Unseen by `ringlet`, who never read that
+// set, but TRAINING DATA for bd_will_01 and bd_mech_01 — so the card was true
+// for one voice and false for another. Written fresh, so it is true for all.
+$('t-fresh').value  = 'She left the back door open while the bread was in the oven, and by four ' +
+                      'o\'clock the whole house smelled of it.';
 $('t-long').value   = 'Some are meant to lead, and others are meant to follow; Some must ' +
                       'always strain, and others have an easy time; Some are naturally big ' +
                       'and strong, and others will always be small; Some will be protected ' +
                       'and nurtured, and others will meet with destruction.';
+
+// ── THE PAGE CHECKS ITS OWN CLAIMS (2026-10-29) ───────────────────────────
+// The "never heard" card held prompts 0016-0017 for a day. They were unseen by
+// the 14-clip test voice and were TRAINING DATA for the real one, and the only
+// thing asserting otherwise was a label. The author found it by asking.
+//
+// A label is not a mechanism. So each card's text is checked against every
+// prompt set on load and the verdict is written into the card — "in the set" is
+// correct for the first card and wrong for the other three.
+const norm = t => t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+async function checkProvenance() {
+  let inSet = new Set();
+  try {
+    for (const id of ['basic', 'tao']) {
+      const d = await codedJson('/api/prompts?set=' + id);
+      for (const p of d.prompts || []) inSet.add(norm(p.text));
+    }
+  } catch (e) {
+    log('could not check card provenance: ' + e.message);
+    return;
+  }
+  // Sentence by sentence: a card holds two, and either could be in a set.
+  const hits = (text) => (text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text])
+    .map(x => norm(x)).filter(x => x.length > 12)
+    .filter(x => [...inSet].some(p => p === x || p.includes(x) || x.includes(p)));
+
+  const cards = [
+    ['t-seen',   'why-seen',   true,  'Confirmed in the prompt set — this IS training data.'],
+    ['t-unseen', 'why-unseen', false, 'Confirmed outside every prompt set.'],
+    ['t-fresh',  'why-fresh',  false, 'Confirmed outside every prompt set.'],
+    ['t-long',   'why-long',   false, 'Confirmed outside every prompt set.'],
+  ];
+  for (const [ta, why, wantIn, okMsg] of cards) {
+    const found = hits($(ta).value);
+    const ok = wantIn ? found.length > 0 : found.length === 0;
+    const el = document.createElement('span');
+    el.className = 'verdict ' + (ok ? 'ok' : 'bad');
+    el.textContent = ok ? '\u2713 ' + okMsg
+      : (wantIn ? '\u2717 NOT found in any prompt set — this card claims to be training data and is not.'
+                : '\u2717 FOUND in a prompt set — this card claims to be unseen and is NOT. Replace the text.');
+    $(why).appendChild(el);
+    if (!ok) log('PROVENANCE FAIL: ' + ta);
+  }
+}
 
 let lexicon = {};
 try {
@@ -183,7 +246,7 @@ $('code-ok').addEventListener('click', async () => {
   try {
     if (await verifyCode(v)) {
       $('code').value = ''; $('code').hidden = true; $('code-ok').hidden = true;
-      await listVoices();
+      await listVoices(); await checkProvenance();
     } else note('That code was not accepted.', 'bad');
   } catch (e) { note('Could not check the code: ' + e.message, 'bad'); }
 });
@@ -214,7 +277,7 @@ async function listVoices() {
     else note('Could not list voices: ' + e.message, 'bad');
   }
 }
-if (!getCode()) askForCode(); else await listVoices();
+if (!getCode()) askForCode(); else { await listVoices(); await checkProvenance(); }
 $('refresh').addEventListener('click', listVoices);
 
 // ONE FILE, NOT A SEQUENCE OF PLAYS. BD synthesises each sentence separately
