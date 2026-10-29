@@ -80,6 +80,10 @@ stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
     <option value="en_GB-alba-medium">alba, the voice it was fine-tuned from</option>
   </select>
   <button id="refresh">Refresh list</button>
+  <label style="display:flex;gap:5px;align-items:center;cursor:pointer">
+    <input type="checkbox" id="trim" checked style="width:16px;height:16px">
+    trim the generated margins
+  </label>
   <input id="code" type="password" inputmode="numeric" autocomplete="off"
          placeholder="code" style="max-width:90px" hidden>
   <button id="code-ok" hidden>Unlock</button>
@@ -303,6 +307,69 @@ function encodeWav(samples, rate) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
+// ── TRIM THE MODEL'S OWN GENERATED MARGINS (2026-10-29) ───────────────────
+//
+// The author: *"on the pauses between sentence the level is discontinuous as it
+// falls from background to true zero"* — and then, correctly, that the pause
+// system genuinely stops playback, so zero in the gap is inherent rather than a
+// fault. He was right: the fault is that the CLIP does not arrive at zero.
+//
+// Measured on `ringlet`: each utterance carries 0.32 s of generated lead-in and
+// 0.27 s of trail at about -56 dB — a breath-like murmur at 120-250 Hz, her
+// own fundamental range, learned because every training clip kept 0.25 s of her
+// breath at each end. Then it stops dead, a step of 56 dB.
+//
+// Three consequences of one cause, all fixed here:
+//   · the murmur in the pauses
+//   · the step, because a 12 ms fade lands the clip on true zero
+//   · the TIMING — the real gap between sentences was 0.27 + 0.504 + 0.32 =
+//     about 1.1 s, more than twice the 504 ms the constant intends
+//
+// A CHECKBOX, not a silent improvement, because the author asked to keep the
+// existing voices for comparison: hearing it both ways is the point.
+//
+// `ringletA` is being retrained on margins replaced with digital silence, which
+// fixes this at source — the model will stop generating the murmur at all. This
+// is the same repair done at playback, available now.
+function trimMargins(pcm, rate) {
+  const win = Math.floor(rate / 100);                 // 10 ms frames
+  const n = Math.floor((pcm.length - win) / win);
+  const rms = new Float64Array(n);
+  let loud = 0;
+  for (let i = 0; i < n; i++) {
+    let s = 0;
+    for (let j = 0; j < win; j++) { const v = pcm[i*win + j]; s += v*v; }
+    rms[i] = Math.sqrt(s / win);
+    if (rms[i] > loud) loud = rms[i];
+  }
+  // Same detector as everywhere else in this project: sustained energy, not a
+  // level threshold. A threshold relative to the peak finds the start of the
+  // FILE, which cost two rounds on 2026-10-28.
+  const thr = loud * 0.08, need = 5;
+  let first = -1, run = 0;
+  for (let i = 0; i < n; i++) {
+    run = rms[i] > thr ? run + 1 : 0;
+    if (run >= need) { first = i - need + 1; break; }
+  }
+  let last = -1; run = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    run = rms[i] > thr ? run + 1 : 0;
+    if (run >= need) { last = i + need - 1; break; }
+  }
+  if (first < 0 || last <= first) return pcm;          // nothing found, leave alone
+  // Keep 30 ms either side so no plosive or final fricative is clipped.
+  const pad = Math.floor(rate * 0.03);
+  const a = Math.max(0, first * win - pad);
+  const b = Math.min(pcm.length, (last + 1) * win + pad);
+  const out = pcm.slice(a, b);
+  const fade = Math.min(Math.floor(rate * 0.012), Math.floor(out.length / 2));
+  for (let i = 0; i < fade; i++) {
+    out[i] *= i / fade;
+    out[out.length - 1 - i] *= i / fade;
+  }
+  return out;
+}
+
 // Serialised: two overlapping synth calls on MPS-backed WASM contend for the
 // same session, and the second's audio can arrive first.
 let busy = false;
@@ -329,7 +396,9 @@ async function speak(text, voiceId) {
       if (!out || !out.blob) throw new Error('synthesise returned no audio');
       const decoded = await audioCtx.decodeAudioData(await out.blob.arrayBuffer());
       rate = decoded.sampleRate;
-      parts.push({ pcm: decoded.getChannelData(0),
+      let pcm = decoded.getChannelData(0);
+      if ($('trim').checked) pcm = trimMargins(pcm, rate);
+      parts.push({ pcm,
                    // The LAST utterance gets no trailing gap — BD's gap is the
                    // wait BEFORE the next one, and there is no next one.
                    gap: i === utts.length - 1 ? 0 : (u.gap != null ? u.gap : SPEAK_GAP_MS) });
@@ -349,7 +418,7 @@ async function speak(text, voiceId) {
     const miss = missing.length
       ? `  ·  DROPPED ${missing.length} symbol(s): ${[...new Set(missing)].join(' ')}` : '';
     const gaps = parts.slice(0, -1).map(p => p.gap);
-    note(`${voiceId} — ${utts.length} utterance(s), ${(total / rate).toFixed(1)} s of audio ` +
+    note(`${voiceId} — ${utts.length} utterance(s)${$('trim').checked ? ', margins trimmed' : ', margins AS GENERATED'}, ${(total / rate).toFixed(1)} s of audio ` +
          `at pace ${SPEAK_LENGTH_SCALE.toFixed(2)}, gaps ${gaps.join('/') || 'none'} ms ` +
          `(synth ${(ms / 1000).toFixed(1)} s)${miss}`, miss ? 'bad' : 'done');
     log(`${voiceId}: ${utts.length} utt, ${(total / rate).toFixed(1)}s audio, ` +
