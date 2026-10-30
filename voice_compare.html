@@ -68,6 +68,9 @@
 <h1>Voice compare</h1>
 <p class="sub">One voice, on text it was trained on and text it has never seen.
 The pair is the point &mdash; either alone is easy to misread.<br>
+<b>2026-10-30:</b> the margin trim no longer cuts the falling cadence &mdash; it follows
+the decay outward and stops where the sound stops falling, rather than at a fixed
+level. Worth re-hearing both builds.<br>
 Delivered exactly as BD delivers it: pace <b>1.209</b>, <b>504&nbsp;ms</b> after a full
 stop, <b>180&nbsp;ms</b> after a comma break &mdash; all imported from
 <code>speech_timing.js</code>, the same definitions BD itself uses.</p>
@@ -353,33 +356,35 @@ function encodeWav(samples, rate) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
-// ── TRIM THE MODEL'S OWN GENERATED MARGINS (2026-10-29) ───────────────────
+// ── TRIM THE MODEL'S OWN GENERATED MARGINS (2026-10-29, rewritten 2026-10-30) ──
 //
 // The author: *"on the pauses between sentence the level is discontinuous as it
 // falls from background to true zero"* — and then, correctly, that the pause
-// system genuinely stops playback, so zero in the gap is inherent rather than a
-// fault. He was right: the fault is that the CLIP does not arrive at zero.
+// system genuinely stops playback, so zero in the gap is inherent. The fault is
+// that the CLIP does not arrive at zero: it ends on ~270 ms of generated murmur
+// at about -56 dB and then stops dead.
 //
-// Measured on `ringlet`: each utterance carries 0.32 s of generated lead-in and
-// 0.27 s of trail at about -56 dB — a breath-like murmur at 120-250 Hz, her
-// own fundamental range, learned because every training clip kept 0.25 s of her
-// breath at each end. Then it stops dead, a step of 56 dB.
+// WHY THIS IS NOT A LEVEL THRESHOLD. The first version cut at 8% of the clip's
+// peak, and the author's wife found the cost: *"at the end of the snow white
+// passage the last few words certainly have a falling cadence on the original
+// that is not present on the processed."* 8% of peak is 22 dB down, and a dying
+// cadence falls past that while still 15-25 dB ABOVE THE ROOM — so it was
+// trimming the diminuendo. That was the FOURTH time in three days that a
+// peak-relative threshold answered a different question from the one asked.
 //
-// Three consequences of one cause, all fixed here:
-//   · the murmur in the pauses
-//   · the step, because a 12 ms fade lands the clip on true zero
-//   · the TIMING — the real gap between sentences was 0.27 + 0.504 + 0.32 =
-//     about 1.1 s, more than twice the 504 ms the constant intends
+// But a floor-relative threshold cannot work either, and measuring proved it:
+// the cadence decays to about -52 dB and the murmur sits at -49 to -57, so they
+// OVERLAP in level. +9 dB over the floor still cut at -40 to -49; +6 dB stopped
+// trimming the murmur at all, because the murmur's louder moments cleared it.
 //
-// A CHECKBOX, not a silent improvement, because the author asked to keep the
-// existing voices for comparison: hearing it both ways is the point.
-//
-// `ringletA` is being retrained on margins replaced with digital silence, which
-// fixes this at source — the model will stop generating the murmur at all. This
-// is the same repair done at playback, available now.
+// WHAT ACTUALLY SEPARATES THEM: the cadence DECAYS and the murmur PLATEAUS. So
+// find the loud core by level — which is all a peak-relative threshold is good
+// for — and then FOLLOW THE DECAY OUTWARD, stopping where it stops falling.
+// Nothing about the absolute level decides it.
 function trimMargins(pcm, rate) {
   const win = Math.floor(rate / 100);                 // 10 ms frames
   const n = Math.floor((pcm.length - win) / win);
+  if (n < 12) return pcm;
   const rms = new Float64Array(n);
   let loud = 0;
   for (let i = 0; i < n; i++) {
@@ -388,27 +393,45 @@ function trimMargins(pcm, rate) {
     rms[i] = Math.sqrt(s / win);
     if (rms[i] > loud) loud = rms[i];
   }
-  // Same detector as everywhere else in this project: sustained energy, not a
-  // level threshold. A threshold relative to the peak finds the start of the
-  // FILE, which cost two rounds on 2026-10-28.
-  const thr = loud * 0.08, need = 5;
-  let first = -1, run = 0;
+  // 1. the loud core. A level threshold is fine HERE: the question is only
+  //    "where is the speech", not "where does it end".
+  const core = loud * 0.08, need = 5;
+  let a = -1, b = -1, run = 0;
   for (let i = 0; i < n; i++) {
-    run = rms[i] > thr ? run + 1 : 0;
-    if (run >= need) { first = i - need + 1; break; }
+    run = rms[i] > core ? run + 1 : 0;
+    if (run >= need) { a = i - need + 1; break; }
   }
-  let last = -1; run = 0;
+  run = 0;
   for (let i = n - 1; i >= 0; i--) {
-    run = rms[i] > thr ? run + 1 : 0;
-    if (run >= need) { last = i + need - 1; break; }
+    run = rms[i] > core ? run + 1 : 0;
+    if (run >= need) { b = i + need - 1; break; }
   }
-  if (first < 0 || last <= first) return pcm;          // nothing found, leave alone
-  // Keep 30 ms either side so no plosive or final fricative is clipped.
-  const pad = Math.floor(rate * 0.03);
-  const a = Math.max(0, first * win - pad);
-  const b = Math.min(pcm.length, (last + 1) * win + pad);
-  const out = pcm.slice(a, b);
-  const fade = Math.min(Math.floor(rate * 0.012), Math.floor(out.length / 2));
+  if (a < 0 || b <= a) return pcm;
+
+  // 2. follow the decay outward from each edge. `best` is the quietest frame
+  //    seen so far; while frames keep beating it the sound is still falling, so
+  //    it is still part of the utterance. PLATEAU frames (no new minimum) are
+  //    counted, and FLAT ms of them ends the search — that is the murmur.
+  const FLAT = 6;                                     // 60 ms of not-falling
+  const LIMIT = Math.floor(rate * 0.40 / win);        // never follow past 400 ms
+  const follow = (from, step) => {
+    let best = rms[from], at = from, flat = 0;
+    for (let k = 1; k <= LIMIT; k++) {
+      const i = from + step * k;
+      if (i < 0 || i >= n) break;
+      if (rms[i] < best) { best = rms[i]; at = i; flat = 0; }
+      else if (++flat >= FLAT) break;
+    }
+    return at;
+  };
+  const aa = follow(a, -1), bb = follow(b, +1);
+
+  const lo = Math.max(0, aa * win);
+  const hi = Math.min(pcm.length, (bb + 1) * win);
+  const out = pcm.slice(lo, hi);
+  // 30 ms: the cut now lands near the bottom of the decay, where a longer fade
+  // from a quieter point is inaudible and a short one could tick.
+  const fade = Math.min(Math.floor(rate * 0.030), Math.floor(out.length / 2));
   for (let i = 0; i < fade; i++) {
     out[i] *= i / fade;
     out[out.length - 1 - i] *= i / fade;
