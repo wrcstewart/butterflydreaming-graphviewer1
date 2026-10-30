@@ -482,9 +482,53 @@ registerProcessor('cap', Cap);`;
 
 async function ensureMic() {
   if (ctx) return;
-  stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-  });
+  // ── ASKING IS NOT THE SAME AS GETTING (2026-10-30) ──────────────────────
+  //
+  // The author: *"Have you any autogain in your processing in the app"*. We ask
+  // for all three off, and have since the rig was written — but in this syntax
+  // they are IDEAL constraints, which a browser may silently ignore. Nothing
+  // here ever checked. If AGC were on it would lift the gain in quiet passages,
+  // raising the noise floor precisely where a day of measurements was taken.
+  //
+  // `exact` makes them requirements: getUserMedia REJECTS rather than quietly
+  // giving us processed audio. A rejection is recoverable — we fall back and say
+  // so — whereas silent processing is not detectable after the fact.
+  const WANT = { channelCount: 1, echoCancellation: false,
+                 noiseSuppression: false, autoGainControl: false };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1,
+               echoCancellation: { exact: false },
+               noiseSuppression: { exact: false },
+               autoGainControl:  { exact: false } },
+    });
+  } catch (e) {
+    log('!! this browser will not guarantee raw audio: ' + e.name);
+    log('   falling back to a request it may ignore — CHECK THE REPORT BELOW');
+    stream = await navigator.mediaDevices.getUserMedia({ audio: WANT });
+  }
+  // WHAT WE ACTUALLY GOT. getSettings() reports the applied values, not the
+  // asked-for ones, so this is the only honest statement about the signal.
+  try {
+    const t = stream.getAudioTracks()[0];
+    const got = t.getSettings ? t.getSettings() : {};
+    const bad = [];
+    for (const k of ['echoCancellation', 'noiseSuppression', 'autoGainControl']) {
+      if (got[k] === true) bad.push(k);
+    }
+    log('audio processing: ' +
+        ['echoCancellation', 'noiseSuppression', 'autoGainControl']
+          .map(k => k.replace(/[a-z]/g, '') + '=' +
+               (got[k] === undefined ? '?' : got[k])).join(' ') +
+        '  (EC/NS/AGC)');
+    if (bad.length) {
+      log('!! WARNING: ' + bad.join(', ') + ' is ON. The recording is PROCESSED.');
+      status('Warning: ' + bad.join(', ') + ' is on — the audio is being processed.', 'bad');
+    } else {
+      log('raw audio confirmed: no echo cancellation, noise suppression or auto-gain');
+    }
+    if (got.sampleRate) log('track reports ' + got.sampleRate + ' Hz, device ' + (got.deviceId ? 'id ' + String(got.deviceId).slice(0, 8) : 'unknown'));
+  } catch (e) { log('could not read track settings: ' + e.message); }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   sampleRate = ctx.sampleRate;
   await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' })));
