@@ -309,7 +309,39 @@ the other three being outside one, ✗ and a log line otherwise. Verified agains
 the real sets — the old text fails, which is the proof the check works, and the
 second instance is exactly what it caught.
 
-## 10. What is still open
+## 10. The corpus edit — `embroidery-frame` (2026-10-30)
+
+The author, on hearing the Snow White card: *"Could you take out the hyphen in
+the corpus version please as it doesnt need to be there."*
+
+**It made the node self-consistent**, which is the better justification than
+taste: twenty words later the same sentence already read *"as black as the wood
+of the embroidery frame"*, unhyphenated. The hyphen disagreed with itself.
+
+`snow-flakes` **keeps its hyphen by his decision**, though espeak renders it as
+one run-together compound with two stresses — `snˈəʊflˈeɪks` against
+`snˈəʊ flˈeɪks` for the open form.
+
+**`cypher` does NOT auto-backup.** Only `write`, `sync-helpers`,
+`backfill-urls` and `apply-subfamily-labels` do. The node has no `name` for
+`write` to key on, so this went through `cypher` and needed
+`node bd_tool.js backup` run by hand first —
+`backups/memgraph_2026-10-30_103111.cypher`, which holds the pre-edit text and
+was checked to contain it. **Worth remembering: reaching for `cypher` loses the
+safety net that the other subcommands provide.**
+
+A targeted `replace` on `n.text` with `updated_at` set from the server clock, so
+an early-loading client treats the node as stale. Verified after: zero
+hyphenated occurrences, two open ones, length unchanged at 663 characters.
+
+Then the test card was brought back into line — and so was the card's own
+*explanation*, which quoted the fragment and still had the hyphen in it. All
+five cards were re-verified character for character against their sources:
+`t-seen` against Tao prompts 0001-0003, `t-long` against node `f796c44e`,
+`t-verse` against node `bcfa0635`, `t-unseen` against chapters 20 and 22 in the
+DB. `t-fresh` is the only one with no source, having been written for the page.
+
+## 11. What is still open
 
 - **`Dhamma` now sounds identical to `dharma`** in non-rhotic British — correct
   English and OED's first form, but it erases the Sanskrit/Pali distinction.
