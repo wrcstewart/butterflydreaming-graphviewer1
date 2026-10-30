@@ -179,7 +179,7 @@ import { synthesise, loadVoice } from '/piper_direct.js';
 // comparison better later." IMPORTED, not copied: every number in there was
 // tuned by ear against the others, and a second copy would be adjusted once.
 import { SPEAK_LENGTH_SCALE, SPEAK_VERSE_SCALE, SPEAK_GAP_MS, SPEAK_LINE_GAP_MS,
-         splitUtterances, looksLikeVerse } from '/speech_timing.js';
+         splitUtterances, looksLikeVerse, lengthScaleFor } from '/speech_timing.js';
 // The voice endpoints are gated as of 2026-10-28 — see voice_code.js.
 import { getCode, verifyCode, codedJson } from '/voice_code.js';
 
@@ -457,7 +457,9 @@ async function speak(text, voiceId) {
     // BD's own decision, imported rather than reimplemented: verse is read line
     // by line at a slower scale, prose by sentence.
     const verse = looksLikeVerse(text);
-    const scale = verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE;
+    // Per voice: alba reads natively brisker than ringlet, so one global scale
+    // cannot suit both. The multiplier lives in speech_timing.js.
+    const scale = lengthScaleFor(voiceId, verse);
     const utts = splitUtterances(text, { verse });
     note(`Synthesising ${utts.length} ${verse ? 'line' : 'utterance'}(s) in ${voiceId}…`, 'busy');
     const parts = [], missing = [];
@@ -492,7 +494,7 @@ async function speak(text, voiceId) {
     const gaps = parts.slice(0, -1).map(p => p.gap);
     note(`${voiceId} — ${verse ? 'VERSE, ' : ''}${utts.length} ${verse ? 'line' : 'utterance'}(s)` +
          `${$('trim').checked ? ', margins trimmed' : ', margins AS GENERATED'}, ${(total / rate).toFixed(1)} s of audio ` +
-         `at pace ${scale.toFixed(2)}, gaps ${gaps.join('/') || 'none'} ms ` +
+         `at pace ${scale.toFixed(2)}${scale !== (verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE) ? ' (per-voice)' : ''}, gaps ${gaps.join('/') || 'none'} ms ` +
          `(synth ${(ms / 1000).toFixed(1)} s)${miss}`, miss ? 'bad' : 'done');
     log(`${voiceId}: ${utts.length} utt, ${(total / rate).toFixed(1)}s audio, ` +
         `gaps ${gaps.join('/') || '-'}ms, synth ${(ms / 1000).toFixed(1)}s${miss}`);

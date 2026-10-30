@@ -16,9 +16,9 @@ import {
 // 2026-10-28 — pace, gaps and sentence-breaking, shared with voice_compare.html
 // so a fine-tuned voice can be judged as BD will actually deliver it.
 import {
+  lengthScaleFor,
   looksLikeVerse,
   SPEAK_LENGTH_SCALE,
-  SPEAK_VERSE_SCALE,
   SPEAK_GAP_MS,
   SPEAK_LINE_GAP_MS,
   splitUtterances,
@@ -2548,7 +2548,9 @@ function speak(raw, { interrupt = false } = {}) {
   // work. The scale rides with each item because a second passage may be queued
   // behind this one and must keep its own pace.
   const verse = looksLikeVerse(text);
-  const scale = verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE;
+  // Per voice as of 2026-10-30: a fine-tune carries its own pace, so the global
+  // scale is a multiplier on it and alba needs a different one from ringlet.
+  const scale = lengthScaleFor(SPEAK_VOICE, verse);
   if (verse) console.log('[speak] verse: line gaps ' + SPEAK_LINE_GAP_MS +
                          'ms, scale ' + scale.toFixed(2));
   // A written pause lands on the LAST utterance of the segment before it, so

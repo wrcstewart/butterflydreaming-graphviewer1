@@ -212,7 +212,38 @@ function looksLikeVerse(text) {
   return after.length > 0 && caps / after.length >= 0.7;
 }
 
+// ── PACE IS PER VOICE, because a voice carries its own (2026-10-30) ─────────
+//
+// SPEAK_LENGTH_SCALE is a MULTIPLIER on whatever pace the model already has,
+// and a fine-tune learns the reader's delivery. `ringlet` was read from the Tao
+// Te Ching unhurriedly, so it generates long durations natively; alba was
+// trained on brisker studio narration. One global number therefore cannot suit
+// both, and on 2026-10-29 the author's 30% speed-up — correct for ringlet —
+// sped alba up with it. The note left in this file then said that if the two
+// ever needed different settings, the right change was a per-voice scale here
+// rather than a second copy of the constant. This is that change.
+//
+// The author, hearing them side by side: *"on the player alba is reading much
+// faster - it will need to be slowed down by at least 50%."* x1.30 would exactly
+// restore alba to the 1.5714 it had before yesterday; x1.50 takes it to 1.8132,
+// slightly slower than it has ever been, which is what he asked for.
+//
+// A MULTIPLIER, not an absolute, so that the global dial still moves everything
+// together and these stay relative corrections to it.
+const VOICE_PACE = {
+  'en_GB-alba-medium': 1.50,
+  'local/alba_int8dp': 1.50,       // BD's shipped default — the same voice, quantised
+};
+
+// The one place either page should ask. `verse` picks the slower verse scale,
+// which is itself derived from the prose one so a single dial moves both.
+function lengthScaleFor(voiceId, verse) {
+  const base = verse ? SPEAK_VERSE_SCALE : SPEAK_LENGTH_SCALE;
+  return base * (VOICE_PACE[voiceId] || 1);
+}
+
 export {
+  lengthScaleFor,
   looksLikeVerse,
   SPEAK_LENGTH_SCALE,
   SPEAK_VERSE_SCALE,
