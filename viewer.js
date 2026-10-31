@@ -4293,7 +4293,17 @@ function buildNodeData(n) {
   if (labels.includes('Entry')) {
     return Object.assign({}, props, {
       id, type: 'Entry',
-      display_name: props.name || '',
+      // 2026-10-31 — display_name first, as Cluster already does. The author
+      // asked for "Only Local AI" on three lines, and the base style sets
+      // `text-wrap: 'wrap'`, so cytoscape honours newlines in the label.
+      //
+      // WHY NOT PUT THE NEWLINES IN `name`. For an Entry the name is both the
+      // label AND the lookup key: five style selectors match on it
+      // (node[type="Entry"][name="Settling"] and friends), bd_tool and every
+      // Cypher query find nodes by it, and it appears in breadcrumbs and chips.
+      // A newline inside it would break all of that invisibly. So the line
+      // breaks live in display_name and `name` stays "Only Local AI".
+      display_name: props.display_name || props.name || '',
       colour: props.colour || '#888888',
     });
   }
