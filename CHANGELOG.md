@@ -6,6 +6,43 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-10-31 — the Methods nodes, and a label that needs more than one line
+
+Five changes under **Methods**, all in the DB:
+
+```
+  Chat-counselling  ->  Chat  ->  "Chat (In Pairs)"   two lines
+  Local AI          ->  "Only Local AI"               three lines
+  new Entry             "Peer Counselling"
+  new Entry             "Toxicity Screening"
+```
+
+Methods now has thirteen children. The two new nodes match the existing eleven
+exactly — `Entry` label, `CONTAINS` from Methods, colour `#9BB0C9`,
+`layer: 'info'`, empty `text` ready for the author to fill, and their own
+`randomUUID()` url so each has a `/n/` link of its own.
+
+**A multi-line label goes in `display_name`, never in `name`.** For an Entry the
+`name` is both the rendered label *and* the lookup key: style selectors match on
+it, every Cypher query finds the node by it, and it appears in breadcrumbs and
+chips. A newline inside it would have broken all of that silently, with the
+label still looking right. So `name` stays flat — `"Chat (In Pairs)"`,
+`"Only Local AI"` — and the breaks live in `display_name`.
+
+That needed one code change, in `ec2b7a1`: `buildNodeData`'s Entry branch took
+the label from `props.name` alone, so it now prefers `props.display_name`, as
+the Cluster branch already did. With that in place the second label was a DB
+edit on its own.
+
+**Two notes for next time.** `bd_tool.js cypher` is *not* one of the
+auto-backing-up subcommands, so both edits took a manual `backup` first
+(`backups/memgraph_2026-10-31_112849.cypher`, `…_124048.cypher`). And the
+tunnel serves **butterflydreaming.net** — `.org` is the GitHub Pages landing
+site and 404s on `/n/`, which is expected and documented at `server.js:194`:
+the stored `.org` stem is cosmetic, the path is what the route matches.
+
+---
+
 ## 2026-10-28 — one voice-dataset directory per speaker, and two measured facts about takes
 
 The author's wife records her training set tomorrow. He asked the question that
