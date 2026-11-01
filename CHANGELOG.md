@@ -6,6 +6,50 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-01 (later) — the readout judges the ROOM, not the voice
+
+The author, within minutes of using it: *"There is something wrong with the
+noise recorder it seems sensitive to the overall level of my voice"*. He was
+right twice over, and the second fault was the serious one.
+
+**S/N genuinely tracks how loudly you speak**, and that is not a bug in the
+arithmetic — the room noise does not care how loud the reader is, so a louder
+line sits further above it. Scaling the speech alone by +6 dB moves S/N by
+exactly +6.00 dB. But it makes S/N the wrong question: it answers "how far above
+the room was this line", which is what the model gets, and cannot answer "was
+the room quiet just now", which is what decides whether to read the line again.
+
+**The absolute A-weighted floor answers that, and is provably immune to it** —
+unchanged to a tenth of a dB at voice -6, 0 and +6 dB. It moves 1:1 with
+RECORDING GAIN, so no fixed threshold can be right; the verdict is therefore
+against the **median floor of this session's own earlier takes**, gain being
+constant within a sitting. The 3 dB warning threshold is measured, not chosen:
+the four room-tone clips of 30 Oct, taken on different power configurations,
+varied by only **0.9 dB** A-weighted.
+
+**And underneath it, a latent bug the complaint flushed out.** The speech
+detector set its threshold 30 dB below the loudest frame. The trigger impulse at
+t=0 — the record button, through the desk and through the air, -40 to -44 dBFS
+over the first 100 ms against a settled floor of -57 — sat just under that
+threshold at his normal level: **5 of the first 30 frames crossed it, and 5
+consecutive is the trigger.** It passed by luck. A line read 3 dB quieter
+dropped the threshold into the impulse, the detector called the lead-in speech,
+and every such take came back *"no pause before speaking"* — which is precisely
+what would have happened on the quiet meditative lines of the Tao set.
+
+Fixed at both ends: the threshold is now anchored to the measured floor as well
+as the peak, and the first 300 ms is excluded from the onset search and from the
+noise window, because the trigger impulse is neither speech nor room. Excluding
+it also stopped it inflating the floor, which is why the reference reading moved
+from 42.00 to 42.23 dB.
+
+Verified across voice level, recording gain and added noise: gain-invariant to
+0.00 dB, floor-invariant to voice to 0.0 dB, and the floor rises when noise is
+added. Previously the whole measure was one small change away from failing
+silently, and it took a reader using it to find that out.
+
+---
+
 ## 2026-11-01 — the rig measures the noise floor of every take
 
 The author, on being told that a wandering noise floor is worse for training

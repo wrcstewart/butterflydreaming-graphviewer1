@@ -39,7 +39,38 @@
 
 const FRAME_MS = 10;     // RMS frame for speech detection
 const RUN_MS   = 50;     // consecutive frames required to call it speech
-const REL_DB   = 30;     // threshold below the loudest frame
+// The speech threshold is anchored to BOTH ends, and the floor is the end that
+// matters. 2026-11-01, the author: *"it seems sensitive to the overall level of
+// my voice"*. He was right, and the fault was here. A threshold of peak-30 dB
+// lands only 3 dB above the room floor when the voice is 33 dB above it, so a
+// line read a few dB quieter put the threshold INTO the noise, the lead-in
+// registered as speech, and the take came back "no pause before speaking". The
+// quiet meditative lines of the Tao set are exactly where that would have hit.
+//
+// So: at least FLOOR_MARGIN_DB above the measured floor, and no higher than
+// PEAK_DROP_DB below the loudest frame, whichever of the two is greater.
+const PEAK_DROP_DB  = 30; // never require more than this far below the peak
+const FLOOR_MARGIN_DB = 12; // but always stay this far clear of the floor
+const FLOOR_PCT = 10;     // the floor is the 10th percentile of frame levels
+
+// ── THE TRIGGER IMPULSE IS NEITHER SPEECH NOR ROOM (2026-11-01) ───────────
+//
+// Hold-to-record puts a mechanical impulse at t=0 of every take: measured at
+// +6.2 and +6.6 dB of 20-90 Hz on the two Rode takes, and -40 to -44 dBFS
+// broadband over the first 100 ms, against a settled floor of -57 dBFS. It is
+// the button, arriving through the desk and through the air.
+//
+// It has to be excluded from BOTH ends of the measurement. Left in the onset
+// search it is detected as the start of speech, which is the fault the author
+// found: *"it seems sensitive to the overall level of my voice"* -- at his
+// normal level the impulse cleared the threshold by a hair and the reading
+// survived by luck; a line read 3 dB quieter and the detector locked onto the
+// click and reported "no pause before speaking". Left in the noise window it
+// inflates the floor by several dB and understates the signal-to-noise.
+//
+// It is not room noise and it is not voice, so it is not part of either
+// measurement. 300 ms covers the impulse and the settling behind it.
+const SKIP_START_MS = 300;
 const GUARD_MS = 50;     // kept clear between speech and the noise window
 const MIN_NOISE_MS = 200;// shorter than this is not a measurement
 const MIN_DYN_DB = 15;   // less range than this is steady noise, not speech
@@ -175,24 +206,31 @@ function frameDb(x, rate) {
 function speechBounds(x, rate) {
   const { db, hop } = frameDb(x, rate);
   if (!db.length) return null;
+  // Everything below ignores the first SKIP_START_MS -- see the note above.
+  const skip = Math.min(db.length - 1,
+                        Math.round(SKIP_START_MS / FRAME_MS));
+  const usable = db.slice(skip);
+  if (usable.length < 4) return null;
   let max = -Infinity;
-  for (const v of db) if (v > max) max = v;
-  const thr = max - REL_DB;
+  for (const v of usable) if (v > max) max = v;
+  const asc = Array.from(usable).sort((p, q) => p - q);
+  const floor = asc[Math.min(asc.length - 1,
+                             Math.floor(asc.length * FLOOR_PCT / 100))];
+  const thr = Math.max(floor + FLOOR_MARGIN_DB, max - PEAK_DROP_DB);
   const need = Math.max(1, Math.round(RUN_MS / FRAME_MS));
   let run = 0, start = -1;
-  for (let i = 0; i < db.length; i++) {
+  for (let i = skip; i < db.length; i++) {
     run = db[i] >= thr ? run + 1 : 0;
     if (run >= need) { start = i - need + 1; break; }
   }
   if (start < 0) return null;
   run = 0; let end = -1;
-  for (let i = db.length - 1; i >= 0; i--) {
+  for (let i = db.length - 1; i >= skip; i--) {
     run = db[i] >= thr ? run + 1 : 0;
     if (run >= need) { end = i + need - 1; break; }
   }
-  const sorted = Array.from(db).sort((p, q) => p - q);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  return { start: start * hop,
+  const median = asc[Math.floor(asc.length / 2)];
+  return { skip: skip * hop, start: start * hop,
            end: Math.min(x.length, (end + 1) * hop),
            dyn: max - median };
 }
@@ -208,12 +246,13 @@ export function analyseTake(pcm, rate) {
   const guard = Math.round(rate * GUARD_MS / 1000);
   const headS = b.start / rate;
   const tailS = (pcm.length - b.end) / rate;
-  const noiseEnd = Math.max(0, b.start - guard);
-  if (noiseEnd < rate * MIN_NOISE_MS / 1000) {
+  const noiseStart = b.skip;
+  const noiseEnd = Math.max(noiseStart, b.start - guard);
+  if (noiseEnd - noiseStart < rate * MIN_NOISE_MS / 1000) {
     return { ok: false, reason: 'no pause before speaking', headS, tailS };
   }
   const sp = levels(pcm, b.start, b.end, rate);
-  const nz = levels(pcm, 0, noiseEnd, rate);
+  const nz = levels(pcm, noiseStart, noiseEnd, rate);
   if (!sp || !nz) return { ok: false, reason: 'windows too short', headS, tailS };
   // The impossible-sign gate. A lead-in louder than the speech means the
   // detector or the take is wrong, and no SNR from it means anything.
@@ -225,6 +264,6 @@ export function analyseTake(pcm, rate) {
     snrA:    sp.a - nz.a,
     snrBand: sp.band - nz.band,
     speechDb: sp.rms, noiseA: nz.a,
-    headS, tailS, noiseWindowS: noiseEnd / rate,
+    headS, tailS, noiseWindowS: (noiseEnd - noiseStart) / rate,
   };
 }
