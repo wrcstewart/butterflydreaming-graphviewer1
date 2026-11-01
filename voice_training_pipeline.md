@@ -223,7 +223,7 @@ Existing sets were migrated into the scheme:
 | connection | **USB-C, direct to the Mac** — the preamp and converter are INSIDE the microphone |
 | interface | **none.** The Focusrite iTwo is out of the chain entirely |
 | mount | SM6 shock mount with its pop screen, on a tabletop stand |
-| pop screen | **about 3 cm in front of the capsule** |
+| pop screen | started ~3 cm from the capsule; **moved TOWARDS THE MOUTH, which the author found works better** (2026-11-01, by ear) |
 | system input gain | **50% on the macOS slider** |
 | captured as | 48 kHz mono, written 16-bit PCM by `voice_record.html`'s `encodeWav` |
 
@@ -276,7 +276,43 @@ in the project (`voice_record.html`, `SNR_YES` / `SNR_WARN`):
 Across all 158 clips recorded here, every Rode take passes and nothing else
 does; the ringlet set reads NO on 112 of its 113 measurable clips.
 
-**The pop screen at 3 cm — checked for comb filtering, NOT FOUND.** A reflector
+### The pop screen belongs near the MOUTH, not near the capsule (2026-11-01)
+
+The author, after trying it: *"the pop screen seems to work better further from
+the mike ie nearer my mouth"*. This is the opposite of how pop screens are
+usually mounted, and he is right on the acoustics.
+
+**A screen does not absorb a plosive, it breaks it up.** A pop is a JET of
+moving air, and a diaphragm responds to air actually crossing it with a large
+low-frequency excursion that has nothing to do with the acoustic signal. The
+mesh converts that coherent jet into fine-scale turbulence — **and turbulence is
+itself a noise source.** So the one thing you want is for it to happen as FAR
+FROM THE DIAPHRAGM as possible, where it can decay and spread before arriving.
+With the screen 3 cm from the capsule, the turbulence is being manufactured
+essentially at the microphone.
+
+Moving it towards the mouth also removes any screen-to-capsule reflection (the
+comb filtering tested for below) and takes the screen out of the capsule's near
+field. **The conventional "mount it close to the mic" is about mechanics, not
+acoustics** — the clamp is on the mic stand, and on the SM6 the screen is part
+of the shock mount. Nothing acoustic recommends that position.
+
+Two costs to accept: a screen nearer the mouth collects more moisture, so it
+wants airing between sessions; and it can sit between the reader and the text.
+
+**WHATEVER POSITION IS CHOSEN, FIX IT AND DO NOT MOVE IT WITHIN A SET.** The
+model learns whatever is consistent across the clips — that is the whole lesson
+of the ringlet voice reproducing the whirr — so a screen that migrates between
+takes puts a varying colouration into the training data. Uniform is worth more
+than optimal.
+
+**Not yet measured.** The finding is by ear and the experiments left no clips. To
+confirm it: one plosive-heavy line recorded twice, screen near the capsule and
+screen near the mouth, nothing else touched. The measure is peak 20–120 Hz
+energy during speech relative to the speech level, where a pop appears as a
+large low-frequency transient.
+
+**The screen at 3 cm — checked for comb filtering, NOT FOUND.** A reflector
 3 cm from the capsule gives a 6 cm extra path, a 0.175 ms delay, and therefore
 cancellation notches at **2.86 kHz and 8.58 kHz**. That is a specific enough
 prediction to test, so it was: the long-term speech spectrum of all three takes,
