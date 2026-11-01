@@ -6,6 +6,52 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-01 — the rig measures the noise floor of every take
+
+The author, on being told that a wandering noise floor is worse for training
+than a steady one: *"But we have seen that it learns the noise"*. He is right,
+and it corrects the priority. ringlet reproduced the whirr of the room it was
+recorded in, so the floor itself is the thing that matters; its consistency is a
+distant second. A number that only appears in offline analysis appears too late.
+
+**What the rig reported before was peak, and peak was the wrong number twice
+over.** The level meter is `width = min(100, peak * 130)%`, which pins at 100%
+once the peak passes **-2.3 dBFS** — so every level from there to clipping looks
+identical, which is why a take at -0.3 dBFS read as fine. And peak says nothing
+at all about the floor, which is what the model learns.
+
+**`voice_snr.js`** now measures each take as it is released, and
+`voice_record.html` prints it: `3.9s, peak 56%, S/N 42 dB(A) — good, pause
+2.6s/5.2s`. Below 38 it says *noisier than usual — a car, or movement?*; below
+30, *NOISY — worth redoing*.
+
+**The thresholds are measured, not chosen.** The two Rode NT1 takes gave 41.2
+and 42.0 dB A-weighted, so 38 allows for ordinary variation below this rig's
+demonstrated capability. The lower bound is the one that earns its keep: her
+ringlet set — the one that learned the whirr — measured **21.1 to 29.6 dB**. So
+under 30 is not "slightly noisy", it is the range that already produced an
+audible fault in a finished voice.
+
+**The method is the one this project arrived at the hard way**, and the module
+comment records why each part is shaped as it is: sustained-energy speech bounds
+rather than a peak-relative threshold, which once put a half-second pause at
+0.03 s; the **lead-in only**, never averaged with the tail, because mixing the
+two made one preamp look +4.5, then +0.3, then -0.5 dB; **A-weighted**, because
+a 120 Hz high-pass here removes 5.0 dB of energy and 0.07 dB of audible noise;
+and an explicit `ok: false` with a reason whenever the reading is impossible,
+after a script twice printed a confident verdict from a noise window that
+measured louder than the speech it was meant to floor.
+
+**Checked against the offline analysis before being wired in**, which is the
+whole point of it being a module: run under node against the existing clips it
+reproduces the python figures to **0.05 dB** A-weighted (41.2 and 42.0), matches
+`bill/0001` exactly at 18.3, and returns *not measured* on a room-tone clip.
+Matching required removing each FFT segment's mean, as `scipy.welch` does by
+default — without it this room's sub-20 Hz drift leaks into the lowest bins and
+shifts the answer about half a dB.
+
+---
+
 ## 2026-10-31 — the Methods nodes, and a label that needs more than one line
 
 Five changes under **Methods**, all in the DB:

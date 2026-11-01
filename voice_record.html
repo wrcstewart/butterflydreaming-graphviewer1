@@ -176,6 +176,7 @@
 
 <script type="module">
 import { getCode, verifyCode, codedJson, codedFetch, withCode } from '/voice_code.js';
+import { analyseTake } from '/voice_snr.js';
 
 const $ = id => document.getElementById(id);
 const log = m => { $('log').textContent += '\n' + m; $('log').scrollTop = 1e6; };
@@ -596,16 +597,52 @@ function stopRec() {
   recording = false;
   $('rec').classList.remove('on'); $('rec').textContent = 'Hold to record';
   if (!chunks.length) { status('Nothing captured — hold the button while speaking.', 'warn'); return; }
-  lastWav = encodeWav(chunks, sampleRate);
+  // One concatenation, used for both the file and the measurement, so the
+  // number reported is taken from exactly the samples that get saved.
+  let total = 0; for (const c of chunks) total += c.length;
+  const pcm = new Float32Array(total);
+  { let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; } }
+  lastWav = encodeWav([pcm], sampleRate);
   $('play').disabled = false; $('keep').disabled = false;
+
+  // ── THE FLOOR IS WHAT GETS LEARNED (2026-11-01) ─────────────────────
+  //
+  // Peak alone was never enough. The author, after the ringlet voice reproduced
+  // the whirr of the room it was recorded in: *"we have seen that it learns the
+  // noise"*. Whatever sits under the voice in these clips is what the model
+  // reproduces, so it has to be visible NOW, while the line can be read again,
+  // not after 125 utterances.
+  //
+  // THRESHOLDS ARE MEASURED, NOT CHOSEN. The Rode takes of 31 Oct and 1 Nov
+  // gave 41.2 and 42.0 dB A-weighted, so this rig's own capability is ~41.5 and
+  // 38 allows for normal variation. The lower bound is the one that matters:
+  // her ringlet set, the one that learned the whirr, measured 21.1 to 29.6 dB.
+  // So below 30 is not "a bit noisy", it is the range that already produced an
+  // audible fault in a finished voice.
+  const snr = analyseTake(pcm, sampleRate);
+  let snrTxt = '', snrBad = false;
+  if (snr.ok) {
+    const v = snr.snrA;
+    const verdict = v >= 38 ? 'good'
+                  : v >= 30 ? 'noisier than usual — a car, or movement?'
+                  : 'NOISY — worth redoing';
+    snrBad = v < 38;
+    snrTxt = `, S/N ${v.toFixed(0)} dB(A) — ${verdict}`;
+  } else {
+    // Never a number that looks like a result when it is not one.
+    snrTxt = `, S/N not measured (${snr.reason})`;
+    snrBad = true;
+  }
+
   // Say what is wrong rather than leaving it to be discovered at training time,
   // when the reader has gone and the take cannot be redone.
   const warn = lastWav.peak > 0.99 ? ' — CLIPPED, move back from the mic'
              : lastWav.peak < 0.05 ? ' — very quiet, move closer'
              : lastWav.seconds < 0.8 ? ' — very short, did it catch the whole line?'
              : '';
-  status(`${lastWav.seconds.toFixed(1)}s, peak ${(lastWav.peak * 100).toFixed(0)}%${warn}`,
-         warn ? 'warn' : 'done');
+  const pause = snr.ok ? `, pause ${snr.headS.toFixed(1)}s/${snr.tailS.toFixed(1)}s` : '';
+  status(`${lastWav.seconds.toFixed(1)}s, peak ${(lastWav.peak * 100).toFixed(0)}%${snrTxt}${pause}${warn}`,
+         warn ? 'warn' : (snrBad ? 'warn' : 'done'));
 }
 
 // Hold-to-record on both pointer and keyboard, because a long read is easier
