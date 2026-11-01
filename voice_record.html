@@ -42,6 +42,16 @@
   button.rec  { background:#b03a3a; border-color:#d05050; color:#fff; min-width:190px; }
   button.rec.on { background:#e04a4a; }
   button.go   { background:#b09e3b; border-color:#a07820; color:#1a1a20; }
+  /* The Keep button carries the verdict on the take in hand. THE AUTHOR HAS
+     REDUCED COLOUR VISION, so hue is the LAST of the three cues here, never
+     the only one: the three states are separated by LIGHTNESS (perceived
+     ~205 / ~150 / ~68 of 255, so they differ even in greyscale), they put
+     dark text on the two light grounds and light text on the dark one, and
+     each prefixes the label with its own SHAPE. Any one of the three cues is
+     enough on its own. */
+  button.go.v-ok   { background:#a8e6ad; border-color:#5ba562; color:#0d1f10; }
+  button.go.v-warn { background:#c8902a; border-color:#8e6210; color:#1e1500; }
+  button.go.v-bad  { background:#8d2525; border-color:#c04a4a; color:#ffecec; }
   .meter { height:8px; background:#26262f; border-radius:4px; overflow:hidden; flex:1 1 130px; min-width:110px; }
   .meter i { display:block; height:100%; width:0; background:#5fbf6a; transition:width .05s linear; }
   .status { font-size:13px; color:#9a9aa4; min-height:20px; margin:0 0 10px; }
@@ -290,7 +300,7 @@ function gateControls() {
   const open = sessionActive();
   $('rec').disabled = !open;
   $('rec').textContent = open ? 'Hold to record' : 'Open a session first';
-  if (!open) { $('play').disabled = true; $('keep').disabled = true; }
+  if (!open) { $('play').disabled = true; $('keep').disabled = true; setKeepVerdict(null); }
 }
 
 async function useSession(name, how) {
@@ -467,6 +477,23 @@ $('set').addEventListener('change', async () => {
   catch (e) { renderSession('Could not load that set: ' + e.message, 'warn'); }
 });
 
+// The verdict on the take currently in hand, shown on the button that commits
+// it. Cleared whenever that take stops being the one in hand -- a new
+// recording, a new prompt, a closed session -- because a stale verdict beside a
+// fresh take is worse than none.
+const KEEP_LABEL = 'Keep & next';
+function setKeepVerdict(kind) {
+  const b = $('keep');
+  b.classList.remove('v-ok', 'v-warn', 'v-bad');
+  const m = { ok:   ['v-ok',   '\u2713 '],   // tick
+              warn: ['v-warn', '! '],
+              none: ['v-warn', '? '],         // measured nothing, same amber
+              bad:  ['v-bad',  '\u2717 '] }[kind];
+  if (!m) { b.textContent = KEEP_LABEL; return; }
+  b.classList.add(m[0]);
+  b.textContent = m[1] + KEEP_LABEL;
+}
+
 function render() {
   const p = prompts[idx];
   if (!p) {
@@ -484,6 +511,7 @@ function render() {
     `prompt ${idx + 1} of ${prompts.length}  ·  ${recorded.size} recorded` +
     (recorded.has(p.id) ? '  ·  ALREADY RECORDED' : '');
   $('play').disabled = true; $('keep').disabled = true; lastWav = null;
+  setKeepVerdict(null);
   status(recorded.has(p.id) ? 'Already recorded — record again to replace it.' : ' ',
          recorded.has(p.id) ? 'warn' : '');
 }
@@ -608,6 +636,9 @@ async function startRec() {
     return;
   }
   chunks = []; recording = true;
+  // The previous take's verdict must go the instant a new one starts, or a
+  // green tick sits beside a recording nobody has measured yet.
+  setKeepVerdict(null);
   $('rec').classList.add('on'); $('rec').textContent = 'Recording — release to stop';
   status('Recording…');
 }
@@ -643,9 +674,10 @@ function stopRec() {
   // So below 30 is not "a bit noisy", it is the range that already produced an
   // audible fault in a finished voice.
   const snr = analyseTake(pcm, sampleRate);
-  let snrTxt = '', snrBad = false;
+  let snrTxt = '', snrBad = false, keepKind = 'none';
   if (snr.ok) {
     const v = snr.snrA;
+    keepKind = v >= SNR_YES ? 'ok' : v >= SNR_WARN ? 'warn' : 'bad';
     const verdict = v >= SNR_YES  ? 'YES'
                   : v >= SNR_WARN ? 'MARGINAL — louder, or closer, or wait'
                                   : 'NO — read it again';
@@ -666,6 +698,9 @@ function stopRec() {
              : lastWav.peak < 0.05 ? ' — very quiet, move closer'
              : lastWav.seconds < 0.8 ? ' — very short, did it catch the whole line?'
              : '';
+  // Keep stays ENABLED on a red verdict. It is a warning, not a lock: whether
+  // a take is good enough is the author's call, not the rig's.
+  setKeepVerdict(keepKind);
   const pause = snr.ok ? `, pause ${snr.headS.toFixed(1)}s/${snr.tailS.toFixed(1)}s` : '';
   status(`${lastWav.seconds.toFixed(1)}s, peak ${(lastWav.peak * 100).toFixed(0)}%${snrTxt}${pause}${warn}`,
          warn ? 'warn' : (snrBad ? 'warn' : 'done'));

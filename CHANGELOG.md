@@ -6,6 +6,35 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-01 (later still) — the verdict is on the Keep button
+
+The author: *"Please colour the keep button with ok - green - warning or not
+found amber and fail red"*. The reading was in the status line, which is where
+you look if you already suspect something; the button is where you look anyway,
+because it is the one you are about to press.
+
+```
+  >= 38 dB      green   "✓ Keep & next"
+  32 to 37      amber   "! Keep & next"
+  not measured  amber   "? Keep & next"
+  < 32          red     "✗ Keep & next"
+```
+
+**Hue is the last of three cues, never the only one**, because the author has
+reduced colour vision. The three grounds are separated by LIGHTNESS -- 205, 149
+and 68 of 255 once hue is stripped, so they differ in greyscale -- they put dark
+text on the two light grounds and light text on the dark one, and each prefixes
+the label with its own shape. Any one of the three carries the state alone.
+*Warning* and *not measured* share the amber, as asked, but keep different marks
+so the two are still distinguishable.
+
+**Keep stays enabled on red.** It is a warning, not a lock: whether a take is
+good enough is the author's call and not the rig's.
+
+The verdict is cleared the moment the take it refers to stops being the one in
+hand -- a new recording, a new prompt, a closed session -- because a green tick
+beside an unmeasured take is worse than no mark at all.
+
 ## 2026-11-01 (later) — S/N is the verdict, and a latent bug under it
 
 Two corrections from the author, minutes apart, the second of which withdrew a
