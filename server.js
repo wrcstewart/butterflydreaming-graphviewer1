@@ -794,7 +794,36 @@ app.post('/api/voice-clip', voiceGate, express.raw({ type: 'audio/wav', limit: '
     try {
       const wavDir = `${dir}/wav`;
       fs.mkdirSync(wavDir, { recursive: true });
-      fs.writeFileSync(`${wavDir}/${id}.wav`, req.body);
+
+      // ── AN OVERWRITE MUST BE ASKED FOR (2026-11-01) ──────────────────────
+      //
+      // On 2026-10-31 a completed session was reopened, the page aimed itself
+      // at prompt 0001 with Keep armed, and her first clip was replaced by a
+      // room-tone recording. It was recovered only because a staged copy
+      // happened to exist. The client bug is fixed too, but THE GUARANTEE
+      // BELONGS HERE: a recording is the one artefact in this project that
+      // cannot be regenerated, and the server must not destroy one because a
+      // page got its index wrong.
+      //
+      // So replacing an existing clip requires `overwrite=1`, which the page
+      // sends only after the reader has confirmed a dialog naming the prompt.
+      // Without it this refuses with 409 and says what is already there, which
+      // a caller can show. Refusing loudly beats succeeding quietly.
+      const wavPath = `${wavDir}/${id}.wav`;
+      const already = fs.existsSync(wavPath);
+      if (already && req.query.overwrite !== '1') {
+        const st = fs.statSync(wavPath);
+        console.warn(`[BD] voice-clip ${id} REFUSED: ${req.query.session} already has ` +
+                     `that clip (${(st.size / 1024).toFixed(0)} kB, ${st.mtime.toISOString()})`);
+        return res.status(409).json({
+          error: `prompt ${id} already has a clip in this session ` +
+                 `(${(st.size / 1024).toFixed(0)} kB, recorded ${st.mtime.toISOString()}). ` +
+                 `Nothing was written. Re-send with overwrite=1 to replace it.`,
+          existing: { id, bytes: st.size, recorded: st.mtime.toISOString() },
+        });
+      }
+      fs.writeFileSync(wavPath, req.body);
+      if (already) console.warn(`[BD] voice clip ${id} REPLACED in ${req.query.session}`);
 
       // Rewrite the whole manifest rather than appending: a re-take must REPLACE
       // its line, and appending would leave two rows for one clip — which
@@ -815,7 +844,8 @@ app.post('/api/voice-clip', voiceGate, express.raw({ type: 'audio/wav', limit: '
 
       console.log(`[BD] voice clip ${id} -> ${req.query.session} ` +
                   `(${(req.body.length / 1024).toFixed(0)} kB), ${rows.size} recorded`);
-      res.json({ ok: true, id, session: String(req.query.session), recorded: rows.size, bytes: req.body.length });
+      res.json({ ok: true, id, session: String(req.query.session), recorded: rows.size,
+                 bytes: req.body.length, replaced: already });
     } catch (err) {
       console.error('[BD] voice-clip failed:', err.message);
       res.status(500).json({ error: err.message });

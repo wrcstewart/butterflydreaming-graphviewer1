@@ -330,16 +330,45 @@ async function useSession(name, how) {
       problem = 'it carries no record of which prompt set it was read from';
     }
   } catch (e) { log('could not read session status: ' + e.message); }
-  // Start at the first prompt without audio, so a second sitting continues
-  // rather than re-treading what is already done.
+  // ── A COMPLETED SESSION AIMS AT NOTHING (2026-11-01) ──────────────────
+  //
+  // This line used to read `idx = firstGap === -1 ? 0 : firstGap`, so a session
+  // with NO gaps -- a finished one -- aimed the page at prompt 0001 with Keep
+  // ready. On 2026-10-31 that replaced the first clip of the author's wife's
+  // set with a room-tone recording, recovered only because a staged copy
+  // happened to exist.
+  //
+  // `prompts.length` is past the end, which render() already shows as "All
+  // prompts recorded" with nothing armed. A finished session now points at no
+  // prompt at all, so there is nothing for a stray Keep to land on.
   const firstGap = prompts.findIndex(x => !recorded.has(x.id));
-  idx = firstGap === -1 ? 0 : firstGap;
+  const complete = firstGap === -1 && prompts.length > 0 && recorded.size > 0;
+  idx = complete ? prompts.length : (firstGap === -1 ? 0 : firstGap);
   log(`${how} ${name} — ${recorded.size} clip(s) already recorded`);
   render();
+  if (complete) {
+    // A DIALOG, NOT A LOG LINE. Reopening a finished session is the selection
+    // mistake that caused the loss, and the author asked for it to be
+    // impossible to miss: *"make sure that if any mistakes of selection occur
+    // then there a dialog warning and not a silent failure"*.
+    renderSession(`This session is COMPLETE — ${recorded.size} of ${prompts.length} ` +
+                  `prompts recorded. Nothing is selected, so nothing can be ` +
+                  `overwritten. Start a new session to record another reading.`, 'warn');
+    gateControls();
+    $('rec').disabled = true;
+    $('rec').textContent = 'Session complete';
+    alert(`"${name}" is already complete.\n\n` +
+          `${recorded.size} of ${prompts.length} prompts are recorded, and no prompt ` +
+          `is selected, so nothing here can be overwritten by accident.\n\n` +
+          `To record another reading, start a NEW session.`);
+    return;
+  }
   if (problem) {
     log('!! ' + problem);
     renderSession('Cannot safely add to this session: ' + problem +
                   '. Its clips are safe — start a new session instead.', 'warn');
+    alert(`Cannot safely add to "${name}".\n\n${problem}.\n\n` +
+          `Its existing clips are untouched. Start a new session instead.`);
     gateControls();
     $('rec').disabled = true;
     $('rec').textContent = 'Prompt set unavailable';
@@ -487,8 +516,18 @@ $('set').addEventListener('change', async () => {
 // it. Cleared whenever that take stops being the one in hand -- a new
 // recording, a new prompt, a closed session -- because a stale verdict beside a
 // fresh take is worse than none.
-const KEEP_LABEL = 'Keep & next';
+let KEEP_LABEL = 'Keep & next';
+// The button says what it will DO. "Keep & next" on a prompt that already has
+// a clip is a lie by omission, and the reader has no other way to see it from
+// the button she is about to press.
+function render_keep_label() {
+  const p = prompts[idx];
+  KEEP_LABEL = (p && recorded.has(p.id)) ? `REPLACE ${p.id}` : 'Keep & next';
+  setKeepVerdict(currentVerdict);
+}
+let currentVerdict = null;
 function setKeepVerdict(kind) {
+  currentVerdict = kind;
   const b = $('keep');
   b.classList.remove('v-ok', 'v-warn', 'v-bad');
   const m = { ok:   ['v-ok',   '\u2713 '],   // tick
@@ -505,6 +544,11 @@ function render() {
   if (!p) {
     $('prompt').textContent = 'All prompts recorded.'; $('counter').textContent = 'done';
     $('say-note').hidden = true;
+    // Disarm explicitly. Nothing is selected here, so there must be no take in
+    // hand and no button that would commit one -- this branch is where a
+    // finished session now rests, and it is the one that lost a clip.
+    $('play').disabled = true; $('keep').disabled = true; lastWav = null;
+    setKeepVerdict(null);
     return;
   }
   $('prompt').textContent = p.text;
@@ -518,6 +562,7 @@ function render() {
     (recorded.has(p.id) ? '  ·  ALREADY RECORDED' : '');
   $('play').disabled = true; $('keep').disabled = true; lastWav = null;
   setKeepVerdict(null);
+  render_keep_label();
   status(recorded.has(p.id) ? 'Already recorded — record again to replace it.' : ' ',
          recorded.has(p.id) ? 'warn' : '');
 }
@@ -773,14 +818,50 @@ $('keep').addEventListener('click', async () => {
   const p = prompts[idx];
   if (!lastWav || !p) return;
   if (!sessionActive()) { status('No session open — the clip cannot be saved.', 'bad'); return; }
+
+  // REPLACING A CLIP IS ASKED FOR, NEVER ASSUMED. The server refuses an
+  // overwrite without this flag, so the two have to agree; the reader sees the
+  // prompt id and its text, because "0005" alone is not something anyone can
+  // check against what they just read.
+  let overwrite = false;
+  if (recorded.has(p.id)) {
+    const ok = confirm(
+      `Prompt ${p.id} ALREADY HAS A CLIP in this session.\n\n` +
+      `    "${p.text}"\n\n` +
+      `Keeping this take will REPLACE that recording permanently.\n\n` +
+      `Replace it?`);
+    if (!ok) {
+      status(`Not saved — ${p.id} still has its original clip. ` +
+             `Use Skip to move on, or Keep again to replace it.`, 'warn');
+      return;                      // the take is still in hand
+    }
+    overwrite = true;
+  }
+
   $('keep').disabled = true;
   status('Saving…');
   try {
     const r = await codedFetch(`/api/voice-clip?session=${encodeURIComponent(session)}` +
-                               `&id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}`,
+                               `&id=${encodeURIComponent(p.id)}&text=${encodeURIComponent(p.text)}` +
+                               (overwrite ? '&overwrite=1' : ''),
       { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: lastWav.blob });
     const d = await r.json();
+    // A 409 means the page and the disk disagree about what is already there --
+    // exactly the condition that lost a clip -- so it is a DIALOG, not a line
+    // in the status bar that scrolls past.
+    if (r.status === 409) {
+      alert(`NOT SAVED — nothing was overwritten.\n\n${d.error}\n\n` +
+            `The page did not know prompt ${p.id} already had a clip, so the ` +
+            `server refused. Your take is still here. Press Keep again to ` +
+            `replace the existing clip, or Skip to leave it alone.`);
+      recorded.add(p.id);          // the page now knows; next Keep will ask
+      status(`Refused — ${p.id} already has a clip. Keep again to replace it.`, 'warn');
+      $('keep').disabled = false;
+      render_keep_label();
+      return;
+    }
     if (d.error) throw new Error(d.error);
+    if (d.replaced) log(`REPLACED ${p.id}`);
     recorded.add(p.id);
     log(`saved ${p.id}  (${(d.bytes / 1024).toFixed(0)} kB)  ${d.recorded} recorded`);
     idx = Math.min(idx + 1, prompts.length);

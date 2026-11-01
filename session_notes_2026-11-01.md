@@ -319,16 +319,46 @@ themselves remain in `mixed`.**
 
 ---
 
+## 7. The overwrite hole, closed
+
+*"correct the overwrite hole - make sure that if any mistakes of selection occur
+then there a dialog warning and not a silent failure."*
+
+`idx = firstGap === -1 ? 0 : firstGap;` aimed a **completed** session at prompt
+`0001` with Keep armed. On 31 October that replaced the first clip of her set
+with a room-tone recording, recovered only because a staged copy happened to
+exist. Closed in three places:
+
+**The server refuses by default.** `/api/voice-clip` now returns **409** if the
+clip exists and `overwrite=1` was not sent, naming the size and timestamp of
+what is already there. This is the guarantee, because a recording is the one
+artefact here that cannot be regenerated and no page bug should be able to
+destroy one. Tested end to end: first write 200 (16,044 bytes), second write
+without the flag **409 with the file byte-for-byte untouched**, third write with
+the flag 200 and replaced.
+
+**A finished session points at no prompt.** `idx` goes to `prompts.length`,
+which `render()` already shows as "All prompts recorded" — and that branch now
+disarms Play and Keep and clears the take in hand, rather than returning early
+with them live.
+
+**Every selection mistake raises a dialog, not a log line.** Reopening a
+complete session, a session whose prompt set no longer matches, a Keep onto a
+prompt that already has a clip (quoting the id *and its text*, since "0005"
+alone is not checkable), and a 409 from the server — which means the page and
+the disk disagreed, exactly the condition that lost the clip. The Keep button
+also relabels itself **`REPLACE 0005`** when that is what it will do.
+
+Declining a replacement keeps the take in hand, so nothing is lost by saying no.
+
+---
+
 ## Still open
 
 - **THE THREE SECRETS IN `config.js` MUST BE TREATED AS COMPROMISED** —
   `CURATION_CODE`, `NEO4J_PASSWORD`, `PAIR_CODE` were publicly fetchable for as
   long as the tunnel had been up before 28 October. Change them, restart, delete
   the `.bak` copies.
-- **The rig can still overwrite a completed set.**
-  `idx = firstGap === -1 ? 0 : firstGap;` aims a *completed* session at prompt
-  `0001` with Keep armed. This is how her first clip was lost. Offered five
-  times, ~10 minutes.
 - **Time Machine exclusions** for `~/bd_voice_train` — offered, the author's call.
 - **Backup disc health** unread; needs WD Drive Utilities or DriveDx.
 - `SPEAK_GAP_MS` / `SPEAK_LINE_GAP_MS` want raising once a voice without
