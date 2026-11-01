@@ -213,6 +213,81 @@ Existing sets were migrated into the scheme:
 | `voice_dataset_will_01/` | `voice_sessions/2026-09-06_1209_will/` (63 takes, the first fine-tune) |
 | `voice_dataset/` | `voice_sessions/2026-10-28_1103_will-mictest/` (3 takes, a mic test) |
 
+### The recording chain, and the gain (2026-11-01)
+
+**The chain, as the author confirmed it:**
+
+| | |
+|---|---|
+| microphone | **Rode NT1 5th Gen** |
+| connection | **USB-C, direct to the Mac** — the preamp and converter are INSIDE the microphone |
+| interface | **none.** The Focusrite iTwo is out of the chain entirely |
+| mount | SM6 shock mount with its pop screen, on a tabletop stand |
+| system input gain | **50% on the macOS slider** |
+| captured as | 48 kHz mono, written 16-bit PCM by `voice_record.html`'s `encodeWav` |
+
+**Why the connection matters to the notes.** On USB-C there is no external
+preamp to blame or to adjust: the gain slider is acting on Rode's own input
+stage, and the improvement measured on 31 Oct over every earlier microphone is
+that stage, not the iTwo's. It also locates the 32-bit float the author raised:
+it exists in the microphone's USB path, but the rig clamps to +/-1.0 and writes
+16-bit, so the ceiling in practice is **ours, not the microphone's**.
+
+**Reference measurements.** All figures A-weighted, floor by the robust
+percentile estimator (see `voice_snr.js`); S/N is gain-invariant, the floor is
+not.
+
+| clip | when | peak | speech RMS | floor dB(A) | S/N dB(A) | pause head/tail |
+|---|---|---|---|---|---|---|
+| `rode1/0001` | 31 Oct 18:04 | −0.3 dBFS | −16.3 | −77.6 | **51.9** | 2.21 / 8.86 s |
+| `rode1/0002` | 1 Nov 10:09 | −5.0 dBFS | −20.9 | −75.7 | **46.7** | 2.55 / 5.19 s |
+| `rode4/0001` | 1 Nov 11:48 | −10.7 dBFS | −26.4 | −83.1 | **50.6** | 1.35 / 0.91 s |
+
+**Only `rode4/0001` is confirmed at 50%.** The author gave that figure after
+that take. The two earlier clips were at an unknown, higher setting, and an
+unkept take shortly before `rode4` clipped outright at peak 100% — so the
+slider had been well above 50% and was brought down. The floors are consistent
+with that: −83.1 at 50% against −75.7 and −77.6 earlier.
+
+**THE FLOOR IS THE GAIN'S FINGERPRINT.** At a fixed slider position it is
+reproducible, so `floor ≈ −83 dB(A)` is the marker for "the gain is where it was
+when it worked". A reading of −75 means the slider has moved up by about 8 dB
+whatever its position claims. This is the only cross-check available, because
+macOS does not report the slider position to the page.
+
+**Moving the slider cannot improve the signal-to-noise.** Measured across a
+24.3 dB sweep of recording level on 64 clips: S/N slope **+0.13 dB/dB**
+(r² = 0.02) while the absolute floor rose **+0.87 dB/dB** (r = 0.70, r² = 0.49). Gain
+lifts voice and floor together. The slider buys **headroom only**; S/N comes
+from proximity and projection. At 50% the peak sits at 29% of full scale, which
+is ample headroom, so there is no reason to raise it.
+
+**What the rig now says about a take**, with thresholds derived from every clip
+in the project (`voice_record.html`, `SNR_YES` / `SNR_WARN`):
+
+```
+  YES       S/N >= 45      the three Rode takes: 46.7, 50.6, 51.9
+  MARGINAL  40 to 44
+  NO        S/N <  40      her ringlet set, which audibly learned the
+                           whirr, topped out at 40.0
+```
+
+Across all 158 clips recorded here, every Rode take passes and nothing else
+does; the ringlet set reads NO on 112 of its 113 measurable clips.
+
+**Two artefacts of the rig itself, both characterised and both handled:**
+
+- **A trigger impulse at t=0 of every take** — the record button, through the
+  desk and through the air: +6.2 and +6.6 dB of 20–90 Hz on two takes, −40 to
+  −44 dBFS broadband over the first 100 ms against a settled floor of −57. The
+  first 300 ms is excluded from both the speech search and the noise window. It
+  sits ~2 s before the first word, so piper's 0.25 s keep discards it.
+- **The reader's own breath and mouth clicks inside the pause** — one isolated
+  50 ms burst at −62 dB, 0.4 s before the first word of `rode4/0001`, inflated
+  a mean-based floor by 12.0 dB. Hence the percentile estimator.
+
+---
+
 ---
 
 ## 3. The first fine-tune — what happened
