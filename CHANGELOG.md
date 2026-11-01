@@ -6,6 +6,39 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-01 (fourth) — one headline, the fault named first
+
+The author, on the readout shipped minutes earlier: *"This seems wrong"* --
+
+```
+4.5s, peak 100%, S/N 38 dB — MARGINAL — louder, or closer, or wait
+(floor -59), pause 0.6s/0.2s — CLIPPED, move back from the mi
+```
+
+Three faults in one line.
+
+**It contradicted itself.** The verdict tested the raw value while the text
+printed `toFixed(0)`, so 37.6 dB appeared as "38" beside the word MARGINAL when
+the stated boundary is 38. The verdict is now decided on the same rounded figure
+that is displayed, so the two cannot disagree. The effective boundary is
+therefore 37.5, which is the honest consequence of showing whole dB.
+
+**It gave dangerous advice.** The take was CLIPPED and the headline said "louder,
+or closer". Clipping is not a matter of degree -- the samples are destroyed and
+no signal-to-noise redeems them -- so it now outranks every other verdict and
+turns the button red. Where the fault really is a quiet voice the advice appears
+only when the peak is low; otherwise the room is the problem and it says *wait
+for quiet*.
+
+**The important part was last, and cut off mid-word** ("the mi"). There is now
+exactly ONE headline -- the most serious that applies -- stated first, with the
+numbers after it in a fixed order.
+
+Two warnings were missing and are now present: a **tail pause under 0.3 s**,
+which is where piper's 0.25 s keep cuts a falling cadence -- the precise fault
+his wife heard on the first processed set -- and a **head pause under 0.8 s**,
+which leaves too little room to measure.
+
 ## 2026-11-01 (later still) — the verdict is on the Keep button
 
 The author: *"Please colour the keep button with ok - green - warning or not

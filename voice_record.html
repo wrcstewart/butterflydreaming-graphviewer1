@@ -674,36 +674,71 @@ function stopRec() {
   // So below 30 is not "a bit noisy", it is the range that already produced an
   // audible fault in a finished voice.
   const snr = analyseTake(pcm, sampleRate);
-  let snrTxt = '', snrBad = false, keepKind = 'none';
-  if (snr.ok) {
-    const v = snr.snrA;
-    keepKind = v >= SNR_YES ? 'ok' : v >= SNR_WARN ? 'warn' : 'bad';
-    const verdict = v >= SNR_YES  ? 'YES'
-                  : v >= SNR_WARN ? 'MARGINAL — louder, or closer, or wait'
-                                  : 'NO — read it again';
-    snrBad = v < SNR_YES;
-    // The floor is shown second and judges nothing. It only says WHY: at a
-    // steady gain a normal floor with a low S/N means the line was read
-    // quietly, and a raised floor means the room was noisy.
-    snrTxt = `, S/N ${v.toFixed(0)} dB — ${verdict}  (floor ${snr.noiseA.toFixed(0)})`;
+  const pk = lastWav.peak;
+
+  // ── ONE FAULT, NAMED FIRST (2026-11-01) ───────────────────────────────
+  //
+  // The author, on the first version of this line: *"This seems wrong"*, over
+  // `4.5s, peak 100%, S/N 38 dB — MARGINAL — louder, or closer, or wait (floor
+  // -59), pause 0.6s/0.2s — CLIPPED, move back from the mi`. Three faults in
+  // one line, all of them mine:
+  //
+  //  1. IT CONTRADICTED ITSELF. The verdict tested the raw value and the text
+  //     printed `toFixed(0)`, so 37.6 dB appeared as "38" next to MARGINAL
+  //     while the stated boundary is 38. The verdict is now decided on the
+  //     SAME ROUNDED NUMBER that is shown, so the two can never disagree.
+  //
+  //  2. IT GAVE DANGEROUS ADVICE. The take was CLIPPED and the headline said
+  //     "louder, or closer". Clipping is not a matter of degree -- the samples
+  //     are destroyed and no amount of signal-to-noise redeems them -- so it
+  //     now outranks every other verdict and turns the button RED. Where the
+  //     fault really is a quiet voice, the advice is given only when the peak
+  //     is actually low; otherwise the room is the problem and it says wait.
+  //
+  //  3. THE IMPORTANT PART WAS LAST, AND TRUNCATED. "CLIPPED" sat at the end
+  //     of a line long enough to be cut off mid-word ("the mi"). The verdict
+  //     and its one piece of advice now come FIRST and the numbers follow.
+  //
+  // Only ever ONE headline, the most serious that applies, so there is nothing
+  // to weigh up while somebody is waiting to read the next line.
+  const clipped = pk > 0.99;
+  const shown = snr.ok ? Math.round(snr.snrA) : null;
+
+  let kind, head;
+  if (clipped) {
+    kind = 'bad';  head = 'CLIPPED — turn the gain down, this take is unusable';
+  } else if (!snr.ok) {
+    kind = 'none'; head = `NOT MEASURED — ${snr.reason}`;
+  } else if (shown < SNR_WARN) {
+    kind = 'bad';  head = 'NO — too close to the room, read it again';
+  } else if (shown < SNR_YES) {
+    kind = 'warn';
+    head = 'MARGINAL — ' + (pk < 0.25 ? 'louder, or closer' : 'wait for quiet');
+  } else if (pk < 0.05) {
+    kind = 'warn'; head = 'VERY QUIET — move closer or raise the gain';
+  } else if (lastWav.seconds < 0.8) {
+    kind = 'warn'; head = 'VERY SHORT — did it catch the whole line?';
+  } else if (snr.tailS < 0.30) {
+    // piper keeps 0.25 s after the last word and can keep no more than is
+    // there, so a short tail is where a falling cadence gets cut -- the exact
+    // fault his wife heard on the first processed set.
+    kind = 'warn'; head = `TAIL PAUSE ONLY ${snr.tailS.toFixed(1)}s — hold on after the last word`;
+  } else if (snr.headS < 0.80) {
+    kind = 'warn'; head = `HEAD PAUSE ONLY ${snr.headS.toFixed(1)}s — pause longer before speaking`;
   } else {
-    // Never a number that looks like a result when it is not one.
-    snrTxt = `, not measured (${snr.reason})`;
-    snrBad = true;
+    kind = 'ok';   head = 'YES';
   }
 
-  // Say what is wrong rather than leaving it to be discovered at training time,
-  // when the reader has gone and the take cannot be redone.
-  const warn = lastWav.peak > 0.99 ? ' — CLIPPED, move back from the mic'
-             : lastWav.peak < 0.05 ? ' — very quiet, move closer'
-             : lastWav.seconds < 0.8 ? ' — very short, did it catch the whole line?'
-             : '';
-  // Keep stays ENABLED on a red verdict. It is a warning, not a lock: whether
-  // a take is good enough is the author's call, not the rig's.
-  setKeepVerdict(keepKind);
-  const pause = snr.ok ? `, pause ${snr.headS.toFixed(1)}s/${snr.tailS.toFixed(1)}s` : '';
-  status(`${lastWav.seconds.toFixed(1)}s, peak ${(lastWav.peak * 100).toFixed(0)}%${snrTxt}${pause}${warn}`,
-         warn ? 'warn' : (snrBad ? 'warn' : 'done'));
+  // The numbers come after, in a fixed order, so the eye can learn where to
+  // look. The floor judges nothing: it only separates a quietly read line
+  // (normal floor, low S/N) from a noisy room (raised floor).
+  const nums = [`${lastWav.seconds.toFixed(1)}s`, `peak ${Math.round(pk * 100)}%`];
+  if (snr.ok) nums.push(`S/N ${shown}`, `floor ${snr.noiseA.toFixed(0)}`,
+                        `pause ${snr.headS.toFixed(1)}/${snr.tailS.toFixed(1)}s`);
+  // Keep stays ENABLED even on red. It is a warning, not a lock: whether a
+  // take is good enough is the author's call, not the rig's.
+  setKeepVerdict(kind);
+  status(`${head}  ·  ${nums.join('   ')}`, kind === 'ok' ? 'done' : 'warn');
 }
 
 // Hold-to-record on both pointer and keyboard, because a long read is easier
