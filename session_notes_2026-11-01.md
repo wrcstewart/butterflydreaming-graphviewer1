@@ -312,9 +312,10 @@ sentences at 17, 34, 51, 68, 85, 102, 119, 128.
 **Reordering was safe only because no session had yet recorded against the set**,
 which was checked first. A prompt id is a POSITION, not a sentence.
 
-Registered as `mixed` / "Mixed registers". A temporary `check` set holds the
-eight written lines alone for review — **delete it and its registry entry once
-the wording is settled.**
+Registered as `mixed` / "Mixed registers". A temporary `check` set held the
+eight written lines alone for review; the author read them, approved them, and
+it was deleted the same day along with its registry entry. **The eight sentences
+themselves remain in `mixed`.**
 
 ---
 
@@ -328,8 +329,6 @@ the wording is settled.**
   `idx = firstGap === -1 ? 0 : firstGap;` aims a *completed* session at prompt
   `0001` with Keep armed. This is how her first clip was lost. Offered five
   times, ~10 minutes.
-- **The `check` prompt set is temporary** and should be deleted with its
-  registry entry.
 - **Time Machine exclusions** for `~/bd_voice_train` — offered, the author's call.
 - **Backup disc health** unread; needs WD Drive Utilities or DriveDx.
 - `SPEAK_GAP_MS` / `SPEAK_LINE_GAP_MS` want raising once a voice without

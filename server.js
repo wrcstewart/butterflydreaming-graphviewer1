@@ -636,13 +636,6 @@ const PROMPT_SETS = {
   // corpus, so the licence is the project's own public-domain text and the
   // register is the register the voice will actually have to read.
   mixed: { label: 'Mixed registers', file: './voice_prompts_mixed.json' },
-  // 2026-11-01 — TEMPORARY. The eight written sentences from `mixed`, pulled
-  // out so the author can read through them in one pass: *"Please arrange them
-  // at the begiing on a temprary basis for me to check through"*. The real set
-  // was NOT reordered to do this — a prompt id is a POSITION, not a sentence, so
-  // moving them would silently repoint every id in a set that may yet be
-  // recorded against. Delete this entry and the file once the wording is settled.
-  check: { label: 'Check: 8 written lines', file: './voice_prompts_check.json' },
 };
 const DEFAULT_PROMPT_SET = 'tao';
 
