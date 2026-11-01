@@ -97,13 +97,14 @@ session is then **bound** to it — see the next section.
 The author, before the second recording: *"we need a new training set so that
 her voice all suits the grimms stuff and the poetry"*. The first set was all Tao
 Te Ching and gave a voice he judged *"fluid meditative"* and short of punch for
-the stories. His specification: 120 utterances, 30 Tao, 30 Zhuangzi, 30 Grimm,
-15 Hardy, 15 Whitman.
+the stories. His specification: 120 utterances — 30 Tao, 30 Zhuangzi, 30 Grimm,
+15 Hardy, 15 Whitman. Delivered as **128**, the eight extra being written
+sentences he later authorised for phoneme coverage.
 
-**Drawn from BD's own corpus**, by query, not from the internet. Two reasons, and
-the second is the better one: the licence is the project's own public-domain text
+**Drawn from BD's own corpus**, by query, not from the internet. Two reasons, the
+second the better one: the licence is the project's own public-domain text
 (McDonald, Legge, Margaret Hunt 1884, Hardy, Whitman), and **the register is the
-register the voice will actually have to read**. Candidate pools after filtering:
+register the voice will actually have to read.** Pools after filtering:
 
 | source | nodes | usable candidates | taken | drawn from |
 |---|---|---|---|---|
@@ -115,38 +116,72 @@ register the voice will actually have to read**. Candidate pools after filtering
 
 **WORDS ESPEAK GETS WRONG ARE EXCLUDED, and `speech_lexicon.json` IS the list.**
 The lexicon exists precisely because espeak mispronounces those words, and the
-reader is the one who makes that dangerous: she says `Dze` correctly, espeak
-renders it **`dˌiːzˌɛdˈiː` — spelling the letters out** — and the model attaches
-her audio to those wrong phonemes. `Khwan`, `Lieh-dze`, `Dze-lai` and `Dze-yu`
-fail the same way. All 58 lexicon words are excluded, plus every capitalised
-non-dictionary word, plus **Tao and Dao**: those are no longer in the lexicon, so
-BD says them espeak's way (`tˈaʊ`) while she says them the Chinese way. **The
-model never sees words, only phoneme ids, so dropping a word costs nothing** —
-there is no vocabulary to cover.
+reader is what makes that dangerous: she says `Dze` correctly, espeak renders it
+**`dˌiːzˌɛdˈiː` — spelling the letters out** — and the model attaches her audio
+to those wrong phonemes. `Khwan`, `Lieh-dze`, `Dze-lai`, `Dze-yu` fail the same
+way. All 58 lexicon words are excluded, plus every capitalised non-dictionary
+word, plus **Tao and Dao**: those are no longer in the lexicon, so BD says them
+espeak's way (`tˈaʊ`) while she says them the Chinese way. **The model never sees
+words, only phoneme ids, so dropping a word costs nothing** — there is no
+vocabulary to cover.
 
-**Selected by phoneme DEFICIT, not by novelty.** A first pass maximising new
-coverage reached all 46 phonemes by utterance 9 and still left /ʒ/ with 3
-instances, /ʊə/ with 3 and /ɪə/ with 4 — useless for fine-tuning. Each phoneme
-now carries a target of 14 instances and candidates are scored by how much of
-the remaining shortfall they fill. Result: **every phoneme the corpus can supply
-reaches 10 instances by utterance 67**, 6,611 instances and 1,000 distinct
-diphones across the set.
+#### COUNT THE PHONEMES THE MODEL ACTUALLY HAS
 
-**One limit is the corpus, not the method.** Across all 819 candidates /ʒ/
-appears **8 times**, /ʊə/ 10 and /ɪə/ 11. Those utterances are pre-seeded so
-nothing better-scoring can crowd them out, and all of them are in — /ʒ/=8 is the
-ceiling these five texts allow. alba already knows /ʒ/, so it will stay closer to
-the base voice than the rest. That is worth knowing rather than discovering.
+**The first two versions of this set optimised an inventory piper does not
+use, and it cost real coverage.** `phoneme_id_map` in the model config has
+exactly **five multi-character keys — `aɪ aʊ ɔɪ eɪ oʊ`** — and every other
+phoneme is a single character. So:
+
+- `/ʊə/`, `/ɪə/`, `/iə/`, `/ɛə/` **are not units the model has any concept of.**
+  They are `ʊ`+`ə`, `ɪ`+`ə` and so on, all of them abundant.
+- `/tʃ/` and `/dʒ/` are likewise `t`+`ʃ` and `d`+`ʒ`.
+
+Counting the phonetician's inventory, `/ʒ/` looked critically scarce at 8
+instances and a whole selection pass was spent rescuing it. **In piper's terms
+it was already at 30**, because every *judge*, *gentle* and *age* supplies one.
+Meanwhile the phonemes that were genuinely thin went unnoticed, each against a
+pool ceiling four to seven times higher:
+
+| phoneme | wrong-inventory pass | pool ceiling | after correction | final set |
+|---|---|---|---|---|
+| `ɔɪ` | 17 | 41 | 41 | **67** |
+| `ʒ` | 30 | 122 | 35 | **53** |
+| `e` | 33 | 189 | 56 | 58 |
+| `ɑ` | 35 | 244 | 60 | 60 |
+| `aʊ` | 44 | 221 | 60 | 63 |
+| `θ` | 48 | 251 | 54 | 64 |
+
+Selection is **deficit-driven** against a target of 60 instances per phoneme,
+not greedy on novelty: covering the inventory is easy and nearly worthless — a
+novelty pass reached all of it by utterance 9 while leaving the table above.
+The set now holds **8,058 phoneme instances and 804 distinct diphones, with its
+rarest phoneme at 53**, against 17 before the correction.
+
+#### Eight written sentences
+
+The author: *"If you think that any phonemes are a bit low you could make up
+sentences and interleave them."* Only one phoneme needed it. After the
+correction `/ɔɪ/` stood at **41 — every instance of it in all five texts, the
+pool ceiling exactly**, so no reselection could add one more. `/ʒ/` and `/θ/`
+were next thinnest.
+
+Eight sentences were written for those three, and **kept deliberately in the
+register of the rest of the set** — storytelling, not a phonetic drill — because
+she reads them as literature and the delivery is itself what the model learns.
+They are marked `"written": true` in the JSON and sit at ids 0016, 0032, 0048,
+0064, 0080, 0096, 0112 and 0128. They lift `/ɔɪ/` 41 → 67, `/ʒ/` 35 → 53 and
+`/θ/` 54 → 64.
+
+#### Order
 
 **Interleaved in pairs** — Tao, Tao, Zhuangzi, Zhuangzi, Grimm, Grimm, Hardy,
-Whitman, repeating — so **any prefix covers all five registers.** Blocking by
-source would lose a whole register to an early finish; pairs still give her two
-in a row to settle into each voice. Natural balanced stopping points are **80**
-(20/20/20/10/10) and **96** (24/24/24/12/12). The scarce-phoneme utterances land
-early by construction, so an early stop keeps the hardest material.
+Whitman, repeating, with a written sentence every sixteenth — so **any prefix
+covers all five registers.** Blocking by source would lose a whole register to
+an early finish; pairs still give her two in a row to settle into each voice.
+Natural balanced stopping points are **80** and **96**.
 
-Registered as `mixed` / "Mixed registers" in `PROMPT_SETS`. ~14 minutes of
-speech at 10,536 characters, median utterance 85 characters.
+Registered as `mixed` / "Mixed registers" in `PROMPT_SETS`. 128 utterances,
+11,649 characters, about 15 minutes of speech, median utterance 90 characters.
 
 ### A LEXICON WORD IN THE TRAINING SET (2026-10-28)
 
