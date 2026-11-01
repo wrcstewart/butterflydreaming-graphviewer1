@@ -188,28 +188,28 @@ let ctx = null, stream = null, node = null, chunks = [], recording = false, samp
 let lastWav = null;
 let session = null;
 
-// ── THE FLOOR IS THE ROOM; THE RATIO IS THE TAKE (2026-11-01) ─────────────
+// ── THE RATIO IS WHAT THE MODEL LEARNS (2026-11-01) ─────────────────
 //
-// The author, of the first version of this readout: *"it seems sensitive to the
-// overall level of my voice"*. Measured, and he was right: scaling the speech
-// alone by +6 dB moves the signal-to-noise by exactly +6 dB, because the room
-// noise does not care how loudly anyone speaks. So S/N answers "how far above
-// the room was this line", which is what the MODEL gets -- but it cannot answer
-// "was the room quiet just now", which is what the reader needs to know in
-// order to decide whether to read it again.
+// The author: *"The absolute SNR must be the critical reading surely??"*. Yes.
+// piper normalises every clip before training, so the absolute level is thrown
+// away and the RATIO of voice to noise is exactly what survives into the model.
+// That also settles the thing that looked like a fault: S/N falling when a line
+// is read quietly is a TRUE warning, not a false one -- that clip really does
+// carry more noise relative to the voice, and the answer is to read it again
+// louder or closer, not to excuse it.
 //
-// The absolute A-weighted floor answers that, and the same test shows it
-// holding at -71.2 dBFS across every voice level. It does move 1:1 with
-// RECORDING GAIN, so no fixed number can be right for it. Hence a baseline of
-// this session's own takes: gain is constant within a sitting, so a car or a
-// chair or a sleeve raises this take's floor above its neighbours' and that is
-// visible without knowing anything absolute. The median is used rather than the
-// mean so that one bad take does not move the thing it should be judged by.
-let floorHistory = [];
-const FLOOR_BASE_MIN = 3;   // takes needed before a comparison means anything
-const FLOOR_WARN_DB  = 3;   // above the session median: mention it
-const FLOOR_BAD_DB   = 6;   // above the session median: say redo it
-const SNR_FLOOR_BAD  = 30;  // absolute backstop: her whirring set was 21-30
+// An earlier version here judged each take against the median floor of its
+// session. It was harder to reason about, needed three takes before it said
+// anything, and measured the room rather than the clip. Withdrawn.
+//
+// THE THREE NUMBERS ARE MEASURED, NOT CHOSEN:
+//   her ringlet set, which audibly learned the whirr   21.1 to 29.6 dB(A)
+//   the old microphones, 28-30 Oct                     18.3 to 33.2 dB(A)
+//   the Rode NT1, careful takes                        41.2 and 42.0 dB(A)
+// So 38 is just below what this rig does when all is well, and 32 sits clear
+// above the best clip of the set that already produced an audible fault.
+const SNR_YES  = 38;
+const SNR_WARN = 32;
 // Is the button STILL held? A hold can outlive its own release: startRec awaits
 // the microphone, and whatever happens during that await — a permission dialog,
 // a worklet compile, an AudioContext resume — happens after pointerdown and can
@@ -294,9 +294,6 @@ function gateControls() {
 }
 
 async function useSession(name, how) {
-  // A new session is a new room, a new reader and possibly a new gain, so the
-  // baseline cannot carry over.
-  if (session !== name) floorHistory = [];
   session = name;
   try { localStorage.setItem(REMEMBER, name); } catch (_) {}
   recorded = new Set();
@@ -648,32 +645,15 @@ function stopRec() {
   const snr = analyseTake(pcm, sampleRate);
   let snrTxt = '', snrBad = false;
   if (snr.ok) {
-    const floorNow = snr.noiseA;
-    const prev = floorHistory.slice();      // BEFORE adding this one
-    floorHistory.push(floorNow);
-    let verdict;
-    if (prev.length < FLOOR_BASE_MIN) {
-      // Honest about having nothing to compare against yet, rather than
-      // calling the first take of a session "good" on no evidence.
-      verdict = `baseline ${prev.length + 1}/${FLOOR_BASE_MIN}`;
-    } else {
-      const srt = prev.slice().sort((a, b) => a - b);
-      const base = srt[Math.floor(srt.length / 2)];
-      const up = floorNow - base;
-      verdict = up >= FLOOR_BAD_DB
-                  ? `FLOOR UP ${up.toFixed(0)} dB — worth redoing`
-              : up >= FLOOR_WARN_DB
-                  ? `floor up ${up.toFixed(0)} dB — a car, or movement?`
-              : 'room quiet';
-      snrBad = up >= FLOOR_WARN_DB;
-    }
-    // The backstop is absolute and does not depend on a baseline: this is the
-    // range that already produced an audible fault in a finished voice.
-    if (snr.snrA < SNR_FLOOR_BAD) {
-      verdict = `S/N only ${snr.snrA.toFixed(0)} dB — too close to the room`;
-      snrBad = true;
-    }
-    snrTxt = `, floor ${floorNow.toFixed(0)} dB(A), S/N ${snr.snrA.toFixed(0)} — ${verdict}`;
+    const v = snr.snrA;
+    const verdict = v >= SNR_YES  ? 'YES'
+                  : v >= SNR_WARN ? 'MARGINAL — louder, or closer, or wait'
+                                  : 'NO — read it again';
+    snrBad = v < SNR_YES;
+    // The floor is shown second and judges nothing. It only says WHY: at a
+    // steady gain a normal floor with a low S/N means the line was read
+    // quietly, and a raised floor means the room was noisy.
+    snrTxt = `, S/N ${v.toFixed(0)} dB — ${verdict}  (floor ${snr.noiseA.toFixed(0)})`;
   } else {
     // Never a number that looks like a result when it is not one.
     snrTxt = `, not measured (${snr.reason})`;

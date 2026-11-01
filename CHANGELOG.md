@@ -6,49 +6,51 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
-## 2026-11-01 (later) — the readout judges the ROOM, not the voice
+## 2026-11-01 (later) — S/N is the verdict, and a latent bug under it
 
-The author, within minutes of using it: *"There is something wrong with the
-noise recorder it seems sensitive to the overall level of my voice"*. He was
-right twice over, and the second fault was the serious one.
+Two corrections from the author, minutes apart, the second of which withdrew a
+design decision made in the entry below.
 
-**S/N genuinely tracks how loudly you speak**, and that is not a bug in the
-arithmetic — the room noise does not care how loud the reader is, so a louder
-line sits further above it. Scaling the speech alone by +6 dB moves S/N by
-exactly +6.00 dB. But it makes S/N the wrong question: it answers "how far above
-the room was this line", which is what the model gets, and cannot answer "was
-the room quiet just now", which is what decides whether to read the line again.
+**First: *"it seems sensitive to the overall level of my voice"*.** True, and it
+flushed out a real bug. The speech detector set its threshold a fixed 30 dB
+below the loudest frame, which put it only 3 dB above the room floor. The
+trigger impulse at t=0 -- the record button, through the desk and through the
+air, -40 to -44 dBFS over the first 100 ms against a settled floor of -57 --
+cleared that threshold with **5 of the first 30 frames, and 5 consecutive is the
+trigger.** It was passing by luck. A line read 3 dB quieter dropped the
+threshold into the impulse, the detector called the lead-in speech, and the take
+came back *"no pause before speaking"* -- exactly what the quiet meditative
+lines of the Tao set would have done.
 
-**The absolute A-weighted floor answers that, and is provably immune to it** —
-unchanged to a tenth of a dB at voice -6, 0 and +6 dB. It moves 1:1 with
-RECORDING GAIN, so no fixed threshold can be right; the verdict is therefore
-against the **median floor of this session's own earlier takes**, gain being
-constant within a sitting. The 3 dB warning threshold is measured, not chosen:
-the four room-tone clips of 30 Oct, taken on different power configurations,
-varied by only **0.9 dB** A-weighted.
-
-**And underneath it, a latent bug the complaint flushed out.** The speech
-detector set its threshold 30 dB below the loudest frame. The trigger impulse at
-t=0 — the record button, through the desk and through the air, -40 to -44 dBFS
-over the first 100 ms against a settled floor of -57 — sat just under that
-threshold at his normal level: **5 of the first 30 frames crossed it, and 5
-consecutive is the trigger.** It passed by luck. A line read 3 dB quieter
-dropped the threshold into the impulse, the detector called the lead-in speech,
-and every such take came back *"no pause before speaking"* — which is precisely
-what would have happened on the quiet meditative lines of the Tao set.
-
-Fixed at both ends: the threshold is now anchored to the measured floor as well
-as the peak, and the first 300 ms is excluded from the onset search and from the
+Fixed at both ends: the threshold is anchored to the measured floor as well as
+the peak, and the first 300 ms is excluded from the onset search and from the
 noise window, because the trigger impulse is neither speech nor room. Excluding
-it also stopped it inflating the floor, which is why the reference reading moved
-from 42.00 to 42.23 dB.
+it also stopped it inflating the floor, which moved the reference reading from
+42.00 to 42.23 dB.
 
-Verified across voice level, recording gain and added noise: gain-invariant to
-0.00 dB, floor-invariant to voice to 0.0 dB, and the floor rises when noise is
-added. Previously the whole measure was one small change away from failing
-silently, and it took a reader using it to find that out.
+**Second: *"The absolute SNR must be the critical reading surely??"*.** Yes, and
+this replaced a more elaborate scheme that had briefly judged each take against
+the median floor of its session. **piper normalises every clip before training,
+so the absolute level is discarded and the voice-to-noise RATIO is precisely
+what survives into the model.** That also dissolves the apparent fault: S/N
+falling on a quietly-read line is a TRUE warning, because that clip really does
+carry more noise relative to the voice. The answer is to read it again louder or
+closer. The floor is still shown, but it judges nothing -- it only distinguishes
+*you spoke quietly* from *the room was noisy*.
 
----
+**Three bands, all three numbers measured rather than chosen:**
+
+```
+  YES       >= 38 dB      the Rode takes give 41.2, 42.0, 42.7
+  MARGINAL  32 to 37      below this rig's capability -- louder, closer, or wait
+  NO        < 32          clear of the best clip of the set that already failed
+```
+
+Validated against every clip in the project. Her ringlet set -- the one that
+audibly learned the whirr of her room -- would have been told **NO on 89 of its
+125 clips**, with exactly one passing. The two Rode takes both pass. A threshold
+that would have caught the failure we actually had is worth more than one
+reasoned from first principles.
 
 ## 2026-11-01 — the rig measures the noise floor of every take
 
