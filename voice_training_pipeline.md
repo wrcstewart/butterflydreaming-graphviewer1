@@ -306,11 +306,39 @@ of the ringlet voice reproducing the whirr — so a screen that migrates between
 takes puts a varying colouration into the training data. Uniform is worth more
 than optimal.
 
-**Not yet measured.** The finding is by ear and the experiments left no clips. To
-confirm it: one plosive-heavy line recorded twice, screen near the capsule and
-screen near the mouth, nothing else touched. The measure is peak 20–120 Hz
-energy during speech relative to the speech level, where a pop appears as a
-large low-frequency transient.
+**MEASURED, and it holds — about 6 to 7 dB** (`rode4/0002` screen close,
+`rode4/0003` screen near the mouth, recorded 17 seconds apart):
+
+| | close | far | difference |
+|---|---|---|---|
+| 20–120 Hz relative to the voice band | +27.5 dB | +21.1 dB | **−6.4 dB** |
+| worst low-frequency transient | +43.4 dB | +36.2 dB | **−7.2 dB** |
+| peak level reached | −2.6 dBFS | −9.9 dBFS | **−7.3 dB** |
+| voice band level (the reference) | −53.8 | −53.2 | 0.5 dB — matched |
+
+**Three independent statistics agreeing within 1 dB.** The peak figure matters
+most because it owes nothing to the band analysis: with the voice level matched
+to half a dB, moving the screen bought **7.3 dB of headroom**, which means the
+peaks had been set by the plosives rather than by the voice.
+
+**The measure had to be referenced to the VOICE BAND, not to speech RMS.** The
+first attempt normalised pop energy by total speech RMS and reported no
+difference at all (+0.1 dB). It could not: these takes are so blast-dominated
+that the RMS is mostly pop, so the pop was inflating its own reference. 300–3000
+Hz is nearly untouched by the jet and is the correct denominator.
+
+**Caveats.** One pair, and the two takes read different prompts (`0002` "The name
+that can be spoken…", `0003` "The nameless is the boundary…") with durations
+1.17 s apart, so the plosive content is not identical. The convergence of three
+unrelated measures is what makes the direction and the rough size credible, not
+the precision of any one of them.
+
+**Context worth keeping: his NORMAL reading does not pop.** 20–120 Hz sits
+**below** the voice band in ordinary takes — −5.7 dB on `rode4/0001`, −2.4 dB on
+`rode1/0002` — against +21 to +28 dB in these deliberate tests, which were
+blasted on purpose and are 27 to 33 dB beyond anything in normal delivery. The
+screen position is therefore **insurance against the occasional hard plosive,
+not a remedy for a problem present in the set.**
 
 **The screen at 3 cm — checked for comb filtering, NOT FOUND.** A reflector
 3 cm from the capsule gives a 6 cm extra path, a 0.175 ms delay, and therefore
