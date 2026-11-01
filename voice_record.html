@@ -213,13 +213,19 @@ let session = null;
 // anything, and measured the room rather than the clip. Withdrawn.
 //
 // THE THREE NUMBERS ARE MEASURED, NOT CHOSEN:
-//   her ringlet set, which audibly learned the whirr   21.1 to 29.6 dB(A)
-//   the old microphones, 28-30 Oct                     18.3 to 33.2 dB(A)
-//   the Rode NT1, careful takes                        41.2 and 42.0 dB(A)
-// So 38 is just below what this rig does when all is well, and 32 sits clear
-// above the best clip of the set that already produced an audible fault.
-const SNR_YES  = 38;
-const SNR_WARN = 32;
+// Re-derived 2026-11-01 after the floor estimator was corrected to a
+// percentile (see voice_snr.js) -- the mean had been inflated by the reader's
+// own breaths and mouth clicks by between 4.5 and 12.0 dB, unevenly, which put
+// the groups below on top of each other and once ranked the quietest of three
+// takes as the worst. With a robust floor they separate by 6.7 dB:
+//   her ringlet set, which audibly learned the whirr   28.0 to 40.0 dB(A)
+//   the old microphones, 28 Oct                        30.7 to 35.2 dB(A)
+//   the gain tests, 30 Oct                             32.1 to 38.6 dB(A)
+//   the Rode NT1, three careful takes                  46.7, 50.6, 51.9 dB(A)
+// So 45 sits below every Rode take and above everything else ever recorded
+// here, and 40 is the ceiling of the set that already produced the fault.
+const SNR_YES  = 45;
+const SNR_WARN = 40;
 // Is the button STILL held? A hold can outlive its own release: startRec awaits
 // the microphone, and whatever happens during that await — a permission dialog,
 // a worklet compile, an AudioContext resume — happens after pointerdown and can

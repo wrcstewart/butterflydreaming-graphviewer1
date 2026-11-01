@@ -6,6 +6,46 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-01 (fifth) — a floor is a low percentile, not a mean
+
+Analysing the author's next take, at 50% on the system gain slider, the readout
+said **S/N 38.6** -- his worst of three -- while the octave bands said the room
+was 8 to 15 dB QUIETER than the day before in every band but one. The exception
+was 2 kHz, 12.2 dB worse, and A-weighting puts full weight there, so it decided
+the answer on its own.
+
+**It was not interference. It was his mouth.** The 1.7-2.6 kHz band across the
+pause, in 50 ms frames, is -96 to -103 dB throughout except for a gentle rise at
+0.65-0.85 s -- an in-breath -- and then **one isolated 50 ms burst at 0.95 s
+reaching -62.3 dB**, 0.4 s before the first word: a lip or tongue click as he
+opened to speak.
+
+**Averaging the lead-in let that one click decide the measurement.** It raised
+the reported floor by 12.0 dB and dropped the reported S/N from 50.6 to 38.6 --
+**ranking the quietest of the three takes as the worst.** The inflation was
+present in all of them and uneven: 9.1, 4.5 and 12.0 dB.
+
+The floor is now the **25th percentile of overlapping 100 ms windows** -- the
+quieter quarter of the pause, which is the room. That is also closer to what
+reaches the model: a discrete click is not the steady bed a voice learns as its
+noise character, and piper's 0.25 s keep trims it anyway. Below four windows
+there is nothing to take a percentile from and it falls back to the mean; in
+practice that happened on 1 clip in 134.
+
+**Thresholds re-derived, because every number moved.** With a robust floor the
+groups separate by 6.7 dB where before they overlapped:
+
+```
+  her ringlet set, which audibly learned the whirr   26.6 to 40.0
+  the old microphones, 28 Oct                        30.8 to 34.6
+  the gain tests, 30 Oct                             32.1 to 38.6
+  the Rode NT1, three careful takes                  46.7, 50.6, 51.9
+                                                     ^ YES >= 45, NO < 40
+```
+
+Checked against all 158 clips in the project: **every Rode take passes and
+nothing else does.** Her set is NO on 112 of its 113 measurable clips.
+
 ## 2026-11-01 (fourth) — one headline, the fault named first
 
 The author, on the readout shipped minutes earlier: *"This seems wrong"* --

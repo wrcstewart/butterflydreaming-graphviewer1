@@ -76,6 +76,27 @@ const MIN_NOISE_MS = 200;// shorter than this is not a measurement
 const MIN_DYN_DB = 15;   // less range than this is steady noise, not speech
 const NFFT = 4096;       // 85 ms at 48 kHz
 
+// ── A FLOOR IS A LOW PERCENTILE, NOT A MEAN (2026-11-01) ──────────────────
+//
+// The lead-in is not pure room. It contains the reader getting ready: an
+// in-breath, a lip parting, a swallow. Averaging the whole window lets one such
+// event decide the answer. Measured on a take of 1 Nov: a single 50 ms mouth
+// click 0.4 s before the first word, -62 dB against -96 to -103 dB either side
+// of it, raised the reported floor by 12.0 dB and dropped the reported S/N from
+// 50.6 to 38.6 -- which ranked the quietest take of the three as the worst.
+//
+// So the floor is taken as the 25th percentile of overlapping 100 ms windows:
+// the quieter quarter of the pause, which is the room. It also matches what
+// actually reaches the model, because a discrete click is not the steady bed a
+// voice learns as its noise character -- and piper's 0.25 s keep trims it.
+//
+// Below MIN_WINDOWS there are too few to take a percentile from, and it falls
+// back to the mean; the head-pause warning in the page already asks for a
+// longer pause than that.
+const SUB_MS = 100;       // sub-window for the percentile
+const SUB_PCT = 25;       // the quieter quarter of the pause is the room
+const MIN_WINDOWS = 4;
+
 // ---- A-weighting, IEC 61672-1 ---------------------------------------------
 export function aWeightDb(f) {
   if (f <= 0) return -200;
@@ -235,6 +256,22 @@ function speechBounds(x, rate) {
            dyn: max - median };
 }
 
+// The room level: 25th percentile of the A-weighted level of overlapping
+// sub-windows. Returns null when there are too few windows to be a percentile.
+function robustNoiseA(x, a, b, rate) {
+  const w = Math.round(rate * SUB_MS / 1000), hop = Math.max(1, Math.round(w / 2));
+  const vals = [];
+  for (let i = a; i + w <= b; i += hop) {
+    const L = levels(x, i, i + w, rate);
+    if (L) vals.push(L.a);
+  }
+  if (vals.length < MIN_WINDOWS) return null;
+  vals.sort((p, q) => p - q);
+  const k = (vals.length - 1) * SUB_PCT / 100;
+  const lo = Math.floor(k), hi = Math.ceil(k);
+  return lo === hi ? vals[lo] : vals[lo] + (vals[hi] - vals[lo]) * (k - lo);
+}
+
 // ---- the one entry point ---------------------------------------------------
 // pcm: Float32Array of the whole take. Returns ok:false with a reason whenever
 // the take cannot be measured, rather than a number that looks like a result.
@@ -259,11 +296,15 @@ export function analyseTake(pcm, rate) {
   if (nz.rms >= sp.rms - 3) {
     return { ok: false, reason: 'lead-in as loud as the speech', headS, tailS };
   }
+  const robust = robustNoiseA(pcm, noiseStart, noiseEnd, rate);
+  const floorA = robust === null ? nz.a : robust;
   return {
     ok: true,
-    snrA:    sp.a - nz.a,
+    snrA:    sp.a - floorA,
     snrBand: sp.band - nz.band,
-    speechDb: sp.rms, noiseA: nz.a,
+    speechDb: sp.rms, noiseA: floorA,
+    noiseMeanA: nz.a,          // the mean, kept for comparison
+    floorRobust: robust !== null,
     headS, tailS, noiseWindowS: (noiseEnd - noiseStart) / rate,
   };
 }
