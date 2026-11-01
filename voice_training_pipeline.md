@@ -223,6 +223,7 @@ Existing sets were migrated into the scheme:
 | connection | **USB-C, direct to the Mac** — the preamp and converter are INSIDE the microphone |
 | interface | **none.** The Focusrite iTwo is out of the chain entirely |
 | mount | SM6 shock mount with its pop screen, on a tabletop stand |
+| pop screen | **about 3 cm in front of the capsule** |
 | system input gain | **50% on the macOS slider** |
 | captured as | 48 kHz mono, written 16-bit PCM by `voice_record.html`'s `encodeWav` |
 
@@ -274,6 +275,29 @@ in the project (`voice_record.html`, `SNR_YES` / `SNR_WARN`):
 
 Across all 158 clips recorded here, every Rode take passes and nothing else
 does; the ringlet set reads NO on 112 of its 113 measurable clips.
+
+**The pop screen at 3 cm — checked for comb filtering, NOT FOUND.** A reflector
+3 cm from the capsule gives a 6 cm extra path, a 0.175 ms delay, and therefore
+cancellation notches at **2.86 kHz and 8.58 kHz**. That is a specific enough
+prediction to test, so it was: the long-term speech spectrum of all three takes,
+smoothed to ~55 Hz and expressed as deviation from its own ~1.4 kHz trend.
+
+| take | near 2.86 kHz | near 8.58 kHz | worst dip anywhere 0.5–12 kHz |
+|---|---|---|---|
+| `rode4/0001` | −3.7 dB at 2684 Hz | −3.7 dB at 8602 Hz | −8.3 dB at 5373 Hz |
+| `rode1/0002` | −5.6 dB at 2830 Hz | −6.2 dB at 8648 Hz | −7.2 dB at 1119 Hz |
+| `rode1/0001` | −3.8 dB at 2783 Hz | −2.7 dB at 9627 Hz | −9.8 dB at 5959 Hz |
+
+There are dips near both predicted frequencies, and two of the three land within
+about 70 Hz of the second one, which is suggestive. **But it is not a finding:**
+the deepest dips in each take are 7 to 10 dB and sit at frequencies the model
+does not predict, so a 3–6 dB dip at a predicted frequency cannot be separated
+from the ordinary lumpiness of a speech spectrum. The SM6's screen sits at that
+distance by design, so nothing is recommended here.
+
+If it ever matters, the clean test is an A/B: the same line twice, screen on and
+screen off, nothing else touched. A real reflection would put a repeating notch
+in one and not the other, and no amount of formant structure can imitate that.
 
 **Two artefacts of the rig itself, both characterised and both handled:**
 
