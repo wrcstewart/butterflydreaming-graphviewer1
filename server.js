@@ -629,6 +629,13 @@ const VOICE_ROOT = './voice_sessions';
 const PROMPT_SETS = {
   basic: { label: 'Basic',        file: './voice_prompts_basic.json' },
   tao:   { label: 'Tao Te Ching', file: './voice_prompts_tao.json'   },
+  // 2026-11-01 — the set for the second recording of the author's wife. The
+  // first gave a "fluid meditative" voice, which he judged short of punch for
+  // the Grimm stories and the poetry: *"we need a new training set so that her
+  // voice all suits the grimms stuff and the poetry"*. Drawn from BD's OWN
+  // corpus, so the licence is the project's own public-domain text and the
+  // register is the register the voice will actually have to read.
+  mixed: { label: 'Mixed registers', file: './voice_prompts_mixed.json' },
 };
 const DEFAULT_PROMPT_SET = 'tao';
 

@@ -92,6 +92,62 @@ Lengths run 45–131 characters, 2.7–7.8 s at the author's measured 16.7 chars
 The reader picks the set from a dropdown when the session opens, and the
 session is then **bound** to it — see the next section.
 
+### Prompt set v4 — mixed registers (2026-11-01)
+
+The author, before the second recording: *"we need a new training set so that
+her voice all suits the grimms stuff and the poetry"*. The first set was all Tao
+Te Ching and gave a voice he judged *"fluid meditative"* and short of punch for
+the stories. His specification: 120 utterances, 30 Tao, 30 Zhuangzi, 30 Grimm,
+15 Hardy, 15 Whitman.
+
+**Drawn from BD's own corpus**, by query, not from the internet. Two reasons, and
+the second is the better one: the licence is the project's own public-domain text
+(McDonald, Legge, Margaret Hunt 1884, Hardy, Whitman), and **the register is the
+register the voice will actually have to read**. Candidate pools after filtering:
+
+| source | nodes | usable candidates | taken | drawn from |
+|---|---|---|---|---|
+| Tao Te Ching | 83 | 416 | 30 | 30 distinct passages |
+| Zhuangzi (Inner Chapters) | 52 | 207 | 30 | 30 |
+| Grimm's Fairy Tales | 32 | 87 | 30 | 28 |
+| Thomas Hardy | 19 | 32 | 15 | 14 |
+| Leaves of Grass | 12 | 77 | 15 | 10 |
+
+**WORDS ESPEAK GETS WRONG ARE EXCLUDED, and `speech_lexicon.json` IS the list.**
+The lexicon exists precisely because espeak mispronounces those words, and the
+reader is the one who makes that dangerous: she says `Dze` correctly, espeak
+renders it **`dˌiːzˌɛdˈiː` — spelling the letters out** — and the model attaches
+her audio to those wrong phonemes. `Khwan`, `Lieh-dze`, `Dze-lai` and `Dze-yu`
+fail the same way. All 58 lexicon words are excluded, plus every capitalised
+non-dictionary word, plus **Tao and Dao**: those are no longer in the lexicon, so
+BD says them espeak's way (`tˈaʊ`) while she says them the Chinese way. **The
+model never sees words, only phoneme ids, so dropping a word costs nothing** —
+there is no vocabulary to cover.
+
+**Selected by phoneme DEFICIT, not by novelty.** A first pass maximising new
+coverage reached all 46 phonemes by utterance 9 and still left /ʒ/ with 3
+instances, /ʊə/ with 3 and /ɪə/ with 4 — useless for fine-tuning. Each phoneme
+now carries a target of 14 instances and candidates are scored by how much of
+the remaining shortfall they fill. Result: **every phoneme the corpus can supply
+reaches 10 instances by utterance 67**, 6,611 instances and 1,000 distinct
+diphones across the set.
+
+**One limit is the corpus, not the method.** Across all 819 candidates /ʒ/
+appears **8 times**, /ʊə/ 10 and /ɪə/ 11. Those utterances are pre-seeded so
+nothing better-scoring can crowd them out, and all of them are in — /ʒ/=8 is the
+ceiling these five texts allow. alba already knows /ʒ/, so it will stay closer to
+the base voice than the rest. That is worth knowing rather than discovering.
+
+**Interleaved in pairs** — Tao, Tao, Zhuangzi, Zhuangzi, Grimm, Grimm, Hardy,
+Whitman, repeating — so **any prefix covers all five registers.** Blocking by
+source would lose a whole register to an early finish; pairs still give her two
+in a row to settle into each voice. Natural balanced stopping points are **80**
+(20/20/20/10/10) and **96** (24/24/24/12/12). The scarce-phoneme utterances land
+early by construction, so an early stop keeps the hardest material.
+
+Registered as `mixed` / "Mixed registers" in `PROMPT_SETS`. ~14 minutes of
+speech at 10,536 characters, median utterance 85 characters.
+
 ### A LEXICON WORD IN THE TRAINING SET (2026-10-28)
 
 The author asked the question, and it had not arisen before: *"if a lexicon
