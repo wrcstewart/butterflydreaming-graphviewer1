@@ -2,7 +2,7 @@
  "version": 4,
  "source": "BD's own corpus, all public domain: Tao Te Ching (tr. John H. McDonald), Zhuangzi Inner Chapters (tr. James Legge), Grimm's Fairy Tales (tr. Margaret Hunt, 1884), Thomas Hardy, Walt Whitman (Leaves of Grass).",
  "note": "30 Tao / 30 Zhuangzi / 30 Grimm / 15 Hardy / 15 Whitman, interleaved in pairs so that ANY PREFIX covers all five registers -- a reader who stops at 80 still has a balanced set. Selected by phoneme DEFICIT against a target of 60 instances each, not by novelty: covering the inventory is easy and nearly worthless. No utterance contains a word from speech_lexicon.json, nor Tao/Dao: espeak renders those differently from the way a reader says them, and the model would attach her audio to the wrong phonemes. Phonemes these texts cannot supply 60 of are pre-seeded so they are never crowded out; what remains is a limit of the corpus (none), and the base voice already knows those, so they stay closer to it than the rest. Eight sentences marked 'written' were composed for this set: /ɔɪ/ was at 41, which is every instance of it in all five texts, so reselection could not add one more; they lift /ɔɪ/ to 67, /ʒ/ to 53 and /θ/ to 64.",
- "complete_at": 59,
+ "complete_at": 58,
  "prompts": [
   {
    "id": "0001",
@@ -14,51 +14,51 @@
   },
   {
    "id": "0003",
-   "text": "Though its spirit would there enjoy a royal abundance, it does not think such confinement good."
-  },
-  {
-   "id": "0004",
-   "text": "My art avoids the membranous ligatures, and much more the great bones."
-  },
-  {
-   "id": "0005",
-   "text": "O gracious! cried they, what beautiful child is this? and were so full of joy to see her that they did not wake her, but let her sleep on."
-  },
-  {
-   "id": "0006",
-   "text": "But you are not forbidden to look, said the old woman, taking out the poisoned comb and holding it up."
-  },
-  {
-   "id": "0007",
-   "text": "And rejoin the roomy silence, and the mute and manifold"
-  },
-  {
-   "id": "0008",
-   "text": "The spotted hawk swoops by and accuses me, he complains of my gab and my loitering."
-  },
-  {
-   "id": "0009",
    "text": "This is called being flexible while advancing, pushing back without using force, and destroying the enemy without engaging him."
   },
   {
-   "id": "0010",
+   "id": "0004",
    "text": "The best generals do not destroy indiscriminately."
   },
   {
-   "id": "0011",
+   "id": "0005",
+   "text": "Though its spirit would there enjoy a royal abundance, it does not think such confinement good."
+  },
+  {
+   "id": "0006",
+   "text": "My art avoids the membranous ligatures, and much more the great bones."
+  },
+  {
+   "id": "0007",
    "text": "There you might saunter idly by its side, or in the enjoyment of untroubled ease sleep beneath it."
   },
   {
-   "id": "0012",
+   "id": "0008",
    "text": "When the seasonal rains are coming down, if we still keep watering the ground, will not our toil be labour lost for all the good it will do?"
   },
   {
-   "id": "0013",
+   "id": "0009",
+   "text": "O gracious! cried they, what beautiful child is this? and were so full of joy to see her that they did not wake her, but let her sleep on."
+  },
+  {
+   "id": "0010",
+   "text": "But you are not forbidden to look, said the old woman, taking out the poisoned comb and holding it up."
+  },
+  {
+   "id": "0011",
    "text": "And then she went to a secret lonely chamber, where no one was likely to come, and there she made a poisonous apple."
   },
   {
-   "id": "0014",
+   "id": "0012",
    "text": "For the apple was so cunningly made, that all the poison was in the rosy half of it."
+  },
+  {
+   "id": "0013",
+   "text": "And rejoin the roomy silence, and the mute and manifold"
+  },
+  {
+   "id": "0014",
+   "text": "The spotted hawk swoops by and accuses me, he complains of my gab and my loitering."
   },
   {
    "id": "0015",
@@ -66,12 +66,12 @@
   },
   {
    "id": "0016",
-   "text": "The boy heard a voice in the thorn thicket, and the noise of it brought him no joy at all.",
-   "written": true
+   "text": "Only the lull I like, the hum of your valved voice."
   },
   {
    "id": "0017",
-   "text": "Only the lull I like, the hum of your valved voice."
+   "text": "The boy heard a voice in the thorn thicket, and the noise of it brought him no joy at all.",
+   "written": true
   },
   {
    "id": "0018",
@@ -83,64 +83,64 @@
   },
   {
    "id": "0020",
-   "text": "What is the peculiar way in which he employs his mind?"
-  },
-  {
-   "id": "0021",
-   "text": "The transformations of things are to him the developments of the appointed constitution of things."
-  },
-  {
-   "id": "0022",
-   "text": "Then she railed and cursed, and was beside herself with disappointment and anger."
-  },
-  {
-   "id": "0023",
-   "text": "At last she thought of a plan; she painted her face and dressed herself like an old pedlar woman, so that no one would have known her."
-  },
-  {
-   "id": "0024",
-   "text": "They are not those who tended me through feeble hours and strong,"
-  },
-  {
-   "id": "0025",
-   "text": "My tongue, every atom of my blood, form'd from this soil, this air,"
-  },
-  {
-   "id": "0026",
    "text": "Other people are joyous, as though they were at a spring festival."
   },
   {
-   "id": "0027",
+   "id": "0021",
    "text": "All creatures in the universe return to the point where they began."
   },
   {
-   "id": "0028",
+   "id": "0022",
+   "text": "What is the peculiar way in which he employs his mind?"
+  },
+  {
+   "id": "0023",
+   "text": "The transformations of things are to him the developments of the appointed constitution of things."
+  },
+  {
+   "id": "0024",
    "text": "I was sorry and felt a grief as if I had sustained a loss, and as if there were no one with whom I could enjoy my state."
   },
   {
-   "id": "0029",
+   "id": "0025",
    "text": "Rather than moisten one another there with their damp breath, it would be better for them to forget one another in the rivers and lakes."
   },
   {
-   "id": "0030",
+   "id": "0026",
+   "text": "Then she railed and cursed, and was beside herself with disappointment and anger."
+  },
+  {
+   "id": "0027",
+   "text": "At last she thought of a plan; she painted her face and dressed herself like an old pedlar woman, so that no one would have known her."
+  },
+  {
+   "id": "0028",
    "text": "If I get Hans, and we have a child, and he grows big, and has to draw beer here, the pick-axe will perhaps fall on his head, and kill him."
   },
   {
-   "id": "0031",
+   "id": "0029",
    "text": "Then she began to run over the sharp stones and through the thorn bushes, and the wild beasts after her, but they did her no harm."
   },
   {
-   "id": "0032",
-   "text": "She made her choice at the point where the three paths met, and rejoiced to be out of the wood.",
-   "written": true
+   "id": "0030",
+   "text": "They are not those who tended me through feeble hours and strong,"
   },
   {
-   "id": "0033",
+   "id": "0031",
+   "text": "My tongue, every atom of my blood, form'd from this soil, this air,"
+  },
+  {
+   "id": "0032",
    "text": "There never at all. And I shall not care. Should you censure me I shall take no heed"
   },
   {
-   "id": "0034",
+   "id": "0033",
    "text": "If they are not yours as much as mine they are nothing, or next to nothing,"
+  },
+  {
+   "id": "0034",
+   "text": "She made her choice at the point where the three paths met, and rejoiced to be out of the wood.",
+   "written": true
   },
   {
    "id": "0035",
@@ -152,64 +152,64 @@
   },
   {
    "id": "0037",
-   "text": "My chin is hidden in my navel, my shoulders are higher than my crown, and my neck-bone points up toward the sky."
-  },
-  {
-   "id": "0038",
-   "text": "Be content with this time and dwell in this order and then neither sorrow nor joy can touch you."
-  },
-  {
-   "id": "0039",
-   "text": "And then they would have buried her, but that she looked still as if she were living, with her beautiful blooming cheeks."
-  },
-  {
-   "id": "0040",
-   "text": "Good wares, fine wares, answered she, laces of all colours; and she held up a piece that was woven of variegated silk."
-  },
-  {
-   "id": "0041",
-   "text": "Standing as when I drew near to the town Where you would wait for me: yes, as I knew you then,"
-  },
-  {
-   "id": "0042",
-   "text": "Swiftly arose and spread around me the peace and knowledge that pass all the argument of the earth,"
-  },
-  {
-   "id": "0043",
    "text": "Knowing when you have enough avoids dishonor, and knowing when to stop will keep you from danger and bring you a long, happy life."
   },
   {
-   "id": "0044",
+   "id": "0038",
    "text": "Where there is music and good food, people will stop to enjoy it."
   },
   {
-   "id": "0045",
+   "id": "0039",
+   "text": "My chin is hidden in my navel, my shoulders are higher than my crown, and my neck-bone points up toward the sky."
+  },
+  {
+   "id": "0040",
+   "text": "Be content with this time and dwell in this order and then neither sorrow nor joy can touch you."
+  },
+  {
+   "id": "0041",
    "text": "He lay gasping at the point of death, while his wife and children stood around wailing."
   },
   {
-   "id": "0046",
+   "id": "0042",
    "text": "Quiet acquiescence in what happens at its proper time, and quietly submitting to its ceasing afford no occasion for grief or for joy."
   },
   {
-   "id": "0047",
+   "id": "0043",
+   "text": "And then they would have buried her, but that she looked still as if she were living, with her beautiful blooming cheeks."
+  },
+  {
+   "id": "0044",
+   "text": "Good wares, fine wares, answered she, laces of all colours; and she held up a piece that was woven of variegated silk."
+  },
+  {
+   "id": "0045",
    "text": "But no sooner had she taken a morsel of it into her mouth than she fell to the earth as dead."
   },
   {
-   "id": "0048",
-   "text": "The royal treasure lay in the moist soil, and nothing but patient toil would ever raise it.",
-   "written": true
-  },
-  {
-   "id": "0049",
+   "id": "0046",
    "text": "And as she worked, gazing at times out on the snow, she pricked her finger, and there fell from it three drops of blood on the snow."
   },
   {
-   "id": "0050",
+   "id": "0047",
+   "text": "Standing as when I drew near to the town Where you would wait for me: yes, as I knew you then,"
+  },
+  {
+   "id": "0048",
+   "text": "Swiftly arose and spread around me the peace and knowledge that pass all the argument of the earth,"
+  },
+  {
+   "id": "0049",
    "text": "The change I notice in my once own quarters! A brilliant budded border where the daisies used to be,"
   },
   {
-   "id": "0051",
+   "id": "0050",
    "text": "I believe a leaf of grass is no less than the journey-work of the stars,"
+  },
+  {
+   "id": "0051",
+   "text": "The royal treasure lay in the moist soil, and nothing but patient toil would ever raise it.",
+   "written": true
   },
   {
    "id": "0052",
@@ -221,64 +221,64 @@
   },
   {
    "id": "0054",
-   "text": "He had not the position of a ruler by which he could save men's lives; he had no accumulation of wealth to content their bellies."
-  },
-  {
-   "id": "0055",
-   "text": "A keeper of monkeys, in giving them out their acorns, once said, In the morning I will give you three measures and in the evening four."
-  },
-  {
-   "id": "0056",
-   "text": "The looking-glass answered, O Queen, although you are of beauty rare, the young bride is a thousand times more fair."
-  },
-  {
-   "id": "0057",
-   "text": "And when the wicked woman got home she went to her glass and said, Looking-glass against the wall, who is fairest of us all?"
-  },
-  {
-   "id": "0058",
-   "text": "To behold where I lived with you for twenty years and more:"
-  },
-  {
-   "id": "0059",
-   "text": "And the hints about old men and mothers, and the offspring taken soon out of their laps."
-  },
-  {
-   "id": "0060",
    "text": "The Master accepts things as they are, and out of compassion avoids extravagance, excess and the extremes."
   },
   {
-   "id": "0061",
+   "id": "0055",
    "text": "Weapons are meant for destruction, and thus are avoided by the wise."
   },
   {
-   "id": "0062",
+   "id": "0056",
+   "text": "He had not the position of a ruler by which he could save men's lives; he had no accumulation of wealth to content their bellies."
+  },
+  {
+   "id": "0057",
+   "text": "A keeper of monkeys, in giving them out their acorns, once said, In the morning I will give you three measures and in the evening four."
+  },
+  {
+   "id": "0058",
    "text": "He who is about to go into the great transformation is but following the ordained way of things."
   },
   {
-   "id": "0063",
+   "id": "0059",
    "text": "You wear out your spirit, leaning against a tree and groaning, and bent over your desk and falling asleep!"
   },
   {
-   "id": "0064",
-   "text": "Avoid the broken toy, said the voice, for the oil upon it is a poison to the touch.",
-   "written": true
+   "id": "0060",
+   "text": "The looking-glass answered, O Queen, although you are of beauty rare, the young bride is a thousand times more fair."
   },
   {
-   "id": "0065",
+   "id": "0061",
+   "text": "And when the wicked woman got home she went to her glass and said, Looking-glass against the wall, who is fairest of us all?"
+  },
+  {
+   "id": "0062",
    "text": "And when she had grown up her father said, We will get her married."
   },
   {
-   "id": "0066",
+   "id": "0063",
    "text": "After Hans had gone away, she cooked herself some good broth and took it into the field with her."
   },
   {
-   "id": "0067",
+   "id": "0064",
+   "text": "To behold where I lived with you for twenty years and more:"
+  },
+  {
+   "id": "0065",
+   "text": "And the hints about old men and mothers, and the offspring taken soon out of their laps."
+  },
+  {
+   "id": "0066",
    "text": "And I went alone, and I did not mind, Not thinking of you as left behind."
   },
   {
-   "id": "0068",
+   "id": "0067",
    "text": "It may be you are from old people, or from offspring taken soon out of their mothers' laps,"
+  },
+  {
+   "id": "0068",
+   "text": "Avoid the broken toy, said the voice, for the oil upon it is a poison to the touch.",
+   "written": true
   },
   {
    "id": "0069",
@@ -290,64 +290,64 @@
   },
   {
    "id": "0071",
-   "text": "When water is not deep it has not strength to support a large boat; when air is not deep it has not strength to bear up great wings."
-  },
-  {
-   "id": "0072",
-   "text": "You, a man all but dead and of no use - how do you know that I am a tree of no use?"
-  },
-  {
-   "id": "0073",
-   "text": "They were seven dwarfs, whose occupation was to dig underground among the mountains."
-  },
-  {
-   "id": "0074",
-   "text": "Then they warned her once more to be on her guard, and never again to let any one in at the door."
-  },
-  {
-   "id": "0075",
-   "text": "Woman much missed, how you call to me, call to me,"
-  },
-  {
-   "id": "0076",
-   "text": "These are really the thoughts of all men in all ages and lands, they are not original with me,"
-  },
-  {
-   "id": "0077",
    "text": "Knowing when to stop naming, you can avoid the pitfall it brings."
   },
   {
-   "id": "0078",
+   "id": "0072",
    "text": "If you are as concerned about the outcome as you are about the beginning, then it is hard to do things wrong."
   },
   {
-   "id": "0079",
+   "id": "0073",
+   "text": "When water is not deep it has not strength to support a large boat; when air is not deep it has not strength to bear up great wings."
+  },
+  {
+   "id": "0074",
+   "text": "You, a man all but dead and of no use - how do you know that I am a tree of no use?"
+  },
+  {
+   "id": "0075",
    "text": "Who can mount up to the sky, and roaming through the clouds, pass beyond the limits of space, forgetful of existence for ever?"
   },
   {
-   "id": "0080",
-   "text": "They were loyal boys, and the joyful noise of their voices carried out through the thorns.",
-   "written": true
-  },
-  {
-   "id": "0081",
+   "id": "0076",
    "text": "Then by a very slight movement of the knife, the part is quickly separated, and drops like a clod of earth to the ground."
   },
   {
-   "id": "0082",
+   "id": "0077",
+   "text": "They were seven dwarfs, whose occupation was to dig underground among the mountains."
+  },
+  {
+   "id": "0078",
+   "text": "Then they warned her once more to be on her guard, and never again to let any one in at the door."
+  },
+  {
+   "id": "0079",
    "text": "You must put her to death, and bring me her heart for a token."
   },
   {
-   "id": "0083",
+   "id": "0080",
    "text": "It happened, however, that one day a king's son rode through the wood and up to the dwarfs' house, which was near it."
   },
   {
-   "id": "0084",
+   "id": "0081",
+   "text": "Woman much missed, how you call to me, call to me,"
+  },
+  {
+   "id": "0082",
+   "text": "These are really the thoughts of all men in all ages and lands, they are not original with me,"
+  },
+  {
+   "id": "0083",
    "text": "Yet the fact indeed remains the same, You are past love, praise, indifference, blame."
   },
   {
-   "id": "0085",
+   "id": "0084",
    "text": "I think I could turn and live with animals, they are so placid and self-contain'd,"
+  },
+  {
+   "id": "0085",
+   "text": "They were loyal boys, and the joyful noise of their voices carried out through the thorns.",
+   "written": true
   },
   {
    "id": "0086",
@@ -359,64 +359,64 @@
   },
   {
    "id": "0088",
-   "text": "When this bird rouses itself and flies, its wings are like clouds all round the sky."
-  },
-  {
-   "id": "0089",
-   "text": "The snare is to catch hares; but when the hares are got, the snare is forgotten."
-  },
-  {
-   "id": "0090",
-   "text": "It answered, Queen, you are full fair, tis true, but Snow-white fairer is than you."
-  },
-  {
-   "id": "0091",
-   "text": "When he got down, five of them were sitting screaming and lamenting quite piteously, each out-doing the other."
-  },
-  {
-   "id": "0092",
-   "text": "And you told of the charm of that haloed view"
-  },
-  {
-   "id": "0093",
-   "text": "Bearing the owner's name someway in the corners, that we may see and remark, and say Whose?"
-  },
-  {
-   "id": "0094",
    "text": "If selfish desires were to arise after their transformation, I would erase them with the power of the Uncarved Block."
   },
   {
-   "id": "0095",
+   "id": "0089",
    "text": "Stop talking, meditate in silence, blunt your sharpness, release your worries, harmonize your inner light, and become one with the dust."
   },
   {
-   "id": "0096",
-   "text": "Point to the north, boy, and think of the truth of it: the soil is poor and the toil is long.",
-   "written": true
+   "id": "0090",
+   "text": "When this bird rouses itself and flies, its wings are like clouds all round the sky."
   },
   {
-   "id": "0097",
+   "id": "0091",
+   "text": "The snare is to catch hares; but when the hares are got, the snare is forgotten."
+  },
+  {
+   "id": "0092",
    "text": "Both of these things arise from themselves - should there be any other agency that excites them?"
   },
   {
-   "id": "0098",
+   "id": "0093",
    "text": "Therefore it is said: The Perfect man has no thought of self; the Spirit-like man, none of merit; the Sagely-minded man, none of fame."
   },
   {
-   "id": "0099",
+   "id": "0094",
+   "text": "It answered, Queen, you are full fair, tis true, but Snow-white fairer is than you."
+  },
+  {
+   "id": "0095",
+   "text": "When he got down, five of them were sitting screaming and lamenting quite piteously, each out-doing the other."
+  },
+  {
+   "id": "0096",
    "text": "Everything there was very small, but as pretty and clean as possible."
   },
   {
-   "id": "0100",
+   "id": "0097",
    "text": "With all my heart, said Snow-white; and so she stayed, and kept the house in good order."
   },
   {
-   "id": "0101",
+   "id": "0098",
+   "text": "And you told of the charm of that haloed view"
+  },
+  {
+   "id": "0099",
+   "text": "Bearing the owner's name someway in the corners, that we may see and remark, and say Whose?"
+  },
+  {
+   "id": "0100",
    "text": "Where eight days later you were to lie, And be spoken of as one who was not;"
   },
   {
-   "id": "0102",
+   "id": "0101",
    "text": "And parted the shirt from my bosom-bone, and plunged your tongue to my bare-stript heart,"
+  },
+  {
+   "id": "0102",
+   "text": "Point to the north, boy, and think of the truth of it: the soil is poor and the toil is long.",
+   "written": true
   },
   {
    "id": "0103",
@@ -428,64 +428,64 @@
   },
   {
    "id": "0105",
-   "text": "In the bare and barren north there is the dark and vast ocean - the Pool of Heaven."
-  },
-  {
-   "id": "0106",
-   "text": "People came to see it in crowds as in a market place, but the mechanic did not look round at it, but held on his way without stopping."
-  },
-  {
-   "id": "0107",
-   "text": "And it was salted and cooked, and the wicked woman ate it up, thinking that there was an end of Snow-white."
-  },
-  {
-   "id": "0108",
-   "text": "Then she ran out of the village, and no one has seen her since."
-  },
-  {
-   "id": "0109",
-   "text": "Travelling across the wet mead to me here, You being ever consigned to existlessness,"
-  },
-  {
-   "id": "0110",
-   "text": "Born here of parents born here from parents the same, and their parents the same,"
-  },
-  {
-   "id": "0111",
    "text": "Can you focus your life-breath until you become supple as a newborn child?"
   },
   {
-   "id": "0112",
-   "text": "The old judge in the village measured out his usual pleasure with a strange gentleness.",
-   "written": true
-  },
-  {
-   "id": "0113",
+   "id": "0106",
    "text": "Good things seem to change into bad, and bad things often turn out for good."
   },
   {
-   "id": "0114",
+   "id": "0107",
+   "text": "In the bare and barren north there is the dark and vast ocean - the Pool of Heaven."
+  },
+  {
+   "id": "0108",
+   "text": "People came to see it in crowds as in a market place, but the mechanic did not look round at it, but held on his way without stopping."
+  },
+  {
+   "id": "0109",
    "text": "At first I thought he was the man of men, and now I do not think so."
   },
   {
-   "id": "0115",
+   "id": "0110",
    "text": "Now in one morning we can sell to this man our art for a hundred ounces - let him have it."
   },
   {
-   "id": "0116",
+   "id": "0111",
+   "text": "And it was salted and cooked, and the wicked woman ate it up, thinking that there was an end of Snow-white."
+  },
+  {
+   "id": "0112",
+   "text": "Then she ran out of the village, and no one has seen her since."
+  },
+  {
+   "id": "0113",
    "text": "And the looking-glass would answer, You are fairest of them all."
   },
   {
-   "id": "0117",
+   "id": "0114",
    "text": "The woman went down, and found all three in the midst of their lamentations."
   },
   {
-   "id": "0118",
+   "id": "0115",
+   "text": "Travelling across the wet mead to me here, You being ever consigned to existlessness,"
+  },
+  {
+   "id": "0116",
+   "text": "Born here of parents born here from parents the same, and their parents the same,"
+  },
+  {
+   "id": "0117",
    "text": "What difference, then? Of the look of a room on returning thence."
   },
   {
-   "id": "0119",
+   "id": "0118",
    "text": "I depart as air, I shake my white locks at the runaway sun,"
+  },
+  {
+   "id": "0119",
+   "text": "The old judge in the village measured out his usual pleasure with a strange gentleness.",
+   "written": true
   },
   {
    "id": "0120",

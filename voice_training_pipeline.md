@@ -172,13 +172,35 @@ They are marked `"written": true` in the JSON and sit at ids 0016, 0032, 0048,
 0064, 0080, 0096, 0112 and 0128. They lift `/ɔɪ/` 41 → 67, `/ʒ/` 35 → 53 and
 `/θ/` 54 → 64.
 
-#### Order
+#### Order — blocks of four
 
-**Interleaved in pairs** — Tao, Tao, Zhuangzi, Zhuangzi, Grimm, Grimm, Hardy,
-Whitman, repeating, with a written sentence every sixteenth — so **any prefix
-covers all five registers.** Blocking by source would lose a whole register to
-an early finish; pairs still give her two in a row to settle into each voice.
-Natural balanced stopping points are **80** and **96**.
+The first draft interleaved the sources in pairs. The author, reading it:
+*"i think the whole sequence is a bit choppy — please arrange it so that there
+are sequences of four TTC followed by for ZZ then the four grims and four poetry
+and then repeat pattern that way she will be able to settle a bit in each
+style."*
+
+He is describing the thing the register is for. **A voice that changes style
+every utterance is a voice reading a list**; four in a row is long enough to find
+the manner and hold it, and the manner is what the model learns. So:
+
+```
+  cycle of 17:   TTC TTC TTC TTC  ZZ ZZ ZZ ZZ  GRM GRM GRM GRM  HDY WHT HDY WHT  written
+  x7                                                                      = 119
+  final cycle:   TTC TTC  ZZ ZZ  GRM GRM  HDY WHT  written                =   9
+                                                                      total 128
+```
+
+30 does not divide by four, hence seven blocks of four and a last block of two
+for each source. Poetry alternates Hardy and Whitman inside its block, reaching
+15 of each. The cycle still repeats, so **a prefix stays balanced**: every 17
+utterances contains all four styles and one written line. The written sentences
+now fall at **17, 34, 51, 68, 85, 102, 119 and 128** — the end of each cycle.
+
+Reordering was safe only because **no session had yet recorded against this
+set**, which was checked before changing it. A prompt id is a POSITION, not a
+sentence: reordering a set that had been partly recorded would silently repoint
+every id, which is how a clip was lost on 31 October.
 
 Registered as `mixed` / "Mixed registers" in `PROMPT_SETS`. 128 utterances,
 11,649 characters, about 15 minutes of speech, median utterance 90 characters.
