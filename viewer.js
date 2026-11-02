@@ -5034,6 +5034,48 @@ function buildStyle() {
         'curve-style': 'bezier',
       }
     },
+    // ── AN AUTHORED READER ROUTE (2026-11-02) ─────────────────────────────
+    //
+    // The author, having nudged the Methods children into place: *"i now want
+    // to hint at a reader route though this - ... make the edge out to
+    // Transpersonal Experience twice as thick with a bigger arrow head and
+    // remove all the other edges to faint grey."*
+    //
+    // Driven by a PROPERTY ON THE EDGE (`reader_route`), not by a selector
+    // naming Transpersonal Experience. buildEdgeData spreads every Neo4j edge
+    // property into the cytoscape data, so marking one edge in the database is
+    // the whole of the authoring — and the next route he wants costs a single
+    // `SET`, with no code change at all. A rule naming the node would have had
+    // to be edited every time, and renaming the node would silently un-style it.
+    //
+    // Exactly twice, both of them: width 1.8 -> 3.6, arrow-scale 0.65 -> 1.3.
+    //
+    // NOT `.route-step`, which looks similar and is something else entirely —
+    // the dynamic next-step indicator maintained by updateNextStep from
+    // navigation state. Sharing the class would have made an authored route
+    // flicker as the reader moved.
+    {
+      selector: 'edge[type="CONTAINS"].reader-route',
+      style: {
+        'width': 3.6,
+        'arrow-scale': 1.3,
+        'line-color': '#f5f5f5',
+        'target-arrow-color': '#f5f5f5',
+        'opacity': 1,
+        'z-index': 20,
+      }
+    },
+    {
+      // The siblings recede. LUMINANCE, not hue: against the #001f4d ground
+      // this reads as faint at a glance and still reads as faint in greyscale,
+      // which is the only way it can work for this author's colour vision.
+      selector: 'edge[type="CONTAINS"].route-dim',
+      style: {
+        'line-color': '#5a6472',
+        'target-arrow-color': '#5a6472',
+        'opacity': 0.4,
+      }
+    },
     // 2026-09-01 — the faint Settling->Gateways side-door rule is gone with the
     // hop itself. Gateways now descends from Conversations, so its edge falls
     // through to the generic DESCENDS_FROM rule above and looks exactly like
@@ -8737,6 +8779,29 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // navigateInto — the pure "expand into this node" branch, extracted from
   // handleNodeTap. Called by advanceOrNavigate when the user has tapped
   // past the last chunk of a node that has descendants.
+  // Mark one CONTAINS edge out of `parent` as the reader's route and recede the
+  // rest. Does nothing unless an edge here carries `reader_route`, so every
+  // other view looks exactly as it did.
+  //
+  // CLEARED FIRST, EVERY TIME. `cy` holds the whole corpus for the life of the
+  // page and navigation is hide/show, so a class added in one view is still on
+  // that edge in the next one — dimming would follow the reader around the
+  // graph. Classes rather than `.style()` for the same reason: inline style on
+  // a persistent element leaks and has to be unset by hand.
+  function applyReaderRoute(parent) {
+    cy.edges().removeClass('reader-route route-dim');
+    if (!parent || !parent.length) return;
+    const pid = parent.id();
+    const out = cy.edges().filter(e =>
+      e.data('type') === 'CONTAINS' && e.source().id() === pid);
+    const route = out.filter(e => e.data('reader_route'));
+    if (!route.length) return;
+    route.addClass('reader-route');
+    out.difference(route).addClass('route-dim');
+    console.log(`[route] ${parent.data('name')}: ${route.length} route edge(s), ` +
+                `${out.length - route.length} dimmed`);
+  }
+
   function navigateInto(node) {
     const type = node.data('type');
     if (type === 'Cluster') {
@@ -9721,6 +9786,7 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
         .filter(el => el.data('type') !== '__root_edge__')
         .show();
     }
+    applyReaderRoute(node);
 
     runLayout(cy, node);
   }

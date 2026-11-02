@@ -6,6 +6,39 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-02 — an authored reader route through a view
+
+*"i now want to hint at a reader route though this - to this end please make the
+edge out to Transpersonal Experience twice as thick with a bigger arrow head and
+remove all the other edges to faint grey."*
+
+**Driven by a property on the EDGE, not a selector naming the node.**
+`buildEdgeData` already spreads every Neo4j edge property into the cytoscape
+data, so `SET r.reader_route = 1` on one edge is the whole of the authoring. The
+next route costs one `SET` and no code at all — where a rule naming
+"Transpersonal Experience" would need editing every time, and renaming the node
+would silently un-style it.
+
+Exactly twice, both of them: **width 1.8 -> 3.6, arrow-scale 0.65 -> 1.3.** The
+fourteen siblings recede to `#5a6472` at 0.4 opacity.
+
+**Luminance, not hue.** Against the `#001f4d` ground the route reads as the
+bright line and the siblings as faint at a glance — and still do in greyscale,
+which is the only way it works for this author's colour vision.
+
+**Two traps avoided.** The classes are **cleared on every view entry**: `cy`
+holds the whole corpus for the life of the page and navigation is hide/show, so
+a class added in one view is still on that edge in the next, and the dimming
+would have followed the reader around the graph. And it is NOT `.route-step`,
+which looks similar and is something else — the dynamic next-step indicator
+maintained by `updateNextStep` from navigation state; sharing the class would
+have made an authored route flicker as the reader moved.
+
+Does nothing in any view where no edge carries the property, so everywhere else
+looks exactly as before.
+
+---
+
 ## 2026-11-02 — no auto logout while the curation code is entered
 
 *"Can you make it so there is no auto log out if the code is entered please"*.
