@@ -6,6 +6,42 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-02 — no auto logout while the curation code is entered
+
+*"Can you make it so there is no auto log out if the code is entered please"*.
+He writes node text in long sittings and steps away from it; being logged out
+mid-passage is how work gets lost, and he had just lost one.
+
+**There were TWO clocks, and one signal now satisfies both.** The client expires
+after 60 minutes (`MAX_IDLE_MS`) and `safeQuery` checks the same
+`wsRef.lastActivity` independently; the **server reaps at 65 minutes**
+(`IDLE_REAP_MS`), measured on `socket.data.lastActiveAt`. Suppressing only the
+client timer would have let the server take the socket five minutes later —
+looking exactly like the bug being fixed. So while `#dev-code` is non-empty the
+timer refreshes `lastActivity` **and** emits one `curating` message a minute,
+which refreshes the server's clock because anything that is not `client_log`
+does.
+
+**No restart was needed, and that mattered** — he had BD open at the time. The
+running server already stamps the activity clock for any non-`client_log`
+message and ignores an unknown type with no `query`, so the client change alone
+works; verified against the live server, three messages, no errors, connection
+held. The `if (type === 'curating') return;` added to `server.js` is
+explicitness, not function.
+
+Clearing the code restarts the idle window from that moment rather than from the
+last tap, so clearing the field cannot expire him on the spot. Suppression is
+logged on the first minute and every thirtieth — a once-only line hides a
+repeating state, a line a minute buries the log.
+
+**The cost, stated rather than buried:** an abandoned CURATOR tab now holds a
+connection slot indefinitely, which is the precise failure the reaper was added
+for in August ("7 connected" with two people present). Accepted — the curator is
+one known person on one machine, and losing his writing is worse than
+miscounting a session. Readers without the code are unaffected.
+
+---
+
 ## 2026-11-02 — a passage was lost, and an empty save can no longer succeed
 
 The author: *"I seem to have just lost some work. I was saving some text under

@@ -1888,6 +1888,12 @@ io.on('connection', async (socket) => {
       // anything, and counting it would keep an abandoned tab alive forever
       // — the exact failure being fixed.
       if (type !== 'client_log') socket.data.lastActiveAt = Date.now();
+      // `curating` exists only to refresh the line above. A client with the
+      // curation code entered sends one a minute so the 65-minute idle reaper
+      // does not take the socket out from under someone writing node text
+      // (2026-11-02, at the author's request). It carries nothing and is
+      // deliberately NOT `client_log`, which is excluded from the clock.
+      if (type === 'curating') return;
       // Client → server log forwarding. Every client's console.log /
       // .info / .warn / .error, plus its uncaught errors and unhandled
       // promise rejections, arrive as these records. Print them here so

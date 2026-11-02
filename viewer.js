@@ -12046,7 +12046,56 @@ async function init() {
   // user has been inactive for 60 min. Connection keepalive is now handled entirely
   // server-side via WebSocket protocol ping/pong (see server.js), which is more
   // reliable than a JS timer and works even when the browser throttles background tabs.
+  // ── NO AUTO LOGOUT WHILE THE CURATION CODE IS ENTERED (2026-11-02) ────
+  //
+  // The author: *"Can you make it so there is no auto log out if the code is
+  // entered please"*. He writes node text in long sittings and steps away from
+  // it; being logged out mid-passage is how work gets lost, and he had just
+  // lost a passage. A curator with the code in the field is working, not an
+  // abandoned tab.
+  //
+  // ONE SIGNAL SATISFIES BOTH CLOCKS, which is why this is here and not in two
+  // places. Refreshing `wsRef.lastActivity` covers the client's 60-minute timer
+  // AND the independent check in safeQuery that reads the same field; emitting
+  // any message that is not `client_log` refreshes `socket.data.lastActiveAt`,
+  // which is what the server's 65-minute idle reaper measures. Without the
+  // emit the server would reap the socket five minutes after the client
+  // stopped expiring it, which would look exactly like the bug being fixed.
+  //
+  // THE COST, STATED: an abandoned CURATOR tab now holds a connection slot
+  // indefinitely — the precise failure the reaper was added for in August
+  // ("7 connected" with two people present). Accepted because the curator is
+  // one known person on one machine, and because losing his writing is worse
+  // than miscounting a session. Readers without the code are unaffected.
+  let curatingTicks = 0;
   const idleTimer = setInterval(() => {
+    const codeEl = document.getElementById('dev-code');
+    if (codeEl && codeEl.value.trim()) {
+      wsRef.lastActivity = Date.now();
+      try {
+        if (wsRef.current && wsRef.current.connected) {
+          wsRef.current.emit('msg', { type: 'curating' });
+        }
+      } catch (err) { console.warn('[BD] curating keepalive failed', err); }
+      // Logged on the first suppression and every 30th minute after, not once
+      // and not every minute: a once-only line hides a repeating state, and a
+      // line a minute buries the log.
+      curatingTicks++;
+      if (curatingTicks === 1 || curatingTicks % 30 === 0) {
+        console.log(`[BD] idle expiry suppressed — curation code entered ` +
+                    `(${curatingTicks} min)`);
+      }
+      return;
+    }
+    if (curatingTicks) {
+      // Code cleared: start the idle window again from now rather than from
+      // whenever he last tapped, so clearing the field does not expire him on
+      // the spot.
+      console.log('[BD] curation code cleared — idle expiry active again');
+      curatingTicks = 0;
+      wsRef.lastActivity = Date.now();
+      return;
+    }
     if (Date.now() - wsRef.lastActivity > MAX_IDLE_MS) {
       clearInterval(idleTimer);
       // 2026-08-22 — expiry must actually LEAVE. This used to show the overlay
