@@ -45,10 +45,25 @@ would cut stored text by more than half.
 Tested end to end: empty refused, whitespace-only refused, a genuine save
 accepted, and the 469 characters of Aims intact afterwards.
 
+**CAUSE CONFIRMED the same afternoon, by the author's own test.** He typed three
+words, saved, reloaded — present. Three more, saved — present. A third set, saved,
+then waited for the session to expire naturally and reloaded: all 59 characters
+intact. *"so it looks like it was the structure edit that messed it up before"*.
+He is right, and the timeline is unambiguous: **11:08:19 a node was created under
+Methods, taking its children from 13 to 14, while he was typing into Methods.**
+His client took the delta — the log shows `hint scan: parent=Methods … total=14`
+— re-rendered the card stack and detached the textarea he was in. The save path
+and session expiry are both sound.
+
+So the rule is operational, not just technical: **do not write to the graph, or
+restart the server, while the author is authoring in BD.** Reads are safe.
+
 **The underlying cause is GUARDED, NOT FIXED.** Sv may still read a stale card
 and assemble nothing; what has changed is that it now says so instead of
-destroying the stored text. Finding why the card reference goes stale is still
-open.
+destroying the stored text. **The guard protects what is stored, not his unsaved
+typing** — a re-render would still discard whatever he had written since the last
+successful save. Making the delta re-render preserve a card that is being edited
+is the real fix, and remains open.
 
 ---
 

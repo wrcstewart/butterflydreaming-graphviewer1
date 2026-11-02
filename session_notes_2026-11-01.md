@@ -355,6 +355,10 @@ Declining a replacement keeps the take in hand, so nothing is lost by saying no.
 
 ## Still open
 
+- **A delta re-render detaches a card being edited** (confirmed 2026-11-02). The
+  empty-save guard protects stored text but not unsaved typing. **Do not write
+  to the graph or restart the server while the author is authoring in BD.**
+
 - **THE THREE SECRETS IN `config.js` MUST BE TREATED AS COMPROMISED** —
   `CURATION_CODE`, `NEO4J_PASSWORD`, `PAIR_CODE` were publicly fetchable for as
   long as the tunnel had been up before 28 October. Change them, restart, delete
