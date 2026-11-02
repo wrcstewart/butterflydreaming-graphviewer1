@@ -81,7 +81,22 @@ would cut stored text by more than half.
 Tested end to end: empty refused, whitespace-only refused, a genuine save
 accepted, and the 469 characters of Aims intact afterwards.
 
-**CAUSE CONFIRMED the same afternoon, by the author's own test.** He typed three
+**CAUSE RETRACTED, 2026-11-02 (later).** The paragraph below claimed the
+structure edit caused it. **Reading the code disproves the mechanism**: there is
+no client-side delta in `viewer.js` — no `applyDelta`, no `graph_delta` — so a
+concurrent database write cannot push a re-render to an open page. The layout
+write is no better a candidate: Wr's own comment is *"No layout re-run —
+positions are already correct on screen."* **Three explanations have now been
+offered and three refuted**, including by his own successful test. The cause is
+NOT established, and the honest record is that it is unknown. `Sv` now logs what
+it read per chunk — card present, element `isConnected`, characters returned —
+on every save, so the next occurrence accounts for itself instead of being
+reconstructed afterwards.
+
+What survives unchanged: an empty save can no longer succeed at either end, and
+that is the fix that matters.
+
+**The test below still stands as evidence, just not of the cause:** He typed three
 words, saved, reloaded — present. Three more, saved — present. A third set, saved,
 then waited for the session to expire naturally and reloaded: all 59 characters
 intact. *"so it looks like it was the structure edit that messed it up before"*.

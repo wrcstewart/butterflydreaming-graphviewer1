@@ -11013,6 +11013,21 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
     // learned from a working system rather than designed for in advance.
     const cardsByIdx = readingState.cardsByIdx || {};
     const parts = [];
+    // ── SAY WHY, IF IT EVER READS EMPTY AGAIN (2026-11-02) ────────────────
+    //
+    // A passage was lost on this path: four saves arrived at the server
+    // carrying the empty string, each reported as saved. Afterwards neither
+    // candidate explanation survived contact with the code -- there is no
+    // client-side delta mechanism, so a concurrent database write could not
+    // have pushed a re-render; and Wr explicitly does NOT re-run layout. The
+    // author's own test then showed that saving onto an empty node works.
+    //
+    // So the cause is NOT KNOWN, and guessing a third time is worth less than
+    // making the next occurrence explain itself. This records, per chunk:
+    // whether a card reference existed, whether that element is still IN THE
+    // DOCUMENT (`isConnected` — a detached element reads as empty, never as an
+    // error, which is the whole danger), and how many characters came back.
+    const svDiag = [];
     for (let i = 0; i < readingState.chunks.length; i++) {
       const cardRef = cardsByIdx[i];
       // 2026-09-25 — the .chunk-hint div is read no longer, and no %%bd_hint
@@ -11022,10 +11037,27 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       // is nothing to reconstruct, and re-emitting whatever sat in that div
       // would quietly put the directive back into the corpus one node at a
       // time — a retirement that un-retires itself.
-      parts.push(cardRef && cardRef.body
+      const live = cardRef && cardRef.body
         ? readChunkBody(cardRef.body)          // live read — the user may have edited
-        : readingState.chunks[i].body);
+        : null;
+      const stored = readingState.chunks[i].body;
+      parts.push(live !== null ? live : stored);
+      svDiag.push({
+        i,
+        card: cardRef ? (cardRef.body ? 'body' : 'no-body') : 'missing',
+        attached: cardRef && cardRef.body ? !!cardRef.body.isConnected : null,
+        textNodes: cardRef && cardRef.body
+          ? cardRef.body.querySelectorAll('.chunk-text').length : null,
+        read: live === null ? null : live.length,
+        stored: stored ? stored.length : 0,
+      });
     }
+    // Printed on EVERY save, not only on failure: a line that appears only when
+    // something is wrong tells you nothing about what normal looks like, and it
+    // was the absence of a normal baseline that made the lost passage so hard
+    // to account for afterwards.
+    console.log('[Sv] read ' + readingState.chunks.length + ' chunk(s) of "' +
+                name + '": ' + JSON.stringify(svDiag));
     // normalizeBotBlocks RESTORED here, 2026-09-25.
     //
     // It used to run on the default-panel Save, which was retired on
