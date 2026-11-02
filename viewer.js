@@ -10942,7 +10942,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
   // Keep butterfly cursor — Cytoscape resets it during its own mouseover pipeline,
   // so we re-apply on every mousemove, which fires after Cytoscape's handlers settle.
-  const butterflyCursor = "url('cursor-wings.svg') 16 16, auto";
+  // Root-relative for the same reason as the voice files: on a `/n/<uuid>` page
+  // a bare `cursor-wings.svg` resolves to `/n/cursor-wings.svg` and 404s, and a
+  // missing cursor image fails silently back to `auto`. Cosmetic where the voice
+  // was not, but the same bug and found in the same sweep.
+  const butterflyCursor = "url('/cursor-wings.svg') 16 16, auto";
   cy.container().addEventListener('mousemove', () => {
     cy.container().querySelectorAll('canvas').forEach(c => {
       if (c.style.cursor !== butterflyCursor) c.style.cursor = butterflyCursor;

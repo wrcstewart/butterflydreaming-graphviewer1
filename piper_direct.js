@@ -110,7 +110,23 @@ const LOCAL_PREFIX = 'local/';
 function voiceUrls(voiceId) {
   if (voiceId.startsWith(LOCAL_PREFIX)) {
     const name = voiceId.slice(LOCAL_PREFIX.length);
-    return { cfg: `voices/${name}.onnx.json`, model: `voices/${name}.onnx` };
+    // ── ROOT-RELATIVE, OR A DEEP LINK CANNOT SPEAK (2026-11-02) ───────
+    //
+    // These were `voices/...` with no leading slash, so they resolved against
+    // the PAGE. On `/` that is `/voices/...` and correct; on a permanent node
+    // URL `/n/<uuid>` it is **`/n/voices/...`, which 404s**.
+    //
+    // It had been failing silently since `/n/` shipped on 2026-10-23. The
+    // author found it the day BD's default became his wife's voice: *"i am
+    // hearing her on my mac here but not on my phone"* — the Mac was on `/`,
+    // the phone on a shared `/n/` link. What hid it for ten days is that
+    // VOICE_FALLBACK answers a missing local voice with a PUBLIC one, whose
+    // URL is absolute and therefore unaffected: every deep-link visitor was
+    // quietly fetching the 60.3 MB HuggingFace alba instead of the 19.4 MB
+    // local build, and still hearing a voice, so nothing looked wrong.
+    //
+    // A fallback that works too well hides the fault it is covering.
+    return { cfg: `/voices/${name}.onnx.json`, model: `/voices/${name}.onnx` };
   }
   const path = voicePath(voiceId);
   return { cfg: `${HF}/${path}.onnx.json`, model: `${HF}/${path}.onnx` };

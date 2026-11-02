@@ -6,6 +6,40 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-02 — a deep link could not load a local voice, and had not since 23 October
+
+*"thats fine but i am hearing her on my mac here but not on my phone"*. His
+phone's forwarded console had it exactly:
+
+```
+[piper] local/ringlet unavailable (fetch 404 for voices/ringlet.onnx.json)
+        — falling back to en_GB-alba-medium
+```
+
+`voiceUrls` returned **`voices/...` with no leading slash**, so it resolved
+against the PAGE. On `/` that is `/voices/...` and right; on a permanent node URL
+it is **`/n/voices/...`, which 404s.** His Mac was on `/`, his phone on a shared
+`/n/` link.
+
+**It had been broken since `/n/` shipped on 2026-10-23, and the fallback hid
+it.** `VOICE_FALLBACK` answers a missing local voice with a PUBLIC one, whose URL
+is absolute and so unaffected — so every deep-link visitor for ten days was
+quietly fetching the **60.3 MB HuggingFace alba instead of the 19.4 MB local
+build**, and still hearing a voice. Nothing looked wrong. It only became
+audible the day the local voice stopped being alba.
+
+**A fallback that works too well hides the fault it is covering.** The lesson is
+not to remove it — a visitor hearing something beats silence — but that a
+fallback needs to be *visible* when it fires. It was: that WARN line has been in
+the log for ten days.
+
+Both local-voice URLs are now root-relative. One sibling found in the same
+sweep and fixed: `url('cursor-wings.svg')` for the butterfly cursor, which
+resolved to `/n/cursor-wings.svg` and failed silently back to `auto`.
+`/speech_lexicon.json` was already correct.
+
+---
+
 ## 2026-11-02 — BD speaks in the author's wife's voice
 
 *"i'm thinking just to substitute as the BD default and we will substitute again
