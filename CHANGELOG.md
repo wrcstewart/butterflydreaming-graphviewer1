@@ -6,6 +6,27 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-02 — Methods: Internet Anonymity, and Local Group
+
+```
+  Anonymity  ->  "Internet Anonymity"   two lines
+  new Entry      "Local Group"
+```
+
+Methods now has fourteen children. No code change: `buildNodeData`'s Entry
+branch learned to prefer `display_name` on 31 October, so the newline goes there
+while `name` stays flat — for an Entry the name is both the rendered label and
+the lookup key, and a newline inside it breaks style selectors, queries and
+breadcrumbs silently while the label still looks right. Checked first that
+nothing in code or docs matched `Anonymity` by name.
+
+`Local Group` matches the other thirteen exactly: `Entry`, `CONTAINS` from
+Methods, colour `#9BB0C9`, layer `info`, empty `text` ready to fill, and its own
+`randomUUID` url, verified reachable. Manual backup first, `bd_tool.js cypher`
+having no auto-backup of its own.
+
+---
+
 ## 2026-11-01 (fifth) — a floor is a low percentile, not a mean
 
 Analysing the author's next take, at 50% on the system gain slider, the readout
