@@ -1930,7 +1930,24 @@ const SPEAK_VOICE = (() => {
   // published voice. ./make_quantised_voice.py makes it, voices/ is gitignored,
   // and piper_direct falls back to the public original if the build is absent.
   // So a fresh checkout still speaks, one size larger, and says why.
-  return 'local/alba_int8dp';
+  // ── 2026-11-02 — BD NOW SPEAKS IN THE AUTHOR'S WIFE'S VOICE ───────────
+  //
+  // *"i m thinking just to substitute as the BD default and we will substitute
+  // again after the next recording - i wanted various folks to hear it in BD"*.
+  // So this is deliberately the voice as it stands, not a finished one: the
+  // second recording (prompt set v4, mixed registers) will replace it.
+  //
+  // THE FULL BUILD, not the quantised one, and that is a measured choice rather
+  // than caution. `ringlet_int8dp` exists at 20.1 MB against 60.6 MB by exactly
+  // the recipe that gave alba 19.4 MB — int8 except the duration predictor —
+  // but the utterance shift came out at **+209 ms where alba's was -58 ms**:
+  // three times the size, and the other way. Same recipe, different voice, so
+  // transparency on alba is no evidence of transparency here, and his ear has
+  // not yet judged it. A heavier first load is recoverable; an audition in a
+  // subtly wrong voice is not. Flip this line once he has listened.
+  //
+  // alba remains reachable as `?voice=local/alba_int8dp` for comparison.
+  return 'local/ringlet';
 })();
 // SPEAK_LENGTH_SCALE, SPEAK_GAP_MS, SPEAK_LINE_GAP_MS — moved to
 // speech_timing.js (2026-10-28) so voice_compare.html delivers a voice the

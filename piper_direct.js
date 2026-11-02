@@ -70,6 +70,15 @@ const voices = new Map();          // voiceId -> { cfg, session }
 const VOICE_FALLBACK = {
   'local/alba_int8dp': 'en_GB-alba-medium',
   'local/alba_int8':   'en_GB-alba-medium',
+  // 2026-11-02 — ringlet is a FINE-TUNE: there is no public original it was
+  // built from, so this is not the usual "fall back to the thing it came from".
+  // It is a safety net, and it exists because `voices/` is gitignored: a fresh
+  // checkout or a redeployed server has no ringlet.onnx, and without an entry
+  // here the only outcome is a 404 and SILENCE. A visitor hearing alba and a
+  // console line saying why is strictly better than a visitor hearing nothing
+  // and concluding the speech does not work.
+  'local/ringlet':        'en_GB-alba-medium',
+  'local/ringlet_int8dp': 'en_GB-alba-medium',
 };
 
 async function cached(url, onProgress) {

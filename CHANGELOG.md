@@ -6,6 +6,45 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-02 — BD speaks in the author's wife's voice
+
+*"i'm thinking just to substitute as the BD default and we will substitute again
+after the next recording - i wanted various folks to hear it in BD"*. So this is
+the voice as it stands, deliberately, with the second recording (prompt set v4)
+to replace it.
+
+Three small changes and one measurement that changed the plan:
+
+**Default** — `SPEAK_VOICE` returns `local/ringlet`. alba stays reachable as
+`?voice=local/alba_int8dp` for comparison.
+
+**Pace 1.00, derived not guessed.** alba sits at 1.50 because he judged it
+*"much faster ... slowed down by at least 50%"*; with that applied he reported
+the two *"talk at roughly the same rate"*. So alba x 1.50 == ringlet x 1.00, and
+1.00 is what his own comparison implies. Written explicitly rather than left to
+the `|| 1` fallback, so it reads as a decision.
+
+**A fallback, because `voices/` is gitignored.** A fine-tune has no public
+original, so this is not the usual "fall back to what it was built from" — it is
+a safety net. Without it, a redeployed server or fresh checkout has no
+`ringlet.onnx`, and the only outcome is a 404 and **silence**. A visitor hearing
+alba with a console line saying why is strictly better than one hearing nothing
+and concluding speech is broken.
+
+**THE QUANTISED BUILD IS NOT THE DEFAULT, and that is the measurement.**
+`make_quantised_voice.py` was generalised to take a local source, and built
+`ringlet_int8dp` at **20.1 MB from 60.6 MB** by exactly the recipe that gave
+alba 19.4 MB — int8 except the duration predictor. But the utterance shift came
+out at **+209 ms where alba's was -58 ms**: three times the magnitude and the
+opposite sign. Same recipe, different voice, so alba's transparency is no
+evidence of transparency here, and no ear has judged it yet. A heavier first
+load is recoverable; an audition in a subtly wrong voice is not.
+
+And the heavier load turns out to be modest: measured over the tunnel,
+**63.5 MB in 5.1 s**, cached per device after that.
+
+---
+
 ## 2026-11-02 — an authored reader route through a view
 
 *"i now want to hint at a reader route though this - to this end please make the

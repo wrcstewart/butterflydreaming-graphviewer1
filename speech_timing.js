@@ -232,7 +232,15 @@ function looksLikeVerse(text) {
 // together and these stay relative corrections to it.
 const VOICE_PACE = {
   'en_GB-alba-medium': 1.50,
-  'local/alba_int8dp': 1.50,       // BD's shipped default — the same voice, quantised
+  'local/alba_int8dp': 1.50,       // the same voice, quantised
+  // ringlet needs NO stretch, and that is derived rather than guessed. alba sits
+  // at 1.50 because the author judged it *"much faster ... slowed down by at
+  // least 50%"*; with that applied he then reported the two *"talk at roughly
+  // the same rate"*. So alba x 1.50 == ringlet x 1.00, which makes 1.00 the
+  // value his own comparison implies. Stated explicitly rather than left to the
+  // `|| 1` fallback, so it reads as a decision and not an omission.
+  'local/ringlet':        1.00,
+  'local/ringlet_int8dp': 1.00,
 };
 
 // The one place either page should ask. `verse` picks the slower verse scale,
