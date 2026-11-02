@@ -6,6 +6,52 @@ The full commit history in `git log` is authoritative; this file is the friendli
 
 ---
 
+## 2026-11-02 — a passage was lost, and an empty save can no longer succeed
+
+The author: *"I seem to have just lost some work. I was saving some text under
+the Methods node and received messages it was being saved okay (several saves in
+fact) - but then while I stepped away ... the text is not there."*
+
+**What happened.** Four `edit_node_text` calls reached the server, each reported
+`ok: true`, and **each wrote the empty string.** Methods' `updated_at` is
+11:16:14 with a text length of 0. The handler's only check was
+`typeof msg.text !== 'string'`, which `''` passes, and it then announced success
+for destroying the content.
+
+**Why Methods and not Aims.** Aims already had text and its edit survived (469
+chars). Methods was empty, so BD took the `chunks.length === 0` branch and built
+a placeholder card to type into — and Sv's read-back returned `''` from a card
+reference that no longer pointed at what was on screen. A layout write is logged
+between his saves, which re-renders the stack. **A stale card reference reads as
+EMPTY, not as an error**, which is what makes it lethal on a save path; the same
+failure shape as "the model's newest card is not the one on screen".
+
+**Not recoverable, and every avenue was checked.** The database holds length 0.
+Memgraph's WAL, with deltas back to 23 September and last written at 11:16,
+contains every Aims revision as prose and for Methods contains **only
+`hint_scale` / `hint_x` / `hint_y` records** — no text was ever written.
+Snapshots at 11:14 predate the saves; the manual backup at 11:07 shows Methods
+already empty; Memgraph had been up seven weeks, so nothing was lost to a
+restart. **The words never left the browser.**
+
+**Closed, in two places.** The server now refuses a save whose text is empty or
+whitespace unless `allow_empty: true` is passed, naming the node and saying
+nothing was written. Nobody deliberately saves an empty passage, and refusing is
+free where succeeding is unrecoverable. The client refuses the same case before
+sending, and **as a dialog rather than `devStatus`** — a few words in a corner is
+exactly what a confident user walks away from. It also asks before any save that
+would cut stored text by more than half.
+
+Tested end to end: empty refused, whitespace-only refused, a genuine save
+accepted, and the 469 characters of Aims intact afterwards.
+
+**The underlying cause is GUARDED, NOT FIXED.** Sv may still read a stale card
+and assemble nothing; what has changed is that it now says so instead of
+destroying the stored text. Finding why the card reference goes stale is still
+open.
+
+---
+
 ## 2026-11-02 — Methods: Internet Anonymity, and Local Group
 
 ```

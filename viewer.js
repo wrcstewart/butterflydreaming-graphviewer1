@@ -11065,6 +11065,47 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       return;
     }
 
+    // ── NEVER SAVE EMPTINESS, AND NEVER SAY "SAVED" WHEN NOTHING WAS ─────
+    //
+    // 2026-11-02. The author wrote a passage under Methods, saved it four
+    // times, was told "saved" each time, and it was gone: *"I received messages
+    // it was being saved okay (several saves in fact) - but ... the text is not
+    // there"*. Each save wrote the EMPTY STRING. Methods had no text, so BD
+    // built a placeholder card (the `chunks.length === 0` branch), and the
+    // read-back above returned '' from a card reference that no longer pointed
+    // at what was on screen -- the layout write logged between his saves had
+    // re-rendered the stack. The words never left the browser.
+    //
+    // Compare the same failure elsewhere in this project: "the model's newest
+    // card is not the one on screen". A stale card reference reads as EMPTY,
+    // not as an error, which is what makes it so dangerous on a save path.
+    //
+    // Two guards, and both are DIALOGS, because devStatus is a few words in a
+    // corner that a confident user walks away from:
+    //   - empty assembled text is refused outright; it is never what anyone
+    //     means, and the previous value exists nowhere recoverable.
+    //   - a save that would cut existing text by more than half asks first.
+    const existing = String(node.data('text') || '');
+    if (!text.trim()) {
+      console.warn('[Sv] refused: assembled text is EMPTY for "' + name + '"');
+      devStatus('NOT saved — the card read as empty');
+      alert('NOT SAVED — nothing was written.\n\n' +
+            'The text assembled from the cards came through EMPTY, so saving ' +
+            'would have erased "' + name + '" rather than filled it.\n\n' +
+            'Whatever you typed has not reached the save. Check the card still ' +
+            'shows your words — if it does, this is a bug worth reporting; if it ' +
+            'does not, the text is only in the card you typed it into.');
+      return;
+    }
+    if (existing.trim() && text.length < existing.length / 2) {
+      const ok = confirm('This save would SHORTEN "' + name + '" from ' +
+                         existing.length + ' characters to ' + text.length + '.\n\n' +
+                         'That is less than half of what is stored. If you did not ' +
+                         'mean to delete most of it, cancel now — the stored text ' +
+                         'cannot be recovered afterwards.\n\nSave anyway?');
+      if (!ok) { devStatus('not saved — kept the longer stored text'); return; }
+    }
+
     const wsNow = wsRef.current;
     if (!wsNow || !wsNow.connected) { devStatus('ws not open'); return; }
     devStatus('saving…');
@@ -11073,6 +11114,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
       wsNow.off('msg', handler);
       if (m.error) {
         if (m.error === 'bad_code') forgetCurationCode();
+        // A refusal from the server is a DIALOG too. `empty_text` means the
+        // two guards disagreed, which is exactly the condition that lost a
+        // passage, so it must not be four words in a corner.
+        if (m.error === 'empty_text') {
+          alert('NOT SAVED — nothing was written.\n\n' +
+                (m.detail || 'The server refused an empty save.'));
+        }
         devStatus(m.error); return;
       }
       devStatus(`saved ${name}`);

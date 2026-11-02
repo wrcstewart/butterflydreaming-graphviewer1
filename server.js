@@ -2414,6 +2414,34 @@ io.on('connection', async (socket) => {
         }
         const s = driver.session({ database: 'memgraph' });
         try {
+          // ── AN EMPTY SAVE IS A LOST SAVE (2026-11-02) ────────────────────
+          //
+          // The author lost a passage he had written under Methods. Four saves
+          // reached here, each reported `ok: true`, and each wrote the EMPTY
+          // STRING: the node had no text, so BD built a placeholder card, and
+          // Sv read back a card reference that no longer pointed at what was on
+          // screen. The words never left the browser. His own account: *"I
+          // received messages it was being saved okay (several saves in fact)
+          // - but ... the text is not there"*.
+          //
+          // `typeof msg.text !== 'string'` let '' straight through, and the
+          // handler then reported success for destroying the content.
+          //
+          // Nobody deliberately saves an empty passage, and if they ever do,
+          // saying so costs one flag. REFUSING AN EMPTY SAVE IS FREE; a
+          // successful one is unrecoverable, because the previous value exists
+          // nowhere else -- not in the WAL, not in a snapshot, not in a backup
+          // taken minutes earlier. Refuse, name the node, and make the caller
+          // say `allow_empty` if it really means it.
+          if (!msg.text.trim() && msg.allow_empty !== true) {
+            console.warn(`[BD] edit_node_text REFUSED: empty text for ${msg.label} ` +
+                         `"${msg.name}" from ${socket.data.userId} — nothing written`);
+            socket.emit('msg', { type: 'edit_node_text', error: 'empty_text',
+              detail: `The text came through EMPTY, so nothing was written to "${msg.name}". ` +
+                      `Whatever you typed did not reach the save. Check the card still ` +
+                      `shows your words before trying again.` });
+            return;
+          }
           const result = await s.run(
             'MATCH (n) WHERE $label IN labels(n) AND n.name = $name ' +
             'SET n.text = $text, n.updated_at = $now RETURN count(n) AS c',
