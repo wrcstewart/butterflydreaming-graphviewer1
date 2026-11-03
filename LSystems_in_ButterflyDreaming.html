@@ -1,0 +1,314 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Grammars that draw and play — L-systems in ButterflyDreaming</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 18mm 18mm; }
+  * { box-sizing: border-box; }
+  html { font-size: 10.5pt; }
+  body {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    color: #1a1a1a; line-height: 1.5; margin: 0; max-width: 100%;
+  }
+  h1 { font-size: 21pt; line-height: 1.15; margin: 0 0 2mm; letter-spacing: -0.01em; }
+  .sub { font-size: 11pt; color: #555; font-style: italic; margin: 0 0 8mm; }
+  h2 {
+    font-size: 13pt; margin: 9mm 0 2.5mm; padding-bottom: 1.2mm;
+    border-bottom: 0.4mm solid #1a1a1a; page-break-after: avoid;
+  }
+  h3 { font-size: 11pt; margin: 6mm 0 1.5mm; page-break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  .lede { font-size: 11.5pt; }
+  code, pre, .mono {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 8.8pt;
+  }
+  code { background: #f0f0ec; padding: 0.3mm 1mm; border-radius: 0.8mm; }
+  pre {
+    background: #f6f6f2; border-left: 0.8mm solid #b8b8ac;
+    padding: 3mm 4mm; margin: 3mm 0; overflow: visible;
+    white-space: pre-wrap; line-height: 1.45; page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 3mm 0; font-size: 9.5pt;
+          page-break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 1.6mm 2.5mm;
+           border-bottom: 0.2mm solid #d6d6cc; }
+  th { border-bottom: 0.4mm solid #1a1a1a; font-size: 8.5pt;
+       text-transform: uppercase; letter-spacing: 0.06em; }
+  td.sym { font-family: "SF Mono", Menlo, monospace; font-weight: 600; width: 16mm; }
+  .note {
+    background: #f4f2ea; border-left: 0.8mm solid #8a7f5c;
+    padding: 3mm 4mm; margin: 4mm 0; font-size: 10pt; page-break-inside: avoid;
+  }
+  .note b { font-variant: small-caps; letter-spacing: 0.03em; }
+  .foot { margin-top: 10mm; padding-top: 3mm; border-top: 0.2mm solid #d6d6cc;
+          font-size: 8.5pt; color: #666; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  .kicker { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.1em;
+            color: #8a7f5c; margin: 0 0 1.5mm; }
+</style>
+
+<p class="kicker">ButterflyDreaming · technical note</p>
+<h1>Grammars that draw and play</h1>
+<p class="sub">How a few lines of text become a figure, a sculpture, or a melody</p>
+
+<p class="lede">Three of ButterflyDreaming's modules — a two-dimensional
+drawing, a three-dimensional one, and a piece of generative music — look
+unrelated on screen. They are the same idea three times over. Each is a short
+piece of text that grows into a much longer one, and is then read aloud by
+something that knows what the letters mean. This note explains the mechanism
+and, more usefully, explains where the line falls between the part that is
+written and the part that is adjusted by hand.</p>
+
+<h2>1. An L-system: a grammar that grows</h2>
+
+<p>An L-system is a rewriting rule. You begin with a short string, the
+<i>axiom</i>, and a set of <i>productions</i> of the form "wherever you see this
+symbol, put these symbols instead". Then you apply all the productions at once,
+and again, and again. Nothing is random and nothing is drawn yet; this stage is
+pure text.</p>
+
+<p>Here is one actually stored in ButterflyDreaming, exactly as it appears:</p>
+
+<pre><code>axiom:  F+F+F+F+F+F+F+F
+F:      F+F-F-F+F+F+F-F</code></pre>
+
+<p>The axiom is eight <code>F</code>s with turns between them. The single
+production says every <code>F</code> becomes fifteen symbols. So:</p>
+
+<pre><code>depth 0    F+F+F+F+F+F+F+F                     8 F
+depth 1    each F replaced                     64 F
+depth 2    again                              512 F   ← 1,023 symbols in total</code></pre>
+
+<p>Those numbers are not illustrative: that score is stored with a depth of 2,
+and the string it produces contains 1,023 symbols of which 512 are
+<code>F</code>. Two lines of text, five hundred strokes. This is the whole
+appeal — the growth is <i>steep</i>, so a human-sized input yields a figure no
+human would draw by hand, and yet it is entirely determined. The same two lines
+always give the same 1,023 symbols.</p>
+
+<h3>Symbols that draw nothing</h3>
+
+<p>Productions may use symbols that have no graphical meaning at all. The music
+module's default grammar is a Hilbert curve:</p>
+
+<pre><code>axiom:  X
+X:      FYFX+F+YFXFY-F-XFYFX
+Y:      FXFY-F-XFYFX+F+YFXFY</code></pre>
+
+<p><code>X</code> and <code>Y</code> never draw. They exist only to be
+rewritten — carriers that steer how the <code>F</code>s and turns arrange
+themselves, and then vanish from the reading. This is worth knowing because it
+explains why the alphabet of the grammar and the alphabet of the renderer are
+<i>different lists</i>, which is the subject of the next section.</p>
+
+<h2>2. The renderer: a string means nothing until something walks it</h2>
+
+<p>A thousand characters of <code>F</code>s and plus signs is not a picture. It
+becomes one only when a second piece of machinery reads it symbol by symbol and
+does something physical with each. The traditional device is a <i>turtle</i>: an
+imaginary pen with a position and a heading, which obeys instructions.</p>
+
+<p>ButterflyDreaming's turtle understands exactly seven symbols:</p>
+
+<table>
+  <tr><th>Symbol</th><th>What the turtle does</th></tr>
+  <tr><td class="sym">F</td><td><b>Draw</b> forward one step, and move there</td></tr>
+  <tr><td class="sym">f</td><td><b>Move</b> forward one step without drawing — pen up</td></tr>
+  <tr><td class="sym">+</td><td>Turn anticlockwise by the current angle</td></tr>
+  <tr><td class="sym">-</td><td>Turn clockwise by the current angle</td></tr>
+  <tr><td class="sym">[</td><td><b>Push</b> the present position and heading onto a stack</td></tr>
+  <tr><td class="sym">]</td><td><b>Pop</b> — return to the last pushed position and heading</td></tr>
+  <tr><td class="sym">|</td><td>Turn 180°</td></tr>
+</table>
+
+<p>Any other character is <i>ignored</i>. That single sentence is what lets
+<code>X</code> and <code>Y</code> exist. It also means a mistyped grammar fails
+quietly rather than loudly: a rule for a symbol the turtle does not know will
+rewrite happily and draw nothing.</p>
+
+<p>The bracket pair is what separates a line from a tree. Without
+<code>[</code> and <code>]</code> the turtle traces a single unbroken path;
+with them it can set off down a branch, draw it, and return to the fork to
+continue. None of ButterflyDreaming's present figures use them, which is a
+choice rather than a limit — kolam are continuous line drawings by tradition.</p>
+
+<div class="note">
+<p><b>One departure worth naming.</b> In a textbook turtle, <code>F</code> draws
+a straight line, and an L-system therefore produces polygons. ButterflyDreaming
+draws a <i>quadratic curve</i> instead, placing its control point perpendicular
+to the heading at three tenths of the step length. The grammar is unchanged; only
+the reading of <code>F</code> differs. That one substitution is most of why these
+figures look like kolam — looping and woven — rather than like a Koch
+snowflake.</p>
+</div>
+
+<h2>3. The separation that makes it workable</h2>
+
+<p>Notice what the grammar does <i>not</i> say. <code>+</code> means "turn", not
+"turn ninety degrees". <code>F</code> means "draw a step", not "draw 299
+pixels". The grammar fixes the <b>sequence</b> of operations and nothing else;
+the <b>magnitudes</b> come from elsewhere.</p>
+
+<p>This is the architectural decision the whole system rests on, and its
+consequence is immediate: the same string can be redrawn at a different angle
+and become an entirely different figure. A turn of 90° closes an eight-step
+axiom into a square ring; 90°26′ leaves it very slightly open, so each repeat
+lands rotated a little from the last and the figure precesses into a rosette.
+Not one character of the grammar changed.</p>
+
+<p>Hence the parameters are expressed in minutes of arc as well as degrees.
+Whole degrees proved too coarse a control: the interesting figures live in the
+near-misses, where a shape almost closes.</p>
+
+<h2>4. Directives and sliders: two faces of one value</h2>
+
+<p>Every parameter is a line of text in the node itself. A directive is a line
+beginning <code>%%bd_</code>, and the drawing above is stored like this:</p>
+
+<pre><code>%%bd_module bd_V_Kolam
+%%bd_p_symmetry 8          how many copies about the centre
+%%bd_p_depth 2             how many rewriting passes
+%%bd_p_step 299            how far F travels
+%%bd_p_angle 90            how much + and - turn ...
+%%bd_p_angle_minutes 26    ... to the minute of arc
+%%bd_p_angle_drift 4       a slow animation of that angle
+%%bd_p_colour_speed 4      how fast hue follows heading
+%%bd_p_weight 0.5          stroke width
+%%bd_p_opacity 0.76
+%%bd_stroke angle          colour BY heading, rather than one colour
+%%bd_background #0a0a0f
+%%bd_score [
+axiom: F+F+F+F+F+F+F+F
+F: F+F-F-F+F+F+F-F
+%%bd_]</code></pre>
+
+<p>The module also presents these as sliders and menus. The two are not
+parallel mechanisms: <b>the sliders are an editor for the text.</b> Moving one
+rewrites the corresponding <code>%%bd_p_</code> line in the script and
+re-renders from the rewritten script. There is no separate state of the world
+that the text might disagree with — which is why a figure arrived at by
+twenty minutes of dragging can be kept simply by saving the node.</p>
+
+<p>Two details of that round trip show the care it needed:</p>
+
+<ul>
+  <li><b>A directive the controls do not manage is left exactly where it is.</b>
+  Older scripts carry parameters that have since been renamed or withdrawn. The
+  rewriter ignores them rather than deleting them, on the principle that
+  removing an author's line is not a value update's business.</li>
+  <li><b>The prefix matters.</b> Parameters are <code>%%bd_p_name</code>;
+  matching the bare name instead inserts a second line, and the parser takes
+  the last one. A whole class of "the slider does nothing" reports came from
+  exactly that.</li>
+</ul>
+
+<p>The practical division, when something looks wrong: <b>if the topology is
+wrong it is the grammar; if the shape is right but the size, sharpness or colour
+is wrong it is a directive.</b></p>
+
+<h2>5. Three readings of one grammar</h2>
+
+<p>The three modules share the grammar and differ in what the turtle's walk is
+taken to <i>mean</i>.</p>
+
+<!-- FIGURES: to add a plate, drop <figure><img src="…"><figcaption>…</figcaption></figure>
+     immediately after any of the three h3 headings below. The captions should pair the
+     figure with the grammar that produced it — that pairing is the point of the
+     document, and a figure without its score illustrates nothing. -->
+<h3>Kolam 2D — ink on a plane</h3>
+
+<p>The turtle walks a flat canvas and leaves curves. One extra stage sits
+outside the turtle entirely: <code>%%bd_p_symmetry 8</code> draws the finished
+path eight times about the centre. With 512 strokes and eightfold symmetry,
+roughly four thousand curves reach the screen. Hue can be tied to heading rather
+than fixed, so the direction of travel becomes visible as colour.</p>
+
+<h3>Kolam 3D — the same walk, lifted out of the plane</h3>
+
+<p>The grammar is <i>identical</i>, and so are the seven symbols. One thing is
+added: every turn now applies a <b>pitch</b> as well as a yaw, so
+<code>+</code> rotates in two planes at once and the path leaves the flat.
+<code>F</code> still draws a quadratic curve, now in three dimensions and
+tessellated into short segments so it can be given to a graphics card.</p>
+
+<p>The clearest way to see that this is the same system: <b>set pitch to zero
+and the camera to directly overhead, and the 3D module reproduces the 2D
+figure.</b> Pitch is the single parameter that makes it a sculpture rather than
+a drawing, and the camera parameters — elevation, distance, and their drift
+rates — are a viewpoint on the result, not part of it.</p>
+
+<h3>Fractal Music — the same walk, read as a melody</h3>
+
+<p>Here the turtle still walks a flat grid, but nothing is drawn. The path
+itself is read as music:</p>
+
+<ul>
+  <li><b>Height becomes pitch.</b> A vertical position of zero is the root note
+  low in the range; each unit upward is one degree up the chosen scale — minor,
+  major, minor pentatonic, or blues. The melody is literally the shape of the
+  curve.</li>
+  <li><b>Horizontal runs become notes.</b> A segment travelling sideways sounds;
+  consecutive sideways segments at the same height become one longer note. The
+  vertical moves are how the melody changes pitch, not events in themselves.</li>
+</ul>
+
+<p>The default grammar is the Hilbert curve shown earlier — a space-filling
+curve, which is a fortunate choice for music because it wanders through every
+height in its range without ever leaping.</p>
+
+<p>This module differs in one engineering respect worth recording. The other two
+hand their grammar to a small library which does the rewriting and returns the
+finished string. At the depths this one uses, that string is far too large to
+hold in memory, so it expands and walks <i>lazily</i> — depth first, consuming
+symbols as it goes, never materialising the whole. A stepper control then lets
+the listener start thousands of symbols into the walk, so a long piece can be
+entered in the middle.</p>
+
+<table>
+  <tr><th></th><th>Kolam 2D</th><th>Kolam 3D</th><th>Fractal Music</th></tr>
+  <tr><td><b>Grammar</b></td><td>shared</td><td>shared</td><td>shared</td></tr>
+  <tr><td><b>Symbols</b></td><td>the seven</td><td>the seven</td><td><code>F + -</code> only</td></tr>
+  <tr><td><b><code>F</code> means</b></td><td>a curve on a plane</td><td>a curve in space</td><td>a step of time</td></tr>
+  <tr><td><b>Turns act in</b></td><td>yaw</td><td>yaw and pitch</td><td>yaw</td></tr>
+  <tr><td><b>Height means</b></td><td>position</td><td>position</td><td><b>pitch</b></td></tr>
+  <tr><td><b>Rewriting by</b></td><td>library</td><td>library</td><td>lazy walk</td></tr>
+  <tr><td><b>Outer stage</b></td><td>symmetry copies</td><td>camera</td><td>scale, tempo, effects</td></tr>
+</table>
+
+<h2>6. Why it is all text</h2>
+
+<p>A figure in ButterflyDreaming is not a file. It is a passage of text in a
+node, and that has consequences the system is built around.</p>
+
+<ul>
+  <li><b>It is small enough to share.</b> The two lines of grammar and a dozen
+  directives describe a four-thousand-stroke drawing. They travel in a message,
+  a link, or a conversation.</li>
+  <li><b>It is editable by a reader.</b> Changing <code>angle</code> by a minute
+  of arc is a plausible act for someone who is not a programmer, and the result
+  is immediate.</li>
+  <li><b>It is reproducible — conditionally.</b> The same text gives the same
+  figure, <i>provided</i> the machinery that reads it does not change
+  underneath. That is not automatic. The rewriting library was for a time
+  fetched unpinned from a public network, which meant a new release elsewhere
+  could have altered stored figures with no change made here. It is now a fixed
+  copy held alongside the code. When a figure <i>is</i> the artwork, the version
+  of the thing that expands its grammar is part of the artwork.</li>
+</ul>
+
+<div class="note">
+<p><b>The shape of the whole thing.</b> A grammar supplies order; a renderer
+supplies meaning; directives supply magnitude; and an outer stage — symmetry,
+camera, or scale and tempo — supplies presentation. Those four are genuinely
+separable, which is why the same two lines of text can be a drawing, a
+sculpture, and a tune, and why a slider can be handed to someone with no
+interest in grammars at all.</p>
+</div>
+
+<p class="foot">ButterflyDreaming · <span class="mono">butterflydreaming.net</span>
+· L-system rewriting by <span class="mono">lindenmayer</span> 1.5.4 (MIT, Tom
+Brewe); turtle, renderers and directive system are ButterflyDreaming's own.
+Figures, scores and parameter values quoted in this note are taken from the live
+corpus.</p>
