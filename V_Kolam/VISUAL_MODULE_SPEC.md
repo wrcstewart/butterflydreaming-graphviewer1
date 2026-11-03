@@ -41,13 +41,37 @@ No sample files are required — all rendering is done in JavaScript on the canv
 
 ## Libraries
 
-Both HTML files load all libraries from CDN — no npm, no build step.
+No npm and no build step. The one library is **vendored**, not fetched.
 
-| Library       | Purpose                          | CDN |
-|---------------|----------------------------------|-----|
-| lindenmayer   | L-System rewriting engine        | https://cdn.jsdelivr.net/npm/lindenmayer/dist/lindenmayer.browser.js |
+| Library | Purpose | Where |
+|---|---|---|
+| lindenmayer 1.5.4 | L-system **rewriting** only | `/lib/lindenmayer-1.5.4.js`, served by BD |
 
-No other libraries are required. All canvas drawing is vanilla JavaScript.
+**It used to come from jsDelivr UNPINNED** — `npm/lindenmayer/dist/…`, no
+`@version` — so every visitor received whatever was latest and an upstream
+release could have changed these figures with no commit here. Vendored
+2026-11-03: a Kolam figure *is* the artwork, and this library decides the string
+the turtle walks, so a stored score must keep drawing what it drew when it was
+chosen. MIT, and the notice travels in the file; the full reasoning is in its
+header. It also means the module needs no network.
+
+**The library does the rewriting and nothing else.** The TURTLE — what each
+symbol means on the canvas — is this module's own, in `renderTurtlePath`:
+
+| symbol | operation |
+|---|---|
+| `F` | draw forward one step, as a **quadratic curve** (control point perpendicular at 0.3 × step) |
+| `f` | move forward one step, pen up |
+| `+` / `-` | turn anticlockwise / clockwise by the current angle |
+| `[` / `]` | push / pop position and heading |
+| `\|` | turn 180° |
+
+Any other character is ignored, which is what lets a carrier symbol exist purely
+to be rewritten. The angle itself is **not** in the grammar — `+` turns by
+whatever `%%bd_p_angle` and `%%bd_p_angle_minutes` currently say, which is why
+one slider reshapes the whole figure without touching a character of the score.
+
+All canvas drawing is vanilla JavaScript.
 
 ---
 

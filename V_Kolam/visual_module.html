@@ -585,8 +585,14 @@
 
   </div>
 
-  <!-- lindenmayer library for L-system rewriting -->
-  <script src="https://cdn.jsdelivr.net/npm/lindenmayer/dist/lindenmayer.browser.js"></script>
+  <!-- lindenmayer 1.5.4, vendored at /lib/lindenmayer-1.5.4.js. Was loaded
+       UNPINNED from jsDelivr, so every visitor got whatever was latest and an
+       upstream release could change these figures with no commit here. A Kolam
+       figure IS the artwork and this library decides the string the turtle
+       walks, so the version has to hold still. ROOT-RELATIVE: a bare path here
+       would resolve against the page, which broke the voice files on /n/ links.
+       MIT; the notice travels in the file. See its header for the full why. -->
+  <script src="/lib/lindenmayer-1.5.4.js"></script>
 
   <script>
     'use strict';
