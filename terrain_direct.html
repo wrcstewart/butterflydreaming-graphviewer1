@@ -35,8 +35,9 @@
 <header>
   <h1>Terrain, direct — height and width straight from the grammar</h1>
   <p><b>No angle is computed.</b> One grammar sets the height of each flat top,
-     another its width. The histogram is drawn faintly; the black line joins the
-     <b>midpoints of the tops</b>. Shown at true 1:1.</p>
+     another its width. Shown at true 1:1. <b>Plains come from the proportion of
+     full steps</b> &mdash; these rules are 3% <code>+</code>/<code>-</code>, so
+     the ground stays level for kilometres between escarpments.</p>
 </header>
 
 <main>
@@ -46,11 +47,11 @@
     <label>axiom</label><input id="h-ax" type="text" value="X">
     <label>rules &mdash; <code>+</code> up, <code>-</code> down, <code>&gt;</code> gentle up,
       <code>&lt;</code> gentle down, <code>=</code> level</label>
-    <textarea id="h-rules" style="min-height:64px">X: &lt;&gt;+&gt;XYX+
-Y: XZ&lt;-YZ-+
-Z: &lt;ZZZ&gt;-</textarea>
+    <textarea id="h-rules" style="min-height:64px">X: XZXZZY&gt;
+Y: &gt;&lt;X-=X&lt;
+Z: Z&gt;&gt;ZXZXZ</textarea>
     <div class="row">
-      <div><label>depth</label><input id="h-depth" type="number" value="6" min="0" max="9"></div>
+      <div><label>depth</label><input id="h-depth" type="number" value="5" min="0" max="9"></div>
       <div><label>m per step</label><input id="h-q" type="number" value="60" step="5"></div>
 
     </div>
