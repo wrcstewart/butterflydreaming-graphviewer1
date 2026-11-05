@@ -34,8 +34,9 @@
 
 <header>
   <h1>Fractal terrain bench — a profile from two grammars</h1>
-  <p>Every drawn segment takes one decision from each fractal: <b>&plusmn;1&deg; of angle</b>,
-     and <b>&plusmn;a quantum of step length</b>. Black line, white canvas, no 3D yet.</p>
+  <p>Every drawn segment takes one decision from each fractal: <b>a turn</b> and
+     <b>a step length</b>. Shown at <b>true 1:1 scale</b> &mdash; no vertical
+     exaggeration. Defaults give a 15% grade &mdash; a summit every 1.5 km, 2.6 km of relief.</p>
 </header>
 
 <main>
@@ -47,11 +48,11 @@
     <textarea id="a-rules">F: F+F-F+F-F-F+F</textarea>
     <div class="row">
       <div><label>depth</label><input id="a-depth" type="number" value="3" min="0" max="7"></div>
-      <div><label>&deg; per step</label><input id="a-q" type="number" value="1" step="0.25"></div>
+      <div><label>&deg; per step</label><input id="a-q" type="number" value="45" step="1"></div>
       <div><label>limit &plusmn;&deg;</label><input id="a-lim" type="number" value="60"></div>
     </div>
-    <label>persistence <span id="a-persist-val">0.95</span> &mdash; 1 = rolling, lower = peaky</label>
-    <input id="a-persist" type="range" min="0.80" max="1" value="0.95" step="0.01" style="width:100%">
+    <label>persistence <span id="a-persist-val">0.80</span> &mdash; 1 = rolling, lower = peaky</label>
+    <input id="a-persist" type="range" min="0.60" max="1" value="0.80" step="0.01" style="width:100%">
     <label>start at <span id="a-start-val">0</span></label>
     <input id="a-start" type="range" min="0" max="95" value="0" step="1" style="width:100%">
   </fieldset>
@@ -62,12 +63,12 @@
     <textarea id="s-rules">F: F-F++F-F</textarea>
     <div class="row">
       <div><label>depth</label><input id="s-depth" type="number" value="4" min="0" max="7"></div>
-      <div><label>m per step</label><input id="s-q" type="number" value="25" step="5"></div>
+      <div><label>m per step</label><input id="s-q" type="number" value="6" step="1"></div>
     </div>
     <div class="row">
-      <div><label>min m</label><input id="s-min" type="number" value="50"></div>
-      <div><label>max m</label><input id="s-max" type="number" value="500"></div>
-      <div><label>start m</label><input id="s-start" type="number" value="275"></div>
+      <div><label>min m</label><input id="s-min" type="number" value="30"></div>
+      <div><label>max m</label><input id="s-max" type="number" value="120"></div>
+      <div><label>start m</label><input id="s-start" type="number" value="60"></div>
     </div>
     <label>start at <span id="s-off-val">0</span></label>
     <input id="s-off" type="range" min="0" max="95" value="0" step="1" style="width:100%">
@@ -83,7 +84,7 @@
 
   <fieldset><legend>View</legend>
     <div class="row">
-      <div><label>view width m</label><input id="v-w" type="number" value="30000" step="1000"></div>
+      <div><label>view width m</label><input id="v-w" type="number" value="10000" step="1000"></div>
       <div><label>vertical &times;</label><input id="v-h" type="number" value="1" step="0.5" min="0.1"></div>
     </div>
     <div style="font-size:11px;color:#666;margin:2px 0 6px">
