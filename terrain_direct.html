@@ -46,11 +46,11 @@
     <label>axiom</label><input id="h-ax" type="text" value="X">
     <label>rules &mdash; <code>+</code> up, <code>-</code> down, <code>&gt;</code> gentle up,
       <code>&lt;</code> gentle down, <code>=</code> level</label>
-    <textarea id="h-rules" style="min-height:64px">X: &lt;&gt;+&gt;XYX+
-Y: XZ&lt;-YZ-+
-Z: &lt;ZZZ&gt;-</textarea>
+    <textarea id="h-rules" style="min-height:64px">X: YX&gt;YYZZZ
+Y: &gt;+--YX+
+Z: ZXZX&gt;X&gt;</textarea>
     <div class="row">
-      <div><label>depth</label><input id="h-depth" type="number" value="6" min="0" max="9"></div>
+      <div><label>depth</label><input id="h-depth" type="number" value="5" min="0" max="9"></div>
       <div><label>m per step</label><input id="h-q" type="number" value="60" step="5"></div>
 
     </div>
@@ -387,6 +387,21 @@ function draw() {
     }
   }
   const meanGrade = tiltN ? 100 * tiltSum / tiltN : 0;
+
+  // ── FLAT SECTIONS AT EVERY SCALE ───────────────────────────────────────
+  // The author: *"mountains arent always changing height they tend to have
+  // level portions as well so there should be more frequent shorter flat
+  // sections too ... again the distribution needs to be fractal to get
+  // realism"*.
+  //
+  // So the thing to show is not how many plains there are, nor how long the
+  // longest is — both of which I searched on before, and both of which can be
+  // excellent while the landscape is wrong. It is whether flat sections occur
+  // at EVERY size, with the small ones commoner: a power law. Binned by
+  // doubling, that is a straight falling line.
+  const BANDS = [[2, 3], [4, 7], [8, 15], [16, 31], [32, 63], [64, Infinity]];
+  const bandCounts = BANDS.map(([a, b]) => runs.filter(v => v >= a && v <= b).length);
+  const bandsUsed = bandCounts.filter(c => c > 0).length;
   let up = 0, down = 0;
   for (const v of M.H.seq) { if (v === 0.001) up++; else if (v === -0.001) down++; }
 
@@ -405,7 +420,11 @@ function draw() {
       ? `smoothing     window ${M.win} bars   ` +
         `<span class="warn">relief ${M.rawRelief.toFixed(0)} &rarr; ` +
         `${M.lineRelief.toFixed(0)} m</span>\n` : '') +
-    `plains        ${runs.length} runs, ${(100 * flatBars / M.n).toFixed(0)}% of bars   ` +
+    `flat runs     ${runs.length} total, ${(100 * flatBars / M.n).toFixed(0)}% of bars\n` +
+    `  by size     2-3:${bandCounts[0]}  4-7:${bandCounts[1]}  8-15:${bandCounts[2]}  ` +
+    `16-31:${bandCounts[3]}  32-63:${bandCounts[4]}  64+:${bandCounts[5]}   ` +
+    `<b>${bandsUsed} of 6 scales</b>\n` +
+    `plains        ${(100 * flatBars / M.n).toFixed(0)}% of bars   ` +
     `longest ${longestM >= 1000 ? (longestM / 1000).toFixed(1) + ' km' : longestM.toFixed(0) + ' m'}\n` +
     `plain tilt    ${meanGrade.toFixed(2)}% mean gradient` +
     `${meanGrade < 0.3 ? '   (reads as level at true scale)' : ''}\n` +
