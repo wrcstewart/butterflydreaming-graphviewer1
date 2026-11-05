@@ -81,6 +81,13 @@ Z: ZZ+Z--</textarea>
     </div>
   </fieldset>
 
+  <fieldset><legend>Smoothing</legend>
+    <label>window <span id="sm-val">1</span> bars</label>
+    <input id="sm" type="range" min="1" max="81" value="1" step="2" style="width:100%">
+    <div class="hint">A moving average over the <b>heights</b>. 1 = untouched.
+      The histogram stays raw, so the line shows what the smoothing did.</div>
+  </fieldset>
+
   <fieldset><legend>View</legend>
     <div class="row">
       <div><label>view width m</label><input id="v-w" type="number" value="10000" step="1000"></div>
@@ -140,6 +147,31 @@ function reflect(v, lo, hi) {
   return lo + (t <= span ? t : 2 * span - t);
 }
 
+// ── SMOOTH THE HEIGHTS, AND ONLY THE LINE ────────────────────────────────
+// There is no angle in this model, so the height sequence IS the thing to
+// average — one less indirection than the first bench, where roughness lived
+// in the slope rather than in the ground.
+//
+// Only the LINE is smoothed; the histogram keeps the raw heights. The bars are
+// the data and the line is a reading of it, so showing the two together says
+// what the smoothing did instead of hiding the evidence.
+//
+// Centred, and shrinking at the ends rather than padding, so the profile is
+// not dragged toward its own mean at the edges.
+function smoothHeights(h, win) {
+  if (win <= 1) return h;
+  const half = Math.floor(win / 2), out = new Array(h.length);
+  for (let i = 0; i < h.length; i++) {
+    let t = 0, c = 0;
+    for (let k = -half; k <= half; k++) {
+      const j = i + k;
+      if (j >= 0 && j < h.length) { t += h[j]; c++; }
+    }
+    out[i] = t / c;
+  }
+  return out;
+}
+
 function build() {
   const H = decisions($('h-ax').value, $('h-rules').value, +$('h-depth').value);
   const Wd = decisions($('w-ax').value, $('w-rules').value, +$('w-depth').value);
@@ -160,7 +192,14 @@ function build() {
     x += w;
     if (h < minH) minH = h; if (h > maxH) maxH = h;
   }
-  return { bars, n, H, W: Wd, span: x, minH, maxH };
+  const win = +$('sm').value;
+  $('sm-val').textContent = win;
+  const sm = smoothHeights(bars.map(b => b.h), win);
+  for (let i = 0; i < bars.length; i++) bars[i].line = sm[i];
+  let lMin = Infinity, lMax = -Infinity;
+  for (const v of sm) { if (v < lMin) lMin = v; if (v > lMax) lMax = v; }
+  return { bars, n, H, W: Wd, span: x, minH, maxH, win,
+           rawRelief: maxH - minH, lineRelief: lMax - lMin };
 }
 
 function draw() {
@@ -218,7 +257,7 @@ function draw() {
   ctx.beginPath();
   let started = false;
   for (const b of M.bars) {
-    const X = px(b.mid), Y = py(b.h);
+    const X = px(b.mid), Y = py(b.line);
     if (X < pad - 400 || X > W - pad + 400) { started = false; continue; }
     started ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
     started = true;
@@ -236,7 +275,7 @@ function draw() {
   ctx.restore();
 
   // Summits by PROMINENCE, on the ramp line, so the two benches are comparable.
-  const ys = M.bars.map(b => b.h), xs = M.bars.map(b => b.mid);
+  const ys = M.bars.map(b => b.line), xs = M.bars.map(b => b.mid);
   let peaks = 0, best = 0;
   for (let i = 1; i < ys.length - 1; i++) {
     if (ys[i] > ys[i - 1] && ys[i] >= ys[i + 1]) {
@@ -259,6 +298,10 @@ function draw() {
     `${vex === 1 ? '<b>true scale</b>' : vex.toFixed(1) + '&times; vertical'}\n` +
     `elevation     ${M.minH.toFixed(0)} to ${M.maxH.toFixed(0)} m   ` +
     `relief ${(M.maxH - M.minH).toFixed(0)} m\n` +
+    (M.win > 1
+      ? `smoothing     window ${M.win} bars   ` +
+        `<span class="warn">relief ${M.rawRelief.toFixed(0)} &rarr; ` +
+        `${M.lineRelief.toFixed(0)} m</span>\n` : '') +
     `summits       ${peaks} over 100 m   ` +
     `${(100 * peaks / km).toFixed(1)} per 100 km   best ${best.toFixed(0)} m\n` +
     `grade         ${(100 * (M.maxH - M.minH) / M.span).toFixed(1)}% over the whole profile` +
