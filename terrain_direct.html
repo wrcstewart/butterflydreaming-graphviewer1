@@ -346,6 +346,7 @@ function draw() {
   // A plain is now a run of GENTLE steps, not of identical ones: `>` and `<`
   // make a plain that slopes, and an equality test would score those as no
   // plain at all — reporting the opposite of what was asked for.
+  const meanWBar = M.span / M.n;
   const raw = M.bars.map(b => b.h);
   const gq = (+$('h-gentle').value) * (+$('h-q').value) + 1e-6;
   const runs = [];
@@ -357,6 +358,37 @@ function draw() {
   if (r > 2) runs.push(r);
   const flatBars = runs.reduce((a, b) => a + b, 0);
   const longestM = runs.length ? Math.max(...runs) * (M.span / M.n) : 0;
+
+  // ── SAY WHAT THE TILT ACTUALLY IS ──────────────────────────────────────
+  // The author: *"the slider is not making a tilt effect as far as i can see
+  // but general level adjust"*. Both halves of that were true and neither was
+  // a fault in the tilt.
+  //
+  // It IS tilting — at 0.15 a twelve-bar plain rises 108 m over 3 km — but
+  // that is a 3.6% grade, and at true 1:1 in a 10 km view the canvas shows
+  // about 7 km of height, so 108 m is 1.5% of the frame. A gently sloping
+  // plain looks flat at true scale BECAUSE IT IS NEARLY FLAT. Stated as a
+  // percentage here, since the eye cannot read it off the picture.
+  //
+  // And the level shift is the GRAMMAR, not the slider: this one holds 552
+  // `>` against 496 `<`, a surplus of 56, so more tilt means higher ground.
+  // Reported rather than normalised away — it is the grammar's character, and
+  // balancing it silently would be editing the author's rules behind his back.
+  let tiltSum = 0, tiltN = 0;
+  {
+    let i = 1, runStart = 0;
+    for (; i < raw.length; i++) {
+      if (Math.abs(raw[i] - raw[i - 1]) <= gq) continue;
+      if (i - runStart > 2) {
+        tiltSum += Math.abs(raw[i - 1] - raw[runStart]) / ((i - 1 - runStart) * meanWBar);
+        tiltN++;
+      }
+      runStart = i;
+    }
+  }
+  const meanGrade = tiltN ? 100 * tiltSum / tiltN : 0;
+  let up = 0, down = 0;
+  for (const v of M.H.seq) { if (v === 0.001) up++; else if (v === -0.001) down++; }
 
   const km = M.span / 1000;
   const meanW = M.span / M.n;
@@ -373,8 +405,12 @@ function draw() {
       ? `smoothing     window ${M.win} bars   ` +
         `<span class="warn">relief ${M.rawRelief.toFixed(0)} &rarr; ` +
         `${M.lineRelief.toFixed(0)} m</span>\n` : '') +
-    `plains        ${runs.length} flat runs, ${(100 * flatBars / M.n).toFixed(0)}% of bars   ` +
+    `plains        ${runs.length} runs, ${(100 * flatBars / M.n).toFixed(0)}% of bars   ` +
     `longest ${longestM >= 1000 ? (longestM / 1000).toFixed(1) + ' km' : longestM.toFixed(0) + ' m'}\n` +
+    `plain tilt    ${meanGrade.toFixed(2)}% mean gradient` +
+    `${meanGrade < 0.3 ? '   (reads as level at true scale)' : ''}\n` +
+    `grammar       ${up} &gt; against ${down} &lt;` +
+    `${up !== down ? `   <span class="warn">net ${up > down ? '+' : ''}${up - down} — tilt also RAISES the ground</span>` : ''}\n` +
     `summits       ${peaks} over 100 m   ` +
     `${(100 * peaks / km).toFixed(1)} per 100 km   best ${best.toFixed(0)} m\n` +
     `grade         ${(100 * (M.maxH - M.minH) / M.span).toFixed(1)}% over the whole profile` +
@@ -384,7 +420,13 @@ function draw() {
 }
 
 $('draw').addEventListener('click', draw);
-for (const el of document.querySelectorAll('input, textarea, select')) {
+// `change` fires on RELEASE for a range input, so a slider dragged slowly
+// appeared to do nothing until let go. `input` fires continuously; textareas
+// keep `change` so a half-typed rule is not expanded on every keystroke.
+for (const el of document.querySelectorAll('input[type=range], input[type=number], select')) {
+  el.addEventListener('input', draw);
+}
+for (const el of document.querySelectorAll('textarea, input[type=text], input[type=checkbox]')) {
   el.addEventListener('change', draw);
 }
 $('png').addEventListener('click', () => {
