@@ -81,12 +81,14 @@
 
   <fieldset><legend>View</legend>
     <div class="row">
-      <div><label>vertical &times;</label><input id="v-ex" type="number" value="1" step="0.5"></div>
+      <div><label>view width m</label><input id="v-w" type="number" value="30000" step="1000"></div>
+      <div><label>view height m</label><input id="v-h" type="number" value="3000" step="250"></div>
+    </div>
+    <label>pan <span id="v-pan-val">0</span> km along</label>
+    <input id="v-pan" type="range" min="0" max="100" value="0" step="0.5" style="width:100%">
+    <div class="row">
       <div><label>max segments</label><input id="v-cap" type="number" value="20000" step="1000"></div>
     </div>
-    <label>zoom <span id="v-zoom-val">100</span>% &mdash; lower is further off</label>
-    <input id="v-zoom" type="range" min="5" max="200" value="100" step="5" style="width:100%">
-    <label><input type="checkbox" id="v-fit" checked style="width:auto"> stretch to fill (off = true proportions)</label>
   </fieldset>
 
   <button class="go" id="draw">Draw</button>
@@ -271,52 +273,54 @@ function draw() {
   const M = build();
   if (M.n === 0) { $('out').textContent = 'no +/- decisions in one of the grammars'; return; }
 
-  const vex = +$('v-ex').value;
-  const spanX = M.pts[M.pts.length - 1].x || 1;
-  const spanY = Math.max(M.maxY - M.minY, 1) * vex;
-  const pad = 26;
-  let sx, sy;
-  if ($('v-fit').checked) {
-    sx = (W - pad * 2) / spanX;
-    sy = (H - pad * 2) / spanY;
-  } else { sx = sy = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY); }
-
-  // ── STEPPING BACK FROM IT ────────────────────────────────────────────
-  // The author: *"we need to see more horizontal - so less canvas px per
-  // horiz and also vertically - in other words like seeing from further
-  // off"*. One multiplier on BOTH axes, so pulling back does not quietly
-  // change the proportions the way an axis-wise control would.
+  // ── A WINDOW ON THE GROUND, NOT A FIT TO THE CANVAS ──────────────────
+  // The author: *"The vertical should be at most say 3000m and the view
+  // distance say 30000m and the horizontal extent should fill the available
+  // screen canvas"*. So the view is a FIXED RECTANGLE OF GROUND -- 30 km by
+  // 3 km by default -- and the canvas is a window onto it, rather than a scale
+  // chosen to make whatever exists fill the frame.
   //
-  // Centred rather than pinned, or zooming out would leave the profile in
-  // the top-left corner with the empty canvas on the other two sides and
-  // nothing would look further away -- it would look mis-placed.
-  const zoom = (+$('v-zoom').value) / 100;
-  $('v-zoom-val').textContent = $('v-zoom').value;
-  sx *= zoom; sy *= zoom;
-  const drawnW = spanX * sx, drawnH = spanY * sy;
-  const offX = (W - drawnW) / 2;
-  const offY = (H - drawnH) / 2;
+  // This is the honest framing. Fitting the profile to the canvas silently
+  // chose a different vertical exaggeration for every grammar, which is how a
+  // 0.88% grade came to look like the Matterhorn at 99x. Here the exaggeration
+  // is a consequence of two numbers the author set, and is stated.
+  const pad = 26;
+  const viewW = Math.max(+$('v-w').value, 1);
+  const viewH = Math.max(+$('v-h').value, 1);
+  const spanX = M.pts[M.pts.length - 1].x || 1;
+
+  const sx = (W - pad * 2) / viewW;     // horizontal fills the canvas, by definition
+  const sy = (H - pad * 2) / viewH;
+  const vexEff = sy / sx;
+
+  // Pan is a distance along the ground, so it stays meaningful when the
+  // grammar or the depth changes the length of the profile.
+  const panMax = Math.max(spanX - viewW, 0);
+  const panM = panMax * (+$('v-pan').value) / 100;
+  $('v-pan-val').textContent = (panM / 1000).toFixed(1);
+
+  // Datum is the profile's own floor and does NOT follow the pan: a vertical
+  // reference that moved with the view would make every hill look the same
+  // height.
+  const offX = pad - panM * sx;
+  const offY = H - pad;
 
   // baseline
   ctx.strokeStyle = '#e4e4de'; ctx.lineWidth = 1;
-  const y0 = offY + drawnH - (0 - M.minY) * vex * sy;
-  ctx.beginPath(); ctx.moveTo(offX, y0); ctx.lineTo(offX + drawnW, y0); ctx.stroke();
+  const y0 = offY - (0 - M.minY) * sy;
+  ctx.beginPath(); ctx.moveTo(pad, y0); ctx.lineTo(W - pad, y0); ctx.stroke();
 
+  ctx.save();
+  ctx.beginPath(); ctx.rect(pad, 0, W - pad * 2, H); ctx.clip();
   ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.beginPath();
   for (let i = 0; i < M.pts.length; i++) {
     const px = offX + M.pts[i].x * sx;
-    const py = offY + drawnH - (M.pts[i].y - M.minY) * vex * sy;
+    const py = offY - (M.pts[i].y - M.minY) * sy;
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
   ctx.stroke();
 
-  // ── SAY HOW MUCH THE PICTURE IS STRETCHED ────────────────────────────
-  // "Fit to canvas" scales x and y independently, which flatters the result
-  // enormously: the first balanced run drew a convincing mountain that was
-  // actually 32 km wide and 147 m tall — stretched about sixtyfold. A bench
-  // whose picture is more dramatic than its numbers teaches the wrong thing.
-  const vexEff = sy / sx;
   const km = spanX / 1000;
   const pc = v => (100 * v / M.n).toFixed(1) + '%';
   $('out').innerHTML =
@@ -324,9 +328,13 @@ function draw() {
     `decisions     angle ${M.A.seq.length} left, from ${M.A.raw} symbols\n` +
     `              step  ${M.S.seq.length} left, from ${M.S.raw} symbols\n` +
     `distance      ${km.toFixed(2)} km\n` +
-    `drawn at      ${vexEff < 1.5 ? 'true scale' :
-       '<span class="warn">' + vexEff.toFixed(0) + '&times; vertical stretch</span>'}` +
+    `view          ${(viewW / 1000).toFixed(0)} km &times; ${viewH} m` +
+    `   ${vexEff < 1.5 ? 'true scale' : vexEff.toFixed(1) + '&times; vertical'}\n` +
+    `showing       ${(100 * Math.min(viewW / spanX, 1)).toFixed(0)}% of the profile` +
     `   true grade ${(100 * (M.maxY - M.minY) / spanX).toFixed(2)}%\n` +
+    ((M.maxY - M.minY) > viewH
+      ? `<span class="warn">relief ${(M.maxY - M.minY).toFixed(0)} m exceeds the ` +
+        `${viewH} m view — clipped at the top</span>\n` : '') +
     `elevation     ${M.minY.toFixed(0)} to ${M.maxY.toFixed(0)} m   ` +
     `range ${(M.maxY - M.minY).toFixed(0)} m\n` +
     `roughness     max slope change ${M.maxTurn.toFixed(2)}&deg; between segments\n` +
