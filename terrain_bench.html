@@ -67,6 +67,14 @@
     </div>
   </fieldset>
 
+  <fieldset><legend>Smoothing</legend>
+    <label>window <span id="sm-val">1</span> segments</label>
+    <input id="sm" type="range" min="1" max="81" value="1" step="2" style="width:100%">
+    <div style="font-size:11px;color:#666;margin-top:4px">
+      A moving average over the <b>angle</b>. 1 = untouched.
+    </div>
+  </fieldset>
+
   <fieldset><legend>View</legend>
     <div class="row">
       <div><label>vertical &times;</label><input id="v-ex" type="number" value="1" step="0.5"></div>
@@ -151,31 +159,77 @@ function build() {
   // They are deliberately independent grammars: if they were one, step and
   // angle would rise and fall together and the terrain would have a single
   // rhythm rather than two beating against each other.
-  let angle = 0, step = Math.min(Math.max(+$('s-start').value, sMin), sMax);
-  let x = 0, y = 0;
-  const pts = [{ x, y }];
-  let angleClamped = 0, stepClamped = 0, climb = 0, fall = 0;
-  let minY = 0, maxY = 0;
-
+  // Angles first, as their own sequence, because smoothing operates on them.
+  let angle = 0;
+  const rawAng = [], steps = [];
+  let step = Math.min(Math.max(+$('s-start').value, sMin), sMax);
+  let angleClamped = 0, stepClamped = 0;
   for (let i = 0; i < n; i++) {
     const a2 = angle + A.seq[i] * aQ;
     if (a2 > aLim || a2 < -aLim) angleClamped++;
     angle = Math.min(Math.max(a2, -aLim), aLim);
-
+    rawAng.push(angle);
     const s2 = step + S.seq[i] * sQ;
     if (s2 > sMax || s2 < sMin) stepClamped++;
     step = Math.min(Math.max(s2, sMin), sMax);
-
-    const r = angle * Math.PI / 180;
-    const dy = Math.sin(r) * step;
-    x += Math.cos(r) * step;          // cos is never negative while |angle| <= 90,
-    y += dy;                          // so the profile always advances: a valid heightfield
-    if (dy > 0) climb += dy; else fall -= dy;
-    if (y < minY) minY = y; if (y > maxY) maxY = y;
-    pts.push({ x, y });
+    steps.push(step);
   }
+  const win = +$('sm').value;
+  $('sm-val').textContent = win;
+  const ang = smoothAngles(rawAng, win);
+
+  const walk = (seq) => {
+    let x = 0, y = 0, minY = 0, maxY = 0, climb = 0, fall = 0, maxTurn = 0;
+    const pts = [{ x, y }];
+    for (let i = 0; i < n; i++) {
+      const r = seq[i] * Math.PI / 180;
+      const dy = Math.sin(r) * steps[i];
+      x += Math.cos(r) * steps[i];   // cos never negative while |angle| <= 90,
+      y += dy;                       // so the profile always advances
+      if (dy > 0) climb += dy; else fall -= dy;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (i) { const d = Math.abs(seq[i] - seq[i - 1]); if (d > maxTurn) maxTurn = d; }
+      pts.push({ x, y });
+    }
+    return { pts, minY, maxY, climb, fall, maxTurn };
+  };
+  const W = walk(ang), RAW = win > 1 ? walk(rawAng) : W;
+  const { pts, minY, maxY, climb, fall, maxTurn } = W;
+
   return { pts, n, A, S, angleClamped, stepClamped, climb, fall, minY, maxY,
+           maxTurn, win, rawRelief: RAW.maxY - RAW.minY,
            truncated: Math.min(A.seq.length, S.seq.length) > cap };
+}
+
+// ── SMOOTH THE ANGLE, NOT THE CORNERS ────────────────────────────────────
+// The first version of this cut corners (Chaikin). MEASURED, it did nothing:
+// the raw profile's sharpest corner is 1.00 degrees, because the angle only
+// ever moves +/-1 per step, so there are no corners to cut. What reads as
+// jaggedness is the SLOPE oscillating, seen through a ninetyfold vertical
+// stretch -- not angular geometry. Corner cutting was the wrong tool, and at
+// full strength it was worse than useless: the two inserted points coincided,
+// producing zero-length segments and RAISING the maximum turn to 2.53 degrees.
+//
+// Roughness lives in the angle sequence, so that is what is averaged. A
+// centred moving average of `win` segments, shrinking at the ends rather than
+// padding, so the profile is not dragged towards zero at its edges.
+//
+//   window  1 -> 1.00 deg max slope change,  relief 821 m
+//   window 61 -> 0.06 deg,                   relief 779 m
+//
+// It costs relief, as any smoothing must, and the readout says how much.
+function smoothAngles(raw, win) {
+  if (win <= 1) return raw;
+  const half = Math.floor(win / 2), out = new Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    let t = 0, c = 0;
+    for (let k = -half; k <= half; k++) {
+      const j = i + k;
+      if (j >= 0 && j < raw.length) { t += raw[j]; c++; }
+    }
+    out[i] = t / c;
+  }
+  return out;
 }
 
 function draw() {
@@ -233,6 +287,11 @@ function draw() {
     `   true grade ${(100 * (M.maxY - M.minY) / spanX).toFixed(2)}%\n` +
     `elevation     ${M.minY.toFixed(0)} to ${M.maxY.toFixed(0)} m   ` +
     `range ${(M.maxY - M.minY).toFixed(0)} m\n` +
+    `roughness     max slope change ${M.maxTurn.toFixed(2)}&deg; between segments\n` +
+    (M.win > 1
+      ? `smoothing     window ${M.win}   ` +
+        `<span class="warn">relief ${M.rawRelief.toFixed(0)} &rarr; ` +
+        `${(M.maxY - M.minY).toFixed(0)} m</span>\n` : '') +
     `ascent/descent ${M.climb.toFixed(0)} / ${M.fall.toFixed(0)} m\n` +
     `angle at limit ${pc(M.angleClamped)}${M.angleClamped / M.n > 0.3
       ? '  <span class="warn">&larr; mostly saturated</span>' : ''}\n` +
