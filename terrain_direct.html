@@ -46,11 +46,11 @@
     <label>axiom</label><input id="h-ax" type="text" value="X">
     <label>rules &mdash; <code>+</code> up, <code>-</code> down, <code>&gt;</code> gentle up,
       <code>&lt;</code> gentle down, <code>=</code> level</label>
-    <textarea id="h-rules" style="min-height:64px">X: YX&gt;YYZZZ
-Y: &gt;+--YX+
-Z: ZXZX&gt;X&gt;</textarea>
+    <textarea id="h-rules" style="min-height:64px">X: &lt;&gt;+&gt;XYX+
+Y: XZ&lt;-YZ-+
+Z: &lt;ZZZ&gt;-</textarea>
     <div class="row">
-      <div><label>depth</label><input id="h-depth" type="number" value="5" min="0" max="9"></div>
+      <div><label>depth</label><input id="h-depth" type="number" value="6" min="0" max="9"></div>
       <div><label>m per step</label><input id="h-q" type="number" value="60" step="5"></div>
 
     </div>
@@ -107,6 +107,9 @@ Z: ZXZX&gt;X&gt;</textarea>
 
   <button class="go" id="draw">Draw</button>
   <button id="png">Save PNG</button>
+  <button id="snap">Record settings</button>
+  <textarea id="snapout" style="display:none;min-height:150px;margin-top:8px;
+    font-size:11px;line-height:1.4"></textarea>
   <div id="out">&mdash;</div>
 </div>
 <div id="stage"><canvas id="cv"></canvas></div>
@@ -448,6 +451,58 @@ for (const el of document.querySelectorAll('input[type=range], input[type=number
 for (const el of document.querySelectorAll('textarea, input[type=text], input[type=checkbox]')) {
   el.addEventListener('change', draw);
 }
+// ── RECORD THE SETTINGS ──────────────────────────────────────────────────
+// The author: *"please instrument all the values so i can say to you record
+// these values for putting into a default"*. He dials the ground by hand and
+// then has to describe it back, which is a transcription job with nine controls
+// and three multi-line grammars in it — easy to get one field wrong, and a
+// wrong field is indistinguishable from a wrong idea.
+//
+// So this dumps EVERY control, in a form that can be pasted straight back.
+// Written to a textarea rather than only to the clipboard: a clipboard write
+// can be refused and would fail silently, and the point is that he can SEE it
+// before sending it.
+//
+// Derived figures are included under a separator. They are not settings and
+// cannot be set, but they say what the settings produced — so a snapshot can
+// be checked against the landscape it claims to describe.
+const SETTINGS = [
+  ['height.axiom',    'h-ax'],     ['height.rules',   'h-rules'],
+  ['height.depth',    'h-depth'],  ['height.m_per_step', 'h-q'],
+  ['height.min_m',    'h-min'],    ['height.max_m',   'h-max'],
+  ['height.start_m',  'h-start'],  ['height.tilt',    'h-gentle'],
+  ['height.mode',     'h-mode'],
+  ['width.axiom',     'w-ax'],     ['width.rules',    'w-rules'],
+  ['width.depth',     'w-depth'],  ['width.m_per_step', 'w-q'],
+  ['width.min_m',     'w-min'],    ['width.max_m',    'w-max'],
+  ['width.start_m',   'w-start'],
+  ['smoothing.window','sm'],
+  ['view.width_m',    'v-w'],      ['view.vertical_x','v-x'],
+  ['view.pan_pct',    'v-pan'],
+];
+$('snap').addEventListener('click', () => {
+  const lines = ['# terrain_direct settings — ' + new Date().toISOString().slice(0, 16).replace('T', ' ')];
+  let maxk = 0;
+  for (const [k] of SETTINGS) maxk = Math.max(maxk, k.length);
+  for (const [k, id] of SETTINGS) {
+    const el = $(id);
+    if (!el) continue;
+    const v = (el.value || '').replace(/\n/g, ' | ');   // rules on one line, readably
+    lines.push(k.padEnd(maxk) + '  ' + v);
+  }
+  lines.push('');
+  lines.push('# produced (not settings — these are what the above gives):');
+  for (const row of ($('out').textContent || '').split('\n')) {
+    if (row.trim()) lines.push('# ' + row.replace(/\s+/g, ' ').trim());
+  }
+  const text = lines.join('\n');
+  const ta = $('snapout');
+  ta.style.display = 'block';
+  ta.value = text;
+  ta.focus(); ta.select();
+  try { navigator.clipboard.writeText(text); } catch (_) {}
+});
+
 $('png').addEventListener('click', () => {
   const a = document.createElement('a');
   a.download = 'terrain-direct.png'; a.href = $('cv').toDataURL('image/png'); a.click();
