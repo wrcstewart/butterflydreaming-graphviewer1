@@ -36,7 +36,7 @@
   <h1>Fractal terrain bench — a profile from two grammars</h1>
   <p>Every drawn segment takes one decision from each fractal: <b>a turn</b> and
      <b>a step length</b>. Shown at <b>true 1:1 scale</b> &mdash; no vertical
-     exaggeration. Defaults give a 15% grade &mdash; a summit every 1.5 km, 2.6 km of relief.</p>
+     exaggeration. Defaults give about a summit per km, tilted to a +2&deg; mean slope.</p>
 </header>
 
 <main>
@@ -51,8 +51,8 @@
       <div><label>&deg; per step</label><input id="a-q" type="number" value="45" step="1"></div>
       <div><label>limit &plusmn;&deg;</label><input id="a-lim" type="number" value="60"></div>
     </div>
-    <label>uphill bias <span id="a-bias-val">6</span>&deg; per step</label>
-    <input id="a-bias" type="range" min="-10" max="15" value="6" step="0.5" style="width:100%">
+    <label>mean slope <span id="a-bias-val">2</span>&deg; &mdash; the whole profile is tilted to this</label>
+    <input id="a-bias" type="range" min="-10" max="15" value="2" step="0.5" style="width:100%">
     <label>persistence <span id="a-persist-val">0.80</span> &mdash; 1 = rolling, lower = peaky</label>
     <input id="a-persist" type="range" min="0.60" max="1" value="0.80" step="0.01" style="width:100%">
     <label>start at <span id="a-start-val">0</span></label>
@@ -186,26 +186,33 @@ function build() {
   const aQ   = +$('a-q').value, aLim = Math.abs(+$('a-lim').value);
   const persist = +$('a-persist').value;
   $('a-persist-val').textContent = persist.toFixed(2);
-  // ── WHY A BIAS IS NEEDED AT ALL ──────────────────────────────────────
+  // ── TILT THE RESULT, DO NOT BIAS THE PROCESS ─────────────────────────
   // The author: *"We need a way to bias towards upward - because everything
-  // is gradually downhill in this effort so far"*. He was right, and the
-  // cause is not the grammar, which is perfectly balanced:
+  // is gradually downhill"*. He was right, and the cause is not the grammar,
+  // whose decisions sum to exactly zero. The lean appears only once the angle
+  // starts hitting the +/-60 walls: at 45 deg/step it saturates a fifth of the
+  // time, and a zero-mean input through a non-linear fold does not come out
+  // zero-mean. Measured: 0% limit hits gives a mean of 0.00 deg, 19% gives
+  // -7.76 deg.
   //
-  //   deg/step   limit hits   mean angle   net over 17 km
-  //        8          0%         0.00         -9 m
-  //       20          0%         0.01        -38 m
-  //       45         19%        -7.76      -2434 m
+  // THE FIRST FIX WAS WRONG AND HE FOUND IT: *"There is no summit at or near
+  // 1.5 or anywhere else i can find"*. Adding a constant to the angle BEFORE
+  // the leaky integrator fights the fractal instead of correcting it -- the
+  // slope is pinned uphill, so it swings less and the ground becomes a rising
+  // serrated ramp. Summits over 100 m prominence fell from 11 to 1 and relief
+  // from 2620 m to 665 m.
   //
-  // The lean appears only once the angle starts hitting the +/-60 walls. At
-  // 45 deg/step it saturates a fifth of the time, and the WALLS introduce the
-  // drift -- a zero-mean input through a non-linear fold does not come out
-  // zero-mean. Reflection makes it worse than clamping (-7.76 against -3.23),
-  // which is the price of the rebound being asked for elsewhere.
+  // So the tilt is applied AFTER the angles are generated: subtract their mean
+  // and add the target. The dynamics are untouched, every summit survives, and
+  // the trend becomes exactly what was asked for:
   //
-  // So this is a correction, not a preference, and +6 is what levels THESE
-  // defaults: mean angle +2.29 deg, net +653 m over 17 km. Change the
-  // steepness and it will want changing too -- the readout gives the mean
-  // angle and the net, which are the two numbers to watch.
+  //   target 0 deg   net -114 m,   17 summits, best prominence 294 m
+  //   target 2 deg   net +487 m,   17 summits
+  //   target 4 deg   net +1086 m,  15 summits
+  //
+  // Relief reads LOWER than before (508 m against 2620 m) and that is the
+  // honest number: the old figure was mostly the 2.4 km the ground descended
+  // overall, which is trend, not relief.
   const bias = +$('a-bias').value;
   $('a-bias-val').textContent = bias;
   const sQ   = +$('s-q').value, sMin = +$('s-min').value, sMax = +$('s-max').value;
@@ -262,7 +269,7 @@ function build() {
     //   8 deg/step, persistence 0.90    1,619 m relief, 14.0 summits/100 km
     //
     // It tames the runaway relief at the same time, and for the same reason.
-    const a2 = angle * persist + A.seq[i] * aQ + bias;
+    const a2 = angle * persist + A.seq[i] * aQ;
     if (a2 > aLim || a2 < -aLim) angleClamped++;
     angle = reflect(a2, -aLim, aLim);
     rawAng.push(angle);
@@ -270,6 +277,15 @@ function build() {
     if (s2 > sMax || s2 < sMin) stepClamped++;
     step = reflect(s2, sMin, sMax);
     steps.push(step);
+  }
+  // Tilt: shift every angle so the sequence's mean becomes `bias`. Guarded at
+  // +/-85 rather than the generation limit — the limit shapes the WALK, this
+  // only has to keep cos positive so the profile still advances.
+  if (rawAng.length) {
+    const mean = rawAng.reduce((a, b) => a + b, 0) / rawAng.length;
+    for (let i = 0; i < rawAng.length; i++) {
+      rawAng[i] = Math.max(-85, Math.min(85, rawAng[i] - mean + bias));
+    }
   }
   const win = +$('sm').value;
   $('sm-val').textContent = win;
