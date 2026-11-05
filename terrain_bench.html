@@ -36,18 +36,20 @@
   <h1>Fractal terrain bench — a profile from two grammars</h1>
   <p>Every drawn segment takes one decision from each fractal: <b>a turn</b> and
      <b>a step length</b>. Shown at <b>true 1:1 scale</b> &mdash; no vertical
-     exaggeration. Defaults give about a summit per km, tilted to a +2&deg; mean slope.</p>
+     exaggeration. Three symbols with <b>different</b> rules &mdash; one rule repeats one motif at every scale, which is why the ground used to look regular.</p>
 </header>
 
 <main>
 <div id="panel">
 
   <fieldset><legend>Angle fractal</legend>
-    <label>axiom</label><input id="a-ax" value="F">
+    <label>axiom</label><input id="a-ax" value="X">
     <label>rules — one per line, <code>symbol: replacement</code></label>
-    <textarea id="a-rules">F: F+F-F+F-F-F+F</textarea>
+    <textarea id="a-rules" style="min-height:64px">X: ++YZX
+Y: Z+XY
+Z: ZZ+Z--</textarea>
     <div class="row">
-      <div><label>depth</label><input id="a-depth" type="number" value="3" min="0" max="7"></div>
+      <div><label>depth</label><input id="a-depth" type="number" value="6" min="0" max="9"></div>
       <div><label>&deg; per step</label><input id="a-q" type="number" value="45" step="1"></div>
       <div><label>limit &plusmn;&deg;</label><input id="a-lim" type="number" value="60"></div>
     </div>
@@ -64,7 +66,7 @@
     <label>rules</label>
     <textarea id="s-rules">F: F-F++F-F</textarea>
     <div class="row">
-      <div><label>depth</label><input id="s-depth" type="number" value="4" min="0" max="7"></div>
+      <div><label>depth</label><input id="s-depth" type="number" value="5" min="0" max="8"></div>
       <div><label>m per step</label><input id="s-q" type="number" value="6" step="1"></div>
     </div>
     <div class="row">
