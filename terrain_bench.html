@@ -50,6 +50,8 @@
       <div><label>&deg; per step</label><input id="a-q" type="number" value="1" step="0.25"></div>
       <div><label>limit &plusmn;&deg;</label><input id="a-lim" type="number" value="60"></div>
     </div>
+    <label>start at <span id="a-start-val">0</span></label>
+    <input id="a-start" type="range" min="0" max="95" value="0" step="1" style="width:100%">
   </fieldset>
 
   <fieldset><legend>Step-size fractal</legend>
@@ -65,6 +67,8 @@
       <div><label>max m</label><input id="s-max" type="number" value="500"></div>
       <div><label>start m</label><input id="s-start" type="number" value="275"></div>
     </div>
+    <label>start at <span id="s-off-val">0</span></label>
+    <input id="s-off" type="range" min="0" max="95" value="0" step="1" style="width:100%">
   </fieldset>
 
   <fieldset><legend>Smoothing</legend>
@@ -153,6 +157,26 @@ function build() {
 
   const A = decisions($('a-ax').value, $('a-rules').value, +$('a-depth').value);
   const S = decisions($('s-ax').value, $('s-rules').value, +$('s-depth').value);
+
+  // ── WHERE IN THE FRACTAL TO ENTER ──────────────────────────────────────
+  // As the fractal-music module does with its stepper: a long expansion holds
+  // many different landscapes, and only the opening is visible without this.
+  //
+  // THE OFFSET IS A PERCENTAGE, not a count, so it survives a change of depth.
+  // An absolute index silently falls off the end when depth drops -- which is
+  // how that module ended up with thirteen of sixteen stepper positions
+  // clamped to the same place without anyone noticing.
+  //
+  // The decisions BEFORE the offset are discarded rather than walked. The
+  // angle therefore still starts at 0 and the profile still starts level, as
+  // specified; entering at 40% gives a different landscape from the same
+  // grammar, not the middle of the first one.
+  const aOff = Math.floor(A.seq.length * (+$('a-start').value) / 100);
+  const sOff = Math.floor(S.seq.length * (+$('s-off').value) / 100);
+  $('a-start-val').textContent = aOff + ' of ' + A.seq.length;
+  $('s-off-val').textContent   = sOff + ' of ' + S.seq.length;
+  A.seq = A.seq.slice(aOff);
+  S.seq = S.seq.slice(sOff);
   const n = Math.min(A.seq.length, S.seq.length, cap);
 
   // The two fractals are consumed IN LOCKSTEP, one decision each per segment.
@@ -279,8 +303,8 @@ function draw() {
   const pc = v => (100 * v / M.n).toFixed(1) + '%';
   $('out').innerHTML =
     `segments      ${M.n}${M.truncated ? '  <span class="warn">(capped)</span>' : ''}\n` +
-    `decisions     angle ${M.A.seq.length} of ${M.A.raw} symbols\n` +
-    `              step  ${M.S.seq.length} of ${M.S.raw} symbols\n` +
+    `decisions     angle ${M.A.seq.length} left, from ${M.A.raw} symbols\n` +
+    `              step  ${M.S.seq.length} left, from ${M.S.raw} symbols\n` +
     `distance      ${km.toFixed(2)} km\n` +
     `drawn at      ${vexEff < 1.5 ? 'true scale' :
        '<span class="warn">' + vexEff.toFixed(0) + '&times; vertical stretch</span>'}` +
