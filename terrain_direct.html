@@ -44,13 +44,15 @@
 
   <fieldset><legend>Height grammar</legend>
     <label>axiom</label><input id="h-ax" type="text" value="X">
-    <label>rules &mdash; <code>+</code> up, <code>-</code> down, <code>=</code> hold (a plain)</label>
-    <textarea id="h-rules" style="min-height:64px">X: ==Z=XX=X
-Y: Y+Y=--=Z
-Z: +ZX=ZY</textarea>
+    <label>rules &mdash; <code>+</code> up, <code>-</code> down, <code>&gt;</code> gentle up,
+      <code>&lt;</code> gentle down, <code>=</code> level</label>
+    <textarea id="h-rules" style="min-height:64px">X: &lt;&gt;+&gt;XYX+
+Y: XZ&lt;-YZ-+
+Z: &lt;ZZZ&gt;-</textarea>
     <div class="row">
-      <div><label>depth</label><input id="h-depth" type="number" value="5" min="0" max="9"></div>
+      <div><label>depth</label><input id="h-depth" type="number" value="6" min="0" max="9"></div>
       <div><label>m per step</label><input id="h-q" type="number" value="60" step="5"></div>
+      <div><label>gentle &times;</label><input id="h-gentle" type="number" value="0.15" step="0.05" min="0" max="1"></div>
     </div>
     <div class="row">
       <div><label>min m</label><input id="h-min" type="number" value="0"></div>
@@ -142,10 +144,22 @@ function decisions(axiom, rulesText, depth) {
   // lets it place them, and because the grammar is fractal their lengths come
   // out varied by themselves — which is what distinguishes a landscape with
   // basins and terraces from one with a single plain stuck in the middle.
+  // ── A PLAIN SHOULD SLOPE ────────────────────────────────────────────
+  // The author: *"the plains are perfectly flat we need a small slope but
+  // stay using grammar if poss"*. So the answer is more INSTRUCTIONS rather
+  // than a parameter that tilts everything behind the grammar's back: `>` and
+  // `<` move the height by a small fraction of a full step, and the grammar
+  // decides where they fall exactly as it decides the rest.
+  //
+  // `=` is kept as an exact hold. Real ground has both — a lake shore is
+  // level, an alluvial fan is not — and a grammar that can only do one of
+  // them is poorer for it.
   const out = [];
   for (const c of s) {
     if (c === '+') out.push(1);
     else if (c === '-') out.push(-1);
+    else if (c === '>') out.push(0.001);        // marker: resolved against
+    else if (c === '<') out.push(-0.001);       // the gentle fraction below
     else if (c === '=') out.push(0);
   }
   return { seq: out, raw: s.length };
@@ -193,15 +207,20 @@ function build() {
   const hQ = +$('h-q').value, hMin = +$('h-min').value, hMax = +$('h-max').value;
   const wQ = +$('w-q').value, wMin = +$('w-min').value, wMax = +$('w-max').value;
   const mode = $('h-mode').value;
+  const gentle = Math.max(0, +$('h-gentle').value);
+  // Resolve the gentle markers to a real fraction of a step.
+  const amount = v => (Math.abs(v) === 0.001 ? Math.sign(v) * gentle : v);
 
   const bars = [];
   let h = Math.min(Math.max(+$('h-start').value, hMin), hMax);
   let w = Math.min(Math.max(+$('w-start').value, wMin), wMax);
   let x = 0, minH = Infinity, maxH = -Infinity;
   for (let i = 0; i < n; i++) {
-    if (mode === 'walk') h = reflect(h + H.seq[i] * hQ, hMin, hMax);
-    else if (H.seq[i] !== 0) h = H.seq[i] > 0 ? hMax : hMin;  // a symbol IS a height
-    // seq === 0 holds the height in BOTH modes — that is the plain.
+    const dv = amount(H.seq[i]);
+    if (mode === 'walk') h = reflect(h + dv * hQ, hMin, hMax);
+    else if (Math.abs(H.seq[i]) === 1) h = H.seq[i] > 0 ? hMax : hMin;
+    else if (dv !== 0) h = reflect(h + dv * hQ, hMin, hMax);   // gentle still nudges
+    // dv === 0 holds the height in BOTH modes — that is a level plain.
     w = reflect(w + Wd.seq[i] * wQ, wMin, wMax);
     bars.push({ x0: x, x1: x + w, h, mid: x + w / 2 });
     x += w;
@@ -305,13 +324,18 @@ function draw() {
   // Flat runs, which are what the author is after. Measured on the RAW bars,
   // not the smoothed line: smoothing destroys a plain by definition, so
   // measuring the line would report the smoother rather than the grammar.
+  // A plain is now a run of GENTLE steps, not of identical ones: `>` and `<`
+  // make a plain that slopes, and an equality test would score those as no
+  // plain at all — reporting the opposite of what was asked for.
   const raw = M.bars.map(b => b.h);
+  const gq = (+$('h-gentle').value) * (+$('h-q').value) + 1e-6;
   const runs = [];
   let r = 1;
   for (let i = 1; i < raw.length; i++) {
-    if (raw[i] === raw[i - 1]) r++; else { if (r > 1) runs.push(r); r = 1; }
+    if (Math.abs(raw[i] - raw[i - 1]) <= gq) r++;
+    else { if (r > 2) runs.push(r); r = 1; }
   }
-  if (r > 1) runs.push(r);
+  if (r > 2) runs.push(r);
   const flatBars = runs.reduce((a, b) => a + b, 0);
   const longestM = runs.length ? Math.max(...runs) * (M.span / M.n) : 0;
 
