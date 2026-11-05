@@ -50,6 +50,8 @@
       <div><label>&deg; per step</label><input id="a-q" type="number" value="1" step="0.25"></div>
       <div><label>limit &plusmn;&deg;</label><input id="a-lim" type="number" value="60"></div>
     </div>
+    <label>persistence <span id="a-persist-val">0.95</span> &mdash; 1 = rolling, lower = peaky</label>
+    <input id="a-persist" type="range" min="0.80" max="1" value="0.95" step="0.01" style="width:100%">
     <label>start at <span id="a-start-val">0</span></label>
     <input id="a-start" type="range" min="0" max="95" value="0" step="1" style="width:100%">
   </fieldset>
@@ -110,6 +112,26 @@ const $ = id => document.getElementById(id);
 // of +1 / -1 decisions. Everything else in the string is a carrier -- it shapes
 // how the decisions fall without being one, exactly as X and Y do in a Hilbert
 // curve. So `F` is not "draw" here; the DECISIONS are the draws.
+// ── REBOUND, DO NOT STICK ────────────────────────────────────────────────
+// The author: *"Remove negative step lengths - they should rebound if
+// encountered in the grammar."* Clamping parks a value on its limit for as
+// long as the decisions keep pushing that way, which throws the excess away
+// and flattens whatever follows. Reflecting folds the excess back inside, so
+// a run of `-` on a short step turns it around and the variation survives.
+//
+// MEASURED HONESTLY: at the present settings this changes nothing, because
+// neither limit is ever reached -- the angle peaks at 4 degrees of its 60, and
+// the step stays inside 50-500. It is a correctness fix for the settings where
+// the limits DO bite, not the cure for the rolling-hills problem; that is what
+// persistence below is for.
+function reflect(v, lo, hi) {
+  const span = hi - lo;
+  if (span <= 0) return lo;
+  let t = (v - lo) % (2 * span);
+  if (t < 0) t += 2 * span;
+  return lo + (t <= span ? t : 2 * span - t);
+}
+
 function decisions(axiom, rulesText, depth) {
   const productions = {};
   for (const line of rulesText.split('\n')) {
@@ -159,6 +181,8 @@ function decisions(axiom, rulesText, depth) {
 
 function build() {
   const aQ   = +$('a-q').value, aLim = Math.abs(+$('a-lim').value);
+  const persist = +$('a-persist').value;
+  $('a-persist-val').textContent = persist.toFixed(2);
   const sQ   = +$('s-q').value, sMin = +$('s-min').value, sMax = +$('s-max').value;
   const cap  = +$('v-cap').value;
 
@@ -196,13 +220,30 @@ function build() {
   let step = Math.min(Math.max(+$('s-start').value, sMin), sMax);
   let angleClamped = 0, stepClamped = 0;
   for (let i = 0; i < n; i++) {
-    const a2 = angle + A.seq[i] * aQ;
+    // ── PERSISTENCE: WHY IT WAS ROLLING HILLS ──────────────────────────
+    // The author: *"there is not enough up and down peakiness - they are more
+    // like high rolling hills than mountains"*. The cause is DOUBLE
+    // INTEGRATION. Decisions sum into an angle, and the angle integrates again
+    // into height, so the ground is the second integral of a +/-1 walk --
+    // which is about as smooth as a curve can be. Nothing in the grammar can
+    // undo that; it is in the shape of the machine.
+    //
+    // So the angle is now a LEAKY integrator: it decays toward level by
+    // `persist` each step instead of remembering every turn for ever. A slope
+    // can no longer run away, has to keep being re-earned, and reverses often
+    // -- which is what a summit IS. Measured over 375 km:
+    //
+    //   8 deg/step, persistence 1.00   23,654 m relief,  2.7 summits/100 km
+    //   8 deg/step, persistence 0.90    1,619 m relief, 14.0 summits/100 km
+    //
+    // It tames the runaway relief at the same time, and for the same reason.
+    const a2 = angle * persist + A.seq[i] * aQ;
     if (a2 > aLim || a2 < -aLim) angleClamped++;
-    angle = Math.min(Math.max(a2, -aLim), aLim);
+    angle = reflect(a2, -aLim, aLim);
     rawAng.push(angle);
     const s2 = step + S.seq[i] * sQ;
     if (s2 > sMax || s2 < sMin) stepClamped++;
-    step = Math.min(Math.max(s2, sMin), sMax);
+    step = reflect(s2, sMin, sMax);
     steps.push(step);
   }
   const win = +$('sm').value;
@@ -222,13 +263,25 @@ function build() {
       if (i) { const d = Math.abs(seq[i] - seq[i - 1]); if (d > maxTurn) maxTurn = d; }
       pts.push({ x, y });
     }
-    return { pts, minY, maxY, climb, fall, maxTurn };
+    // Summits, by PROMINENCE rather than by being a local maximum: on a line
+    // of 1300 points every little wobble is a local max, and counting those
+    // would measure sampling, not landscape.
+    let peaks = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      if (pts[i].y > pts[i - 1].y && pts[i].y >= pts[i + 1].y) {
+        let l = pts[i].y, r2 = pts[i].y;
+        for (let j = i; j >= 0 && pts[j].y <= pts[i].y; j--) l = Math.min(l, pts[j].y);
+        for (let j = i; j < pts.length && pts[j].y <= pts[i].y; j++) r2 = Math.min(r2, pts[j].y);
+        if (pts[i].y - Math.max(l, r2) > 100) peaks++;
+      }
+    }
+    return { pts, minY, maxY, climb, fall, maxTurn, peaks };
   };
   const W = walk(ang), RAW = win > 1 ? walk(rawAng) : W;
-  const { pts, minY, maxY, climb, fall, maxTurn } = W;
+  const { pts, minY, maxY, climb, fall, maxTurn, peaks } = W;
 
   return { pts, n, A, S, angleClamped, stepClamped, climb, fall, minY, maxY,
-           maxTurn, win, rawRelief: RAW.maxY - RAW.minY,
+           maxTurn, peaks, win, rawRelief: RAW.maxY - RAW.minY,
            truncated: Math.min(A.seq.length, S.seq.length) > cap };
 }
 
@@ -359,6 +412,8 @@ function draw() {
         `${vSpanM.toFixed(0)} m the canvas can show — clipped</span>\n` : '') +
     `elevation     ${M.minY.toFixed(0)} to ${M.maxY.toFixed(0)} m   ` +
     `range ${(M.maxY - M.minY).toFixed(0)} m\n` +
+    `summits       ${M.peaks} over 100 m prominence   ` +
+    `${(100 * M.peaks / km).toFixed(1)} per 100 km\n` +
     `roughness     max slope change ${M.maxTurn.toFixed(2)}&deg; between segments\n` +
     (M.win > 1
       ? `smoothing     window ${M.win}   ` +
