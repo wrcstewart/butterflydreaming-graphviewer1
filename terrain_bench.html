@@ -84,7 +84,9 @@
       <div><label>vertical &times;</label><input id="v-ex" type="number" value="1" step="0.5"></div>
       <div><label>max segments</label><input id="v-cap" type="number" value="20000" step="1000"></div>
     </div>
-    <label><input type="checkbox" id="v-fit" checked style="width:auto"> fit to canvas</label>
+    <label>zoom <span id="v-zoom-val">100</span>% &mdash; lower is further off</label>
+    <input id="v-zoom" type="range" min="5" max="200" value="100" step="5" style="width:100%">
+    <label><input type="checkbox" id="v-fit" checked style="width:auto"> stretch to fill (off = true proportions)</label>
   </fieldset>
 
   <button class="go" id="draw">Draw</button>
@@ -279,16 +281,32 @@ function draw() {
     sy = (H - pad * 2) / spanY;
   } else { sx = sy = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY); }
 
+  // ── STEPPING BACK FROM IT ────────────────────────────────────────────
+  // The author: *"we need to see more horizontal - so less canvas px per
+  // horiz and also vertically - in other words like seeing from further
+  // off"*. One multiplier on BOTH axes, so pulling back does not quietly
+  // change the proportions the way an axis-wise control would.
+  //
+  // Centred rather than pinned, or zooming out would leave the profile in
+  // the top-left corner with the empty canvas on the other two sides and
+  // nothing would look further away -- it would look mis-placed.
+  const zoom = (+$('v-zoom').value) / 100;
+  $('v-zoom-val').textContent = $('v-zoom').value;
+  sx *= zoom; sy *= zoom;
+  const drawnW = spanX * sx, drawnH = spanY * sy;
+  const offX = (W - drawnW) / 2;
+  const offY = (H - drawnH) / 2;
+
   // baseline
   ctx.strokeStyle = '#e4e4de'; ctx.lineWidth = 1;
-  const y0 = H - pad - (0 - M.minY) * vex * sy;
-  ctx.beginPath(); ctx.moveTo(pad, y0); ctx.lineTo(W - pad, y0); ctx.stroke();
+  const y0 = offY + drawnH - (0 - M.minY) * vex * sy;
+  ctx.beginPath(); ctx.moveTo(offX, y0); ctx.lineTo(offX + drawnW, y0); ctx.stroke();
 
   ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.beginPath();
   for (let i = 0; i < M.pts.length; i++) {
-    const px = pad + M.pts[i].x * sx;
-    const py = H - pad - (M.pts[i].y - M.minY) * vex * sy;
+    const px = offX + M.pts[i].x * sx;
+    const py = offY + drawnH - (M.pts[i].y - M.minY) * vex * sy;
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
   ctx.stroke();
