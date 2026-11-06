@@ -64,12 +64,13 @@ Z: &lt;ZZZ&gt;-</textarea>
     <input id="h-gentle" type="range" min="0" max="0.6" value="0.09" step="0.01" style="width:100%">
     <div class="hint">How big a <code>&gt;</code> or <code>&lt;</code> is.
       0 = dead level plains, higher = rougher ground within a plain.</div>
-    <label>tilt of a plain <span id="h-slope-val">0.00</span>
-      (&minus;1 falling &hellip; 0 balanced &hellip; +1 rising)</label>
-    <input id="h-slope" type="range" min="-1" max="1" value="0" step="0.05" style="width:100%">
-    <div class="hint">Which WAY the gentle steps lean. At 0 a <code>&lt;&gt;</code> pair
-      cancels exactly and the plain is level however big the step is &mdash; so this,
-      not the slider above, is what tilts a plain.</div>
+    <label>tilt of a plain <span id="h-slope-val">5.0</span>% of the relief,
+      across the plain</label>
+    <input id="h-slope" type="range" min="0" max="15" value="5" step="0.5" style="width:100%">
+    <div class="hint">Added on top of the gentle steps, so it slopes the plain
+      without roughening it. Each plain rises or falls by this share of the
+      landscape's total relief over its own length; the grammar decides WHICH
+      WAY &mdash; a plain continues the trend of the last full step before it.</div>
     <label>mode</label>
     <select id="h-mode" style="width:100%;font:12px ui-monospace,Menlo,monospace;padding:4px">
       <option value="walk" selected>walk — each symbol moves the height (one integration)</option>
@@ -223,29 +224,52 @@ function build() {
   const mode = $('h-mode').value;
   const gentle = Math.max(0, +$('h-gentle').value);
   $('h-gentle-val').textContent = gentle.toFixed(2);
-  const slope = Math.max(-1, Math.min(1, +$('h-slope').value));
-  $('h-slope-val').textContent = slope.toFixed(2);
-  // ── WHY A SECOND CONTROL, AND NOT A BIGGER FIRST ONE ──────────────────
-  // The author: *"There is a long plain on the righthand side and the tilt
-  // slider does nothing to it so i think the tilt is not working"*. He was
-  // right, and `gentle` was not the fault.
+  const tiltPct = Math.max(0, +$('h-slope').value);
+  $('h-slope-val').textContent = tiltPct.toFixed(1);
+  // ── A PLAIN TILTS BY A SHARE OF THE RELIEF, NOT A SHARE OF A STEP ─────
+  // The author: *"we need to see a tilt to some degree as say 5% of the max
+  // height of the mountains - the point is that dead flat is unrealistic"*,
+  // and of the previous attempt *"the effect of tilt slider is just to make a
+  // few bumps"*.
   //
-  // The tokens under that plain were `-<<>-<>-<>->->--+<<<<>-<>-<>->-<<>-<>-<>`
-  // — dominated by ALTERNATING `<>` PAIRS. With one symmetric magnitude a
-  // pair cancels EXACTLY, so scaling the magnitude scales the up and the down
-  // together and the net stays at zero: twelve bars moved 1.6 m at 0.09. A
-  // plain built from balanced pairs is level at EVERY value of `gentle`, and
-  // no amount of slider travel can tilt it. The old slider was really
-  // "how rough is a plain", which is why it read as doing nothing.
+  // Both earlier schemes failed for the same reason: they sized the tilt
+  // against a STEP. First one symmetric magnitude (`>` = +g, `<` = -g), where
+  // an alternating `<>` run cancels exactly. Then a multiplicative lean
+  // (`>` = g(1+s), `<` = -g(1-s)), which does accumulate — but it scales the
+  // ZIGZAG along with the slope, so turning it up roughens the plain into
+  // bumps faster than it tilts it. A step is the wrong yardstick either way:
+  // what reads as a slope to the eye is rise measured against the RELIEF of
+  // the landscape it sits in.
   //
-  // So direction has to be separable from size. `slope` leans the pair:
-  // `>` is worth gentle*(1+slope) and `<` is worth gentle*(1-slope), so each
-  // `<>` pair nets 2*gentle*slope instead of nothing. It leaves `+` and `-`
-  // untouched, so the mountains keep the shape they have while the plains
-  // between them acquire a gradient — and at slope 0 the arithmetic is
-  // identical to before, so the recorded defaults still reproduce exactly.
-  const amount = v => (Math.abs(v) !== 0.001 ? v
-    : v > 0 ? gentle * (1 + slope) : -gentle * (1 - slope));
+  // So the tilt is now additive and sized against the relief. Each plain
+  // receives a total rise of `tiltPct`% of the relief, spread evenly over its
+  // own bars, ON TOP of whatever the gentle tokens were already doing. The
+  // zigzag stays as texture at whatever `gentle` says, and the slope is
+  // independent of it — which is what "5% of the max height" asks for.
+  //
+  // DIRECTION COMES FROM THE GRAMMAR, per the standing preference to stay
+  // with it: a plain drifts the way the last full step before it went, so
+  // ground continues its trend across a terrace instead of every plain
+  // leaning the same way and walking the whole landscape uphill.
+  //
+  // A PLAIN IS WHAT THE EYE SEES, NOT A TOKEN TYPE. Sizing the drift inside
+  // the walk failed twice more and both failures were informative. The
+  // grammar's gentle runs are never longer than FIVE bars — `X: <>+>XYX+`
+  // offers `<>` and nothing longer — so the long flat stretches are not runs
+  // of gentle tokens at all: they are places where mixed tokens happen to
+  // cancel. Drifting the gentle tokens therefore tilts the wrong 5 bars and
+  // leaves the 70-bar stretch alone. And with relief 1979 m inside a 0-2000 m
+  // band the walk is pinned against both walls, so `reflect` bounced most of
+  // the drift straight back out again.
+  //
+  // So the tilt is applied AFTER the walk, to runs found by flatness: a
+  // maximal run whose height stays inside 2% of the relief. Each is pivoted
+  // about its own midpoint by `tiltPct`% of the relief end to end, which
+  // tilts exactly the stretches that read as flat, leaves the mountains
+  // either side where the grammar put them, and cannot accumulate into the
+  // rest of the landscape. At tilt 0 nothing is touched at all, so the
+  // recorded defaults still reproduce exactly.
+  const amount = v => (Math.abs(v) !== 0.001 ? v : Math.sign(v) * gentle);
 
   const bars = [];
   let h = Math.min(Math.max(+$('h-start').value, hMin), hMax);
@@ -262,13 +286,44 @@ function build() {
     x += w;
     if (h < minH) minH = h; if (h > maxH) maxH = h;
   }
+
+  // ── TILT THE PLAINS ────────────────────────────────────────────────────
+  let plains = 0, plainRise = 0;
+  if (tiltPct > 0 && maxH > minH) {
+    const relief = maxH - minH, tol = 0.02 * relief;
+    const h0 = bars.map(b => b.h);
+    let st = 0;
+    for (let i = 1; i <= n; i++) {
+      if (i < n && Math.abs(h0[i] - h0[st]) <= tol) continue;
+      const a = st, b = i - 1, len = b - a + 1;
+      if (len >= 3) {
+        // Direction from the grammar: continue the trend of the last full step
+        // before the run, so terraces follow the ground rather than all
+        // leaning one way and walking the landscape uphill.
+        let sign = 1;
+        for (let k = a - 1; k >= 0; k--) {
+          if (Math.abs(H.seq[k]) === 1) { sign = H.seq[k] > 0 ? 1 : -1; break; }
+        }
+        const total = sign * (tiltPct / 100) * relief;
+        for (let k = a; k <= b; k++) {
+          bars[k].h = Math.min(hMax, Math.max(hMin,
+            h0[k] + total * ((k - a) / (len - 1) - 0.5)));
+        }
+        plains++; plainRise += Math.abs(bars[b].h - bars[a].h);
+      }
+      st = i;
+    }
+    minH = Infinity; maxH = -Infinity;
+    for (const bb of bars) { if (bb.h < minH) minH = bb.h; if (bb.h > maxH) maxH = bb.h; }
+  }
+
   const win = +$('sm').value;
   $('sm-val').textContent = win;
   const sm = smoothHeights(bars.map(b => b.h), win);
   for (let i = 0; i < bars.length; i++) bars[i].line = sm[i];
   let lMin = Infinity, lMax = -Infinity;
   for (const v of sm) { if (v < lMin) lMin = v; if (v > lMax) lMax = v; }
-  return { bars, n, H, W: Wd, span: x, minH, maxH, win,
+  return { bars, n, H, W: Wd, span: x, minH, maxH, win, plains, plainRise, tiltPct,
            rawRelief: maxH - minH, lineRelief: lMax - lMin };
 }
 
@@ -413,8 +468,11 @@ function draw() {
   // plain at all — reporting the opposite of what was asked for.
   const meanWBar = M.span / M.n;
   const raw = M.bars.map(b => b.h);
-  const gq = (+$('h-gentle').value) * (1 + Math.abs(+$('h-slope').value))
-           * (+$('h-q').value) + 1e-6;
+  // A bar inside a tilted plain moves by the gentle step PLUS the drift, so
+  // the "still flat" tolerance has to admit both or a sloping plain is read as
+  // a sequence of separate short ones.
+  const gq = (+$('h-gentle').value) * (+$('h-q').value)
+           + (+$('h-slope').value) / 100 * (M.maxH - M.minH) / 3 + 1e-6;
   const runs = [];
   let r = 1;
   for (let i = 1; i < raw.length; i++) {
@@ -482,7 +540,9 @@ function draw() {
   const km = M.span / 1000;
   const meanW = M.span / M.n;
   const hQ = +$('h-q').value;
-  const plainPx = Math.abs(meanGrade) / 100 * longestM * sy;
+  // The realised rise of a typical plain, in drawn pixels — the thing being
+  // looked at, in the units it is looked at in.
+  const plainPx = M.plains ? (M.plainRise / M.plains) * sy : 0;
   // px per metre goes as 1/viewW, so to multiply the tilt by k, DIVIDE the
   // view by k. Written the other way round first, which widened it.
   const fitW = plainPx > 0 ? viewW * (plainPx / 4) : 0;
@@ -505,31 +565,21 @@ function draw() {
     `<b>${bandsUsed} of 6 scales</b>\n` +
     `plains        ${(100 * flatBars / M.n).toFixed(0)}% of bars   ` +
     `longest ${longestM >= 1000 ? (longestM / 1000).toFixed(1) + ' km' : longestM.toFixed(0) + ' m'}\n` +
-    `plain tilt    ${meanGrade >= 0 ? '+' : ''}${meanGrade.toFixed(2)}% net, `
-    + `${meanAbsGrade.toFixed(2)}% bar to bar`
-    + `${meanAbsGrade > 0.02 && Math.abs(meanGrade) < meanAbsGrade / 4
-        ? ` <span class="warn">— the plains CANCEL; raise &lsquo;tilt of a plain&rsquo;</span>` : ''}` +
-    `${Math.abs(meanGrade) < 0.3 ? '   (reads as level at true scale)' : ''}\n` +
-    // ── CAN THE TILT BE DRAWN AT ALL? ──────────────────────────────────
-    // The author: *"it changes the length of the plain - the part that is
-    // left flat is still perfectly flat"*. Both halves measured true, and
-    // the arithmetic was never the problem.
-    //
-    // At 431 km across, sy is 0.025 px per metre: a FULL mountain step of
-    // 60 m is 1.5 px, and a whole plain's rise is 0.3-0.55 px even with the
-    // tilt slider at maximum. It is tilted, to a fraction of one pixel, so
-    // the canvas can only round it to the same row and it stays perfectly
-    // flat. And the length changes because a bigger gentle step breaks a run
-    // sooner — 12 bars at 0.00, 8 at 0.40 — which is the one visible effect.
-    //
-    // A plain is also 0.65 px per bar WIDE at this view. So the honest answer
-    // is not a bigger tilt, which would stop it being a plain: it is a
-    // narrower view. This line says what the scale can resolve and what view
-    // width would show a plain's slope at a legible 4 px, because that is the
-    // number a slider cannot tell you.
+    // The quantity the author ASKED FOR, reported in his own terms: *"we need
+    // to see a tilt to some degree as say 5% of the max height of the
+    // mountains"*. Realised, not requested — the pivot is clamped to the
+    // height band, so a plain already sitting on the floor keeps less of its
+    // tilt than the slider asked for, and that gap is worth seeing.
+    `plains        ${M.plains} tilted   mean rise ` +
+    `${M.plains ? (M.plainRise / M.plains).toFixed(0) : 0} m = ` +
+    `${M.plains && M.maxH > M.minH
+        ? (100 * (M.plainRise / M.plains) / (M.maxH - M.minH)).toFixed(1) : '0.0'}% ` +
+    `of relief   (asked ${M.tiltPct.toFixed(1)}%)\n` +
+    `bar to bar    ${meanAbsGrade.toFixed(2)}% within a plain   ` +
+    `${meanGrade >= 0 ? '+' : ''}${meanGrade.toFixed(2)}% net\n` +
     `resolution    ${sy.toFixed(3)} px per m   full step ${(hQ * sy).toFixed(1)} px   ` +
-    `longest plain ${plainPx.toFixed(2)} px of tilt` +
-    (plainPx < 2 && longestM > 0
+    `a plain's tilt ${plainPx.toFixed(1)} px` +
+    (plainPx < 4 && M.plains > 0
       ? `\n<span class="warn">a plain's tilt is SUB-PIXEL here — ` +
         `narrow the view to about ${(fitW / 1000).toFixed(0)} km to see it</span>`
       : '') + '\n' +
@@ -573,7 +623,7 @@ const SETTINGS = [
   ['height.depth',    'h-depth'],  ['height.m_per_step', 'h-q'],
   ['height.min_m',    'h-min'],    ['height.max_m',   'h-max'],
   ['height.start_m',  'h-start'],  ['height.gentle',  'h-gentle'],
-  ['height.tilt',     'h-slope'],
+  ['height.tilt_pct', 'h-slope'],
   ['height.mode',     'h-mode'],
   ['width.axiom',     'w-ax'],     ['width.rules',    'w-rules'],
   ['width.depth',     'w-depth'],  ['width.m_per_step', 'w-q'],
