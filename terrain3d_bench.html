@@ -531,7 +531,18 @@ function reliefStats(h, N, R) {
     worst = Math.max(worst, Math.abs(h[y*N+x] - h[y*N+x-1]));
   for (let x = 0; x < N; x++) for (let y = 1; y < N; y++)
     worst = Math.max(worst, Math.abs(h[y*N+x] - h[(y-1)*N+x]));
+  // CREASES are a first-derivative discontinuity, so they live in the second
+  // difference, not the first — the straight ridges did not move the
+  // cell-to-cell figure at all. A crease is sparse and tall, so the measure
+  // is the 99.9th percentile of curvature against its median.
+  const curv = [];
+  for (let y = 1; y < N - 1; y += 2) for (let x = 1; x < N - 1; x += 2)
+    curv.push(Math.abs(h[y*N+x+1] + h[y*N+x-1] + h[(y+1)*N+x] + h[(y-1)*N+x] - 4*h[y*N+x]));
+  curv.sort((a, b) => a - b);
+  const med = curv[curv.length >> 1] || 1e-12;
+  const hi = curv[Math.floor(curv.length * 0.999)] || 0;
   return { spiky: 100 * g / n, summits: proms.length, worst: 100 * worst,
+           crease: hi / med,
            variety: proms.length > 1 ? proms[proms.length - 1] / proms[0] : 0 };
 }
 
@@ -633,10 +644,36 @@ function build() {
     let u = t % (2 * LP); if (u < 0) u += 2 * LP;
     return u > LP ? 2 * LP - u : u;
   };
+  // ── THE STRAIGHT RIDGES AND VALLEYS ───────────────────────────────────
+  // The author, after the seam was fixed: *"now one can see lots of straight
+  // lines in the scenery topography ... I think they are mainly at the local
+  // max or min of the height ie they form straightline ridges or valleys"*.
+  // Both observations were right and together they name the cause.
+  //
+  // LINEAR interpolation makes the sampled profile PIECEWISE LINEAR, so its
+  // first derivative jumps at every sample join and its second derivative is
+  // zero in between and a spike at the join. Measured on the 1D function at
+  // spread 16 with 4 octaves: 463 spikes, one every 2.2 units of d, matching
+  // the 2.0 predicted from the finest octave's spread. In the 2D field each
+  // join is a straight line perpendicular to its direction, five directions
+  // over, which is the dense family of straight lines he saw. And a corner at
+  // a sample that happens to be a local maximum of the profile IS a sharp
+  // ridge, a minimum a sharp valley — which is the second half of his
+  // description, and the part that identified it as interpolation rather than
+  // as structure in the grammar.
+  //
+  // CATMULL-ROM instead: C1, so there is no derivative jump at a join, and
+  // interpolating, so it still passes through every profile sample rather
+  // than smoothing the grammar away. Measured, zero spikes above 8x the
+  // median second difference, and the lowest curvature ratio of the three
+  // candidates (5.2 against smoothstep's 7.3 and linear's 2.8e13).
+  const pv = i => P[Math.max(0, Math.min(LP - 1, i))];
   const atf = t => {
-    const r = reflectIdx(t + OFF), f = Math.floor(r);
-    const a = P[Math.min(f, LP - 1)], b = P[Math.min(f + 1, LP - 1)];
-    return a + (b - a) * (r - f);
+    const r = reflectIdx(t + OFF), f = Math.floor(r), u = r - f;
+    const p0 = pv(f - 1), p1 = pv(f), p2 = pv(f + 1), p3 = pv(f + 2);
+    return p1 + 0.5 * u * (p2 - p0 +
+           u * (2 * p0 - 5 * p1 + 4 * p2 - p3 +
+           u * (3 * (p1 - p2) + p3 - p0)));
   };
   // ── SPREAD AND OCTAVES ────────────────────────────────────────────────
   // The author: *"it needs the height variation on the grid to varying much
@@ -749,6 +786,14 @@ function build() {
     (rs.spiky > 0.8 ? `   <span class="warn">spiky — raise the spread</span>` : '') +
     (rs.worst / Math.max(rs.spiky, 1e-9) > 7
       ? `\n<span class="warn">              one cell jumps far above the mean — that is a SEAM, not terrain</span>` : '') + '\n' +
+    // Threshold MEASURED, not guessed: at these defaults linear interpolation
+    // reads 7.6 and Catmull-Rom 4.8, so the boundary is 6.5. The margin is
+    // only 1.6x because five directions times four octaves dilute twenty
+    // crease families into each other — a first guess of 40 would never have
+    // fired at all.
+    `curvature     ${rs.crease.toFixed(1)}x median at the 99.9th percentile   ` +
+    `(creased &gt;6.5, smooth ~4.8)` +
+    (rs.crease > 6.5 ? `   <span class="warn">CREASES</span>` : '') + '\n' +
     `summits       ${rs.summits} within radius 10   ` +
     `tallest/shortest prominence ${rs.variety ? rs.variety.toFixed(1) + 'x' : '-'}` +
     (rs.variety && rs.variety < 1.6 ? `   <span class="warn">peaks too uniform — lower the spread</span>` : '') + '\n' +
