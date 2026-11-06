@@ -36,7 +36,8 @@
   <h1>Terrain, direct — height and width straight from the grammar</h1>
   <p><b>No angle is computed.</b> One grammar sets the height of each flat top,
      another its width. The histogram is drawn faintly; the black line joins the
-     <b>midpoints of the tops</b>. Shown at true 1:1.</p>
+     <b>midpoints of the tops</b>. The default view is the whole 341 km range at
+     <b>9.6&times; vertical</b>; set vertical to 1 for true scale.</p>
 </header>
 
 <main>
@@ -59,8 +60,8 @@ Z: &lt;ZZZ&gt;-</textarea>
       <div><label>max m</label><input id="h-max" type="number" value="2000"></div>
       <div><label>start m</label><input id="h-start" type="number" value="400"></div>
     </div>
-    <label>tilt of a plain <span id="h-gentle-val">0.15</span>&times; a full step</label>
-    <input id="h-gentle" type="range" min="0" max="0.6" value="0.15" step="0.01" style="width:100%">
+    <label>tilt of a plain <span id="h-gentle-val">0.09</span>&times; a full step</label>
+    <input id="h-gentle" type="range" min="0" max="0.6" value="0.09" step="0.01" style="width:100%">
     <div class="hint">What <code>&gt;</code> and <code>&lt;</code> are worth.
       0 = dead level plains, higher = visibly ramped.</div>
     <label>mode</label>
@@ -88,16 +89,16 @@ Z: &lt;ZZZ&gt;-</textarea>
   </fieldset>
 
   <fieldset><legend>Smoothing</legend>
-    <label>window <span id="sm-val">1</span> bars</label>
-    <input id="sm" type="range" min="1" max="81" value="1" step="2" style="width:100%">
+    <label>window <span id="sm-val">3</span> bars</label>
+    <input id="sm" type="range" min="1" max="81" value="3" step="2" style="width:100%">
     <div class="hint">A moving average over the <b>heights</b>. 1 = untouched.
       The histogram stays raw, so the line shows what the smoothing did.</div>
   </fieldset>
 
   <fieldset><legend>View</legend>
     <div class="row">
-      <div><label>view width m</label><input id="v-w" type="number" value="10000" step="1000"></div>
-      <div><label>vertical &times;</label><input id="v-x" type="number" value="1" step="0.5" min="0.1"></div>
+      <div><label>view width m</label><input id="v-w" type="number" value="431000" step="1000"></div>
+      <div><label>vertical &times;</label><input id="v-x" type="number" value="9.6" step="0.1" min="0.1"></div>
     </div>
     <div class="hint">1 = true scale. <span id="v-span">&mdash;</span></div>
     <label>pan <span id="v-pan-val">0</span> km along</label>
