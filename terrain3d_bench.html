@@ -142,18 +142,22 @@
         straight line (stripe index 6.4 against a random field's 1.1); letting
         the heading integrate the grammar's own sequence brings it to 3.3 and
         isotropy to 1.47 against the random field's 1.39.</div>
-      <label>mesh thinning &mdash; build 1/<span id="thin-val">16</span> size,
+      <label>mesh thinning &mdash; build 1/<span id="thin-val">1</span> size,
         then interpolate up</label>
-      <input id="thin" type="range" min="0" max="5" value="4" step="1">
-      <div class="hint">The author: <em>"far too many peaks needs thinning out
-        by a linear factor of at least 10"</em>. Measured at 257, peaks of
-        prominence 0.015 within radius 4 and their mean nearest-neighbour
-        spacing: <b>1&times; gives 38 peaks at spacing 22.6</b>;
-        <b>16&times; gives 4 peaks at spacing 94.4</b>.<br>
-        The readout below carries both figures live &mdash; trust them over any
-        table of mine, because peak COUNT is confounded by roughness: a very
-        rough field has few strict maxima over a radius-4 disc and a smooth one
-        has many, so the intermediate factors do not form a tidy progression.</div>
+      <input id="thin" type="range" min="0" max="5" value="0" step="1">
+      <div class="hint">DEFAULTED BACK TO 1&times;. Thinning this way was
+        <em>"worse not better"</em> and the author was right: building at 1/16
+        size gives a construction with only four subdivision levels stretched
+        out, so all the texture is gone.<br>
+        Measured, nothing inside the construction thins it far anyway &mdash;
+        truncating the fine levels reaches 5.4&times; before collapsing to one
+        peak; lowering persistence collapses the count while curvature goes
+        from 9 to 280 as the surface turns to facets; a two-band amplitude
+        schedule reaches 1.9&times; at best. And 10&times; the present 22.6-cell
+        spacing is 226 cells, which is <b>one peak in a 257 frame</b>. What is
+        wanted is a ZOOM &mdash; a frame covering 1/10 of a larger landscape,
+        with every level of detail still in it &mdash; not a thinner
+        construction.</div>
       <label>mesh derivation depth <span id="mdepth-val">9</span></label>
       <input id="mdepth" type="range" min="4" max="11" value="9" step="1">
       <div class="hint">Mesh rewriting only. The edge count is
