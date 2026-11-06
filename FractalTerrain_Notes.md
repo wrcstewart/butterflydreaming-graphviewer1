@@ -263,3 +263,49 @@ a peak/median ratio divides by. The question was settled by a derivation. When
 proxies disagree, look for the property that can be derived rather than
 measured, and only compare proxy figures between fields of equal smoothness
 and equal sample count.
+
+### Mesh rewriting v2 — an edge owns a SLICE of the derivation (2026-11-06)
+
+**Why v1 was no better, traced rather than guessed.** Each edge carried one
+symbol and the children took the first three characters of its production. Two
+faults compounded: terminals have no production so they bred only themselves
+(absorbing states), and three of eight symbols discarded most of each rule —
+`X: <>+>XYX+` begins `<>+`, all terminals, so `X` died in **one step**. By
+level 8, 96% of edges carried `<` and only **two** displacement values existed,
+both negative. A uniform sinking with the grammar burned out by level three.
+The method had never been given a working grammar to run.
+
+**v2.** An edge owns a half-open slice `[a,b)` of the fully derived string.
+Subdividing splits it in three — first third to one half, last third to the
+other, middle third to the new internal edge, which is where it belongs since
+that edge lies between them. Nothing is discarded and nothing is absorbing.
+Distinct displacement values per level now run 5, 15, 45, 115, 217, 281, 173,
+69 (868 in total) instead of 2.
+
+**Per-level normalisation, which the summits needed.** The slice sets the
+*character* of a displacement, the amplitude schedule sets the *magnitude*.
+Untangling them mattered: a level-0 slice is 10,654 symbols so its mean drift
+is ~0, while a level-8 slice is under two symbols and gives a full step — so
+the coarse levels, which should *be* the mountains, contributed almost nothing
+and there were 2 summits. Dividing by each level's own mean |drift| restored 8.
+
+Three normalisations were measured before settling: the raw **sum** is
+catastrophic (curvature up to 735 — huge single-point spikes, 0 summits), and
+`sum/√n` helps ordering but not summits.
+
+| method | fringe | ordering | isotropy | summits | curvature |
+|---|---|---|---|---|---|
+| RANDOM subdivision (control) | **57** | 10.55% | 1.39 | **22** | **3.7** |
+| projection K=5 | 1975 | **1.81%** | 4.37 | 4 | 4.7 |
+| mesh v1, one symbol per edge | 330 | 2.50% | 2.61 | 15 | 18.9 |
+| **mesh v2, slice per edge** | **203** | **5.16%** | **2.11** | **8** | 9.4 |
+
+Ten times less fringing than the projection, twice its summits, and half v1's
+faceting. Still short of the control on fringe (203 vs 57) and curvature
+(9.4 vs 3.7).
+
+**Still open: triangle-edge faceting.** The principled fix is a subdivision
+with a C1 limit surface — four-point or butterfly — in place of plain midpoint
+averaging. Post-smoothing is *not* the fix: it removes the high-frequency
+content the median divides by, so the fringe figure rises to 7258 and the
+summits go to zero.
