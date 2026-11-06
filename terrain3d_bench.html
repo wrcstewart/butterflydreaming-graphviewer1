@@ -523,7 +523,15 @@ function reliefStats(h, N, R) {
     if (top && v - lowest > 0.04) proms.push(v - lowest);
   }
   proms.sort((a, b) => a - b);
-  return { spiky: 100 * g / n, summits: proms.length,
+  // The WORST single-cell jump beside the mean. A seam does not move the mean
+  // — it is a handful of cells out of 130,000 — but it stands far above it,
+  // so the ratio is what finds one. The two walls read 8.5x the mean.
+  let worst = 0;
+  for (let y = 0; y < N; y++) for (let x = 1; x < N; x++)
+    worst = Math.max(worst, Math.abs(h[y*N+x] - h[y*N+x-1]));
+  for (let x = 0; x < N; x++) for (let y = 1; y < N; y++)
+    worst = Math.max(worst, Math.abs(h[y*N+x] - h[(y-1)*N+x]));
+  return { spiky: 100 * g / n, summits: proms.length, worst: 100 * worst,
            variety: proms.length > 1 ? proms[proms.length - 1] / proms[0] : 0 };
 }
 
@@ -591,14 +599,44 @@ function build() {
   }
   const P = makeProfile(dec);
   const at = i => P[((i % P.length) + P.length) % P.length];
+  // ── SAMPLING THE PROFILE WITHOUT A SEAM ───────────────────────────────
   // Fractional index with linear interpolation. Stretching the profile over
   // many cells without this just repeats each sample, which replaces spiky
-  // peaks with staircases — the same amount of per-cell change, in uglier
-  // steps.
+  // peaks with staircases — the same per-cell change, in uglier steps.
+  //
+  // THE TWO WALLS. The author: *"there is an artefact consisting of two
+  // precipitous and fairly straight walls that run near neighbouring edges of
+  // the tableaux"*. Found, and it was a seam in this function.
+  //
+  // The projected distance `x·cos θ + y·sin θ` is NEGATIVE wherever cos and
+  // sin have opposite signs, and MEASURED, exactly two of the five default
+  // directions cross zero — hence exactly two walls. The old index wrapped
+  // modulo the profile length, so at d = 0 it interpolated between P[1863] =
+  // 0.602 and P[0] = 0.497: a 0.105 jump, over a tenth of the whole profile
+  // range, in a single cell. `d = 0` is a straight line through the origin,
+  // so the jump drew a straight cliff; both lines radiate from the (0,0)
+  // corner — y = 0.39x and y = 2.03x — which is one near each of two
+  // neighbouring edges, exactly as described. Every octave crosses zero at
+  // the same place, so they stacked, which is why it was precipitous.
+  //
+  // OFFSET, THEN REFLECT. Reflecting the index alone removes the cliff
+  // (worst single-cell jump 3.48% of relief down to 0.92%) but makes the
+  // field mirror-symmetric about those same lines, trading a cliff for a
+  // mirror. So the index is first offset to the middle of the profile. At
+  // every usable spread the sampled range then sits wholly inside the
+  // profile — 751 to 1071 of 1864 at the defaults — so no reflection happens
+  // at all and no symmetry is introduced. The reflection is kept for the
+  // degenerate settings that can still run off the end, where a mirror is
+  // the lesser fault.
+  const LP = P.length, OFF = Math.floor(LP / 2);
+  const reflectIdx = t => {
+    let u = t % (2 * LP); if (u < 0) u += 2 * LP;
+    return u > LP ? 2 * LP - u : u;
+  };
   const atf = t => {
-    const f = Math.floor(t), a = at(f), b = at(f + 1);
-    const u = t - f;
-    return a + (b - a) * u;
+    const r = reflectIdx(t + OFF), f = Math.floor(r);
+    const a = P[Math.min(f, LP - 1)], b = P[Math.min(f + 1, LP - 1)];
+    return a + (b - a) * (r - f);
   };
   // ── SPREAD AND OCTAVES ────────────────────────────────────────────────
   // The author: *"it needs the height variation on the grid to varying much
@@ -705,9 +743,12 @@ function build() {
   $('out').innerHTML =
     `grid          ${N} x ${N} = ${(N * N).toLocaleString()} vertices   ` +
     `profile ${P.length.toLocaleString()} samples\n` +
-    `cell to cell  ${rs.spiky.toFixed(2)}% of the relief   ` +
-    `finest octave ${finest.toFixed(1)} cells per step` +
-    (rs.spiky > 0.8 ? `   <span class="warn">spiky — raise the spread</span>` : '') + '\n' +
+    `cell to cell  ${rs.spiky.toFixed(2)}% mean, ${rs.worst.toFixed(2)}% worst ` +
+    `(${(rs.worst / Math.max(rs.spiky, 1e-9)).toFixed(1)}x)   ` +
+    `finest octave ${finest.toFixed(1)} cells/step` +
+    (rs.spiky > 0.8 ? `   <span class="warn">spiky — raise the spread</span>` : '') +
+    (rs.worst / Math.max(rs.spiky, 1e-9) > 7
+      ? `\n<span class="warn">              one cell jumps far above the mean — that is a SEAM, not terrain</span>` : '') + '\n' +
     `summits       ${rs.summits} within radius 10   ` +
     `tallest/shortest prominence ${rs.variety ? rs.variety.toFixed(1) + 'x' : '-'}` +
     (rs.variety && rs.variety < 1.6 ? `   <span class="warn">peaks too uniform — lower the spread</span>` : '') + '\n' +
