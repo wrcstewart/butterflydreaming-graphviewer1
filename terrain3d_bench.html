@@ -155,6 +155,14 @@ Z: &lt;ZZZ&gt;-</textarea>
         <div><label>sun elevation&deg;</label><input id="sun" type="number" value="28" step="1"></div>
         <div><label>sun azimuth&deg;</label><input id="sunaz" type="number" value="135" step="5"></div>
       </div>
+      <label>colour scheme</label>
+      <select id="scheme">
+        <option value="grey" selected>grey on white &mdash; rock</option>
+        <option value="whiteblue">white on blue &mdash; cloud</option>
+      </select>
+      <div class="hint">The author: <em>"not sure as mountains but some setting
+        produce a good cloud layer"</em>. Both schemes keep the full luminance
+        range, so the shape is still read from light and not from hue.</div>
       <label><input type="checkbox" id="wire" style="width:auto"> show the mesh</label>
     </fieldset>
 
@@ -316,7 +324,35 @@ function diamondSquare(N, displace) {
 }
 
 // ── THE RENDER ──────────────────────────────────────────────────────────
-let renderer, scene, camera, mesh, wireMesh, sun;
+let renderer, scene, camera, mesh, wireMesh, sun, hemi;
+
+// ── COLOUR SCHEMES ──────────────────────────────────────────────────────
+// Two, because the same heightfield reads as two different things: at low
+// vertical exaggeration with many projection directions it stops looking like
+// rock and starts looking like a cloud layer seen from above, which is the
+// author's observation and worth being able to light properly.
+//
+// LUMINANCE DOES THE WORK IN BOTH. The author has reduced colour vision, so a
+// scheme may tint but must not carry any information in hue: each one keeps a
+// bright surface against a darker ground-bounce so the relief is still read
+// from light alone. The blue is saturation on the SKY and the bounce, with the
+// surface itself left near-white — which is also how a real cloud top looks,
+// since the blue in a cloud photograph is the sky and the shadow, not the
+// water.
+const SCHEMES = {
+  grey:      { bg: 0xffffff, surface: 0xcfcdc4, sky: 0xffffff, bounce: 0x9a9a92,
+               sun: 0xffffff, hemi: 0.55, sunI: 2.3, rough: 0.95 },
+  whiteblue: { bg: 0xbcd4ec, surface: 0xf8fbff, sky: 0xe4eefa, bounce: 0x6f8aa8,
+               sun: 0xfffdf6, hemi: 0.75, sunI: 2.0, rough: 0.98 },
+};
+function applyScheme() {
+  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  if (scene) scene.background = new THREE.Color(s.bg);
+  if (hemi) { hemi.color.setHex(s.sky); hemi.groundColor.setHex(s.bounce); hemi.intensity = s.hemi; }
+  if (sun) { sun.color.setHex(s.sun); sun.intensity = s.sunI; }
+  if (mesh) { mesh.material.color.setHex(s.surface); mesh.material.roughness = s.rough; }
+  place();
+}
 // The last built heightfield, kept so the vertical slider can rescale the
 // surface without recomputing the field and re-running the measurements —
 // at 513 x 513 with twelve projection directions that is the difference
@@ -336,7 +372,8 @@ function initThree() {
   // from luminance — a hue ramp would be information he cannot use.
   sun = new THREE.DirectionalLight(0xffffff, 2.3);
   scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9a9a92, 0.55));
+  hemi = new THREE.HemisphereLight(0xffffff, 0x9a9a92, 0.55);
+  scene.add(hemi);
   cv.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
   cv.addEventListener('pointerup', e => { dragging = false; });
   cv.addEventListener('pointermove', e => {
@@ -529,8 +566,9 @@ function build() {
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, h[i] * vx);
   geo.computeVertexNormals();
+  const sch = SCHEMES[$('scheme').value] || SCHEMES.grey;
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xcfcdc4, roughness: 0.95, metalness: 0.0,
+    color: sch.surface, roughness: sch.rough, metalness: 0.0,
     flatShading: false, side: THREE.DoubleSide
   });
   mesh = new THREE.Mesh(geo, mat);
@@ -573,6 +611,7 @@ if (window.THREE) {
   for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
+  $('scheme').addEventListener('input', applyScheme);
   for (const id of ['sun', 'sunaz'])
     $(id).addEventListener('input', place);
   for (const id of ['ax', 'rules'])
@@ -585,5 +624,6 @@ if (window.THREE) {
     a.click();
   });
   build();
+  applyScheme();
 }
 </script>
