@@ -114,7 +114,8 @@
     <fieldset>
       <legend>method</legend>
       <select id="method">
-        <option value="mesh" selected>mesh rewriting — the grammar in the edge labels</option>
+        <option value="skeleton" selected>skeleton — the grammar draws the ridges</option>
+        <option value="mesh">mesh rewriting — a slice of the derivation per edge</option>
         <option value="projection">projection — sum along N directions</option>
         <option value="separable">separable — outer product of the profile</option>
         <option value="hierarchical">subdivision — grammar depth drives level</option>
@@ -123,6 +124,24 @@
         <option value="hilbert">Hilbert-indexed — locality-preserving index</option>
         <option value="random">RANDOM control — diamond-square, no grammar</option>
       </select>
+      <label>ridge grammar &mdash; <code>F</code> crest step,
+        <code>[ ]</code> branch, <code>+ -</code> turn</label>
+      <textarea id="sgrammar" style="min-height:42px">F: F+F-F-F[+F]F</textarea>
+      <div class="row">
+        <div><label>depth</label><input id="sdepth" type="number" value="4" min="1" max="6"></div>
+        <div><label>turn&deg;</label><input id="sturn" type="number" value="16" step="1"></div>
+        <div><label>meander&deg;</label><input id="scurve" type="number" value="38" step="1"></div>
+      </div>
+      <div class="row">
+        <div><label>slope</label><input id="sslope" type="number" value="0.022" step="0.002"></div>
+        <div><label>spur drop</label><input id="sdrop" type="number" value="0.72" step="0.02"></div>
+        <div><label>smooth</label><input id="ssm" type="number" value="3" min="1" max="9" step="2"></div>
+      </div>
+      <div class="hint">Skeleton only. <b>meander&deg;</b> is the one that
+        matters: at 0 the turtle takes only a few headings and every crest is a
+        straight line (stripe index 6.4 against a random field's 1.1); letting
+        the heading integrate the grammar's own sequence brings it to 3.3 and
+        isotropy to 1.47 against the random field's 1.39.</div>
       <label>mesh derivation depth <span id="mdepth-val">9</span></label>
       <input id="mdepth" type="range" min="4" max="11" value="9" step="1">
       <div class="hint">Mesh rewriting only. The edge count is
@@ -358,7 +377,162 @@ function hilbert(N, at) {
 // It also restores what the projection had lost: 15 summits against 4, because
 // the grammar is acting on the topology where the averaging cannot reach it,
 // which is exactly why the earlier displacement-table attempt washed out.
-// AN EDGE OWNS A SLICE OF THE DERIVATION — the working version.
+// 8. SKELETON — THE GRAMMAR DRAWS THE RIDGES. The author, on the mesh:
+// *"its like it is stiched together in patches - if the fractal cannot be
+// distibuted across the patchwork so as to render them invisible then i dont
+// think the whole method works"*. He was right, and measured: the mesh's
+// high-curvature cells were enriched 3.5-4x on the subdivision's own triangle
+// lattice. The patches were the triangles.
+//
+// AND THE WHOLE FAMILY WAS WRONG, by a counting argument rather than a
+// measurement. A 1D sequence has one linear order; a 2D domain has no
+// canonical linear order. So any map from a string to a heightfield must
+// either cut the string up and lay the pieces out — patches, with seams where
+// unrelated stretches abut — or use a translation-invariant function of
+// position, whose terms have exactly straight level sets and so give ruled
+// lines. Six methods, two failure modes, one cause.
+//
+// THE ESCAPE: A PATH IS A 1D OBJECT EMBEDDED IN THE PLANE, so a sequence lays
+// along it with no mismatch to pay for at all. The grammar draws a branching
+// CREST NETWORK; the same grammar's walk sets the height ALONG the crest; the
+// surface is the upper envelope of roofs sloping away from them. Then the only
+// ridges in the picture are ones the grammar actually drew, and there is no
+// partition to have boundaries. It is also what the literature does and what I
+// missed while quoting it: Prusinkiewicz & Hammel's squig is a river CURVE,
+// Kelley/Malin/Nielson build around a drainage NETWORK, Genevaux from a river
+// NETWORK. None of them projects or partitions.
+//
+// WHY IT IS CHEAP. The surface wanted is
+//   h = max over segments of ( H_s - slope * dist(p, s) )
+// — every crest a roof, the terrain their upper envelope, so valleys fall out
+// where two roofs meet, which is what a valley geologically IS. Naively that
+// is every cell against every segment. Substituting D = (Hmax - h)/slope gives
+//   D = min over s of ( (Hmax - H_s)/slope + dist(p, s) )
+// which is a multi-source WEIGHTED DISTANCE TRANSFORM: seed each crest cell
+// with (Hmax - H_s)/slope and run a chamfer sweep. O(N^2) however much the
+// grammar draws, instead of O(N^2 x segments).
+//
+// MEANDER IS THE PARAMETER THAT MATTERS. A turtle with a fixed turn angle only
+// ever takes a few headings, so every crest is a straight line and the field
+// reads as ruled — stripe index 6.43 against a random field's 1.12. Real
+// ridges curve. Letting the heading INTEGRATE the grammar's sequence makes the
+// headings continuous and the meander fractal: 3.33, with isotropy 1.47
+// against the random field's 1.39 and lattice enrichment 1.21 against the
+// mesh's 4.06. One grammar then supplies the plan, the meander and the relief,
+// and none of them has to be reconciled with the others.
+//
+// HONEST REMAINDER: stripe index is still 3x a random field's and curvature
+// 15.8 against 3.7. Both are inherent to roofs-and-slopes — a crest is a
+// polyline so it is straight between its vertices, and the valleys are creases
+// where two roofs meet. Rounding those is the next thing, not a tuning.
+function skeletonField(N, srules, axiom, depth, turnDeg, curveDeg, slope, drop, sm, prof) {
+  let str;
+  try {
+    const ls = new LSystem({ axiom, productions: srules });
+    ls.iterate(depth);
+    str = ls.getString();
+  } catch (e) { return null; }
+  const segs = [];
+  let x = 0, y = 0, a = -Math.PI / 2, len = 1, order = 0, k = 0;
+  const stack = [], turn = turnDeg * Math.PI / 180, curve = curveDeg * Math.PI / 180;
+  for (const c of str) {
+    if (c === 'F' || c === 'G') {
+      if (prof && prof.length) a += (prof[k % prof.length] - 0.5) * 2 * curve;
+      const nx = x + Math.cos(a) * len, ny = y + Math.sin(a) * len;
+      segs.push({ x0: x, y0: y, x1: nx, y1: ny, order });
+      x = nx; y = ny; k++;
+    } else if (c === '+') a += turn;
+    else if (c === '-') a -= turn;
+    // 0.68 is the length shrink per branch, which is NOT `drop` — that sets
+    // the HEIGHT band of a spur. Written as one ternary with identical
+    // branches first, which is how the two got conflated.
+    else if (c === '[') { stack.push([x, y, a, len, order]); len *= 0.68; order++; }
+    else if (c === ']') { const st = stack.pop(); if (st) { x = st[0]; y = st[1]; a = st[2]; len = st[3]; order = st[4]; } }
+  }
+  if (segs.length < 4 || segs.length > 40000) return null;
+
+  let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+  for (const sg of segs) {
+    xmin = Math.min(xmin, sg.x0, sg.x1); xmax = Math.max(xmax, sg.x0, sg.x1);
+    ymin = Math.min(ymin, sg.y0, sg.y1); ymax = Math.max(ymax, sg.y0, sg.y1);
+  }
+  const pad = 0.08 * N;
+  const sc = Math.min((N - 2 * pad) / Math.max(xmax - xmin, 1e-9),
+                      (N - 2 * pad) / Math.max(ymax - ymin, 1e-9));
+  const ox = pad + ((N - 2 * pad) - (xmax - xmin) * sc) / 2 - xmin * sc;
+  const oy = pad + ((N - 2 * pad) - (ymax - ymin) * sc) / 2 - ymin * sc;
+
+  const BIG = 1e9, D = new Float64Array(N * N).fill(BIG);
+  // The segment's OWN branch order at both of its ends, rather than the next
+  // segment's at the far end. Blending the order across a boundary sounds
+  // smoother and measured worse on the figure that matters here — stripe index
+  // 4.03 against 3.22 — because it drags a spur's height band up into its
+  // parent crest along the join, which is a line.
+  const hSeg = (i, own) => {
+    const band = Math.pow(drop, own.order);
+    if (!prof || !prof.length) return band;
+    return band * (0.45 + 0.55 * prof[i % prof.length]);
+  };
+  for (let si = 0; si < segs.length; si++) {
+    const sg = segs[si];
+    const X0 = sg.x0 * sc + ox, Y0 = sg.y0 * sc + oy;
+    const X1 = sg.x1 * sc + ox, Y1 = sg.y1 * sc + oy;
+    const steps = Math.max(1, Math.ceil(Math.hypot(X1 - X0, Y1 - Y0)));
+    const hA = hSeg(si, sg), hB = hSeg(si + 1, sg);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps, hh = hA + (hB - hA) * t;
+      const xi = Math.round(X0 + (X1 - X0) * t), yi = Math.round(Y0 + (Y1 - Y0) * t);
+      if (xi < 0 || xi >= N || yi < 0 || yi >= N) continue;
+      const d0 = (1 - hh) / slope;
+      if (d0 < D[yi * N + xi]) D[yi * N + xi] = d0;
+    }
+  }
+  const C2 = Math.SQRT2;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x; let d = D[i];
+    if (y > 0) {
+      d = Math.min(d, D[i - N] + 1);
+      if (x > 0) d = Math.min(d, D[i - N - 1] + C2);
+      if (x < N - 1) d = Math.min(d, D[i - N + 1] + C2);
+    }
+    if (x > 0) d = Math.min(d, D[i - 1] + 1);
+    D[i] = d;
+  }
+  for (let y = N - 1; y >= 0; y--) for (let x = N - 1; x >= 0; x--) {
+    const i = y * N + x; let d = D[i];
+    if (y < N - 1) {
+      d = Math.min(d, D[i + N] + 1);
+      if (x > 0) d = Math.min(d, D[i + N - 1] + C2);
+      if (x < N - 1) d = Math.min(d, D[i + N + 1] + C2);
+    }
+    if (x < N - 1) d = Math.min(d, D[i + 1] + 1);
+    D[i] = d;
+  }
+  let h = new Float64Array(N * N);
+  for (let i = 0; i < h.length; i++) h[i] = Math.max(0, 1 - slope * D[i]);
+  // A light smoothing rounds the valley creases, which are a real feature of
+  // roofs meeting but sharper than ground is. Measured: width 3 takes
+  // curvature from 22.7 to 9.1 and the stripe index from 6.4 to 3.8.
+  const w = Math.max(1, sm | 0);
+  if (w > 1) {
+    const r = (w - 1) >> 1, o = new Float64Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      let t = 0, c = 0;
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        const X = x + dx, Y = y + dy;
+        if (X < 0 || X >= N || Y < 0 || Y >= N) continue;
+        t += h[Y * N + X]; c++;
+      }
+      o[y * N + x] = t / c;
+    }
+    h = o;
+  }
+  skelDiag = { segments: segs.length, maxOrder: segs.reduce((m, sg) => Math.max(m, sg.order), 0) };
+  return h;
+}
+let skelDiag = null;
+
+// AN EDGE OWNS A SLICE OF THE DERIVATION — kept for comparison.
 //
 // THE FIRST ATTEMPT FAILED AND IT IS WORTH SAYING HOW. Each edge carried a
 // single symbol, and the three children took the first three characters of its
@@ -1052,6 +1226,17 @@ function build() {
   const wrap = (a, i) => a[((i % a.length) + a.length) % a.length];
   let h;
   switch ($('method').value) {
+    case 'skeleton': {
+      h = skeletonField(N, parseRules($('sgrammar').value), 'F', +$('sdepth').value,
+        +$('sturn').value, +$('scurve').value, Math.max(0.001, +$('sslope').value),
+        Math.max(0.05, Math.min(0.99, +$('sdrop').value)), +$('ssm').value, P);
+      if (!h) {
+        $('out').innerHTML = '<span class="warn">that ridge grammar drew nothing usable — ' +
+          'it needs F for a crest step, and [ ] to branch</span>';
+        return null;
+      }
+      break;
+    }
     case 'mesh': {
       const md = +$('mdepth').value;
       h = meshField(N, parseRules($('rules').value), $('ax').value.trim(), gentle, pers, md);
@@ -1133,6 +1318,10 @@ function build() {
     // The figure that showed the first mesh attempt was degenerate: it
     // collapsed to TWO distinct displacement values, both negative. Printed so
     // a grammar that burns itself out is visible rather than inferred.
+    ($('method').value === 'skeleton' && skelDiag
+      ? `skeleton      ${skelDiag.segments.toLocaleString()} crest segments   ` +
+        `branch order up to ${skelDiag.maxOrder}\n`
+      : '') +
     ($('method').value === 'mesh' && meshDiag
       ? `mesh          ${meshDiag.symbols.toLocaleString()} symbols over ` +
         `${meshDiag.edges.toLocaleString()} edge slices   ` +
@@ -1173,13 +1362,14 @@ if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
   for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire',
-                    'spread', 'oct', 'pers', 'mdepth'])
+                    'spread', 'oct', 'pers', 'mdepth',
+                    'sdepth', 'sturn', 'scurve', 'sslope', 'sdrop', 'ssm'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
   for (const id of ['sun', 'sunaz'])
     $(id).addEventListener('input', place);
-  for (const id of ['ax', 'rules'])
+  for (const id of ['ax', 'rules', 'sgrammar'])
     $(id).addEventListener('change', build);
   $('png').addEventListener('click', () => {
     place();                                    // render fresh into the kept buffer

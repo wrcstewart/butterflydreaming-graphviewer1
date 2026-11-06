@@ -309,3 +309,64 @@ with a C1 limit surface — four-point or butterfly — in place of plain midpoi
 averaging. Post-smoothing is *not* the fix: it removes the high-frequency
 content the median divides by, so the fringe figure rises to 7258 and the
 summits go to zero.
+
+### The whole 1D-distribution family was wrong — skeleton terrain (2026-11-06)
+
+The author on mesh v2: *"its like it is stiched together in patches - if the
+fractal cannot be distibuted across the patchwork so as to render them
+invisible then i dont think the whole method works"*. Measured: the
+high-curvature cells were enriched **3.5–4.1×** on the subdivision's own
+triangle lattice. The patches were the triangles, and he was right.
+
+**And the whole family was wrong, by a counting argument rather than a
+measurement.** A 1D sequence has one linear order; a 2D domain has no
+canonical linear order. So any map from a string to a heightfield must either
+**cut the string up and lay the pieces out** — patches, with seams where
+unrelated stretches abut — or **use a translation-invariant function of
+position**, whose terms have exactly straight level sets and so give ruled
+lines. Six methods, two failure modes, one cause. That is why separable,
+projection, Hilbert and three subdivisions all produced linear artefacts: it
+was never six bugs.
+
+**The escape: a path is a 1D object embedded in the plane**, so a sequence lays
+along it with no mismatch to pay. The grammar draws a branching **crest
+network**; the same grammar's walk sets the height **along** the crest; the
+surface is the upper envelope of roofs sloping away. The only ridges in the
+picture are ones the grammar drew, and there is no partition to have
+boundaries. This is also what every paper cited above actually does —
+Prusinkiewicz & Hammel's squig is a river *curve*, Kelley/Malin/Nielson build
+around a drainage *network*, Genevaux from a river *network*. None projects or
+partitions; I quoted them and missed what they had in common.
+
+**Cheap by a substitution.** The surface wanted is
+`h = max_s (H_s − slope·dist(p,s))` — every crest a roof, the terrain their
+upper envelope, so valleys fall out where two roofs meet, which is what a
+valley geologically is. Substituting `D = (Hmax − h)/slope` turns it into
+`D = min_s ((Hmax − H_s)/slope + dist(p,s))`: a multi-source **weighted
+distance transform**, computable by a chamfer sweep in O(N²) however much the
+grammar draws.
+
+**Meander is the parameter that matters.** A fixed turn angle gives only a few
+headings, so every crest is straight and the field reads as ruled — stripe
+index 6.43 against a random field's 1.12. Letting the heading *integrate* the
+grammar's own sequence makes headings continuous and the meander fractal.
+
+| | stripe | isotropy | lattice | summits | curvature |
+|---|---|---|---|---|---|
+| RANDOM control | **1.12** | 1.39 | — | **22** | **3.7** |
+| mesh v2 (patches) | — | 2.11 | **4.06** | 8 | 9.4 |
+| skeleton, fixed turn | 6.43 | 1.22 | 1.21 | 11 | 22.7 |
+| **skeleton, meandering** | **3.22** | **1.47** | **1.21** | 10 | 15.8 |
+
+The patchwork is gone (1.21 against 4.06) and isotropy matches the control.
+**Honest remainder:** stripe is still ~3× a random field's and curvature ~4×.
+Both are inherent to roofs-and-slopes — a crest is a polyline so it is straight
+between its vertices, and the valleys are creases where two roofs meet.
+
+**Metric lesson, the fifth instance.** Six proxies for "straight lines"
+disagreed across this work. Ratios of percentiles (fringe = p99.9/median) are
+confounded by smoothness; counts-on-the-best-line are confounded by population
+size. The two that held up are both ratios **against a matched control**:
+lattice enrichment (curved cells on a lattice vs random cells) and the
+magnitude-weighted gradient-direction peak/mean. Prefer a measure with a
+control built into it.
