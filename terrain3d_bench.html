@@ -806,19 +806,37 @@ function build() {
   // description, and the part that identified it as interpolation rather than
   // as structure in the grammar.
   //
-  // CATMULL-ROM instead: C1, so there is no derivative jump at a join, and
-  // interpolating, so it still passes through every profile sample rather
-  // than smoothing the grammar away. Measured, zero spikes above 8x the
-  // median second difference, and the lowest curvature ratio of the three
-  // candidates (5.2 against smoothstep's 7.3 and linear's 2.8e13).
+  // CATMULL-ROM WAS NOT ENOUGH. It is C1, so it removed the sharp creases,
+  // and the author still reported "many straightline discontinuities". He
+  // clicked one six times; the probe put it at cell (105,137) and the top
+  // 2,000 most-creased cells were then tested against every direction and
+  // octave for whether they sit on a sample join. They do: clustering 0.32
+  // where 0 means no relationship. Band-limiting the octaves to the grid did
+  // NOT help (0.32 to 0.79 of the no-relationship figure however coarse the
+  // finest octave), so it was not aliasing either.
+  //
+  // The cause is that Catmull-Rom is C1 but NOT C2 — its second derivative
+  // jumps at every join. That leaves the surface normal continuous, so there
+  // is no crease, but the RATE of change of the normal is discontinuous, and
+  // in a shaded render a curvature discontinuity is a visible line. Measured
+  // on identical data at spread 16, worst crease clustering:
+  //
+  //   linear          C0 derivative   0.409
+  //   Catmull-Rom     C1              0.316
+  //   cubic B-spline  C2              0.158   (but smooths 6 summits to 2)
+  //   quintic blend   C2              0.063   <-- five times better than C1
+  //
+  // So: the quintic fade u^3(6u^2-15u+10) applied to linear interpolation.
+  // Its first AND second derivatives vanish at the joins, so the join is C2;
+  // it still passes exactly through every profile sample, unlike the
+  // B-spline, which is why it keeps the summits the grammar put there.
   const pv = i => P[Math.max(0, Math.min(LP - 1, i))];
   const atf = t => {
-    const r = reflectIdx(t + OFF), f = Math.floor(r), u = r - f;
-    const p0 = pv(f - 1), p1 = pv(f), p2 = pv(f + 1), p3 = pv(f + 2);
-    return p1 + 0.5 * u * (p2 - p0 +
-           u * (2 * p0 - 5 * p1 + 4 * p2 - p3 +
-           u * (3 * (p1 - p2) + p3 - p0)));
+    const r = reflectIdx(t + OFF), f = Math.floor(r), w = r - f;
+    const u = w * w * w * (w * (6 * w - 15) + 10);
+    return pv(f) + (pv(f + 1) - pv(f)) * u;
   };
+
   // ── SPREAD AND OCTAVES ────────────────────────────────────────────────
   // The author: *"it needs the height variation on the grid to varying much
   // more slowly but at the same time the peaks should have fractal variation
