@@ -401,6 +401,21 @@ function applyScheme() {
 // at 513 x 513 with twelve projection directions that is the difference
 // between a slider that tracks the hand and one that stutters.
 let lastH = null, lastN = 0;
+// ── THE CLICK PROBE ─────────────────────────────────────────────────────
+// The author: *"could you instrument the mouse and work back to the image and
+// its generation - i will display the image - put the mouse in the midle of a
+// line and click it 6 times without moving it"*.
+//
+// A straight line in the picture is a locus in ONE direction's projected
+// distance, so the question a click has to answer is: at this cell, which
+// (direction, octave) pair is sitting on a feature, and what is that feature —
+// a sample join, a corner in the profile data, or neither. The probe reports
+// every pair's index and the profile's local curvature there, so the answer
+// is read off rather than guessed.
+//
+// Results go to /api/bench-log, which already exists and writes to the server
+// console — so nothing in server.js changes and it does not need restarting.
+let probe = null, clickNo = 0;
 let az = -0.6, el = 0.55, dist = 2.4, dragging = false, lx = 0, ly = 0;
 
 function initThree() {
@@ -425,6 +440,14 @@ function initThree() {
     el = Math.max(0.05, Math.min(1.5, el));
     lx = e.clientX; ly = e.clientY; place();
   });
+  // A click probes; a drag orbits. Distinguished by movement, so the six
+  // clicks he is going to make in one spot are not read as tiny drags.
+  let downAt = null;
+  cv.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('click', e => {
+    if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 3) return;
+    probeAt(e);
+  });
   cv.addEventListener('wheel', e => {
     e.preventDefault();
     dist = Math.max(0.6, Math.min(8, dist * (1 + Math.sign(e.deltaY) * 0.08)));
@@ -446,6 +469,94 @@ function place() {
   const se = (+$('sun').value) * Math.PI / 180, sa = (+$('sunaz').value) * Math.PI / 180;
   sun.position.set(Math.cos(se) * Math.sin(sa), Math.sin(se), Math.cos(se) * Math.cos(sa));
   renderer.render(scene, camera);
+}
+
+function probeAt(ev) {
+  if (!probe || !mesh) return;
+  const cv = $('cv'), r = cv.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((ev.clientX - r.left) / r.width) * 2 - 1,
+    -((ev.clientY - r.top) / r.height) * 2 + 1);
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(ndc, camera);
+  const hit = rc.intersectObject(mesh, false)[0];
+  if (!hit) { console.log('probe: the ray missed the surface'); return; }
+
+  // The mesh is a PlaneGeometry(2,2) rotated -90 degrees about X, which maps
+  // (x,y,z) -> (x, z, -y). The plane's own x runs -1..+1 with the column and
+  // its y runs +1..-1 with the row, so the inverse is this:
+  const P2 = probe, Nn = P2.N;
+  const col = (hit.point.x + 1) / 2 * (Nn - 1);
+  const row = (hit.point.z + 1) / 2 * (Nn - 1);
+  const cx = Math.round(col), cy = Math.round(row);
+
+  const L = [];
+  clickNo++;
+  L.push('click ' + clickNo + '  screen (' + Math.round(ev.clientX - r.left) + ',' +
+         Math.round(ev.clientY - r.top) + ')  ->  cell (' + cx + ',' + cy + ')' +
+         '   exact (' + col.toFixed(2) + ',' + row.toFixed(2) + ')');
+  L.push('  method ' + P2.method + '   spread ' + P2.spread + '   octaves ' + P2.octaves +
+         '   persistence ' + P2.pers + '   directions ' + P2.K);
+  L.push('  height here ' + (lastH ? lastH[cy * Nn + cx].toFixed(4) : '?') +
+         '   profile ' + P2.LP + ' samples, offset ' + P2.OFF);
+
+  // Local curvature of the FIELD at this cell, against the field's median, so
+  // we know whether the click actually landed on a crease at all.
+  if (lastH) {
+    const H = (x, y) => lastH[Math.max(0, Math.min(Nn-1, y)) * Nn + Math.max(0, Math.min(Nn-1, x))];
+    const lap = Math.abs(H(cx+1,cy) + H(cx-1,cy) + H(cx,cy+1) + H(cx,cy-1) - 4*H(cx,cy));
+    const samp = [];
+    for (let i = 0; i < 400; i++) {
+      const rx = 1 + Math.floor(Math.random() * (Nn - 2)), ry = 1 + Math.floor(Math.random() * (Nn - 2));
+      samp.push(Math.abs(H(rx+1,ry) + H(rx-1,ry) + H(rx,ry+1) + H(rx,ry-1) - 4*H(rx,ry)));
+    }
+    samp.sort((a, b) => a - b);
+    const med = samp[samp.length >> 1] || 1e-12;
+    L.push('  field curvature here ' + lap.toExponential(2) + '   = ' +
+           (lap / med).toFixed(1) + 'x the field median' +
+           (lap / med > 3 ? '   <-- ON a crease' : '   <-- NOT on a crease'));
+  }
+
+  // The decomposition. For each direction and octave: the projected distance,
+  // the profile index, how far that index is from a sample join, and the
+  // profile's own second difference there.
+  L.push('  dir  deg    d at this cell   octave  index      dist to join   profile curvature there');
+  const d2 = i => {
+    const q = j => P2.P[Math.max(0, Math.min(P2.LP - 1, j))];
+    return Math.abs(q(i + 1) - 2 * q(i) + q(i - 1));
+  };
+  const curvs = [];
+  for (let i = 1; i < P2.LP - 1; i++) curvs.push(d2(i));
+  curvs.sort((a, b) => a - b);
+  const pmed = curvs[curvs.length >> 1] || 1e-12;
+  let nearest = { frac: 9, label: '' };
+  for (const D of P2.dirs) {
+    const d = cx * D.cos + cy * D.sin;
+    for (let o = 0; o < P2.octaves; o++) {
+      const t = d * Math.pow(2, o) / P2.spread;
+      const idx = P2.reflectIdx(t + P2.OFF);
+      const frac = Math.min(idx - Math.floor(idx), Math.ceil(idx) - idx);
+      const c = d2(Math.round(idx));
+      if (frac < nearest.frac) nearest = { frac, label: 'dir ' + D.k + ' octave ' + o };
+      L.push('   ' + String(D.k).padStart(2) + '  ' + D.deg.toFixed(0).padStart(4) +
+             '   ' + d.toFixed(1).padStart(8) + '        ' + o +
+             '    ' + idx.toFixed(3).padStart(9) + '      ' + frac.toFixed(3) +
+             '          ' + c.toExponential(2) + ' = ' + (c / pmed).toFixed(1) + 'x median');
+    }
+  }
+  L.push('  nearest sample join: ' + nearest.label + ', ' + nearest.frac.toFixed(3) +
+         ' of a sample away' +
+         (nearest.frac < 0.08 ? '   <-- this cell sits ON a join' : ''));
+  L.push('  profile corners: ' + P2.dec.length + ' decisions; a direction reversal is a corner ' +
+         'in the DATA, which interpolation passes through rather than removing');
+
+  const text = L.join('\n');
+  console.log(text);
+  fetch('/api/bench-log', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag: 'terrain3d probe', log: text })
+  }).catch(() => {});
+  $('hint3d').textContent = 'probe ' + clickNo + ' sent — cell (' + cx + ',' + cy + ')';
 }
 
 // ── MEASUREMENT, THE SAME CODE THAT CHOSE THE DEFAULT ───────────────────
@@ -742,6 +853,18 @@ function build() {
   }
   h = norm(h);
   lastH = h; lastN = N;
+  // Everything the click probe needs to work backwards from a point on the
+  // screen to the symbols that put it there. Captured here because this is
+  // the only place that knows the directions, the octave weights and the
+  // index offset actually used.
+  probe = {
+    N, spread, octaves, pers, K, LP, OFF, P, dec, ampSum,
+    dirs: (() => { const a = [];
+      for (let k = 0; k < K; k++) { const t = Math.PI * k * 0.6180339887;
+        a.push({ k, cos: Math.cos(t), sin: Math.sin(t), deg: t * 180 / Math.PI % 180 }); }
+      return a; })(),
+    method: $('method').value, atf, fract, reflectIdx,
+  };
   const ctrl = norm(diamondSquare(N, () => rnd()));
 
   // ── the surface ──
