@@ -122,6 +122,23 @@
       <div class="hint">Only used by the projection method. Angles are spaced
         by the golden ratio so no two directions are commensurate &mdash; equal
         spacing would put ridges on a grid.</div>
+      <label>spread &mdash; grid cells per profile step
+        <span id="spread-val">16</span></label>
+      <input id="spread" type="range" min="1" max="96" value="16" step="1">
+      <label>octaves <span id="oct-val">4</span></label>
+      <input id="oct" type="range" min="1" max="7" value="4" step="1">
+      <label>detail kept per octave <span id="pers-val">0.50</span></label>
+      <input id="pers" type="range" min="0.1" max="0.85" value="0.5" step="0.01">
+      <div class="hint">The author: <em>"way too much height variation - like a
+        load of spiket peaks"</em>. At spread 1 one grid cell is one profile
+        step &mdash; measured, that gives <b>1,984 single-cell maxima</b>, which
+        is the complaint exactly. Spreading the profile makes the large
+        features slow; the octaves re-add the same profile at half the spread
+        and a fraction of the height, so the peaks keep fractal variation
+        without the field returning to per-cell noise.<br>
+        Measured at 257&times;257: spread 8 gives the most varied peak heights
+        (3.8&times; tallest to shortest) at 32 summits; <b>16 is the default</b>
+        at 19 summits; 32 gives 10 and the calmest ground.</div>
     </fieldset>
 
     <fieldset>
@@ -241,9 +258,9 @@ function makeProfile(d) {
 // ORDERED of all of them — it is the 1D sequence twice over — while being the
 // most anisotropic. Ridges run exactly north-south and east-west. It is the
 // proof that preserving the ordering is not by itself enough.
-function separable(N, at) {
+function separable(N, fract) {
   const h = new Float64Array(N * N);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) h[y * N + x] = (at(x) + at(y)) / 2;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) h[y * N + x] = (fract(x) + fract(y)) / 2;
   return h;
 }
 
@@ -253,15 +270,18 @@ function separable(N, at) {
 // incommensurate directions. Each projection carries the WHOLE sequence, so
 // the ordering is preserved by construction rather than by luck. This is also
 // the only method that needs nothing the 1D bench does not already have.
-function projection(N, at, K) {
+function projection(N, fract, K) {
   const h = new Float64Array(N * N), cs = [], sn = [];
   for (let k = 0; k < K; k++) {
     const t = Math.PI * k * 0.6180339887;   // golden spacing: no two commensurate
     cs.push(Math.cos(t)); sn.push(Math.sin(t));
   }
+  // The projected distance is NOT rounded now — it feeds the fractional
+  // sampler. Rounding it was quietly re-introducing per-cell jumps even when
+  // the profile was stretched, because every cell snapped to a whole sample.
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     let v = 0;
-    for (let k = 0; k < K; k++) v += at(Math.round(x * cs[k] + y * sn[k]));
+    for (let k = 0; k < K; k++) v += fract(x * cs[k] + y * sn[k]);
     h[y * N + x] = v / K;
   }
   return h;
@@ -477,6 +497,36 @@ function spectrumSlope(h, N) {
   const m = pts.length;
   return (m * sxy - sx * sy) / (m * sxx - sx * sx);
 }
+// ── SPIKINESS AND SUMMITS ───────────────────────────────────────────────
+// The two figures the author actually judged the field on: how fast the
+// height changes from cell to cell, and whether the peaks vary in height.
+//
+// A SUMMIT NEEDS A RADIUS. Prominence measured against the 8 immediate
+// neighbours collapses to zero on any smooth field — it reported 0 summits
+// for every spread above 1, which said nothing. Prominence against the lowest
+// point within a radius is the same measure the 1D bench uses, and it counts
+// summits at a mountain scale rather than pixel scale.
+function reliefStats(h, N, R) {
+  let g = 0, n = 0;
+  for (let y = 0; y < N; y++) for (let x = 1; x < N; x++) { g += Math.abs(h[y*N+x] - h[y*N+x-1]); n++; }
+  for (let x = 0; x < N; x++) for (let y = 1; y < N; y++) { g += Math.abs(h[y*N+x] - h[(y-1)*N+x]); n++; }
+  const proms = [];
+  const step = Math.max(1, Math.round(N / 257));      // keep the cost flat at 513
+  for (let y = R; y < N - R; y += step) for (let x = R; x < N - R; x += step) {
+    const v = h[y*N+x]; let top = true, lowest = v;
+    for (let dy = -R; dy <= R && top; dy++) for (let dx = -R; dx <= R; dx++) {
+      if ((!dx && !dy) || dx*dx + dy*dy > R*R) continue;
+      const w = h[(y+dy)*N+x+dx];
+      if (w > v) { top = false; break; }
+      if (w < lowest) lowest = w;
+    }
+    if (top && v - lowest > 0.04) proms.push(v - lowest);
+  }
+  proms.sort((a, b) => a - b);
+  return { spiky: 100 * g / n, summits: proms.length,
+           variety: proms.length > 1 ? proms[proms.length - 1] / proms[0] : 0 };
+}
+
 // ── THE ORDERING TEST: SUBWORD COMPLEXITY ───────────────────────────────
 // The standard measure of quasi-ordering. Quantise the heights to Q levels
 // and count the DISTINCT windows of length n. For a quasi-periodic sequence
@@ -541,6 +591,43 @@ function build() {
   }
   const P = makeProfile(dec);
   const at = i => P[((i % P.length) + P.length) % P.length];
+  // Fractional index with linear interpolation. Stretching the profile over
+  // many cells without this just repeats each sample, which replaces spiky
+  // peaks with staircases — the same amount of per-cell change, in uglier
+  // steps.
+  const atf = t => {
+    const f = Math.floor(t), a = at(f), b = at(f + 1);
+    const u = t - f;
+    return a + (b - a) * u;
+  };
+  // ── SPREAD AND OCTAVES ────────────────────────────────────────────────
+  // The author: *"it needs the height variation on the grid to varying much
+  // more slowly but at the same time the peaks should have fractal variation
+  // of height - so maybe distribute the fractal more slowly over the grid"*.
+  //
+  // Both halves of that are needed and they pull opposite ways, so they get
+  // separate mechanisms. SPREAD stretches the profile over the grid, which
+  // makes the large features slow. OCTAVES then re-add the SAME profile at
+  // half the spread each time with a fraction of the amplitude, which puts
+  // fractal variation back on the peaks without returning the whole field to
+  // per-cell noise. It is the fBm construction, with the L-system profile as
+  // the basis function instead of a noise lattice — so the ordering measured
+  // in the table below is summed rather than discarded.
+  const spread = Math.max(1, +$('spread').value);
+  const octaves = Math.max(1, Math.round(+$('oct').value));
+  const pers = Math.max(0.05, +$('pers').value);
+  $('spread-val').textContent = spread;
+  $('oct-val').textContent = octaves;
+  $('pers-val').textContent = pers.toFixed(2);
+  let ampSum = 0;
+  for (let o = 0; o < octaves; o++) ampSum += Math.pow(pers, o);
+  // Sample the profile as a band-limited function of a distance in cells.
+  const fract = d => {
+    let v = 0;
+    for (let o = 0; o < octaves; o++)
+      v += Math.pow(pers, o) * atf(d * Math.pow(2, o) / spread);
+    return v / ampSum;
+  };
 
   // The random control is always computed, so every reading has a scale beside
   // it rather than being a number on its own.
@@ -562,8 +649,8 @@ function build() {
   const wrap = (a, i) => a[((i % a.length) + a.length) % a.length];
   let h;
   switch ($('method').value) {
-    case 'separable':    h = separable(N, at); break;
-    case 'projection':   h = projection(N, at, K); break;
+    case 'separable':    h = separable(N, fract); break;
+    case 'projection':   h = projection(N, fract, K); break;
     case 'hilbert':      h = hilbert(N, at); break;
     case 'flat':         h = diamondSquare(N, (lv, i) => wrap(FLAT, i)); break;
     case 'rowmajor':
@@ -613,9 +700,17 @@ function build() {
   const iso = isotropy(h, N), sl = spectrumSlope(h, N);
   const carried = r8 > 0 ? (r8 - c8) / (r8 - Math.min(p8, r8)) : 0;
 
+  const rs = reliefStats(h, N, 10);
+  const finest = spread / Math.pow(2, octaves - 1);
   $('out').innerHTML =
     `grid          ${N} x ${N} = ${(N * N).toLocaleString()} vertices   ` +
     `profile ${P.length.toLocaleString()} samples\n` +
+    `cell to cell  ${rs.spiky.toFixed(2)}% of the relief   ` +
+    `finest octave ${finest.toFixed(1)} cells per step` +
+    (rs.spiky > 0.8 ? `   <span class="warn">spiky — raise the spread</span>` : '') + '\n' +
+    `summits       ${rs.summits} within radius 10   ` +
+    `tallest/shortest prominence ${rs.variety ? rs.variety.toFixed(1) + 'x' : '-'}` +
+    (rs.variety && rs.variety < 1.6 ? `   <span class="warn">peaks too uniform — lower the spread</span>` : '') + '\n' +
     `ordering      ${c8.toFixed(1)}% distinct 8-windows   ` +
     `(random ${r8.toFixed(1)}%, the 1D profile ${p8.toFixed(1)}%)\n` +
     `              ${(100 * Math.max(0, Math.min(1, carried))).toFixed(0)}% of the way from noise to the 1D profile` +
@@ -631,7 +726,8 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire'])
+  for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire',
+                    'spread', 'oct', 'pers'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
