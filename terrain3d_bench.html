@@ -96,6 +96,11 @@
   #hint3d { position: absolute; right: 12px; top: 12px; color: var(--dim);
             font-size: 11px; background: rgba(255,255,255,.9);
             border: 1px solid var(--line); border-radius: 3px; padding: 5px 8px; }
+  #probe-out { position: absolute; right: 12px; bottom: 12px; margin: 0;
+         display: none; font: 10px/1.4 ui-monospace, Menlo, monospace;
+         white-space: pre; background: rgba(255,255,255,.96);
+         border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px;
+         max-width: 62%; max-height: 52%; overflow: auto; }
   #err { position: absolute; inset: 0; display: none; place-content: center;
          text-align: center; padding: 30px; color: var(--warn); }
 </style>
@@ -193,6 +198,7 @@ Z: &lt;ZZZ&gt;-</textarea>
     <canvas id="cv"></canvas>
     <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
     <pre id="out"></pre>
+    <pre id="probe-out"></pre>
     <div id="err"></div>
   </div>
 </div>
@@ -440,13 +446,21 @@ function initThree() {
     el = Math.max(0.05, Math.min(1.5, el));
     lx = e.clientX; ly = e.clientY; place();
   });
-  // A click probes; a drag orbits. Distinguished by movement, so the six
-  // clicks he is going to make in one spot are not read as tiny drags.
+  // A tap probes; a drag orbits. Distinguished by movement.
+  //
+  // ON POINTERUP, NOT CLICK. The first version listened for `click` and six
+  // real clicks produced nothing. The orbit handler calls
+  // `setPointerCapture`, and a captured pointer suppresses the subsequent
+  // `click` in Safari — which is the browser on this machine. `pointerup`
+  // fires regardless of capture, so the probe no longer depends on a
+  // behaviour that differs between browsers.
   let downAt = null;
   cv.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
-  cv.addEventListener('click', e => {
-    if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 3) return;
-    probeAt(e);
+  cv.addEventListener('pointerup', e => {
+    if (!downAt) return;
+    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+    downAt = null;
+    if (moved <= 4) probeAt(e);
   });
   cv.addEventListener('wheel', e => {
     e.preventDefault();
@@ -552,11 +566,30 @@ function probeAt(ev) {
 
   const text = L.join('\n');
   console.log(text);
+
+  // THE REPORT IS SHOWN HERE AS WELL AS POSTED. The first version only
+  // posted it and swallowed the error with an empty catch, so six probes
+  // that never left the browser still printed "sent" — a silent failure of
+  // exactly the kind that is not allowed in this project. Now the page is
+  // the primary record and the POST is a convenience, and if the POST fails
+  // it says so in words.
+  const panel = $('probe-out');
+  panel.textContent = text + '\n\n' + panel.textContent;
+  panel.style.display = 'block';
+  $('hint3d').textContent = 'probe ' + clickNo + ' — cell (' + cx + ',' + cy + ') — posting…';
   fetch('/api/bench-log', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tag: 'terrain3d probe', log: text })
-  }).catch(() => {});
-  $('hint3d').textContent = 'probe ' + clickNo + ' sent — cell (' + cx + ',' + cy + ')';
+  }).then(r => {
+    $('hint3d').textContent = r.ok
+      ? 'probe ' + clickNo + ' sent — cell (' + cx + ',' + cy + ')'
+      : 'probe ' + clickNo + ': the server answered ' + r.status +
+        ' — read it from the panel instead';
+  }).catch(err => {
+    $('hint3d').innerHTML = '<span class="warn">probe ' + clickNo +
+      ' COULD NOT BE POSTED (' + err.message + ') — the report is in the ' +
+      'panel below, copy it across</span>';
+  });
 }
 
 // ── MEASUREMENT, THE SAME CODE THAT CHOSE THE DEFAULT ───────────────────
