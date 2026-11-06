@@ -160,6 +160,7 @@ Z: &lt;ZZZ&gt;-</textarea>
         <option value="grey" selected>grey on white &mdash; rock</option>
         <option value="whiteblue">white on blue &mdash; cloud</option>
         <option value="whiteolive">white on greeny brown &mdash; land</option>
+        <option value="sea">blue green on sky blue &mdash; sea</option>
       </select>
       <div class="hint">The author: <em>"not sure as mountains but some setting
         produce a good cloud layer"</em>. Both schemes keep the full luminance
@@ -350,13 +351,29 @@ const SCHEMES = {
   // vegetated ground, and keeps the same luminance span as the other two.
   whiteolive: { bg: 0xa9a67a, surface: 0xfbfaf3, sky: 0xeeead6, bounce: 0x62653a,
                 sun: 0xfff9ec, hemi: 0.70, sunI: 2.1, rough: 0.97 },
+  // The sea inverts the pattern of the other three: here the SURFACE carries
+  // the colour and sits DARKER than the sky behind it, which is what water
+  // under a bright sky does. The luminance span therefore has to come from
+  // the lit surface against a deep-water bounce rather than from a white
+  // surface against a dark one — measured at 3.80:1, between the blue and the
+  // olive, so the relief reads as well as in either.
+  //
+  // Lower roughness and a little metalness, because water is specular and
+  // rock is not: the sheen lands on the crests and is most of what makes a
+  // heightfield read as a surface of water rather than a painted hill.
+  sea: { bg: 0x9cc4e8, surface: 0x47a39a, sky: 0xd4e6f7, bounce: 0x123f4a,
+         sun: 0xfffdf4, hemi: 0.60, sunI: 2.4, rough: 0.42, metal: 0.10 },
 };
 function applyScheme() {
   const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
   if (scene) scene.background = new THREE.Color(s.bg);
   if (hemi) { hemi.color.setHex(s.sky); hemi.groundColor.setHex(s.bounce); hemi.intensity = s.hemi; }
   if (sun) { sun.color.setHex(s.sun); sun.intensity = s.sunI; }
-  if (mesh) { mesh.material.color.setHex(s.surface); mesh.material.roughness = s.rough; }
+  if (mesh) {
+    mesh.material.color.setHex(s.surface);
+    mesh.material.roughness = s.rough;
+    mesh.material.metalness = s.metal || 0;
+  }
   place();
 }
 // The last built heightfield, kept so the vertical slider can rescale the
@@ -574,7 +591,7 @@ function build() {
   geo.computeVertexNormals();
   const sch = SCHEMES[$('scheme').value] || SCHEMES.grey;
   const mat = new THREE.MeshStandardMaterial({
-    color: sch.surface, roughness: sch.rough, metalness: 0.0,
+    color: sch.surface, roughness: sch.rough, metalness: sch.metal || 0,
     flatShading: false, side: THREE.DoubleSide
   });
   mesh = new THREE.Mesh(geo, mat);
