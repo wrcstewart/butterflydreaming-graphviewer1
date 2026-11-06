@@ -159,6 +159,7 @@ Z: &lt;ZZZ&gt;-</textarea>
       <select id="scheme">
         <option value="grey" selected>grey on white &mdash; rock</option>
         <option value="whiteblue">white on blue &mdash; cloud</option>
+        <option value="whiteolive">white on greeny brown &mdash; land</option>
       </select>
       <div class="hint">The author: <em>"not sure as mountains but some setting
         produce a good cloud layer"</em>. Both schemes keep the full luminance
@@ -344,6 +345,11 @@ const SCHEMES = {
                sun: 0xffffff, hemi: 0.55, sunI: 2.3, rough: 0.95 },
   whiteblue: { bg: 0xbcd4ec, surface: 0xf8fbff, sky: 0xe4eefa, bounce: 0x6f8aa8,
                sun: 0xfffdf6, hemi: 0.75, sunI: 2.0, rough: 0.98 },
+  // Greeny brown built the same way: olive in the sky and the bounce, the
+  // surface left near-white and faintly warm. Reads as snow or cloud over
+  // vegetated ground, and keeps the same luminance span as the other two.
+  whiteolive: { bg: 0xa9a67a, surface: 0xfbfaf3, sky: 0xeeead6, bounce: 0x62653a,
+                sun: 0xfff9ec, hemi: 0.70, sunI: 2.1, rough: 0.97 },
 };
 function applyScheme() {
   const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
