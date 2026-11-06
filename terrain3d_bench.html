@@ -1,0 +1,589 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>terrain3d bench — lifting a 1D L-system into a heightfield</title>
+<!--
+  terrain3d_bench.html — 2026-11-06.
+
+  THE QUESTION THIS BENCH EXISTS TO ANSWER. `terrain_direct.html` makes a 1D
+  mountain profile from an L-system, and it has the quality the author wanted:
+  structure at six scales, motifs that recur in a definite order, plains and
+  summits placed by the grammar rather than by a threshold. He asked how to
+  generalise that into 3D "in such a way as to maintain the quasi ordering you
+  get with the L system".
+
+  A 1D string is an ordering along a line. A heightfield is a function over a
+  2D domain. Getting from one to the other without losing the ordering is the
+  whole problem, and there is more than one plausible answer, so this bench
+  implements SIX and measures them against a random control.
+
+  WHY A WALK CANNOT BE GENERALISED DIRECTLY. The 1D profile integrates
+  decisions: h[i+1] = h[i] + d[i]. In 2D that is not merely awkward, it is
+  ill-defined — there are many paths from the origin to a point (x,y) and a
+  walk gives a different answer along each, so h(x,y) is not a function. Every
+  method here is therefore POSITION-INDEXED rather than cumulative. That is
+  the real content of the generalisation and it is forced, not chosen.
+
+  THE LITERATURE. Prusinkiewicz & Hammel, "A Fractal Model of Mountains with
+  Rivers", Graphics Interface '93, pp. 174-180, at
+  https://algorithmicbotany.org/papers/mountains.gi93.pdf — the authority on
+  L-systems writing about exactly this. Their answer is to rewrite the MESH
+  rather than a string: a triangle is replaced by four triangles, and that is
+  the production. Their central observation is that midpoint displacement is
+  context-SENSITIVE, not context-free as Carpenter and Mandelbrot had it: two
+  triangles sharing an edge must displace its midpoint identically, and they
+  show the subdivision pattern chosen for ONE triangle determines the pattern
+  for every other triangle in the mesh. They relate this to Wang tiles —
+  labelled edges that must match — which Wang proved can simulate any Turing
+  machine, so edge-matching is not a weaker ordering mechanism than a string.
+  Their Figure 5 gives Smith's trick for getting the context-sensitivity for
+  free: hash an edge's endpoint coordinates into an index and look the
+  displacement up in a table, so both sides agree without any traversal. The
+  obvious move is to make the L-system sequence that table, which is what
+  `hierarchical` and `rowMajor` below do.
+
+  MEASURED, AND THE MEASUREMENT DISAGREED WITH THAT. See THE ORDERING TEST
+  further down. The subdivision methods land close to the random control:
+  midpoint displacement sets each new height to the AVERAGE of its neighbours
+  plus a displacement whose amplitude halves every level, so the averaging is
+  a low-pass filter and the grammar enters only as a diminishing scalar
+  perturbation. What survives is the averaging, which is the same whatever the
+  displacement source. The paper's method is excellent for its actual subject
+  — rivers and realism — but it is not a way to carry 1D quasi-ordering into
+  2D, and conflating those two goals is a mistake this comment exists to stop
+  being repeated.
+-->
+<style>
+  :root {
+    --ink: #1b1b18; --dim: #6e6e66; --line: #d7d7cf;
+    --ground: #f6f5f1; --panel: #fffffe; --warn: #8a5a00;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+         font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display: grid; grid-template-columns: 330px 1fr; height: 100dvh; }
+  #panel { overflow-y: auto; padding: 14px; background: var(--panel);
+           border-right: 1px solid var(--line); }
+  h1 { font-size: 14px; margin: 0 0 2px; letter-spacing: .02em; }
+  .sub { color: var(--dim); font-size: 11px; margin: 0 0 14px; }
+  fieldset { border: 1px solid var(--line); border-radius: 3px;
+             margin: 0 0 12px; padding: 9px 10px 11px; }
+  legend { font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+           color: var(--dim); padding: 0 4px; }
+  label { display: block; font-size: 11px; color: var(--dim); margin: 7px 0 2px; }
+  label:first-child { margin-top: 0; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; font: 12px ui-monospace, Menlo, monospace; padding: 4px 5px;
+    border: 1px solid var(--line); border-radius: 2px; background: #fff;
+    color: var(--ink); }
+  textarea { min-height: 58px; resize: vertical; }
+  input[type=range] { width: 100%; }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hint { font-size: 10px; color: var(--dim); margin-top: 3px; }
+  button { font: 12px ui-monospace, Menlo, monospace; padding: 6px 10px;
+           border: 1px solid var(--line); border-radius: 2px; background: #fff;
+           color: var(--ink); cursor: pointer; }
+  button:hover { background: #f0efe9; }
+  #stage { position: relative; background: #fff; }
+  #cv { display: block; width: 100%; height: 100%; }
+  #out { position: absolute; left: 12px; bottom: 12px; margin: 0;
+         font: 11px/1.5 ui-monospace, Menlo, monospace; white-space: pre;
+         background: rgba(255,255,255,.92); border: 1px solid var(--line);
+         border-radius: 3px; padding: 8px 10px; max-width: calc(100% - 24px);
+         overflow-x: auto; }
+  .warn { color: var(--warn); font-weight: 600; }
+  #hint3d { position: absolute; right: 12px; top: 12px; color: var(--dim);
+            font-size: 11px; background: rgba(255,255,255,.9);
+            border: 1px solid var(--line); border-radius: 3px; padding: 5px 8px; }
+  #err { position: absolute; inset: 0; display: none; place-content: center;
+         text-align: center; padding: 30px; color: var(--warn); }
+</style>
+
+<div id="wrap">
+  <div id="panel">
+    <h1>terrain3d bench</h1>
+    <p class="sub">Six ways to lift a 1D L&#8209;system profile into a heightfield,
+      measured against a random control.</p>
+
+    <fieldset>
+      <legend>method</legend>
+      <select id="method">
+        <option value="projection" selected>projection — sum along N directions</option>
+        <option value="separable">separable — outer product of the profile</option>
+        <option value="hierarchical">subdivision — grammar depth drives level</option>
+        <option value="rowmajor">subdivision — row-major within each level</option>
+        <option value="flat">subdivision — one long string, in order</option>
+        <option value="hilbert">Hilbert-indexed — locality-preserving index</option>
+        <option value="random">RANDOM control — diamond-square, no grammar</option>
+      </select>
+      <label>projection directions <span id="k-val">5</span></label>
+      <input id="k" type="range" min="2" max="12" value="5" step="1">
+      <div class="hint">Only used by the projection method. Angles are spaced
+        by the golden ratio so no two directions are commensurate &mdash; equal
+        spacing would put ridges on a grid.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>grammar</legend>
+      <label>axiom</label><input id="ax" type="text" value="X">
+      <label>rules</label>
+      <textarea id="rules">X: &lt;&gt;+&gt;XYX+
+Y: XZ&lt;-YZ-+
+Z: &lt;ZZZ&gt;-</textarea>
+      <div class="row">
+        <div><label>depth</label><input id="depth" type="number" value="6" min="1" max="9"></div>
+        <div><label>gentle</label><input id="gentle" type="number" value="0.09" step="0.01"></div>
+        <div><label>grid</label>
+          <select id="grid">
+            <option value="129">129</option>
+            <option value="257" selected>257</option>
+            <option value="513">513</option>
+          </select></div>
+      </div>
+      <div class="hint">Same grammar and the same token meanings as
+        terrain_direct: <code>+</code> up, <code>-</code> down,
+        <code>&gt;</code> gentle up, <code>&lt;</code> gentle down,
+        <code>=</code> level.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>view</legend>
+      <label>vertical &times; <span id="vx-val">0.35</span></label>
+      <input id="vx" type="range" min="0.02" max="1.2" value="0.35" step="0.01">
+      <div class="row2">
+        <div><label>sun elevation&deg;</label><input id="sun" type="number" value="28" step="1"></div>
+        <div><label>sun azimuth&deg;</label><input id="sunaz" type="number" value="135" step="5"></div>
+      </div>
+      <label><input type="checkbox" id="wire" style="width:auto"> show the mesh</label>
+    </fieldset>
+
+    <button id="go">rebuild</button>
+    <button id="png">save PNG</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
+    <pre id="out"></pre>
+    <div id="err"></div>
+  </div>
+</div>
+
+<!-- three.js 0.160.0, the UMD build, PINNED — same version and the same
+     reasoning as V_Kolam3D: it defines window.THREE and needs no import map,
+     and an unpinned "latest" would let someone else's release change what
+     this bench shows with no commit here. -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<!-- lindenmayer 1.5.4, vendored. ROOT-RELATIVE: a bare path resolves against
+     the page, which is what broke the voice files on /n/ deep links. -->
+<script src="/lib/lindenmayer-1.5.4.js"></script>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+if (!window.THREE) {
+  $('err').style.display = 'grid';
+  $('err').textContent = 'three.js did not load from the CDN. Nothing can be drawn; ' +
+    'check the network rather than the grammar.';
+}
+
+// ── THE GRAMMAR, AND THE 1D PROFILE ─────────────────────────────────────
+function parseRules(text) {
+  const p = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z])\s*:\s*(.+?)\s*$/);
+    if (m) p[m[1]] = m[2];
+  }
+  return p;
+}
+function decisions(axiom, rules, depth, gentle) {
+  const l = new LSystem({ axiom, productions: rules });
+  l.iterate(depth);
+  const out = [];
+  for (const c of l.getString()) {
+    if (c === '+') out.push(1); else if (c === '-') out.push(-1);
+    else if (c === '>') out.push(gentle); else if (c === '<') out.push(-gentle);
+    else if (c === '=') out.push(0);
+  }
+  return out;
+}
+// The 1D profile exactly as terrain_direct draws it: a walk, reflected in a
+// band. Normalised to 0..1 here because every method below mixes profiles
+// together and an un-normalised one would dominate by accident.
+function makeProfile(d) {
+  const p = new Float64Array(d.length);
+  let h = 0.5;
+  for (let i = 0; i < d.length; i++) {
+    h += d[i] * 0.03;
+    if (h < 0) h = -h; if (h > 1) h = 2 - h;
+    p[i] = h;
+  }
+  return p;
+}
+
+// ── THE SIX LIFTINGS ────────────────────────────────────────────────────
+// Each returns a Float64Array of N*N heights. `at` wraps, so a profile
+// shorter than the grid repeats rather than running off the end.
+
+// 1. SEPARABLE. The naive baseline, and worth keeping because it is the most
+// ORDERED of all of them — it is the 1D sequence twice over — while being the
+// most anisotropic. Ridges run exactly north-south and east-west. It is the
+// proof that preserving the ordering is not by itself enough.
+function separable(N, at) {
+  const h = new Float64Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) h[y * N + x] = (at(x) + at(y)) / 2;
+  return h;
+}
+
+// 2. MULTI-DIRECTIONAL PROJECTION. The cut-and-project construction of a
+// quasicrystal, after de Bruijn's method for Penrose tilings: a 2D
+// quasi-ordered field is the sum of a few 1D quasi-periodic waves taken along
+// incommensurate directions. Each projection carries the WHOLE sequence, so
+// the ordering is preserved by construction rather than by luck. This is also
+// the only method that needs nothing the 1D bench does not already have.
+function projection(N, at, K) {
+  const h = new Float64Array(N * N), cs = [], sn = [];
+  for (let k = 0; k < K; k++) {
+    const t = Math.PI * k * 0.6180339887;   // golden spacing: no two commensurate
+    cs.push(Math.cos(t)); sn.push(Math.sin(t));
+  }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let v = 0;
+    for (let k = 0; k < K; k++) v += at(Math.round(x * cs[k] + y * sn[k]));
+    h[y * N + x] = v / K;
+  }
+  return h;
+}
+
+// 3. HILBERT-INDEXED. The idea is that a space-filling curve preserves
+// locality, so indexing the sequence by Hilbert order should turn the
+// sequence's self-similar structure into 2D self-similar structure. MEASURED
+// IT DOES THE OPPOSITE — see the table in the readout. The curve's returns
+// put distant sequence positions side by side within a row, so rows sample
+// the profile almost randomly. Kept because the negative result is the useful
+// part: locality ALONG THE CURVE is not locality along a row.
+function hilbertIndex(x, y, order) {
+  let rx, ry, d = 0;
+  for (let s = order >> 1; s >= 1; s >>= 1) {
+    rx = (x & s) > 0 ? 1 : 0; ry = (y & s) > 0 ? 1 : 0;
+    d += s * s * ((3 * rx) ^ ry);
+    if (ry === 0) { if (rx === 1) { x = s - 1 - x; y = s - 1 - y; } const t = x; x = y; y = t; }
+  }
+  return d;
+}
+function hilbert(N, at) {
+  const h = new Float64Array(N * N);
+  let order = 1; while (order < N) order <<= 1;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
+    h[y * N + x] = at(hilbertIndex(Math.min(x, order - 1), Math.min(y, order - 1), order));
+  return h;
+}
+
+// 4-6. SUBDIVISION. One skeleton, so the ONLY difference between the variants
+// and the random control is where the displacement comes from — otherwise a
+// difference in the numbers could be a difference in the skeleton.
+//
+// On a regular grid the paper's context-sensitivity is free: every new point
+// has a unique grid coordinate, so there is no shared edge to disagree about.
+// The hash of Figure 5 is what you need when the triangles are irregular.
+function diamondSquare(N, displace) {
+  const h = new Float64Array(N * N);
+  const H = (x, y) => h[y * N + x], S = (x, y, v) => { h[y * N + x] = v; };
+  S(0, 0, .5); S(N - 1, 0, .5); S(0, N - 1, .5); S(N - 1, N - 1, .5);
+  let step = N - 1, level = 0, counter = 0;
+  while (step > 1) {
+    const half = step / 2, amp = Math.pow(0.5, level * 0.5) * 0.45;
+    for (let y = half; y < N; y += step) for (let x = half; x < N; x += step) {
+      const a = (H(x - half, y - half) + H(x + half, y - half) +
+                 H(x - half, y + half) + H(x + half, y + half)) / 4;
+      S(x, y, a + displace(level, counter++, x, y, half) * amp);
+    }
+    for (let y = 0; y < N; y += half) {
+      for (let x = (y / half) % 2 === 0 ? half : 0; x < N; x += step) {
+        let t = 0, c = 0;
+        if (x - half >= 0) { t += H(x - half, y); c++; }
+        if (x + half < N)  { t += H(x + half, y); c++; }
+        if (y - half >= 0) { t += H(x, y - half); c++; }
+        if (y + half < N)  { t += H(x, y + half); c++; }
+        S(x, y, t / c + displace(level, counter++, x, y, half) * amp);
+      }
+    }
+    step = half; level++;
+  }
+  return h;
+}
+
+// ── THE RENDER ──────────────────────────────────────────────────────────
+let renderer, scene, camera, mesh, wireMesh, sun;
+// The last built heightfield, kept so the vertical slider can rescale the
+// surface without recomputing the field and re-running the measurements —
+// at 513 x 513 with twelve projection directions that is the difference
+// between a slider that tracks the hand and one that stutters.
+let lastH = null, lastN = 0;
+let az = -0.6, el = 0.55, dist = 2.4, dragging = false, lx = 0, ly = 0;
+
+function initThree() {
+  const cv = $('cv'), st = $('stage');
+  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xffffff);
+  camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
+  // Lighting carries the relief, not colour. The author has reduced colour
+  // vision, so the surface is a neutral grey and the shape is read entirely
+  // from luminance — a hue ramp would be information he cannot use.
+  sun = new THREE.DirectionalLight(0xffffff, 2.3);
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x9a9a92, 0.55));
+  cv.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointerup', e => { dragging = false; });
+  cv.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    az -= (e.clientX - lx) * 0.006; el += (e.clientY - ly) * 0.005;
+    el = Math.max(0.05, Math.min(1.5, el));
+    lx = e.clientX; ly = e.clientY; place();
+  });
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    dist = Math.max(0.6, Math.min(8, dist * (1 + Math.sign(e.deltaY) * 0.08)));
+    place();
+  }, { passive: false });
+  resize();
+  window.addEventListener('resize', () => { resize(); place(); });
+}
+function resize() {
+  const st = $('stage');
+  renderer.setSize(st.clientWidth, st.clientHeight, false);
+  camera.aspect = Math.max(st.clientWidth / Math.max(st.clientHeight, 1), 0.01);
+  camera.updateProjectionMatrix();
+}
+function place() {
+  camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el),
+                      dist * Math.cos(el) * Math.cos(az));
+  camera.lookAt(0, 0, 0);
+  const se = (+$('sun').value) * Math.PI / 180, sa = (+$('sunaz').value) * Math.PI / 180;
+  sun.position.set(Math.cos(se) * Math.sin(sa), Math.sin(se), Math.cos(se) * Math.cos(sa));
+  renderer.render(scene, camera);
+}
+
+// ── MEASUREMENT, THE SAME CODE THAT CHOSE THE DEFAULT ───────────────────
+function norm(h) {
+  let mn = Infinity, mx = -Infinity;
+  for (const v of h) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const s = mx > mn ? 1 / (mx - mn) : 0, o = new Float64Array(h.length);
+  for (let i = 0; i < h.length; i++) o[i] = (h[i] - mn) * s;
+  return o;
+}
+function vario(h, N, dx, dy, r) {
+  let t = 0, c = 0;
+  for (let y = 0; y < N; y += 2) for (let x = 0; x < N; x += 2) {
+    const X = x + dx * r, Y = y + dy * r;
+    if (X < 0 || X >= N || Y < 0 || Y >= N) continue;
+    const d = h[y * N + x] - h[Y * N + X]; t += d * d; c++;
+  }
+  return c ? t / c : 0;
+}
+// Worst directional disagreement across a RANGE of lags. A single lag can
+// land where the directions happen to agree; grid alignment shows up
+// somewhere, so take the worst rather than one convenient reading.
+function isotropy(h, N) {
+  let worst = 1;
+  for (const r of [4, 8, 16, 32, 64]) {
+    if (r >= N - 1) break;
+    const d = Math.max(1, Math.round(r / Math.SQRT2));
+    const v = [vario(h, N, 1, 0, r), vario(h, N, 0, 1, r),
+               vario(h, N, 1, 1, d), vario(h, N, 1, -1, d)];
+    const lo = Math.min(...v);
+    if (lo > 0) worst = Math.max(worst, Math.max(...v) / lo);
+  }
+  return worst;
+}
+function spectrumSlope(h, N) {
+  const n = 1 << Math.floor(Math.log2(N - 1)), y = N >> 1, row = [];
+  for (let x = 0; x < n; x++) row.push(h[y * N + x]);
+  const pts = [];
+  for (let k = 1; k < n / 2; k++) {
+    let re = 0, im = 0;
+    for (let i = 0; i < n; i++) {
+      const a = -2 * Math.PI * k * i / n;
+      re += row[i] * Math.cos(a); im += row[i] * Math.sin(a);
+    }
+    pts.push([Math.log(k), Math.log((re * re + im * im) / n + 1e-18)]);
+  }
+  let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (const [X, Y] of pts) { sx += X; sy += Y; sxy += X * Y; sxx += X * X; }
+  const m = pts.length;
+  return (m * sxy - sx * sy) / (m * sxx - sx * sx);
+}
+// ── THE ORDERING TEST: SUBWORD COMPLEXITY ───────────────────────────────
+// The standard measure of quasi-ordering. Quantise the heights to Q levels
+// and count the DISTINCT windows of length n. For a quasi-periodic sequence
+// that count grows polynomially in n; for a random one it grows exponentially
+// until it saturates. So an ordered field reuses a small vocabulary of local
+// shapes many times, and a noise field's windows are nearly all distinct.
+//
+// EQUAL BUDGETS. The share-distinct FALLS as more windows are sampled, so a
+// field contributing 32,500 windows cannot be compared against a profile
+// contributing 1,993 — the denominator would be doing the work and the
+// comparison would be meaningless. Every call is capped at exactly BUDGET.
+const BUDGET = 16000, QLEV = 8;
+function complexity(lines, n) {
+  const seen = new Set(); let total = 0;
+  outer: for (const line of lines) {
+    const q = new Array(line.length);
+    for (let i = 0; i < line.length; i++)
+      q[i] = Math.max(0, Math.min(QLEV - 1, Math.floor(line[i] * QLEV)));
+    for (let i = 0; i + n <= q.length; i++) {
+      seen.add(q.slice(i, i + n).join(','));
+      if (++total >= BUDGET) break outer;
+    }
+  }
+  return total ? 100 * seen.size / total : 0;
+}
+function allLines(h, N) {
+  const out = [], stride = Math.max(1, Math.round(N / 64));
+  for (let y = 0; y < N; y += stride) { const r = []; for (let x = 0; x < N; x++) r.push(h[y * N + x]); out.push(r); }
+  for (let x = 0; x < N; x += stride) { const c = []; for (let y = 0; y < N; y++) c.push(h[y * N + x]); out.push(c); }
+  return out;
+}
+
+// ── BUILD ───────────────────────────────────────────────────────────────
+// Rescale only. Called by the vertical slider.
+function rescale() {
+  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
+  if (!mesh || !lastH) return build();
+  const pos = mesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, lastH[i] * vx);
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  if (wireMesh) {
+    const wp = wireMesh.geometry.attributes.position;
+    for (let i = 0; i < wp.count; i++) wp.setZ(i, lastH[i] * vx);
+    wp.needsUpdate = true;
+  }
+  place();
+}
+
+function build() {
+  const N = +$('grid').value, gentle = +$('gentle').value;
+  const K = +$('k').value; $('k-val').textContent = K;
+  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
+
+  let dec;
+  try { dec = decisions($('ax').value.trim(), parseRules($('rules').value), +$('depth').value, gentle); }
+  catch (e) { $('out').innerHTML = '<span class="warn">the grammar did not parse: ' + e.message + '</span>'; return null; }
+  if (dec.length < 8) {
+    $('out').innerHTML = '<span class="warn">that grammar yields ' + dec.length +
+      ' drawing symbols — nothing to lift. Does it contain + - &gt; &lt; or = ?</span>';
+    return null;
+  }
+  const P = makeProfile(dec);
+  const at = i => P[((i % P.length) + P.length) % P.length];
+
+  // The random control is always computed, so every reading has a scale beside
+  // it rather than being a number on its own.
+  let seed = 12345;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff * 2 - 1; };
+  const DEPTHS = [];
+  const needDepths = ['hierarchical', 'rowmajor'].includes($('method').value);
+  if (needDepths) {
+    const maxd = +$('depth').value;
+    for (let k = 1; k <= Math.max(maxd, 9); k++) {
+      try { DEPTHS.push(decisions($('ax').value.trim(), parseRules($('rules').value), k, gentle)); }
+      catch (e) { break; }
+    }
+  }
+  const FLAT = $('method').value === 'flat'
+    ? decisions($('ax').value.trim(), parseRules($('rules').value), Math.min(9, +$('depth').value + 3), gentle)
+    : null;
+
+  const wrap = (a, i) => a[((i % a.length) + a.length) % a.length];
+  let h;
+  switch ($('method').value) {
+    case 'separable':    h = separable(N, at); break;
+    case 'projection':   h = projection(N, at, K); break;
+    case 'hilbert':      h = hilbert(N, at); break;
+    case 'flat':         h = diamondSquare(N, (lv, i) => wrap(FLAT, i)); break;
+    case 'rowmajor':
+      h = diamondSquare(N, (lv, i, x, y, half) => {
+        const a = DEPTHS[Math.min(lv, DEPTHS.length - 1)];
+        const cols = Math.ceil(N / half);
+        return wrap(a, Math.floor(y / half) * cols + Math.floor(x / half));
+      });
+      break;
+    case 'hierarchical':
+      h = diamondSquare(N, (lv, i) => wrap(DEPTHS[Math.min(lv, DEPTHS.length - 1)], i));
+      break;
+    default:             h = diamondSquare(N, () => rnd()); break;
+  }
+  h = norm(h);
+  lastH = h; lastN = N;
+  const ctrl = norm(diamondSquare(N, () => rnd()));
+
+  // ── the surface ──
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
+  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); wireMesh = null; }
+  const geo = new THREE.PlaneGeometry(2, 2, N - 1, N - 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, h[i] * vx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xcfcdc4, roughness: 0.95, metalness: 0.0,
+    flatShading: false, side: THREE.DoubleSide
+  });
+  mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  scene.add(mesh);
+  if ($('wire').checked) {
+    wireMesh = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({
+      color: 0x55554e, wireframe: true, transparent: true, opacity: 0.16 }));
+    wireMesh.rotation.x = -Math.PI / 2;
+    scene.add(wireMesh);
+  }
+  place();
+
+  // ── the readout ──
+  const lines = allLines(h, N), ctrlLines = allLines(ctrl, N);
+  const pLines = [(() => { const a = Array.from(P); const mn = Math.min(...a), mx = Math.max(...a);
+                           return a.map(v => (v - mn) / ((mx - mn) || 1)); })()];
+  const c8 = complexity(lines, 8), r8 = complexity(ctrlLines, 8), p8 = complexity(pLines, 8);
+  const iso = isotropy(h, N), sl = spectrumSlope(h, N);
+  const carried = r8 > 0 ? (r8 - c8) / (r8 - Math.min(p8, r8)) : 0;
+
+  $('out').innerHTML =
+    `grid          ${N} x ${N} = ${(N * N).toLocaleString()} vertices   ` +
+    `profile ${P.length.toLocaleString()} samples\n` +
+    `ordering      ${c8.toFixed(1)}% distinct 8-windows   ` +
+    `(random ${r8.toFixed(1)}%, the 1D profile ${p8.toFixed(1)}%)\n` +
+    `              ${(100 * Math.max(0, Math.min(1, carried))).toFixed(0)}% of the way from noise to the 1D profile` +
+    (c8 > r8 ? `   <span class="warn">WORSE than random</span>` : '') + '\n' +
+    `isotropy      ${iso.toFixed(2)}   (1.00 = structure the same in every direction)` +
+    (iso > 1.5 ? `   <span class="warn">grid-aligned</span>` : '') + '\n' +
+    `spectrum      ${sl.toFixed(2)}   (real terrain sits near -2)\n` +
+    `relief        vertical x ${vx.toFixed(2)} of the ground extent`;
+  return h;
+}
+
+// ── WIRING ──────────────────────────────────────────────────────────────
+if (window.THREE) {
+  initThree();
+  $('go').addEventListener('click', build);
+  for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire'])
+    $(id).addEventListener('input', build);
+  $('vx').addEventListener('input', rescale);
+  for (const id of ['sun', 'sunaz'])
+    $(id).addEventListener('input', place);
+  for (const id of ['ax', 'rules'])
+    $(id).addEventListener('change', build);
+  $('png').addEventListener('click', () => {
+    place();                                    // render fresh into the kept buffer
+    const a = document.createElement('a');
+    a.href = $('cv').toDataURL('image/png');
+    a.download = 'terrain3d.png';
+    a.click();
+  });
+  build();
+}
+</script>

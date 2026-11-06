@@ -131,3 +131,69 @@ emergent property of a filter.
 What should carry over: the true-1:1 view, the end-of-profile marker, the summit
 count by prominence, and the measured fact that a landscape only looks like
 mountains when it is steep.
+
+## Going to 3D — which lifting keeps the quasi-ordering (2026-11-06)
+
+`terrain3d_bench.html`. The author asked how to generalise the 1D profile into
+3D "in such a way as to maintain the quasi ordering you get with the L system".
+
+**A walk cannot be generalised directly.** The 1D profile integrates decisions.
+In 2D there are many paths from the origin to (x,y) and a walk gives a
+different answer along each, so `h(x,y)` is not even a function. Every method
+has to be *position-indexed* rather than cumulative. That is forced, not
+chosen, and it is the real content of the generalisation.
+
+**The literature.** Prusinkiewicz & Hammel, *A Fractal Model of Mountains with
+Rivers*, Graphics Interface '93, pp. 174–180
+(<https://algorithmicbotany.org/papers/mountains.gi93.pdf>). They rewrite the
+**mesh**, not a string. Their central result is that midpoint displacement is
+context-**sensitive**, not context-free as Carpenter and Mandelbrot had it: two
+triangles sharing an edge must displace its midpoint identically, and the
+pattern chosen for one triangle determines the pattern for every other
+triangle in the mesh. They tie this to **Wang tiles** — labelled edges that
+must match — which Wang proved can simulate any Turing machine, so
+edge-matching is no weaker an ordering mechanism than a string. Their Figure 5
+gives Smith's trick: hash an edge's endpoints into an index and look the
+displacement up in a table, so both sides agree with no traversal.
+
+**The ordering test: subword complexity.** Quantise to 8 levels and count the
+distinct windows of length *n*. Polynomial growth means quasi-periodic,
+exponential means noise. Budgets must be EQUAL — share-distinct falls as more
+windows are sampled, so 32,500 windows cannot be compared against 1,993.
+
+Measured at 257×257, 16,000 windows each, against a random diamond-square
+control:
+
+| method | isotropy | spectrum | distinct 8-windows | ordering carried |
+|---|---|---|---|---|
+| the 1D profile itself | — | — | 2.5% | (the target) |
+| separable (outer product) | **1.61** | −1.71 | **3.0%** | 95% |
+| projection, 5 directions | 1.36 | −1.58 | **5.5%** | **72%** |
+| subdivision, row-major per level | 1.36 | −1.75 | 9.6% | 34% |
+| subdivision, depth drives level | 1.27 | −1.83 | 10.5% | 25% |
+| subdivision, one long string | 1.27 | −1.73 | 11.5% | 16% |
+| RANDOM control | 1.15 | −1.44 | 13.2% | 0% |
+| Hilbert-indexed | 1.31 | −1.67 | **36.5%** | worse than random |
+
+Four findings, two of them against my own prior recommendation:
+
+1. **Projection wins.** The cut-and-project construction of a quasicrystal
+   (after de Bruijn for Penrose tilings): sum the sequence along several
+   incommensurate directions. Each projection carries the whole sequence, so
+   ordering is preserved by construction. It needs nothing the 1D bench does
+   not already have.
+2. **The subdivision route barely beats noise** — 25% against the random
+   control, where I had recommended it. Midpoint displacement sets each new
+   height to the *average* of its neighbours plus a displacement whose
+   amplitude halves every level, so the averaging is a low-pass filter and the
+   grammar enters only as a diminishing scalar perturbation. What survives is
+   the averaging, which is identical whatever the displacement source. The
+   paper's method is excellent for rivers and realism, its actual subject, but
+   it is not a way to carry 1D quasi-ordering into 2D. Those are two different
+   goals and I conflated them.
+3. **Separable is the most ordered and the least usable** — 95% of the
+   ordering carried, and the worst isotropy at 1.61, with ridges running
+   exactly N–S and E–W. Proof that preserving the ordering is not sufficient.
+4. **Hilbert indexing is actively harmful**, nearly three times worse than
+   random. Locality *along the curve* is not locality along a row: the curve's
+   returns put distant sequence positions side by side within a row.
