@@ -122,11 +122,17 @@
         <option value="hilbert">Hilbert-indexed — locality-preserving index</option>
         <option value="random">RANDOM control — diamond-square, no grammar</option>
       </select>
-      <label>projection directions <span id="k-val">5</span></label>
-      <input id="k" type="range" min="2" max="12" value="5" step="1">
+      <label>projection directions <span id="k-val">20</span></label>
+      <input id="k" type="range" min="2" max="48" value="20" step="1">
       <div class="hint">Only used by the projection method. Angles are spaced
-        by the golden ratio so no two directions are commensurate &mdash; equal
-        spacing would put ridges on a grid.</div>
+        by the golden ratio so no two directions are commensurate.<br>
+        <b>This is the one real lever on the straight lines.</b> The method sums
+        K one-dimensional functions, and each one's contour lines are exactly
+        straight, so the field is a superposition of K striped patterns. At
+        K=5 a single direction accounted for <b>35% of the shading's
+        variance</b>; at K=20 that falls to about 20%. Raising K cannot remove
+        the stripes &mdash; only dilute them &mdash; and it slowly costs
+        ordering, so the readout's ordering line is worth watching.</div>
       <label>spread &mdash; grid cells per profile step
         <span id="spread-val">16</span></label>
       <input id="spread" type="range" min="1" max="96" value="16" step="1">
