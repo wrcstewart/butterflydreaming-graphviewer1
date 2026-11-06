@@ -303,9 +303,43 @@ function draw() {
   ctx.save();
   ctx.beginPath(); ctx.rect(pad, 0, W - pad * 2, Hc); ctx.clip();
 
-  // baseline
+  // ── NOTHING FLAT MAY BE DRAWN WHERE THERE IS NO TERRAIN ───────────────
+  // The author: *"There is a long plain on the righthand side and the tilt
+  // slider does nothing to it"*, and then *"it changes the length of the
+  // plain - the part that is left flat is still perfectly flat"*.
+  //
+  // MEASURED: the profile is 341 km and the view is 431 km, so the last
+  // 236 px of a 1128 px drawing area — 21% of the picture — holds NO BARS AT
+  // ALL. The only thing out there was this baseline rule, drawn from `pad` to
+  // `W - pad` regardless of where the data stopped: a perfectly flat grey line
+  // along the bottom of an empty strip. That is the plain he was looking at.
+  // No terrain parameter could ever tilt it, because it is not terrain.
+  //
+  // The end WAS marked, by a dashed amber line and a label. That was not
+  // enough, and on the author's colour vision a 1 px amber dash on white is
+  // close to invisible — see the standing rule never to carry meaning in hue
+  // alone. So the empty region is now shaded and hatched, and the baseline
+  // stops with the data.
+  const endX = Math.min(px(M.span), W - pad);
   ctx.strokeStyle = '#e4e4de'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(pad, py(M.minH)); ctx.lineTo(W - pad, py(M.minH)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad, py(M.minH)); ctx.lineTo(endX, py(M.minH)); ctx.stroke();
+
+  if (endX < W - pad - 1) {
+    ctx.fillStyle = 'rgba(70,70,64,0.07)';
+    ctx.fillRect(endX, 0, W - pad - endX, Hc);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(endX, 0, W - pad - endX, Hc); ctx.clip();
+    ctx.strokeStyle = 'rgba(70,70,64,0.16)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let d = -Hc; d < W; d += 9) { ctx.moveTo(endX + d, Hc); ctx.lineTo(endX + d + Hc, 0); }
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#4a4a44';
+    ctx.font = '11px ui-monospace,Menlo,monospace';
+    ctx.fillText('no terrain — the profile ends here, at ' +
+      (M.span / 1000).toFixed(0) + ' km of a ' + (viewW / 1000).toFixed(0) + ' km view',
+      endX + 7, Hc - 10);
+  }
 
   // The histogram first, faint: it is the data, and the line is an
   // interpretation of it. Drawing it behind makes the relationship visible
@@ -447,6 +481,11 @@ function draw() {
 
   const km = M.span / 1000;
   const meanW = M.span / M.n;
+  const hQ = +$('h-q').value;
+  const plainPx = Math.abs(meanGrade) / 100 * longestM * sy;
+  // px per metre goes as 1/viewW, so to multiply the tilt by k, DIVIDE the
+  // view by k. Written the other way round first, which widened it.
+  const fitW = plainPx > 0 ? viewW * (plainPx / 4) : 0;
   $('out').innerHTML =
     `bars          ${M.n}   mean width ${meanW.toFixed(0)} m\n` +
     `decisions     height ${M.H.seq.length} of ${M.H.raw}   width ${M.W.seq.length} of ${M.W.raw}\n` +
@@ -471,6 +510,29 @@ function draw() {
     + `${meanAbsGrade > 0.02 && Math.abs(meanGrade) < meanAbsGrade / 4
         ? ` <span class="warn">— the plains CANCEL; raise &lsquo;tilt of a plain&rsquo;</span>` : ''}` +
     `${Math.abs(meanGrade) < 0.3 ? '   (reads as level at true scale)' : ''}\n` +
+    // ── CAN THE TILT BE DRAWN AT ALL? ──────────────────────────────────
+    // The author: *"it changes the length of the plain - the part that is
+    // left flat is still perfectly flat"*. Both halves measured true, and
+    // the arithmetic was never the problem.
+    //
+    // At 431 km across, sy is 0.025 px per metre: a FULL mountain step of
+    // 60 m is 1.5 px, and a whole plain's rise is 0.3-0.55 px even with the
+    // tilt slider at maximum. It is tilted, to a fraction of one pixel, so
+    // the canvas can only round it to the same row and it stays perfectly
+    // flat. And the length changes because a bigger gentle step breaks a run
+    // sooner — 12 bars at 0.00, 8 at 0.40 — which is the one visible effect.
+    //
+    // A plain is also 0.65 px per bar WIDE at this view. So the honest answer
+    // is not a bigger tilt, which would stop it being a plain: it is a
+    // narrower view. This line says what the scale can resolve and what view
+    // width would show a plain's slope at a legible 4 px, because that is the
+    // number a slider cannot tell you.
+    `resolution    ${sy.toFixed(3)} px per m   full step ${(hQ * sy).toFixed(1)} px   ` +
+    `longest plain ${plainPx.toFixed(2)} px of tilt` +
+    (plainPx < 2 && longestM > 0
+      ? `\n<span class="warn">a plain's tilt is SUB-PIXEL here — ` +
+        `narrow the view to about ${(fitW / 1000).toFixed(0)} km to see it</span>`
+      : '') + '\n' +
     `grammar       ${up} &gt; against ${down} &lt;` +
     `${up !== down ? `   <span class="warn">net ${up > down ? '+' : ''}${up - down} — tilt also RAISES the ground</span>` : ''}\n` +
     `summits       ${peaks} over 100 m   ` +
