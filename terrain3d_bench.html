@@ -114,8 +114,8 @@
     <fieldset>
       <legend>method</legend>
       <select id="method">
-        <option value="skeleton" selected>skeleton — the grammar draws the ridges</option>
-        <option value="mesh">mesh rewriting — a slice of the derivation per edge</option>
+        <option value="skeleton">skeleton — the grammar draws the ridges</option>
+        <option value="mesh" selected>mesh rewriting — a slice of the derivation per edge</option>
         <option value="projection">projection — sum along N directions</option>
         <option value="separable">separable — outer product of the profile</option>
         <option value="hierarchical">subdivision — grammar depth drives level</option>
@@ -142,6 +142,18 @@
         straight line (stripe index 6.4 against a random field's 1.1); letting
         the heading integrate the grammar's own sequence brings it to 3.3 and
         isotropy to 1.47 against the random field's 1.39.</div>
+      <label>mesh thinning &mdash; build 1/<span id="thin-val">16</span> size,
+        then interpolate up</label>
+      <input id="thin" type="range" min="0" max="5" value="4" step="1">
+      <div class="hint">The author: <em>"far too many peaks needs thinning out
+        by a linear factor of at least 10"</em>. Measured at 257, peaks of
+        prominence 0.015 within radius 4 and their mean nearest-neighbour
+        spacing: <b>1&times; gives 38 peaks at spacing 22.6</b>;
+        <b>16&times; gives 4 peaks at spacing 94.4</b>.<br>
+        The readout below carries both figures live &mdash; trust them over any
+        table of mine, because peak COUNT is confounded by roughness: a very
+        rough field has few strict maxima over a radius-4 disc and a smooth one
+        has many, so the intermediate factors do not form a tidy progression.</div>
       <label>mesh derivation depth <span id="mdepth-val">9</span></label>
       <input id="mdepth" type="range" min="4" max="11" value="9" step="1">
       <div class="hint">Mesh rewriting only. The edge count is
@@ -655,6 +667,42 @@ function meshField(N, rules, axiom, gentle, pers, depth) {
   return h;
 }
 let meshDiag = null;
+
+// ── THINNING AS A TRUE LINEAR RESCALE ───────────────────────────────────
+// The author: *"far too many peaks needs thinning out by a linear factor of at
+// least 10"*. Build the whole construction on a grid N/f and interpolate up,
+// so every feature is f times further apart and nothing is truncated.
+// Truncating the fine subdivision levels instead reaches only 5.4x before
+// collapsing to a single peak, and leaves the surface piecewise-flat —
+// curvature read 1e14 because most cells then had exactly zero curvature.
+//
+// CATMULL-ROM, NOT THE QUINTIC FADE. The first version reused the quintic
+// blend from the profile sampler, and it was wrong for this job: the quintic
+// fade has ZERO DERIVATIVE at its nodes, so upsampling planted a tiny plateau
+// at every build-grid point and each plateau registered as a local maximum.
+// The thinned fields came out with MORE peaks than the unthinned one — 16
+// against 4 at 16x. Catmull-Rom's derivative at a node is not zero, so it
+// reconstructs a surface instead of a field of plateaus. Same family of
+// mistake as the creases earlier, in the opposite direction: there the fade's
+// vanishing derivatives were exactly what was wanted.
+function upsampleCR(hc, Nc, N) {
+  const H = (x, y) => hc[Math.max(0, Math.min(Nc - 1, y)) * Nc + Math.max(0, Math.min(Nc - 1, x))];
+  const cr = (p0, p1, p2, p3, u) =>
+    p1 + 0.5 * u * (p2 - p0 + u * (2 * p0 - 5 * p1 + 4 * p2 - p3 + u * (3 * (p1 - p2) + p3 - p0)));
+  const out = new Float64Array(N * N), sc = (Nc - 1) / (N - 1);
+  for (let y = 0; y < N; y++) {
+    const fy = y * sc, iy = Math.floor(fy), uy = fy - iy;
+    for (let x = 0; x < N; x++) {
+      const fx = x * sc, ix = Math.floor(fx), ux = fx - ix;
+      const r = [];
+      for (let k = -1; k <= 2; k++)
+        r.push(cr(H(ix - 1, iy + k), H(ix, iy + k), H(ix + 1, iy + k), H(ix + 2, iy + k), ux));
+      out[y * N + x] = cr(r[0], r[1], r[2], r[3], uy);
+    }
+  }
+  return out;
+}
+
 
 // 4-6. SUBDIVISION. One skeleton, so the ONLY difference between the variants
 // and the random control is where the displacement comes from — otherwise a
@@ -1239,7 +1287,13 @@ function build() {
     }
     case 'mesh': {
       const md = +$('mdepth').value;
-      h = meshField(N, parseRules($('rules').value), $('ax').value.trim(), gentle, pers, md);
+      const f = Math.pow(2, Math.max(0, Math.min(5, +$('thin').value)));
+      $('thin-val').textContent = f;
+      // The build grid must stay a power of two plus one, or the subdivision
+      // does not land on grid points.
+      const Nc = Math.max(5, (N - 1) / f + 1);
+      h = meshField(Nc, parseRules($('rules').value), $('ax').value.trim(), gentle, pers, md);
+      if (h && f > 1) h = upsampleCR(h, Nc, N);
       if (!h) {
         $('out').innerHTML = '<span class="warn">that grammar derives too few ' +
           'drawing symbols at depth ' + md + ' to fill the mesh — raise the mesh depth</span>';
@@ -1311,6 +1365,32 @@ function build() {
   const carried = r8 > 0 ? (r8 - c8) / (r8 - Math.min(p8, r8)) : 0;
 
   const rs = reliefStats(h, N, 10);
+  // PEAK COUNT AND SPACING, the two figures he actually used: "far too many
+  // peaks needs thinning out by a linear factor of at least 10". A count on
+  // its own cannot say whether thinning worked — the spacing is the linear
+  // quantity — so both are reported.
+  const pk = (() => {
+    const R = 4, pts = [];
+    for (let y = R; y < N - R; y += 2) for (let x = R; x < N - R; x += 2) {
+      const v = h[y * N + x]; let top = true, lo = v;
+      for (let dy = -R; dy <= R && top; dy++) for (let dx = -R; dx <= R; dx++) {
+        if ((!dx && !dy) || dx * dx + dy * dy > R * R) continue;
+        const w = h[(y + dy) * N + x + dx];
+        if (w > v) { top = false; break; }
+        if (w < lo) lo = w;
+      }
+      if (top && v - lo > 0.015) pts.push([x, y]);
+    }
+    if (pts.length < 2) return { n: pts.length, spacing: 0 };
+    let t = 0;
+    for (const [x, y] of pts) {
+      let best = Infinity;
+      for (const [u, v] of pts) { if (u === x && v === y) continue;
+        const d = Math.hypot(u - x, v - y); if (d < best) best = d; }
+      if (best < Infinity) t += best;
+    }
+    return { n: pts.length, spacing: t / pts.length };
+  })();
   const finest = spread / Math.pow(2, octaves - 1);
   $('out').innerHTML =
     `grid          ${N} x ${N} = ${(N * N).toLocaleString()} vertices   ` +
@@ -1343,6 +1423,9 @@ function build() {
     `curvature     ${rs.crease.toFixed(1)}x median at the 99.9th percentile   ` +
     `(creased &gt;6.5, smooth ~4.8)` +
     (rs.crease > 6.5 ? `   <span class="warn">CREASES</span>` : '') + '\n' +
+    `peaks         ${pk.n} of prominence 0.015 within radius 4   ` +
+    `mean spacing ${pk.spacing.toFixed(1)} cells` +
+    (pk.n > 200 ? `   <span class="warn">crowded — raise the thinning</span>` : '') + '\n' +
     `summits       ${rs.summits} within radius 10   ` +
     `tallest/shortest prominence ${rs.variety ? rs.variety.toFixed(1) + 'x' : '-'}` +
     (rs.variety && rs.variety < 1.6 ? `   <span class="warn">peaks too uniform — lower the spread</span>` : '') + '\n' +
@@ -1363,7 +1446,7 @@ if (window.THREE) {
   $('go').addEventListener('click', build);
   for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire',
                     'spread', 'oct', 'pers', 'mdepth',
-                    'sdepth', 'sturn', 'scurve', 'sslope', 'sdrop', 'ssm'])
+                    'sdepth', 'sturn', 'scurve', 'sslope', 'sdrop', 'ssm', 'thin'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
