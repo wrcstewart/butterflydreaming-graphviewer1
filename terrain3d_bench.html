@@ -114,7 +114,8 @@
     <fieldset>
       <legend>method</legend>
       <select id="method">
-        <option value="projection" selected>projection — sum along N directions</option>
+        <option value="mesh" selected>mesh rewriting — the grammar in the edge labels</option>
+        <option value="projection">projection — sum along N directions</option>
         <option value="separable">separable — outer product of the profile</option>
         <option value="hierarchical">subdivision — grammar depth drives level</option>
         <option value="rowmajor">subdivision — row-major within each level</option>
@@ -122,6 +123,18 @@
         <option value="hilbert">Hilbert-indexed — locality-preserving index</option>
         <option value="random">RANDOM control — diamond-square, no grammar</option>
       </select>
+      <label>mesh seed labels (one per edge of the opening square, then its
+        diagonal)</label>
+      <input id="seed" type="text" value="ZZZZZ">
+      <div class="hint">Mesh rewriting only. Measured against the other methods
+        at 257&times;257, worst fringe over 36 directions:<br>
+        <b>projection K=5: fringe 1975</b> &mdash; 35&times; the random control's
+        57, which is the straight lines quantified.<br>
+        <b>mesh ZZZZZ: fringe 330</b>, ordering 2.50% against projection's
+        1.81%, and 15 summits against 4. Six times fewer fringes for almost
+        none of the ordering.<br>
+        It uses the <b>persistence</b> slider below; spread, octaves and
+        directions do nothing here.</div>
       <label>projection directions <span id="k-val">20</span></label>
       <input id="k" type="range" min="2" max="48" value="20" step="1">
       <div class="hint">Only used by the projection method. Angles are spaced
@@ -138,8 +151,8 @@
       <input id="spread" type="range" min="1" max="96" value="16" step="1">
       <label>octaves <span id="oct-val">4</span></label>
       <input id="oct" type="range" min="1" max="7" value="4" step="1">
-      <label>detail kept per octave <span id="pers-val">0.50</span></label>
-      <input id="pers" type="range" min="0.1" max="0.85" value="0.5" step="0.01">
+      <label>detail kept per level <span id="pers-val">0.60</span></label>
+      <input id="pers" type="range" min="0.1" max="0.85" value="0.6" step="0.01">
       <div class="hint">The author: <em>"way too much height variation - like a
         load of spiket peaks"</em>. At spread 1 one grid cell is one profile
         step &mdash; measured, that gives <b>1,984 single-cell maxima</b>, which
@@ -320,6 +333,101 @@ function hilbert(N, at) {
   let order = 1; while (order < N) order <<= 1;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
     h[y * N + x] = at(hilbertIndex(Math.min(x, order - 1), Math.min(y, order - 1), order));
+  return h;
+}
+
+// 7. MESH REWRITING — Prusinkiewicz & Hammel, and the answer to the author's
+// original question. A triangle is replaced by FOUR triangles and that IS the
+// production; the grammar chooses the subdivision PATTERN, carried as a label
+// on each edge, rather than a displacement amplitude.
+//
+// WHY THE LABEL GOES ON THE EDGE. The paper's central result is that midpoint
+// displacement is context-SENSITIVE: two triangles sharing an edge must
+// displace its midpoint identically. Their Figure 5 achieves that by hashing
+// the edge's endpoints into a displacement table. Putting the label on the
+// edge itself is stronger — both triangles read the same label and derive the
+// same children, so consistency is structural and there is nothing to hash.
+//
+// WHY THIS AND NOT THE PROJECTION. The author asked whether the straight-line
+// regularity came from the fractal data itself, and that turned out to be the
+// decisive question. A quasi-periodic sequence is DEFINED by having a discrete
+// diffraction spectrum, so a projection that faithfully transmits the sequence
+// necessarily transmits its Bragg peaks — and peaks along a projected
+// direction ARE regular fringes. Preserving the ordering through a projection
+// and avoiding ruled lines are therefore the same property pulling opposite
+// ways; measured, projection's worst fringe is 1975 against a random control's
+// 57. Here the ordering is COMBINATORIAL — which cell neighbours which — and a
+// combinatorial order has no spectrum to project into fringes. Measured, 330.
+//
+// It also restores what the projection had lost: 15 summits against 4, because
+// the grammar is acting on the topology where the averaging cannot reach it,
+// which is exactly why the earlier displacement-table attempt washed out.
+function meshField(N, rules, gentle, pers, amp0, seed) {
+  const TERMV = { '+': 1, '-': -1, '>': gentle, '<': -gentle, '=': 0 };
+  const vcache = new Map(), kcache = new Map();
+  // A terminal is worth itself. A NON-terminal is worth the mean drift its own
+  // rule imposes, so it still carries a height meaning and that meaning is the
+  // grammar's rather than one invented here.
+  const value = Lb => {
+    if (Lb in TERMV) return TERMV[Lb];
+    if (vcache.has(Lb)) return vcache.get(Lb);
+    const pr = rules[Lb] || '';
+    let t = 0, n = 0;
+    for (const c of pr) if (c in TERMV) { t += TERMV[c]; n++; }
+    const v = n ? t / n : 0;
+    vcache.set(Lb, v);
+    return v;
+  };
+  // Two halves and the internal edge parallel to it, taken in order from the
+  // parent's production and cycled, so a short rule still works.
+  const kids = Lb => {
+    if (kcache.has(Lb)) return kcache.get(Lb);
+    const pr = rules[Lb] || Lb;
+    const k = [pr[0 % pr.length], pr[1 % pr.length], pr[2 % pr.length]];
+    kcache.set(Lb, k);
+    return k;
+  };
+  const order = Math.round(Math.log2(N - 1));
+  const h = new Float64Array(N * N), seen = new Uint8Array(N * N);
+  const ix = (x, y) => y * N + x;
+  const put = (x, y, v) => { h[ix(x, y)] = v; seen[ix(x, y)] = 1; };
+  for (const [x, y] of [[0, 0], [N-1, 0], [0, N-1], [N-1, N-1]]) put(x, y, 0.5);
+  const ek = (a, b) => (a[0] * N + a[1]) < (b[0] * N + b[1])
+    ? a[0] + ',' + a[1] + '|' + b[0] + ',' + b[1]
+    : b[0] + ',' + b[1] + '|' + a[0] + ',' + a[1];
+  const lab = new Map();
+  const A = [0, 0], B = [N-1, 0], C = [N-1, N-1], D = [0, N-1];
+  const sd = (seed && seed.length ? seed : 'ZZZZZ').split('');
+  const pick = i => sd[i % sd.length];
+  lab.set(ek(A, B), pick(0)); lab.set(ek(B, C), pick(1));
+  lab.set(ek(C, D), pick(2)); lab.set(ek(D, A), pick(3));
+  lab.set(ek(A, C), pick(4));
+  let tris = [[A, B, C], [A, C, D]];
+  for (let level = 0; level < order; level++) {
+    const amp = amp0 * Math.pow(pers, level), next = [], mids = new Map();
+    for (const [p, q, r] of tris) {
+      const E = [[p, q], [q, r], [r, p]], M = [];
+      for (const [u, v] of E) {
+        const k = ek(u, v);
+        if (mids.has(k)) { M.push(mids.get(k)); continue; }
+        const m = [(u[0] + v[0]) >> 1, (u[1] + v[1]) >> 1];
+        if (!seen[ix(m[0], m[1])]) {
+          const Lb = lab.get(k) || 'X';
+          put(m[0], m[1], (h[ix(u[0], u[1])] + h[ix(v[0], v[1])]) / 2 + value(Lb) * amp);
+        }
+        mids.set(k, m); M.push(m);
+      }
+      const par = [[M[1], M[2]], [M[2], M[0]], [M[0], M[1]]];
+      for (let i = 0; i < 3; i++) {
+        const Lb = lab.get(ek(E[i][0], E[i][1])) || 'X', kk = kids(Lb);
+        lab.set(ek(E[i][0], M[i]), kk[0]);
+        lab.set(ek(M[i], E[i][1]), kk[1]);
+        if (!lab.has(ek(par[i][0], par[i][1]))) lab.set(ek(par[i][0], par[i][1]), kk[2]);
+      }
+      next.push([p, M[0], M[2]], [M[0], q, M[1]], [M[2], M[1], r], [M[0], M[1], M[2]]);
+    }
+    tris = next;
+  }
   return h;
 }
 
@@ -892,6 +1000,9 @@ function build() {
   const wrap = (a, i) => a[((i % a.length) + a.length) % a.length];
   let h;
   switch ($('method').value) {
+    case 'mesh':
+      h = meshField(N, parseRules($('rules').value), gentle, pers, 0.55, $('seed').value.trim());
+      break;
     case 'separable':    h = separable(N, fract); break;
     case 'projection':   h = projection(N, fract, K); break;
     case 'hilbert':      h = hilbert(N, at); break;
@@ -999,7 +1110,7 @@ if (window.THREE) {
   $('scheme').addEventListener('input', applyScheme);
   for (const id of ['sun', 'sunaz'])
     $(id).addEventListener('input', place);
-  for (const id of ['ax', 'rules'])
+  for (const id of ['ax', 'rules', 'seed'])
     $(id).addEventListener('change', build);
   $('png').addEventListener('click', () => {
     place();                                    // render fresh into the kept buffer

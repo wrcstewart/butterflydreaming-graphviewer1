@@ -197,3 +197,69 @@ Four findings, two of them against my own prior recommendation:
 4. **Hilbert indexing is actively harmful**, nearly three times worse than
    random. Locality *along the curve* is not locality along a row: the curve's
    returns put distant sequence positions side by side within a row.
+
+## The straight lines, and why mesh rewriting is the answer (2026-11-06)
+
+Four rounds were spent fixing *discontinuities* in the projection method — a
+wrap seam, linear interpolation, C1→C2 — and the lines barely moved. They were
+never discontinuities.
+
+**The arithmetic.** `h(x,y) = Σ f(x·cos θₖ + y·sin θₖ)` is a sum of K
+one-dimensional functions, and each term's level sets are *exactly straight
+lines*. The field is a superposition of K perfectly smooth striped patterns.
+Nothing about interpolation can remove a contour that is straight by
+construction.
+
+**The author's question settled it.** He asked whether the regularity came
+from the fractal data itself. Measured, the decision sequence is **2.6×** more
+spectrally concentrated than a shuffle of the same symbols in the 2–24 sample
+band, with dominant periods near 2.9 and 18.3 samples — which at spread 16
+predict fringes every ~46 and ~293 cells, the right order for what is visible.
+Shuffling does *not* reliably remove the fringes (at K=5 the ordered sequence
+scored between two shuffles), so the data is not the sole cause.
+
+**The synthesis, by derivation rather than measurement.** A quasi-periodic
+sequence is *defined* by having a discrete diffraction spectrum. A projection
+that faithfully transmits the sequence necessarily transmits its Bragg peaks,
+and peaks along a projected direction **are** regular fringes. So *preserving
+the L-system's quasi-ordering through a projection* and *avoiding ruled lines*
+are one property pulling two ways. That is why projection scored best on
+ordering and worst on appearance — not a coincidence.
+
+**The escape: carry the ordering combinatorially, not spectrally.** Which cell
+neighbours which has no spectrum to project into fringes. That is
+Prusinkiewicz & Hammel's mesh rewriting with the grammar on the **edge
+labels** — and putting the label on the edge is stronger than their Figure 5
+endpoint hash, because both triangles read the same label and derive the same
+children, so consistency is structural with nothing to hash.
+
+Identical measures, 257×257, worst fringe over 36 directions:
+
+| method | fringe | ordering | isotropy | summits | curvature |
+|---|---|---|---|---|---|
+| RANDOM subdivision (control) | **57** | 10.55% | 1.39 | 22 | **3.7** |
+| projection K=5 | **1975** | **1.81%** | 4.37 | 4 | 4.7 |
+| projection K=20 | 1181 | 1.59% | 10.57 | 0 | 4.9 |
+| **mesh rewriting `ZZZZZ`** | **330** | **2.50%** | **2.61** | **15** | 18.9 |
+| mesh rewriting `XYZYX` | 637 | 6.29% | 1.94 | 9 | 5.0 |
+| mesh rewriting `XYZXY` | 422 | 12.47% | 1.93 | 1 | 9.0 |
+
+Projection's fringe is **35× the random control**. Mesh rewriting cuts it 6×,
+keeps nearly all the ordering, and restores the summits the projection had lost
+(15 against 4) — because the grammar acts on the topology, where the averaging
+cannot reach it. That is precisely why the earlier displacement-table attempt
+washed out.
+
+**Open: triangle-edge faceting**, curvature 18.9 against the control's 3.7.
+Post-smoothing is the wrong cure — it removes the high-frequency content the
+median is computed from, so the fringe figure *rises* from 330 to 7258 while
+the summits go to zero. The principled fix is a subdivision scheme with a C1
+limit surface (four-point or butterfly) in place of plain midpoint averaging.
+
+**A method note, against repeating it.** Five proxy metrics for "straight
+lines" disagreed with one another; at least three were confounded — two by
+comparing populations of different size, one by smoothness changing the median
+a peak/median ratio divides by. The question was settled by a derivation. When
+proxies disagree, look for the property that can be derived rather than
+measured, and only compare proxy figures between fields of equal smoothness
+and equal sample count.
