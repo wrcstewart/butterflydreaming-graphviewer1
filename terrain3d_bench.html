@@ -142,22 +142,19 @@
         straight line (stripe index 6.4 against a random field's 1.1); letting
         the heading integrate the grammar's own sequence brings it to 3.3 and
         isotropy to 1.47 against the random field's 1.39.</div>
-      <label>mesh thinning &mdash; build 1/<span id="thin-val">1</span> size,
-        then interpolate up</label>
-      <input id="thin" type="range" min="0" max="5" value="0" step="1">
-      <div class="hint">DEFAULTED BACK TO 1&times;. Thinning this way was
-        <em>"worse not better"</em> and the author was right: building at 1/16
-        size gives a construction with only four subdivision levels stretched
-        out, so all the texture is gone.<br>
-        Measured, nothing inside the construction thins it far anyway &mdash;
-        truncating the fine levels reaches 5.4&times; before collapsing to one
-        peak; lowering persistence collapses the count while curvature goes
-        from 9 to 280 as the surface turns to facets; a two-band amplitude
-        schedule reaches 1.9&times; at best. And 10&times; the present 22.6-cell
-        spacing is 226 cells, which is <b>one peak in a 257 frame</b>. What is
-        wanted is a ZOOM &mdash; a frame covering 1/10 of a larger landscape,
-        with every level of detail still in it &mdash; not a thinner
-        construction.</div>
+      <label>feature scale &mdash; levels at full height
+        <span id="kc-val">2</span> (pitch <span id="kc-pitch">128</span> cells)</label>
+      <input id="kc" type="range" min="1" max="8" value="2" step="1">
+      <label>fine texture <span id="tex-val">0.12</span> of full height</label>
+      <input id="tex" type="range" min="0" max="0.6" value="0.12" step="0.01">
+      <div class="hint">Mesh only, and this is the thinning control. Measured at
+        257, peaks of prominence 0.015 within radius 4 and their mean spacing:
+        the old single-decay default gave <b>38 peaks at spacing 22.6</b>;
+        levels 2 with texture 0.12 gives <b>5 peaks at spacing 50.7</b>, with
+        the surface SMOOTHER than before (curvature 7.6 against 9.4) and the
+        fine texture retained.<br>
+        Texture 0 alone would facet badly &mdash; it is the four-point
+        subdivision that makes truncating the levels usable at all.</div>
       <label>mesh derivation depth <span id="mdepth-val">9</span></label>
       <input id="mdepth" type="range" min="4" max="11" value="9" step="1">
       <div class="hint">Mesh rewriting only. The edge count is
@@ -592,7 +589,7 @@ let skelDiag = null;
 // curvature is 9.4 against its 3.7 — triangle-edge faceting, whose principled
 // fix is a subdivision with a C1 limit surface (four-point or butterfly)
 // rather than plain midpoint averaging. Not done.
-function meshField(N, rules, axiom, gentle, pers, depth) {
+function meshField(N, rules, axiom, gentle, pers, depth, kCoarse, texture) {
   const TERMV = { '+': 1, '-': -1, '>': gentle, '<': -gentle, '=': 0 };
   let str;
   try {
@@ -628,7 +625,24 @@ function meshField(N, rules, axiom, gentle, pers, depth) {
   let tris = [[A, B, C], [A, C, D]];
   let distinctTotal = 0;
   for (let level = 0; level < order; level++) {
-    const amp = Math.pow(pers, level), next = [], mids = new Map();
+    // ── FEATURE SCALE: a two-band amplitude ───────────────────────────
+    // The author: *"far too many peaks needs thinning out by a linear factor
+    // of at least 10"*. Levels below kCoarse run at full amplitude and the
+    // finer ones are scaled by `texture`, so the feature scale is set by
+    // kCoarse while fine detail survives at low amplitude.
+    //
+    // Three other readings were measured and failed. Building the whole thing
+    // 1/16 size and interpolating up gives a construction with four levels
+    // stretched over the frame — the author: "worse not better". Lowering
+    // persistence collapses the peak count while curvature goes 9.4 to 279.7
+    // as the surface turns to facets. And ZOOMING cannot work at all: a
+    // self-similar field looks the same at every scale, so a pruned descent
+    // into a 16x larger construction moved the peak spacing from 15.9 to only
+    // 27.2 while halving the roughness — it adds four levels of fine detail
+    // rather than making features bigger. Peaks-per-frame is a property of the
+    // amplitude spectrum, not of the viewing scale.
+    const amp = Math.pow(pers, level) * (level < kCoarse ? 1 : texture);
+    const next = [], mids = new Map();
     // pass one: this level's own mean absolute drift
     let lvlSum = 0, lvlN = 0;
     const seenE = new Set();
@@ -649,7 +663,23 @@ function meshField(N, rules, axiom, gentle, pers, depth) {
         if (!seen[ix(m[0], m[1])]) {
           const d = Math.max(-2, Math.min(2, rawDrift(sl.get(k) || [0, 1]) * scale));
           used.add(d.toFixed(4));
-          put(m[0], m[1], (h[ix(u[0], u[1])] + h[ix(v[0], v[1])]) / 2 + d * amp);
+          // ── FOUR-POINT INTERPOLATING SUBDIVISION ──────────────────────
+          // 9/16(v1+v2) - 1/16(v0+v3) along the edge, instead of the plain
+          // 1/2(v1+v2). This is what made truncation usable at all: the
+          // midpoint rule has a PIECEWISE-LINEAR limit, so cutting the
+          // displacement at a level leaves flat facets with creases between
+          // them — measured, curvature 3.7e14 at kCoarse 5, because almost
+          // every cell then has exactly zero curvature. The four-point rule
+          // has a C1 limit, and the same setting reads 13.6. It is the fix
+          // flagged as still open three commits ago.
+          const dxE = v[0] - u[0], dyE = v[1] - u[1];
+          const o0 = [u[0] - dxE, u[1] - dyE], o3 = [v[0] + dxE, v[1] + dyE];
+          const ok = pt => pt[0] >= 0 && pt[0] < N && pt[1] >= 0 && pt[1] < N && seen[ix(pt[0], pt[1])];
+          const base = (ok(o0) && ok(o3))
+            ? 0.5625 * (h[ix(u[0], u[1])] + h[ix(v[0], v[1])])
+              - 0.0625 * (h[ix(o0[0], o0[1])] + h[ix(o3[0], o3[1])])
+            : (h[ix(u[0], u[1])] + h[ix(v[0], v[1])]) / 2;   // at the boundary
+          put(m[0], m[1], base + d * amp);
         }
         mids.set(k, m); M.push(m);
       }
@@ -672,40 +702,6 @@ function meshField(N, rules, axiom, gentle, pers, depth) {
 }
 let meshDiag = null;
 
-// ── THINNING AS A TRUE LINEAR RESCALE ───────────────────────────────────
-// The author: *"far too many peaks needs thinning out by a linear factor of at
-// least 10"*. Build the whole construction on a grid N/f and interpolate up,
-// so every feature is f times further apart and nothing is truncated.
-// Truncating the fine subdivision levels instead reaches only 5.4x before
-// collapsing to a single peak, and leaves the surface piecewise-flat —
-// curvature read 1e14 because most cells then had exactly zero curvature.
-//
-// CATMULL-ROM, NOT THE QUINTIC FADE. The first version reused the quintic
-// blend from the profile sampler, and it was wrong for this job: the quintic
-// fade has ZERO DERIVATIVE at its nodes, so upsampling planted a tiny plateau
-// at every build-grid point and each plateau registered as a local maximum.
-// The thinned fields came out with MORE peaks than the unthinned one — 16
-// against 4 at 16x. Catmull-Rom's derivative at a node is not zero, so it
-// reconstructs a surface instead of a field of plateaus. Same family of
-// mistake as the creases earlier, in the opposite direction: there the fade's
-// vanishing derivatives were exactly what was wanted.
-function upsampleCR(hc, Nc, N) {
-  const H = (x, y) => hc[Math.max(0, Math.min(Nc - 1, y)) * Nc + Math.max(0, Math.min(Nc - 1, x))];
-  const cr = (p0, p1, p2, p3, u) =>
-    p1 + 0.5 * u * (p2 - p0 + u * (2 * p0 - 5 * p1 + 4 * p2 - p3 + u * (3 * (p1 - p2) + p3 - p0)));
-  const out = new Float64Array(N * N), sc = (Nc - 1) / (N - 1);
-  for (let y = 0; y < N; y++) {
-    const fy = y * sc, iy = Math.floor(fy), uy = fy - iy;
-    for (let x = 0; x < N; x++) {
-      const fx = x * sc, ix = Math.floor(fx), ux = fx - ix;
-      const r = [];
-      for (let k = -1; k <= 2; k++)
-        r.push(cr(H(ix - 1, iy + k), H(ix, iy + k), H(ix + 1, iy + k), H(ix + 2, iy + k), ux));
-      out[y * N + x] = cr(r[0], r[1], r[2], r[3], uy);
-    }
-  }
-  return out;
-}
 
 
 // 4-6. SUBDIVISION. One skeleton, so the ONLY difference between the variants
@@ -1291,13 +1287,13 @@ function build() {
     }
     case 'mesh': {
       const md = +$('mdepth').value;
-      const f = Math.pow(2, Math.max(0, Math.min(5, +$('thin').value)));
-      $('thin-val').textContent = f;
-      // The build grid must stay a power of two plus one, or the subdivision
-      // does not land on grid points.
-      const Nc = Math.max(5, (N - 1) / f + 1);
-      h = meshField(Nc, parseRules($('rules').value), $('ax').value.trim(), gentle, pers, md);
-      if (h && f > 1) h = upsampleCR(h, Nc, N);
+      const kc = Math.max(1, Math.min(8, +$('kc').value));
+      const tex = Math.max(0, +$('tex').value);
+      $('kc-val').textContent = kc;
+      $('kc-pitch').textContent = (N - 1) >> (kc - 1);
+      $('tex-val').textContent = tex.toFixed(2);
+      h = meshField(N, parseRules($('rules').value), $('ax').value.trim(),
+                    gentle, pers, md, kc, tex);
       if (!h) {
         $('out').innerHTML = '<span class="warn">that grammar derives too few ' +
           'drawing symbols at depth ' + md + ' to fill the mesh — raise the mesh depth</span>';
@@ -1450,7 +1446,7 @@ if (window.THREE) {
   $('go').addEventListener('click', build);
   for (const id of ['method', 'k', 'depth', 'gentle', 'grid', 'wire',
                     'spread', 'oct', 'pers', 'mdepth',
-                    'sdepth', 'sturn', 'scurve', 'sslope', 'sdrop', 'ssm', 'thin'])
+                    'sdepth', 'sturn', 'scurve', 'sslope', 'sdrop', 'ssm', 'kc', 'tex'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
