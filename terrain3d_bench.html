@@ -143,18 +143,22 @@
         the heading integrate the grammar's own sequence brings it to 3.3 and
         isotropy to 1.47 against the random field's 1.39.</div>
       <label>feature scale &mdash; levels at full height
-        <span id="kc-val">2</span> (pitch <span id="kc-pitch">128</span> cells)</label>
-      <input id="kc" type="range" min="1" max="8" value="2" step="1">
-      <label>fine texture <span id="tex-val">0.12</span> of full height</label>
-      <input id="tex" type="range" min="0" max="0.6" value="0.12" step="0.01">
-      <div class="hint">Mesh only, and this is the thinning control. Measured at
-        257, peaks of prominence 0.015 within radius 4 and their mean spacing:
-        the old single-decay default gave <b>38 peaks at spacing 22.6</b>;
-        levels 2 with texture 0.12 gives <b>5 peaks at spacing 50.7</b>, with
-        the surface SMOOTHER than before (curvature 7.6 against 9.4) and the
-        fine texture retained.<br>
-        Texture 0 alone would facet badly &mdash; it is the four-point
-        subdivision that makes truncating the levels usable at all.</div>
+        <span id="kc-val">4</span> (pitch <span id="kc-pitch">32</span> cells)</label>
+      <input id="kc" type="range" min="1" max="8" value="4" step="1">
+      <label>fine texture <span id="tex-val">0.01</span> of full height</label>
+      <input id="tex" type="range" min="0" max="0.6" value="0.01" step="0.01">
+      <div class="hint">Mesh only, and this is the thinning control. The
+        author: <em>"there look to be thousands of peaks but your stats say
+        different"</em> &mdash; he was right and the statistic was wrong. A
+        radius-4, 1.5%-prominence test counts mountain-scale summits and is
+        blind to narrow bumps, which lighting makes very visible. Counted at
+        radius 1 the old default had <b>3,067</b> of them.<br>
+        Measured at 257: old default (levels 2, texture 0.12) 3,067 bumps,
+        12 summits, mean curvature 0.664%. <b>Levels 4, texture 0.01: 317
+        bumps, 17 summits, 0.227%</b> &mdash; nine times fewer bumps, MORE real
+        summits, three times smoother.<br>
+        The readout carries the bump count now, because that is the figure
+        being judged and my old one hid it.</div>
       <label>mesh derivation depth <span id="mdepth-val">9</span></label>
       <input id="mdepth" type="range" min="4" max="11" value="9" step="1">
       <div class="hint">Mesh rewriting only. The edge count is
@@ -1365,10 +1369,35 @@ function build() {
   const carried = r8 > 0 ? (r8 - c8) / (r8 - Math.min(p8, r8)) : 0;
 
   const rs = reliefStats(h, N, 10);
-  // PEAK COUNT AND SPACING, the two figures he actually used: "far too many
-  // peaks needs thinning out by a linear factor of at least 10". A count on
-  // its own cannot say whether thinning worked — the spacing is the linear
-  // quantity — so both are reported.
+  const bumps = (() => {
+    let n = 0;
+    for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+      const v = h[y*N+x];
+      if (v >= h[y*N+x+1] && v >= h[y*N+x-1] && v >= h[(y+1)*N+x] && v >= h[(y-1)*N+x] &&
+          v > Math.min(h[y*N+x+1], h[y*N+x-1], h[(y+1)*N+x], h[(y-1)*N+x]) + 0.0005) n++;
+    }
+    return n;
+  })();
+  // ABSOLUTE curvature. The p99.9/median ratio rises when the median falls, so
+  // a SMOOTHER field scored WORSE — it read 25.6 at texture 0 and 7.6 at 0.12,
+  // the opposite of the truth, and it sent me to the wrong default. Mean and
+  // max |laplacian| as a share of the relief cannot invert like that.
+  const curvAbs = (() => {
+    let t = 0, n = 0, mx = 0;
+    for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+      const l = Math.abs(h[y*N+x+1] + h[y*N+x-1] + h[(y+1)*N+x] + h[(y-1)*N+x] - 4*h[y*N+x]);
+      t += l; n++; if (l > mx) mx = l;
+    }
+    return { mean: 100 * t / n, max: 100 * mx };
+  })();
+  // ── COUNT AT THE SCALE THE EYE SEES ───────────────────────────────────
+  // The author: *"there look to be thousands of peaks but your stats say
+  // different"*. Both were true of the same field and the statistic was the
+  // misleading one: a radius-4, 1.5%-prominence test counts mountain-scale
+  // summits and cannot see a narrow bump, which shading makes glaring. The
+  // same field read 68 that way and 3,068 at radius 1. BOTH are reported now —
+  // bumps for the texture, summits for the structure — because one without the
+  // other is what let four rounds of tuning aim at the wrong thing.
   const pk = (() => {
     const R = 4, pts = [];
     for (let y = R; y < N - R; y += 2) for (let x = R; x < N - R; x += 2) {
@@ -1420,9 +1449,11 @@ function build() {
     // only 1.6x because five directions times four octaves dilute twenty
     // crease families into each other — a first guess of 40 would never have
     // fired at all.
-    `curvature     ${rs.crease.toFixed(1)}x median at the 99.9th percentile   ` +
-    `(creased &gt;6.5, smooth ~4.8)` +
-    (rs.crease > 6.5 ? `   <span class="warn">CREASES</span>` : '') + '\n' +
+    `bumps         ${bumps.toLocaleString()} local maxima at radius 1   ` +
+    `<i>the fine texture — this is what reads as "thousands of peaks"</i>` +
+    (bumps > 1200 ? `   <span class="warn">lower the texture</span>` : '') + '\n' +
+    `curvature     mean ${curvAbs.mean.toFixed(3)}% of relief, max ` +
+    `${curvAbs.max.toFixed(2)}%   (smooth ~0.04%, textured ~0.66%)\n` +
     `peaks         ${pk.n} of prominence 0.015 within radius 4   ` +
     `mean spacing ${pk.spacing.toFixed(1)} cells` +
     (pk.n > 200 ? `   <span class="warn">crowded — raise the thinning</span>` : '') + '\n' +
