@@ -1,0 +1,392 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>constant delta terrain</title>
+<!--
+  constdelta_terrain.html — 2026-11-07. A deliberately small page: the
+  triangle scan with a CONSTANT delta and nothing else, in real units.
+  trianglescan_terrain.html had grown fifteen controls and the author said the
+  number of options and tick boxes worried him. Six here, and no grammar at
+  all — so this page does not even load the L-system library.
+  See trianglescan_terrain.html for the fractal version.
+
+  WHAT IT DOES. A u,v grid is filled in anti-diagonal order from the origin.
+  Each cell's base height is the reciprocal-distance weighted average of its
+  three already-established neighbours — (u-1,v) and (u,v-1) at weight 1,
+  (u-1,v-1) at 1/sqrt(2), over 2+1/sqrt(2) — and the same delta is added to
+  every cell.
+
+  WHY THAT IS NOT A PLANE, which is the whole point of looking at it. The two
+  orthogonal neighbours are one diagonal back and (u-1,v-1) is TWO, so a cell's
+  base lags the current diagonal by SUM(w_i * lag_i). Interior that is
+  1 + w_diag = 1.26120; an axis cell has only an orthogonal neighbour and lags
+  exactly 1. So the axes rise at delta per diagonal and the interior at
+  1/1.26120 = 0.792893, and the difference is a valley along the main diagonal
+  worth (sqrt(2)-1)/2 = 20.7% of the edge rise AT EVERY SCALE. Verified against
+  the closed form to six decimals in the far field, where its assumption of no
+  edge influence holds.
+
+  WHY IT LOOKS FLAT, and it is not that the delta is too small. A constant
+  delta is a CONSTANT GRADIENT, so fixing the total rise fixes the steepness.
+  The author's target — 1000 m of relief over 20 km — is itself a 5% average
+  gradient, and 2.5% along an axis. The Alps run about 25%. To reach an Alpine
+  slope here the delta would have to be 20 m, which puts the far corner at
+  10,240 m. The two cannot both be had, and no amount of sliding will do it:
+  it is arithmetic, not tuning. What makes a gentle landscape read as mountains
+  is vertical exaggeration, which is why that slider is here and says plainly
+  when it is lying.
+
+  The serpentine option is GONE rather than defaulted: with a constant delta
+  the traversal order within a diagonal cannot matter, and the two orders were
+  measured byte-identical. A control that provably does nothing is worse than
+  no control.
+-->
+<style>
+  :root { --ink:#1b1b18; --dim:#6e6e66; --line:#d7d7cf; --panel:#fffffe;
+          --ground:#f6f5f1; --warn:#8a5a00; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+         font:13px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display:grid; grid-template-columns:320px 1fr; height:100dvh; }
+  #panel { overflow-y:auto; padding:16px; background:var(--panel);
+           border-right:1px solid var(--line); }
+  h1 { font-size:14px; margin:0 0 2px; }
+  .sub { color:var(--dim); font-size:11px; margin:0 0 16px; }
+  label { display:block; font-size:11px; color:var(--dim); margin:14px 0 3px; }
+  label:first-of-type { margin-top:0; }
+  input[type=number], select { width:100%; font:12px ui-monospace, Menlo, monospace;
+    padding:5px; border:1px solid var(--line); border-radius:2px; background:#fff; }
+  input[type=range] { width:100%; }
+  .hint { font-size:10px; color:var(--dim); margin-top:4px; }
+  b { color:var(--ink); }
+  #stage { position:relative; background:#fff; }
+  #cv { display:block; width:100%; height:100%; }
+  #out { position:absolute; left:12px; bottom:12px; margin:0;
+         font:11px/1.55 ui-monospace, Menlo, monospace; white-space:pre;
+         background:rgba(255,255,255,.94); border:1px solid var(--line);
+         border-radius:3px; padding:9px 11px; max-width:calc(100% - 24px);
+         overflow-x:auto; }
+  .warn { color:var(--warn); font-weight:600; }
+  #hint3d { position:absolute; right:12px; top:12px; color:var(--dim);
+            font-size:11px; background:rgba(255,255,255,.9);
+            border:1px solid var(--line); border-radius:3px; padding:5px 8px; }
+  #err { position:absolute; inset:0; display:none; place-content:center;
+         text-align:center; padding:30px; color:var(--warn); }
+</style>
+
+<div id="wrap">
+  <div id="panel">
+    <h1>constant delta terrain</h1>
+    <p class="sub">The triangle scan with the same delta at every cell, in
+      metres. Six controls, no grammar.</p>
+
+    <label>range across <span id="km-val">20</span> km</label>
+    <input id="km" type="range" min="2" max="80" value="20" step="1">
+
+    <label>delta h <span id="dh-val">2.00</span> m per diagonal step</label>
+    <input id="dh" type="range" min="0.1" max="25" value="2" step="0.1">
+    <div class="hint">Derived, not guessed: for 1000 m of relief over the
+      diagonal this has to be <b>1000 / 2(N&minus;1)</b>, which is 1.95 m at
+      grid 257 &mdash; so <b>2 m</b>. The readout gives the far-corner height
+      and the gradient for whatever you set.</div>
+
+    <label>grid <span id="n-val">257</span> cells across</label>
+    <select id="grid">
+      <option value="129">129 &mdash; coarse</option>
+      <option value="257" selected>257</option>
+      <option value="513">513 &mdash; fine</option>
+    </select>
+    <div class="hint">Only the cell size changes with this. The gradient for a
+      given total rise does not: at 1000 m over 20 km it is 2.50% along an axis
+      at every grid size, because the rise and the distance are what fix it.</div>
+
+    <label><input type="checkbox" id="comp" style="width:auto">
+      level the diagonal valley</label>
+    <div class="hint">The valley is not a bug in the code &mdash; it is what
+      this weighting does, verified against the closed form. (u&minus;1,v&minus;1)
+      is two diagonals back, so interior cells lag the axes and sit
+      <b>20.7%</b> lower. Ticking this multiplies each cell's delta by its own
+      lag, which levels it exactly.</div>
+
+    <label>vertical &times; <span id="vx-val">1.0</span></label>
+    <input id="vx" type="range" min="1" max="30" value="1" step="0.5">
+    <div class="hint">At 1 this is true scale and the readout says so. Anything
+      above is the picture lying about the slope, which is the only way a 2.6%
+      gradient reads as a mountain.</div>
+
+    <label>colour scheme</label>
+    <select id="scheme">
+      <option value="grey" selected>grey on white &mdash; rock</option>
+      <option value="whiteblue">white on blue &mdash; cloud</option>
+      <option value="whiteolive">white on greeny brown &mdash; land</option>
+      <option value="sea">blue green on sky blue &mdash; sea</option>
+    </select>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
+    <pre id="out"></pre>
+    <div id="err"></div>
+  </div>
+</div>
+
+<!-- three.js 0.160.0 UMD, PINNED — same version and reasoning as the other
+     benches: it defines window.THREE and needs no import map, and an unpinned
+     "latest" would let someone else's release change what this shows with no
+     commit here. No L-system library: there is no grammar on this page. -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+if (!window.THREE) {
+  $('err').style.display = 'grid';
+  $('err').textContent = 'three.js did not load from the CDN. Nothing can be drawn; ' +
+    'check the network rather than the settings.';
+}
+
+// Reciprocal distance: the orthogonal neighbours are 1 away, the diagonal one
+// sqrt(2). These are the only constants in the construction.
+const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
+const W_SUM = 2 * W_ORTH + W_DIAG;
+const LAG_INTERIOR = 1 + W_DIAG / W_SUM;          // 1.26120
+const SLOPE_INTERIOR = 1 / LAG_INTERIOR;          // 0.792893
+const TROUGH_FRACTION = 1 - SLOPE_INTERIOR;       // 0.207107 = (sqrt(2)-1)/2
+
+// The origin trio, and the first 50 cells in plot order, so the corner the
+// whole scan grows from can be found. Fixed rather than configurable — this
+// page exists to be small.
+const ORIGIN_CELLS = [[0, 0], [0, 1], [1, 0]];
+const ORIGIN_CORE = 0xffd21f, ORIGIN_RING = 0x2e2100, MARK_COLOUR = 0x0d2060;
+const ORIGIN_SPREAD = 2, MARK_N = 50;
+
+function scanField(N, delta, compensate) {
+  const h = new Float64Array(N * N);
+  const ix = (u, v) => v * N + u;
+  const marks = [ix(0, 0)];
+  h[ix(0, 0)] = 0;
+  for (let k = 1; k <= 2 * (N - 1); k++) {
+    const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
+    for (let u = uHi; u >= uLo; u--) {
+      const v = k - u;
+      let num = 0, den = 0, lagNum = 0;
+      if (u > 0)          { num += W_ORTH * h[ix(u-1, v)];   den += W_ORTH; lagNum += W_ORTH; }
+      if (v > 0)          { num += W_ORTH * h[ix(u, v-1)];   den += W_ORTH; lagNum += W_ORTH; }
+      if (u > 0 && v > 0) { num += W_DIAG * h[ix(u-1, v-1)]; den += W_DIAG; lagNum += 2 * W_DIAG; }
+      const base = den > 0 ? num / den : 0;
+      const lag = den > 0 ? lagNum / den : 1;
+      h[ix(u, v)] = base + delta * (compensate ? lag : 1);
+      if (marks.length < MARK_N) marks.push(ix(u, v));
+    }
+  }
+  return { h, marks };
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────
+// Lighting carries the relief, not colour: every scheme keeps a bright surface
+// against a darker ground-bounce, so the shape is read from luminance and
+// nothing is encoded in hue.
+const SCHEMES = {
+  grey:       { bg:0xffffff, surface:0xcfcdc4, sky:0xffffff, bounce:0x9a9a92,
+                sun:0xffffff, hemi:0.55, sunI:2.3, rough:0.95 },
+  whiteblue:  { bg:0xbcd4ec, surface:0xf8fbff, sky:0xe4eefa, bounce:0x6f8aa8,
+                sun:0xfffdf6, hemi:0.75, sunI:2.0, rough:0.98 },
+  whiteolive: { bg:0xa9a67a, surface:0xfbfaf3, sky:0xeeead6, bounce:0x62653a,
+                sun:0xfff9ec, hemi:0.70, sunI:2.1, rough:0.97 },
+  sea:        { bg:0x9cc4e8, surface:0x47a39a, sky:0xd4e6f7, bounce:0x123f4a,
+                sun:0xfffdf4, hemi:0.60, sunI:2.4, rough:0.42, metal:0.10 },
+};
+let renderer, scene, camera, mesh, sun, hemi;
+let lastH = null, lastMarks = null, lastN = 0, lastScaleZ = 1;
+let az = -0.7, el = 0.42, dist = 2.6, dragging = false, lx = 0, ly = 0;
+
+function initThree() {
+  const cv = $('cv');
+  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
+  sun = new THREE.DirectionalLight(0xffffff, 2.3); scene.add(sun);
+  hemi = new THREE.HemisphereLight(0xffffff, 0x9a9a92, 0.55); scene.add(hemi);
+  cv.addEventListener('pointerdown', e => {
+    dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointerup', () => { dragging = false; });
+  cv.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    az -= (e.clientX - lx) * 0.006; el += (e.clientY - ly) * 0.005;
+    el = Math.max(0.03, Math.min(1.5, el));
+    lx = e.clientX; ly = e.clientY; place();
+  });
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    dist = Math.max(0.6, Math.min(9, dist * (1 + Math.sign(e.deltaY) * 0.08)));
+    place();
+  }, { passive: false });
+  resize();
+  window.addEventListener('resize', () => { resize(); place(); });
+}
+function resize() {
+  const st = $('stage');
+  renderer.setSize(st.clientWidth, st.clientHeight, false);
+  camera.aspect = Math.max(st.clientWidth / Math.max(st.clientHeight, 1), 0.01);
+  camera.updateProjectionMatrix();
+}
+function place() {
+  if (!camera) return;
+  camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el),
+                      dist * Math.cos(el) * Math.cos(az));
+  camera.lookAt(0, 0, 0);
+  sun.position.set(Math.cos(0.49) * Math.sin(2.36), Math.sin(0.49), Math.cos(0.49) * Math.cos(2.36));
+  renderer.render(scene, camera);
+}
+// The surface colour lives in a vertex attribute rather than material.color,
+// because three multiplies the two together and the markers have to come out
+// their own colour rather than tinted by the scheme.
+function paint() {
+  if (!mesh) return;
+  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  const attr = mesh.geometry.attributes.color;
+  const base = new THREE.Color().setHex(s.surface);
+  const mk = new THREE.Color().setHex(MARK_COLOUR);
+  const core = new THREE.Color().setHex(ORIGIN_CORE);
+  const ring = new THREE.Color().setHex(ORIGIN_RING);
+  for (let i = 0; i < attr.count; i++) attr.setXYZ(i, base.r, base.g, base.b);
+  if (lastMarks) for (const i of lastMarks) attr.setXYZ(i, mk.r, mk.g, mk.b);
+  const stamp = (c, rad, col) => {
+    for (let dv = -rad; dv <= rad; dv++) for (let du = -rad; du <= rad; du++) {
+      const u = c[0] + du, v = c[1] + dv;
+      if (u < 0 || u >= lastN || v < 0 || v >= lastN) continue;
+      attr.setXYZ(v * lastN + u, col.r, col.g, col.b);
+    }
+  };
+  for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD + 1, ring);
+  for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD, core);
+  attr.needsUpdate = true;
+}
+function applyScheme() {
+  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  scene.background = new THREE.Color(s.bg);
+  hemi.color.setHex(s.sky); hemi.groundColor.setHex(s.bounce); hemi.intensity = s.hemi;
+  sun.color.setHex(s.sun); sun.intensity = s.sunI;
+  if (mesh) { mesh.material.roughness = s.rough; mesh.material.metalness = s.metal || 0; }
+  paint(); place();
+}
+function rescale() {
+  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(1);
+  if (!mesh || !lastH) return build();
+  const pos = mesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, lastH[i] * lastScaleZ * vx);
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  place();
+  report();
+}
+
+// ── BUILD ───────────────────────────────────────────────────────────────
+let lastStats = null;
+function build() {
+  const N = +$('grid').value, km = +$('km').value, delta = +$('dh').value;
+  $('km-val').textContent = km;
+  $('n-val').textContent = N;
+  $('dh-val').textContent = delta.toFixed(2);
+  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(1);
+
+  const r = scanField(N, delta, $('comp').checked);
+  lastH = r.h; lastMarks = r.marks; lastN = N;
+
+  // Heights are in METRES. The ground plane spans 2 world units for km across,
+  // so a metre of height is 2/(km*1000) world units and the surface is at TRUE
+  // SCALE when the vertical multiplier is 1.
+  const metrePerWorld = (km * 1000) / 2;
+  lastScaleZ = 1 / metrePerWorld;
+
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+  const sch = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  const geo = new THREE.PlaneGeometry(2, 2, N - 1, N - 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, r.h[i] * lastScaleZ * vx);
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
+  geo.computeVertexNormals();
+  mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: 0xffffff, vertexColors: true,
+    roughness: sch.rough, metalness: sch.metal || 0, side: THREE.DoubleSide
+  }));
+  mesh.rotation.x = -Math.PI / 2;
+  scene.add(mesh);
+
+  // measured, so the readout is never a restatement of the inputs
+  const steps = 2 * (N - 1), cell = km * 1000 / (N - 1);
+  const edgeFar = r.h[0 * N + (N - 1)];
+  const cornerFar = r.h[(N - 1) * N + (N - 1)];
+  const mid = r.h[Math.floor((N - 1) / 2) * N + Math.floor((N - 1) / 2)];
+  let mn = Infinity, mx = -Infinity;
+  for (const v of r.h) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const fit = pts => {
+    let sx = 0, sy = 0, sxy = 0, sxx = 0;
+    for (const [x, y] of pts) { sx += x; sy += y; sxy += x * y; sxx += x * x; }
+    const n = pts.length;
+    return n > 2 ? (n * sxy - sx * sy) / (n * sxx - sx * sx) : NaN;
+  };
+  const eP = [], dP = [];
+  for (let k = 2; k < N - 2; k++) {
+    eP.push([k, r.h[0 * N + k]]);
+    if (k % 2 === 0) dP.push([k, r.h[(k / 2) * N + (k / 2)]]);
+  }
+  lastStats = { N, km, delta, steps, cell, edgeFar, cornerFar, mid, mn, mx,
+                edgeSlope: fit(eP) / delta, midSlope: fit(dP) / delta,
+                comp: $('comp').checked };
+  applyScheme();
+  report();
+}
+
+function report() {
+  const s = lastStats;
+  if (!s) return;
+  const vx = +$('vx').value;
+  const trough = s.edgeFar - s.mid;
+  const axisGrad = 100 * s.delta / s.cell;
+  const diagGrad = 100 * s.cornerFar / (s.km * 1000 * Math.SQRT2);
+  const relief = s.mx - s.mn;
+  const ALPS = 25;
+  $('out').innerHTML =
+    `range         ${s.km} km across, ${s.N} cells, ` +
+    `${s.cell.toFixed(1)} m per cell, ${s.steps} diagonal steps\n` +
+    `delta         ${s.delta.toFixed(2)} m per step\n` +
+    `\n` +
+    `far corner    ${s.cornerFar.toFixed(0)} m   ` +
+    `axis far end ${s.edgeFar.toFixed(0)} m   relief ${relief.toFixed(0)} m\n` +
+    `diagonal      centre of the diagonal ${s.mid.toFixed(0)} m, so the valley is ` +
+    `${trough.toFixed(0)} m\n` +
+    `              = ${(100 * trough / Math.max(s.edgeFar, 1e-9)).toFixed(1)}% of the ` +
+    `edge rise   ${s.comp ? '(levelled)' : `(predicted ${(100 * TROUGH_FRACTION).toFixed(1)}%)`}\n` +
+    `slopes        axis ${s.edgeSlope.toFixed(6)}, diagonal centre ` +
+    `${s.midSlope.toFixed(6)} per step   ` +
+    `predicted 1.000000 and ${s.comp ? '1.000000' : SLOPE_INTERIOR.toFixed(6)}\n` +
+    `\n` +
+    `GRADIENT      ${axisGrad.toFixed(2)}% along an axis, ` +
+    `${diagGrad.toFixed(2)}% origin to far corner\n` +
+    `              the Alps run about ${ALPS}%` +
+    (axisGrad < 8
+      ? `, so this is <span class="warn">upland, not mountains</span> — and that is ` +
+        `arithmetic,\n              not a low delta: a constant delta is a constant ` +
+        `gradient, so fixing\n              the total rise fixes the steepness. ` +
+        `${(ALPS / 100 * s.cell).toFixed(0)} m per step would reach ` +
+        `${ALPS}%,\n              and put the far corner at ` +
+        `${(ALPS / 100 * s.cell * s.steps).toFixed(0)} m.`
+      : `, so this one is genuinely steep — note the far corner height`) + '\n' +
+    `\n` +
+    `vertical      ${vx === 1 ? '<b>x1 — TRUE SCALE</b>, the slope you see is the real one'
+      : `<span class="warn">x${vx.toFixed(1)} — the picture is exaggerating the slope ` +
+        `${vx.toFixed(1)}-fold</span>`}`;
+}
+
+if (window.THREE) {
+  initThree();
+  for (const id of ['km', 'dh', 'grid', 'comp']) $(id).addEventListener('input', build);
+  $('vx').addEventListener('input', rescale);
+  $('scheme').addEventListener('input', applyScheme);
+  build();
+}
+</script>
