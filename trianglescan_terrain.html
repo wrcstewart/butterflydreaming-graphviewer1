@@ -280,9 +280,15 @@ Z: &lt;ZZZ&gt;-</textarea>
         way.<br>
         The fan adds cells further along diagonal k&minus;1 &mdash;
         (u&minus;1&minus;j, v+j) and (u+j, v&minus;1&minus;j) &mdash; which have
-        real sideways reach. Measured on this fractal: elongation
-        <b>3.57 at fan 0, 1.81 at 1, 1.13 at 2, 0.77 at 3</b>. Beyond 2 it
-        OVERSHOOTS and streaks along the anti-diagonal instead.</div>
+        real sideways reach, and it halves the plume aspect, 6.7 to 3.2 to 2.3.<br>
+        <b>BUT IT DOES NOT REMOVE THE STREAKING — it rotates it.</b> The
+        elongation figure falls 3.57 to 1.13, which is why this was first
+        reported as a fix, but that figure is a ratio between the two diagonals
+        and goes blind when the structure leaves both. The directional power
+        spectrum, calibrated on known stripe fields, gives peak anisotropy
+        3.26 at fan 0 along a diagonal, and <b>4.49 at fan 2 along the u
+        axis</b> &mdash; higher, not lower. Judge it by eye; the elongation
+        line below cannot see this.</div>
 
       <label>cells per symbol <span id="st-val">16</span></label>
       <input id="st" type="range" min="1" max="64" value="16" step="1">
@@ -850,7 +856,9 @@ function build() {
     `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n` +
     `\n` +
     `PREDICTION 1  elongation along +u+v: ${el24.toFixed(2)} at lag 24, ` +
-    `${el8.toFixed(2)} at lag 8   (1.00 = none)` +
+    `${el8.toFixed(2)} at lag 8   <span class="warn">(1.00 does NOT mean ` +
+    `isotropic — it is a ratio of the two diagonals and reads 1.00 for a field ` +
+    `streaked on both, or on neither)</span>` +
     (el24 > 1.25 || el8 > 1.25 ? `   <span class="warn">streaked</span>` : '') + '\n' +
     // PREDICTION 2 rewritten as what it actually is: a measurement of the
     // sequence's order. 0.5 means the ordering contributes nothing beyond
@@ -880,7 +888,7 @@ function build() {
     `per unit   diagonal ${((gains.diag / Math.max(Math.abs(gains.axis), 1e-9) - 1) * 100).toFixed(1)}% ` +
     `steeper\n` +
     `fan           ${fan} extra pairs, ${3 + 2 * fan} cells in the stencil   ` +
-    `<i>1.00 elongation is isotropic; below 1 streaks the other way</i>\n` +
+    `<i>rotates the streaking rather than removing it — see the hint</i>\n` +
     `stretch       ${stretch} cells per symbol   ` +
     `so one pass covers ${(seq.length * stretch).toLocaleString()} cells\n` +
     `start         ${offPct}% in, symbol ${offset.toLocaleString()} of ` +

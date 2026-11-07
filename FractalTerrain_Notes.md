@@ -548,3 +548,118 @@ plain wrong. The pattern, stated so it can be checked against in future:
   a broken one.** Both pages now print the relief as a share of the frame width
   at the current exaggeration, and warn below 5%. That single line is what
   would have prevented two rounds of "the slider isn't doing anything".
+
+---
+
+## Triangle scan, day two — and why it was set aside (2026-11-07)
+
+### What was fixed, and it is real
+
+**The diagonal weight is √2, not 1/√2.** The author, from the 10×10 table:
+*"the rise should be more like 41% bigger on the diagonal but we are more like
+60%"*. Both figures exact. Comparing `(n,n)` with `(n,0)`, the old weighting
+gave `2 × 0.792893 = 1.5858` → 58.6%; if height tracked true distance it would
+be `√2` → 41.4%. The interior slope is `1/(1 + w_diag)`, so isotropy needs
+`w_diag = √2 − 1`, i.e. **unnormalised 1 : 1 : √2 over 2 + √2**. The diagonal
+cell is √2 further (argues for less weight) but *two* diagonals back (argues
+for more), and the second governs height. Gain per unit distance on the
+diagonal: 1.130 → **1.010**.
+
+**It is a RIDGE, not a valley** — see the previous section. Six rounds of a
+parameterisation artefact described as terrain.
+
+**The grammar is not balanced**: −0.1438 per symbol at depth 9, worsening with
+depth because `Z` triples itself. Partial-sum exponent 0.933 raw, 0.597
+de-meaned, 0.442 shuffled — so the ordering *reinforces* the wander.
+
+**One shared scan.** `trianglescan_scan.js`, loaded by both pages, with six
+self-tests. A constant delta is a sequence of length 1, so the test rig
+exercises the production path rather than a copy.
+
+### The mechanism of the streaking, which is the real result
+
+The author asked the decisive question: why should delta variation give diagonal
+structure, when on a long anti-diagonal the variations appear everywhere along
+it and so cannot correlate between scan lines?
+
+**He was right about the input.** On diagonal `k` the sequence index at the
+start is ≈ `k²/2`, so a cell and its inward neighbour take symbols ≈ `k` apart —
+independent once `k` exceeds the run length.
+
+**So the anisotropy is the filter.** Inject one unit of dH at a single cell:
+
+| cells along the diagonal | peak | width across | aspect |
+|---|---|---|---|
+| 10 | 0.232 | 5 | 2.0 |
+| 40 | 0.117 | 7 | 5.7 |
+| 100 | 0.074 | 13 | **7.7** |
+
+A single dH makes a **plume**, not a point. In the rotated frame the sideways
+component of a step is ±1/√2 for the two orthogonal cells and **exactly zero**
+for the diagonal one, which carries the heaviest weight. Mean step straight
+down the diagonal; sideways variance only 0.369 per step. Travel grows as `n`,
+spread as `√(0.369 n)`. The field is a superposition of long thin plumes all
+pointing the same way — diagonal structure from perfectly uncorrelated input.
+
+Two things this accounts for that we had observed without explaining: a
+**constant delta looks flat** because it excites only the DC response, which is
+the smooth ramp, so the plume never shows; and the **√2 weighting made the
+streaking worse** because it raised the weight of the one step with zero
+sideways spread from 0.261 to 0.414 — the same coefficient acting in two places.
+
+Confirmed independently by feeding the scan a square wave and then random runs:
+elongation 6.7–107 from alternating runs and **9.6 at run length 5 from random
+runs**, where a constant delta gives 1.0. Nothing periodic is involved, so it is
+the scan. The 107 at run length 20 was a resonance — randomising the sign at
+the same length gives 8.37.
+
+### What did NOT work, and the metric that hid it
+
+**Four-corner averaging symmetrises rather than removes.** Elongation 4.38 →
+1.00, which looked like a cure. The 2D FFT says otherwise: one corner has one
+streak family at 5× isotropic; four corners has **two**, one along each
+diagonal, at ~3× each. Elongation is a *ratio of those two directions*, so when
+they became equal it read 1.00 while both were three times isotropic.
+
+**The sideways fan rotates the streaking rather than removing it.** Adding
+cells further along diagonal k−1 — `(u−1−j, v+j)` and `(u+j, v−1−j)` — gives
+real sideways reach and halves the plume aspect, 6.7 → 3.2 → 2.3. Elongation on
+the fractal falls 3.57 → 1.13. But the directional power spectrum, calibrated
+against known stripe fields first, says:
+
+| fan | peak directional power | direction | elongation |
+|---|---|---|---|
+| 0 | 3.26 | 143° (a diagonal) | 1.00 |
+| 1 | 3.41 | 8° | 1.00 |
+| 2 | **4.49** | **8° (the u axis)** | 1.00 |
+| 3 | 4.87 | 8° | 1.00 |
+
+**The peak anisotropy rose.** No stencil setting removes the streaking; it only
+chooses which direction it runs in. The author's verdict — *"still very
+streaked along the diagonal"* — was right, and my "3.57 → 1.13" was measuring
+a ratio between two quantities that were both moving.
+
+### The metric lesson, fourth instance in this work
+
+**Elongation — the along/across variogram ratio — is unusable here.** It reads
+1.00 for a field streaked on both diagonals, and 1.00 again for one streaked on
+the axes. Anything that is a ratio *between two of the directions in question*
+goes blind the moment the structure leaves both.
+
+What works is the **2D power spectrum binned by direction**, with two
+conditions that were learned the hard way: calibrate the labelling on synthetic
+fields of known stripe direction first (a wavevector at θ means crests at
+θ+90, and reading one for the other is an easy mistake to make twice); and
+compare each direction against the *isotropic mean*, not against another
+direction.
+
+### Status
+
+Set aside by the author in favour of a different approach. The construction is
+sound, cheap, and fully instrumented; what defeats it is that its two
+organising directions are both diagonals — the anti-diagonal is the scan line,
+where neighbouring cells take consecutive symbols, and the main diagonal is the
+propagation direction. The u and v axes are special to nothing, which is why
+the FFT showed them suppressed to 0.06–0.42 at fan 0. Any fix has to break that
+organisation rather than reweight within it — scanning in shells of constant
+Euclidean radius was the candidate, never built.
