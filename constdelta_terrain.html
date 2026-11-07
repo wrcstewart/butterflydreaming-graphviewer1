@@ -115,18 +115,32 @@
       grid 257 &mdash; so <b>2 m</b>. The readout gives the far-corner height
       and the gradient for whatever you set.</div>
 
-    <label><input type="checkbox" id="alt" checked style="width:auto">
-      alternating runs instead of a constant delta</label>
+    <label>delta pattern</label>
+    <select id="pattern">
+      <option value="const">constant &mdash; the ramp, with closed-form answers</option>
+      <option value="alt">alternating runs &mdash; + then &minus;, strictly</option>
+      <option value="rand" selected>RANDOM runs &mdash; sign drawn per run</option>
+    </select>
     <label>run length <span id="run-val">20</span> cells</label>
     <input id="run" type="range" min="5" max="100" value="20" step="1">
-    <div class="hint">The simplest structured sequence there is: <b>+delta for
-      N cells, then &minus;delta for N cells</b>, repeating. A step towards
-      simulating the fractal without its complications &mdash; it is exactly
-      balanced, so there is no drift, and the only thing in it is one length
-      scale. Whatever the scan does with structure should show here in its
-      plainest form.<br>
-      Unticked gives the constant delta, where the surface is a ramp and the
-      self-tests below have closed-form answers.</div>
+    <label>random seed <input id="seed" type="number" value="1" min="1"
+      max="9999" step="1" style="width:90px"></label>
+    <div class="hint"><b>alternating</b> is + for N cells then &minus; for N,
+      strictly: one length scale and nothing else, exactly balanced. Measured,
+      it gives elongation 6.7 to 107 &mdash; so the scan turns even that into
+      strong diagonals.<br>
+      <b>random</b> keeps the run length but draws each run's sign
+      independently, which removes the periodicity while leaving the length
+      scale. If the diagonals survive that, they are the scan's and not the
+      sequence's. The seed picks the draw, so a figure can be returned to.</div>
+
+    <label>sideways fan <span id="fan-val">0</span> extra pairs</label>
+    <input id="fan" type="range" min="0" max="5" value="0" step="1">
+    <div class="hint">Extra cells further along diagonal k&minus;1, which give
+      the filter sideways spread. <b>0 keeps the three-cell stencil the
+      self-tests assert</b>; above 0 those closed forms no longer apply and the
+      tests are told so. Worth sweeping against the random runs to see the
+      streaking fall.</div>
 
     <label>grid <span id="n-val">257</span> cells across</label>
     <select id="grid">
@@ -316,6 +330,22 @@ function altSeq(len) {
   for (let i = 0; i < L; i++) { a[i] = 1; a[i + L] = -1; }
   return a;
 }
+// Random runs: the same length scale, but each run's sign drawn independently,
+// so the periodicity goes and only the length scale remains. Long enough to
+// cover the whole scan without wrapping, or the wrap would reintroduce a
+// period of its own — which is the thing being removed.
+function randRunSeq(len, cells, seed) {
+  const L = Math.max(1, len | 0);
+  const runs = Math.ceil(cells / L) + 2;
+  let st = (seed | 0) || 1;
+  const rnd = () => { st = (st * 1103515245 + 12345) & 0x7fffffff; return st / 0x7fffffff; };
+  const a = new Array(runs * L);
+  for (let r = 0; r < runs; r++) {
+    const sgn = rnd() < 0.5 ? -1 : 1;
+    for (let i = 0; i < L; i++) a[r * L + i] = sgn;
+  }
+  return a;
+}
 
 // ── RENDER ──────────────────────────────────────────────────────────────
 // Lighting carries the relief, not colour: every scheme keeps a bright surface
@@ -463,11 +493,17 @@ function build() {
   $('dh-val').textContent = delta.toFixed(2);
   const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(1);
 
-  const useAlt = $('alt').checked;
+  const pattern = $('pattern').value;
   const runLen = Math.max(5, Math.min(100, +$('run').value));
   $('run-val').textContent = runLen;
-  const seq = useAlt ? altSeq(runLen) : CONST_SEQ;
-  const r = scanField(N, seq, 0, delta, $('serp').checked, MARK_N, $('comp').checked);
+  const seed = Math.max(1, +$('seed').value || 1);
+  const seq = pattern === 'alt' ? altSeq(runLen)
+            : pattern === 'rand' ? randRunSeq(runLen, N * N, seed)
+            : CONST_SEQ;
+  const useAlt = pattern !== 'const';
+  const fan = Math.max(0, Math.min(5, +$('fan').value));
+  $('fan-val').textContent = fan;
+  const r = scanField(N, seq, 0, delta, $('serp').checked, MARK_N, $('comp').checked, 0, 1, fan);
   lastH = r.h; lastMarks = r.marks; lastN = N;
 
   // Heights are in METRES. The ground plane spans 2 world units for km across,
@@ -523,7 +559,7 @@ function build() {
   const gDiag = (samp(Math.PI / 4, R2) - samp(Math.PI / 4, R1)) / (R2 - R1);
 
   lastStats = { N, km, delta, steps, cell, edgeFar, cornerFar, mid, mn, mx, gAxis, gDiag,
-                useAlt, runLen, seqLen: seq.length,
+                useAlt, runLen, seqLen: seq.length, pattern, seed,
                 edgeSlope: fit(eP) / delta, midSlope: fit(dP) / delta,
                 comp: $('comp').checked };
   applyScheme();
@@ -594,8 +630,11 @@ function report() {
     `range         ${s.km} km across, ${s.N} cells, ` +
     `${s.cell.toFixed(1)} m per cell, ${s.steps} diagonal steps\n` +
     `delta         ${s.delta.toFixed(2)} m per step   ` +
-    (s.useAlt
-      ? `<b>alternating runs of ${s.runLen} cells</b> — period ${2 * s.runLen} cells`
+    (s.pattern === 'alt'
+      ? `<b>alternating runs of ${s.runLen} cells</b> — period ${2 * s.runLen}`
+      : s.pattern === 'rand'
+      ? `<b>random runs of ${s.runLen} cells</b>, seed ${s.seed} — ` +
+        `${s.seqLen.toLocaleString()} symbols, no wrap`
       : `constant — the surface is a ramp`) + '\n' +
     `\n` +
     `far corner    ${s.cornerFar.toFixed(0)} m   ` +
@@ -653,7 +692,7 @@ function report() {
 
 if (window.THREE) {
   initThree();
-  for (const id of ['km', 'dh', 'grid', 'comp', 'serp', 'alt', 'run']) $(id).addEventListener('input', build);
+  for (const id of ['km', 'dh', 'grid', 'comp', 'serp', 'run', 'seed', 'fan']) $(id).addEventListener('input', build);
   // The sun only changes the lighting, so it repaints rather than rebuilding.
   for (const id of ['sun', 'sunaz']) $(id).addEventListener('input', () => {
     $('sun-val').textContent = $('sun').value;
@@ -662,6 +701,7 @@ if (window.THREE) {
   });
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', () => { applyScheme(); legend(); });
+  $('pattern').addEventListener('input', build);
   $('bands').addEventListener('input', () => {
     $('bands-val').textContent = $('bands').value;
     paint(); place(); legend();

@@ -269,6 +269,21 @@ Z: &lt;ZZZ&gt;-</textarea>
         the axis gain, because a diagonal step covers &radic;2 of ground and an
         axis step covers 1. The diagonal weight &mdash; now &radic;2, not
         1/&radic;2 &mdash; is the real fix. Off by default.</div>
+      <label>sideways fan <span id="fan-val">2</span> extra pairs</label>
+      <input id="fan" type="range" min="0" max="5" value="2" step="1">
+      <div class="hint">The streaking is the FILTER's doing, not the sequence's.
+        Measured, one unit of dH injected at a cell travels 100 cells along the
+        diagonal while spreading only 13 across &mdash; because the sideways
+        component of a step is &plusmn;1/&radic;2 for the two orthogonal cells
+        and <b>exactly zero</b> for the diagonal one, which carries the heaviest
+        weight. The field is a sum of long thin plumes all pointing the same
+        way.<br>
+        The fan adds cells further along diagonal k&minus;1 &mdash;
+        (u&minus;1&minus;j, v+j) and (u+j, v&minus;1&minus;j) &mdash; which have
+        real sideways reach. Measured on this fractal: elongation
+        <b>3.57 at fan 0, 1.81 at 1, 1.13 at 2, 0.77 at 3</b>. Beyond 2 it
+        OVERSHOOTS and streaks along the anti-diagonal instead.</div>
+
       <label>cells per symbol <span id="st-val">16</span></label>
       <input id="st" type="range" min="1" max="64" value="16" step="1">
       <div class="hint">The author: <em>"the frequency of the bumps in general
@@ -724,6 +739,8 @@ function build() {
   const expo = growthExponent(seq);
 
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
+  const fan = Math.max(0, Math.min(5, +$('fan').value));
+  $('fan-val').textContent = fan;
   const stretch = Math.max(1, Math.min(64, +$('st').value));
   $('st-val').textContent = stretch;
   const offPct = Math.max(0, Math.min(90, +$('off').value));
@@ -739,8 +756,9 @@ function build() {
   const useFour = $('four').checked;
   const r = useFour
     ? scanFourCorners(N, seq, h0, dh * CORNER_AMP, $('serp').checked, markN,
-                      $('comp').checked, offset, stretch)
-    : scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked, offset, stretch);
+                      $('comp').checked, offset, stretch, fan)
+    : scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked,
+                offset, stretch, fan);
   lastMarks = r.marks;
   lastN = N;
   // The two slopes, measured on the RAW field before normalising, so they can
@@ -861,6 +879,8 @@ function build() {
     `per-distance  axis ${gains.axis.toFixed(4)}, diagonal ${gains.diag.toFixed(4)} ` +
     `per unit   diagonal ${((gains.diag / Math.max(Math.abs(gains.axis), 1e-9) - 1) * 100).toFixed(1)}% ` +
     `steeper\n` +
+    `fan           ${fan} extra pairs, ${3 + 2 * fan} cells in the stencil   ` +
+    `<i>1.00 elongation is isotropic; below 1 streaks the other way</i>\n` +
     `stretch       ${stretch} cells per symbol   ` +
     `so one pass covers ${(seq.length * stretch).toLocaleString()} cells\n` +
     `start         ${offPct}% in, symbol ${offset.toLocaleString()} of ` +
@@ -879,7 +899,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp', 'four', 'off', 'st'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp', 'four', 'off', 'st', 'fan'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);

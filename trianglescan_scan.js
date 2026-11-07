@@ -63,6 +63,57 @@
   const DEFICIT_FRACTION = 1 - SLOPE_INTERIOR;       // 0.292893
   const TROUGH_FRACTION = DEFICIT_FRACTION;          // kept: the old name
 
+  // ── THE SIDEWAYS FAN ────────────────────────────────────────────────────
+  // The three-cell stencil streaks badly along the main diagonal, and the
+  // reason is in its impulse response, not in the sequence. Measured: inject
+  // one unit of dH at a single cell and it travels 100 cells along the
+  // diagonal while spreading only 13 across — an aspect ratio of 7.7.
+  //
+  // WHY. In the rotated frame the sideways component of a step is +-1/sqrt(2)
+  // for the two orthogonal cells and EXACTLY ZERO for the diagonal one, which
+  // carries the heaviest weight. So the mean step is straight down the
+  // diagonal while sideways variance is only 0.369 per step: travel grows as
+  // n, spread as sqrt(0.369 n). The field is a superposition of long thin
+  // plumes all pointing the same way, and that alone gives diagonal structure
+  // even from perfectly uncorrelated input — which is what the author's
+  // objection correctly predicted the input could not supply.
+  //
+  // THE FIX is cells with real sideways reach. Diagonal k-1 extends sideways
+  // and all of it is established, but the old stencil used only its two
+  // innermost cells. The fan adds (u-1-j, v+j) and (u+j, v-1-j) for
+  // j = 1..fan, still on k-1, at distances sqrt(5), sqrt(13), ... and sideways
+  // offsets +-2.12, +-3.54, ... against the original +-0.71.
+  //
+  // MEASURED on the fractal at grid 257, elongation (1.00 = isotropic):
+  //
+  //   fan   stretch 1   stretch 16
+  //     0        2.49         3.57
+  //     1        1.10         1.81
+  //     2        0.78         1.13   <- the default
+  //     3        0.58         0.77
+  //
+  // It OVERSHOOTS if pushed: beyond 2 the field streaks along the ANTI-diagonal
+  // instead, because the fan averages along the previous diagonal and that
+  // creates correlation in the other direction. The right value depends on how
+  // fast the input varies, which is why it is a control and not a constant.
+  //
+  // It also undoes the height-against-distance isotropy the sqrt(2) weighting
+  // bought, since the fan cells are one diagonal back while being 2.24 away.
+  // The author: *"height against isotropy i dont think matters in fact it
+  // might be a bad thing because scenery isnt like that - much more important
+  // is getting rid of the streaks"*. So that trade is made deliberately.
+  function stencil(fan) {
+    const st = [[-1, 0], [0, -1], [-1, -1]];
+    const W = [W_ORTH, W_ORTH, W_DIAG];
+    for (let j = 1; j <= (fan | 0); j++) {
+      for (const d of [[-1 - j, j], [j, -1 - j]]) {
+        st.push(d);
+        W.push(1 / Math.hypot(d[0], d[1]));      // reciprocal distance
+      }
+    }
+    return { st, W };
+  }
+
   // A u,v grid filled in anti-diagonal order from the origin. Each cell's base
   // height is the reciprocal-distance weighted average of its three already
   // established neighbours — (u-1,v) and (u,v-1) at weight 1, (u-1,v-1) at
@@ -77,7 +128,8 @@
   // opposite corners — consecutive symbols landing far apart, a seam down one
   // edge. The alternation removes it, for the same reason boustrophedon beats
   // raster in space-filling constructions.
-  function scanField(N, seq, h0, dh, serpentine, markN, compensate, offset, stretch) {
+  function scanField(N, seq, h0, dh, serpentine, markN, compensate, offset, stretch, fan) {
+    const ST = stencil(fan || 0);
     const h = new Float64Array(N * N);
     const ix = (u, v) => v * N + u;
     // The first `markN` cells in PLOT ORDER, so the origin and the opening
@@ -125,9 +177,14 @@
       for (const u of list) {
         const v = k - u;
         let num = 0, den = 0, lagNum = 0;
-        if (u > 0)          { num += W_ORTH * h[ix(u-1, v)];   den += W_ORTH; lagNum += W_ORTH * 1; }
-        if (v > 0)          { num += W_ORTH * h[ix(u, v-1)];   den += W_ORTH; lagNum += W_ORTH * 1; }
-        if (u > 0 && v > 0) { num += W_DIAG * h[ix(u-1, v-1)]; den += W_DIAG; lagNum += W_DIAG * 2; }
+        for (let i = 0; i < ST.st.length; i++) {
+          const a = u + ST.st[i][0], b = v + ST.st[i][1];
+          if (a < 0 || a >= N || b < 0 || b >= N) continue;
+          if (a + b >= k) continue;              // must already be established
+          num += ST.W[i] * h[ix(a, b)];
+          den += ST.W[i];
+          lagNum += ST.W[i] * (k - a - b);       // how many diagonals back
+        }
         const base = den > 0 ? num / den : h0;
         // ── LAG COMPENSATION: KEPT AS A DIAGNOSTIC, AND IT IS NOT A FIX ──
         // It multiplies each cell's dH by its own SUM(w_i x lag_i), which
@@ -168,12 +225,12 @@
   // it should be for four fields, so the caller is told to double dH; the
   // amplitude is a free parameter and no normalisation is involved.
   const CORNER_AMP = 2;
-  function scanFourCorners(N, seq, h0, dh, serpentine, markN, compensate, offset, stretch) {
+  function scanFourCorners(N, seq, h0, dh, serpentine, markN, compensate, offset, stretch, fan) {
     const acc = new Float64Array(N * N);
     let marks = null;
     for (const fu of [0, 1]) for (const fv of [0, 1]) {
       const one = scanCorner(N, seq, h0, dh, serpentine, fu ? 0 : (fv ? 0 : markN),
-                             compensate, fu, fv, offset, stretch);
+                             compensate, fu, fv, offset, stretch, fan);
       for (let i = 0; i < acc.length; i++) acc[i] += one.h[i];
       if (!fu && !fv) marks = one.marks;
     }
@@ -182,7 +239,8 @@
   }
   // The scan with its origin at a chosen corner. fu/fv flip the axis, so the
   // traversal starts there while the sequence still runs from the beginning.
-  function scanCorner(N, seq, h0, dh, serpentine, markN, compensate, fu, fv, offset, stretch) {
+  function scanCorner(N, seq, h0, dh, serpentine, markN, compensate, fu, fv, offset, stretch, fan) {
+    const ST = stencil(fan || 0);
     const h = new Float64Array(N * N);
     const X = u => (fu ? N - 1 - u : u), Y = v => (fv ? N - 1 - v : v);
     const ix = (u, v) => Y(v) * N + X(u);
@@ -228,9 +286,14 @@
       for (const u of list) {
         const v = k - u;
         let num = 0, den = 0, lagNum = 0;
-        if (u > 0)          { num += W_ORTH * h[ix(u-1, v)];   den += W_ORTH; lagNum += W_ORTH; }
-        if (v > 0)          { num += W_ORTH * h[ix(u, v-1)];   den += W_ORTH; lagNum += W_ORTH; }
-        if (u > 0 && v > 0) { num += W_DIAG * h[ix(u-1, v-1)]; den += W_DIAG; lagNum += 2 * W_DIAG; }
+        for (let i = 0; i < ST.st.length; i++) {
+          const a = u + ST.st[i][0], b = v + ST.st[i][1];
+          if (a < 0 || a >= N || b < 0 || b >= N) continue;
+          if (a + b >= k) continue;              // must already be established
+          num += ST.W[i] * h[ix(a, b)];
+          den += ST.W[i];
+          lagNum += ST.W[i] * (k - a - b);       // how many diagonals back
+        }
         const base = den > 0 ? num / den : h0;
         const lag = den > 0 ? lagNum / den : 1;
         h[ix(u, v)] = base + wrap(used++) * dh * (compensate ? lag : 1);
@@ -244,6 +307,11 @@
   // Properties that should hold by construction, asserted rather than assumed.
   // Run from the constant-delta page, which exists to test this code.
   function selfTest(N) {
+    // FAN 0 THROUGHOUT. These assert the closed form for the THREE-cell
+    // stencil — the axis slope, the interior slope, the lag. A fan changes the
+    // stencil and so changes those answers; asserting them with a fan would be
+    // testing a different claim. The fan's effect is measured separately, by
+    // elongation, which is the thing it exists to change.
     const out = [];
     const constSeq = [1];                       // length 1: wraps to a constant
     const d = 2;
@@ -375,7 +443,7 @@
   }
 
   root.TriangleScan = {
-    GRID_LINES, lineColourOver, stampGridLines, DEFICIT_FRACTION,
+    GRID_LINES, lineColourOver, stampGridLines, DEFICIT_FRACTION, stencil,
     scanFourCorners, scanCorner, CORNER_AMP,
     scanField, selfTest,
     W_ORTH, W_DIAG, W_SUM, LAG_INTERIOR, SLOPE_INTERIOR, TROUGH_FRACTION,
