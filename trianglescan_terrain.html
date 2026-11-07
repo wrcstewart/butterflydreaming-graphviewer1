@@ -269,6 +269,19 @@ Z: &lt;ZZZ&gt;-</textarea>
         the axis gain, because a diagonal step covers &radic;2 of ground and an
         axis step covers 1. The diagonal weight &mdash; now &radic;2, not
         1/&radic;2 &mdash; is the real fix. Off by default.</div>
+      <label><input type="checkbox" id="four" checked style="width:auto">
+        scan from all four corners and average</label>
+      <div class="hint">The streaking along +u+v was predicted from the stencil
+        at the outset and measured at elongation <b>4.38</b>. It is the SINGLE
+        CAUSAL DIRECTION, and the proof is that entering from the opposite
+        corner gives <b>0.23</b> &mdash; the same factor the other way, 1/4.3.
+        Averaging four scans, each consuming the sequence afresh in its own
+        traversal, cancels the bias: <b>elongation 4.38 &rarr; 1.00</b>.<br>
+        It costs amplitude, since averaging four partly-correlated fields
+        cancels signal too, so dH is multiplied by
+        2 &mdash; the measured roughness ratio. Roughness
+        comes back to 1.032 of 1.036 and relief to 79%. No normalisation
+        involved; the amplitude is a free parameter.</div>
       <label><input type="checkbox" id="serp" checked style="width:auto">
         serpentine scan (alternate the direction each diagonal)</label>
       <div class="hint">Unchecking it makes every diagonal run the same way,
@@ -291,7 +304,7 @@ Z: &lt;ZZZ&gt;-</textarea>
         <option value="sea">blue green on sky blue &mdash; sea</option>
       </select>
       <div class="row">
-        <div><label>sun elev&deg;</label><input id="sun" type="number" value="28" step="1"></div>
+        <div><label>sun elev&deg;</label><input id="sun" type="number" value="12" step="1"></div>
         <div><label>sun azim&deg;</label><input id="sunaz" type="number" value="135" step="5"></div>
         <div><label>mesh</label><input type="checkbox" id="wire" style="width:auto"></div>
       </div>
@@ -392,7 +405,8 @@ if (!window.TriangleScan) {
     'is shared with the other triangle-scan page; nothing can be drawn without it.';
   throw new Error('TriangleScan missing');
 }
-const { scanField, W_ORTH, W_DIAG, stampGridLines, GRID_LINES } = window.TriangleScan;
+const { scanField, scanFourCorners, CORNER_AMP, W_ORTH, W_DIAG,
+        stampGridLines, GRID_LINES } = window.TriangleScan;
 
 // ── MEASURES ────────────────────────────────────────────────────────────
 // ── NO NORMALISATION ────────────────────────────────────────────────────
@@ -680,7 +694,10 @@ function build() {
   const expo = growthExponent(seq);
 
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
-  const r = scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked);
+  const useFour = $('four').checked;
+  const r = useFour
+    ? scanFourCorners(N, seq, h0, dh * CORNER_AMP, $('serp').checked, markN, $('comp').checked)
+    : scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked);
   lastMarks = r.marks;
   lastN = N;
   // The two slopes, measured on the RAW field before normalising, so they can
@@ -734,6 +751,21 @@ function build() {
   const el24 = elongation(h, N, 24), el8 = elongation(h, N, 8);
   const gr = reliefGrowth(h, N), ch = chevron(h, N);
   const bp = bumps(h, N, REL), su = summits(h, N, 8, REL), cv = curvature(h, N, REL);
+  // Gain per unit of TRUE distance, axis against diagonal. Comparing along
+  // constant k instead is what made a ridge read as a valley for six rounds.
+  const gains = (() => {
+    const samp = (ang, R) => {
+      const u = R * Math.cos(ang), v = R * Math.sin(ang);
+      const u0 = Math.floor(u), v0 = Math.floor(v), fu = u - u0, fv = v - v0;
+      if (u0 < 0 || v0 < 0 || u0 + 1 >= N || v0 + 1 >= N) return NaN;
+      const H = (a, b) => h[b * N + a];
+      return H(u0,v0)*(1-fu)*(1-fv) + H(u0+1,v0)*fu*(1-fv) +
+             H(u0,v0+1)*(1-fu)*fv + H(u0+1,v0+1)*fu*fv;
+    };
+    const R1 = 0.45 * (N - 1), R2 = 0.68 * (N - 1);
+    return { axis: (samp(0, R2) - samp(0, R1)) / (R2 - R1),
+             diag: (samp(Math.PI/4, R2) - samp(Math.PI/4, R1)) / (R2 - R1) };
+  })();
   const need = N * N;
 
   $('out').innerHTML =
@@ -783,6 +815,11 @@ function build() {
     `${Math.max(0, Math.min(12, +$('spread').value || 0))} with a dark ring\n` +
     `marked        ${r.marks.length} cells in plot order, blue — ` +
     `k up to ${Math.max(0, Math.ceil((Math.sqrt(8 * r.marks.length + 1) - 3) / 2))}\n` +
+    `per-distance  axis ${gains.axis.toFixed(4)}, diagonal ${gains.diag.toFixed(4)} ` +
+    `per unit   diagonal ${((gains.diag / Math.max(Math.abs(gains.axis), 1e-9) - 1) * 100).toFixed(1)}% ` +
+    `steeper\n` +
+    `scan          ${useFour ? 'FOUR corners averaged, dH x' + CORNER_AMP
+                             : 'one corner — expect streaking along +u+v'}\n` +
     `grid lines    u and v = ${GRID_LINES.join(', ')}   white on dark ground, ` +
     `near-black on light\n` +
     `weights       ${(W_ORTH / (2 * W_ORTH + W_DIAG)).toFixed(4)}, ` +
@@ -794,7 +831,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp', 'four'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
