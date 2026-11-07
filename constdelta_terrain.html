@@ -131,6 +131,21 @@
       readout always gives the on-screen relief as a share of the frame, which
       is the figure that explains a slider that looks inert.</div>
 
+    <label>sun elevation <span id="sun-val">12</span>&deg;</label>
+    <input id="sun" type="range" min="2" max="60" value="12" step="1">
+    <label>sun azimuth <span id="sunaz-val">135</span>&deg;</label>
+    <input id="sunaz" type="range" min="0" max="355" value="135" step="5">
+    <div class="hint">For shallow relief the ELEVATION is the lever: Lambert
+      shading shifts a slope's brightness by about
+      grade&nbsp;&times;&nbsp;cot(elevation) relative to flat ground, so a 1%
+      slope moves brightness 1.0% at 45&deg;, 1.9% at 28&deg; and
+      <b>4.7% at 12&deg;</b>. It was fixed at 28&deg;, which is why the valley
+      was faint.<br>
+      The valley runs along u&nbsp;=&nbsp;v, which is world (1,0,1).
+      <b>135&deg; and 315&deg; light ACROSS it</b>; 45&deg; and 225&deg; light
+      along it and show nothing. The readout gives the sensitivity and warns
+      when the azimuth is in the blind direction.</div>
+
     <label>colour scheme</label>
     <select id="scheme">
       <option value="grey" selected>grey on white &mdash; rock</option>
@@ -246,7 +261,12 @@ function place() {
   camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el),
                       dist * Math.cos(el) * Math.cos(az));
   camera.lookAt(0, 0, 0);
-  sun.position.set(Math.cos(0.49) * Math.sin(2.36), Math.sin(0.49), Math.cos(0.49) * Math.cos(2.36));
+  // Was fixed at 28 deg / 135 deg. The azimuth was right — across the valley —
+  // but 28 deg was too high to show a shallow one, since the sensitivity goes
+  // as cot(elevation).
+  const se = (+$('sun').value) * Math.PI / 180;
+  const sa = (+$('sunaz').value) * Math.PI / 180;
+  sun.position.set(Math.cos(se) * Math.sin(sa), Math.sin(se), Math.cos(se) * Math.cos(sa));
   renderer.render(scene, camera);
 }
 // The surface colour lives in a vertex attribute rather than material.color,
@@ -405,6 +425,15 @@ function report() {
     (100 * relief / (s.km * 1000) * vx < 5
       ? `\n              <span class="warn">under 5% — the delta slider will look ` +
         `inert however much you move it; raise the vertical</span>` : '') + '\n' +
+    `sun           ${$('sun').value}&deg; elevation, ${$('sunaz').value}&deg; azimuth   ` +
+    `a 1% slope shifts brightness ` +
+    `${(100 * 0.01 / Math.tan((+$('sun').value) * Math.PI / 180)).toFixed(1)}%` +
+    (Math.min(Math.abs(((+$('sunaz').value) - 45 + 360) % 360),
+              Math.abs(((+$('sunaz').value) - 225 + 360) % 360),
+              360 - Math.abs(((+$('sunaz').value) - 45 + 360) % 360),
+              360 - Math.abs(((+$('sunaz').value) - 225 + 360) % 360)) < 20
+      ? `\n              <span class="warn">lighting ALONG the valley — the blind ` +
+        `direction; try 135&deg; or 315&deg;</span>` : '') + '\n' +
     `vertical      ${vx === 1 ? '<b>x1 — TRUE SCALE</b>, the slope you see is the real one'
       : `<span class="warn">x${vx.toFixed(1)} — the picture is exaggerating the slope ` +
         `${vx.toFixed(1)}-fold</span>`}`;
@@ -413,6 +442,12 @@ function report() {
 if (window.THREE) {
   initThree();
   for (const id of ['km', 'dh', 'grid', 'comp', 'serp']) $(id).addEventListener('input', build);
+  // The sun only changes the lighting, so it repaints rather than rebuilding.
+  for (const id of ['sun', 'sunaz']) $(id).addEventListener('input', () => {
+    $('sun-val').textContent = $('sun').value;
+    $('sunaz-val').textContent = $('sunaz').value;
+    place(); report();
+  });
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
   build();
