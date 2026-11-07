@@ -218,7 +218,7 @@ if (!window.TriangleScan) {
     'is shared with the other triangle-scan page; nothing can be drawn without it.';
   throw new Error('TriangleScan missing');
 }
-const { scanField, selfTest, SLOPE_INTERIOR, TROUGH_FRACTION } = window.TriangleScan;
+const { scanField, selfTest, SLOPE_INTERIOR, TROUGH_FRACTION, stampGridLines, GRID_LINES } = window.TriangleScan;
 
 // ── THE ELEVATION SPECTRUM ──────────────────────────────────────────────
 // The author: *"colour spectrum from 0 at origin = deep red to top elevation
@@ -396,6 +396,8 @@ function paint() {
   const originCore = s.byElevation ? new THREE.Color(1, 1, 1) : core;
   for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD + 1, ring);
   for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD, originCore);
+  // The u,v grid lines last of all, so they sit on top of every other marker.
+  if (lastN) stampGridLines(attr, lastN);
   attr.needsUpdate = true;
 }
 function applyScheme() {
@@ -566,6 +568,9 @@ function report() {
     (100 * relief / (s.km * 1000) * vx < 5
       ? `\n              <span class="warn">under 5% — the delta slider will look ` +
         `inert however much you move it; raise the vertical</span>` : '') + '\n' +
+    `grid lines    u and v = ${GRID_LINES.join(', ')}   ` +
+    `<i>white on dark ground, near-black on light — measured per cell, because ` +
+    `white\n              vanishes on three of the four schemes</i>\n` +
     `sun           ${$('sun').value}&deg; elevation, ${$('sunaz').value}&deg; azimuth   ` +
     `a 1% slope shifts brightness ` +
     `${(100 * 0.01 / Math.tan((+$('sun').value) * Math.PI / 180)).toFixed(1)}%` +

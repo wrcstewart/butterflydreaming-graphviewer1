@@ -185,7 +185,47 @@
     return out;
   }
 
+  // ── THE u,v GRID LINES ──────────────────────────────────────────────────
+  // The author asked for a thin white line marking u=9, v=9, u=30 and v=30 —
+  // 9 being the edge of the 10x10 table he had just worked through, and 30 a
+  // larger reference.
+  //
+  // WHITE ALONE WOULD BE A BROKEN FEATURE. Measured, the four scheme surfaces
+  // have luminances 0.609 (grey), 0.962 (white on blue), 0.954 (white on olive)
+  // and 0.299 (sea): white would vanish on three of the four, and on the
+  // elevation spectrum it would vanish at the pale blue top of the ramp. So the
+  // line is decided PER CELL against whatever colour is already there — white
+  // on dark ground, near-black on light. It is white wherever white can be
+  // seen, which is what was asked for, and visible everywhere else, which is
+  // what was meant.
+  const GRID_LINES = [9, 30];
+  const WHITE = [1, 1, 1], NEARBLACK = [0.06, 0.06, 0.06];
+  function lineColourOver(r, g, b) {
+    const f = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const L = 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    return L < 0.5 ? WHITE : NEARBLACK;
+  }
+  // Stamps the lines into a three-component colour attribute. Called last, so
+  // the lines sit on top of everything else.
+  function stampGridLines(attr, N) {
+    const put = (u, v) => {
+      if (u < 0 || u >= N || v < 0 || v >= N) return;
+      const i = v * N + u;
+      if (i < 0 || i >= attr.count) return;
+      const c = lineColourOver(attr.getX(i), attr.getY(i), attr.getZ(i));
+      attr.setXYZ(i, c[0], c[1], c[2]);
+    };
+    let drawn = 0;
+    for (const n of GRID_LINES) {
+      if (n >= N) continue;                 // the grid is smaller than the line
+      for (let t = 0; t < N; t++) { put(n, t); put(t, n); }
+      drawn++;
+    }
+    return drawn;
+  }
+
   root.TriangleScan = {
+    GRID_LINES, lineColourOver, stampGridLines,
     scanField, selfTest,
     W_ORTH, W_DIAG, W_SUM, LAG_INTERIOR, SLOPE_INTERIOR, TROUGH_FRACTION,
   };
