@@ -155,13 +155,15 @@
       along it and show nothing. The readout gives the sensitivity and warns
       when the azimuth is in the blind direction.</div>
 
-    <label>spectrum bands <span id="bands-val">12</span>
+    <label>spectrum bands <span id="bands-val">0</span>
       (0 = continuous)</label>
-    <input id="bands" type="range" min="0" max="40" value="12" step="1">
-    <div class="hint">Only used by the elevation spectrum. Discrete bands are
-      what make it quantitative &mdash; contours you can count, each with a
-      known metre range, instead of a ramp the eye has to judge. The legend
-      gives the boundaries.</div>
+    <input id="bands" type="range" min="0" max="40" value="0" step="1">
+    <div class="hint">Only used by the elevation spectrum. <b>Defaulted to 0,
+      continuous</b> &mdash; the author: <em>"Bands are not much use please
+      have a quasi continous colour scale"</em>. The ramp has 256 entries, so
+      at 0 it is continuous for all practical purposes. Raise it only if you
+      want countable contours with a stated metre range; the legend follows
+      either way.</div>
 
     <label>colour scheme</label>
     <select id="scheme">
@@ -485,7 +487,7 @@ function legend() {
   let mn = Infinity, mx = -Infinity;
   for (const v of lastH) { if (v < mn) mn = v; if (v > mx) mx = v; }
   const bands = Math.max(0, Math.min(40, +$('bands').value || 0));
-  const steps = bands > 0 ? bands : 24;
+  const steps = bands > 0 ? bands : 64;   // smooth enough to read as continuous
   const swatch = [];
   for (let i = 0; i < steps; i++) {
     let t = (i + 0.5) / steps;
