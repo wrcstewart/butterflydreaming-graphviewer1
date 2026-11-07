@@ -169,6 +169,16 @@ Z: &lt;ZZZ&gt;-</textarea>
         by LUMINANCE and not by hue &mdash; worst contrast against any of the
         four schemes is 5.0:1, on the sea. 50 cells covers the diagonals up to
         k=9, so it marks the origin corner and the first few scan lines.</div>
+      <label>marker spread <input id="spread" type="number" value="2" min="0"
+        max="12" step="1" style="width:80px"> cells each side</label>
+      <div class="hint">(0,0), (0,1) and (1,0) are <b>yellow</b>. At spread 0
+        that is literally three vertices of 66,049 &mdash; 0.005% of the
+        surface, and invisible; the spread widens the patch so the corner can
+        actually be found. The blue 50 are unaffected.<br>
+        Bright yellow alone cannot work here: measured against the four scheme
+        surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
+        telling you apart by hue only. It therefore has a dark ring, which
+        guarantees a luminance edge whatever it sits on.</div>
       <label><input type="checkbox" id="serp" checked style="width:auto">
         serpentine scan (alternate the direction each diagonal)</label>
       <div class="hint">Unchecking it makes every diagonal run the same way,
@@ -424,7 +434,19 @@ const SCHEMES = {
 // surface — measured worst case 5.0:1, on the sea — because the standing rule
 // here is that nothing may be carried by hue alone.
 const MARK_COLOUR = 0x0d2060;
-let renderer, scene, camera, mesh, wireMesh, sun, hemi, lastH = null, lastMarks = null;
+// (0,0), (0,1), (1,0) — the three cells the whole scan grows from.
+//
+// A bright yellow is the natural choice and on its own it is unusable: against
+// the four scheme surfaces its worst luminance contrast measures 1.2:1, so on
+// the two near-white schemes it would be distinguishable by HUE ALONE, which
+// is the one thing ruled out here. Darkening it until it works gives 3.2:1 at
+// #5a3f00, which is no longer recognisably yellow. So instead the yellow stays
+// bright and carries a dark ring: the ring supplies a luminance edge against
+// anything, and the core stays the colour that was asked for.
+const ORIGIN_CELLS = [[0, 0], [0, 1], [1, 0]];
+const ORIGIN_CORE = 0xffd21f, ORIGIN_RING = 0x2e2100;
+let renderer, scene, camera, mesh, wireMesh, sun, hemi;
+let lastH = null, lastMarks = null, lastN = 0;
 let az = -0.6, el = 0.55, dist = 2.4, dragging = false, lx = 0, ly = 0;
 
 function initThree() {
@@ -474,6 +496,24 @@ function paint() {
   for (let i = 0; i < attr.count; i++) attr.setXYZ(i, base.r, base.g, base.b);
   if (lastMarks) for (const i of lastMarks) {
     if (i >= 0 && i < attr.count) attr.setXYZ(i, mk.r, mk.g, mk.b);
+  }
+  // The origin trio last, so it is never overwritten by the blue — and the
+  // ring before the core, for the same reason.
+  const N = lastN;
+  if (N) {
+    const core = new THREE.Color().setHex(ORIGIN_CORE);
+    const ring = new THREE.Color().setHex(ORIGIN_RING);
+    const r = Math.max(0, Math.min(12, +$('spread').value || 0));
+    const stamp = (c, rad, col) => {
+      for (let dv = -rad; dv <= rad; dv++) for (let du = -rad; du <= rad; du++) {
+        const u = c[0] + du, v = c[1] + dv;
+        if (u < 0 || u >= N || v < 0 || v >= N) continue;
+        const i = v * N + u;
+        if (i >= 0 && i < attr.count) attr.setXYZ(i, col.r, col.g, col.b);
+      }
+    };
+    for (const c of ORIGIN_CELLS) stamp(c, r + 1, ring);
+    for (const c of ORIGIN_CELLS) stamp(c, r, core);
   }
   attr.needsUpdate = true;
 }
@@ -554,6 +594,7 @@ function build() {
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
   const r = scanField(N, seq, h0, dh, $('serp').checked, markN);
   lastMarks = r.marks;
+  lastN = N;
   const nm = norm(r.h);
   const h = nm.h;
   lastH = h;
@@ -625,6 +666,8 @@ function build() {
     `<i>this is what reads as "thousands of peaks"</i>\n` +
     `summits       ${su.n} of prominence 2% within radius 8   best ${su.best.toFixed(3)}\n` +
     `curvature     mean ${cv.mean.toFixed(3)}% of relief, max ${cv.max.toFixed(2)}%\n` +
+    `origin        (0,0) (0,1) (1,0) yellow, spread ` +
+    `${Math.max(0, Math.min(12, +$('spread').value || 0))} with a dark ring\n` +
     `marked        ${r.marks.length} cells in plot order, blue — ` +
     `k up to ${Math.max(0, Math.ceil((Math.sqrt(8 * r.marks.length + 1) - 3) / 2))}\n` +
     `weights       ${(W_ORTH / (2 * W_ORTH + W_DIAG)).toFixed(4)}, ` +
@@ -636,7 +679,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
