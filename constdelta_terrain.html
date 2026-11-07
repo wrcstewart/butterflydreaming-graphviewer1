@@ -115,6 +115,19 @@
       grid 257 &mdash; so <b>2 m</b>. The readout gives the far-corner height
       and the gradient for whatever you set.</div>
 
+    <label><input type="checkbox" id="alt" checked style="width:auto">
+      alternating runs instead of a constant delta</label>
+    <label>run length <span id="run-val">20</span> cells</label>
+    <input id="run" type="range" min="5" max="100" value="20" step="1">
+    <div class="hint">The simplest structured sequence there is: <b>+delta for
+      N cells, then &minus;delta for N cells</b>, repeating. A step towards
+      simulating the fractal without its complications &mdash; it is exactly
+      balanced, so there is no drift, and the only thing in it is one length
+      scale. Whatever the scan does with structure should show here in its
+      plainest form.<br>
+      Unticked gives the constant delta, where the surface is a ramp and the
+      self-tests below have closed-form answers.</div>
+
     <label>grid <span id="n-val">257</span> cells across</label>
     <select id="grid">
       <option value="129">129 &mdash; coarse</option>
@@ -295,6 +308,14 @@ const ORIGIN_CELLS = [[0, 0], [0, 1], [1, 0]];
 const ORIGIN_CORE = 0xffd21f, ORIGIN_RING = 0x2e2100, MARK_COLOUR = 0x0d2060;
 const ORIGIN_SPREAD = 2, MARK_N = 50;
 const CONST_SEQ = [1];
+// Alternating runs: +1 for `len` cells then -1 for `len`, which the scan's
+// wrap then repeats for ever. Exactly balanced, so no drift, and carrying a
+// single length scale and nothing else.
+function altSeq(len) {
+  const L = Math.max(1, len | 0), a = new Array(2 * L);
+  for (let i = 0; i < L; i++) { a[i] = 1; a[i + L] = -1; }
+  return a;
+}
 
 // ── RENDER ──────────────────────────────────────────────────────────────
 // Lighting carries the relief, not colour: every scheme keeps a bright surface
@@ -442,7 +463,11 @@ function build() {
   $('dh-val').textContent = delta.toFixed(2);
   const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(1);
 
-  const r = scanField(N, CONST_SEQ, 0, delta, $('serp').checked, MARK_N, $('comp').checked);
+  const useAlt = $('alt').checked;
+  const runLen = Math.max(5, Math.min(100, +$('run').value));
+  $('run-val').textContent = runLen;
+  const seq = useAlt ? altSeq(runLen) : CONST_SEQ;
+  const r = scanField(N, seq, 0, delta, $('serp').checked, MARK_N, $('comp').checked);
   lastH = r.h; lastMarks = r.marks; lastN = N;
 
   // Heights are in METRES. The ground plane spans 2 world units for km across,
@@ -498,6 +523,7 @@ function build() {
   const gDiag = (samp(Math.PI / 4, R2) - samp(Math.PI / 4, R1)) / (R2 - R1);
 
   lastStats = { N, km, delta, steps, cell, edgeFar, cornerFar, mid, mn, mx, gAxis, gDiag,
+                useAlt, runLen, seqLen: seq.length,
                 edgeSlope: fit(eP) / delta, midSlope: fit(dP) / delta,
                 comp: $('comp').checked };
   applyScheme();
@@ -567,7 +593,10 @@ function report() {
   $('out').innerHTML =
     `range         ${s.km} km across, ${s.N} cells, ` +
     `${s.cell.toFixed(1)} m per cell, ${s.steps} diagonal steps\n` +
-    `delta         ${s.delta.toFixed(2)} m per step\n` +
+    `delta         ${s.delta.toFixed(2)} m per step   ` +
+    (s.useAlt
+      ? `<b>alternating runs of ${s.runLen} cells</b> — period ${2 * s.runLen} cells`
+      : `constant — the surface is a ramp`) + '\n' +
     `\n` +
     `far corner    ${s.cornerFar.toFixed(0)} m   ` +
     `axis far end ${s.edgeFar.toFixed(0)} m   relief ${relief.toFixed(0)} m\n` +
@@ -582,9 +611,11 @@ function report() {
     `per-distance  axis ${s.gAxis.toFixed(4)}, diagonal ${s.gDiag.toFixed(4)} ` +
     `m per m   diagonal ${((s.gDiag / Math.max(s.gAxis, 1e-9) - 1) * 100).toFixed(1)}% ` +
     `steeper   <i>equal would be isotropic</i>\n` +
-    `slopes        axis ${s.edgeSlope.toFixed(6)}, diagonal centre ` +
-    `${s.midSlope.toFixed(6)} per step   ` +
-    `predicted 1.000000 and ${s.comp ? '1.000000' : SLOPE_INTERIOR.toFixed(6)}\n` +
+    (s.useAlt
+      ? `slopes        not applicable — the closed form is for a CONSTANT delta\n`
+      : `slopes        axis ${s.edgeSlope.toFixed(6)}, diagonal centre ` +
+        `${s.midSlope.toFixed(6)} per step   ` +
+        `predicted 1.000000 and ${s.comp ? '1.000000' : SLOPE_INTERIOR.toFixed(6)}\n`) +
     `\n` +
     `GRADIENT      ${axisGrad.toFixed(2)}% along an axis, ` +
     `${diagGrad.toFixed(2)}% origin to far corner\n` +
@@ -622,7 +653,7 @@ function report() {
 
 if (window.THREE) {
   initThree();
-  for (const id of ['km', 'dh', 'grid', 'comp', 'serp']) $(id).addEventListener('input', build);
+  for (const id of ['km', 'dh', 'grid', 'comp', 'serp', 'alt', 'run']) $(id).addEventListener('input', build);
   // The sun only changes the lighting, so it repaints rather than rebuilding.
   for (const id of ['sun', 'sunaz']) $(id).addEventListener('input', () => {
     $('sun-val').textContent = $('sun').value;
