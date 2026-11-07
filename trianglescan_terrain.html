@@ -179,6 +179,29 @@ Z: &lt;ZZZ&gt;-</textarea>
         surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
         telling you apart by hue only. It therefore has a dark ring, which
         guarantees a luminance edge whatever it sits on.</div>
+      <label><input type="checkbox" id="konst" style="width:auto">
+        TEST: constant dH instead of the fractal</label>
+      <label>constant delta <input id="kdelta" type="number" value="0.01"
+        step="0.002" style="width:100px"></label>
+      <div class="hint">A known-answer check on the scan and the weights. With
+        every cell given the same dH, the axes have one neighbour and so rise
+        exactly delta per diagonal; an interior cell's base includes
+        (u&minus;1,v&minus;1), which is TWO diagonals back, so its effective lag
+        is 1&nbsp;+&nbsp;w<sub>diag</sub> and it rises at
+        1/(1+w<sub>diag</sub>) = <b>0.792893</b> per diagonal.<br>
+        So the right answer is NOT a plane: it is a trough along the main
+        diagonal, deepening linearly, because the weighting favours the axes.
+        The readout prints the measured slopes against those two predictions.</div>
+      <label><input type="checkbox" id="comp" style="width:auto">
+        compensate the stencil lag</label>
+      <div class="hint">Found by the constant-dH test above. The diagonal
+        neighbour is TWO diagonals back, so an interior cell's base lags by
+        1&nbsp;+&nbsp;w<sub>diag</sub> = 1.2612 while an axis cell lags exactly
+        1 &mdash; which makes the axes rise faster than the middle and carves a
+        valley along the main diagonal worth
+        (&radic;2&minus;1)/2&nbsp;=&nbsp;<b>20.7% of the edge rise, at every
+        scale</b>, with no help from the fractal. Multiplying dH by the lag
+        levels it. Off by default so the uncorrected behaviour stays visible.</div>
       <label><input type="checkbox" id="serp" checked style="width:auto">
         serpentine scan (alternate the direction each diagonal)</label>
       <div class="hint">Unchecking it makes every diagonal run the same way,
@@ -287,7 +310,7 @@ function growthExponent(a) {
 // edges and the origin fall out of the same expression.
 const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
 
-function scanField(N, seq, h0, dh, serpentine, markN) {
+function scanField(N, seq, h0, dh, serpentine, markN, compensate) {
   const h = new Float64Array(N * N);
   const ix = (u, v) => v * N + u;
   // The first `markN` cells in PLOT ORDER, so the origin and the opening scan
@@ -307,12 +330,26 @@ function scanField(N, seq, h0, dh, serpentine, markN) {
     else       for (let u = uLo; u <= uHi; u++) list.push(u);
     for (const u of list) {
       const v = k - u;
-      let num = 0, den = 0;
-      if (u > 0)            { num += W_ORTH * h[ix(u - 1, v)];     den += W_ORTH; }
-      if (v > 0)            { num += W_ORTH * h[ix(u, v - 1)];     den += W_ORTH; }
-      if (u > 0 && v > 0)   { num += W_DIAG * h[ix(u - 1, v - 1)]; den += W_DIAG; }
+      let num = 0, den = 0, lagNum = 0;
+      if (u > 0)            { num += W_ORTH * h[ix(u - 1, v)];     den += W_ORTH; lagNum += W_ORTH * 1; }
+      if (v > 0)            { num += W_ORTH * h[ix(u, v - 1)];     den += W_ORTH; lagNum += W_ORTH * 1; }
+      if (u > 0 && v > 0)   { num += W_DIAG * h[ix(u - 1, v - 1)]; den += W_DIAG; lagNum += W_DIAG * 2; }
       const base = den > 0 ? num / den : h0;
-      h[ix(u, v)] = base + wrap(used++) * dh;
+      // ── LAG COMPENSATION ────────────────────────────────────────────
+      // Found by the constant-dH test. Each neighbour sits a number of
+      // diagonals back — 1 for the orthogonal pair, 2 for (u-1,v-1) — so a
+      // cell's base lags the current diagonal by SUM(w_i * lag_i). Interior
+      // that is 1 + w_diag = 1.2612, while an axis cell has only an
+      // orthogonal neighbour and lags exactly 1. So with a constant dH the
+      // axes rise at dH per diagonal and the interior at 1/1.2612 = 0.792893,
+      // and the gap is a valley along the main diagonal worth (sqrt(2)-1)/2 =
+      // 20.7% of the edge rise AT EVERY SCALE. Nothing to do with the fractal.
+      //
+      // Multiplying dH by that lag makes every cell rise at dH per diagonal
+      // whatever stencil it has, which removes the valley. Off by default so
+      // the uncorrected behaviour stays visible.
+      const lag = den > 0 ? lagNum / den : 1;
+      h[ix(u, v)] = base + wrap(used++) * dh * (compensate ? lag : 1);
       if (marks.length < markN) marks.push(ix(u, v));
     }
   }
@@ -588,13 +625,37 @@ function build() {
   const steps = 2 * (N - 1);
   const disc = maxAbsPartial(seq, Math.min(steps, seq.length));
   const dhAuto = 1 / Math.max(disc, 1e-9);
-  const dh = dhAuto * dhMul;
+  let dh = dhAuto * dhMul;
   const expo = growthExponent(seq);
 
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
-  const r = scanField(N, seq, h0, dh, $('serp').checked, markN);
+  // TEST MODE: a constant dH, which has a closed-form answer, so the scan and
+  // the weighting can be checked rather than trusted.
+  const konst = $('konst').checked;
+  if (konst) {
+    const kd = +$('kdelta').value;
+    seq = new Array(Math.max(16, Math.min(seq.length, 4 * N * N))).fill(1);
+    dh = kd;
+  }
+  const r = scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked);
   lastMarks = r.marks;
   lastN = N;
+  // The two slopes, measured on the RAW field before normalising, so they can
+  // be compared with the closed form directly.
+  const slopes = (() => {
+    const fit = pts => {
+      let sx = 0, sy = 0, sxy = 0, sxx = 0;
+      for (const [x, y] of pts) { sx += x; sy += y; sxy += x * y; sxx += x * x; }
+      const n = pts.length;
+      return n > 2 ? (n * sxy - sx * sy) / (n * sxx - sx * sx) : NaN;
+    };
+    const edge = [], diag = [];
+    for (let k = 2; k < N - 2; k++) {
+      edge.push([k, r.h[0 * N + k]]);                       // along v = 0
+      if (k % 2 === 0) diag.push([k, r.h[(k / 2) * N + (k / 2)]]);  // u = v
+    }
+    return { edge: fit(edge), interior: fit(diag) };
+  })();
   const nm = norm(r.h);
   const h = nm.h;
   lastH = h;
@@ -639,6 +700,16 @@ function build() {
       : `   enough for ${(seq.length / need).toFixed(1)} passes`) + '\n' +
     `raw range     ${nm.min.toFixed(2)} to ${nm.max.toFixed(2)}   ` +
     `before normalising to 0..1\n` +
+    (konst
+      ? `TEST MODE     constant dH = ${(+$('kdelta').value).toFixed(4)}\n` +
+        `  edge slope  ${(slopes.edge / dh).toFixed(6)} per diagonal   ` +
+        `predicted 1.000000   ` +
+        `<b>${Math.abs(slopes.edge / dh - 1) < 2e-3 ? 'MATCHES' : 'DOES NOT MATCH'}</b>\n` +
+        `  u=v slope   ${(slopes.interior / dh).toFixed(6)} per diagonal   ` +
+        `predicted 0.792893   ` +
+        `<b>${Math.abs(slopes.interior / dh - 0.792893) < 2e-3 ? 'MATCHES' : 'DOES NOT MATCH'}</b>\n` +
+        `  the gap is the diagonal trough: the weighting favours the axes\n`
+      : '') +
     `fractal mean  ${rawMean.toFixed(4)} per symbol   ` +
     (bal ? `removed` : `<span class="warn">NOT removed — expect a one-way ramp</span>`) +
     `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n` +
@@ -679,7 +750,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'konst', 'kdelta', 'comp'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
