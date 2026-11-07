@@ -144,7 +144,8 @@ Z: &lt;ZZZ&gt;-</textarea>
       <label>start height at (0,0) <span id="h0-val">0.50</span></label>
       <input id="h0" type="range" min="0" max="1" value="0.5" step="0.01">
       <label><input type="checkbox" id="balance" checked style="width:auto">
-        balance the fractal (subtract its mean)</label>
+        balance the fractal (subtract its mean)
+        <span id="bal-na" class="warn"></span></label>
       <div class="hint">MEASURED, this grammar is NOT balanced: at depth 9 it
         holds 6,764 <code>+</code> against 14,514 <code>-</code>, a mean of
         &minus;0.1438 per symbol. The bias is in the rules &mdash; X is net
@@ -156,7 +157,8 @@ Z: &lt;ZZZ&gt;-</textarea>
         dH is a one-way ramp some seventy times the texture. Uncheck it to see
         that for yourself; it is almost certainly why earlier benches were
         "gradually downhill" throughout.</div>
-      <label>dH &times; <span id="dh-val">1.00</span> of the automatic scale</label>
+      <label>dH &times; <span id="dh-val">1.00</span> of the automatic scale
+        <span id="dh-na" class="warn"></span></label>
       <input id="dh" type="range" min="0.05" max="4" value="1" step="0.05">
       <div class="hint">The three-point average has unity gain, so every cell
         adds one more dH and the wander accumulates. The automatic scale sets
@@ -179,7 +181,7 @@ Z: &lt;ZZZ&gt;-</textarea>
         surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
         telling you apart by hue only. It therefore has a dark ring, which
         guarantees a luminance edge whatever it sits on.</div>
-      <label><input type="checkbox" id="konst" style="width:auto">
+      <label><input type="checkbox" id="konst" checked style="width:auto">
         TEST: constant dH instead of the fractal</label>
       <label>constant delta <input id="kdelta" type="number" value="0.01"
         step="0.002" style="width:100px"></label>
@@ -599,6 +601,9 @@ function build() {
   const h0 = +$('h0').value, dhMul = +$('dh').value;
   $('h0-val').textContent = h0.toFixed(2);
   $('dh-val').textContent = dhMul.toFixed(2);
+  // Say so rather than letting a slider sit there doing nothing.
+  $('dh-na').textContent = $('konst').checked ? '  — no effect in test mode' : '';
+  $('bal-na').textContent = $('konst').checked ? '  — no effect in test mode' : '';
   const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
 
   let seq;
@@ -613,30 +618,42 @@ function build() {
     return;
   }
 
-  // BALANCE. Without this the mean rides into every cell and the surface is a
-  // ramp; the drift is a property of the grammar, not of the scan.
-  const rawMean = seq.reduce((a, b) => a + b, 0) / seq.length;
-  const bal = $('balance').checked;
-  if (bal) seq = seq.map(v => v - rawMean);
-
-  // AUTOMATIC dH. The wander over the diagonal is maxAbsPartial x dH, so
-  // setting dH to its reciprocal brings the accumulated relief to about 1 —
-  // the same order as the normalised height range, instead of ninety times it.
+  // ── WHICH SEQUENCE IS ACTUALLY USED ───────────────────────────────────
+  // The override has to happen BEFORE the discrepancy and the exponent are
+  // taken, or the readout reports statistics of a sequence that was thrown
+  // away — which is exactly the sort of misleading readout that has cost
+  // rounds on this work already.
+  const konst = $('konst').checked;
   const steps = 2 * (N - 1);
-  const disc = maxAbsPartial(seq, Math.min(steps, seq.length));
-  const dhAuto = 1 / Math.max(disc, 1e-9);
-  let dh = dhAuto * dhMul;
-  const expo = growthExponent(seq);
+  let rawMean, bal, disc, dhAuto, dh, expo;
+
+  if (konst) {
+    // TEST MODE: every cell gets the same dH. A constant sequence is pure
+    // drift by construction, so its exponent is 1 and its discrepancy is just
+    // the step count — both correct, and both saying "this is not a fractal".
+    seq = new Array(Math.max(16, Math.min(4 * N * N, 4 * steps + 64))).fill(1);
+    bal = false;
+    rawMean = 1;
+    dh = +$('kdelta').value;
+    disc = maxAbsPartial(seq, Math.min(steps, seq.length));
+    dhAuto = NaN;
+    expo = growthExponent(seq);
+  } else {
+    // BALANCE. Without this the grammar's mean rides into every cell and the
+    // surface is a ramp; the drift is a property of the grammar, not the scan.
+    rawMean = seq.reduce((a, b) => a + b, 0) / seq.length;
+    bal = $('balance').checked;
+    if (bal) seq = seq.map(v => v - rawMean);
+    // AUTOMATIC dH. The wander over the diagonal is maxAbsPartial x dH, so
+    // setting dH to its reciprocal brings the accumulated relief to about 1 —
+    // the same order as the normalised height range, instead of ninety times it.
+    disc = maxAbsPartial(seq, Math.min(steps, seq.length));
+    dhAuto = 1 / Math.max(disc, 1e-9);
+    dh = dhAuto * dhMul;
+    expo = growthExponent(seq);
+  }
 
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
-  // TEST MODE: a constant dH, which has a closed-form answer, so the scan and
-  // the weighting can be checked rather than trusted.
-  const konst = $('konst').checked;
-  if (konst) {
-    const kd = +$('kdelta').value;
-    seq = new Array(Math.max(16, Math.min(seq.length, 4 * N * N))).fill(1);
-    dh = kd;
-  }
   const r = scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked);
   lastMarks = r.marks;
   lastN = N;
@@ -701,7 +718,8 @@ function build() {
     `raw range     ${nm.min.toFixed(2)} to ${nm.max.toFixed(2)}   ` +
     `before normalising to 0..1\n` +
     (konst
-      ? `TEST MODE     constant dH = ${(+$('kdelta').value).toFixed(4)}\n` +
+      ? `TEST MODE     constant dH = ${dh.toFixed(4)} at every cell — ` +
+        `the grammar is NOT in use\n` +
         `  edge slope  ${(slopes.edge / dh).toFixed(6)} per diagonal   ` +
         `predicted 1.000000   ` +
         `<b>${Math.abs(slopes.edge / dh - 1) < 2e-3 ? 'MATCHES' : 'DOES NOT MATCH'}</b>\n` +
@@ -710,9 +728,10 @@ function build() {
         `<b>${Math.abs(slopes.interior / dh - 0.792893) < 2e-3 ? 'MATCHES' : 'DOES NOT MATCH'}</b>\n` +
         `  the gap is the diagonal trough: the weighting favours the axes\n`
       : '') +
-    `fractal mean  ${rawMean.toFixed(4)} per symbol   ` +
-    (bal ? `removed` : `<span class="warn">NOT removed — expect a one-way ramp</span>`) +
-    `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n` +
+    (konst ? '' :
+      `fractal mean  ${rawMean.toFixed(4)} per symbol   ` +
+      (bal ? `removed` : `<span class="warn">NOT removed — expect a one-way ramp</span>`) +
+      `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n`) +
     `\n` +
     `PREDICTION 1  elongation along +u+v: ${el24.toFixed(2)} at lag 24, ` +
     `${el8.toFixed(2)} at lag 8   (1.00 = none)` +
@@ -720,12 +739,15 @@ function build() {
     // PREDICTION 2 rewritten as what it actually is: a measurement of the
     // sequence's order. 0.5 means the ordering contributes nothing beyond
     // chance, below 0.5 that it cancels, above that it reinforces.
-    `PREDICTION 2  growth exponent of the partial sums ${expo.toFixed(3)}   ` +
-    `(0 bounded, 0.5 random walk, 1 drift)\n` +
-    `              ${expo > 0.75 ? 'DRIFT — the fractal is not balanced'
-                     : expo > 0.55 ? 'persistent: the ordering REINFORCES the wander'
-                     : expo > 0.45 ? 'indistinguishable from a random walk'
-                     : 'the ordering CANCELS — low discrepancy'}\n` +
+    (konst
+      ? `PREDICTION 2  not applicable — a constant dH is pure drift by ` +
+        `construction (exponent ${expo.toFixed(3)})\n`
+      : `PREDICTION 2  growth exponent of the partial sums ${expo.toFixed(3)}   ` +
+        `(0 bounded, 0.5 random walk, 1 drift)\n` +
+        `              ${expo > 0.75 ? 'DRIFT — the fractal is not balanced'
+                         : expo > 0.55 ? 'persistent: the ordering REINFORCES the wander'
+                         : expo > 0.45 ? 'indistinguishable from a random walk'
+                         : 'the ordering CANCELS — low discrepancy'}\n`) +
     `              relief near the origin ${gr.near.toFixed(3)}, far corner ` +
     `${gr.far.toFixed(3)}, ratio ${gr.ratio.toFixed(2)}` +
     (gr.ratio > 1.5 ? `   <span class="warn">far corner much rougher</span>` : '') + '\n' +
