@@ -249,6 +249,8 @@ Z: &lt;ZZZ&gt;-</textarea>
 <!-- lindenmayer 1.5.4, vendored. ROOT-RELATIVE: a bare path resolves against
      the page, which is what broke the voice files on /n/ deep links. -->
 <script src="/lib/lindenmayer-1.5.4.js"></script>
+<!-- The scan, shared with constdelta_terrain.html. -->
+<script src="/trianglescan_scan.js"></script>
 
 <script>
 'use strict';
@@ -307,56 +309,22 @@ function growthExponent(a) {
 }
 
 // ── THE SCAN ────────────────────────────────────────────────────────────
-// Exactly as specified. The weights are reciprocal distance, renormalised over
-// whichever neighbours exist, so no special case is written out by hand — the
-// edges and the origin fall out of the same expression.
-const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
-
-function scanField(N, seq, h0, dh, serpentine, markN, compensate) {
-  const h = new Float64Array(N * N);
-  const ix = (u, v) => v * N + u;
-  // The first `markN` cells in PLOT ORDER, so the origin and the opening scan
-  // lines can be found on the surface. Recorded here because this is the only
-  // place that knows the traversal.
-  const marks = [];
-  h[ix(0, 0)] = h0;
-  if (markN > 0) marks.push(ix(0, 0));
-  let k = 0, used = 0, maxK = 2 * (N - 1);
-  const wrap = i => seq[i % seq.length];
-  for (k = 1; k <= maxK; k++) {
-    // the cells on this anti-diagonal, in traversal order
-    const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
-    const fromU = serpentine ? (k % 2 === 1) : true;   // odd k: u axis -> v axis
-    const list = [];
-    if (fromU) for (let u = uHi; u >= uLo; u--) list.push(u);
-    else       for (let u = uLo; u <= uHi; u++) list.push(u);
-    for (const u of list) {
-      const v = k - u;
-      let num = 0, den = 0, lagNum = 0;
-      if (u > 0)            { num += W_ORTH * h[ix(u - 1, v)];     den += W_ORTH; lagNum += W_ORTH * 1; }
-      if (v > 0)            { num += W_ORTH * h[ix(u, v - 1)];     den += W_ORTH; lagNum += W_ORTH * 1; }
-      if (u > 0 && v > 0)   { num += W_DIAG * h[ix(u - 1, v - 1)]; den += W_DIAG; lagNum += W_DIAG * 2; }
-      const base = den > 0 ? num / den : h0;
-      // ── LAG COMPENSATION ────────────────────────────────────────────
-      // Found by the constant-dH test. Each neighbour sits a number of
-      // diagonals back — 1 for the orthogonal pair, 2 for (u-1,v-1) — so a
-      // cell's base lags the current diagonal by SUM(w_i * lag_i). Interior
-      // that is 1 + w_diag = 1.2612, while an axis cell has only an
-      // orthogonal neighbour and lags exactly 1. So with a constant dH the
-      // axes rise at dH per diagonal and the interior at 1/1.2612 = 0.792893,
-      // and the gap is a valley along the main diagonal worth (sqrt(2)-1)/2 =
-      // 20.7% of the edge rise AT EVERY SCALE. Nothing to do with the fractal.
-      //
-      // Multiplying dH by that lag makes every cell rise at dH per diagonal
-      // whatever stencil it has, which removes the valley. Off by default so
-      // the uncorrected behaviour stays visible.
-      const lag = den > 0 ? lagNum / den : 1;
-      h[ix(u, v)] = base + wrap(used++) * dh * (compensate ? lag : 1);
-      if (marks.length < markN) marks.push(ix(u, v));
-    }
-  }
-  return { h, used, marks };
+// Lives in /trianglescan_scan.js, shared with constdelta_terrain.html so that
+// the constant-delta page tests THIS code rather than a copy of it. It had
+// been duplicated, which meant the test page was testing its own duplicate —
+// the same fault that left two divergent copies of music_module.html in this
+// repo.
+// A missing shared file must say so rather than throwing on the destructure
+// and leaving a blank page — the path is root-relative and that is exactly the
+// kind of thing that breaks silently on a deep link.
+if (!window.TriangleScan) {
+  const e = document.getElementById('err');
+  e.style.display = 'grid';
+  e.textContent = '/trianglescan_scan.js did not load. The scan lives there and ' +
+    'is shared with the other triangle-scan page; nothing can be drawn without it.';
+  throw new Error('TriangleScan missing');
 }
+const { scanField, W_ORTH, W_DIAG } = window.TriangleScan;
 
 // ── MEASURES ────────────────────────────────────────────────────────────
 function norm(h) {

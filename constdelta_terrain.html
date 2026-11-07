@@ -70,6 +70,11 @@
   #hint3d { position:absolute; right:12px; top:12px; color:var(--dim);
             font-size:11px; background:rgba(255,255,255,.9);
             border:1px solid var(--line); border-radius:3px; padding:5px 8px; }
+  #tests { position:absolute; right:12px; bottom:12px; margin:0;
+         font:10px/1.5 ui-monospace, Menlo, monospace; white-space:pre;
+         background:rgba(255,255,255,.95); border:1px solid var(--line);
+         border-radius:3px; padding:8px 10px; max-width:46%; }
+  .pass { color:#1b5e20; } .fail { color:#8a1c1c; font-weight:600; }
   #err { position:absolute; inset:0; display:none; place-content:center;
          text-align:center; padding:30px; color:var(--warn); }
 </style>
@@ -100,6 +105,14 @@
       given total rise does not: at 1000 m over 20 km it is 2.50% along an axis
       at every grid size, because the rise and the distance are what fix it.</div>
 
+    <label><input type="checkbox" id="serp" checked style="width:auto">
+      serpentine scan</label>
+    <div class="hint">The author: <em>"although serpentine option shouldnt
+      matter we need to test it"</em> &mdash; right, and I had deleted it on the
+      ground that it provably cannot matter, which is the hypothesis a test
+      exists to check. It is back, and the self-test below asserts the two
+      orders agree bit for bit under a constant delta.</div>
+
     <label><input type="checkbox" id="comp" style="width:auto">
       level the diagonal valley</label>
     <div class="hint">The valley is not a bug in the code &mdash; it is what
@@ -127,6 +140,7 @@
     <canvas id="cv"></canvas>
     <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
     <pre id="out"></pre>
+    <pre id="tests"></pre>
     <div id="err"></div>
   </div>
 </div>
@@ -136,6 +150,9 @@
      "latest" would let someone else's release change what this shows with no
      commit here. No L-system library: there is no grammar on this page. -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<!-- The scan, shared with trianglescan_terrain.html. ROOT-RELATIVE: a bare
+     path resolves against the page. -->
+<script src="/trianglescan_scan.js"></script>
 
 <script>
 'use strict';
@@ -146,42 +163,29 @@ if (!window.THREE) {
     'check the network rather than the settings.';
 }
 
-// Reciprocal distance: the orthogonal neighbours are 1 away, the diagonal one
-// sqrt(2). These are the only constants in the construction.
-const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
-const W_SUM = 2 * W_ORTH + W_DIAG;
-const LAG_INTERIOR = 1 + W_DIAG / W_SUM;          // 1.26120
-const SLOPE_INTERIOR = 1 / LAG_INTERIOR;          // 0.792893
-const TROUGH_FRACTION = 1 - SLOPE_INTERIOR;       // 0.207107 = (sqrt(2)-1)/2
+// The scan itself lives in /trianglescan_scan.js and is shared with
+// trianglescan_terrain.html, so this page tests the code the fractal page runs
+// rather than a copy of it. A constant delta is just a sequence of length 1
+// holding the value 1 — `wrap` indexes modulo the length — so it goes down
+// exactly the same path with no special case.
+// A missing shared file must say so rather than throwing on the destructure
+// and leaving a blank page — the path is root-relative and that is exactly the
+// kind of thing that breaks silently on a deep link.
+if (!window.TriangleScan) {
+  const e = document.getElementById('err');
+  e.style.display = 'grid';
+  e.textContent = '/trianglescan_scan.js did not load. The scan lives there and ' +
+    'is shared with the other triangle-scan page; nothing can be drawn without it.';
+  throw new Error('TriangleScan missing');
+}
+const { scanField, selfTest, SLOPE_INTERIOR, TROUGH_FRACTION } = window.TriangleScan;
 
 // The origin trio, and the first 50 cells in plot order, so the corner the
-// whole scan grows from can be found. Fixed rather than configurable — this
-// page exists to be small.
+// whole scan grows from can be found. Fixed rather than configurable.
 const ORIGIN_CELLS = [[0, 0], [0, 1], [1, 0]];
 const ORIGIN_CORE = 0xffd21f, ORIGIN_RING = 0x2e2100, MARK_COLOUR = 0x0d2060;
 const ORIGIN_SPREAD = 2, MARK_N = 50;
-
-function scanField(N, delta, compensate) {
-  const h = new Float64Array(N * N);
-  const ix = (u, v) => v * N + u;
-  const marks = [ix(0, 0)];
-  h[ix(0, 0)] = 0;
-  for (let k = 1; k <= 2 * (N - 1); k++) {
-    const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
-    for (let u = uHi; u >= uLo; u--) {
-      const v = k - u;
-      let num = 0, den = 0, lagNum = 0;
-      if (u > 0)          { num += W_ORTH * h[ix(u-1, v)];   den += W_ORTH; lagNum += W_ORTH; }
-      if (v > 0)          { num += W_ORTH * h[ix(u, v-1)];   den += W_ORTH; lagNum += W_ORTH; }
-      if (u > 0 && v > 0) { num += W_DIAG * h[ix(u-1, v-1)]; den += W_DIAG; lagNum += 2 * W_DIAG; }
-      const base = den > 0 ? num / den : 0;
-      const lag = den > 0 ? lagNum / den : 1;
-      h[ix(u, v)] = base + delta * (compensate ? lag : 1);
-      if (marks.length < MARK_N) marks.push(ix(u, v));
-    }
-  }
-  return { h, marks };
-}
+const CONST_SEQ = [1];
 
 // ── RENDER ──────────────────────────────────────────────────────────────
 // Lighting carries the relief, not colour: every scheme keeps a bright surface
@@ -293,7 +297,7 @@ function build() {
   $('dh-val').textContent = delta.toFixed(2);
   const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(1);
 
-  const r = scanField(N, delta, $('comp').checked);
+  const r = scanField(N, CONST_SEQ, 0, delta, $('serp').checked, MARK_N, $('comp').checked);
   lastH = r.h; lastMarks = r.marks; lastN = N;
 
   // Heights are in METRES. The ground plane spans 2 world units for km across,
@@ -339,6 +343,21 @@ function build() {
                 comp: $('comp').checked };
   applyScheme();
   report();
+  runTests(N);
+}
+
+// ── THE SELF-TESTS, ON SCREEN ───────────────────────────────────────────
+// Six properties that must hold by construction, asserted on the shared scan
+// at whatever grid is selected. This is what the page is for.
+function runTests(N) {
+  const rows = selfTest(N);
+  const nPass = rows.filter(t => t.pass).length;
+  $('tests').innerHTML =
+    `<b>self-test of /trianglescan_scan.js at ${N}</b>   ` +
+    `<span class="${nPass === rows.length ? 'pass' : 'fail'}">` +
+    `${nPass}/${rows.length}</span>\n` +
+    rows.map(t => `  <span class="${t.pass ? 'pass' : 'fail'}">` +
+      `${t.pass ? 'PASS' : 'FAIL'}</span>  ${t.name}\n        ${t.detail}`).join('\n');
 }
 
 function report() {
@@ -384,7 +403,7 @@ function report() {
 
 if (window.THREE) {
   initThree();
-  for (const id of ['km', 'dh', 'grid', 'comp']) $(id).addEventListener('input', build);
+  for (const id of ['km', 'dh', 'grid', 'comp', 'serp']) $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
   build();
