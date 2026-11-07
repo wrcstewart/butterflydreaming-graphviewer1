@@ -269,6 +269,24 @@ Z: &lt;ZZZ&gt;-</textarea>
         the axis gain, because a diagonal step covers &radic;2 of ground and an
         axis step covers 1. The diagonal weight &mdash; now &radic;2, not
         1/&radic;2 &mdash; is the real fix. Off by default.</div>
+      <label>cells per symbol <span id="st-val">16</span></label>
+      <input id="st" type="range" min="1" max="64" value="16" step="1">
+      <div class="hint">The author: <em>"the frequency of the bumps in general
+        is way to high we need more slowly changing."</em> One symbol per cell
+        makes the cell the finest scale there is, and measured along the
+        anti-diagonal the bumps came out at <b>18&ndash;23 cells</b> &mdash;
+        eleven to fourteen across a 257 grid.<br>
+        Holding each symbol for several cells scales the structure up, and
+        because a held symbol is a <em>constant</em> dH over those cells it
+        gives a smooth ramp rather than a step. Measured at 385 from stretch 1
+        to 32: roughness 0.466 &rarr; 0.353, relief 0.206 &rarr; 0.415. It also
+        multiplies the sequence available by the same factor, which is what
+        makes the start slider below worth having.<br>
+        The spectral peak is <em>not</em> a reliable single number here &mdash;
+        it jumps between bins as the sequence's own structure interacts with
+        the smoothing &mdash; so judge it by roughness and relief, both in the
+        readout.</div>
+
       <label>start at <span id="off-val">35</span>% into the sequence
         <span id="off-note" class="warn"></span></label>
       <input id="off" type="range" min="0" max="90" value="35" step="1">
@@ -706,18 +724,23 @@ function build() {
   const expo = growthExponent(seq);
 
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
+  const stretch = Math.max(1, Math.min(64, +$('st').value));
+  $('st-val').textContent = stretch;
   const offPct = Math.max(0, Math.min(90, +$('off').value));
   const offset = Math.floor(offPct / 100 * seq.length);
   $('off-val').textContent = offPct;
   // Say so when the shift cannot mean anything, rather than letting a slider
   // rotate a sequence that is already repeating.
-  const passes = seq.length / (N * N);
+  // Each symbol now covers `stretch` cells, so the sequence goes that much
+  // further — the passes figure has to say so or the warning misfires.
+  const passes = seq.length / ((N * N) / stretch);
   $('off-note').textContent = passes < 1.1
     ? '  — no room: the sequence wraps ' + (1 / passes).toFixed(1) + 'x, raise the depth' : '';
   const useFour = $('four').checked;
   const r = useFour
-    ? scanFourCorners(N, seq, h0, dh * CORNER_AMP, $('serp').checked, markN, $('comp').checked, offset)
-    : scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked, offset);
+    ? scanFourCorners(N, seq, h0, dh * CORNER_AMP, $('serp').checked, markN,
+                      $('comp').checked, offset, stretch)
+    : scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked, offset, stretch);
   lastMarks = r.marks;
   lastN = N;
   // The two slopes, measured on the RAW field before normalising, so they can
@@ -838,6 +861,8 @@ function build() {
     `per-distance  axis ${gains.axis.toFixed(4)}, diagonal ${gains.diag.toFixed(4)} ` +
     `per unit   diagonal ${((gains.diag / Math.max(Math.abs(gains.axis), 1e-9) - 1) * 100).toFixed(1)}% ` +
     `steeper\n` +
+    `stretch       ${stretch} cells per symbol   ` +
+    `so one pass covers ${(seq.length * stretch).toLocaleString()} cells\n` +
     `start         ${offPct}% in, symbol ${offset.toLocaleString()} of ` +
     `${seq.length.toLocaleString()}   ${passes.toFixed(2)} passes available` +
     (passes < 1.1 ? `   <span class="warn">wraps — raise the depth</span>` : '') + '\n' +
@@ -854,7 +879,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp', 'four', 'off'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp', 'four', 'off', 'st'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);

@@ -77,7 +77,7 @@
   // opposite corners — consecutive symbols landing far apart, a seam down one
   // edge. The alternation removes it, for the same reason boustrophedon beats
   // raster in space-filling constructions.
-  function scanField(N, seq, h0, dh, serpentine, markN, compensate, offset) {
+  function scanField(N, seq, h0, dh, serpentine, markN, compensate, offset, stretch) {
     const h = new Float64Array(N * N);
     const ix = (u, v) => v * N + u;
     // The first `markN` cells in PLOT ORDER, so the origin and the opening
@@ -101,7 +101,21 @@
     // it wrapped 3.8 times and an offset would merely have rotated a repeat.
     // Depth 10 yields 162,019 — 2.45 passes — and depth 11 gives 7.45.
     const off = (offset | 0) % seq.length;
-    const wrap = i => seq[(off + i) % seq.length];
+    // ── HOW MANY CELLS EACH SYMBOL COVERS ─────────────────────────────────
+    // The author: *"the frequency of the bumps in general is way to high we
+    // need more slowly changing."* One symbol per cell makes the cell the
+    // finest scale there is, and measured along the anti-diagonal the bumps
+    // came out at 18-23 cells — eleven to fourteen across a 257 grid.
+    //
+    // Holding each symbol for `stretch` cells scales the whole structure by
+    // that factor, and because a held symbol is a CONSTANT dH over those
+    // cells, each stretch produces a smooth ramp rather than a step — which
+    // the constant-delta page established directly.
+    //
+    // It also buys sequence: one corner needs N*N/stretch symbols instead of
+    // N*N, so the passes available multiply by the same factor.
+    const st = Math.max(1, stretch | 0) || 1;
+    const wrap = i => seq[(off + Math.floor(i / st)) % seq.length];
     for (let k = 1; k <= maxK; k++) {
       const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
       const fromU = serpentine ? (k % 2 === 1) : true;   // odd k: u axis -> v axis
@@ -154,12 +168,12 @@
   // it should be for four fields, so the caller is told to double dH; the
   // amplitude is a free parameter and no normalisation is involved.
   const CORNER_AMP = 2;
-  function scanFourCorners(N, seq, h0, dh, serpentine, markN, compensate, offset) {
+  function scanFourCorners(N, seq, h0, dh, serpentine, markN, compensate, offset, stretch) {
     const acc = new Float64Array(N * N);
     let marks = null;
     for (const fu of [0, 1]) for (const fv of [0, 1]) {
       const one = scanCorner(N, seq, h0, dh, serpentine, fu ? 0 : (fv ? 0 : markN),
-                             compensate, fu, fv, offset);
+                             compensate, fu, fv, offset, stretch);
       for (let i = 0; i < acc.length; i++) acc[i] += one.h[i];
       if (!fu && !fv) marks = one.marks;
     }
@@ -168,7 +182,7 @@
   }
   // The scan with its origin at a chosen corner. fu/fv flip the axis, so the
   // traversal starts there while the sequence still runs from the beginning.
-  function scanCorner(N, seq, h0, dh, serpentine, markN, compensate, fu, fv, offset) {
+  function scanCorner(N, seq, h0, dh, serpentine, markN, compensate, fu, fv, offset, stretch) {
     const h = new Float64Array(N * N);
     const X = u => (fu ? N - 1 - u : u), Y = v => (fv ? N - 1 - v : v);
     const ix = (u, v) => Y(v) * N + X(u);
@@ -190,7 +204,21 @@
     // it wrapped 3.8 times and an offset would merely have rotated a repeat.
     // Depth 10 yields 162,019 — 2.45 passes — and depth 11 gives 7.45.
     const off = (offset | 0) % seq.length;
-    const wrap = i => seq[(off + i) % seq.length];
+    // ── HOW MANY CELLS EACH SYMBOL COVERS ─────────────────────────────────
+    // The author: *"the frequency of the bumps in general is way to high we
+    // need more slowly changing."* One symbol per cell makes the cell the
+    // finest scale there is, and measured along the anti-diagonal the bumps
+    // came out at 18-23 cells — eleven to fourteen across a 257 grid.
+    //
+    // Holding each symbol for `stretch` cells scales the whole structure by
+    // that factor, and because a held symbol is a CONSTANT dH over those
+    // cells, each stretch produces a smooth ramp rather than a step — which
+    // the constant-delta page established directly.
+    //
+    // It also buys sequence: one corner needs N*N/stretch symbols instead of
+    // N*N, so the passes available multiply by the same factor.
+    const st = Math.max(1, stretch | 0) || 1;
+    const wrap = i => seq[(off + Math.floor(i / st)) % seq.length];
     for (let k = 1; k <= maxK; k++) {
       const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
       const fromU = serpentine ? (k % 2 === 1) : true;
