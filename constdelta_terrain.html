@@ -70,6 +70,15 @@
   #hint3d { position:absolute; right:12px; top:12px; color:var(--dim);
             font-size:11px; background:rgba(255,255,255,.9);
             border:1px solid var(--line); border-radius:3px; padding:5px 8px; }
+  #legend { position:absolute; left:12px; top:12px; display:none;
+         background:rgba(255,255,255,.94); border:1px solid var(--line);
+         border-radius:3px; padding:8px 10px;
+         font:10px/1.35 ui-monospace, Menlo, monospace; }
+  #legend .bar { display:flex; height:150px; width:22px; flex-direction:column-reverse;
+         border:1px solid #0003; }
+  #legend .bar i { flex:1 1 auto; display:block; }
+  #legend table { border-collapse:collapse; }
+  #legend td { padding:0 0 0 7px; vertical-align:top; white-space:nowrap; }
   #tests { position:absolute; right:12px; bottom:12px; margin:0;
          font:10px/1.5 ui-monospace, Menlo, monospace; white-space:pre;
          background:rgba(255,255,255,.95); border:1px solid var(--line);
@@ -146,12 +155,21 @@
       along it and show nothing. The readout gives the sensitivity and warns
       when the azimuth is in the blind direction.</div>
 
+    <label>spectrum bands <span id="bands-val">12</span>
+      (0 = continuous)</label>
+    <input id="bands" type="range" min="0" max="40" value="12" step="1">
+    <div class="hint">Only used by the elevation spectrum. Discrete bands are
+      what make it quantitative &mdash; contours you can count, each with a
+      known metre range, instead of a ramp the eye has to judge. The legend
+      gives the boundaries.</div>
+
     <label>colour scheme</label>
     <select id="scheme">
       <option value="grey" selected>grey on white &mdash; rock</option>
       <option value="whiteblue">white on blue &mdash; cloud</option>
       <option value="whiteolive">white on greeny brown &mdash; land</option>
       <option value="sea">blue green on sky blue &mdash; sea</option>
+      <option value="spectrum">ELEVATION SPECTRUM &mdash; red low to blue high</option>
     </select>
   </div>
 
@@ -159,6 +177,7 @@
     <canvas id="cv"></canvas>
     <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
     <pre id="out"></pre>
+    <div id="legend"></div>
     <pre id="tests"></pre>
     <div id="err"></div>
   </div>
@@ -199,6 +218,61 @@ if (!window.TriangleScan) {
 }
 const { scanField, selfTest, SLOPE_INTERIOR, TROUGH_FRACTION } = window.TriangleScan;
 
+// ── THE ELEVATION SPECTRUM ──────────────────────────────────────────────
+// The author: *"colour spectrum from 0 at origin = deep red to top elevation
+// as blue - in between go through the spectrum ie orange yellw green etc"*.
+//
+// A rainbow ramp is normally the worst possible choice for reduced colour
+// vision, because its LUMINANCE is not monotone and so the ordering becomes
+// unreadable. Measured on the naive version — hue 0..240 at fixed lightness —
+// the luminance runs 0.202, 0.298, 0.615, 0.798, 0.704, 0.676, 0.685, 0.717,
+// 0.482, 0.166, 0.070: it rises to a peak at yellow-green and falls off a
+// cliff into blue, so two quite different elevations can share a brightness
+// and the eye cannot order them.
+//
+// So the lightness at each hue is SOLVED, by bisection, to make relative
+// luminance linear in elevation: 0.05 at the deep red through to 0.42 at the
+// light blue, monotone throughout, with saturation held at 0.95 so the hues
+// are still the full spectrum. The map is then readable twice over — by hue
+// for the eye that has it, and by brightness for the ordering.
+const RAMP_N = 256;
+const RAMP = (() => {
+  const lum = (r, g, b) => {
+    const f = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const hsl = (h, sat, l) => {
+    const c = (1 - Math.abs(2 * l - 1)) * sat, hp = h / 60, x = c * (1 - Math.abs(hp % 2 - 1));
+    let r = 0, g = 0, b = 0;
+    if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; }
+    else if (hp < 3) { g = c; b = x; } else if (hp < 4) { g = x; b = c; }
+    else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
+    const m = l - c / 2;
+    return [r + m, g + m, b + m];
+  };
+  // 0.05 to 0.42, chosen by measurement rather than taste. Pushing the top to
+  // 0.72 gives the strongest brightness ordering (7.7:1 end to end) but drives
+  // hue 240 to #dadafe — saturation 0.14, effectively white, not the blue that
+  // was asked for. Dropping it to 0.18 gives a proper #6161fb but only 2.3:1,
+  // too little to order by. At 0.42 the ramp keeps saturation 0.97 all the way
+  // through red, orange, yellow, green and cyan, desaturates only for the last
+  // blue step, and still runs 4.7:1 end to end with a 0.037 luminance step
+  // between eleven samples.
+  const LO = 0.05, HI = 0.42, out = [];
+  for (let i = 0; i < RAMP_N; i++) {
+    const t = i / (RAMP_N - 1), h = 240 * t, target = LO + (HI - LO) * t;
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 40; k++) {
+      const m = (lo + hi) / 2;
+      const c = hsl(h, 0.95, m);
+      if (lum(c[0], c[1], c[2]) < target) lo = m; else hi = m;
+    }
+    out.push(hsl(h, 0.95, (lo + hi) / 2));
+  }
+  return out;
+})();
+const rampAt = t => RAMP[Math.max(0, Math.min(RAMP_N - 1, Math.round(t * (RAMP_N - 1))))];
+
 // The origin trio, and the first 50 cells in plot order, so the corner the
 // whole scan grows from can be found. Fixed rather than configurable.
 const ORIGIN_CELLS = [[0, 0], [0, 1], [1, 0]];
@@ -219,6 +293,13 @@ const SCHEMES = {
                 sun:0xfff9ec, hemi:0.70, sunI:2.1, rough:0.97 },
   sea:        { bg:0x9cc4e8, surface:0x47a39a, sky:0xd4e6f7, bounce:0x123f4a,
                 sun:0xfffdf4, hemi:0.60, sunI:2.4, rough:0.42, metal:0.10 },
+  // Lighting is deliberately almost flat here — high hemisphere, weak sun —
+  // so the colour on screen is very nearly the colour the elevation maps to.
+  // Shading would otherwise modulate it and the reading would be a mixture of
+  // height and aspect. Use another scheme to judge SHAPE; this one is for
+  // reading heights off the surface.
+  spectrum:   { bg:0x33332f, surface:0xffffff, sky:0xffffff, bounce:0xffffff,
+                sun:0xffffff, hemi:1.35, sunI:0.18, rough:1.0, byElevation:true },
 };
 let renderer, scene, camera, mesh, sun, hemi;
 let lastH = null, lastMarks = null, lastN = 0, lastScaleZ = 1;
@@ -280,8 +361,26 @@ function paint() {
   const mk = new THREE.Color().setHex(MARK_COLOUR);
   const core = new THREE.Color().setHex(ORIGIN_CORE);
   const ring = new THREE.Color().setHex(ORIGIN_RING);
-  for (let i = 0; i < attr.count; i++) attr.setXYZ(i, base.r, base.g, base.b);
-  if (lastMarks) for (const i of lastMarks) attr.setXYZ(i, mk.r, mk.g, mk.b);
+  if (s.byElevation && lastH) {
+    // BANDS, because a continuous ramp cannot be read off by eye. At 0 the
+    // ramp is continuous; at N the elevation is quantised into N steps, so the
+    // contours can be counted and each band has a known metre range.
+    const bands = Math.max(0, Math.min(40, +$('bands').value || 0));
+    let mn = Infinity, mx = -Infinity;
+    for (const v of lastH) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    const span = Math.max(mx - mn, 1e-12);
+    for (let i = 0; i < attr.count; i++) {
+      let t = (lastH[i] - mn) / span;
+      if (bands > 0) t = Math.min(bands - 1, Math.floor(t * bands)) / (bands - 1 || 1);
+      const c = rampAt(t);
+      attr.setXYZ(i, c[0], c[1], c[2]);
+    }
+    // The blue 50 are suppressed here: they would be indistinguishable from
+    // the ramp's own blue, which is the whole top of the scale.
+  } else {
+    for (let i = 0; i < attr.count; i++) attr.setXYZ(i, base.r, base.g, base.b);
+    if (lastMarks) for (const i of lastMarks) attr.setXYZ(i, mk.r, mk.g, mk.b);
+  }
   const stamp = (c, rad, col) => {
     for (let dv = -rad; dv <= rad; dv++) for (let du = -rad; du <= rad; du++) {
       const u = c[0] + du, v = c[1] + dv;
@@ -289,8 +388,12 @@ function paint() {
       attr.setXYZ(v * lastN + u, col.r, col.g, col.b);
     }
   };
+  // The origin keeps its dark ring in both modes, but the core goes WHITE
+  // under the spectrum: yellow sits inside the ramp and would read as an
+  // elevation rather than as a landmark.
+  const originCore = s.byElevation ? new THREE.Color(1, 1, 1) : core;
   for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD + 1, ring);
-  for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD, core);
+  for (const c of ORIGIN_CELLS) stamp(c, ORIGIN_SPREAD, originCore);
   attr.needsUpdate = true;
 }
 function applyScheme() {
@@ -368,6 +471,42 @@ function build() {
   applyScheme();
   report();
   runTests(N);
+  legend();
+}
+
+// ── THE LEGEND ──────────────────────────────────────────────────────────
+// Built from the SAME lookup table the surface uses, so it cannot drift from
+// what is drawn — a legend computed separately is a legend that will one day
+// lie.
+function legend() {
+  const el = $('legend');
+  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  if (!s.byElevation || !lastH) { el.style.display = 'none'; return; }
+  let mn = Infinity, mx = -Infinity;
+  for (const v of lastH) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const bands = Math.max(0, Math.min(40, +$('bands').value || 0));
+  const steps = bands > 0 ? bands : 24;
+  const swatch = [];
+  for (let i = 0; i < steps; i++) {
+    let t = (i + 0.5) / steps;
+    if (bands > 0) t = i / (steps - 1 || 1);
+    const c = rampAt(t).map(v => Math.round(255 * Math.max(0, Math.min(1, v))));
+    swatch.push('<i style="background:rgb(' + c.join(',') + ')"></i>');
+  }
+  const ticks = [];
+  for (let i = 0; i <= 4; i++) {
+    const f = i / 4;
+    ticks.push('<tr><td>' + (mn + f * (mx - mn)).toFixed(0) + ' m</td></tr>');
+  }
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="margin-bottom:5px"><b>elevation</b>' +
+    (bands > 0 ? ' — ' + bands + ' bands of ' + ((mx - mn) / bands).toFixed(0) + ' m'
+               : ' — continuous') + '</div>' +
+    '<div style="display:flex;align-items:stretch">' +
+    '<div class="bar">' + swatch.join('') + '</div>' +
+    '<table style="display:flex;flex-direction:column-reverse;justify-content:space-between">' +
+    ticks.join('') + '</table></div>';
 }
 
 // ── THE SELF-TESTS, ON SCREEN ───────────────────────────────────────────
@@ -449,7 +588,11 @@ if (window.THREE) {
     place(); report();
   });
   $('vx').addEventListener('input', rescale);
-  $('scheme').addEventListener('input', applyScheme);
+  $('scheme').addEventListener('input', () => { applyScheme(); legend(); });
+  $('bands').addEventListener('input', () => {
+    $('bands-val').textContent = $('bands').value;
+    paint(); place(); legend();
+  });
   build();
 }
 </script>
