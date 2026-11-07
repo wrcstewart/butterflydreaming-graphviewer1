@@ -145,7 +145,7 @@ Z: &lt;ZZZ&gt;-</textarea>
       <input id="h0" type="range" min="0" max="1" value="0.5" step="0.01">
       <label><input type="checkbox" id="balance" checked style="width:auto">
         balance the fractal (subtract its mean)
-        <span id="bal-na" class="warn"></span></label>
+</label>
       <div class="hint">MEASURED, this grammar is NOT balanced: at depth 9 it
         holds 6,764 <code>+</code> against 14,514 <code>-</code>, a mean of
         &minus;0.1438 per symbol. The bias is in the rules &mdash; X is net
@@ -158,7 +158,7 @@ Z: &lt;ZZZ&gt;-</textarea>
         that for yourself; it is almost certainly why earlier benches were
         "gradually downhill" throughout.</div>
       <label>dH &times; <span id="dh-val">1.00</span> of the automatic scale
-        <span id="dh-na" class="warn"></span></label>
+</label>
       <input id="dh" type="range" min="0.05" max="4" value="1" step="0.05">
       <div class="hint">The three-point average has unity gain, so every cell
         adds one more dH and the wander accumulates. The automatic scale sets
@@ -181,22 +181,89 @@ Z: &lt;ZZZ&gt;-</textarea>
         surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
         telling you apart by hue only. It therefore has a dark ring, which
         guarantees a luminance edge whatever it sits on.</div>
-      <label><input type="checkbox" id="konst" checked style="width:auto">
-        TEST: constant dH instead of the fractal</label>
-      <label>constant delta <input id="kdelta" type="number" value="0.01"
-        step="0.002" style="width:100px"></label>
-      <div class="hint">A known-answer check on the scan and the weights. With
-        every cell given the same dH, the axes have one neighbour and so rise
-        exactly delta per diagonal; an interior cell's base includes
-        (u&minus;1,v&minus;1), which is TWO diagonals back, so its effective lag
-        is 1&nbsp;+&nbsp;w<sub>diag</sub> and it rises at
-        1/(1+w<sub>diag</sub>) = <b>0.792893</b> per diagonal.<br>
-        So the right answer is NOT a plane: it is a trough along the main
-        diagonal, deepening linearly, because the weighting favours the axes.
-        The readout prints the measured slopes against those two predictions.</div>
+      <div class="hint">For CONSTANT-delta work use
+        <a href="/constdelta_terrain.html">constdelta_terrain.html</a>, which
+        shares this page's scan and works in real metres. A constant-delta mode
+        HERE was removed as a trap: this page normalises the field to 0..1
+        before rendering, which divides the delta out entirely — delta 1 and
+        delta 100 came out identical to 1.1e&minus;15, so the control could not
+        possibly do anything. The author set it to 100 and rightly asked
+        whether it was wired.</div>
+      <label>marker spread <input id="spread" type="number" value="2" min="0"
+        max="12" step="1" style="width:80px"> cells each side</label>
+      <div class="hint">(0,0), (0,1) and (1,0) are <b>yellow</b>. At spread 0
+        that is literally three vertices of 66,049 &mdash; 0.005% of the
+        surface, and invisible; the spread widens the patch so the corner can
+        actually be found. The blue 50 are unaffected.<br>
+        Bright yellow alone cannot work here: measured against the four scheme
+        surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
+        telling you apart by hue only. It therefore has a dark ring, which
+        guarantees a luminance edge whatever it sits on.</div>
+      <div class="hint">For CONSTANT-delta work use
+        <a href="/constdelta_terrain.html">constdelta_terrain.html</a>, which
+        shares this page's scan and works in real metres. A constant-delta mode
+        HERE was removed as a trap: this page normalises the field to 0..1
+        before rendering, which divides the delta out entirely — delta 1 and
+        delta 100 came out identical to 1.1e&minus;15, so the control could not
+        possibly do anything. The author set it to 100 and rightly asked
+        whether it was wired.</div>
+      <label>marker spread <input id="spread" type="number" value="2" min="0"
+        max="12" step="1" style="width:80px"> cells each side</label>
+      <div class="hint">(0,0), (0,1) and (1,0) are <b>yellow</b>. At spread 0
+        that is literally three vertices of 66,049 &mdash; 0.005% of the
+        surface, and invisible; the spread widens the patch so the corner can
+        actually be found. The blue 50 are unaffected.<br>
+        Bright yellow alone cannot work here: measured against the four scheme
+        surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
+        telling you apart by hue only. It therefore has a dark ring, which
+        guarantees a luminance edge whatever it sits on.</div>
+      <div class="hint">For CONSTANT-delta work use
+        <a href="/constdelta_terrain.html">constdelta_terrain.html</a>, which
+        shares this page's scan and works in real metres. A constant-delta mode
+        HERE was removed as a trap: this page normalises the field to 0..1
+        before rendering, which divides the delta out entirely — delta 1 and
+        delta 100 came out identical to 1.1e&minus;15, so the control could not
+        possibly do anything. The author set it to 100 and rightly asked
+        whether it was wired.</div>
+      <label>marker spread <input id="spread" type="number" value="2" min="0"
+        max="12" step="1" style="width:80px"> cells each side</label>
+      <div class="hint">(0,0), (0,1) and (1,0) are <b>yellow</b>. At spread 0
+        that is literally three vertices of 66,049 &mdash; 0.005% of the
+        surface, and invisible; the spread widens the patch so the corner can
+        actually be found. The blue 50 are unaffected.<br>
+        Bright yellow alone cannot work here: measured against the four scheme
+        surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
+        telling you apart by hue only. It therefore has a dark ring, which
+        guarantees a luminance edge whatever it sits on.</div>
+      <div class="hint">For CONSTANT-delta work use
+        <a href="/constdelta_terrain.html">constdelta_terrain.html</a>, which
+        shares this page's scan and works in real metres. A constant-delta mode
+        HERE was removed as a trap: this page normalises the field to 0..1
+        before rendering, which divides the delta out entirely — delta 1 and
+        delta 100 came out identical to 1.1e&minus;15, so the control could not
+        possibly do anything. The author set it to 100 and rightly asked
+        whether it was wired.</div>
+      <label>marker spread <input id="spread" type="number" value="2" min="0"
+        max="12" step="1" style="width:80px"> cells each side</label>
+      <div class="hint">(0,0), (0,1) and (1,0) are <b>yellow</b>. At spread 0
+        that is literally three vertices of 66,049 &mdash; 0.005% of the
+        surface, and invisible; the spread widens the patch so the corner can
+        actually be found. The blue 50 are unaffected.<br>
+        Bright yellow alone cannot work here: measured against the four scheme
+        surfaces its worst luminance contrast is <b>1.2:1</b>, so it would be
+        telling you apart by hue only. It therefore has a dark ring, which
+        guarantees a luminance edge whatever it sits on.</div>
+      <div class="hint">For CONSTANT-delta work use
+        <a href="/constdelta_terrain.html">constdelta_terrain.html</a>, which
+        shares this page's scan and works in real metres. A constant-delta mode
+        HERE was a trap and has gone: this page used to normalise the field to
+        0..1 before rendering, which divided the delta out entirely &mdash;
+        delta 1 and delta 100 came out identical to 1.1e&minus;15, so the
+        control could not possibly have done anything. The author set it to 100
+        and rightly asked whether it was wired.</div>
       <label><input type="checkbox" id="comp" style="width:auto">
         compensate the stencil lag</label>
-      <div class="hint">Found by the constant-dH test above. The diagonal
+      <div class="hint">Found by the constant-delta test on the other page. The diagonal
         neighbour is TWO diagonals back, so an interior cell's base lags by
         1&nbsp;+&nbsp;w<sub>diag</sub> = 1.2612 while an axis cell lags exactly
         1 &mdash; which makes the axes rise faster than the middle and carves a
@@ -207,14 +274,17 @@ Z: &lt;ZZZ&gt;-</textarea>
       <label><input type="checkbox" id="serp" checked style="width:auto">
         serpentine scan (alternate the direction each diagonal)</label>
       <div class="hint">Unchecking it makes every diagonal run the same way,
-        which puts consecutive symbols at opposite corners between lines. The
-        readout's seam figure measures what that costs.</div>
+        which puts consecutive symbols at opposite corners between lines &mdash;
+        a seam down one edge. With the FRACTAL it matters; under a constant
+        delta it provably cannot, and the self-test on
+        <a href="/constdelta_terrain.html">constdelta_terrain.html</a> asserts
+        the two orders agree there bit for bit.</div>
     </fieldset>
 
     <fieldset>
       <legend>view</legend>
-      <label>vertical &times; <span id="vx-val">0.35</span></label>
-      <input id="vx" type="range" min="0.02" max="1.2" value="0.35" step="0.01">
+      <label>vertical &times; <span id="vx-val">1.7</span></label>
+      <input id="vx" type="range" min="0.1" max="8" value="1.7" step="0.1">
       <label>colour scheme</label>
       <select id="scheme">
         <option value="grey" selected>grey on white &mdash; rock</option>
@@ -327,12 +397,17 @@ if (!window.TriangleScan) {
 const { scanField, W_ORTH, W_DIAG } = window.TriangleScan;
 
 // ── MEASURES ────────────────────────────────────────────────────────────
-function norm(h) {
+// ── NO NORMALISATION ────────────────────────────────────────────────────
+// The author: *"Please remove all normalisations they just make it harder to
+// see whats happening"*. He is right, and the constant-delta episode proved
+// it: normalising to 0..1 divides the amplitude out, so delta 1 and delta 100
+// rendered identically to 1.1e-15 and the slider looked unwired. The field is
+// now drawn as it comes out of the scan, and every threshold below is a share
+// of the ACTUAL relief rather than of an assumed 0..1.
+function extent(h) {
   let mn = Infinity, mx = -Infinity;
   for (const v of h) { if (v < mn) mn = v; if (v > mx) mx = v; }
-  const o = new Float64Array(h.length), s = mx > mn ? 1 / (mx - mn) : 0;
-  for (let i = 0; i < h.length; i++) o[i] = (h[i] - mn) * s;
-  return { h: o, min: mn, max: mx };
+  return { min: mn, max: mx, relief: mx - mn };
 }
 // PREDICTION 1 — elongation along +u+v. Compare the mean squared difference at
 // a fixed lag ALONG the diagonal against ACROSS it. Streaking along +u+v means
@@ -387,17 +462,17 @@ function chevron(h, N) {
   const one = dk(1), two = dk(2);
   return two > 0 ? (one * 2) / two : 0;    // 1.0 = no period-1 excess
 }
-function bumps(h, N) {
+function bumps(h, N, rel) {
   let n = 0;
   for (let v = 1; v < N - 1; v++) for (let u = 1; u < N - 1; u++) {
     const z = h[v * N + u];
     const a = h[v * N + u + 1], b = h[v * N + u - 1],
           c = h[(v + 1) * N + u], d = h[(v - 1) * N + u];
-    if (z >= a && z >= b && z >= c && z >= d && z > Math.min(a, b, c, d) + 0.0005) n++;
+    if (z >= a && z >= b && z >= c && z >= d && z > Math.min(a, b, c, d) + 0.0005 * rel) n++;
   }
   return n;
 }
-function summits(h, N, R) {
+function summits(h, N, R, rel) {
   let n = 0, best = 0;
   for (let v = R; v < N - R; v += 2) for (let u = R; u < N - R; u += 2) {
     const z = h[v * N + u]; let top = true, lo = z;
@@ -407,19 +482,19 @@ function summits(h, N, R) {
       if (w > z) { top = false; break; }
       if (w < lo) lo = w;
     }
-    if (top && z - lo > 0.02) { n++; if (z - lo > best) best = z - lo; }
+    if (top && z - lo > 0.02 * rel) { n++; if (z - lo > best) best = z - lo; }
   }
   return { n, best };
 }
 // ABSOLUTE curvature. A p99.9/median ratio rises when the median falls, so it
 // scored a smoother field as worse and sent the last bench to a wrong default.
-function curvature(h, N) {
+function curvature(h, N, rel) {
   let t = 0, n = 0, mx = 0;
   for (let v = 1; v < N - 1; v++) for (let u = 1; u < N - 1; u++) {
     const l = Math.abs(h[v*N+u+1] + h[v*N+u-1] + h[(v+1)*N+u] + h[(v-1)*N+u] - 4*h[v*N+u]);
     t += l; n++; if (l > mx) mx = l;
   }
-  return { mean: 100 * t / n, max: 100 * mx };
+  return { mean: 100 * (t / n) / rel, max: 100 * mx / rel };
 }
 
 // ── RENDER ──────────────────────────────────────────────────────────────
@@ -570,8 +645,6 @@ function build() {
   $('h0-val').textContent = h0.toFixed(2);
   $('dh-val').textContent = dhMul.toFixed(2);
   // Say so rather than letting a slider sit there doing nothing.
-  $('dh-na').textContent = $('konst').checked ? '  — no effect in test mode' : '';
-  $('bal-na').textContent = $('konst').checked ? '  — no effect in test mode' : '';
   const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
 
   let seq;
@@ -591,35 +664,20 @@ function build() {
   // taken, or the readout reports statistics of a sequence that was thrown
   // away — which is exactly the sort of misleading readout that has cost
   // rounds on this work already.
-  const konst = $('konst').checked;
   const steps = 2 * (N - 1);
-  let rawMean, bal, disc, dhAuto, dh, expo;
 
-  if (konst) {
-    // TEST MODE: every cell gets the same dH. A constant sequence is pure
-    // drift by construction, so its exponent is 1 and its discrepancy is just
-    // the step count — both correct, and both saying "this is not a fractal".
-    seq = new Array(Math.max(16, Math.min(4 * N * N, 4 * steps + 64))).fill(1);
-    bal = false;
-    rawMean = 1;
-    dh = +$('kdelta').value;
-    disc = maxAbsPartial(seq, Math.min(steps, seq.length));
-    dhAuto = NaN;
-    expo = growthExponent(seq);
-  } else {
-    // BALANCE. Without this the grammar's mean rides into every cell and the
-    // surface is a ramp; the drift is a property of the grammar, not the scan.
-    rawMean = seq.reduce((a, b) => a + b, 0) / seq.length;
-    bal = $('balance').checked;
-    if (bal) seq = seq.map(v => v - rawMean);
-    // AUTOMATIC dH. The wander over the diagonal is maxAbsPartial x dH, so
-    // setting dH to its reciprocal brings the accumulated relief to about 1 —
-    // the same order as the normalised height range, instead of ninety times it.
-    disc = maxAbsPartial(seq, Math.min(steps, seq.length));
-    dhAuto = 1 / Math.max(disc, 1e-9);
-    dh = dhAuto * dhMul;
-    expo = growthExponent(seq);
-  }
+  // BALANCE. Without this the grammar's mean rides into every cell and the
+  // surface is a ramp; the drift is a property of the grammar, not the scan.
+  const rawMean = seq.reduce((a, b) => a + b, 0) / seq.length;
+  const bal = $('balance').checked;
+  if (bal) seq = seq.map(v => v - rawMean);
+  // AUTOMATIC dH. The wander over the diagonal is maxAbsPartial x dH, so
+  // setting dH to its reciprocal brings the accumulated relief to about 1 —
+  // the same order as the normalised height range, instead of ninety times it.
+  const disc = maxAbsPartial(seq, Math.min(steps, seq.length));
+  const dhAuto = 1 / Math.max(disc, 1e-9);
+  const dh = dhAuto * dhMul;
+  const expo = growthExponent(seq);
 
   const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
   const r = scanField(N, seq, h0, dh, $('serp').checked, markN, $('comp').checked);
@@ -641,8 +699,9 @@ function build() {
     }
     return { edge: fit(edge), interior: fit(diag) };
   })();
-  const nm = norm(r.h);
-  const h = nm.h;
+  const nm = extent(r.h);
+  const h = r.h;                      // as it comes out of the scan
+  const REL = Math.max(nm.relief, 1e-12);
   lastH = h;
 
   if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
@@ -674,7 +733,7 @@ function build() {
   // ── the readout: the three predictions first, then what he judges by ──
   const el24 = elongation(h, N, 24), el8 = elongation(h, N, 8);
   const gr = reliefGrowth(h, N), ch = chevron(h, N);
-  const bp = bumps(h, N), su = summits(h, N, 8), cv = curvature(h, N);
+  const bp = bumps(h, N, REL), su = summits(h, N, 8, REL), cv = curvature(h, N, REL);
   const need = N * N;
 
   $('out').innerHTML =
@@ -683,23 +742,19 @@ function build() {
     (seq.length < need
       ? `   <span class="warn">repeats ${(need / seq.length).toFixed(1)}x — raise the depth</span>`
       : `   enough for ${(seq.length / need).toFixed(1)} passes`) + '\n' +
-    `raw range     ${nm.min.toFixed(2)} to ${nm.max.toFixed(2)}   ` +
-    `before normalising to 0..1\n` +
-    (konst
-      ? `TEST MODE     constant dH = ${dh.toFixed(4)} at every cell — ` +
-        `the grammar is NOT in use\n` +
-        `  edge slope  ${(slopes.edge / dh).toFixed(6)} per diagonal   ` +
-        `predicted 1.000000   ` +
-        `<b>${Math.abs(slopes.edge / dh - 1) < 2e-3 ? 'MATCHES' : 'DOES NOT MATCH'}</b>\n` +
-        `  u=v slope   ${(slopes.interior / dh).toFixed(6)} per diagonal   ` +
-        `predicted 0.792893   ` +
-        `<b>${Math.abs(slopes.interior / dh - 0.792893) < 2e-3 ? 'MATCHES' : 'DOES NOT MATCH'}</b>\n` +
-        `  the gap is the diagonal trough: the weighting favours the axes\n`
-      : '') +
-    (konst ? '' :
-      `fractal mean  ${rawMean.toFixed(4)} per symbol   ` +
-      (bal ? `removed` : `<span class="warn">NOT removed — expect a one-way ramp</span>`) +
-      `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n`) +
+    `range         ${nm.min.toFixed(3)} to ${nm.max.toFixed(3)}, relief ` +
+    `${nm.relief.toFixed(3)}   <i>drawn as-is, not normalised</i>\n` +
+    // The figure whose absence let a working slider look unwired. Without
+    // normalisation the amplitude is real, so it has to be reported in terms
+    // of what the frame can actually show.
+    `on screen     relief is ${(100 * nm.relief * (+$('vx').value) / 2).toFixed(1)}% of the ` +
+    `frame width at vertical x${(+$('vx').value).toFixed(1)}` +
+    (100 * nm.relief * (+$('vx').value) / 2 < 5
+      ? `\n              <span class="warn">under 5% — any amplitude slider will look ` +
+        `inert; raise the vertical</span>` : '') + '\n' +
+    `fractal mean  ${rawMean.toFixed(4)} per symbol   ` +
+    (bal ? `removed` : `<span class="warn">NOT removed — expect a one-way ramp</span>`) +
+    `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n` +
     `\n` +
     `PREDICTION 1  elongation along +u+v: ${el24.toFixed(2)} at lag 24, ` +
     `${el8.toFixed(2)} at lag 8   (1.00 = none)` +
@@ -707,15 +762,12 @@ function build() {
     // PREDICTION 2 rewritten as what it actually is: a measurement of the
     // sequence's order. 0.5 means the ordering contributes nothing beyond
     // chance, below 0.5 that it cancels, above that it reinforces.
-    (konst
-      ? `PREDICTION 2  not applicable — a constant dH is pure drift by ` +
-        `construction (exponent ${expo.toFixed(3)})\n`
-      : `PREDICTION 2  growth exponent of the partial sums ${expo.toFixed(3)}   ` +
-        `(0 bounded, 0.5 random walk, 1 drift)\n` +
-        `              ${expo > 0.75 ? 'DRIFT — the fractal is not balanced'
-                         : expo > 0.55 ? 'persistent: the ordering REINFORCES the wander'
-                         : expo > 0.45 ? 'indistinguishable from a random walk'
-                         : 'the ordering CANCELS — low discrepancy'}\n`) +
+    `PREDICTION 2  growth exponent of the partial sums ${expo.toFixed(3)}   ` +
+    `(0 bounded, 0.5 random walk, 1 drift)\n` +
+    `              ${expo > 0.75 ? 'DRIFT — the fractal is not balanced'
+                     : expo > 0.55 ? 'persistent: the ordering REINFORCES the wander'
+                     : expo > 0.45 ? 'indistinguishable from a random walk'
+                     : 'the ordering CANCELS — low discrepancy'}\n` +
     `              relief near the origin ${gr.near.toFixed(3)}, far corner ` +
     `${gr.far.toFixed(3)}, ratio ${gr.ratio.toFixed(2)}` +
     (gr.ratio > 1.5 ? `   <span class="warn">far corner much rougher</span>` : '') + '\n' +
@@ -740,7 +792,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'konst', 'kdelta', 'comp'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn', 'spread', 'comp'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
