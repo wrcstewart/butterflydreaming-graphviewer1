@@ -121,11 +121,15 @@
       <b>20.7%</b> lower. Ticking this multiplies each cell's delta by its own
       lag, which levels it exactly.</div>
 
-    <label>vertical &times; <span id="vx-val">1.0</span></label>
-    <input id="vx" type="range" min="1" max="30" value="1" step="0.5">
-    <div class="hint">At 1 this is true scale and the readout says so. Anything
-      above is the picture lying about the slope, which is the only way a 2.6%
-      gradient reads as a mountain.</div>
+    <label>vertical &times; <span id="vx-val">8.0</span></label>
+    <input id="vx" type="range" min="1" max="30" value="8" step="0.5">
+    <div class="hint">At 1 this is true scale and the readout says so, but it
+      also makes the delta slider look dead: over 20 km the whole plausible
+      range of deltas is 2&ndash;8% of the frame at a grazing angle, which is
+      real change and invisible change. <b>Defaulted to 8</b> so the delta
+      slider can be seen to work; drop it to 1 for the honest slope. The
+      readout always gives the on-screen relief as a share of the frame, which
+      is the figure that explains a slider that looks inert.</div>
 
     <label>colour scheme</label>
     <select id="scheme">
@@ -396,6 +400,11 @@ function report() {
         `${(ALPS / 100 * s.cell * s.steps).toFixed(0)} m.`
       : `, so this one is genuinely steep — note the far corner height`) + '\n' +
     `\n` +
+    `on screen     relief is ${(100 * relief / (s.km * 1000) * vx).toFixed(1)}% of the ` +
+    `frame width at this exaggeration` +
+    (100 * relief / (s.km * 1000) * vx < 5
+      ? `\n              <span class="warn">under 5% — the delta slider will look ` +
+        `inert however much you move it; raise the vertical</span>` : '') + '\n' +
     `vertical      ${vx === 1 ? '<b>x1 — TRUE SCALE</b>, the slope you see is the real one'
       : `<span class="warn">x${vx.toFixed(1)} — the picture is exaggerating the slope ` +
         `${vx.toFixed(1)}-fold</span>`}`;
