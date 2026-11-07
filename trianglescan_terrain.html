@@ -1,0 +1,611 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>trianglescan terrain</title>
+<!--
+  trianglescan_terrain.html — 2026-11-07. The author's own construction, and
+  the first one in this series that is easy to reason about.
+
+  THE IDEA. A u,v grid is filled in anti-diagonal order: cell (0,0) takes a
+  start height, then every cell with u+v = 1, then u+v = 2, and so on. Each new
+  cell's base height is a RECIPROCAL-DISTANCE WEIGHTED AVERAGE of the three
+  neighbours already established — (u-1,v) and (u,v-1) at distance 1, and
+  (u-1,v-1) at distance sqrt(2) — and the fractal supplies a dH on top.
+
+      weights   1 : 1 : 1/sqrt(2)   over   2 + 1/sqrt(2) = 2.7071
+                0.3694, 0.3694, 0.2612
+
+  The three neighbours have u+v sums of k-1, k-1 and k-2, all strictly less
+  than k, so nothing is ever read before it is written. On the bottom row only
+  (u-1,0) exists, so after renormalising its weight is 1 and the row is a pure
+  1D walk of the fractal along the axis; likewise up the left column.
+
+  SERPENTINE, NOT RASTER, and that is the author's design rather than mine. Odd
+  k runs from the u axis to the v axis, even k back again. Symbols are consumed
+  in traversal order, so a raster scan would put the last cell of line k and
+  the first cell of line k+1 at opposite corners of the tableau — consecutive
+  fractal symbols landing far apart, which is a seam down one edge. The
+  alternation makes the sequence mapping continuous across every diagonal
+  boundary and removes it. Same reason boustrophedon beats raster in
+  space-filling constructions.
+
+  WHAT THIS IS, which is the useful frame. A causal autoregressive filter on
+  the lattice, driven by the fractal as its innovation stream. The weights sum
+  to 1, so the base is a unity-gain smoother and each cell integrates one more
+  innovation — a genuine 2D analogue of the 1D walk. Unlike every earlier
+  attempt there is NO subdivision hierarchy: all of the multi-scale structure
+  comes from the fractal itself, which is exactly what is being tested.
+
+  THREE THINGS PREDICTED IN ADVANCE, measured in the readout rather than tuned
+  away quietly:
+
+    1. Features elongated along +u+v. The stencil's dependency runs outward
+       from the origin whatever order cells are visited in, so this one comes
+       from the stencil and not from the scan.
+    2. Relief growing with distance from the origin, since variance
+       accumulates one innovation per cell. I first said sqrt(u+v) from the
+       random-walk argument and the author asked whether there were not as many
+       downs as ups. Balance is the right requirement and MEASURED THIS GRAMMAR
+       DOES NOT MEET IT — 6,764 `+` against 14,514 `-` at depth 9, a mean of
+       -0.1438 per symbol, worsening with depth because Z triples itself and
+       carries net -1. Raw, the partial sums grow with exponent 0.933: linear
+       DRIFT, a one-way ramp some seventy times the texture. De-meaned the
+       exponent is 0.597 against 0.442 for the same symbols shuffled, so the
+       ordering is PERSISTENT and reinforces the wander rather than cancelling
+       it. Neither sqrt(k) nor bounded. The exponent is now reported live,
+       because that single number IS the order property this page exists to
+       examine.
+    3. A herringbone or chevron, because successive diagonals are traversed in
+       opposite directions. That is the price of removing the seam in 2, and
+       may well be the better trade.
+
+  TWO METRIC LESSONS CARRIED IN FROM THE LAST BENCH, both of which cost rounds:
+  peaks are counted at RADIUS 1, because a radius-4 1.5%-prominence test reads
+  68 where the eye sees 3,068; and curvature is reported ABSOLUTELY, because
+  p99.9/median rises when the median falls and so scored a smoother field as
+  worse.
+-->
+<style>
+  :root { --ink:#1b1b18; --dim:#6e6e66; --line:#d7d7cf; --panel:#fffffe;
+          --ground:#f6f5f1; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+         font:13px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display:grid; grid-template-columns:330px 1fr; height:100dvh; }
+  #panel { overflow-y:auto; padding:14px; background:var(--panel);
+           border-right:1px solid var(--line); }
+  h1 { font-size:14px; margin:0 0 2px; letter-spacing:.02em; }
+  .sub { color:var(--dim); font-size:11px; margin:0 0 14px; }
+  fieldset { border:1px solid var(--line); border-radius:3px; margin:0 0 12px;
+             padding:9px 10px 11px; }
+  legend { font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+           color:var(--dim); padding:0 4px; }
+  label { display:block; font-size:11px; color:var(--dim); margin:7px 0 2px; }
+  label:first-child { margin-top:0; }
+  input[type=text], input[type=number], textarea, select {
+    width:100%; font:12px ui-monospace, Menlo, monospace; padding:4px 5px;
+    border:1px solid var(--line); border-radius:2px; background:#fff; color:var(--ink); }
+  textarea { min-height:58px; resize:vertical; }
+  input[type=range] { width:100%; }
+  .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .hint { font-size:10px; color:var(--dim); margin-top:3px; }
+  button { font:12px ui-monospace, Menlo, monospace; padding:6px 10px;
+           border:1px solid var(--line); border-radius:2px; background:#fff;
+           color:var(--ink); cursor:pointer; }
+  button:hover { background:#f0efe9; }
+  #stage { position:relative; background:#fff; }
+  #cv { display:block; width:100%; height:100%; }
+  #out { position:absolute; left:12px; bottom:12px; margin:0;
+         font:11px/1.5 ui-monospace, Menlo, monospace; white-space:pre;
+         background:rgba(255,255,255,.93); border:1px solid var(--line);
+         border-radius:3px; padding:8px 10px; max-width:calc(100% - 24px);
+         overflow-x:auto; }
+  .warn { color:var(--warn); font-weight:600; }
+  #hint3d { position:absolute; right:12px; top:12px; color:var(--dim);
+            font-size:11px; background:rgba(255,255,255,.9);
+            border:1px solid var(--line); border-radius:3px; padding:5px 8px; }
+  #err { position:absolute; inset:0; display:none; place-content:center;
+         text-align:center; padding:30px; color:var(--warn); }
+</style>
+
+<div id="wrap">
+  <div id="panel">
+    <h1>trianglescan terrain</h1>
+    <p class="sub">Anti-diagonal scan from the u,v origin. Each cell's base is a
+      reciprocal-distance average of its three established neighbours; the
+      fractal supplies dH.</p>
+
+    <fieldset>
+      <legend>fractal</legend>
+      <label>axiom</label><input id="ax" type="text" value="X">
+      <label>rules</label>
+      <textarea id="rules">X: &lt;&gt;+&gt;XYX+
+Y: XZ&lt;-YZ-+
+Z: &lt;ZZZ&gt;-</textarea>
+      <div class="row">
+        <div><label>depth</label><input id="depth" type="number" value="8" min="1" max="11"></div>
+        <div><label>gentle</label><input id="gentle" type="number" value="0.09" step="0.01"></div>
+        <div><label>grid</label>
+          <select id="grid">
+            <option value="129">129</option>
+            <option value="257" selected>257</option>
+            <option value="385">385</option>
+          </select></div>
+      </div>
+      <div class="hint"><code>+</code> up, <code>-</code> down,
+        <code>&gt;</code> gentle up, <code>&lt;</code> gentle down,
+        <code>=</code> level &mdash; the same tokens as the other benches. One
+        symbol is consumed per cell in scan order, so a grid of N needs
+        N&sup2; symbols; the readout says whether the derivation is long enough.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>scan</legend>
+      <label>start height at (0,0) <span id="h0-val">0.50</span></label>
+      <input id="h0" type="range" min="0" max="1" value="0.5" step="0.01">
+      <label><input type="checkbox" id="balance" checked style="width:auto">
+        balance the fractal (subtract its mean)</label>
+      <div class="hint">MEASURED, this grammar is NOT balanced: at depth 9 it
+        holds 6,764 <code>+</code> against 14,514 <code>-</code>, a mean of
+        &minus;0.1438 per symbol. The bias is in the rules &mdash; X is net
+        +2.09 but Y is &minus;1.09 and Z is &minus;1.00 &mdash; and it worsens
+        with depth because Z triples itself each generation: &minus;0.032 at
+        depth 6, &minus;0.170 at depth 10.<br>
+        Unbalanced, the partial sums grow with exponent <b>0.933</b> &mdash;
+        linear DRIFT, not a random walk &mdash; which at 257 and the automatic
+        dH is a one-way ramp some seventy times the texture. Uncheck it to see
+        that for yourself; it is almost certainly why earlier benches were
+        "gradually downhill" throughout.</div>
+      <label>dH &times; <span id="dh-val">1.00</span> of the automatic scale</label>
+      <input id="dh" type="range" min="0.05" max="4" value="1" step="0.05">
+      <div class="hint">The three-point average has unity gain, so every cell
+        adds one more dH and the wander accumulates. The automatic scale sets
+        dH so the accumulated wander over the diagonal comes out near full
+        relief; at a fixed 0.03 it was about ninety times it, and the texture
+        would have been invisible.</div>
+      <label><input type="checkbox" id="serp" checked style="width:auto">
+        serpentine scan (alternate the direction each diagonal)</label>
+      <div class="hint">Unchecking it makes every diagonal run the same way,
+        which puts consecutive symbols at opposite corners between lines. The
+        readout's seam figure measures what that costs.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>view</legend>
+      <label>vertical &times; <span id="vx-val">0.35</span></label>
+      <input id="vx" type="range" min="0.02" max="1.2" value="0.35" step="0.01">
+      <label>colour scheme</label>
+      <select id="scheme">
+        <option value="grey" selected>grey on white &mdash; rock</option>
+        <option value="whiteblue">white on blue &mdash; cloud</option>
+        <option value="whiteolive">white on greeny brown &mdash; land</option>
+        <option value="sea">blue green on sky blue &mdash; sea</option>
+      </select>
+      <div class="row">
+        <div><label>sun elev&deg;</label><input id="sun" type="number" value="28" step="1"></div>
+        <div><label>sun azim&deg;</label><input id="sunaz" type="number" value="135" step="5"></div>
+        <div><label>mesh</label><input type="checkbox" id="wire" style="width:auto"></div>
+      </div>
+    </fieldset>
+
+    <button id="go">rebuild</button>
+    <button id="png">save PNG</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
+    <pre id="out"></pre>
+    <div id="err"></div>
+  </div>
+</div>
+
+<!-- three.js 0.160.0 UMD, PINNED — same version and reasoning as V_Kolam3D and
+     terrain3d_bench: it defines window.THREE and needs no import map, and an
+     unpinned "latest" would let someone else's release change what this shows
+     with no commit here. -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<!-- lindenmayer 1.5.4, vendored. ROOT-RELATIVE: a bare path resolves against
+     the page, which is what broke the voice files on /n/ deep links. -->
+<script src="/lib/lindenmayer-1.5.4.js"></script>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+if (!window.THREE) {
+  $('err').style.display = 'grid';
+  $('err').textContent = 'three.js did not load from the CDN. Nothing can be drawn; ' +
+    'check the network rather than the grammar.';
+}
+
+// ── THE FRACTAL ─────────────────────────────────────────────────────────
+function parseRules(text) {
+  const p = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z])\s*:\s*(.+?)\s*$/);
+    if (m) p[m[1]] = m[2];
+  }
+  return p;
+}
+function decisions(axiom, rules, depth, gentle) {
+  const T = { '+': 1, '-': -1, '>': gentle, '<': -gentle, '=': 0 };
+  const ls = new LSystem({ axiom, productions: rules });
+  ls.iterate(depth);
+  const out = [];
+  for (const c of ls.getString()) if (c in T) out.push(T[c]);
+  return out;
+}
+
+// ── DISCREPANCY: HOW FAR THE PARTIAL SUMS WANDER ────────────────────────
+// This is the order property the whole page is asking about, and it is a
+// property of the SEQUENCE, not of the surface — so it can be reported before
+// anything is drawn.
+//
+// The author asked why relief should grow as sqrt(u+v) and whether there are
+// not as many downs as ups. Both halves were worth asking. Balance is the
+// right requirement and this grammar does not meet it; and even balanced, the
+// growth is not sqrt. Measured on the de-meaned sequence the exponent is
+// 0.597, against 0.442 for the same symbols shuffled — so the ordering is
+// PERSISTENT, long runs that keep going the same way, which amplifies the
+// accumulation rather than cancelling it. A low-discrepancy word like a
+// Sturmian would have given nearly 0; this is the opposite.
+function maxAbsPartial(a, K) {
+  let s = 0, m = 0;
+  for (let i = 0; i < K && i < a.length; i++) { s += a[i]; const v = Math.abs(s); if (v > m) m = v; }
+  return m;
+}
+function growthExponent(a) {
+  const pts = [];
+  for (let K = 64; K <= a.length; K *= 2) pts.push([Math.log(K), Math.log(maxAbsPartial(a, K) + 1e-12)]);
+  if (pts.length < 3) return NaN;
+  let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (const [x, y] of pts) { sx += x; sy += y; sxy += x * y; sxx += x * x; }
+  const n = pts.length;
+  return (n * sxy - sx * sy) / (n * sxx - sx * sx);
+}
+
+// ── THE SCAN ────────────────────────────────────────────────────────────
+// Exactly as specified. The weights are reciprocal distance, renormalised over
+// whichever neighbours exist, so no special case is written out by hand — the
+// edges and the origin fall out of the same expression.
+const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
+
+function scanField(N, seq, h0, dh, serpentine) {
+  const h = new Float64Array(N * N);
+  const ix = (u, v) => v * N + u;
+  h[ix(0, 0)] = h0;
+  let k = 0, used = 0, maxK = 2 * (N - 1);
+  const wrap = i => seq[i % seq.length];
+  for (k = 1; k <= maxK; k++) {
+    // the cells on this anti-diagonal, in traversal order
+    const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
+    const fromU = serpentine ? (k % 2 === 1) : true;   // odd k: u axis -> v axis
+    const list = [];
+    if (fromU) for (let u = uHi; u >= uLo; u--) list.push(u);
+    else       for (let u = uLo; u <= uHi; u++) list.push(u);
+    for (const u of list) {
+      const v = k - u;
+      let num = 0, den = 0;
+      if (u > 0)            { num += W_ORTH * h[ix(u - 1, v)];     den += W_ORTH; }
+      if (v > 0)            { num += W_ORTH * h[ix(u, v - 1)];     den += W_ORTH; }
+      if (u > 0 && v > 0)   { num += W_DIAG * h[ix(u - 1, v - 1)]; den += W_DIAG; }
+      const base = den > 0 ? num / den : h0;
+      h[ix(u, v)] = base + wrap(used++) * dh;
+    }
+  }
+  return { h, used };
+}
+
+// ── MEASURES ────────────────────────────────────────────────────────────
+function norm(h) {
+  let mn = Infinity, mx = -Infinity;
+  for (const v of h) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const o = new Float64Array(h.length), s = mx > mn ? 1 / (mx - mn) : 0;
+  for (let i = 0; i < h.length; i++) o[i] = (h[i] - mn) * s;
+  return { h: o, min: mn, max: mx };
+}
+// PREDICTION 1 — elongation along +u+v. Compare the mean squared difference at
+// a fixed lag ALONG the diagonal against ACROSS it. Streaking along +u+v means
+// the field changes less along that direction, so the ratio across/along > 1.
+function elongation(h, N, r) {
+  const d = Math.max(1, Math.round(r / Math.SQRT2));
+  const vg = (du, dv) => {
+    let t = 0, c = 0;
+    for (let v = 0; v < N; v += 2) for (let u = 0; u < N; u += 2) {
+      const U = u + du, V = v + dv;
+      if (U < 0 || U >= N || V < 0 || V >= N) continue;
+      const e = h[v * N + u] - h[V * N + U]; t += e * e; c++;
+    }
+    return c ? t / c : 0;
+  };
+  const along = vg(d, d), across = vg(d, -d);
+  return along > 0 ? across / along : 0;
+}
+// PREDICTION 2 — relief growing as sqrt(u+v). Report the RMS deviation from
+// the local mean in the first and last thirds of the diagonal, and what the
+// ratio would be if it grew exactly as sqrt.
+function reliefGrowth(h, N) {
+  const band = (lo, hi) => {
+    let s = 0, ss = 0, n = 0;
+    for (let v = 0; v < N; v++) for (let u = 0; u < N; u++) {
+      const k = u + v;
+      if (k < lo || k > hi) continue;
+      const z = h[v * N + u]; s += z; ss += z * z; n++;
+    }
+    if (!n) return 0;
+    return Math.sqrt(Math.max(0, ss / n - (s / n) * (s / n)));
+  };
+  const K = 2 * (N - 1);
+  const near = band(0, Math.round(K / 3)), far = band(Math.round(2 * K / 3), K);
+  return { near, far, ratio: near > 0 ? far / near : 0,
+           sqrtPredict: Math.sqrt((5 / 6) * K) / Math.sqrt((1 / 6) * K) };
+}
+// PREDICTION 3 — a chevron from the alternating traversal. A herringbone has
+// period 1 in k, so it shows as an excess in the mean squared difference
+// between ADJACENT diagonals over the difference two diagonals apart, halved
+// to put them on the same footing.
+function chevron(h, N) {
+  const dk = step => {
+    let t = 0, c = 0;
+    for (let v = 1; v < N - 2; v++) for (let u = 1; u < N - 2; u++) {
+      const U = u + step, V = v;
+      if (U >= N) continue;
+      const e = h[v * N + u] - h[V * N + U]; t += e * e; c++;
+    }
+    return c ? t / c : 0;
+  };
+  const one = dk(1), two = dk(2);
+  return two > 0 ? (one * 2) / two : 0;    // 1.0 = no period-1 excess
+}
+function bumps(h, N) {
+  let n = 0;
+  for (let v = 1; v < N - 1; v++) for (let u = 1; u < N - 1; u++) {
+    const z = h[v * N + u];
+    const a = h[v * N + u + 1], b = h[v * N + u - 1],
+          c = h[(v + 1) * N + u], d = h[(v - 1) * N + u];
+    if (z >= a && z >= b && z >= c && z >= d && z > Math.min(a, b, c, d) + 0.0005) n++;
+  }
+  return n;
+}
+function summits(h, N, R) {
+  let n = 0, best = 0;
+  for (let v = R; v < N - R; v += 2) for (let u = R; u < N - R; u += 2) {
+    const z = h[v * N + u]; let top = true, lo = z;
+    for (let dv = -R; dv <= R && top; dv++) for (let du = -R; du <= R; du++) {
+      if ((!du && !dv) || du * du + dv * dv > R * R) continue;
+      const w = h[(v + dv) * N + u + du];
+      if (w > z) { top = false; break; }
+      if (w < lo) lo = w;
+    }
+    if (top && z - lo > 0.02) { n++; if (z - lo > best) best = z - lo; }
+  }
+  return { n, best };
+}
+// ABSOLUTE curvature. A p99.9/median ratio rises when the median falls, so it
+// scored a smoother field as worse and sent the last bench to a wrong default.
+function curvature(h, N) {
+  let t = 0, n = 0, mx = 0;
+  for (let v = 1; v < N - 1; v++) for (let u = 1; u < N - 1; u++) {
+    const l = Math.abs(h[v*N+u+1] + h[v*N+u-1] + h[(v+1)*N+u] + h[(v-1)*N+u] - 4*h[v*N+u]);
+    t += l; n++; if (l > mx) mx = l;
+  }
+  return { mean: 100 * t / n, max: 100 * mx };
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────
+// Lighting carries the relief, not colour: the author has reduced colour
+// vision, so every scheme keeps a bright surface against a darker bounce and
+// nothing is encoded in hue. The sea inverts the pattern deliberately — the
+// surface carries the colour and sits darker than the sky, as water does.
+const SCHEMES = {
+  grey:       { bg:0xffffff, surface:0xcfcdc4, sky:0xffffff, bounce:0x9a9a92,
+                sun:0xffffff, hemi:0.55, sunI:2.3, rough:0.95 },
+  whiteblue:  { bg:0xbcd4ec, surface:0xf8fbff, sky:0xe4eefa, bounce:0x6f8aa8,
+                sun:0xfffdf6, hemi:0.75, sunI:2.0, rough:0.98 },
+  whiteolive: { bg:0xa9a67a, surface:0xfbfaf3, sky:0xeeead6, bounce:0x62653a,
+                sun:0xfff9ec, hemi:0.70, sunI:2.1, rough:0.97 },
+  sea:        { bg:0x9cc4e8, surface:0x47a39a, sky:0xd4e6f7, bounce:0x123f4a,
+                sun:0xfffdf4, hemi:0.60, sunI:2.4, rough:0.42, metal:0.10 },
+};
+let renderer, scene, camera, mesh, wireMesh, sun, hemi, lastH = null;
+let az = -0.6, el = 0.55, dist = 2.4, dragging = false, lx = 0, ly = 0;
+
+function initThree() {
+  const cv = $('cv'), st = $('stage');
+  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
+  sun = new THREE.DirectionalLight(0xffffff, 2.3); scene.add(sun);
+  hemi = new THREE.HemisphereLight(0xffffff, 0x9a9a92, 0.55); scene.add(hemi);
+  cv.addEventListener('pointerdown', e => {
+    dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointerup', () => { dragging = false; });
+  cv.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    az -= (e.clientX - lx) * 0.006; el += (e.clientY - ly) * 0.005;
+    el = Math.max(0.05, Math.min(1.5, el));
+    lx = e.clientX; ly = e.clientY; place();
+  });
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    dist = Math.max(0.6, Math.min(8, dist * (1 + Math.sign(e.deltaY) * 0.08)));
+    place();
+  }, { passive: false });
+  resize();
+  window.addEventListener('resize', () => { resize(); place(); });
+}
+function resize() {
+  const st = $('stage');
+  renderer.setSize(st.clientWidth, st.clientHeight, false);
+  camera.aspect = Math.max(st.clientWidth / Math.max(st.clientHeight, 1), 0.01);
+  camera.updateProjectionMatrix();
+}
+function applyScheme() {
+  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  if (scene) scene.background = new THREE.Color(s.bg);
+  if (hemi) { hemi.color.setHex(s.sky); hemi.groundColor.setHex(s.bounce); hemi.intensity = s.hemi; }
+  if (sun) { sun.color.setHex(s.sun); sun.intensity = s.sunI; }
+  if (mesh) {
+    mesh.material.color.setHex(s.surface);
+    mesh.material.roughness = s.rough;
+    mesh.material.metalness = s.metal || 0;
+  }
+  place();
+}
+function place() {
+  if (!camera) return;
+  camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el),
+                      dist * Math.cos(el) * Math.cos(az));
+  camera.lookAt(0, 0, 0);
+  const se = (+$('sun').value) * Math.PI / 180, sa = (+$('sunaz').value) * Math.PI / 180;
+  sun.position.set(Math.cos(se) * Math.sin(sa), Math.sin(se), Math.cos(se) * Math.cos(sa));
+  renderer.render(scene, camera);
+}
+// The vertical slider only rescales, so it tracks the hand instead of
+// rebuilding the field and re-running every measurement.
+function rescale() {
+  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
+  if (!mesh || !lastH) return build();
+  const pos = mesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, lastH[i] * vx);
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  if (wireMesh) {
+    const wp = wireMesh.geometry.attributes.position;
+    for (let i = 0; i < wp.count; i++) wp.setZ(i, lastH[i] * vx);
+    wp.needsUpdate = true;
+  }
+  place();
+}
+
+// ── BUILD ───────────────────────────────────────────────────────────────
+function build() {
+  const N = +$('grid').value;
+  const gentle = +$('gentle').value, depth = +$('depth').value;
+  const h0 = +$('h0').value, dhMul = +$('dh').value;
+  $('h0-val').textContent = h0.toFixed(2);
+  $('dh-val').textContent = dhMul.toFixed(2);
+  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
+
+  let seq;
+  try { seq = decisions($('ax').value.trim(), parseRules($('rules').value), depth, gentle); }
+  catch (e) {
+    $('out').innerHTML = '<span class="warn">the grammar did not parse: ' + e.message + '</span>';
+    return;
+  }
+  if (seq.length < 16) {
+    $('out').innerHTML = '<span class="warn">that grammar yields ' + seq.length +
+      ' drawing symbols — nothing to scan with. Does it contain + - &gt; &lt; or = ?</span>';
+    return;
+  }
+
+  // BALANCE. Without this the mean rides into every cell and the surface is a
+  // ramp; the drift is a property of the grammar, not of the scan.
+  const rawMean = seq.reduce((a, b) => a + b, 0) / seq.length;
+  const bal = $('balance').checked;
+  if (bal) seq = seq.map(v => v - rawMean);
+
+  // AUTOMATIC dH. The wander over the diagonal is maxAbsPartial x dH, so
+  // setting dH to its reciprocal brings the accumulated relief to about 1 —
+  // the same order as the normalised height range, instead of ninety times it.
+  const steps = 2 * (N - 1);
+  const disc = maxAbsPartial(seq, Math.min(steps, seq.length));
+  const dhAuto = 1 / Math.max(disc, 1e-9);
+  const dh = dhAuto * dhMul;
+  const expo = growthExponent(seq);
+
+  const r = scanField(N, seq, h0, dh, $('serp').checked);
+  const nm = norm(r.h);
+  const h = nm.h;
+  lastH = h;
+
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
+  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); wireMesh = null; }
+  const sch = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  const geo = new THREE.PlaneGeometry(2, 2, N - 1, N - 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, h[i] * vx);
+  geo.computeVertexNormals();
+  mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: sch.surface, roughness: sch.rough, metalness: sch.metal || 0,
+    side: THREE.DoubleSide
+  }));
+  mesh.rotation.x = -Math.PI / 2;
+  scene.add(mesh);
+  if ($('wire').checked) {
+    wireMesh = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({
+      color: 0x55554e, wireframe: true, transparent: true, opacity: 0.16 }));
+    wireMesh.rotation.x = -Math.PI / 2;
+    scene.add(wireMesh);
+  }
+  applyScheme();
+
+  // ── the readout: the three predictions first, then what he judges by ──
+  const el24 = elongation(h, N, 24), el8 = elongation(h, N, 8);
+  const gr = reliefGrowth(h, N), ch = chevron(h, N);
+  const bp = bumps(h, N), su = summits(h, N, 8), cv = curvature(h, N);
+  const need = N * N;
+
+  $('out').innerHTML =
+    `grid          ${N} x ${N}   ${r.used.toLocaleString()} cells scanned   ` +
+    `fractal ${seq.length.toLocaleString()} symbols` +
+    (seq.length < need
+      ? `   <span class="warn">repeats ${(need / seq.length).toFixed(1)}x — raise the depth</span>`
+      : `   enough for ${(seq.length / need).toFixed(1)} passes`) + '\n' +
+    `raw range     ${nm.min.toFixed(2)} to ${nm.max.toFixed(2)}   ` +
+    `before normalising to 0..1\n` +
+    `fractal mean  ${rawMean.toFixed(4)} per symbol   ` +
+    (bal ? `removed` : `<span class="warn">NOT removed — expect a one-way ramp</span>`) +
+    `   discrepancy ${disc.toFixed(1)} over ${steps} steps   dH ${dh.toFixed(5)}\n` +
+    `\n` +
+    `PREDICTION 1  elongation along +u+v: ${el24.toFixed(2)} at lag 24, ` +
+    `${el8.toFixed(2)} at lag 8   (1.00 = none)` +
+    (el24 > 1.25 || el8 > 1.25 ? `   <span class="warn">streaked</span>` : '') + '\n' +
+    // PREDICTION 2 rewritten as what it actually is: a measurement of the
+    // sequence's order. 0.5 means the ordering contributes nothing beyond
+    // chance, below 0.5 that it cancels, above that it reinforces.
+    `PREDICTION 2  growth exponent of the partial sums ${expo.toFixed(3)}   ` +
+    `(0 bounded, 0.5 random walk, 1 drift)\n` +
+    `              ${expo > 0.75 ? 'DRIFT — the fractal is not balanced'
+                     : expo > 0.55 ? 'persistent: the ordering REINFORCES the wander'
+                     : expo > 0.45 ? 'indistinguishable from a random walk'
+                     : 'the ordering CANCELS — low discrepancy'}\n` +
+    `              relief near the origin ${gr.near.toFixed(3)}, far corner ` +
+    `${gr.far.toFixed(3)}, ratio ${gr.ratio.toFixed(2)}` +
+    (gr.ratio > 1.5 ? `   <span class="warn">far corner much rougher</span>` : '') + '\n' +
+    `PREDICTION 3  chevron, period-1 excess across diagonals: ${ch.toFixed(2)}   ` +
+    `(1.00 = none)` +
+    (ch > 1.25 ? `   <span class="warn">herringbone</span>` : '') + '\n' +
+    `\n` +
+    `bumps         ${bp.toLocaleString()} local maxima at radius 1   ` +
+    `<i>this is what reads as "thousands of peaks"</i>\n` +
+    `summits       ${su.n} of prominence 2% within radius 8   best ${su.best.toFixed(3)}\n` +
+    `curvature     mean ${cv.mean.toFixed(3)}% of relief, max ${cv.max.toFixed(2)}%\n` +
+    `weights       ${(W_ORTH / (2 * W_ORTH + W_DIAG)).toFixed(4)}, ` +
+    `${(W_ORTH / (2 * W_ORTH + W_DIAG)).toFixed(4)}, ` +
+    `${(W_DIAG / (2 * W_ORTH + W_DIAG)).toFixed(4)}   ` +
+    `over ${(2 * W_ORTH + W_DIAG).toFixed(4)}`;
+}
+
+if (window.THREE) {
+  initThree();
+  $('go').addEventListener('click', build);
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance'])
+    $(id).addEventListener('input', build);
+  $('vx').addEventListener('input', rescale);
+  $('scheme').addEventListener('input', applyScheme);
+  for (const id of ['sun', 'sunaz']) $(id).addEventListener('input', place);
+  for (const id of ['ax', 'rules']) $(id).addEventListener('change', build);
+  $('png').addEventListener('click', () => {
+    place();
+    const a = document.createElement('a');
+    a.href = $('cv').toDataURL('image/png');
+    a.download = 'trianglescan.png';
+    a.click();
+  });
+  build();
+}
+</script>
