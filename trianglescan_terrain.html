@@ -163,6 +163,12 @@ Z: &lt;ZZZ&gt;-</textarea>
         dH so the accumulated wander over the diagonal comes out near full
         relief; at a fixed 0.03 it was about ninety times it, and the texture
         would have been invisible.</div>
+      <label>mark the first <input id="markn" type="number" value="50" min="0"
+        max="4000" step="10" style="width:80px"> cells plotted</label>
+      <div class="hint">Coloured <b>#0d2060</b>, a dark blue chosen so it reads
+        by LUMINANCE and not by hue &mdash; worst contrast against any of the
+        four schemes is 5.0:1, on the sea. 50 cells covers the diagonals up to
+        k=9, so it marks the origin corner and the first few scan lines.</div>
       <label><input type="checkbox" id="serp" checked style="width:auto">
         serpentine scan (alternate the direction each diagonal)</label>
       <div class="hint">Unchecking it makes every diagonal run the same way,
@@ -271,10 +277,15 @@ function growthExponent(a) {
 // edges and the origin fall out of the same expression.
 const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
 
-function scanField(N, seq, h0, dh, serpentine) {
+function scanField(N, seq, h0, dh, serpentine, markN) {
   const h = new Float64Array(N * N);
   const ix = (u, v) => v * N + u;
+  // The first `markN` cells in PLOT ORDER, so the origin and the opening scan
+  // lines can be found on the surface. Recorded here because this is the only
+  // place that knows the traversal.
+  const marks = [];
   h[ix(0, 0)] = h0;
+  if (markN > 0) marks.push(ix(0, 0));
   let k = 0, used = 0, maxK = 2 * (N - 1);
   const wrap = i => seq[i % seq.length];
   for (k = 1; k <= maxK; k++) {
@@ -292,9 +303,10 @@ function scanField(N, seq, h0, dh, serpentine) {
       if (u > 0 && v > 0)   { num += W_DIAG * h[ix(u - 1, v - 1)]; den += W_DIAG; }
       const base = den > 0 ? num / den : h0;
       h[ix(u, v)] = base + wrap(used++) * dh;
+      if (marks.length < markN) marks.push(ix(u, v));
     }
   }
-  return { h, used };
+  return { h, used, marks };
 }
 
 // ── MEASURES ────────────────────────────────────────────────────────────
@@ -408,7 +420,11 @@ const SCHEMES = {
   sea:        { bg:0x9cc4e8, surface:0x47a39a, sky:0xd4e6f7, bounce:0x123f4a,
                 sun:0xfffdf4, hemi:0.60, sunI:2.4, rough:0.42, metal:0.10 },
 };
-let renderer, scene, camera, mesh, wireMesh, sun, hemi, lastH = null;
+// The marker colour. Dark enough to read by luminance against every scheme's
+// surface — measured worst case 5.0:1, on the sea — because the standing rule
+// here is that nothing may be carried by hue alone.
+const MARK_COLOUR = 0x0d2060;
+let renderer, scene, camera, mesh, wireMesh, sun, hemi, lastH = null, lastMarks = null;
 let az = -0.6, el = 0.55, dist = 2.4, dragging = false, lx = 0, ly = 0;
 
 function initThree() {
@@ -443,16 +459,34 @@ function resize() {
   camera.aspect = Math.max(st.clientWidth / Math.max(st.clientHeight, 1), 0.01);
   camera.updateProjectionMatrix();
 }
+// The surface colour now lives in a VERTEX ATTRIBUTE rather than in
+// material.color, because three multiplies the two together — so to get a true
+// blue marker the material has to stay white and the scheme's colour has to be
+// written per vertex. Changing scheme therefore refills the attribute instead
+// of setting one colour, and it still does not rebuild the field.
+function paint() {
+  if (!mesh) return;
+  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
+  const attr = mesh.geometry.attributes.color;
+  if (!attr) return;
+  const base = new THREE.Color().setHex(s.surface);
+  const mk = new THREE.Color().setHex(MARK_COLOUR);
+  for (let i = 0; i < attr.count; i++) attr.setXYZ(i, base.r, base.g, base.b);
+  if (lastMarks) for (const i of lastMarks) {
+    if (i >= 0 && i < attr.count) attr.setXYZ(i, mk.r, mk.g, mk.b);
+  }
+  attr.needsUpdate = true;
+}
 function applyScheme() {
   const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
   if (scene) scene.background = new THREE.Color(s.bg);
   if (hemi) { hemi.color.setHex(s.sky); hemi.groundColor.setHex(s.bounce); hemi.intensity = s.hemi; }
   if (sun) { sun.color.setHex(s.sun); sun.intensity = s.sunI; }
   if (mesh) {
-    mesh.material.color.setHex(s.surface);
     mesh.material.roughness = s.rough;
     mesh.material.metalness = s.metal || 0;
   }
+  paint();
   place();
 }
 function place() {
@@ -517,7 +551,9 @@ function build() {
   const dh = dhAuto * dhMul;
   const expo = growthExponent(seq);
 
-  const r = scanField(N, seq, h0, dh, $('serp').checked);
+  const markN = Math.max(0, Math.min(4000, +$('markn').value || 0));
+  const r = scanField(N, seq, h0, dh, $('serp').checked, markN);
+  lastMarks = r.marks;
   const nm = norm(r.h);
   const h = nm.h;
   lastH = h;
@@ -528,9 +564,14 @@ function build() {
   const geo = new THREE.PlaneGeometry(2, 2, N - 1, N - 1);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, h[i] * vx);
+  // PlaneGeometry's vertex i is row floor(i/N), column i%N, and the heights
+  // are indexed v*N+u — the same order, so a cell index marks its vertex
+  // directly with no remapping.
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
   geo.computeVertexNormals();
   mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color: sch.surface, roughness: sch.rough, metalness: sch.metal || 0,
+    color: 0xffffff, vertexColors: true,
+    roughness: sch.rough, metalness: sch.metal || 0,
     side: THREE.DoubleSide
   }));
   mesh.rotation.x = -Math.PI / 2;
@@ -584,6 +625,8 @@ function build() {
     `<i>this is what reads as "thousands of peaks"</i>\n` +
     `summits       ${su.n} of prominence 2% within radius 8   best ${su.best.toFixed(3)}\n` +
     `curvature     mean ${cv.mean.toFixed(3)}% of relief, max ${cv.max.toFixed(2)}%\n` +
+    `marked        ${r.marks.length} cells in plot order, blue — ` +
+    `k up to ${Math.max(0, Math.ceil((Math.sqrt(8 * r.marks.length + 1) - 3) / 2))}\n` +
     `weights       ${(W_ORTH / (2 * W_ORTH + W_DIAG)).toFixed(4)}, ` +
     `${(W_ORTH / (2 * W_ORTH + W_DIAG)).toFixed(4)}, ` +
     `${(W_DIAG / (2 * W_ORTH + W_DIAG)).toFixed(4)}   ` +
@@ -593,7 +636,7 @@ function build() {
 if (window.THREE) {
   initThree();
   $('go').addEventListener('click', build);
-  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance'])
+  for (const id of ['depth', 'gentle', 'grid', 'h0', 'dh', 'serp', 'wire', 'balance', 'markn'])
     $(id).addEventListener('input', build);
   $('vx').addEventListener('input', rescale);
   $('scheme').addEventListener('input', applyScheme);
