@@ -77,7 +77,7 @@
   // opposite corners — consecutive symbols landing far apart, a seam down one
   // edge. The alternation removes it, for the same reason boustrophedon beats
   // raster in space-filling constructions.
-  function scanField(N, seq, h0, dh, serpentine, markN, compensate) {
+  function scanField(N, seq, h0, dh, serpentine, markN, compensate, offset) {
     const h = new Float64Array(N * N);
     const ix = (u, v) => v * N + u;
     // The first `markN` cells in PLOT ORDER, so the origin and the opening
@@ -88,7 +88,20 @@
     if (markN > 0) marks.push(ix(0, 0));
     let used = 0;
     const maxK = 2 * (N - 1);
-    const wrap = i => seq[i % seq.length];
+    // ── WHERE IN THE SEQUENCE TO START ────────────────────────────────────
+    // The author: *"Can you put in a slider to shift the part of fractal that
+    // is used ... We want the slider to take it far away from the start as
+    // that can often repeat."* An L-system's opening is the least
+    // characteristic part of it — the first symbols come straight from the
+    // axiom's own expansion — so being able to start deep in the derivation
+    // matters.
+    //
+    // There has to BE room, and at the old default there was none: depth 8
+    // yields 17,475 drawing symbols against the 66,049 a 257 grid consumes, so
+    // it wrapped 3.8 times and an offset would merely have rotated a repeat.
+    // Depth 10 yields 162,019 — 2.45 passes — and depth 11 gives 7.45.
+    const off = (offset | 0) % seq.length;
+    const wrap = i => seq[(off + i) % seq.length];
     for (let k = 1; k <= maxK; k++) {
       const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
       const fromU = serpentine ? (k % 2 === 1) : true;   // odd k: u axis -> v axis
@@ -141,11 +154,12 @@
   // it should be for four fields, so the caller is told to double dH; the
   // amplitude is a free parameter and no normalisation is involved.
   const CORNER_AMP = 2;
-  function scanFourCorners(N, seq, h0, dh, serpentine, markN, compensate) {
+  function scanFourCorners(N, seq, h0, dh, serpentine, markN, compensate, offset) {
     const acc = new Float64Array(N * N);
     let marks = null;
     for (const fu of [0, 1]) for (const fv of [0, 1]) {
-      const one = scanCorner(N, seq, h0, dh, serpentine, fu ? 0 : (fv ? 0 : markN), compensate, fu, fv);
+      const one = scanCorner(N, seq, h0, dh, serpentine, fu ? 0 : (fv ? 0 : markN),
+                             compensate, fu, fv, offset);
       for (let i = 0; i < acc.length; i++) acc[i] += one.h[i];
       if (!fu && !fv) marks = one.marks;
     }
@@ -154,7 +168,7 @@
   }
   // The scan with its origin at a chosen corner. fu/fv flip the axis, so the
   // traversal starts there while the sequence still runs from the beginning.
-  function scanCorner(N, seq, h0, dh, serpentine, markN, compensate, fu, fv) {
+  function scanCorner(N, seq, h0, dh, serpentine, markN, compensate, fu, fv, offset) {
     const h = new Float64Array(N * N);
     const X = u => (fu ? N - 1 - u : u), Y = v => (fv ? N - 1 - v : v);
     const ix = (u, v) => Y(v) * N + X(u);
@@ -163,7 +177,20 @@
     if (markN > 0) marks.push(ix(0, 0));
     let used = 0;
     const maxK = 2 * (N - 1);
-    const wrap = i => seq[i % seq.length];
+    // ── WHERE IN THE SEQUENCE TO START ────────────────────────────────────
+    // The author: *"Can you put in a slider to shift the part of fractal that
+    // is used ... We want the slider to take it far away from the start as
+    // that can often repeat."* An L-system's opening is the least
+    // characteristic part of it — the first symbols come straight from the
+    // axiom's own expansion — so being able to start deep in the derivation
+    // matters.
+    //
+    // There has to BE room, and at the old default there was none: depth 8
+    // yields 17,475 drawing symbols against the 66,049 a 257 grid consumes, so
+    // it wrapped 3.8 times and an offset would merely have rotated a repeat.
+    // Depth 10 yields 162,019 — 2.45 passes — and depth 11 gives 7.45.
+    const off = (offset | 0) % seq.length;
+    const wrap = i => seq[(off + i) % seq.length];
     for (let k = 1; k <= maxK; k++) {
       const uLo = Math.max(0, k - (N - 1)), uHi = Math.min(k, N - 1);
       const fromU = serpentine ? (k % 2 === 1) : true;
