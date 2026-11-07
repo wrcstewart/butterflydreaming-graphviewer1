@@ -28,13 +28,40 @@
 (function (root) {
   'use strict';
 
-  // Reciprocal distance: the orthogonal neighbours are 1 away, the diagonal
-  // one sqrt(2). These are the only constants in the construction.
-  const W_ORTH = 1, W_DIAG = 1 / Math.SQRT2;
-  const W_SUM = 2 * W_ORTH + W_DIAG;                 // 2.7071
-  const LAG_INTERIOR = 1 + W_DIAG / W_SUM;           // 1.26120
-  const SLOPE_INTERIOR = 1 / LAG_INTERIOR;           // 0.792893
-  const TROUGH_FRACTION = 1 - SLOPE_INTERIOR;        // 0.207107 = (sqrt(2)-1)/2
+  // ── THE DIAGONAL WEIGHT IS sqrt(2), NOT 1/sqrt(2) ─────────────────────
+  // It began as reciprocal distance — the orthogonal neighbours are 1 away and
+  // the diagonal one sqrt(2), so 1 : 1 : 1/sqrt(2). That is the natural
+  // reading and it pulls the wrong way, which the author spotted from the
+  // table: "the rise should be more like 41% bigger on the diagonal but we are
+  // more like 60%".
+  //
+  // He is right and the figure is exact. Comparing (n,n) with (n,0), the old
+  // weighting gave 2 x 0.792893 = 1.5858, so 58.6% bigger (64.4% at n=9, the
+  // rest being edge influence). If height tracked TRUE DISTANCE it would be
+  // sqrt(2), so 41.4%. The diagonal was over-climbing by 1.1213.
+  //
+  // WHY. The diagonal cell is sqrt(2) further away, which argues for LESS
+  // weight — but it is also TWO diagonals back rather than one, which argues
+  // for MORE, and it is the second effect that governs height. The interior
+  // slope is 1/(1 + w_diag), so an isotropic rise per unit distance needs
+  // slope = 1/sqrt(2), hence lag = sqrt(2), hence w_diag = sqrt(2) - 1
+  // normalised — that is unnormalised weights 1 : 1 : sqrt(2) over 2 + sqrt(2).
+  // The diagonal neighbour weighted sqrt(2) times MORE than the orthogonal
+  // pair, by exactly the factor that reciprocal distance would have removed.
+  //
+  // MEASURED after the change: gain per unit of true distance is 1.0000 on the
+  // axes and 1.0097 on the diagonal, down from 1.1295. The 30 and 60 degree
+  // shoulders remain about 7% high — the double-ridge residue, a separate and
+  // much smaller matter.
+  //
+  // The DENOMINATOR follows automatically and at the edges too, because `den`
+  // accumulates only the weights actually used rather than assuming a total.
+  const W_ORTH = 1, W_DIAG = Math.SQRT2;
+  const W_SUM = 2 * W_ORTH + W_DIAG;                 // 3.41421
+  const LAG_INTERIOR = 1 + W_DIAG / W_SUM;           // 1.41421 = sqrt(2)
+  const SLOPE_INTERIOR = 1 / LAG_INTERIOR;           // 0.707107 = 1/sqrt(2)
+  const DEFICIT_FRACTION = 1 - SLOPE_INTERIOR;       // 0.292893
+  const TROUGH_FRACTION = DEFICIT_FRACTION;          // kept: the old name
 
   // A u,v grid filled in anti-diagonal order from the origin. Each cell's base
   // height is the reciprocal-distance weighted average of its three already
@@ -75,15 +102,17 @@
         if (v > 0)          { num += W_ORTH * h[ix(u, v-1)];   den += W_ORTH; lagNum += W_ORTH * 1; }
         if (u > 0 && v > 0) { num += W_DIAG * h[ix(u-1, v-1)]; den += W_DIAG; lagNum += W_DIAG * 2; }
         const base = den > 0 ? num / den : h0;
-        // ── LAG COMPENSATION ──────────────────────────────────────────
-        // Found by the constant-delta test. Each neighbour sits a number of
-        // diagonals back: 1 for the orthogonal pair, 2 for (u-1,v-1). So a
-        // cell's base lags the current diagonal by SUM(w_i * lag_i) — interior
-        // 1 + w_diag = 1.26120, an axis cell exactly 1. Hence with a constant
-        // delta the axes rise at delta per diagonal and the interior at
-        // 0.792893, and the gap is a valley along the main diagonal worth
-        // (sqrt(2)-1)/2 = 20.7% of the edge rise at every scale. Multiplying
-        // delta by the cell's own lag levels it exactly.
+        // ── LAG COMPENSATION: KEPT AS A DIAGNOSTIC, AND IT IS NOT A FIX ──
+        // It multiplies each cell's dH by its own SUM(w_i x lag_i), which
+        // equalises the rise per DIAGONAL: every cell then gains dH per
+        // diagonal whatever stencil it has.
+        //
+        // MEASURED, THAT MAKES THE ANISOTROPY WORSE, not better. Gain per unit
+        // of true distance goes from axis 1.0000 / diagonal 1.1295 to axis
+        // 1.0000 / diagonal 1.4142 — exactly sqrt(2) — because a diagonal step
+        // covers sqrt(2) of distance while an axis step covers 1, so levelling
+        // per-k over-rewards the diagonal. The weighting above is the real fix;
+        // this switch stays only to show what per-k levelling does.
         const lag = den > 0 ? lagNum / den : 1;
         h[ix(u, v)] = base + wrap(used++) * dh * (compensate ? lag : 1);
         if (marks.length < markN) marks.push(ix(u, v));
@@ -173,8 +202,10 @@
     const cd = [];
     for (let k = 2; k < N - 2; k += 2) cd.push([k, c.h[(k / 2) * N + (k / 2)]]);
     const sc = fit(cd) / d;
-    out.push({ name: 'lag compensation levels the diagonal valley',
-               pass: Math.abs(sc - 1) < 1e-9, detail: 'diagonal slope ' + sc.toFixed(9) });
+    out.push({ name: 'lag compensation equalises the rise per diagonal',
+               pass: Math.abs(sc - 1) < 1e-9,
+               detail: 'diagonal slope ' + sc.toFixed(9) +
+                       ' per diagonal — note this WORSENS the per-distance anisotropy' });
 
     // 6. Every cell must be written, and exactly once each.
     const n = N * N;
@@ -225,7 +256,7 @@
   }
 
   root.TriangleScan = {
-    GRID_LINES, lineColourOver, stampGridLines,
+    GRID_LINES, lineColourOver, stampGridLines, DEFICIT_FRACTION,
     scanField, selfTest,
     W_ORTH, W_DIAG, W_SUM, LAG_INTERIOR, SLOPE_INTERIOR, TROUGH_FRACTION,
   };

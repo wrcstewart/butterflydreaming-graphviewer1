@@ -263,14 +263,12 @@ Z: &lt;ZZZ&gt;-</textarea>
         and rightly asked whether it was wired.</div>
       <label><input type="checkbox" id="comp" style="width:auto">
         compensate the stencil lag</label>
-      <div class="hint">Found by the constant-delta test on the other page. The diagonal
-        neighbour is TWO diagonals back, so an interior cell's base lags by
-        1&nbsp;+&nbsp;w<sub>diag</sub> = 1.2612 while an axis cell lags exactly
-        1 &mdash; which makes the axes rise faster than the middle and carves a
-        valley along the main diagonal worth
-        (&radic;2&minus;1)/2&nbsp;=&nbsp;<b>20.7% of the edge rise, at every
-        scale</b>, with no help from the fractal. Multiplying dH by the lag
-        levels it. Off by default so the uncorrected behaviour stays visible.</div>
+      <div class="hint">Equalises the rise per <em>diagonal</em>, and it is a
+        diagnostic rather than a fix: measured, it makes the per-distance
+        anisotropy WORSE, taking the diagonal from 1.010 to <b>1.414</b> times
+        the axis gain, because a diagonal step covers &radic;2 of ground and an
+        axis step covers 1. The diagonal weight &mdash; now &radic;2, not
+        1/&radic;2 &mdash; is the real fix. Off by default.</div>
       <label><input type="checkbox" id="serp" checked style="width:auto">
         serpentine scan (alternate the direction each diagonal)</label>
       <div class="hint">Unchecking it makes every diagonal run the same way,

@@ -18,13 +18,24 @@
 
   WHY THAT IS NOT A PLANE, which is the whole point of looking at it. The two
   orthogonal neighbours are one diagonal back and (u-1,v-1) is TWO, so a cell's
-  base lags the current diagonal by SUM(w_i * lag_i). Interior that is
-  1 + w_diag = 1.26120; an axis cell has only an orthogonal neighbour and lags
-  exactly 1. So the axes rise at delta per diagonal and the interior at
-  1/1.26120 = 0.792893, and the difference is a valley along the main diagonal
-  worth (sqrt(2)-1)/2 = 20.7% of the edge rise AT EVERY SCALE. Verified against
-  the closed form to six decimals in the far field, where its assumption of no
-  edge influence holds.
+  base lags the current diagonal by SUM(w_i * lag_i) = 1 + w_diag. An axis cell
+  has only an orthogonal neighbour and lags exactly 1, so the axes rise at delta
+  per diagonal and the interior more slowly.
+  
+  AND IT IS A RIDGE ALONG THE DIAGONAL, NOT A VALLEY. I had it backwards for
+  several rounds, from comparing heights along constant k = u+v — which is not
+  constant DISTANCE, since the midpoint of the line k=30 sits only 21.2 from
+  the origin rather than 30. Against true Euclidean distance the diagonal
+  stands higher than the axes, because it accumulates one delta per diagonal
+  while covering sqrt(2) of ground per step. The per-k deficit is real and
+  correctly measured; it is simply not a landform.
+  
+  THE DIAGONAL WEIGHT IS NOW sqrt(2), not 1/sqrt(2) — see trianglescan_scan.js
+  for the derivation. Reciprocal distance argues for less weight because the
+  cell is further away; being two diagonals back argues for more; the second
+  governs height, by exactly the same sqrt(2). With it the gain per unit of
+  true distance is 1.000 on the axes and 1.010 on the diagonal, against 1.130
+  before.
 
   WHY IT LOOKS FLAT, and it is not that the delta is too small. A constant
   delta is a CONSTANT GRADIENT, so fixing the total rise fixes the steepness.
@@ -123,12 +134,15 @@
       orders agree bit for bit under a constant delta.</div>
 
     <label><input type="checkbox" id="comp" style="width:auto">
-      level the diagonal valley</label>
-    <div class="hint">The valley is not a bug in the code &mdash; it is what
-      this weighting does, verified against the closed form. (u&minus;1,v&minus;1)
-      is two diagonals back, so interior cells lag the axes and sit
-      <b>20.7%</b> lower. Ticking this multiplies each cell's delta by its own
-      lag, which levels it exactly.</div>
+      equalise the rise per diagonal &mdash; a diagnostic, not a fix</label>
+    <div class="hint">Multiplies each cell's delta by its own lag, so every
+      cell gains delta per <em>diagonal</em> whatever stencil it has.
+      <b>Measured, that makes the anisotropy worse</b>: gain per unit of true
+      distance goes from axis 1.000 / diagonal 1.010 to axis 1.000 / diagonal
+      <b>1.414</b> &mdash; exactly &radic;2, because a diagonal step covers
+      &radic;2 of distance and an axis step covers 1, so levelling per&nbsp;k
+      over-rewards the diagonal. Left here only to show what per-k levelling
+      does; the diagonal weight is the real fix.</div>
 
     <label>vertical &times; <span id="vx-val">8.0</span></label>
     <input id="vx" type="range" min="1" max="30" value="8" step="0.5">
@@ -148,9 +162,9 @@
       shading shifts a slope's brightness by about
       grade&nbsp;&times;&nbsp;cot(elevation) relative to flat ground, so a 1%
       slope moves brightness 1.0% at 45&deg;, 1.9% at 28&deg; and
-      <b>4.7% at 12&deg;</b>. It was fixed at 28&deg;, which is why the valley
-      was faint.<br>
-      The valley runs along u&nbsp;=&nbsp;v, which is world (1,0,1).
+      <b>4.7% at 12&deg;</b>. It was fixed at 28&deg;, which is why the diagonal
+      feature was faint.<br>
+      The diagonal ridge runs along u&nbsp;=&nbsp;v, which is world (1,0,1).
       <b>135&deg; and 315&deg; light ACROSS it</b>; 45&deg; and 225&deg; light
       along it and show nothing. The readout gives the sensitivity and warns
       when the azimuth is in the blind direction.</div>
@@ -344,7 +358,7 @@ function place() {
   camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el),
                       dist * Math.cos(el) * Math.cos(az));
   camera.lookAt(0, 0, 0);
-  // Was fixed at 28 deg / 135 deg. The azimuth was right — across the valley —
+  // Was fixed at 28 deg / 135 deg. The azimuth was right — across the ridge —
   // but 28 deg was too high to show a shallow one, since the sensitivity goes
   // as cot(elevation).
   const se = (+$('sun').value) * Math.PI / 180;
@@ -469,7 +483,21 @@ function build() {
     eP.push([k, r.h[0 * N + k]]);
     if (k % 2 === 0) dP.push([k, r.h[(k / 2) * N + (k / 2)]]);
   }
-  lastStats = { N, km, delta, steps, cell, edgeFar, cornerFar, mid, mn, mx,
+  // Gain per unit of TRUE distance along the axis and the diagonal, fitted over
+  // a far-field span so the origin's edge influence is out of it.
+  const samp = (ang, R) => {
+    const u = R * Math.cos(ang), v = R * Math.sin(ang);
+    const u0 = Math.floor(u), v0 = Math.floor(v), fu = u - u0, fv = v - v0;
+    if (u0 < 0 || v0 < 0 || u0 + 1 >= N || v0 + 1 >= N) return NaN;
+    const H = (a, b) => r.h[b * N + a];
+    return H(u0,v0)*(1-fu)*(1-fv) + H(u0+1,v0)*fu*(1-fv) +
+           H(u0,v0+1)*(1-fu)*fv + H(u0+1,v0+1)*fu*fv;
+  };
+  const R1 = 0.45 * (N - 1), R2 = 0.68 * (N - 1);
+  const gAxis = (samp(0, R2) - samp(0, R1)) / (R2 - R1);
+  const gDiag = (samp(Math.PI / 4, R2) - samp(Math.PI / 4, R1)) / (R2 - R1);
+
+  lastStats = { N, km, delta, steps, cell, edgeFar, cornerFar, mid, mn, mx, gAxis, gDiag,
                 edgeSlope: fit(eP) / delta, midSlope: fit(dP) / delta,
                 comp: $('comp').checked };
   applyScheme();
@@ -543,10 +571,17 @@ function report() {
     `\n` +
     `far corner    ${s.cornerFar.toFixed(0)} m   ` +
     `axis far end ${s.edgeFar.toFixed(0)} m   relief ${relief.toFixed(0)} m\n` +
-    `diagonal      centre of the diagonal ${s.mid.toFixed(0)} m, so the valley is ` +
-    `${trough.toFixed(0)} m\n` +
-    `              = ${(100 * trough / Math.max(s.edgeFar, 1e-9)).toFixed(1)}% of the ` +
-    `edge rise   ${s.comp ? '(levelled)' : `(predicted ${(100 * TROUGH_FRACTION).toFixed(1)}%)`}\n` +
+    `per-k deficit the diagonal centre is ${s.mid.toFixed(0)} m against the axis ` +
+    `${s.edgeFar.toFixed(0)} m at the same k\n` +
+    `              = ${(100 * trough / Math.max(s.edgeFar, 1e-9)).toFixed(1)}% ` +
+    `${s.comp ? '(equalised)' : `(predicted ${(100 * TROUGH_FRACTION).toFixed(1)}%)`}` +
+    `   <i>a parameterisation deficit, NOT a valley</i>\n` +
+    // The quantity that actually describes the surface: gain per unit of TRUE
+    // distance, which is what the eye reads as slope. Comparing along constant
+    // k is what made me call a ridge a valley for several rounds.
+    `per-distance  axis ${s.gAxis.toFixed(4)}, diagonal ${s.gDiag.toFixed(4)} ` +
+    `m per m   diagonal ${((s.gDiag / Math.max(s.gAxis, 1e-9) - 1) * 100).toFixed(1)}% ` +
+    `steeper   <i>equal would be isotropic</i>\n` +
     `slopes        axis ${s.edgeSlope.toFixed(6)}, diagonal centre ` +
     `${s.midSlope.toFixed(6)} per step   ` +
     `predicted 1.000000 and ${s.comp ? '1.000000' : SLOPE_INTERIOR.toFixed(6)}\n` +
@@ -578,7 +613,7 @@ function report() {
               Math.abs(((+$('sunaz').value) - 225 + 360) % 360),
               360 - Math.abs(((+$('sunaz').value) - 45 + 360) % 360),
               360 - Math.abs(((+$('sunaz').value) - 225 + 360) % 360)) < 20
-      ? `\n              <span class="warn">lighting ALONG the valley — the blind ` +
+      ? `\n              <span class="warn">lighting ALONG the diagonal — the blind ` +
         `direction; try 135&deg; or 315&deg;</span>` : '') + '\n' +
     `vertical      ${vx === 1 ? '<b>x1 — TRUE SCALE</b>, the slope you see is the real one'
       : `<span class="warn">x${vx.toFixed(1)} — the picture is exaggerating the slope ` +
