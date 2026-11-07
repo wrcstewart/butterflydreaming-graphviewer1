@@ -370,3 +370,181 @@ size. The two that held up are both ratios **against a matched control**:
 lattice enrichment (curved cells on a lattice vs random cells) and the
 magnitude-weighted gradient-direction peak/mean. Prefer a measure with a
 control built into it.
+
+---
+
+## The triangle scan — the author's own construction (2026-11-07)
+
+After six liftings had all failed in one of two ways, the author set the
+approach aside and specified his own, on the grounds that he wanted something
+*"i find easier to understand"*. It is. Two pages, one shared scan:
+
+| file | what it is |
+|---|---|
+| `trianglescan_scan.js` | **the scan, in one place** — plus six self-tests |
+| `trianglescan_terrain.html` | the fractal version |
+| `constdelta_terrain.html` | a constant delta, in real metres, six controls |
+
+### The construction
+
+A `u,v` grid is filled in **anti-diagonal order** from the origin: `(0,0)` takes
+a start height, then every cell with `u+v = 1`, then `u+v = 2`, and so on. Each
+new cell's base height is the **reciprocal-distance weighted average** of its
+three already-established neighbours, and a `dH` is added on top:
+
+| cell | distance | weight | diagonals back |
+|---|---|---|---|
+| `(u−1, v)` | 1 | 1 / 2.7071 = 0.3694 | 1 |
+| `(u, v−1)` | 1 | 1 / 2.7071 = 0.3694 | 1 |
+| `(u−1, v−1)` | √2 | (1/√2) / 2.7071 = 0.2612 | **2** |
+
+Those three are the complete set of established neighbours within √2 — the
+other two, `(u−1,v+1)` and `(u+1,v−1)`, lie on the *same* anti-diagonal and so
+are not reliably available. On the axes the missing ones drop out and the
+survivor renormalises to weight 1, making each axis a pure 1D walk.
+
+**Serpentine, and it is the author's design.** Odd `k` runs from the u axis to
+the v axis, even `k` back. Symbols are consumed in traversal order, so a raster
+scan would put the last cell of line `k` and the first of line `k+1` at
+opposite corners — consecutive symbols far apart, a seam down one edge. The
+alternation removes it. I had mis-stated my own streaking prediction as being
+about the scan when it is about the **stencil**, whose dependency runs outward
+from the origin whatever order cells are visited in.
+
+**What it is:** a causal autoregressive filter on the lattice, driven by the
+fractal as its innovation stream. Weights sum to 1, so the base is a
+unity-gain smoother and each cell integrates one more innovation. Unlike every
+earlier attempt there is **no subdivision hierarchy** — all the multi-scale
+structure comes from the fractal itself, which is what was being tested.
+
+### THE CORRECTION THAT MATTERS: it is a RIDGE, not a valley
+
+For several rounds I described a **valley along the main diagonal** and
+measured it at 20.7% of the edge rise. The author: *"it seems there is no vally
+on the main diag but in fact a ridge"*. He is right and I was wrong.
+
+The error: I compared heights along **constant `k = u+v`**, which is *not*
+constant distance from the origin. The midpoint of the line `k = 30` is
+`(15,15)`, only **21.2** from the origin rather than 30 — so it was lower
+simply because it was nearer. I read a parameterisation artefact as terrain.
+
+Measured properly, height against **true Euclidean distance** by direction:
+
+| radius | 0° (axis) | 15° | 30° | 45° (diagonal) |
+|---|---|---|---|---|
+| 20 | 20.00 | 22.35 | **23.20** | 23.10 |
+| 40 | 40.00 | 44.70 | **46.36** | 45.81 |
+| 60 | 60.00 | 67.05 | **69.54** | 68.45 |
+
+The diagonal stands ~15% **higher** than the axes at the same radius. The axes
+are the low ground.
+
+What is actually there is a **double ridge**: the crest sits at about **30°**,
+not 45°, so there are two crests roughly ±15° either side of the diagonal with
+a shallow crease between them — 0.49% of local height at radius 20, 1.22% at
+40, 1.59% at 60. That crease is presumably what reads as a faint diagonal line,
+and it is two orders of magnitude smaller than the "valley" I described.
+
+**Still to fix:** the pages' comments and hints state the valley claim in
+several places, and the *"level the diagonal valley"* switch is misnamed — it
+equalises the per-`k` rise, which flattens the surface into a plane under a
+constant delta rather than removing a valley. The 20.7% figure itself is
+correctly measured; it is the *deficit relative to the axis value at the same
+k*, which is a real quantity and not a valley.
+
+### What the constant-delta test established
+
+`constdelta_terrain.html` exists because the author asked to test the code with
+a fixed delta instead of the fractal. It pays for itself three times.
+
+**The lag arithmetic, verified.** Each neighbour sits a number of diagonals
+back, so a cell's base lags the current diagonal by `Σ wᵢ·lagᵢ` — interior
+`1 + w_diag = 1.26120`, an axis cell exactly 1. Hence the axes rise at `delta`
+per diagonal and the interior at `1/1.26120 = 0.792893`. Six self-tests, all
+passing at N = 129, 257 and 513:
+
+```
+serpentine and raster agree under a constant delta   difference 0.00e+0
+both axes rise at exactly delta per diagonal         1.000000000 each
+field is symmetric about u = v                       asymmetry 0.00e+0
+interior slope converges to 1/(1+w_diag)             .8069 > .7985 > .7970
+lag compensation levels it                           1.000000000
+every cell is visited exactly once                   66,048 for 66,049
+```
+
+**A false verification of my own, caught by the shared test.** I had claimed
+the scan "reproduces the closed form to six decimal places in the far field".
+It does not. That window started at an **odd** `k` and took `m = k/2`, and
+because `m*N+m` is `m*(N+1)` with `N+1` even, a half-integer `m` still yields a
+**valid integer index** — for a different cell. It was reading `(243,114)` and
+never touched the diagonal. The true far-field slopes are 0.798681, 0.796964
+and 0.795767 at N = 129, 257, 513: converging on 0.792893 roughly as `1/√N` and
+still 0.4% short at 513. A finite grid does not reach the asymptote.
+
+**The grammar is not balanced**, which the author had asked about. At depth 9 it
+holds 6,764 `+` against 14,514 `-` — a mean of **−0.1438 per symbol**. The bias
+is in the rules (`X` net +2.09, `Y` −1.09, `Z` −1.00) and compounds with depth
+because `Z` triples itself: −0.032 at depth 6, −0.170 at depth 10. This is
+almost certainly the cause of his *"everything is gradually downhill"*
+complaint weeks earlier, and of why the 1D bench needed reflection at its
+bounds. Raw, the partial sums grow with exponent **0.933** — linear drift.
+De-meaned it is **0.597** against **0.442** for the same symbols shuffled, so
+the ordering is *persistent* and reinforces the wander. Neither `√k` nor
+bounded; I had floated both.
+
+### Three faults of my own worth not repeating
+
+1. **A test against a copy tests the copy.** I gave the constant-delta page its
+   own duplicate of the scan, so it exercised the duplicate rather than the
+   code the fractal page runs. Now one shared file. This repo already carried
+   that scar in two divergent copies of `music_module.html`.
+2. **"Provably cannot matter" is the hypothesis a test checks**, not grounds
+   for deleting the control. I removed the serpentine switch from the test page
+   for that reason. It is back, and asserted.
+3. **Normalising to 0..1 divides the amplitude out.** With a constant delta the
+   shape is identical and only the amplitude changes, so delta 1 and delta 100
+   rendered identically to 1.1e−15 and the slider looked unwired — the author
+   set it to 100 and rightly asked. All normalisation is now gone from both
+   pages, and every threshold is a share of the actual relief.
+
+### The metric record across this whole effort
+
+Six proxies for "straight lines" disagreed with one another; two more were
+plain wrong. The pattern, stated so it can be checked against in future:
+
+- **Ratios of percentiles are confounded by smoothness.** `p99.9/median` rises
+  when the median falls, so a smoother field scores *worse*. It read 25.6 at
+  texture 0 and 7.6 at texture 0.12 — the exact opposite of the truth, and it
+  sent me to a wrong default.
+- **Counts are confounded by population size and by roughness.** A rough field
+  has few strict maxima over a radius-4 disc; a smooth one has many.
+- **A denominator that differs between the things being compared does the
+  work.** The subword-complexity budget, and the constant-`k` comparison above.
+- **What held up** were the two measures with a control built into them:
+  lattice enrichment (curved cells on a lattice *vs* random cells) and the
+  magnitude-weighted gradient-direction peak/mean.
+- **And when proxies disagree, look for the property that can be derived.**
+  The straight lines were settled by arithmetic — a sum of K one-dimensional
+  functions has straight level sets — not by a seventh metric.
+
+### Presentation findings, measured rather than chosen
+
+- **The elevation spectrum needs its luminance solved.** A plain rainbow has
+  luminance 0.202, 0.298, 0.615, 0.798, 0.704, 0.676, 0.685, 0.717, 0.482,
+  0.166, 0.070 — it peaks at yellow-green and falls off a cliff into blue, so
+  the *ordering* is unreadable. Lightness is now solved per hue to make
+  luminance linear in elevation, 0.05 → 0.42, monotone over 256 entries,
+  saturation 0.97 held through red, orange, yellow, green and cyan.
+- **A low sun is the lever for shallow relief.** Lambert shading shifts a
+  slope's brightness by about `grade × cot(elevation)`, so a 1% slope moves
+  brightness 1.0% at 45°, 1.9% at 28° and 4.7% at 12°. The sun had been fixed
+  at 28°. Azimuth 135°/315° cuts across the diagonal; 45°/225° is the blind
+  direction.
+- **White is not a safe marker colour.** The four scheme surfaces have
+  luminances 0.609, 0.962, 0.954 and 0.299, so white vanishes on three of four.
+  The grid lines at `u,v = 9` and `30` therefore pick white or near-black per
+  cell against whatever is under them.
+- **A working control that produces no visible change is indistinguishable from
+  a broken one.** Both pages now print the relief as a share of the frame width
+  at the current exaggeration, and warn below 5%. That single line is what
+  would have prevented two rounds of "the slider isn't doing anything".
