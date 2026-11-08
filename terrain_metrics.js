@@ -79,6 +79,13 @@ export function hurstFromVariogram(h, n, lo = 2, hi = 32) {
 // does not need one. Only a mid-range band is fitted, away from the few-bins
 // region at low |k| and the Nyquist corner.
 export function powerRadial(h, n) {
+  // The radix-2 FFT below needs a power of two. Without this guard a grid like
+  // 193 (three 64-cell chunks plus a shared edge) returned NaN and the readout
+  // printed it, which is exactly the silent failure the standing rule forbids.
+  if (n & (n - 1)) throw new Error(
+    'powerRadial needs a power-of-two grid; got ' + n +
+    '. Crop to one, or use the variogram — which is the right instrument anyway ' +
+    'for a field that is not periodic.');
   const re = new Float64Array(n * n), im = new Float64Array(n * n);
   let mean = 0;
   for (let i = 0; i < n * n; i++) mean += h[i];
@@ -110,6 +117,10 @@ export function powerRadial(h, n) {
 }
 // lo/hi as fractions of Nyquist, so the band scales with the grid.
 export function hurstFromSpectrum(h, n, lo = 0.06, hi = 0.5) {
+  // ONLY FOR A PERIODIC FIELD. This estimator's advantage is that it applies no
+  // taper, which is legitimate only because an inverse-FFT field wraps. On a
+  // field that does not wrap — anything from the noise method — a window is
+  // needed and the estimate is biased, so use hurstFromVariogram there.
   const { k, P } = powerRadial(h, n);
   const nyq = n / 2;
   let sx = 0, sy = 0, sxy = 0, sxx = 0, m = 0;

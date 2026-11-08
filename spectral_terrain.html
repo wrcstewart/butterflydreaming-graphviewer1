@@ -237,65 +237,16 @@ import { fbm2d } from './fbm2d.js';
 import { hurstFromVariogram, hurstFromSpectrum, directionalPower, calibrate,
          EXCESS_NOTE, relief as reliefOf, bumps, summits,
          curvature } from './terrain_metrics.js';
+import { makeViewer, frameShare } from './terrain_view.js';
 
 const $ = id => document.getElementById(id);
 
-// ── THE ELEVATION SPECTRUM ──────────────────────────────────────────────
-// Carried over unchanged from constdelta_terrain.html, where the lightness at
-// each hue was SOLVED by bisection so that relative luminance is linear in
-// elevation. A naive rainbow is the worst possible ramp for reduced colour
-// vision because its luminance peaks at yellow-green and falls off a cliff into
-// blue, so two different elevations share a brightness and the eye cannot order
-// them. Here the ramp is readable twice over: by hue, and by brightness.
-const RAMP_N = 256;
-const RAMP = (() => {
-  const lum = (r, g, b) => {
-    const f = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const hsl = (h, sat, l) => {
-    const c = (1 - Math.abs(2 * l - 1)) * sat, hp = h / 60, x = c * (1 - Math.abs(hp % 2 - 1));
-    let r = 0, g = 0, b = 0;
-    if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; }
-    else if (hp < 3) { g = c; b = x; } else if (hp < 4) { g = x; b = c; }
-    else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
-    const m = l - c / 2;
-    return [r + m, g + m, b + m];
-  };
-  const LO = 0.05, HI = 0.42, out = [];
-  for (let i = 0; i < RAMP_N; i++) {
-    const t = i / (RAMP_N - 1), h = 240 * t, target = LO + (HI - LO) * t;
-    let lo = 0, hi = 1;
-    for (let k = 0; k < 40; k++) {
-      const m = (lo + hi) / 2, c = hsl(h, 0.95, m);
-      if (lum(c[0], c[1], c[2]) < target) lo = m; else hi = m;
-    }
-    out.push(hsl(h, 0.95, (lo + hi) / 2));
-  }
-  return out;
-})();
-const rampAt = t => RAMP[Math.max(0, Math.min(RAMP_N - 1, Math.round(t * (RAMP_N - 1))))];
-
-// ── SCHEMES ─────────────────────────────────────────────────────────────
-// Lighting carries the relief, not colour: nothing is encoded in hue. The sea
-// inverts the pattern deliberately — the surface carries the colour and sits
-// darker than the sky, as water does.
-const SCHEMES = {
-  grey:       { bg:0xffffff, surface:0xcfcdc4, sky:0xffffff, bounce:0x9a9a92,
-                sun:0xffffff, hemi:0.55, sunI:2.3, rough:0.95 },
-  whiteblue:  { bg:0xbcd4ec, surface:0xf8fbff, sky:0xe4eefa, bounce:0x6f8aa8,
-                sun:0xfffdf6, hemi:0.75, sunI:2.0, rough:0.98 },
-  whiteolive: { bg:0xa9a67a, surface:0xfbfaf3, sky:0xeeead6, bounce:0x62653a,
-                sun:0xfff9ec, hemi:0.70, sunI:2.1, rough:0.97 },
-  sea:        { bg:0x9cc4e8, surface:0x47a39a, sky:0xd4e6f7, bounce:0x123f4a,
-                sun:0xfffdf4, hemi:0.60, sunI:2.4, rough:0.42, metal:0.10 },
-  spectrum:   { bg:0x33332f, surface:0xffffff, sky:0xffffff, bounce:0xffffff,
-                sun:0xffffff, hemi:0.90, sunI:1.1, rough:0.98, byElevation:true },
-};
-
-let renderer, scene, camera, mesh, wireMesh, sun, hemi;
-let lastH = null, lastN = 0;
-let az = -0.6, el = 0.45, dist = 2.4, dragging = false, lx = 0, ly = 0;
+// The viewer never reaches into this page's DOM; it asks for what it needs.
+const read = () => ({
+  scheme: $('scheme').value, bands: +$('bands').value, vx: +$('vx').value,
+  sun: +$('sun').value, sunaz: +$('sunaz').value,
+  wire: $('wire').checked, km: +$('km').value,
+});
 
 function fail(msg) {
   // No silent failure anywhere on this page: anything that stops a build says
@@ -306,130 +257,7 @@ function fail(msg) {
   console.error(msg);
 }
 
-function initThree() {
-  const cv = $('cv');
-  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
-  sun = new THREE.DirectionalLight(0xffffff, 2.3); scene.add(sun);
-  hemi = new THREE.HemisphereLight(0xffffff, 0x9a9a92, 0.55); scene.add(hemi);
-  cv.addEventListener('pointerdown', e => {
-    dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId);
-  });
-  cv.addEventListener('pointerup', () => { dragging = false; });
-  cv.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    az -= (e.clientX - lx) * 0.006; el += (e.clientY - ly) * 0.005;
-    el = Math.max(0.05, Math.min(1.5, el));
-    lx = e.clientX; ly = e.clientY; place();
-  });
-  cv.addEventListener('wheel', e => {
-    e.preventDefault();
-    dist = Math.max(0.6, Math.min(8, dist * (1 + Math.sign(e.deltaY) * 0.08)));
-    place();
-  }, { passive: false });
-  resize();
-  window.addEventListener('resize', () => { resize(); place(); });
-}
-function resize() {
-  const st = $('stage');
-  renderer.setSize(st.clientWidth, st.clientHeight, false);
-  camera.aspect = Math.max(st.clientWidth / Math.max(st.clientHeight, 1), 0.01);
-  camera.updateProjectionMatrix();
-}
-// The surface colour lives in a VERTEX ATTRIBUTE, not in material.color, because
-// three multiplies the two together — so the material stays white and the
-// scheme's colour is written per vertex. Changing scheme refills the attribute
-// instead of rebuilding the field.
-function paint() {
-  if (!mesh || !lastH) return;
-  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
-  const attr = mesh.geometry.attributes.color;
-  if (!attr) return;
-  if (s.byElevation) {
-    let mn = Infinity, mx = -Infinity;
-    for (const v of lastH) { if (v < mn) mn = v; if (v > mx) mx = v; }
-    const span = (mx - mn) || 1;
-    const bands = Math.max(0, Math.min(40, +$('bands').value || 0));
-    for (let i = 0; i < attr.count; i++) {
-      let t = (lastH[i] - mn) / span;
-      if (bands > 0) t = Math.min(bands - 1, Math.floor(t * bands)) / (bands - 1 || 1);
-      const c = rampAt(t);
-      attr.setXYZ(i, c[0], c[1], c[2]);
-    }
-  } else {
-    const base = new THREE.Color().setHex(s.surface);
-    for (let i = 0; i < attr.count; i++) attr.setXYZ(i, base.r, base.g, base.b);
-  }
-  attr.needsUpdate = true;
-  drawLegend();
-}
-function drawLegend() {
-  const e = $('legend'), s = SCHEMES[$('scheme').value] || SCHEMES.grey;
-  if (!s.byElevation || !lastH) { e.style.display = 'none'; return; }
-  let mn = Infinity, mx = -Infinity;
-  for (const v of lastH) { if (v < mn) mn = v; if (v > mx) mx = v; }
-  // Metres: the heights are dimensionless, so they are reported against the
-  // ground covered, which is the only length on the page with a unit.
-  const km = +$('km').value, vx = +$('vx').value;
-  const metres = (mx - mn) * vx * km * 1000 / 2;
-  const bands = Math.max(0, Math.min(40, +$('bands').value || 0));
-  const steps = bands > 0 ? bands : 64;
-  const sw = [];
-  for (let i = 0; i < steps; i++) {
-    let t = bands > 0 ? i / (steps - 1 || 1) : (i + 0.5) / steps;
-    const c = rampAt(t).map(v => Math.round(255 * Math.max(0, Math.min(1, v))));
-    sw.push('<i style="background:rgb(' + c.join(',') + ')"></i>');
-  }
-  const ticks = [];
-  for (let i = 4; i >= 0; i--) ticks.push('<tr><td>' + Math.round(metres * i / 4) + ' m</td></tr>');
-  e.style.display = 'block';
-  e.innerHTML =
-    '<div style="margin-bottom:5px"><b>elevation</b>' +
-    (bands > 0 ? ' — ' + bands + ' bands of ' + Math.round(metres / bands) + ' m'
-               : ' — continuous') + '</div>' +
-    '<div class="wrapbar"><div class="bar">' + sw.join('') + '</div>' +
-    '<table>' + ticks.join('') + '</table></div>';
-}
-function applyScheme() {
-  const s = SCHEMES[$('scheme').value] || SCHEMES.grey;
-  if (scene) scene.background = new THREE.Color(s.bg);
-  if (hemi) { hemi.color.setHex(s.sky); hemi.groundColor.setHex(s.bounce); hemi.intensity = s.hemi; }
-  if (sun) { sun.color.setHex(s.sun); sun.intensity = s.sunI; }
-  if (mesh) { mesh.material.roughness = s.rough; mesh.material.metalness = s.metal || 0; }
-  paint();
-  place();
-}
-function place() {
-  if (!camera) return;
-  camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el),
-                      dist * Math.cos(el) * Math.cos(az));
-  camera.lookAt(0, 0, 0);
-  const se = (+$('sun').value) * Math.PI / 180, sa = (+$('sunaz').value) * Math.PI / 180;
-  sun.position.set(Math.cos(se) * Math.sin(sa), Math.sin(se), Math.cos(se) * Math.cos(sa));
-  renderer.render(scene, camera);
-}
-// The vertical control only rescales the geometry, so it tracks the hand
-// instead of rebuilding the field and re-running every measurement.
-function rescale() {
-  const vx = +$('vx').value; $('vx-val').textContent = vx.toFixed(2);
-  if (!mesh || !lastH) return build();
-  const pos = mesh.geometry.attributes.position;
-  for (let i = 0; i < pos.count; i++) pos.setZ(i, lastH[i] * vx);
-  pos.needsUpdate = true;
-  mesh.geometry.computeVertexNormals();
-  if (wireMesh) {
-    const wp = wireMesh.geometry.attributes.position;
-    for (let i = 0; i < wp.count; i++) wp.setZ(i, lastH[i] * vx);
-    wp.needsUpdate = true;
-  }
-  drawLegend();
-  report();
-  place();
-}
-
-let lastStats = null;
+let view = null, lastStats = null;
 
 function build() {
   $('err').style.display = 'none';
@@ -437,14 +265,12 @@ function build() {
     const N = +$('n').value, H = +$('H').value, seed = Math.max(1, +$('seed').value | 0);
     const widest = +$('widest').value;           // in cells; 0 = no cutoff
     const k0 = widest > 0 ? 1 / widest : 0;      // cycles per sample
-    const vx = +$('vx').value;
 
     const t0 = performance.now();
     // normalise: false — the author's standing instruction. A normalising step
     // on an earlier page divided a delta control out entirely and the slider
     // looked unwired, so nothing here rescales per field.
-    const r = fbm2d({ n: N, H, seed, normalise: false, k0 });
-    const h = r.heights;
+    const h = fbm2d({ n: N, H, seed, normalise: false, k0 }).heights;
     const genMs = performance.now() - t0;
 
     // H IS MEASURED HERE, before the massif mask and from the spectrum, and
@@ -452,22 +278,22 @@ function build() {
     //
     // From the SPECTRUM because the variogram is the wrong instrument for a
     // periodic field: the wrap flattens large-lag correlations, so its slope
-    // reads systematically low — fine at H = 0.5 but 0.14 low by H = 0.95, which
-    // would convict the generator of an error belonging to the measurement. The
-    // spectrum is what the generator actually sets, and un-windowed on a
-    // periodic field it is near unbiased: a flat -0.016 at n = 256 across the
-    // whole range of H.
+    // reads systematically low — fine at H = 0.5 but 0.14 low by H = 0.95,
+    // which would convict the generator of an error belonging to the
+    // measurement. The spectrum is what the generator actually sets, and
+    // un-windowed on a periodic field it is near unbiased: a flat -0.016 at
+    // n = 256 across the whole range of H.
     //
     // BEFORE THE MASK because the mask destroys the periodicity the estimator
-    // relies on. Measured, it shifts H by about +0.03, which is small but it is
-    // an artefact of the window rather than anything the method did.
+    // relies on. Measured, it shifts H by about +0.03 — small, but an artefact
+    // of the window rather than anything the method did.
     //
     // The fit band must also clear the cutoff, or the rolloff is mistaken for
-    // the fractal slope — fitting through it read H = -0.149 for an asked 0.80.
-    // Starting at three times k0 leaves a Butterworth factor of 0.988, which is
-    // negligible. At the narrowest cutoff that band lies above Nyquist and
-    // there is nothing to fit, so the readout says so instead of printing a
-    // number.
+    // the fractal slope: fitting straight through it read H = -0.149 for an
+    // asked 0.80. Starting at three times k0 leaves a Butterworth factor of
+    // 0.988, which is negligible. At the narrowest cutoff that band lies above
+    // Nyquist and there is nothing to fit, so the readout says so instead of
+    // printing a number.
     const loBand = widest > 0 ? Math.max(0.06, 6 / widest) : 0.06;
     const hs = hurstFromSpectrum(h, N, loBand, 0.5);
 
@@ -480,34 +306,12 @@ function build() {
       }
     }
 
-    lastH = h; lastN = N;
-
-    if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
-    if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); wireMesh = null; }
-    const sch = SCHEMES[$('scheme').value] || SCHEMES.grey;
-    const geo = new THREE.PlaneGeometry(2, 2, N - 1, N - 1);
-    const pos = geo.attributes.position;
-    // PlaneGeometry's vertex i is row floor(i/N), column i%N, and the heights
-    // are indexed y*N+x — the same order, so no remapping is needed.
-    for (let i = 0; i < pos.count; i++) pos.setZ(i, h[i] * vx);
-    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
-    geo.computeVertexNormals();
-    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      color: 0xffffff, vertexColors: true,
-      roughness: sch.rough, metalness: sch.metal || 0, side: THREE.DoubleSide }));
-    mesh.rotation.x = -Math.PI / 2;
-    scene.add(mesh);
-    if ($('wire').checked) {
-      wireMesh = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({
-        color: 0x55554e, wireframe: true, transparent: true, opacity: 0.16 }));
-      wireMesh.rotation.x = -Math.PI / 2;
-      scene.add(wireMesh);
-    }
+    // One tile covering the whole frame.
+    view.setTiles([{ h, n: N, cx: 0, cz: 0, size: 2 }]);
 
     // ── the measurements ──
-    // reliefOf returns { min, max, relief }, and summits returns
-    // { count, best } — both are objects, so the scalars are taken out here
-    // rather than being formatted as [object Object] in the readout.
+    // reliefOf returns { min, max, relief } and summits returns { count, best },
+    // so the scalars come out here rather than reaching the readout as objects.
     const rm = reliefOf(h), rel = rm.relief;
     const st = { N, H, seed, widest, genMs, rel, min: rm.min, max: rm.max };
     if ($('domeasure').checked) {
@@ -525,7 +329,6 @@ function build() {
       st.measMs = performance.now() - t1;
     }
     lastStats = st;
-    applyScheme();
     report();
   } catch (e) {
     fail('build failed\n\n' + (e && e.stack ? e.stack : String(e)));
@@ -536,7 +339,7 @@ function report() {
   const st = lastStats;
   if (!st) return;
   const vx = +$('vx').value, km = +$('km').value;
-  const share = 100 * st.rel * vx / 2;           // the frame is 2 units across
+  const share = frameShare(st.rel, vx);
   const mPerCell = km * 1000 / st.N;
   const widestKm = st.widest > 0 ? (st.widest * mPerCell / 1000) : km;
   let s = '';
@@ -545,13 +348,12 @@ function report() {
   s += `ground        ${km} km across, ${mPerCell.toFixed(0)} m per cell   ` +
        `widest feature ${widestKm.toFixed(1)} km` +
        (st.widest === 0 ? '  <span class="warn">(no cutoff — one massif)</span>' : '') + '\n';
-  s += `relief        ${st.rel.toFixed(3)} raw (${st.min.toFixed(3)} to ${st.max.toFixed(3)}), drawn as-is   ` +
-       `on screen ${share.toFixed(1)}% of the frame` +
+  s += `relief        ${st.rel.toFixed(3)} raw (${st.min.toFixed(3)} to ${st.max.toFixed(3)}), ` +
+       `drawn as-is   on screen ${share.toFixed(1)}% of the frame` +
        (share < 5 ? '  <span class="warn">— too shallow to judge, raise vertical</span>' : '') + '\n';
   if (st.slope !== undefined) {
-    // The check the earlier work lacked: does the H that comes out match the H
-    // asked for? Primary figure from the spectrum, which is what the generator
-    // sets and is near unbiased on a periodic field.
+    // Does the H that comes out match the H asked for? Primary figure from the
+    // spectrum, which is what the generator sets and is near unbiased here.
     if (st.HsPts >= 4) {
       const dH = Math.abs(st.Hs - st.H);
       s += `H             asked ${st.H.toFixed(2)}   measured <b>${st.Hs.toFixed(3)}</b> ` +
@@ -567,9 +369,9 @@ function report() {
     // by construction and someone will otherwise read it as a fault.
     s += `              variogram gives ${st.Hm.toFixed(3)} (slope ${st.slope.toFixed(3)} = 2H) — ` +
          `<i>reads low on a periodic field; the wrap flattens the large lags</i>\n`;
-    // Anisotropy against a matched null. Quoted with its uncertainty, because a
-    // single reading at n=256 carries about +/- 0.4 and an earlier version of
-    // this measure read 1.80-2.17 on an isotropic field.
+    // Anisotropy against a matched null, quoted with its uncertainty: one
+    // reading at n=256 carries about +/-0.4, and an earlier version of this
+    // measure read 1.80-2.17 on a field that is in fact isotropic.
     const verdict = st.excess > 1.6
       ? `<span class="warn">streaked at ${st.peak}&deg;</span>`
       : '<span class="good">isotropic</span>';
@@ -589,10 +391,10 @@ function report() {
 function runCalibration() {
   try {
     const rows = calibrate(256);
+    const nb = s => s.replace(/ /g, '&nbsp;');
     const lines = rows.map(c =>
       (c.pass ? '<span class="good">PASS</span>  ' : '<span class="warn">FAIL</span>  ') +
-      c.name.padEnd(34, ' ').replace(/ /g, '&nbsp;') +
-      ' got ' + String(c.got).padStart(5, ' ').replace(/ /g, '&nbsp;') +
+      nb(c.name.padEnd(34, ' ')) + ' got ' + nb(String(c.got).padStart(5, ' ')) +
       '   expected ' + c.expect);
     const bad = rows.filter(c => !c.pass).length;
     $('out').innerHTML =
@@ -607,10 +409,9 @@ function runCalibration() {
   }
 }
 
-// ── wiring ──────────────────────────────────────────────────────────────
-function wire() {
-  const rebuild = ['n', 'H', 'seed', 'widest', 'massif', 'wire', 'domeasure'];
-  for (const id of rebuild) $(id).addEventListener('change', build);
+function wireControls() {
+  for (const id of ['n', 'H', 'seed', 'widest', 'massif', 'wire', 'domeasure'])
+    $(id).addEventListener('change', build);
   $('H').addEventListener('input', () => {
     const H = +$('H').value;
     $('H-val').textContent = H.toFixed(2);
@@ -618,17 +419,20 @@ function wire() {
   });
   $('km').addEventListener('input', () => {
     $('km-val').textContent = $('km').value;
-    drawLegend(); report();
+    view.drawLegend(); report();
   });
-  $('vx').addEventListener('input', rescale);
+  $('vx').addEventListener('input', () => {
+    $('vx-val').textContent = (+$('vx').value).toFixed(2);
+    view.rescale(); report();
+  });
   $('bands').addEventListener('input', () => {
-    $('bands-val').textContent = $('bands').value; paint(); place();
+    $('bands-val').textContent = $('bands').value; view.paint(); view.place();
   });
-  $('scheme').addEventListener('change', applyScheme);
+  $('scheme').addEventListener('change', () => view.applyScheme());
   for (const id of ['sun', 'sunaz']) $(id).addEventListener('input', () => {
     $('sun-val').textContent = $('sun').value;
     $('sunaz-val').textContent = $('sunaz').value;
-    place();
+    view.place();
   });
   $('go').addEventListener('click', build);
   $('calib').addEventListener('click', runCalibration);
@@ -638,8 +442,13 @@ if (!window.THREE) {
   fail('three.js did not load from the CDN, so nothing can be drawn.\n' +
        'Check the network, then reload.');
 } else {
-  initThree();
-  wire();
-  build();
+  try {
+    view = makeViewer({ THREE: window.THREE, canvas: $('cv'), stage: $('stage'),
+                        legend: $('legend'), onError: fail, read });
+    wireControls();
+    build();
+  } catch (e) {
+    fail('could not start\n\n' + (e && e.stack ? e.stack : String(e)));
+  }
 }
 </script>
