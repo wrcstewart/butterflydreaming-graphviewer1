@@ -1101,3 +1101,42 @@ real mistake, its olive sitting at the tree line and persisting a third of the
 way to the snow line. The merge now runs from the tree line to 18% above it, so
 it is green below, brown within about 130 m above, and brown for the rest of the
 band.
+
+**Three flat bands, and why the graded ramp failed twice (2026-11-08).** *"I'm
+still not seeing any brown - just keep it simple for testing and use defined
+colours brown , light green and white and make the transition fairly abrupt."*
+
+Two independent causes, both measurable, neither of which was the hue choice I
+had spent the previous round fixing.
+
+**The pure-brown window held 6.6% of the ground.** At the page defaults the area
+fell out as forest 87.1%, green-to-brown merge 3.4%, pure brown 6.6%,
+brown-to-scree 0.9%, scree 0.4%, snow 1.7%. So of the 13% above the tree line,
+half again went to transitions, and brown survived only as a thin fringe round
+the peaks. **A graded ramp spends most of its length on transitions, which is
+exactly wrong when the band is already thin** — and no amount of correcting the
+brown's R/G ratio could fix that, which is why the previous round's fix did not
+show.
+
+**The lighting was destroying the hue.** A lit vertex colour is
+`colour × (sun.NdotL + hemi)` and channels past 1.0 *pin*. The scheme carried
+sunI 2.0 with hemi 0.55, a gain of 2.55, so brown 139,90,43 rendered as
+**255,229,110** — a pale cream — and the light green as 255,255,209, near white.
+Red and green clip together and the result drifts to yellow. Measured, 1.15 is
+the most gain that leaves both clean, so this scheme now runs sunI 0.75 with
+hemi 0.40 and the brown lights to 160,103,49, R/G 1.55. **In the one scheme
+where colour carries information, exposure is set for colour fidelity rather
+than for contrast.**
+
+The bands are flat and defined — light green 140,193,82, brown 139,90,43, white
+242,245,247 — with transitions 11 m either side of each line. The ordering is
+deliberately **not** monotone in luminance here (0.443, 0.130, 0.909), which is
+acceptable only because every pair is separated anyway: green/brown 3.4:1,
+white/green 2.1:1, white/brown 7.0:1, so all three are told apart by brightness
+alone. That would not be acceptable for a gradient, where only a monotone
+sequence reads as an ordering.
+
+The readout now gives **the share of ground in each band**, so a band too thin
+to see says so rather than leaving it to be deduced; and the default height
+moved from 0.34 to 0.45, which puts 79% green, 15% brown and 7% white on screen
+instead of 87/11/2.

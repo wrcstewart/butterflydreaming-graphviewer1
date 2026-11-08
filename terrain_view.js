@@ -50,8 +50,11 @@ export const SCHEMES = {
   // the colour carries the altitude rather than competing with shading, but the
   // sun still has to model relief — hence a moderate hemi rather than the
   // spectrum scheme's near-ambient 0.90.
-  alpine:     { bg:0xb9cfe2, surface:0xffffff, sky:0xdce8f2, bounce:0x6e7466,
-                sun:0xfff8e8, hemi:0.55, sunI:2.0, rough:0.92, byAltitude:true },
+  // sunI + hemi must stay at or under about 1.15, or the vertex colours clip and
+  // the brown renders as pale cream. This is the one scheme where colour
+  // carries information, so exposure is set for colour fidelity, not contrast.
+  alpine:     { bg:0xb9cfe2, surface:0xffffff, sky:0xf2f6fa, bounce:0x8a8f84,
+                sun:0xfffdf6, hemi:0.40, sunI:0.75, rough:0.95, byAltitude:true },
 };
 // A dark mark that reads by luminance against every scheme's surface — worst
 // case measured 5.0:1, on the sea.
@@ -149,80 +152,72 @@ export const snowLineM = lat =>
 // Altitude is then legible twice over — by hue for the eye that has it, and by
 // brightness for the ordering. Measured relative luminances are in the comment
 // against each stop, and a test asserts the sequence is increasing.
-const ALPINE_STOPS = [
-  // [position, r, g, b].  position 0 = valley floor, 1 = tree line, 2 = snow line.
-  //
-  // THE BROWNS ARE REAL BROWNS, and the first version's were not. The author:
-  // *"the brown looks like muddy green = can you make ordinary brown please"*.
-  // He was right, and the giveaway is one ratio: the stop at the tree line was
-  // 107,107,52, so R/G = 1.00 — that IS olive, by definition. The next stop up
-  // was 1.17, a khaki. Measured against reference browns, sienna is 1.95,
-  // russet earth and peru are both 1.54; anything under about 1.15 reads as
-  // green however brown it was meant to be. The browns below sit at 1.40, 1.40
-  // and 1.29.
-  //
-  // The awkward part is that making a colour browner makes it DARKER — saddle
-  // brown is only luminance 0.098 — while the ordering here has to stay
-  // monotone in luminance, because green-to-brown is a hue distinction and the
-  // author's colour vision cannot carry it alone. So the browns get
-  // progressively LIGHTER as they climb, which is also what real slopes do:
-  // dark earth and scrub low down, pale dry scree higher.
-  [0.00,  42,  74,  30],   // valley floor, deep green            lum 0.055
-  [0.50,  56,  90,  34],   // conifer slope                       lum 0.083
-  [1.00,  88, 112,  46],   // AT the tree line, thinning forest   lum 0.135
-  [1.18, 143, 102,  48],   // brown begins, R/G 1.40              lum 0.156
-  [1.48, 164, 117,  60],   // full brown, R/G 1.40                lum 0.209
-  [1.78, 185, 143,  92],   // tan-brown, drying out, R/G 1.29     lum 0.307
-  [1.95, 192, 178, 160],   // scree, warm grey                    lum 0.456
-  [2.00, 196, 187, 172],   // pale scree just under the snow      lum 0.502
-  [2.04, 242, 245, 247],   // snow — a deliberate hard step       lum 0.909
-];
-// The green-to-brown merge runs from 1.00 to 1.18, i.e. it starts AT the tree
-// line and completes just above it, which is what was asked for — green below,
-// merging to brown above. Keeping the merge short matters: interpolating green
-// to brown through RGB passes through olive at the midpoint, so a long merge
-// puts a wide muddy band exactly where the brown should be. That was the first
-// version's real mistake — its olive sat at the tree line and persisted a third
-// of the way to the snow line.
+// THREE FLAT COLOURS, ABRUPT TRANSITIONS. The author, after two attempts at a
+// graded ramp: *"I'm still not seeing any brown - just keep it simple for
+// testing and use defined colours brown , light green and white and make the
+// transition fairly abrupt."*
 //
-// The jump from 2.00 to 2.04 is the "fairly sharp" snow transition: about 2% of
-// the floor-to-snowline span, a few tens of metres on these scenes, and the
-// largest luminance ratio in the chain at 1.81x. Not a true step, because an
-// abrupt one aliases into a ragged edge on a triangle mesh.
+// He could not see brown because there was almost none on screen, and for TWO
+// independent reasons, both measured rather than guessed at.
+//
+// 1. THE PURE-BROWN WINDOW HELD 6.6% OF THE GROUND. With the graded ramp at the
+//    page defaults, the area fell out as: forest 87.1%, green-to-brown merge
+//    3.4%, pure brown 6.6%, brown-to-scree 0.9%, scree 0.4%, snow 1.7%. So of
+//    the 13% above the tree line, half again was merge, scree or snow, and the
+//    brown was a thin fringe round the peaks. A graded ramp spends most of its
+//    length on transitions, which is exactly wrong when a band is already thin.
+//
+// 2. THE LIGHTING WAS DESTROYING THE HUE. A lit vertex colour is
+//    colour x (sun.NdotL + hemi), and channels past 1.0 PIN. The scheme was
+//    carrying sunI 2.0 with hemi 0.55, a gain of 2.55, so the brown 139,90,43
+//    rendered as 255,229,110 — a pale cream — and the green as 255,255,209,
+//    near white. Red and green clip together and the result drifts to yellow.
+//    Measured, a gain of 1.15 is the most that leaves both clean, so this scheme
+//    now runs sunI 0.75 with hemi 0.40. Brown lights to 164,106,51, which is
+//    still brown at R/G 1.55.
+//
+// The three colours are flat and defined, with transitions a few metres wide —
+// abrupt to the eye, just soft enough not to saw-tooth along a contour on a
+// triangle mesh.
+//
+// NOTE the ordering is deliberately NOT monotone in luminance here: light green
+// 0.443, brown 0.130, white 0.909. That is fine for three flat bands because
+// every pair is separated anyway — green/brown 3.4:1, white/green 2.1:1,
+// white/brown 7.0:1 — so all three are told apart by brightness alone, which is
+// what the author's colour vision needs. It would NOT be acceptable for a
+// gradient, where only a monotone sequence can be read as an ordering.
+const BAND_GREEN = [140, 193, 82];   // light green,  lum 0.443, R/G 0.73
+const BAND_BROWN = [139,  90, 43];   // ordinary brown, lum 0.130, R/G 1.54
+const BAND_SNOW  = [242, 245, 247];  // white,        lum 0.909
+
 export function alpineColour(aM, floorM, treeM, snowM) {
-  let pos;
-  if (aM <= treeM) {
-    const span = Math.max(1, treeM - floorM);
-    pos = Math.max(0, (aM - floorM) / span);
-  } else {
-    const span = Math.max(1, snowM - treeM);
-    pos = 1 + (aM - treeM) / span;
-  }
-  if (pos >= ALPINE_STOPS[ALPINE_STOPS.length - 1][0]) {
-    const c = ALPINE_STOPS[ALPINE_STOPS.length - 1];
-    return [c[1] / 255, c[2] / 255, c[3] / 255];
-  }
-  for (let i = 1; i < ALPINE_STOPS.length; i++) {
-    if (pos <= ALPINE_STOPS[i][0]) {
-      const a = ALPINE_STOPS[i - 1], b = ALPINE_STOPS[i];
-      const u = (pos - a[0]) / (b[0] - a[0] || 1);
-      return [(a[1] + (b[1] - a[1]) * u) / 255,
-              (a[2] + (b[2] - a[2]) * u) / 255,
-              (a[3] + (b[3] - a[3]) * u) / 255];
-    }
-  }
-  const c = ALPINE_STOPS[0];
-  return [c[1] / 255, c[2] / 255, c[3] / 255];
+  const span = Math.max(1, snowM - floorM);
+  const blend = 0.006 * span;        // a few metres on these scenes
+  const mix = (a, b, u) => [
+    (a[0] + (b[0] - a[0]) * u) / 255,
+    (a[1] + (b[1] - a[1]) * u) / 255,
+    (a[2] + (b[2] - a[2]) * u) / 255,
+  ];
+  const flat = c => [c[0] / 255, c[1] / 255, c[2] / 255];
+  if (aM >= snowM + blend) return flat(BAND_SNOW);
+  if (aM >= snowM - blend) return mix(BAND_BROWN, BAND_SNOW, (aM - snowM + blend) / (2 * blend));
+  if (aM >= treeM + blend) return flat(BAND_BROWN);
+  if (aM >= treeM - blend) return mix(BAND_GREEN, BAND_BROWN, (aM - treeM + blend) / (2 * blend));
+  return flat(BAND_GREEN);
 }
+// The three bands, for the legend and for a test to check they are separable.
+export const alpineBands = () => [
+  { name: 'below the tree line', rgb: BAND_GREEN },
+  { name: 'above the tree line', rgb: BAND_BROWN },
+  { name: 'above the snow line', rgb: BAND_SNOW },
+].map(b => ({ ...b,
+  lum: relLuminance(b.rgb[0] / 255, b.rgb[1] / 255, b.rgb[2] / 255) }));
+
 export function relLuminance(r, g, b) {
   const f = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
 }
-// The stops, for a test to check the luminance ordering.
-export const alpineStops = () => ALPINE_STOPS.map(c => ({
-  pos: c[0], rgb: [c[1] / 255, c[2] / 255, c[3] / 255],
-  lum: relLuminance(c[1] / 255, c[2] / 255, c[3] / 255),
-}));
+
 
 // The frame is 2 units across, so this is the share of it the relief fills.
 // Under about 5% nothing can be judged, however correct the arithmetic.
@@ -508,6 +503,9 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
           .map(v => Math.round(255 * Math.max(0, Math.min(1, v))));
         sw.push('<i style="background:rgb(' + c.join(',') + ')"></i>');
       }
+      // The bar shows the three bands at their true proportions in THIS scene,
+      // so a band that holds almost no ground is visibly thin rather than
+      // appearing as an equal third.
       // Marks where the two lines fall INSIDE this scene, which is the thing
       // worth knowing: a snow line above the highest peak means no snow, and
       // saying so beats leaving someone to wonder why the tops are brown.

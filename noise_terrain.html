@@ -359,13 +359,21 @@
         <div><label>snow line m</label><input id="snow" type="number" value="2820" step="10"></div>
       </div>
       <div class="hint">Moving latitude resets both; type over either to hold a
-        local climate. Approximate to a few hundred metres at best.</div>
+        local climate. Approximate to a few hundred metres at best.<br>
+        The colours are now <b>three flat bands</b> &mdash; light green, ordinary
+        brown, white &mdash; with transitions about 11&nbsp;m wide. The graded
+        version before it put only <b>6.6% of the ground</b> in its pure-brown
+        window, the rest going to merges and scree, which is why there was no
+        brown to see; and at the old sun intensity the brown rendered as
+        <b>255,229,110</b>, a pale cream, because the channels clipped. This
+        scheme runs a tamer exposure for that reason. The readout gives the
+        share of ground in each band.</div>
     </fieldset>
 
     <fieldset>
       <legend>view</legend>
-      <label>mountain height <span id="vx-val">0.34</span></label>
-      <input id="vx" type="range" min="0.01" max="1" value="0.34" step="0.01">
+      <label>mountain height <span id="vx-val">0.45</span></label>
+      <input id="vx" type="range" min="0.01" max="1" value="0.45" step="0.01">
       <div class="hint">Sets the relief <b>in metres</b>; the readout gives it.
         height01 already returns [0,&nbsp;1], so unlike the spectral page the
         raw relief here is fixed at 1.000 by the method itself &mdash; it
@@ -375,7 +383,7 @@
         flattens the view</b> &mdash; the same mountains across more land.</div>
       <label>colour</label>
       <select id="scheme">
-        <option value="alpine" selected>ALPINE &mdash; green to brown, snow above the line</option>
+        <option value="alpine" selected>ALPINE &mdash; three bands: green, brown, white</option>
         <option value="grey">grey on white</option>
         <option value="whiteblue">white on blue</option>
         <option value="whiteolive">white on greeny brown</option>
@@ -717,13 +725,26 @@ function report() {
     {
       s += `altitude      valley ${st.baseM} m to peak <b>${Math.round(st.peakM)} m</b>   ` +
          `tree line ${st.treeM} m, snow line ${st.snowM} m (mid-year)\n`;
-    s += `              ${(100 * st.aboveTree).toFixed(0)}% of the ground is above the tree line, ` +
-         `${(100 * st.aboveSnow).toFixed(1)}% under snow` +
+    // The three band shares, which is the figure that explains what is on
+    // screen. A graded ramp here once put only 6.6% of the ground in its
+    // pure-brown window and the author quite reasonably reported seeing no
+    // brown at all; a percentage per band makes that visible instead of
+    // leaving it to be deduced.
+    const pcGreen = 100 * (1 - st.aboveTree);
+    const pcBrown = 100 * (st.aboveTree - st.aboveSnow);
+    const pcSnow = 100 * st.aboveSnow;
+    s += `              <b>${pcGreen.toFixed(0)}%</b> green below the tree line, ` +
+         `<b>${pcBrown.toFixed(0)}%</b> brown above it, ` +
+         `<b>${pcSnow.toFixed(1)}%</b> white above the snow line` +
          (st.peakM < st.treeM
-            ? '   <span class="warn">— nothing reaches the tree line; raise the height or the floor</span>'
-            : st.aboveSnow < 0.001 && st.peakM < st.snowM
-              ? '   <i>— no peak reaches the snow line</i>'
-              : '') + '\n';
+            ? '   <span class="warn">— nothing reaches the tree line, so it is all green; ' +
+              'raise the height or the valley floor</span>'
+            : pcBrown < 3
+              ? '   <span class="warn">— too little brown to see; raise the height or ' +
+                'lower the tree line</span>'
+              : st.aboveSnow < 0.001 && st.peakM < st.snowM
+                ? '   <i>— no peak reaches the snow line</i>'
+                : '') + '\n';
     }
     if (st.baseShare > 0 || st.coverage < 0.999) {
       s += `two layers    swell ${st.baseKm} km at ${(100 * st.baseShare).toFixed(0)}% of the ` +
