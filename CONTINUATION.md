@@ -1,4 +1,4 @@
-# Continuation note — 2026-09-08, updated 09-12, 09-15, 09-17, 09-18, 09-28 and 09-29
+# Continuation note — 2026-09-08, updated 09-12, 09-15, 09-17, 09-18, 09-28, 09-29 and **11-08**
 
 **Read this first if context has been lost.** It says where the work is, what
 state it is in, and which document answers which question.
@@ -573,3 +573,77 @@ it cannot.
 - **Sv saves text, Wr saves layout**, and both say "saved".
 - **Never grant authorisation by IP address** — the tunnel makes every public
   visitor arrive from loopback. The real address is in `CF-Connecting-IP`.
+
+
+---
+
+## Added 2026-11-08 — 3D fractal terrain: three methods, three pages
+
+**Additive. Nothing in the sections above is invalidated.** This work is a set
+of standalone benches at the repo root; it does not touch BD, the viewer, the
+server's routes or the graph.
+
+**First command if resuming on the terrain work:**
+
+    node terrain_selftest.mjs      # 29 invariants, exits non-zero on failure
+
+It checks every claim that can be asserted, so the notes can be trusted or not
+on evidence. Written because this work produced four faults the author caught by
+eye while a number was reassuring me.
+
+**Then read
+`FractalTerrain_Notes.md`'s TOP SECTION — headed "STATE OF THE WORK".** That
+file is chronological and everything below that block is superseded. The block
+gives what exists, the headline measurements, the measurement rules, the traps,
+and where to pick up. `DOCS_INDEX.md` now has a row per file and
+`PLANNING_REGISTER.md` has the built/not-built table.
+
+### In one paragraph
+
+The L-system approach to terrain is **set aside**, measured rather than
+preferred: every construction that carried a 1D fractal's ordering into 2D
+streaked, worst of all the author's own triangle scan, which turns out to be a
+causal filter whose impulse response is a plume along its own diagonal — so no
+reweighting could have fixed it. Three methods from a new document
+(`AV/fractal-terrain-methods.md`, written elsewhere, now committed here because
+every page cites it) replace it, one page each:
+
+    http://localhost:8080/spectral_terrain.html    isotropic, settles the question
+    http://localhost:8080/noise_terrain.html       unbounded, chunk edges exact
+    http://localhost:8080/faults_terrain.html      fracture and lift, cost-aware
+
+Served by the existing `node server.js` on **8080**. No route was added — they
+are static files at the repo root — so no restart is needed for them.
+
+### The three things most likely to be needed again
+
+- **A biased measure needs a null built from the data itself.** The direction
+  measure reported the *isotropic* method as anisotropic at 1.80–2.17, and three
+  successive fixes each made the null resemble the measurement — one read a
+  convincing 1.01 on isotropic fields while losing a real streak. What works is
+  a null isotropic *by construction*, synthesised from the measurement's own
+  radial profile and put through the same window.
+- **The right instrument depends on whether the field wraps.** Spectral fields
+  are periodic, so an un-windowed spectral H is near unbiased while the
+  variogram reads up to 0.14 low; noise and fault fields do not wrap, so the
+  variogram is sound there and the spectral estimator is invalid — it now throws
+  rather than returning a quiet NaN into a readout.
+- **`./check_module.sh` passes runtime faults.** A local shadowing a same-named
+  alias in the same function threw a TDZ error with a clean syntax check. Run
+  the module, do not merely parse it.
+
+### Four faults the author found by eye that measurement had missed
+
+Worth knowing, because in each case a number was reassuring and wrong.
+
+- A "ground covered" slider that did nothing: metres had been *derived* from the
+  same quantities, making the drawing true-to-scale by construction, so the
+  control could only rename the axis.
+- A control that measurably smoothed the terrain while `cv = sd/mean` scored it
+  as more varied, because the mean was falling. Third instance of that defect
+  in this work.
+- Two "stitch lines" dividing the scene: heights matched exactly, but each tile
+  computed its own vertex normals, so the shading creased at the joins.
+- No visible brown in an alpine scheme, for two independent reasons — a graded
+  ramp put only 6.6% of the ground in its pure-brown window, and the lighting
+  gain of 2.55 clipped the brown to pale cream.

@@ -9,6 +9,146 @@ The bench is `terrain_bench.html`, served at `/terrain_bench.html`.
 
 ---
 
+# STATE OF THE WORK — 2026-11-08. READ THIS FIRST.
+
+**This file is chronological and the sections below this one are superseded.**
+They are kept because every number in them was measured and several are still
+load-bearing, but the live work is the three pages named here. The L-system is
+no longer involved in any of them: that is the conclusion the first two thirds of
+this file arrives at.
+
+## Check it before trusting it
+
+    node terrain_selftest.mjs        # 29 invariants, exits non-zero on failure
+
+Every claim below that could be asserted, is. It covers the document's own test
+table, bit-identity of the variants against `noise.js`, exact chunk edges with
+all controls engaged, the direction measure's calibration AND its null, both H
+estimators including the one that must refuse, the clamp and its cure, hetero
+raising heterogeneity without smoothing, the colour bands' luminance separation,
+the metre scale, and normals matching across a tile seam. **Written because this
+work produced four faults the author caught by eye that a number had reassured
+me about.**
+
+## What exists, and where
+
+Served from the repo root by `node server.js` on **port 8080**
+(`http://localhost:8080/<page>`; 8081 is `rx.js`, not this).
+
+| page | method | the question it answers |
+|---|---|---|
+| `spectral_terrain.html` | B — spectral synthesis, amplitude ∝ \|k\|^−(H+1) | does removing construction order remove the streaks? **Yes.** |
+| `noise_terrain.html` | C — chunked seeded noise, height a pure function of position | is the world genuinely endless? **Yes, edges exact.** |
+| `faults_terrain.html` | A — random faults, fracture and lift | the oldest method; its primitive is a landform |
+
+Five modules, each **one copy by policy**, because this work has twice paid for
+duplication — the triangle scan tested a copy of itself for a round, and two
+copies of `music_module.html` diverged:
+
+- `fbm2d.js`, `faults.js`, `noise.js` — **extracted programmatically** from
+  `AV/fractal-terrain-methods.md` §11.1–11.3, not retyped, so they cannot drift
+  from it silently. All three reproduce that document's own §8 test table.
+  `fbm2d.js` has one documented addition, the `k0` cutoff, taken from the
+  document's *own* demo-page version of the same function.
+- `terrain_metrics.js` — every measurement. Its header carries the rules, below.
+- `terrain_view.js` — schemes, the elevation ramp, the alpine bands, the camera,
+  the legend, the metre scale, analytic normals.
+- `noise_variants.js` — the four mechanisms added on top of Method C. With every
+  control off it is **bit-identical** to `noise.js`, which is asserted by test.
+
+`AV/fractal-terrain-methods.md` is the source document, written elsewhere. Every
+page cites its sections, so it is now committed — it was untracked, which was a
+resume hazard.
+
+## The headline results
+
+- **Spectral synthesis is isotropic**, anisotropy excess 1.03 averaged over
+  seven seeds. The author's own triangle scan, whose streaking he could see,
+  reads 2.89 at 53° — on the 45° diagonal it runs along. There was never a
+  weighting that would have fixed that scan: it is a causal filter whose impulse
+  response is a plume along +u+v.
+- **Chunk edges agree exactly** — max difference 0, over 4 pairs at 2×2 and 12
+  at 3×3, and with all four variant controls engaged. Walking five chunks out
+  and back returns an identical array.
+- **Neither noise nor faults delivers the H it is asked for.** Noise: 0.50 → 0.47
+  but 0.90 → 0.72. Faults: 0.498 ± 0.022 at 0.50, 0.767 ± 0.037 at 0.80,
+  0.881 ± 0.039 at 0.95 — so α + ½ is near exact at 0.5 and runs low above it.
+  The document lists that relation as needing a check; this is the check.
+- **The fault method's cost is predictable** to 2%: about 2.6 ns per cell-fault
+  at α = 0 and 10.6 ns otherwise, the difference being one `Math.pow` per cell.
+
+## The measurement rules, which cost the most to learn
+
+Written into `terrain_metrics.js`'s header as instructions, not just notes.
+
+1. **Use the directional power spectrum against a matched null.** The estimator
+   alone is badly biased for a red spectrum — it reported the spectral method,
+   whose entire claim is isotropy, at 1.80–2.17. The null must be **isotropic by
+   construction**: a Gaussian field synthesised from the measurement's own radial
+   profile, through the same window. Three other nulls were tried and all three
+   made the null *resemble* the measurement; the ring-rotation one read a clean
+   1.01 on isotropic fields while losing the triangle scan's real streaking.
+2. **Never a ratio whose denominator the numerator can move.** Three instances
+   in this work now: a p99.9/median curvature ratio that inverted, and twice
+   `cv = sd/mean` reporting a uniformly *smoother* field as more heterogeneous.
+   Absolute measures, or a matched baseline measured the same way.
+3. **Calibrate any direction label** on synthetic fields of known stripe angle
+   *and* on an isotropic null. `calibrate()` does both; stripes alone passed a
+   version that had gone blind.
+4. **Count at the scale the eye sees**, and prefer the largest *connected*
+   region to a total percentage. 0.53% of cells pinned in scattered specks is
+   invisible; 5.3% gathered into one corner is the first thing noticed.
+5. **The right H estimator depends on whether the field wraps.** Spectral fields
+   are periodic, so an un-windowed spectral slope is near unbiased (−0.016) while
+   the variogram reads up to 0.14 low. Noise and fault fields do not wrap — the
+   step across a fault field's seam is ten times an interior step — so there the
+   variogram is sound and the spectral estimator is invalid. It now **throws**
+   rather than returning a quiet NaN.
+6. **A vacuous test must not report success.** At 1×1 chunks there are no
+   adjacent pairs, so "max difference 0" was trivially true.
+
+## Traps specific to these pages
+
+- **The hard clamp** in `noise.js`, `min(1, max(0, …))`, shears a broad swell
+  flat into a corner mesa — 5.3% of the grid as one region at widest 16 km over
+  3 octaves. The `soft ceiling` control replaces the corner with a knee that
+  never reaches zero gradient.
+- **Vertex colours clip, and that destroys hue.** A lit colour is
+  `colour × (sun.NdotL + hemi)`; at the alpine scheme's original gain of 2.55 a
+  brown rendered as 255,229,110, pale cream. Gain must stay ≈1.15 where colour
+  carries information.
+- **Separate meshes need analytic normals.** `computeVertexNormals()` sees only
+  its own tile, so boundary vertices disagree and the shading creases — read as
+  "two stitch lines dividing the scene into 4". Fixed with a one-cell apron.
+- **A graded ramp spends its length on transitions.** The alpine ramp put only
+  6.6% of the ground in its pure-brown window; three flat bands put 15% there.
+- **`check_module.sh` passes runtime faults.** A local `sv` shadowed the
+  `stretchV` alias in the same function and threw TDZ; the syntax check was
+  clean. Run the module, don't just parse it.
+- **Bit-identity is an expression-level property.** Refactoring
+  `0.85 * sum / norm` to `0.85 * (sum/norm)` changed the rounding by one ulp.
+
+## Where to pick up
+
+Nothing is blocked. The open ends, roughly in order of value:
+
+1. **The author's judgement on the alpine scheme.** Three flat bands are a
+   deliberate test state — *"We will take from there"*. The graded version is in
+   git history if a return is wanted.
+2. **Level of detail by octave count.** Proven to work: adding octaves while
+   zooming leaves the coarse shape put to within half a percent, exactly with
+   `stable zoom` on. Nothing consumes it yet; a real walk-through would.
+3. **Erosion, or a ridged multifractal** — the document's §9 suggests both, and
+   they are the obvious next lift in realism now that the belt structure exists.
+4. **Three.js module integration.** All three pages are standalone benches. The
+   standing rule is that new visual work renders through three.js to keep WebXR
+   open, which these do, but none is a BD module yet.
+5. `AV/fractal-terrain-methods.md` §8's faults figures differ slightly from mine
+   (1.17 and 1.73 against its 1.00 and 1.59) — probably a different lag range,
+   with the H trend agreeing. Never run down.
+
+---
+
 ## The approach that is being set aside
 
 **Two independent grammars drive a turtle.** Each drawn segment takes one

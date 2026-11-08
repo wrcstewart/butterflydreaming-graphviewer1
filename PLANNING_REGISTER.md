@@ -1482,3 +1482,27 @@ what a real device has to settle, and the instruments for settling it.
 | **`/x` — the headset check** | `x.html`, `server.js` | **BUILT.** Capabilities, BD's own text sizes with an 18/50-character ruler, an immersive session reporting blend mode, input-source kinds and frame rate, and one 400-character Piper utterance timed in **ms per character** against the Mac's ~50. Nothing downloads unasked. At `/x` because on a demo unit every character of the path is typed by gaze and pinch. |
 | **`/qr` — a QR for any BD URL** | `qr.html`, `server.js` | **BUILT**, reusing BD's own `qrcode.js`. The rule is about **whose device it is**: a Quest can scan (built-in on Horizon OS 2.9's test channel, third-party today), a Vision Pro cannot natively, and a demo unit can install nothing — so a shop means typing. |
 | **Restart needed** | `server.js` | `/x` and `/qr` are explicit routes; `/x.html` and `/qr.html` work without a restart. |
+
+
+## BUILT 2026-11-08 — 3D fractal terrain, the three methods from the new document
+
+The L-system approach is **set aside**, and that is a measured conclusion rather
+than a preference: every construction that carried a 1D fractal's ordering into
+2D streaked, and the author's own triangle scan streaked worst because it is a
+causal filter whose impulse response is a plume along its diagonal. Removing the
+construction order removes the streaks. Detail in `FractalTerrain_Notes.md`,
+whose **top section is the current state** — the rest of that file is
+chronological and superseded.
+
+| item | where | state |
+|---|---|---|
+| **Method B — spectral synthesis** | `spectral_terrain.html`, `fbm2d.js` | **BUILT.** Anisotropy excess 1.03 over seven seeds, against the triangle scan's 2.89 at 53°. The page that settles the series' question. H checked from the spectral slope, near unbiased at −0.016; the variogram reads up to 0.14 low on a periodic field and is shown labelled. |
+| **Method C — chunked seeded noise** | `noise_terrain.html`, `noise.js`, `noise_variants.js` | **BUILT, and the only unbounded one.** Chunk edges measured at **max difference 0** with every variant engaged. Four mechanisms break the homogeneity; a two-layer swell also places the mountain belt, so ranges stand on uplifted ground and foothills fall away from it. Real altitudes with latitude-driven tree and snow lines. |
+| **Method A — random faults** | `faults_terrain.html`, `faults.js` | **BUILT**, and the "tricky if at all" one the author flagged. Cost is faults × n² with no way round it, so the page predicts its own runtime to 2% and refuses anything over 1.5 s unasked. α + ½ confirmed near exact at H = 0.5 (0.498 ± 0.022), low above it. |
+| **The measurement module** | `terrain_metrics.js` | **BUILT, one copy by policy.** The direction measure needs a **matched null** — the estimator alone reported the isotropic method at 1.80–2.17, and three different nulls were wrong before one worked. Rules in the header. |
+| **The shared view layer** | `terrain_view.js` | **BUILT.** Schemes, ramps, camera, legend, metre scale, and analytic normals from a one-cell apron so independently-drawn tiles do not crease. |
+| **Level of detail by octave count** | `noise_variants.js` | **PROVEN, NOT CONSUMED.** Adding octaves while zooming leaves the coarse shape within half a percent, and exactly with `stable zoom` on. Nothing uses it; a walk-through would. |
+| **Erosion or a ridged multifractal** | §9 of the source document | **NOT BUILT.** The obvious next lift in realism now the belt structure exists. |
+| **A BD module** | — | **NOT BUILT.** All three are standalone benches. They render through three.js, which satisfies the standing rule, but none is wired into BD's four registries. |
+| **The alpine colour scheme** | `terrain_view.js` | **BUILT as a deliberate test state** — three flat bands, the author's *"We will take from there"*. A graded seven-stop version is in git history. |
+| **The document's two `fbm2d`s** | `AV/fractal-terrain-methods.md` | **OPEN, in the document not the code.** §11.1 has no `k0` cutoff; its own demo page does, and §3 describes that cutoff as one of the method's controls. They should be made one. |
