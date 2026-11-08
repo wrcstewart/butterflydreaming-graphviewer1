@@ -55,6 +55,7 @@ export function makeVariedTerrain({
   warp = 0, warpKm = 8,                // warp in km of displacement
   hetero = 0,                          // 0 = homogeneous, 1 = fully modulated
   pinNorm = false,                     // see below
+  softClamp = false,                   // see THE FLAT PLATEAU below
 } = {}) {
   const simplex2 = makeSimplex(seed);
   // Separate lattices for the two warp components, or x and z would be
@@ -103,6 +104,48 @@ export function makeVariedTerrain({
   // and the same total as before.
   const wNorm = hetero > 0 ? 1 / (1 - hetero / 2) : 1;
 
+  // ── THE FLAT PLATEAU ──────────────────────────────────────────────────
+  // The author: *"Theres a completely flat large palteau in one corner - whats
+  // that about?"*. It is the HARD CLAMP that noise.js ends with,
+  // min(1, max(0, 0.5 + 0.85*sum/norm)), and it is much worse at some settings
+  // than the default figures suggested. Located by flood-filling for the largest
+  // connected region at a rail:
+  //
+  //   widest  octaves   clamped   biggest single plateau
+  //     4 km      7       0.53%    0.19% of the grid    (unnoticeable)
+  //     8 km      3       5.17%    1.11%
+  //    16 km      3       6.49%    5.30% of the grid, in a CORNER
+  //
+  // The mechanism: when the widest feature is comparable to the view, one broad
+  // swell carries most of the amplitude and overshoots the ceiling, so min()
+  // shears its entire top off and leaves a mesa. Few octaves make it worse,
+  // because less of the budget goes to detail that would break the top up. At
+  // 32 km the view is under one wavelength, the sum never reaches the rails, and
+  // the relief drops to 0.85 instead — no clamping at all.
+  //
+  // A SOFT CEILING fixes it without touching the statistics in the middle. Only
+  // the outer `knee` of the range is compressed, through t/(1+t), which
+  // approaches the rail asymptotically and NEVER has zero gradient — so the top
+  // of a swell stays curved however far it overshoots. The derivative is 1 at
+  // the knee, so there is no crease where it takes over, and ordering is
+  // preserved everywhere, which a clamp destroys.
+  //
+  // Off by default only because the baseline has to stay bit-identical to
+  // noise.js. The page offers it and its readout names it when plateaus appear.
+  const KNEE = 0.12;
+  function squash(v) {
+    if (!softClamp) return Math.min(1, Math.max(0, v));
+    if (v > 1 - KNEE) {
+      const t = (v - (1 - KNEE)) / KNEE;
+      return 1 - KNEE + KNEE * t / (1 + t);
+    }
+    if (v < KNEE) {
+      const t = (KNEE - v) / KNEE;
+      return KNEE - KNEE * t / (1 + t);
+    }
+    return v;
+  }
+
   function height01(xKm, zKm) {
     let x = xKm, z = zKm;
     if (warp > 0) {
@@ -136,7 +179,7 @@ export function makeVariedTerrain({
       }
       f *= 2; a *= gain;
     }
-    return Math.min(1, Math.max(0, 0.5 + 0.85 * sum / norm));
+    return squash(0.5 + 0.85 * sum / norm);
   }
 
   function chunk(cx, cz, { chunkKm = 4, res = 64 } = {}) {
@@ -152,6 +195,42 @@ export function makeVariedTerrain({
 // The uniformity measure the mechanisms are judged by: the coefficient of
 // variation of local relief. Low means every patch is equally rough, which is
 // the complaint; higher means plains and ranges have become distinguishable.
+// THE LARGEST CONNECTED FLAT REGION, as a share of the grid. A total percentage
+// of pinned cells does not describe what the eye sees: 0.53% scattered in
+// specks is invisible, while 5.3% gathered into one mesa in a corner is the
+// first thing noticed. This reports the blob, not the tally.
+export function largestPlateau(h, n) {
+  let lo = Infinity, hi = -Infinity;
+  for (const v of h) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const rel = (hi - lo) || 1, tol = 0.002 * rel;
+  const flat = new Uint8Array(n * n);
+  for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+    const g = Math.max(Math.abs(h[j * n + i + 1] - h[j * n + i - 1]),
+                       Math.abs(h[(j + 1) * n + i] - h[(j - 1) * n + i])) / 2;
+    if (g < tol) flat[j * n + i] = 1;
+  }
+  const seen = new Uint8Array(n * n);
+  let best = 0, bv = 0;
+  for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+    if (!flat[j * n + i] || seen[j * n + i]) continue;
+    let c = 0, sv = 0;
+    const st = [[i, j]];
+    seen[j * n + i] = 1;
+    while (st.length) {
+      const [x, y] = st.pop(); c++; sv += h[y * n + x];
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const u = x + a, v = y + b;
+        if (u < 1 || v < 1 || u >= n - 1 || v >= n - 1) continue;
+        if (seen[v * n + u] || !flat[v * n + u]) continue;
+        seen[v * n + u] = 1; st.push([u, v]);
+      }
+    }
+    if (c > best) { best = c; bv = sv / c; }
+  }
+  const atRail = bv <= lo + 1e-9 || bv >= hi - 1e-9;
+  return { cells: best, pct: 100 * best / (n * n), value: bv, atRail };
+}
+
 // ABSOLUTE heterogeneity: the spread of local relief as a share of the GLOBAL
 // relief. Unlike cv = sd/mean, its denominator is not a statistic the numerator
 // can drag down, so a uniformly smoother field does not score as a more varied

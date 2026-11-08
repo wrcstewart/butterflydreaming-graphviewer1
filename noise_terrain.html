@@ -239,6 +239,16 @@
         terrain &mdash; the weight averaged 1&nbsp;&minus;&nbsp;h/2, so it
         deleted detail rather than moving it. It now averages exactly 1, and
         the readout reports absolute roughness so a repeat would show.</div>
+      <label><input type="checkbox" id="soft" style="width:auto"> soft ceiling</label>
+      <div class="hint">height01 ends in a <b>hard clamp</b> to [0,&nbsp;1], and
+        where a broad swell overshoots it the whole top is sheared off into a
+        dead-flat mesa. It is invisible at the 4&nbsp;km default (one blob,
+        0.19% of the grid) and glaring once the widest feature approaches the
+        view: at 16&nbsp;km over 3 octaves, <b>5.3% of the grid is a single flat
+        plateau</b>, usually in a corner. This replaces the clamp's corner with
+        a smooth knee over the outer 12%, which approaches the rail
+        asymptotically and never reaches zero gradient, so a swell stays curved
+        however far it overshoots. The middle of the range is untouched.</div>
       <label><input type="checkbox" id="pin" style="width:auto"> stable zoom</label>
       <div class="hint">Divides by a fixed octave budget rather than by the
         octaves actually summed, so <b>adding octaves to zoom in leaves the
@@ -338,7 +348,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script type="module">
-import { makeVariedTerrain, heterogeneity } from './noise_variants.js';
+import { makeVariedTerrain, heterogeneity,
+         largestPlateau } from './noise_variants.js';
 import { hurstFromVariogram, directionalPower, EXCESS_NOTE,
          bumps, summits, curvature } from './terrain_metrics.js';
 import { makeViewer, frameShare, verticalFor,
@@ -384,13 +395,15 @@ function build() {
     const stretchU = Math.sqrt(ratio), stretchV = 1 / Math.sqrt(ratio);
     const warp = +$('wp').value;
     const hetero = +$('ht').value, pinNorm = $('pin').checked;
+    const softClamp = $('soft').checked;
 
     const t0 = performance.now();
     // With stretch 1, warp 0, hetero 0 and pinNorm off this is bit-identical to
     // noise.js — checked, max difference 0 — so every figure measured against
     // the document's own version still holds.
     const terrain = makeVariedTerrain({ seed, H, widestKm, octaves,
-                                        stretchU, stretchV, warp, hetero, pinNorm });
+                                        stretchU, stretchV, warp, hetero, pinNorm,
+                                        softClamp });
 
     // Every chunk through the module's own chunk() call, INDEPENDENTLY. That is
     // the point of the method, so it is also how the page gets its geometry —
@@ -460,7 +473,7 @@ function build() {
     }
     const st = { seed, H, octaves, widestKm, k, res, chunkKm, cx0, cz0,
                  genMs, maxEdge, pairs, finestKm: terrain.finestKm,
-                 stretchU, stretchV, ratio, warp, hetero, pinNorm,
+                 stretchU, stretchV, ratio, warp, hetero, pinNorm, softClamp,
                  rlo, rhi, rel: (rhi - rlo) || 1 };
     if ($('domeasure').checked) {
       const t1 = performance.now();
@@ -497,6 +510,11 @@ function build() {
       // This one divides by the global relief, a denominator the numerator
       // cannot drag down, and is provably unchanged by a pure rescale.
       st.spread = heterogeneity(h, N, 16).spread;
+      // The largest connected FLAT BLOB, which is what the eye notices. A total
+      // percentage of pinned cells does not describe it: 0.53% in scattered
+      // specks is invisible, 5.3% gathered into one corner mesa is the first
+      // thing seen.
+      st.plateau = largestPlateau(h, N);
       if (ratio > 1.05 || warp > 0 || hetero > 0) {
         const plain = makeVariedTerrain({ seed, H, widestKm, octaves, pinNorm });
         const p = new Float64Array(N * N);
@@ -565,8 +583,23 @@ function report() {
     s += `clamp         ${st.clamped.toLocaleString()} of ${st.cells.toLocaleString()} cells ` +
          `pinned flat at 0 or 1 (${pc.toFixed(2)}%)` +
          (pc > 1.5 ? '  <span class="warn">— capping summits; add octaves or lower H</span>' : '') + '\n';
-    s += `              range ${st.lo.toFixed(3)} to ${st.hi.toFixed(3)} — ` +
-         `<i>height01 clamps to [0,1], so relief is fixed at 1.000 and is not a measure here</i>\n`;
+    s += `              range ${st.lo.toFixed(3)} to ${st.hi.toFixed(3)}` +
+         (st.softClamp
+            ? ' — <i>soft ceiling on, so the rails are approached but never reached</i>\n'
+            : ' — <i>hard clamp, so anything past a rail is sheared dead flat</i>\n');
+    // Flat ground is only a fault when it is PINNED. Gentle ground at a coarse
+    // feature scale is the setting working, and saying otherwise would send him
+    // hunting a bug that is not there.
+    const pl = st.plateau;
+    s += `flattest patch largest flat region <b>${pl.pct.toFixed(2)}%</b> of the grid ` +
+         `(${pl.cells.toLocaleString()} cells) at height ${pl.value.toFixed(3)}   ` +
+         (pl.atRail && pl.pct > 0.3
+            ? '<span class="warn">pinned at a rail — this is the clamp shearing a swell flat; ' +
+              'turn on soft ceiling</span>'
+            : pl.pct > 2
+              ? '<span class="warn">large, but not pinned — gentle ground from a coarse ' +
+                'feature scale, so add octaves or narrow the widest feature</span>'
+              : '<span class="good">nothing flat enough to notice</span>') + '\n';
     // The lattice check: simplex has one, and the module rotates each octave by
     // 0.83 radians to hide it. This is whether that worked.
     // The verdict has to know whether a direction was ASKED FOR. With stretch
@@ -618,7 +651,7 @@ function step(dx, dz) {
 
 function wireControls() {
   for (const id of ['seed', 'oct', 'H', 'widest', 'k', 'res', 'ck', 'cx', 'cz',
-                    'wire', 'domeasure', 'st', 'wp', 'ht', 'pin'])
+                    'wire', 'domeasure', 'st', 'wp', 'ht', 'pin', 'soft'])
     $(id).addEventListener('change', build);
   $('st').addEventListener('input', () => { $('st-val').textContent = (+$('st').value).toFixed(1); });
   $('wp').addEventListener('input', () => { $('wp-val').textContent = (+$('wp').value).toFixed(1); });

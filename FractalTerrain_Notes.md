@@ -909,3 +909,46 @@ One interaction worth keeping: **warp fights stretch**. Over four seeds, stretch
 3:1 alone gives a grain of 2.15 and keeps it under hetero (2.01), but warp at
 1.5 km randomises the direction and the grain falls to 1.43. At 0.5 km it
 survives at 1.93.
+
+#### The flat plateau in a corner: the hard clamp (2026-11-08)
+
+*"Theres a completely flat large palteau in one corner - whats that about?"*
+
+It is the hard clamp `noise.js` ends with — `min(1, max(0, 0.5 + 0.85·sum/norm))`
+— and it is far worse at some settings than the default figures suggested. The
+diagnosis needed the right measure: a *total percentage* of pinned cells says
+nothing about what the eye sees, so the search was a flood-fill for the largest
+**connected** region at a rail.
+
+| widest | octaves | clamped total | biggest single plateau |
+|---|---|---|---|
+| 4 km | 7 | 0.53% | 0.19% — scattered specks, invisible |
+| 8 km | 3 | 5.17% | 1.11% |
+| 16 km | 3 | 6.49% | **5.30%, in a corner** |
+
+The mechanism: when the widest feature approaches the size of the view, one
+broad swell carries most of the amplitude and overshoots the ceiling, so `min()`
+shears its entire top off and leaves a mesa. Few octaves make it worse, because
+less of the amplitude budget goes to detail that would break the flat top up.
+At 32 km the view spans under one wavelength, the sum never reaches the rails,
+and the relief simply drops to 0.85 with no clamping at all.
+
+Three wrong guesses were ruled out by measurement first, which is the only
+reason the real cause was found: the clamp at *default* settings (0.19%, far too
+small), the hetero weight collapsing to zero in low ground (74 cells), and
+realisation variation across seeds and world positions (worst 0.58%). Only
+sweeping the **feature scale** reproduced it.
+
+The fix is a **soft ceiling**: the outer 12% of the range is compressed through
+`t/(1+t)`, which approaches the rail asymptotically and never reaches zero
+gradient, so a swell stays curved however far it overshoots. The derivative is 1
+at the knee, so nothing creases where it takes over, and ordering is preserved
+everywhere — which a clamp destroys outright. Measured, `atRail` becomes false
+at every setting tested. It is off by default only to keep the baseline
+bit-identical to `noise.js`.
+
+**Flat ground is only a fault when it is pinned**, and the readout now says
+which. At 16 km over 3 octaves the soft ceiling still leaves a 3.1% flat region,
+but it is no longer at a rail: that is honest gentle ground from a coarse
+feature scale (roughness 0.59, nearly featureless by construction), and
+reporting it as a defect would send someone hunting a bug that is not there.
