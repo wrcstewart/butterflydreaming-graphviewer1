@@ -952,3 +952,66 @@ which. At 16 km over 3 octaves the soft ceiling still leaves a 3.1% flat region,
 but it is no longer at a rail: that is honest gentle ground from a coarse
 feature scale (roughness 0.59, nearly featureless by construction), and
 reporting it as a defect would send someone hunting a bug that is not there.
+
+#### Two layers: the regional swell and the mountain belt (2026-11-08)
+
+*"what deterimnes the uv scale on which the noise sits. What it really needs is
+at least two noise layers — the second is as now but the first would be of lower
+amplitude and more imporatntly more a slow gentle rolling … The slow varying
+could carry on past the mountains proper ie foothills"*
+
+**The scale question.** `f0 = 1/widestKm` with coordinates in kilometres, so the
+lowest octave's wavelength *is* `widestKm` and the finest is
+`widestKm / 2^(octaves−1)`. What governs the look is the **ratio of widestKm to
+the ground in view**: at the page defaults, 4 km features across 8 km of ground
+gives two big features per side, so nothing larger than a hill organises the
+scene. Raising `widestKm` does not fix it — that coarsens everything equally,
+and past 16 km it hits the clamp and shears flat (section above).
+
+**One slow field, used twice.** The implementation worth keeping is not two
+independent layers but one slow field doing both jobs:
+
+    height = baseShare·slow + (1 − baseShare)·mask(slow)·mountains
+
+so ranges stand on the high ground of the swell, its flanks carry low-amplitude
+mountains — which is exactly what a foothill is — and the swell keeps rolling
+across the lows where no mountains grow at all. That also gets the geology right
+for free: real ranges sit on uplifted ground rather than scattered at random.
+Two independent fields would have needed two more controls and would have put
+ranges in the basins as often as on the swells.
+
+Measured against an 8 km view, the swell wavelength wants to be **about the
+width of the view** — one belt in frame, continuing past the edge. Much longer
+flattens into a ramp (40 km read 66% mountainous, the belt structure lost);
+much shorter is just more hills.
+
+| asked cover | delivered | spread | relief |
+|---|---|---|---|
+| 100% | 99% | 9.4% | 0.886 |
+| 70% | 75% | 12.5% | 0.819 |
+| 45% | 42% | 15.3% | 0.654 |
+| 30% | 32% | 12.7% | 0.623 |
+| 20% | **51%** | 9.5% | 0.529 |
+
+The dial tracks to about 0.3 and then **the measure itself breaks**, reading 51%
+for an asked 20%: with so little mountain left, the swell is the roughest thing
+present and `mountainousFraction` — which thresholds against the roughest window
+in the field — starts counting the swell. Reported as a dial with the delivered
+figure measured beside it, not as a guarantee.
+
+At the page's new defaults the uniformity spread is **+60%** over the same
+settings with the layer off, 46% of the ground measures mountainous against 45%
+asked, and there is no clamping at all.
+
+**Flat ground outside a belt is the design, not a defect**, and the readout now
+distinguishes that from the clamp's pinned plateau — otherwise the feature
+reports itself as a fault.
+
+Two mistakes worth recording. A local named `sv` **shadowed the `stretchV`
+alias** of the same name in the same function and threw a TDZ error that
+`check_module.sh` passed clean, because it is a runtime fault and not a syntax
+one — the fourth instance of "two sites in one function are not one binding".
+And refactoring `0.85 * sum / norm` into `0.85 * (sum/norm)` **broke the
+bit-identity claim by exactly one ulp**, 2.2e-16: the original associates as
+`(0.85 * sum) / norm`, and the rounding differs. The expression, not just the
+value, is what has to be preserved on a path claiming identity.

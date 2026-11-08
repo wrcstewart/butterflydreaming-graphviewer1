@@ -193,6 +193,47 @@
     </fieldset>
 
     <fieldset>
+      <legend>two layers &mdash; swell and mountain belt</legend>
+      <div class="hint" style="margin-bottom:6px">What sets the u,v scale is
+        <code>f0 = 1/widest</code> with coordinates in km, so the lowest octave's
+        wavelength <i>is</i> the widest feature and the finest is
+        widest&nbsp;/&nbsp;2<sup>octaves&minus;1</sup>. What governs the look is
+        the <b>ratio of widest to the ground in view</b> &mdash; 4&nbsp;km
+        features across 8&nbsp;km means two per side, so nothing larger than a
+        hill organises the scene. Raising widest does not fix that: it coarsens
+        everything, and past 16&nbsp;km it hits the clamp.<br>
+        So there is a <b>second, slower layer</b>, and it does double duty
+        &mdash; it is both the gentle swell and the mask deciding where
+        mountains grow, so ranges stand on its high ground, its flanks carry
+        low mountains (which is what a foothill is), and it keeps rolling across
+        the lows where no mountains grow at all. That is also how real ranges
+        sit: on uplifted ground, not scattered at random.</div>
+      <label>swell wavelength <span id="bk-val">8</span> km</label>
+      <input id="bk" type="range" min="2" max="60" value="8" step="1">
+      <div class="hint">Measured against an 8&nbsp;km view, <b>about the width
+        of the view works best</b> &mdash; one belt in frame, continuing past the
+        edge. Much longer and it flattens into a ramp; much shorter and it is
+        just more hills.</div>
+      <label>swell share <span id="bs-val">0.35</span></label>
+      <input id="bs" type="range" min="0" max="0.8" value="0.35" step="0.05">
+      <div class="hint">Its share of the total amplitude. <b>0 turns the layer
+        off entirely</b>, which with cover at 1 and the soft ceiling off
+        reproduces the document's method exactly, bit for bit.</div>
+      <label>mountain cover <span id="cov-val">0.45</span></label>
+      <input id="cov" type="range" min="0.15" max="1" value="0.45" step="0.05">
+      <div class="hint">The share of ground that carries mountains; 1 puts them
+        everywhere, as before. Noise is bell-shaped rather than uniform so this
+        is a dial, not a guarantee &mdash; the readout <b>measures what came
+        out</b>. It tracks well to about 0.3 and the measure itself breaks below
+        that, reading 51% for an asked 20% because with so little mountain left
+        the swell is the roughest thing present.</div>
+      <label>foothills <span id="fh-val">0.30</span></label>
+      <input id="fh" type="range" min="0.05" max="0.8" value="0.3" step="0.05">
+      <div class="hint">Width of the transition into the belt. Wide gives long
+        gentle approaches, narrow gives a wall rising straight off the plain.</div>
+    </fieldset>
+
+    <fieldset>
       <legend>break up the uniformity</legend>
       <div class="hint" style="margin-bottom:6px">Plain octave noise is
         statistically <b>homogeneous</b> &mdash; the same everywhere, so every
@@ -239,7 +280,7 @@
         terrain &mdash; the weight averaged 1&nbsp;&minus;&nbsp;h/2, so it
         deleted detail rather than moving it. It now averages exactly 1, and
         the readout reports absolute roughness so a repeat would show.</div>
-      <label><input type="checkbox" id="soft" style="width:auto"> soft ceiling</label>
+      <label><input type="checkbox" id="soft" checked style="width:auto"> soft ceiling</label>
       <div class="hint">height01 ends in a <b>hard clamp</b> to [0,&nbsp;1], and
         where a broad swell overshoots it the whole top is sheared off into a
         dead-flat mesa. It is invisible at the 4&nbsp;km default (one blob,
@@ -296,8 +337,8 @@
 
     <fieldset>
       <legend>view</legend>
-      <label>mountain height <span id="vx-val">0.12</span></label>
-      <input id="vx" type="range" min="0.01" max="1" value="0.12" step="0.01">
+      <label>mountain height <span id="vx-val">0.18</span></label>
+      <input id="vx" type="range" min="0.01" max="1" value="0.18" step="0.01">
       <div class="hint">Sets the relief <b>in metres</b>; the readout gives it.
         height01 already returns [0,&nbsp;1], so unlike the spectral page the
         raw relief here is fixed at 1.000 by the method itself &mdash; it
@@ -348,8 +389,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script type="module">
-import { makeVariedTerrain, heterogeneity,
-         largestPlateau } from './noise_variants.js';
+import { makeVariedTerrain, heterogeneity, largestPlateau,
+         mountainousFraction } from './noise_variants.js';
 import { hurstFromVariogram, directionalPower, EXCESS_NOTE,
          bumps, summits, curvature } from './terrain_metrics.js';
 import { makeViewer, frameShare, verticalFor,
@@ -396,6 +437,8 @@ function build() {
     const warp = +$('wp').value;
     const hetero = +$('ht').value, pinNorm = $('pin').checked;
     const softClamp = $('soft').checked;
+    const baseKm = +$('bk').value, baseShare = +$('bs').value;
+    const coverage = +$('cov').value, foothills = +$('fh').value;
 
     const t0 = performance.now();
     // With stretch 1, warp 0, hetero 0 and pinNorm off this is bit-identical to
@@ -403,7 +446,8 @@ function build() {
     // the document's own version still holds.
     const terrain = makeVariedTerrain({ seed, H, widestKm, octaves,
                                         stretchU, stretchV, warp, hetero, pinNorm,
-                                        softClamp });
+                                        softClamp, baseKm, baseShare, coverage,
+                                        foothills });
 
     // Every chunk through the module's own chunk() call, INDEPENDENTLY. That is
     // the point of the method, so it is also how the page gets its geometry —
@@ -474,6 +518,7 @@ function build() {
     const st = { seed, H, octaves, widestKm, k, res, chunkKm, cx0, cz0,
                  genMs, maxEdge, pairs, finestKm: terrain.finestKm,
                  stretchU, stretchV, ratio, warp, hetero, pinNorm, softClamp,
+                 baseKm, baseShare, coverage, foothills,
                  rlo, rhi, rel: (rhi - rlo) || 1 };
     if ($('domeasure').checked) {
       const t1 = performance.now();
@@ -515,7 +560,8 @@ function build() {
       // specks is invisible, 5.3% gathered into one corner mesa is the first
       // thing seen.
       st.plateau = largestPlateau(h, N);
-      if (ratio > 1.05 || warp > 0 || hetero > 0) {
+      st.mountainous = mountainousFraction(h, N, 12);
+      if (ratio > 1.05 || warp > 0 || hetero > 0 || baseShare > 0 || coverage < 0.999) {
         const plain = makeVariedTerrain({ seed, H, widestKm, octaves, pinNorm });
         const p = new Float64Array(N * N);
         for (let j = 0; j < N; j++) for (let i = 0; i < N; i++)
@@ -597,8 +643,13 @@ function report() {
             ? '<span class="warn">pinned at a rail — this is the clamp shearing a swell flat; ' +
               'turn on soft ceiling</span>'
             : pl.pct > 2
-              ? '<span class="warn">large, but not pinned — gentle ground from a coarse ' +
-                'feature scale, so add octaves or narrow the widest feature</span>'
+              // Gentle ground OUTSIDE A BELT is the design, not a defect. Saying
+              // otherwise would send someone hunting a bug that is not there.
+              ? (st.coverage < 0.999
+                  ? '<span class="good">gentle ground beyond the belt — the swell ' +
+                    'rolling on past the mountains</span>'
+                  : '<span class="warn">large, but not pinned — gentle ground from a coarse ' +
+                    'feature scale, so add octaves or narrow the widest feature</span>')
               : '<span class="good">nothing flat enough to notice</span>') + '\n';
     // The lattice check: simplex has one, and the module rotates each octave by
     // 0.83 radians to hide it. This is whether that worked.
@@ -616,6 +667,13 @@ function report() {
     s += `anisotropy    ${st.aniso.toFixed(2)} measured against ${st.nullA.toFixed(2)} ` +
          `isotropic null   excess <b>${st.excess.toFixed(2)}</b> &plusmn;0.4   ${verdict}\n`;
     s += `              <i>${EXCESS_NOTE}</i>\n`;
+    if (st.baseShare > 0 || st.coverage < 0.999) {
+      s += `two layers    swell ${st.baseKm} km at ${(100 * st.baseShare).toFixed(0)}% of the ` +
+           `amplitude, ${(acrossKm / st.baseKm).toFixed(1)} across the view\n`;
+      s += `              mountains asked over ${(100 * st.coverage).toFixed(0)}% of the ground, ` +
+           `<b>measured ${(100 * st.mountainous).toFixed(0)}%</b>, foothills ` +
+           `${st.foothills.toFixed(2)} wide\n`;
+    }
     // The uniformity figure, against the matched baseline so the GAIN shows.
     if (st.spreadPlain !== undefined) {
       const gain = 100 * (st.spread / st.spreadPlain - 1);
@@ -651,11 +709,16 @@ function step(dx, dz) {
 
 function wireControls() {
   for (const id of ['seed', 'oct', 'H', 'widest', 'k', 'res', 'ck', 'cx', 'cz',
-                    'wire', 'domeasure', 'st', 'wp', 'ht', 'pin', 'soft'])
+                    'wire', 'domeasure', 'st', 'wp', 'ht', 'pin', 'soft',
+                    'bk', 'bs', 'cov', 'fh'])
     $(id).addEventListener('change', build);
   $('st').addEventListener('input', () => { $('st-val').textContent = (+$('st').value).toFixed(1); });
   $('wp').addEventListener('input', () => { $('wp-val').textContent = (+$('wp').value).toFixed(1); });
   $('ht').addEventListener('input', () => { $('ht-val').textContent = (+$('ht').value).toFixed(2); });
+  $('bk').addEventListener('input', () => { $('bk-val').textContent = $('bk').value; });
+  $('bs').addEventListener('input', () => { $('bs-val').textContent = (+$('bs').value).toFixed(2); });
+  $('cov').addEventListener('input', () => { $('cov-val').textContent = (+$('cov').value).toFixed(2); });
+  $('fh').addEventListener('input', () => { $('fh-val').textContent = (+$('fh').value).toFixed(2); });
   $('H').addEventListener('input', () => { $('H-val').textContent = (+$('H').value).toFixed(2); });
   $('widest').addEventListener('input', () => { $('widest-val').textContent = $('widest').value; });
   $('ck').addEventListener('input', () => { $('ck-val').textContent = $('ck').value; });

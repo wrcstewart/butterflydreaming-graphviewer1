@@ -56,8 +56,16 @@ export function makeVariedTerrain({
   hetero = 0,                          // 0 = homogeneous, 1 = fully modulated
   pinNorm = false,                     // see below
   softClamp = false,                   // see THE FLAT PLATEAU below
+  // ── THE SLOW LAYER, see TWO LAYERS below. Off at baseShare 0, coverage 1.
+  baseKm = 40,                         // wavelength of the gentle swell
+  baseShare = 0,                       // its share of the amplitude
+  coverage = 1,                        // fraction of ground that is mountainous
+  foothills = 0.3,                     // width of the belt's transition
 } = {}) {
   const simplex2 = makeSimplex(seed);
+  // The slow field gets its own lattice, so it is independent of the mountains
+  // rather than a rescaling of them.
+  const slow = makeSimplex((seed ^ 0x27d4eb2f) >>> 0);
   // Separate lattices for the two warp components, or x and z would be
   // displaced identically and the warp would only slide the field diagonally.
   const warpX = warp > 0 ? makeSimplex((seed ^ 0x9e3779b9) >>> 0) : null;
@@ -103,6 +111,61 @@ export function makeVariedTerrain({
   // 0 to 2 about a mean of 1: double the detail on the highs, none in the lows,
   // and the same total as before.
   const wNorm = hetero > 0 ? 1 / (1 - hetero / 2) : 1;
+
+  // ── TWO LAYERS, AND A MOUNTAIN BELT ───────────────────────────────────
+  // The author: *"What it really needs is at least two noise layers - the second
+  // is as now but the first would be of lower amplitude and more imporatntly
+  // more a slow gentle rolling ... The slow varying could carry on past the
+  // mountains proper ie foothills"*.
+  //
+  // The scale question first, since it is what makes this necessary. f0 is
+  // 1/widestKm with coordinates in km, so the LOWEST octave's wavelength is
+  // exactly widestKm and the finest is widestKm/2^(octaves-1). What governs the
+  // look is the RATIO of widestKm to the ground in view: at the defaults, 4 km
+  // features across 8 km of ground means two big features per side, so nothing
+  // larger than a hill organises the scene. Simply raising widestKm does not fix
+  // it — that makes the whole surface coarser, and past about 16 km it hits the
+  // clamp and shears flat.
+  //
+  // ONE SLOW FIELD, USED TWICE, which is the part worth keeping. It is both the
+  // gentle swell and the mask that decides where mountains grow:
+  //
+  //   height = baseShare·slow + (1 - baseShare)·mask(slow)·mountains
+  //
+  // so ranges stand on the high ground of the swell, their flanks carry
+  // low-amplitude mountains — which is what a foothill is — and the swell keeps
+  // rolling across the lows where no mountains grow at all. That is also how
+  // real ranges sit: on uplifted ground, not scattered at random. Tying the two
+  // together costs one control instead of two lattices and gets the geology
+  // right for free.
+  //
+  // `coverage` is the share of ground that is mountainous and `foothills` the
+  // width of the transition into it; wide transitions give long gentle
+  // approaches, narrow ones give a wall. Noise is bell-shaped rather than
+  // uniform, so coverage is a dial and not a guarantee — the page MEASURES the
+  // fraction that came out and reports it rather than restating the asked-for
+  // number.
+  //
+  // At baseShare 0 and coverage 1 the mask is exactly 1 and the whole thing
+  // collapses to the original formula, bit-identical. Checked.
+  const BASE_OCT = 2;                  // a two-octave swell, less regular than one
+  const beltOn = coverage < 0.999;
+  function slowAt(xKm, zKm) {
+    // Roughly [-1, 1]. Two octaves, so the swell itself is not a plain sine.
+    let v = 0, f = 1 / Math.max(0.001, baseKm), a = 1, nm = 0;
+    for (let o = 0; o < BASE_OCT; o++) {
+      v += a * slow(xKm * f + o * 7.1, zKm * f - o * 4.3);
+      nm += a; f *= 2; a *= 0.5;
+    }
+    return v / (nm || 1);
+  }
+  function beltMask(s01) {
+    if (!beltOn) return 1;
+    const w = Math.max(1e-6, foothills);
+    let u = (s01 - (1 - coverage)) / w + 0.5;
+    u = u < 0 ? 0 : u > 1 ? 1 : u;
+    return u * u * (3 - 2 * u);        // smoothstep: flat at both ends, no crease
+  }
 
   // ── THE FLAT PLATEAU ──────────────────────────────────────────────────
   // The author: *"Theres a completely flat large palteau in one corner - whats
@@ -179,7 +242,22 @@ export function makeVariedTerrain({
       }
       f *= 2; a *= gain;
     }
-    return squash(0.5 + 0.85 * sum / norm);
+    // NOTE THE EXPRESSION, not just the value: the original is
+    // `0.85 * sum / norm`, which associates as `(0.85 * sum) / norm`. Writing
+    // `0.85 * (sum / norm)` instead changes the rounding and broke the
+    // bit-identity claim by exactly one ulp, 2.2e-16. Kept verbatim on the
+    // path that has to match.
+    if (baseShare <= 0 && !beltOn) return squash(0.5 + 0.85 * sum / norm);
+    const mtn = sum / norm;
+    // The slow layer is sampled at the UNWARPED, UNSTRETCHED position, so the
+    // regional swell is not dragged about by controls meant for the mountains.
+    // Named slowV, not sv: `sv` is already the stretchV alias in this scope, and
+    // shadowing it threw a TDZ error that the module syntax check passed clean —
+    // two sites can be in the same function and not be the same binding.
+    const slowV = slowAt(xKm, zKm);
+    const s01 = 0.5 + 0.5 * slowV;
+    return squash(0.5 + 0.85 *
+      (baseShare * slowV + (1 - baseShare) * beltMask(s01) * mtn));
   }
 
   function chunk(cx, cz, { chunkKm = 4, res = 64 } = {}) {
@@ -195,6 +273,28 @@ export function makeVariedTerrain({
 // The uniformity measure the mechanisms are judged by: the coefficient of
 // variation of local relief. Low means every patch is equally rough, which is
 // the complaint; higher means plains and ranges have become distinguishable.
+// How much of the ground is actually MOUNTAINOUS, as against gentle. Measured
+// rather than restated from the coverage dial, because simplex noise is
+// bell-shaped and not uniform, so asking for 45% does not deliver 45%. A window
+// counts as mountainous when its local relief exceeds a quarter of the biggest
+// window's — a threshold inside the field, so it does not need calibrating
+// against an absolute height.
+export function mountainousFraction(h, n, W = 12) {
+  const rel = [];
+  for (let by = 0; by + W <= n; by += W) for (let bx = 0; bx + W <= n; bx += W) {
+    let lo = Infinity, hi = -Infinity;
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+      const v = h[(by + y) * n + bx + x];
+      if (v < lo) lo = v; if (v > hi) hi = v;
+    }
+    rel.push(hi - lo);
+  }
+  if (!rel.length) return 0;
+  const top = Math.max(...rel);
+  if (!(top > 0)) return 0;
+  return rel.filter(r => r > 0.25 * top).length / rel.length;
+}
+
 // THE LARGEST CONNECTED FLAT REGION, as a share of the grid. A total percentage
 // of pinned cells does not describe what the eye sees: 0.53% scattered in
 // specks is invisible, while 5.3% gathered into one mesa in a corner is the
