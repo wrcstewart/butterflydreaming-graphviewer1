@@ -83,6 +83,25 @@ export function makeVariedTerrain({
 
   const f0 = 1 / widestKm;
   const su = stretchU > 0 ? stretchU : 1, sv = stretchV > 0 ? stretchV : 1;
+  // THE HETERO WEIGHT MUST AVERAGE 1, and this divisor is why.
+  //
+  // The author, on the first version: *"the slider hetero seems to make it
+  // smoother"*. He was right and the measurement agrees — mean |laplacian| fell
+  // 7.24 to 4.48 and roughness 3.55 to 2.40 across the slider's range. The
+  // weight 1 - h + h*(0.5 + 0.5n) has expectation 1 - h/2, because the noise is
+  // zero-mean, so at h = 1 every octave after the first was damped to half
+  // amplitude. The control was deleting detail, not moving it.
+  //
+  // Worse, my own metric hid it: cv = sd/mean RISES WHEN THE MEAN FALLS, so a
+  // uniformly smoother field scored as more heterogeneous. That is the same
+  // failure as the p99.9/median curvature ratio that inverted earlier in this
+  // work, and it is written as a rule in terrain_metrics.js — which I then
+  // walked into anyway. An absolute measure is reported alongside it now.
+  //
+  // Dividing by 1 - h/2 restores unit mean weight. At h = 1 the weight runs
+  // 0 to 2 about a mean of 1: double the detail on the highs, none in the lows,
+  // and the same total as before.
+  const wNorm = hetero > 0 ? 1 / (1 - hetero / 2) : 1;
 
   function height01(xKm, zKm) {
     let x = xKm, z = zKm;
@@ -97,15 +116,23 @@ export function makeVariedTerrain({
     // in one consistent direction. Stretching after the rotation would turn the
     // grain a different way in every octave and cancel out to nothing.
     const xs = x / su, zs = z / sv;
-    let sum = 0, f = f0, a = 1, w = 1;
+    let sum = 0, f = f0, a = 1, w = 1, amp = 0;
     for (let o = 0; o < octaves; o++) {
       const [c, s, ox, oy] = rot[o];
       const n = simplex2((xs * c - zs * s) * f + ox, (xs * s + zs * c) * f + oy);
       sum += a * w * n;
+      amp += a;                            // amplitude available so far
       if (hetero > 0) {
-        // Detail where the ground is already high. Clamped, or the product can
-        // run away over many octaves.
-        w = Math.max(0, Math.min(1, 1 - hetero + hetero * (0.5 + 0.5 * n)));
+        // MODULATE ON ACCUMULATED ELEVATION, not on the previous octave's
+        // sample. Both were built and measured: modulating on the last octave
+        // is a one-octave lookahead, which is noise-scale and incoherent, and
+        // gave only +11% heterogeneity. The running sum is the terrain's own
+        // elevation at this point, so roughness ends up tied to height — rough
+        // peaks over smooth plains, which is what was actually asked for — and
+        // it measured +33% at the same roughness. Musgrave's hybrid
+        // multifractal works this way for the same reason.
+        const elev = 0.5 + 0.5 * sum / (amp || 1);
+        w = wNorm * Math.max(0, 1 - hetero + hetero * elev);
       }
       f *= 2; a *= gain;
     }
@@ -125,6 +152,28 @@ export function makeVariedTerrain({
 // The uniformity measure the mechanisms are judged by: the coefficient of
 // variation of local relief. Low means every patch is equally rough, which is
 // the complaint; higher means plains and ranges have become distinguishable.
+// ABSOLUTE heterogeneity: the spread of local relief as a share of the GLOBAL
+// relief. Unlike cv = sd/mean, its denominator is not a statistic the numerator
+// can drag down, so a uniformly smoother field does not score as a more varied
+// one. Report this one; cv is kept only because it is the familiar figure.
+export function heterogeneity(h, n, W = 16) {
+  const rel = [];
+  let glo = Infinity, ghi = -Infinity;
+  for (const v of h) { if (v < glo) glo = v; if (v > ghi) ghi = v; }
+  const global = (ghi - glo) || 1;
+  for (let by = 0; by + W <= n; by += W) for (let bx = 0; bx + W <= n; bx += W) {
+    let lo = Infinity, hi = -Infinity;
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+      const v = h[(by + y) * n + bx + x];
+      if (v < lo) lo = v; if (v > hi) hi = v;
+    }
+    rel.push(hi - lo);
+  }
+  if (!rel.length) return { spread: 0, mean: 0 };
+  const m = rel.reduce((p, q) => p + q, 0) / rel.length;
+  const sd = Math.sqrt(rel.reduce((p, q) => p + (q - m) ** 2, 0) / rel.length);
+  return { spread: sd / global, mean: m / global };
+}
 export function reliefVariation(h, n, W = 16) {
   const rel = [];
   for (let by = 0; by + W <= n; by += W) for (let bx = 0; bx + W <= n; bx += W) {

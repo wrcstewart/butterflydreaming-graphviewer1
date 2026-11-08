@@ -91,6 +91,19 @@
   a percent, and exactly if "stable zoom" pins the divisor. That is a real level
   of detail path — far chunks few octaves, near chunks many.
 
+  THE TILE SEAMS, since they looked like a fault and were one. The author:
+  *"There are two stiches lines down the centres - dividing scene into 4
+  parts"* — the 2x2 tile boundaries. The heights were never wrong: the edge test
+  reads max difference 0. What differed was the NORMALS, because each tile is
+  its own mesh and computeVertexNormals() averages only its own triangles, so a
+  vertex on a boundary took its normal from one side while its twin in the
+  neighbouring tile took a different one. Lambert shading stepped across the
+  join, and the low default sun made it as plain as possible. Each tile now
+  carries a one-cell APRON of heights from just outside itself and the normals
+  are computed from the gradient, so both tiles derive the same normal at a
+  shared vertex. Possible only because height01 is defined everywhere — the same
+  property the method rests on.
+
   WHAT TO LOOK FOR. Simplex noise has a lattice, and an octave sum can show it
   as faint axis-aligned structure. The module hides it by rotating each octave
   by 0.83 radians. The anisotropy excess in the readout is the check on whether
@@ -194,22 +207,38 @@
         country instead of a field of lumps. <b>This one makes the terrain
         genuinely anisotropic on purpose</b>, so the readout will report a
         direction &mdash; that is the control working, and the only place in
-        this work where a direction is wanted.</div>
+        this work where a direction is wanted.<br>
+        <b>Area-preserving</b>, stretching one axis by &radic;r and squeezing the
+        other by the same, because stretching one alone just lowers the
+        frequency along it and smooths the whole surface: roughness fell 3.55 to
+        1.49 at 3:1 that way, against 2.33 keeping the area. Some loss is
+        unavoidable &mdash; a stretched axis has gentler gradients.</div>
       <label>warp <span id="wp-val">0.0</span> km &mdash; placement</label>
       <input id="wp" type="range" min="0" max="3" value="0" step="0.1">
       <div class="hint">Displaces the sample point by a slower second noise
         field, so ridges become sinuous and peaks stop being evenly scattered.
-        Raises the uniformity spread by about a third. It nudges the direction
-        reading up to about 1.4 on average, which stays under the 1.6
-        detection threshold.</div>
+        Raises the uniformity spread by about a quarter. It nudges the direction
+        reading to about 1.4 on average, which stays under the 1.6 detection
+        threshold.<br>
+        <b>Warp fights stretch.</b> Measured over four seeds, stretch 3:1 alone
+        gives a grain of 2.15 and keeps it under hetero (2.01), but warp at
+        1.5&nbsp;km bends the ground enough to randomise the direction and the
+        grain drops to 1.43 &mdash; gone. At 0.5&nbsp;km it survives at 1.93.
+        <b>Keep warp under about 0.5&nbsp;km if you want grain</b>; use it
+        freely if you do not.</div>
       <label>hetero <span id="ht-val">0.00</span> &mdash; roughness</label>
       <input id="ht" type="range" min="0" max="1" value="0" step="0.05">
       <div class="hint"><b>The direct answer to uniform peaks.</b> Each octave's
-        amplitude is modulated by the one before, so detail appears where the
-        ground is already high and dies in the lows &mdash; rough peaks over
-        smooth plains. Musgrave's multifractal idea. Raises the spread by about
-        a third and <b>stays isotropic</b> (0.96), unlike the other two. All
-        three together roughly double it.</div>
+        amplitude is modulated by the <b>accumulated elevation</b>, so detail
+        appears where the ground is already high and dies in the lows &mdash;
+        rough peaks over smooth plains. Musgrave's multifractal idea.
+        <b>Stays isotropic</b> (0.89), unlike the other two.<br>
+        <b>It bites above about 0.75</b>: +2% at 0.5, +13% at 0.75, +33% at 1.0,
+        because the weight only swings the full 0&ndash;2 at the top of the
+        range. The first version of this control instead <i>smoothed</i> the
+        terrain &mdash; the weight averaged 1&nbsp;&minus;&nbsp;h/2, so it
+        deleted detail rather than moving it. It now averages exactly 1, and
+        the readout reports absolute roughness so a repeat would show.</div>
       <label><input type="checkbox" id="pin" style="width:auto"> stable zoom</label>
       <div class="hint">Divides by a fixed octave budget rather than by the
         octaves actually summed, so <b>adding octaves to zoom in leaves the
@@ -309,7 +338,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script type="module">
-import { makeVariedTerrain, reliefVariation } from './noise_variants.js';
+import { makeVariedTerrain, heterogeneity } from './noise_variants.js';
 import { hurstFromVariogram, directionalPower, EXCESS_NOTE,
          bumps, summits, curvature } from './terrain_metrics.js';
 import { makeViewer, frameShare, verticalFor,
@@ -344,7 +373,16 @@ function build() {
     const k = +$('k').value, res = +$('res').value, chunkKm = +$('ck').value;
     const cx0 = +$('cx').value | 0, cz0 = +$('cz').value | 0;
 
-    const stretchU = +$('st').value, warp = +$('wp').value;
+    // AREA-PRESERVING stretch: su = sqrt(ratio), sv = 1/sqrt(ratio), so the
+    // product stays 1. Stretching one axis alone lowers the frequency along it
+    // and nothing compensates, so the terrain simply goes smoother — measured,
+    // roughness fell 3.55 to 1.49 at ratio 3 and the heterogeneity spread
+    // dropped 6%, while the cv measure had claimed a 30% gain. Keeping the area
+    // retains far more detail at the same grain: roughness 2.33 and spread up
+    // 8%, still strongly directional at 2.03.
+    const ratio = +$('st').value;
+    const stretchU = Math.sqrt(ratio), stretchV = 1 / Math.sqrt(ratio);
+    const warp = +$('wp').value;
     const hetero = +$('ht').value, pinNorm = $('pin').checked;
 
     const t0 = performance.now();
@@ -352,7 +390,7 @@ function build() {
     // noise.js — checked, max difference 0 — so every figure measured against
     // the document's own version still holds.
     const terrain = makeVariedTerrain({ seed, H, widestKm, octaves,
-                                        stretchU, warp, hetero, pinNorm });
+                                        stretchU, stretchV, warp, hetero, pinNorm });
 
     // Every chunk through the module's own chunk() call, INDEPENDENTLY. That is
     // the point of the method, so it is also how the page gets its geometry —
@@ -389,11 +427,25 @@ function build() {
     // Tiles. Each tile is `size` wide and the whole set fills the 2-unit frame;
     // column i runs with world x and row j with world z, which is the same
     // order the viewer's meshes use, so they abut instead of mirroring.
+    //
+    // Each also carries a one-cell APRON — the heights just outside its own
+    // edges — so the viewer can compute normals from ground that continues past
+    // the boundary. Without it the shading creases along every tile join even
+    // though the heights match exactly, which is what the author saw as two
+    // stitch lines dividing the scene into four. The apron is cheap and it is
+    // only possible at all because height01 is defined everywhere, which is the
+    // same property the whole method rests on.
     const size = 2 / k;
+    const step2 = chunkKm / res;
     const specs = [];
-    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++)
-      specs.push({ h: grid[j][i], n, size,
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) {
+      const w = n + 2, hp = new Float64Array(w * w);
+      const ox = (cx0 + i) * chunkKm, oz = (cz0 + j) * chunkKm;
+      for (let b = 0; b < w; b++) for (let a = 0; a < w; a++)
+        hp[b * w + a] = terrain.height01(ox + (a - 1) * step2, oz + (b - 1) * step2);
+      specs.push({ h: grid[j][i], n, size, hp,
                    cx: -1 + (i + 0.5) * size, cz: -1 + (j + 0.5) * size });
+    }
     view.setTiles(specs);
 
     // ── the measurements ──
@@ -408,7 +460,7 @@ function build() {
     }
     const st = { seed, H, octaves, widestKm, k, res, chunkKm, cx0, cz0,
                  genMs, maxEdge, pairs, finestKm: terrain.finestKm,
-                 stretchU, warp, hetero, pinNorm,
+                 stretchU, stretchV, ratio, warp, hetero, pinNorm,
                  rlo, rhi, rel: (rhi - rlo) || 1 };
     if ($('domeasure').checked) {
       const t1 = performance.now();
@@ -438,13 +490,19 @@ function build() {
       // constant called hetero's real 34% gain "still homogeneous". Same lesson
       // as the anisotropy null — compare against the same thing, measured the
       // same way. The extra field is built only when a control is engaged.
-      st.cv = reliefVariation(h, N, 16).cv;
-      if (stretchU > 1.05 || warp > 0 || hetero > 0) {
+      // THE ABSOLUTE MEASURE, not cv = sd/mean. cv rises when the mean falls, so
+      // when the first hetero made the whole surface smoother cv read it as MORE
+      // heterogeneous — +28% for a field that was measurably flatter. The
+      // author caught it by eye: "the slider hetero seems to make it smoother".
+      // This one divides by the global relief, a denominator the numerator
+      // cannot drag down, and is provably unchanged by a pure rescale.
+      st.spread = heterogeneity(h, N, 16).spread;
+      if (ratio > 1.05 || warp > 0 || hetero > 0) {
         const plain = makeVariedTerrain({ seed, H, widestKm, octaves, pinNorm });
         const p = new Float64Array(N * N);
         for (let j = 0; j < N; j++) for (let i = 0; i < N; i++)
           p[j * N + i] = plain.height01((cx0 * chunkKm) + i * step, (cz0 * chunkKm) + j * step);
-        st.cvPlain = reliefVariation(p, N, 16).cv;
+        st.spreadPlain = heterogeneity(p, N, 16).spread;
       }
       st.aniso = dp.anisotropy; st.nullA = dp.nullAnisotropy;
       st.excess = dp.excess; st.peak = dp.peak.structureDeg;
@@ -514,7 +572,7 @@ function report() {
     // The verdict has to know whether a direction was ASKED FOR. With stretch
     // engaged, anisotropy is the point, and calling the working control a fault
     // would be worse than not measuring it at all.
-    const wanted = st.stretchU > 1.05;
+    const wanted = st.ratio > 1.05;
     const verdict = st.excess > 1.6
       ? (wanted
           ? `<span class="good">grain at ${st.peak}&deg;, as the stretch asks for</span>`
@@ -526,19 +584,21 @@ function report() {
          `isotropic null   excess <b>${st.excess.toFixed(2)}</b> &plusmn;0.4   ${verdict}\n`;
     s += `              <i>${EXCESS_NOTE}</i>\n`;
     // The uniformity figure, against the matched baseline so the GAIN shows.
-    if (st.cvPlain !== undefined) {
-      const gain = 100 * (st.cv / st.cvPlain - 1);
-      s += `uniformity    local relief varies by <b>cv ${st.cv.toFixed(3)}</b> against ` +
-           `${st.cvPlain.toFixed(3)} with the controls off   ` +
+    if (st.spreadPlain !== undefined) {
+      const gain = 100 * (st.spread / st.spreadPlain - 1);
+      s += `uniformity    local relief spread <b>${(100 * st.spread).toFixed(1)}%</b> of the ` +
+           `relief, against ${(100 * st.spreadPlain).toFixed(1)}% with the controls off   ` +
            (gain > 20
               ? `<span class="good">+${gain.toFixed(0)}% — plains and ranges now differ</span>`
               : `<span class="warn">only +${gain.toFixed(0)}% — push the controls harder</span>`) + '\n';
     } else {
-      s += `uniformity    local relief varies by <b>cv ${st.cv.toFixed(3)}</b>   ` +
+      s += `uniformity    local relief spread <b>${(100 * st.spread).toFixed(1)}%</b> of the relief   ` +
            '<span class="warn">homogeneous — every patch equally rough</span>' +
            '   <i>try hetero, warp or stretch</i>\n';
     }
-    s += `              <i>stretch ${st.stretchU.toFixed(1)}:1, warp ${st.warp.toFixed(1)} km, ` +
+    s += `              <i>absolute, not a ratio to its own mean — a cv rose 28% on a ` +
+         `field that was simply smoother, which is how the first hetero slipped through</i>\n`;
+    s += `              <i>stretch ${st.ratio.toFixed(1)}:1 area-preserving, warp ${st.warp.toFixed(1)} km, ` +
          `hetero ${st.hetero.toFixed(2)}${st.pinNorm ? ', stable zoom' : ''}</i>\n`;
     s += `texture       ${st.bumps.toLocaleString()} bumps, ${st.summits} summits at radius 8 ` +
          `(tallest ${(100 * st.bestSummit / st.rel).toFixed(0)}% of relief)   ` +

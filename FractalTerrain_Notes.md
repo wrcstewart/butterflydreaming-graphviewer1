@@ -860,3 +860,52 @@ well as the method, and at the page's default sampling plain noise reads 0.217,
 so the constant dismissed hetero's real 28% gain as "still homogeneous". It now
 builds a **matched baseline** at the same settings with the controls off — the
 same lesson as the anisotropy null, one section up.
+
+#### Both of the author's next two observations were faults (2026-11-08)
+
+*"Two points the slider hetero seems to make it smoother. There are two stiches
+lines down the centres - dividing scene into 4 parts"*. Both real.
+
+**hetero was smoothing the terrain, and my own metric hid it.** The weight
+`1 − h + h·(0.5 + 0.5n)` has expectation `1 − h/2`, because the noise is
+zero-mean, so at hetero 1 every octave after the first carried half amplitude.
+Measured: mean |laplacian| fell 7.24 to 4.48 and roughness 3.55 to 2.40. The
+control was deleting detail, not redistributing it.
+
+The metric failure is the worse half. **cv = sd/mean rises when the mean falls**,
+so a uniformly smoother field scored as *more* heterogeneous — it reported +28%
+for a field that was measurably flatter. This is the same defect as the
+p99.9/median curvature ratio that inverted earlier in this work, and it is
+written as a rule in `terrain_metrics.js`, which I then walked past anyway.
+Replaced with the spread of local relief over the GLOBAL relief — a denominator
+the numerator cannot drag down, and provably unchanged by a pure rescale.
+
+Two consequences once the measure was honest. Dividing the weight by `1 − h/2`
+restores unit mean, and then **modulating on accumulated elevation rather than
+on the previous octave's sample** is three times better: +33% against +11% at
+the same roughness, because the running sum is terrain-scale while a
+single-octave lookahead is noise-scale. It also means roughness tracks height,
+which is what "rough peaks over smooth plains" actually asks for.
+
+And **stretch had the identical flaw**, which only showed once cv was gone:
+one-sided stretching lowers the frequency along that axis with nothing to
+compensate, so roughness fell 3.55 to 1.49 at 3:1 and the spread fell 6% while
+cv had claimed +30%. Made area-preserving — √r on one axis, 1/√r on the other —
+it keeps roughness at 2.33 and gains 8%, still strongly directional at 2.03.
+
+**The stitch lines were normals, not heights.** The edge test reads max
+difference 0, so the surfaces meet perfectly. Each tile is its own mesh, and
+`computeVertexNormals()` averages only its own triangles — so a vertex on a
+boundary takes its normal from one side while its twin in the next tile takes a
+different one, and Lambert shading steps across the join. The 12° default sun
+makes it as obvious as possible. Fixed by computing normals analytically from
+the height gradient with a **one-cell apron** sampled across each boundary:
+verified, the normals are now bit-identical at every shared vertex, on both
+seams, plain and with all three variants. Possible only because `height01` is
+defined everywhere — the same property the method rests on. Flat ground checks
+out as straight up, which is the sign test.
+
+One interaction worth keeping: **warp fights stretch**. Over four seeds, stretch
+3:1 alone gives a grain of 2.15 and keeps it under hetero (2.01), but warp at
+1.5 km randomises the direction and the grain falls to 1.43. At 0.5 km it
+survives at 1.93.

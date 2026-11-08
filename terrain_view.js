@@ -195,7 +195,50 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
     tiles = [];
   }
 
-  // specs: [{ h, n, cx, cz, size }] where size is the tile's width in frame
+  // THE SEAM BETWEEN TILES, and why it needs more than matching heights.
+  //
+  // The author: *"There are two stiches lines down the centres - dividing scene
+  // into 4 parts"* — at the 2x2 default, exactly the tile boundaries. The
+  // heights are not the problem: the edge test reads max difference 0, so the
+  // surfaces meet perfectly and there is no crack. What differs is the NORMALS.
+  // computeVertexNormals() averages the faces of ITS OWN geometry, so a vertex
+  // on a tile edge is averaged from triangles on one side only, and the vertex
+  // in the neighbouring tile at the identical position gets a different normal
+  // from its own half. Lambert shading then steps across the join and draws a
+  // line — and the low 12-degree sun this page defaults to makes it as obvious
+  // as possible.
+  //
+  // So normals are computed ANALYTICALLY from the height field instead, using a
+  // one-cell apron sampled across the boundary. Both tiles then derive the same
+  // gradient at a shared vertex, from the same neighbouring ground, and the
+  // seam disappears while the tiles stay genuinely independent meshes — which
+  // is the whole point of drawing them separately. This is what a real chunked
+  // terrain renderer does.
+  //
+  // PlaneGeometry's vertex iy*n + ix is at local (x, -y), and rotating -90
+  // degrees about x maps local z to world y and local -y to world z. So a world
+  // normal (nx, ny, nz) is the local vector (nx, -nz, ny), and for a height
+  // field whose world normal is (-dh/dx, 1, -dh/dz) the local normal is
+  // (-dh/dx, dh/dz, 1). Flat ground gives (0, 0, 1), which rotates to straight
+  // up — the check that the signs are the right way round.
+  function analyticNormals(t, vx) {
+    const { hp, n, size } = t;
+    if (!hp) { t.mesh.geometry.computeVertexNormals(); return; }
+    const w = n + 2;                       // the padded row stride
+    const d = size / (n - 1);              // world spacing between samples
+    const attr = t.mesh.geometry.attributes.normal;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const pj = j + 1, pi = i + 1;
+      const dhdx = (hp[pj * w + pi + 1] - hp[pj * w + pi - 1]) * vx / (2 * d);
+      const dhdz = (hp[(pj + 1) * w + pi] - hp[(pj - 1) * w + pi]) * vx / (2 * d);
+      const lx = -dhdx, ly = dhdz, lz = 1;
+      const len = Math.hypot(lx, ly, lz) || 1;
+      attr.setXYZ(j * n + i, lx / len, ly / len, lz / len);
+    }
+    attr.needsUpdate = true;
+  }
+
+  // specs: [{ h, n, cx, cz, size, hp }] where size is the tile's width in frame
   // units and (cx, cz) is its centre. PlaneGeometry's vertex iy*n + ix sits at
   // local (x, -y); rotating -90 degrees about x sends local z to world y and
   // local -y to world z, so row index j increases with world z and column index
@@ -215,7 +258,7 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
         const pos = geo.attributes.position;
         for (let i = 0; i < pos.count; i++) pos.setZ(i, sp.h[i] * o.vx);
         geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
-        geo.computeVertexNormals();
+        geo.computeVertexNormals();        // replaced below when an apron exists
         const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
           color: 0xffffff, vertexColors: true,
           roughness: sch.rough, metalness: sch.metal || 0, side: THREE.DoubleSide }));
@@ -230,7 +273,9 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
           wire.position.copy(mesh.position);
           scene.add(wire);
         }
-        tiles.push({ mesh, wire, h: sp.h, n });
+        const t = { mesh, wire, h: sp.h, n, hp: sp.hp, size };
+        tiles.push(t);
+        analyticNormals(t, o.vx);
       }
       applyScheme();
     } catch (e) {
@@ -284,7 +329,10 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
       const pos = t.mesh.geometry.attributes.position;
       for (let i = 0; i < pos.count; i++) pos.setZ(i, t.h[i] * o.vx);
       pos.needsUpdate = true;
-      t.mesh.geometry.computeVertexNormals();
+      // The gradient scales with the vertical, so the normals are recomputed
+      // rather than left over from the previous height.
+      if (t.hp) analyticNormals(t, o.vx);
+      else t.mesh.geometry.computeVertexNormals();
       if (t.wire) {
         const wp = t.wire.geometry.attributes.position;
         for (let i = 0; i < wp.count; i++) wp.setZ(i, t.h[i] * o.vx);
