@@ -806,3 +806,57 @@ seeds the *mean* is 0.769 at 2,000 faults and 0.764 at 8,000: unchanged. Each
 fault count is a different random field, not a further step in one. What the
 count does set is the **relief**, which grows as √faults, as a sum of
 independent steps must.
+
+### Breaking the noise method's uniformity, and what zoom really costs (2026-11-08)
+
+The author on the noise page: *"the noise idea is attractive given that it could
+manage very big views i suppse that can zoomed in on potentially. Also noise
+with different varaition on u v could be supimposed to braek up the noise
+uniformity of the peaks"*. Both halves check out, and both have a measured
+catch.
+
+**Zoom has a hard ceiling.** The octave set is fixed, so detail stops at
+`finestKm` — 62.5 m at widest 4 km over 7 octaves. Sampling one 200 m patch from
+28.6 m spacing down to 0.8 m gives relief 0.1975, 0.1976, 0.1975: *no new
+detail*, just a smoother interpolation of the same surface. The cure is to **add
+octaves as you zoom**, which works precisely because `height01` is a pure
+function — the coarse shape stays put to within half a percent (mean change
+0.004 to 0.006 on a [0,1] field). That residue is `norm` depending on the octave
+count; pinning the divisor to a fixed budget makes it exact, which the page
+offers as "stable zoom". So the level-of-detail path is real: far chunks few
+octaves, near chunks many, and nothing moves.
+
+**The uniformity complaint is a real and known weakness.** Plain octave fBm is
+statistically *homogeneous* — the same everywhere — so every patch is equally
+rough and nothing separates a plain from a range. Measured as the coefficient of
+variation of local relief over 16-cell windows, cv 0.20 at H = 0.5 rising to
+0.32 at H = 0.9.
+
+Three mechanisms are in `noise_variants.js`, and they break **different** things,
+which is the part worth keeping straight:
+
+| control | breaks | effect | isotropy |
+|---|---|---|---|
+| stretch u:v | isotropy | grain, ridge-and-valley country | **deliberately not** — 2.46 at 3:1 |
+| warp | placement | sinuous ridges, uneven spacing | 1.40 mean, under the threshold |
+| hetero | roughness | rough peaks over smooth plains | stays isotropic, 0.96 |
+
+At the page's own default sampling, each raises cv by 27–30% and all three
+together by **107%**. `hetero` — Musgrave's multifractal idea, each octave's
+amplitude modulated by the previous one — is the direct answer to "uniformity of
+the peaks", and the only one of the three that does not cost isotropy.
+
+**Every variant keeps the chunk edges exact**, max difference 0 individually and
+all three together. That was checked rather than assumed: a variant that broke
+it would destroy the only reason to prefer this method. And with every control
+off the output is **bit-identical** to `noise.js`, so the figures measured
+against the document's own version still hold.
+
+Two smaller corrections along the way. The anisotropy verdict had to learn that
+**a direction can be asked for** — with stretch engaged, reporting the working
+control as "the lattice is showing" would be worse than not measuring it. And a
+hardcoded cv reference of 0.26 was wrong: cv depends on the grid and window as
+well as the method, and at the page's default sampling plain noise reads 0.217,
+so the constant dismissed hetero's real 28% gain as "still homogeneous". It now
+builds a **matched baseline** at the same settings with the controls off — the
+same lesson as the anisotropy null, one section up.
