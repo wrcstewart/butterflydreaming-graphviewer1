@@ -187,12 +187,15 @@
 
     <fieldset>
       <legend>view</legend>
-      <label>vertical &times; <span id="vx-val">0.60</span></label>
-      <input id="vx" type="range" min="0.02" max="2" value="0.6" step="0.02">
-      <div class="hint">height01 already returns [0,&nbsp;1], so unlike the
-        spectral page the relief here is fixed at 1.000 by the method itself
-        &mdash; it clamps. That is the method's doing, not a normalisation
-        added here.</div>
+      <label>mountain height <span id="vx-val">0.12</span></label>
+      <input id="vx" type="range" min="0.01" max="1" value="0.12" step="0.01">
+      <div class="hint">Sets the relief <b>in metres</b>; the readout gives it.
+        height01 already returns [0,&nbsp;1], so unlike the spectral page the
+        raw relief here is fixed at 1.000 by the method itself &mdash; it
+        clamps. That is the method's doing, not a normalisation added here, and
+        it is why metres come from this control alone.<br>
+        Chunk size and chunk count set the ground width, so <b>adding chunks
+        flattens the view</b> &mdash; the same mountains across more land.</div>
       <label>colour</label>
       <select id="scheme">
         <option value="grey" selected>grey on white</option>
@@ -239,12 +242,16 @@
 import { makeTerrain } from './noise.js';
 import { hurstFromVariogram, directionalPower, EXCESS_NOTE,
          bumps, summits, curvature } from './terrain_metrics.js';
-import { makeViewer } from './terrain_view.js';
+import { makeViewer, frameShare, verticalFor,
+         reliefMetres } from './terrain_view.js';
 
 const $ = id => document.getElementById(id);
 
 const read = () => ({
-  scheme: $('scheme').value, bands: +$('bands').value, vx: +$('vx').value,
+  scheme: $('scheme').value, bands: +$('bands').value,
+  // The vertical sets metre height; the ground width here is the whole set of
+  // chunks, so adding chunks or widening them flattens the view.
+  vx: verticalFor(+$('vx').value, (+$('ck').value) * (+$('k').value)),
   sun: +$('sun').value, sunaz: +$('sunaz').value,
   wire: $('wire').checked, km: (+$('ck').value) * (+$('k').value),
 });
@@ -374,6 +381,10 @@ function report() {
     : `${st.pairs} adjacent pairs, max difference ` + (st.maxEdge === 0
         ? '<b>exactly 0</b>   <span class="good">chunks agree — the world is seamless</span>'
         : `<b>${st.maxEdge.toExponential(2)}</b>   <span class="warn">NOT exact — chunks disagree</span>`)) + '\n';
+  s += `relief        ${reliefMetres(1, +$('vx').value).toFixed(0)} m over ${acrossKm} km, ` +
+       `true to scale   ${frameShare(1, verticalFor(+$('vx').value, acrossKm)).toFixed(1)}% of the frame` +
+       (frameShare(1, verticalFor(+$('vx').value, acrossKm)) < 5
+         ? '  <span class="warn">— too shallow to judge, raise mountain height</span>' : '') + '\n';
   s += `feature scale widest ${st.widestKm} km, finest ` +
        `${(st.finestKm * 1000).toFixed(0)} m over ${st.octaves} octaves   ` +
        `${(acrossKm * 1000 / (st.k * st.res)).toFixed(0)} m per cell\n`;
@@ -430,7 +441,7 @@ function wireControls() {
   $('ck').addEventListener('input', () => { $('ck-val').textContent = $('ck').value; });
   $('vx').addEventListener('input', () => {
     $('vx-val').textContent = (+$('vx').value).toFixed(2);
-    view.rescale();
+    view.rescale(); report();
   });
   $('bands').addEventListener('input', () => {
     $('bands-val').textContent = $('bands').value; view.paint(); view.place();

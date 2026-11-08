@@ -90,7 +90,40 @@ export const rampAt = t =>
 
 // The frame is 2 units across, so this is the share of it the relief fills.
 // Under about 5% nothing can be judged, however correct the arithmetic.
-export const frameShare = (relief, vx) => 100 * relief * vx / 2;
+// Takes the EFFECTIVE vertical from verticalFor(), not the raw slider.
+export const frameShare = (relief, vxEff) => 100 * relief * vxEff / 2;
+
+// ── GIVING HEIGHT A SCALE OF ITS OWN ────────────────────────────────────
+// The author, on the spectral page: *"slider ground covered doesnt seems to do
+// anything"*. It did not, and the reason was in the arithmetic rather than the
+// wiring. The pages had been deriving metres AS relief x vx x km/2, which makes
+// the drawing true-to-scale by construction — so widening the ground scaled
+// both axes together, the shape could not change, and the control could only
+// ever relabel the axis. A second instance of a working slider that looks dead,
+// after the delta slider that a normalising step had divided out.
+//
+// The fix is to pin ONE fixed constant: one dimensionless height unit is
+// METRES_PER_UNIT metres, always. Then the two controls separate and both do
+// something visible and physical:
+//
+//   vertical  sets how tall the mountains are IN METRES, independent of km
+//   km        sets how much ground is in the frame, so widening it flattens
+//             the view — which is what looking at more land actually does
+//
+// and the surface is drawn true to scale, so a grade on screen is a real grade.
+// 10,000 m per unit is chosen so the shipped defaults land on about 2,100 m of
+// relief across 20 km, which is a real mountain range rather than a guess.
+//
+// This is NOT a normalisation. It is one constant, identical for every field,
+// so H and the cutoff still change the height exactly as much as they really
+// do — which is the thing the standing instruction protects.
+export const METRES_PER_UNIT = 10000;
+// 2 frame units of width = km x 1000 metres, so true scale needs this.
+export const verticalFor = (vxSlider, km) =>
+  vxSlider * 2 * METRES_PER_UNIT / (Math.max(0.001, km) * 1000);
+// Height in metres, which depends on the vertical control ALONE. The km term
+// cancels out of the legend's metre labels for the same reason.
+export const reliefMetres = (relief, vxSlider) => relief * vxSlider * METRES_PER_UNIT;
 
 // ── THE VIEWER ──────────────────────────────────────────────────────────
 // Holds the renderer, camera, lights and one mesh PER TILE. Tiles exist because

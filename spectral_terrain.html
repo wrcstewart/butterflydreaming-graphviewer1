@@ -51,6 +51,20 @@
      measured across the settings spans 0.29 to 9.68, a factor of 33, which is
      why the vertical slider has to cover a wide range.
 
+  WHAT "GROUND COVERED" DOES, since it first appeared to do nothing. The author:
+  *"slider ground covered doesnt seems to do anything"*. It did not, and the
+  fault was arithmetic rather than wiring: metres had been DERIVED as relief x
+  vertical x km/2, which makes the drawing true to scale by construction, so
+  widening the ground scaled both axes together and the control could only
+  rename the axis. One fixed constant now pins height to metres — see
+  terrain_view.js — and the two controls separate: the vertical sets relief in
+  METRES, independent of km, and ground covered sets the frame's width in real
+  ground, so widening it flattens the view as looking at more land does. The
+  surface stays true to scale between them, so an on-screen grade is a real
+  grade. Measured, 2,078 m of relief reads as 42% of the frame across 5 km and
+  2.6% across 80 km. Second instance of a working slider that looked dead, after
+  the delta slider a normalising step had divided out.
+
   THE WIDEST-FEATURE CUTOFF is the control worth reaching for first. Without it
   the widest feature is always the whole grid, so the tile reads as one
   grid-sized hump. The cutoff is a soft Butterworth high-pass, amp x k^4/(k^4 +
@@ -166,6 +180,9 @@
         64 cells rather than off</b>, because off is a single hump.</div>
       <label>ground covered <span id="km-val">20</span> km</label>
       <input id="km" type="range" min="2" max="80" value="20" step="1">
+      <div class="hint">The frame's width in real ground. At a fixed mountain
+        height this flattens the view as it widens &mdash; 2,078 m reads as 42%
+        of the frame across 5 km and 2.6% across 80 km.</div>
       <label><input type="checkbox" id="massif" style="width:auto"> massif falloff</label>
       <div class="hint">Optional radial smoothstep that gathers the tile into
         one mountain group. Off by default: it is a window on the result, not
@@ -176,12 +193,16 @@
 
     <fieldset>
       <legend>view</legend>
-      <label>vertical &times; <span id="vx-val">0.15</span></label>
+      <label>mountain height <span id="vx-val">0.15</span></label>
       <input id="vx" type="range" min="0.01" max="1.2" value="0.15" step="0.01">
-      <div class="hint"><b>A fixed multiplier, not a rescale.</b> The heights are
-        drawn as the method produces them, so the relief genuinely changes with
-        H and with the cutoff &mdash; raw relief spans 0.29 to 9.68 across the
-        settings. The readout says what share of the frame it fills.</div>
+      <div class="hint">Sets the relief <b>in metres</b> &mdash; the readout
+        gives the figure. Still a fixed multiplier and not a rescale, so the
+        relief genuinely changes with H and with the cutoff as well; raw relief
+        spans 0.29 to 9.68 across the settings.<br>
+        <b>Ground covered is the other half of the scale.</b> Height is in
+        metres independent of it, so widening the ground flattens the view, as
+        looking at more land does. The surface is drawn true to scale between
+        the two, so an on-screen grade is a real grade.</div>
       <label>colour</label>
       <select id="scheme">
         <option value="grey" selected>grey on white</option>
@@ -237,13 +258,17 @@ import { fbm2d } from './fbm2d.js';
 import { hurstFromVariogram, hurstFromSpectrum, directionalPower, calibrate,
          EXCESS_NOTE, relief as reliefOf, bumps, summits,
          curvature } from './terrain_metrics.js';
-import { makeViewer, frameShare } from './terrain_view.js';
+import { makeViewer, frameShare, verticalFor,
+         reliefMetres } from './terrain_view.js';
 
 const $ = id => document.getElementById(id);
 
 // The viewer never reaches into this page's DOM; it asks for what it needs.
 const read = () => ({
-  scheme: $('scheme').value, bands: +$('bands').value, vx: +$('vx').value,
+  scheme: $('scheme').value, bands: +$('bands').value,
+  // EFFECTIVE vertical: the slider sets metre height, km sets ground width,
+  // and the surface is drawn true to scale between them.
+  vx: verticalFor(+$('vx').value, +$('km').value),
   sun: +$('sun').value, sunaz: +$('sunaz').value,
   wire: $('wire').checked, km: +$('km').value,
 });
@@ -338,8 +363,9 @@ function build() {
 function report() {
   const st = lastStats;
   if (!st) return;
-  const vx = +$('vx').value, km = +$('km').value;
-  const share = frameShare(st.rel, vx);
+  const vxs = +$('vx').value, km = +$('km').value;
+  const share = frameShare(st.rel, verticalFor(vxs, km));
+  const metres = reliefMetres(st.rel, vxs);
   const mPerCell = km * 1000 / st.N;
   const widestKm = st.widest > 0 ? (st.widest * mPerCell / 1000) : km;
   let s = '';
@@ -348,9 +374,10 @@ function report() {
   s += `ground        ${km} km across, ${mPerCell.toFixed(0)} m per cell   ` +
        `widest feature ${widestKm.toFixed(1)} km` +
        (st.widest === 0 ? '  <span class="warn">(no cutoff — one massif)</span>' : '') + '\n';
-  s += `relief        ${st.rel.toFixed(3)} raw (${st.min.toFixed(3)} to ${st.max.toFixed(3)}), ` +
-       `drawn as-is   on screen ${share.toFixed(1)}% of the frame` +
-       (share < 5 ? '  <span class="warn">— too shallow to judge, raise vertical</span>' : '') + '\n';
+  s += `relief        ${st.rel.toFixed(3)} raw (${st.min.toFixed(3)} to ${st.max.toFixed(3)}), drawn as-is   ` +
+       `<b>${metres.toFixed(0)} m</b> over ${km} km, true to scale   ` +
+       `${share.toFixed(1)}% of the frame` +
+       (share < 5 ? '  <span class="warn">— too shallow to judge, raise vertical or narrow the ground</span>' : '') + '\n';
   if (st.slope !== undefined) {
     // Does the H that comes out match the H asked for? Primary figure from the
     // spectrum, which is what the generator sets and is near unbiased here.
@@ -417,9 +444,10 @@ function wireControls() {
     $('H-val').textContent = H.toFixed(2);
     $('D-val').textContent = (3 - H).toFixed(2);
   });
+  // km changes the GEOMETRY now, not just the labels, so it rescales.
   $('km').addEventListener('input', () => {
     $('km-val').textContent = $('km').value;
-    view.drawLegend(); report();
+    view.rescale(); report();
   });
   $('vx').addEventListener('input', () => {
     $('vx-val').textContent = (+$('vx').value).toFixed(2);
