@@ -1077,3 +1077,27 @@ Right for mid-year. The readout gives both percentages and says plainly when
 nothing reaches either line, which is the failure mode of the controls being
 left where they were: at the previous height the peaks reached 1,577 m and the
 whole scene would have been green with no hint why.
+
+**The browns were olives (2026-11-08).** *"the brown looks like muddy green =
+can you make ordinary brown please"*. Correct, and one ratio gives it away: the
+stop at the tree line was 107,107,52, so **R/G = 1.00**, which *is* olive by
+definition; the next stop up was 1.17, a khaki. Calibrated against reference
+browns — sienna 1.95, russet earth and peru both 1.54 — anything under about
+1.15 reads as green no matter what it was meant to be. The band now sits at
+1.40, 1.41, 1.38, 1.31.
+
+The awkward part is that browner means *darker* (saddle brown is luminance
+0.098) while the chain has to stay monotone, since green-to-brown is hue and
+cannot carry the ordering alone. So the browns get progressively lighter as they
+climb, which is also what real slopes do: dark earth and scrub low, pale dry
+scree high. Chain 0.055 → 0.083 → 0.139 → 0.156 → 0.209 → 0.307 → 0.456 → 0.503
+→ 0.909, monotone, 17:1 end to end, with the snow line now the largest single
+ratio at 1.81×.
+
+The second fix was **where the merge sits**. Interpolating green to brown
+through RGB passes through olive at the midpoint, so a long merge plants a wide
+muddy band exactly where the brown should be — which was the first version's
+real mistake, its olive sitting at the tree line and persisting a third of the
+way to the snow line. The merge now runs from the tree line to 18% above it, so
+it is green below, brown within about 130 m above, and brown for the rest of the
+band.

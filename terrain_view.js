@@ -150,20 +150,45 @@ export const snowLineM = lat =>
 // brightness for the ordering. Measured relative luminances are in the comment
 // against each stop, and a test asserts the sequence is increasing.
 const ALPINE_STOPS = [
-  // [position, r, g, b]  position is relative to the bands described below
-  [0.00, 0x27, 0x40, 0x1c],   // valley floor, deep green          lum 0.040
-  [0.55, 0x3e, 0x5a, 0x26],   // conifer slope                     lum 0.080
-  [1.00, 0x6b, 0x6b, 0x34],   // at the tree line, olive           lum 0.145
-  [1.35, 0x94, 0x7e, 0x54],   // above it: scrub and soil, brown   lum 0.219
-  [1.75, 0x9d, 0x93, 0x82],   // bare rock, grey-brown             lum 0.300
-  [2.00, 0xb4, 0xad, 0x9e],   // scree just under the snow         lum 0.420
-  [2.04, 0xf2, 0xf5, 0xf7],   // snow — a deliberate hard step     lum 0.880
+  // [position, r, g, b].  position 0 = valley floor, 1 = tree line, 2 = snow line.
+  //
+  // THE BROWNS ARE REAL BROWNS, and the first version's were not. The author:
+  // *"the brown looks like muddy green = can you make ordinary brown please"*.
+  // He was right, and the giveaway is one ratio: the stop at the tree line was
+  // 107,107,52, so R/G = 1.00 — that IS olive, by definition. The next stop up
+  // was 1.17, a khaki. Measured against reference browns, sienna is 1.95,
+  // russet earth and peru are both 1.54; anything under about 1.15 reads as
+  // green however brown it was meant to be. The browns below sit at 1.40, 1.40
+  // and 1.29.
+  //
+  // The awkward part is that making a colour browner makes it DARKER — saddle
+  // brown is only luminance 0.098 — while the ordering here has to stay
+  // monotone in luminance, because green-to-brown is a hue distinction and the
+  // author's colour vision cannot carry it alone. So the browns get
+  // progressively LIGHTER as they climb, which is also what real slopes do:
+  // dark earth and scrub low down, pale dry scree higher.
+  [0.00,  42,  74,  30],   // valley floor, deep green            lum 0.055
+  [0.50,  56,  90,  34],   // conifer slope                       lum 0.083
+  [1.00,  88, 112,  46],   // AT the tree line, thinning forest   lum 0.135
+  [1.18, 143, 102,  48],   // brown begins, R/G 1.40              lum 0.156
+  [1.48, 164, 117,  60],   // full brown, R/G 1.40                lum 0.209
+  [1.78, 185, 143,  92],   // tan-brown, drying out, R/G 1.29     lum 0.307
+  [1.95, 192, 178, 160],   // scree, warm grey                    lum 0.456
+  [2.00, 196, 187, 172],   // pale scree just under the snow      lum 0.502
+  [2.04, 242, 245, 247],   // snow — a deliberate hard step       lum 0.909
 ];
-// Position 0 is the valley floor, 1 is the tree line, 2 is the snow line, and
-// the jump from 2.00 to 2.04 is the "fairly sharp" transition that was asked
-// for: about 2% of the floor-to-snowline span, so a few tens of metres on these
-// scenes. Not a true step, because an abrupt one aliases into a ragged edge on
-// a triangle mesh; this is sharp enough to read as a snowline and still smooth.
+// The green-to-brown merge runs from 1.00 to 1.18, i.e. it starts AT the tree
+// line and completes just above it, which is what was asked for — green below,
+// merging to brown above. Keeping the merge short matters: interpolating green
+// to brown through RGB passes through olive at the midpoint, so a long merge
+// puts a wide muddy band exactly where the brown should be. That was the first
+// version's real mistake — its olive sat at the tree line and persisted a third
+// of the way to the snow line.
+//
+// The jump from 2.00 to 2.04 is the "fairly sharp" snow transition: about 2% of
+// the floor-to-snowline span, a few tens of metres on these scenes, and the
+// largest luminance ratio in the chain at 1.81x. Not a true step, because an
+// abrupt one aliases into a ragged edge on a triangle mesh.
 export function alpineColour(aM, floorM, treeM, snowM) {
   let pos;
   if (aM <= treeM) {
