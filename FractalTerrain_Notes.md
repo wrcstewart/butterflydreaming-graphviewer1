@@ -663,3 +663,146 @@ propagation direction. The u and v axes are special to nothing, which is why
 the FFT showed them suppressed to 0.06–0.42 at fan 0. Any fix has to break that
 organisation rather than reweight within it — scanning in shells of constant
 Euclidean radius was the candidate, never built.
+
+---
+
+## The three methods from the new document (2026-11-08)
+
+The author brought in `AV/fractal-terrain-methods.md`, written elsewhere, and
+asked for a page per method: spectral first, then noise, then faults "if
+feasible but this can come later if tricky". All three are built. None of them
+uses the L-system at all, which is the point — every construction before this
+one was an attempt to carry a 1D fractal's ordering into 2D, and every one
+streaked.
+
+| page | method | primitive | bounded? |
+|---|---|---|---|
+| `spectral_terrain.html` | B: spectral synthesis | a frequency | one periodic tile |
+| `noise_terrain.html` | C: chunked seeded noise | a lattice sample | **unbounded** |
+| `faults_terrain.html` | A: random faults | **a landform** — one scarp | one tile |
+
+The modules `fbm2d.js`, `faults.js` and `noise.js` were extracted
+**programmatically** from the document's §11.1–11.3 code fences rather than
+retyped, so they cannot drift from it silently. All three reproduce the
+document's own §8 test table. `terrain_metrics.js` holds every measure and
+`terrain_view.js` the schemes, the elevation ramp, the camera and the legend —
+one copy each, because this work has already paid twice for duplication.
+
+### The spectral method answers the question the whole series was asking
+
+Measured anisotropy excess against a matched null: **1.03 on average over seven
+seeds**, i.e. no detectable direction. The triangle scan, whose streaking the
+author could see plainly, reads **2.89 at 53°** — close to the 45° diagonal it
+runs along. Removing the construction order removes the streaks. There was
+never a weighting that would have fixed the scan.
+
+### One divergence found inside the document
+
+It carries **two different `fbm2d` implementations**: §11.1 takes `(n, H, seed)`
+only, while the demo page later adds the `k0` Butterworth high-pass that §3
+describes as one of the method's controls. Without that cutoff the widest
+feature is always the whole grid — one tile-sized hump rather than a range — so
+it is not optional in practice. `fbm2d.js` now carries it, copied from the
+document's own demo version and defaulting to 0 so the test table is
+unaffected. **The two implementations in the document should be made one.**
+
+### Three figures the document does not state
+
+Its test table checks the noise method for edge agreement only, so these are
+additions rather than corrections.
+
+**The noise method does not deliver the H it is asked for.** Asked 0.50 gives
+0.47; asked 0.90 gives 0.72. Discrete octave spacing and simplex's own spectral
+shape are not a true power law. The faults method is much closer — over six
+seeds, 0.498 ± 0.022 at H = 0.50, 0.767 ± 0.037 at 0.80, 0.881 ± 0.039 at 0.95
+— so **α + ½ is exact at 0.5 and runs modestly low above it**. The document
+lists that relation as needing a check against its references [8] and [9]; this
+is that check.
+
+**`height01` clamps, and the clamp bites.** 0.1% to 2.4% of cells are pinned
+dead flat at 0 or 1, worst at few octaves and high H, which caps summits and
+floors valleys. Relief is therefore *always exactly 1.000*, so relief is not a
+measure on that page at all. Separately checked: the clamp is **not** what
+lowers H — unclamped and clamped fields agree to within 0.001.
+
+**The fault method's cost is predictable.** About 2.6 ns per cell-fault at
+α = 0 and 10.6 ns otherwise, the difference being one `Math.pow` per cell. The
+model predicted the 256-grid, 4000-fault case at 2,779 ms against 2,788
+measured, so the page shows the cost before it blocks and refuses to start
+anything over 1.5 s unasked. The document's 1.9 s warning is for α ≠ 0; at
+H = 0.5 the same job is 135 ms.
+
+### Which H estimator, and why it is not the same one twice
+
+This is worth keeping straight, because the right instrument is the opposite on
+the spectral page from the other two.
+
+- **Spectral fields are periodic** — they come out of an inverse FFT. No taper
+  is needed, and a taper is what biases a spectral estimate, so an un-windowed
+  spectral slope is near unbiased: a flat **−0.016** at n = 256 across the whole
+  range of H. The variogram, meanwhile, reads **systematically low** there,
+  because the wrap flattens the large lags: fine at H = 0.5 but 0.14 low by
+  H = 0.95, with a spread of only ±0.01–0.04, so it is bias and not scatter.
+  Reporting that against the H asked for would convict the generator of an error
+  belonging to the measurement.
+- **Noise and fault fields do not wrap.** Measured on a fault field, the mean
+  step across the seam is 30.1 against 3.0 for an interior step — a factor of
+  ten. There a spectral estimate needs a window, so the **variogram** is the
+  sound instrument.
+- The fit band must also **clear the cutoff**. Fitting straight through the
+  Butterworth rolloff read H = **−0.149** for an asked 0.80. Starting at 3·k₀
+  leaves a factor of 0.988, negligible; where that band would lie above Nyquist
+  the page says H is not measurable rather than printing a number.
+
+`hurstFromSpectrum` now **throws** on a non-power-of-two grid instead of
+returning a quiet NaN. That is how the above was noticed at all: a 193-cell
+grid — three 64-cell chunks plus a shared edge — had been printing NaN into a
+readout.
+
+### The direction measure needed a null, and three attempts were wrong
+
+Fifth instance of the frame-of-reference lesson, and the most expensive.
+
+The estimator **alone** is badly biased for a red spectrum. It reported the
+spectral method — whose entire claim is isotropy — at 1.80 to 2.17. Broken down
+by radius band the figure fell 2.71, 1.75, 1.34, 1.21, 1.10, 1.05 as the bins
+per direction rose 3, 12, 50, 201, 804, 3084: a red spectrum puts nearly all
+its power exactly where a discrete grid has fewest samples, so the average was
+dominated by its noisiest bins.
+
+Then three wrong fixes, each of which *looked* like success:
+
+1. **Dividing each bin by its ring mean.** Read 1.07 at 83° for *every* H — the
+   same answer white noise gives — and failed three of the four stripe
+   calibrations, because the window's leakage cross divided by a near-zero ring
+   mean swamps the signal. A measure that returns one figure whatever its input
+   has gone blind, which is harder to spot than being wrong.
+2. **Rotating each ring.** Subtler and worse. A rotation *preserves* a ring's
+   angular profile and merely moves it, and max-over-mean is nearly rotation
+   invariant, so the null became a near-copy of the measurement. It read 1.01 on
+   isotropic fBm, which looks like a pass, while the triangle scan's real
+   streaking fell from 2.17 to 1.47.
+3. **Phase randomisation**, the textbook surrogate, is no use here either: it
+   preserves the power spectrum *exactly*, angular structure included. It is a
+   null for nonlinearity, not for anisotropy.
+
+What works: synthesise a Gaussian field from the measurement's **own radial
+profile**, isotropic by construction, and put it through the identical window.
+The effective sample count, the redness and the leakage all carry over; only the
+direction is gone. White noise 1.04, spectral fBm 1.03, faults 1.17, triangle
+scan 2.89.
+
+**The scatter is in the measurement, not the null**, so averaging more nulls
+does not reduce it: one reading at n = 256 carries about ±0.4, and only an
+excess past roughly 1.6 means anything on its own. Every page quotes that
+uncertainty rather than two decimal places.
+
+### And one false result caught before it was written up
+
+Measured H appeared to rise and fall with the fault count — 0.859 at 500
+faults, 0.683 at 4,000, 0.813 at 16,000 for an asked 0.80 — which reads as a
+convergence curve and was very nearly reported as one. It is not. Across six
+seeds the *mean* is 0.769 at 2,000 faults and 0.764 at 8,000: unchanged. Each
+fault count is a different random field, not a further step in one. What the
+count does set is the **relief**, which grows as √faults, as a sum of
+independent steps must.

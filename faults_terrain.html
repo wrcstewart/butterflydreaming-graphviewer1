@@ -1,0 +1,432 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>faults terrain</title>
+<!--
+  faults_terrain.html — 2026-11-08. Method A from AV/fractal-terrain-methods.md:
+  RANDOM FAULTS, the fracture-and-lift construction (Mandelbrot, Chentsov).
+
+  THE IDEA, and it is the oldest of the three. Draw a random straight line
+  across the terrain; lift everything on one side and drop everything on the
+  other by Q·sgn(d)·|d|^α, where d is the signed distance from the line. Repeat
+  a few thousand times with lines at uniformly random angles and offsets. The
+  sum of many such steps converges on a fractional Brownian surface, with
+  H = α + ½.
+
+  WHY IT IS WORTH HAVING ALONGSIDE THE OTHER TWO. It is the only one of the
+  three whose primitive is a LANDFORM rather than a frequency or a lattice
+  sample: each step is a scarp, and the result looks fault-blocked in a way the
+  spectral method does not. It is also isotropic by construction for a reason
+  that is easy to state — the line angles are drawn uniformly — rather than as
+  a consequence of a spectrum.
+
+  THE COST IS REAL, AND THIS IS THE "TRICKY" PART THE AUTHOR ANTICIPATED. Every
+  fault touches every cell, so the work is faults x n^2 with no way around it in
+  this formulation. Measured here, the rate is about 2.6 ns per cell-fault when
+  α = 0 and 10.6 ns when it is not, because α ≠ 0 costs a Math.pow per cell:
+
+      n     faults   α        measured
+      128    3000    0          135 ms
+      256    2000    0          333 ms
+      256    4000    0.3       2,788 ms
+      256    8000    0.3       5,583 ms
+      512    4000    0.3      11,111 ms
+
+  That model predicts the 256/4000 case at 2,779 ms against 2,788 measured, so
+  the page can say in advance what a setting will cost. It shows the estimate on
+  every control, refuses to start anything over about 1.5 s without being asked,
+  and paints the estimate before it blocks — a synchronous 11-second build with
+  no warning simply looks like a hung page. The document's own note that this
+  took 1.9 s for 3000 faults at n = 128 applies to α ≠ 0; at H = 0.5 the same
+  job is 135 ms, because α = 0 takes a branch with no pow in it.
+
+  WHAT WAS MEASURED HERE THAT THE DOCUMENT LEAVES OPEN. It lists the α–H
+  relation as "confirmed empirically here" and flags it to be checked against
+  its references [8] and [9]. Over six seeds at n = 128:
+
+      asked H    0.50            0.80            0.95
+      measured   0.498 ± 0.022   0.767 ± 0.037   0.881 ± 0.039
+
+  So the relation holds very well at H = 0.5 and runs modestly low above it,
+  by 0.03 at 0.80 and 0.07 at 0.95. The readout quotes the measured scatter
+  rather than treating one reading as exact.
+
+  AND ONE THING I NEARLY GOT WRONG. Measured H appeared to rise and fall with
+  the fault count — 0.859 at 500 faults, 0.683 at 4,000, 0.813 at 16,000 for an
+  asked 0.80 — which looks like a convergence curve and would have been written
+  up as one. It is not. Across six seeds the MEAN is 0.769 at 2,000 faults and
+  0.764 at 8,000: unchanged. The apparent trend was realisation scatter, each
+  fault count being a different random field rather than a further step in one.
+  What the fault count does set is the RELIEF, which grows as the square root of
+  the count, as a sum of independent steps must.
+
+  THE VERTICAL CONTROL IS LOGARITHMIC, and that is forced by the above. Raw
+  relief runs from 112 to 2,777 across the settings, a factor of 25, because it
+  accumulates with √faults and with the |d|^α scale. It is still a FIXED
+  multiplier rather than a per-field rescale, on the standing instruction that
+  no page normalises — so more faults genuinely build higher ground, which is
+  the truth about the method and is what a normalising step would have hidden.
+-->
+<style>
+  :root { --ink:#1b1b18; --dim:#6e6e66; --line:#d7d7cf; --panel:#fffffe;
+          --ground:#f6f5f1; --warn:#8a5a00; --good:#2f5d2a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+         font:13px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display:grid; grid-template-columns:330px 1fr; height:100dvh; }
+  #panel { overflow-y:auto; padding:14px; background:var(--panel);
+           border-right:1px solid var(--line); }
+  h1 { font-size:14px; margin:0 0 2px; letter-spacing:.02em; }
+  .sub { color:var(--dim); font-size:11px; margin:0 0 14px; }
+  fieldset { border:1px solid var(--line); border-radius:3px; margin:0 0 12px;
+             padding:9px 10px 11px; }
+  legend { font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+           color:var(--dim); padding:0 4px; }
+  label { display:block; font-size:11px; color:var(--dim); margin:7px 0 2px; }
+  label:first-child { margin-top:0; }
+  input[type=number], select {
+    width:100%; font:12px ui-monospace, Menlo, monospace; padding:4px 5px;
+    border:1px solid var(--line); border-radius:2px; background:#fff; color:var(--ink); }
+  input[type=range] { width:100%; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .hint { font-size:10px; color:var(--dim); margin-top:3px; }
+  button { font:12px ui-monospace, Menlo, monospace; padding:6px 10px;
+           border:1px solid var(--line); border-radius:2px; background:#fff;
+           color:var(--ink); cursor:pointer; width:100%; }
+  button:hover { background:#f0efe9; }
+  #cost { margin-top:7px; padding:6px 8px; border:1px solid var(--line);
+          border-radius:2px; background:#faf9f4; font-size:11px; }
+  #stage { position:relative; background:#fff; }
+  #cv { display:block; width:100%; height:100%; }
+  #out { position:absolute; left:12px; bottom:12px; margin:0;
+         font:11px/1.5 ui-monospace, Menlo, monospace; white-space:pre;
+         background:rgba(255,255,255,.93); border:1px solid var(--line);
+         border-radius:3px; padding:8px 10px; max-width:calc(100% - 24px);
+         overflow-x:auto; }
+  .warn { color:var(--warn); font-weight:600; }
+  .good { color:var(--good); font-weight:600; }
+  #hint3d { position:absolute; right:12px; top:12px; color:var(--dim);
+            font-size:11px; background:rgba(255,255,255,.9);
+            border:1px solid var(--line); border-radius:3px; padding:5px 8px; }
+  #legend { position:absolute; left:12px; top:12px; display:none;
+         background:rgba(255,255,255,.94); border:1px solid var(--line);
+         border-radius:3px; padding:8px 10px; font-size:10px; }
+  #legend .wrapbar { display:flex; align-items:stretch; }
+  #legend .bar { display:flex; height:150px; width:22px; flex-direction:column-reverse;
+         border:1px solid #0003; }
+  #legend .bar i { flex:1 1 auto; display:block; }
+  #legend table { border-collapse:collapse; height:150px; }
+  #legend td { padding:0 0 0 7px; vertical-align:top; white-space:nowrap; }
+  #err { position:absolute; inset:0; display:none; place-content:center;
+         text-align:center; padding:30px; color:var(--warn);
+         background:rgba(255,255,255,.96); white-space:pre-wrap; }
+</style>
+
+<div id="wrap">
+  <div id="panel">
+    <h1>faults terrain</h1>
+    <p class="sub">Method A: fracture and lift. Each step is a random line with
+      the ground raised on one side by Q&middot;sgn(d)&middot;|d|<sup>&alpha;</sup>.
+      Thousands of scarps sum to an fBm surface with H = &alpha; + &frac12;.</p>
+
+    <fieldset>
+      <legend>surface</legend>
+      <div class="row">
+        <div><label>grid</label>
+          <select id="n">
+            <option value="128">128</option>
+            <option value="256" selected>256</option>
+            <option value="512">512</option>
+          </select></div>
+        <div><label>seed</label><input id="seed" type="number" value="7" min="1" step="1"></div>
+      </div>
+      <label>Hurst exponent H <span id="H-val">0.80</span>
+        &nbsp;&nbsp;<span class="hint" style="display:inline">&alpha; = <span id="a-val">0.30</span></span></label>
+      <input id="H" type="range" min="0.3" max="0.95" value="0.8" step="0.01">
+      <div class="hint">&alpha; = H &minus; &frac12;. <b>&alpha; = 0, i.e.
+        H&nbsp;=&nbsp;0.50, is four times faster</b> because it skips a
+        <code>Math.pow</code> per cell &mdash; and it is also the case where the
+        relation is most exact, measured 0.498&nbsp;&plusmn;&nbsp;0.022.</div>
+      <label>faults <span id="f-val">1500</span></label>
+      <input id="f" type="range" min="200" max="8000" value="1500" step="100">
+      <div class="hint">More faults means <b>higher ground, not a different
+        H</b>: relief grows as &radic;faults while measured H is unchanged
+        (0.769 at 2,000 against 0.764 at 8,000, over six seeds). Below about
+        500 the individual scarps are still visible as straight steps, which is
+        worth seeing once.</div>
+      <label>ground covered <span id="km-val">20</span> km</label>
+      <input id="km" type="range" min="2" max="80" value="20" step="1">
+      <div id="cost">cost &mdash;</div>
+      <button id="go" style="margin-top:7px">build</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>view</legend>
+      <label>vertical <span id="vx-val">1.6e-3</span></label>
+      <input id="vx" type="range" min="-4" max="-1.7" value="-2.79" step="0.01">
+      <div class="hint"><b>Logarithmic, and still a fixed multiplier.</b> Raw
+        relief runs 112 to 2,777 across the settings because it accumulates with
+        &radic;faults, so a linear slider cannot reach both ends. Nothing is
+        rescaled per field, so adding faults really does raise the ground.</div>
+      <label>colour</label>
+      <select id="scheme">
+        <option value="grey" selected>grey on white</option>
+        <option value="whiteblue">white on blue</option>
+        <option value="whiteolive">white on greeny brown</option>
+        <option value="sea">blue-green sea against sky</option>
+        <option value="spectrum">ELEVATION SPECTRUM &mdash; red low to blue high</option>
+      </select>
+      <label>spectrum bands <span id="bands-val">0</span></label>
+      <input id="bands" type="range" min="0" max="40" value="0" step="1">
+      <div class="row">
+        <div><label>sun elevation <span id="sun-val">12</span>&deg;</label>
+          <input id="sun" type="range" min="2" max="80" value="12" step="1"></div>
+        <div><label>sun azimuth <span id="sunaz-val">135</span>&deg;</label>
+          <input id="sunaz" type="range" min="0" max="359" value="135" step="1"></div>
+      </div>
+      <div class="hint">A low sun is the lever for shallow relief: shading
+        sensitivity goes as grade &times; cot(elevation). It also throws the
+        scarps into relief, which is the thing to look at here.</div>
+      <label><input type="checkbox" id="wire" style="width:auto"> wireframe</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>measure</legend>
+      <label><input type="checkbox" id="domeasure" checked style="width:auto">
+        measure H and anisotropy after each build</label>
+      <div class="hint">Cheap next to the build itself. H comes from the
+        variogram: a fault field does not wrap &mdash; measured, the step across
+        the seam is ten times a neighbouring step &mdash; so the un-windowed
+        spectral estimator used on the spectral page does not apply here.</div>
+    </fieldset>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hint3d">drag to orbit &middot; wheel to zoom</div>
+    <div id="legend"></div>
+    <pre id="out">press build…</pre>
+    <div id="err"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script type="module">
+import { faults2d } from './faults.js';
+import { hurstFromVariogram, directionalPower, EXCESS_NOTE,
+         relief as reliefOf, bumps, summits, curvature } from './terrain_metrics.js';
+import { makeViewer, frameShare } from './terrain_view.js';
+
+const $ = id => document.getElementById(id);
+
+// The vertical control is logarithmic; everything else reads straight.
+const vxOf = () => Math.pow(10, +$('vx').value);
+const read = () => ({
+  scheme: $('scheme').value, bands: +$('bands').value, vx: vxOf(),
+  sun: +$('sun').value, sunaz: +$('sunaz').value,
+  wire: $('wire').checked, km: +$('km').value,
+});
+
+function fail(msg) {
+  const e = $('err');
+  e.style.display = 'grid';
+  e.textContent = msg;
+  console.error(msg);
+}
+
+// MEASURED on this machine, not guessed: about 2.6 ns per cell-fault when
+// α = 0 and 10.6 ns when it is not, the difference being one Math.pow per cell.
+// The model predicted the 256-grid, 4000-fault case at 2,779 ms against 2,788
+// measured, which is why it is worth showing before the work starts.
+const NS_FLAT = 2.6, NS_POW = 10.6;
+const AUTO_MS = 1500;          // above this, wait to be asked
+function estimateMs() {
+  const n = +$('n').value, f = +$('f').value, H = +$('H').value;
+  const alpha = H - 0.5;
+  const rate = Math.abs(alpha) < 1e-9 ? NS_FLAT : NS_POW;
+  return n * n * f * rate / 1e6;
+}
+function showCost() {
+  const ms = estimateMs();
+  const txt = ms < 1000 ? ms.toFixed(0) + ' ms' : (ms / 1000).toFixed(1) + ' s';
+  $('cost').innerHTML =
+    'cost  <b>about ' + txt + '</b>  (' + (+$('f').value).toLocaleString() +
+    ' faults &times; ' + (+$('n').value) + '&sup2; cells)' +
+    (ms > AUTO_MS
+      ? '<br><span class="warn">too slow to run on every change — press build</span>'
+      : '');
+  $('go').textContent = 'build  (' + txt + ')';
+}
+
+let view = null, lastStats = null;
+
+function build() {
+  $('err').style.display = 'none';
+  const ms = estimateMs();
+  // Paint the warning BEFORE blocking. faults2d is synchronous, so an 11-second
+  // build with no notice is indistinguishable from a hung page.
+  $('out').innerHTML = 'building ' + (+$('f').value).toLocaleString() +
+    ' faults — about ' + (ms < 1000 ? ms.toFixed(0) + ' ms' : (ms / 1000).toFixed(1) + ' s') +
+    '…\n<i>the page is blocked while this runs</i>';
+  setTimeout(buildNow, 0);
+}
+
+function buildNow() {
+  try {
+    const N = +$('n').value, H = +$('H').value;
+    const seed = Math.max(1, +$('seed').value | 0), faults = +$('f').value;
+    const predicted = estimateMs();
+
+    const t0 = performance.now();
+    // normalise: false — the standing instruction. Nothing here rescales per
+    // field, so adding faults genuinely raises the ground.
+    const h = faults2d({ n: N, H, faults, seed, normalise: false }).heights;
+    const genMs = performance.now() - t0;
+
+    view.setTiles([{ h, n: N, cx: 0, cz: 0, size: 2 }]);
+
+    const rm = reliefOf(h), rel = rm.relief;
+    const st = { N, H, seed, faults, genMs, predicted, rel, min: rm.min, max: rm.max };
+    if ($('domeasure').checked) {
+      const t1 = performance.now();
+      // THE VARIOGRAM, not the spectrum. A fault field does not wrap: measured,
+      // the mean step across the x seam is 30.1 against 3.0 for a neighbouring
+      // interior step, a factor of ten. The spectral page's un-windowed
+      // estimator is only valid on a periodic field.
+      const hv = hurstFromVariogram(h, N, 2, Math.min(32, N / 8));
+      const dp = directionalPower(h, N);
+      st.Hm = hv.H; st.slope = hv.slope;
+      st.aniso = dp.anisotropy; st.nullA = dp.nullAnisotropy;
+      st.excess = dp.excess; st.peak = dp.peak.structureDeg;
+      st.bumps = bumps(h, N, rel);
+      const su = summits(h, N, 8, rel);
+      st.summits = su.count; st.bestSummit = su.best;
+      st.curv = curvature(h, N, rel);
+      st.measMs = performance.now() - t1;
+    }
+    lastStats = st;
+    report();
+  } catch (e) {
+    fail('build failed\n\n' + (e && e.stack ? e.stack : String(e)));
+  }
+}
+
+// The measured scatter over six seeds at n = 128, so one reading is quoted with
+// its uncertainty instead of to three decimal places as though it were exact.
+const SCATTER = [[0.50, 0.498, 0.022], [0.80, 0.767, 0.037], [0.95, 0.881, 0.039]];
+function expectedH(H) {
+  // linear interpolation between the measured points
+  if (H <= SCATTER[0][0]) return SCATTER[0];
+  for (let i = 1; i < SCATTER.length; i++) {
+    const [h0, m0, s0] = SCATTER[i - 1], [h1, m1, s1] = SCATTER[i];
+    if (H <= h1) {
+      const t = (H - h0) / (h1 - h0);
+      return [H, m0 + t * (m1 - m0), s0 + t * (s1 - s0)];
+    }
+  }
+  return SCATTER[SCATTER.length - 1];
+}
+
+function report() {
+  const st = lastStats;
+  if (!st) return;
+  const vx = vxOf(), km = +$('km').value;
+  const share = frameShare(st.rel, vx);
+  let s = '';
+  s += `grid          ${st.N} x ${st.N}   seed ${st.seed}   ` +
+       `${st.faults.toLocaleString()} faults, &alpha; = ${(st.H - 0.5).toFixed(2)}\n`;
+  s += `built in      ${st.genMs.toFixed(0)} ms   ` +
+       `<i>predicted ${st.predicted.toFixed(0)} ms, ` +
+       `out by ${(100 * Math.abs(st.genMs - st.predicted) / Math.max(st.genMs, 1)).toFixed(0)}%</i>\n`;
+  s += `ground        ${km} km across, ${(km * 1000 / st.N).toFixed(0)} m per cell\n`;
+  s += `relief        ${st.rel.toFixed(1)} raw (${st.min.toFixed(1)} to ${st.max.toFixed(1)}), ` +
+       `drawn as-is   on screen ${share.toFixed(1)}% of the frame` +
+       (share < 5 ? '  <span class="warn">— too shallow to judge, raise vertical</span>' : '') + '\n';
+  if (st.Hm !== undefined) {
+    // Asked, measured, and what this method is KNOWN to deliver at that H —
+    // three different numbers, so all three are shown.
+    const [, exp, sd] = expectedH(st.H);
+    const off = st.Hm - exp;
+    s += `H             asked ${st.H.toFixed(2)}   measured <b>${st.Hm.toFixed(3)}</b> ` +
+         `from the variogram (slope ${st.slope.toFixed(3)} = 2H)\n`;
+    s += `              this method delivers ${exp.toFixed(3)} &plusmn;${sd.toFixed(3)} at that H ` +
+         `over six seeds   ` +
+         (Math.abs(off) < 2.5 * sd
+           ? '<span class="good">within the seed scatter</span>'
+           : `<span class="warn">${off < 0 ? 'below' : 'above'} it by ${Math.abs(off).toFixed(3)}</span>`) + '\n';
+    s += `              <i>&alpha; + &frac12; is exact at H = 0.50 and runs low above it — ` +
+         `0.03 at 0.80, 0.07 at 0.95</i>\n`;
+    // Isotropy here is by construction, the line angles being uniform, so this
+    // is a check on the implementation rather than on the idea.
+    const verdict = st.excess > 1.6
+      ? `<span class="warn">structure at ${st.peak}&deg;</span>`
+      : '<span class="good">isotropic, as uniform line angles require</span>';
+    s += `anisotropy    ${st.aniso.toFixed(2)} measured against ${st.nullA.toFixed(2)} ` +
+         `isotropic null   excess <b>${st.excess.toFixed(2)}</b> &plusmn;0.4   ${verdict}\n`;
+    s += `              <i>${EXCESS_NOTE}</i>\n`;
+    s += `texture       ${st.bumps.toLocaleString()} bumps, ${st.summits} summits at radius 8 ` +
+         `(tallest ${(100 * st.bestSummit / st.rel).toFixed(0)}% of relief)   ` +
+         `curvature ${st.curv.mean.toFixed(3)}% mean, ${st.curv.max.toFixed(1)}% max\n`;
+    s += `              measured in ${st.measMs.toFixed(0)} ms`;
+  } else {
+    s += 'measurement   <span class="warn">off</span> — tick it for H and anisotropy';
+  }
+  $('out').innerHTML = s;
+}
+
+function maybeBuild() {
+  showCost();
+  if (estimateMs() <= AUTO_MS) build();
+}
+
+function wireControls() {
+  for (const id of ['n', 'seed', 'domeasure']) $(id).addEventListener('change', maybeBuild);
+  $('wire').addEventListener('change', maybeBuild);
+  $('H').addEventListener('input', () => {
+    const H = +$('H').value;
+    $('H-val').textContent = H.toFixed(2);
+    $('a-val').textContent = (H - 0.5).toFixed(2);
+    showCost();
+  });
+  $('f').addEventListener('input', () => {
+    $('f-val').textContent = (+$('f').value).toLocaleString();
+    showCost();
+  });
+  // change, not input, for the expensive pair: dragging must not launch builds.
+  $('H').addEventListener('change', maybeBuild);
+  $('f').addEventListener('change', maybeBuild);
+  $('km').addEventListener('input', () => {
+    $('km-val').textContent = $('km').value;
+    view.drawLegend(); report();
+  });
+  $('vx').addEventListener('input', () => {
+    $('vx-val').textContent = vxOf().toExponential(1);
+    view.rescale(); report();
+  });
+  $('bands').addEventListener('input', () => {
+    $('bands-val').textContent = $('bands').value; view.paint(); view.place();
+  });
+  $('scheme').addEventListener('change', () => view.applyScheme());
+  for (const id of ['sun', 'sunaz']) $(id).addEventListener('input', () => {
+    $('sun-val').textContent = $('sun').value;
+    $('sunaz-val').textContent = $('sunaz').value;
+    view.place();
+  });
+  $('go').addEventListener('click', build);
+}
+
+if (!window.THREE) {
+  fail('three.js did not load from the CDN, so nothing can be drawn.\n' +
+       'Check the network, then reload.');
+} else {
+  try {
+    view = makeViewer({ THREE: window.THREE, canvas: $('cv'), stage: $('stage'),
+                        legend: $('legend'), onError: fail, read });
+    wireControls();
+    showCost();
+    build();
+  } catch (e) {
+    fail('could not start\n\n' + (e && e.stack ? e.stack : String(e)));
+  }
+}
+</script>
