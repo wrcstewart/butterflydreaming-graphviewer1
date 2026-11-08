@@ -336,9 +336,36 @@
     </fieldset>
 
     <fieldset>
+      <legend>altitude and vegetation</legend>
+      <div class="hint" style="margin-bottom:6px">The field is dimensionless, so
+        a <b>datum</b> is needed before a tree line means anything. The valley
+        floor of the view is that datum, and mountain height sets the metres
+        above it. <b>Mid-year is assumed</b>, so the snow line is the SUMMER one
+        &mdash; the altitude above which snow survives the melt season. A winter
+        snow line sits roughly a kilometre lower and would bury these scenes.</div>
+      <label>valley floor <span id="base-val">1000</span> m</label>
+      <input id="base" type="range" min="0" max="3000" value="1000" step="50">
+      <label>latitude <span id="lat-val">46</span>&deg;</label>
+      <input id="lat" type="range" min="0" max="78" value="46" step="1">
+      <div class="hint">Latitude drives both lines, far more than anything else
+        does. Interpolated from observed figures rather than a formula &mdash; a
+        cosine law is wrong in the subtropics, where the dry highs push the snow
+        line <i>above</i> its equatorial value, over 5,000&nbsp;m at
+        20&deg;. Checks: 46&deg; gives 2,120 and 2,820&nbsp;m against the Alps'
+        observed ~2,200 and ~2,900; 60&deg; gives 1,100 and 1,500, which is
+        southern Norway; past 73&deg; the tree line reaches zero.</div>
+      <div class="row">
+        <div><label>tree line m</label><input id="tree" type="number" value="2120" step="10"></div>
+        <div><label>snow line m</label><input id="snow" type="number" value="2820" step="10"></div>
+      </div>
+      <div class="hint">Moving latitude resets both; type over either to hold a
+        local climate. Approximate to a few hundred metres at best.</div>
+    </fieldset>
+
+    <fieldset>
       <legend>view</legend>
-      <label>mountain height <span id="vx-val">0.18</span></label>
-      <input id="vx" type="range" min="0.01" max="1" value="0.18" step="0.01">
+      <label>mountain height <span id="vx-val">0.34</span></label>
+      <input id="vx" type="range" min="0.01" max="1" value="0.34" step="0.01">
       <div class="hint">Sets the relief <b>in metres</b>; the readout gives it.
         height01 already returns [0,&nbsp;1], so unlike the spectral page the
         raw relief here is fixed at 1.000 by the method itself &mdash; it
@@ -348,7 +375,8 @@
         flattens the view</b> &mdash; the same mountains across more land.</div>
       <label>colour</label>
       <select id="scheme">
-        <option value="grey" selected>grey on white</option>
+        <option value="alpine" selected>ALPINE &mdash; green to brown, snow above the line</option>
+        <option value="grey">grey on white</option>
         <option value="whiteblue">white on blue</option>
         <option value="whiteolive">white on greeny brown</option>
         <option value="sea">blue-green sea against sky</option>
@@ -393,8 +421,8 @@ import { makeVariedTerrain, heterogeneity, largestPlateau,
          mountainousFraction } from './noise_variants.js';
 import { hurstFromVariogram, directionalPower, EXCESS_NOTE,
          bumps, summits, curvature } from './terrain_metrics.js';
-import { makeViewer, frameShare, verticalFor,
-         reliefMetres } from './terrain_view.js';
+import { makeViewer, frameShare, verticalFor, reliefMetres,
+         METRES_PER_UNIT, treeLineM, snowLineM } from './terrain_view.js';
 
 const $ = id => document.getElementById(id);
 
@@ -405,6 +433,11 @@ const read = () => ({
   vx: verticalFor(+$('vx').value, (+$('ck').value) * (+$('k').value)),
   sun: +$('sun').value, sunaz: +$('sunaz').value,
   wire: $('wire').checked, km: (+$('ck').value) * (+$('k').value),
+  altitude: {
+    baseM: +$('base').value,
+    mPerUnit: (+$('vx').value) * METRES_PER_UNIT,
+    treeM: +$('tree').value, snowM: +$('snow').value,
+  },
 });
 
 function fail(msg) {
@@ -515,7 +548,21 @@ function build() {
     for (const row of grid) for (const c of row) for (const v of c) {
       if (v < rlo) rlo = v; if (v > rhi) rhi = v;
     }
+    // What share of the ground sits above each line. Computed from the chunk
+    // arrays, which exist whether or not the measure pass runs.
+    const baseM = +$('base').value, mPerUnit = (+$('vx').value) * METRES_PER_UNIT;
+    const treeM = +$('tree').value, snowM = +$('snow').value;
+    let nAbove = 0, nSnow = 0, nAll = 0;
+    for (const row of grid) for (const c of row) for (const v of c) {
+      const aM = baseM + (v - rlo) * mPerUnit;
+      if (aM > treeM) nAbove++;
+      if (aM > snowM) nSnow++;
+      nAll++;
+    }
     const st = { seed, H, octaves, widestKm, k, res, chunkKm, cx0, cz0,
+                 baseM, treeM, snowM, mPerUnit,
+                 aboveTree: nAbove / nAll, aboveSnow: nSnow / nAll,
+                 peakM: baseM + (rhi - rlo) * mPerUnit,
                  genMs, maxEdge, pairs, finestKm: terrain.finestKm,
                  stretchU, stretchV, ratio, warp, hetero, pinNorm, softClamp,
                  baseKm, baseShare, coverage, foothills,
@@ -667,6 +714,17 @@ function report() {
     s += `anisotropy    ${st.aniso.toFixed(2)} measured against ${st.nullA.toFixed(2)} ` +
          `isotropic null   excess <b>${st.excess.toFixed(2)}</b> &plusmn;0.4   ${verdict}\n`;
     s += `              <i>${EXCESS_NOTE}</i>\n`;
+    {
+      s += `altitude      valley ${st.baseM} m to peak <b>${Math.round(st.peakM)} m</b>   ` +
+         `tree line ${st.treeM} m, snow line ${st.snowM} m (mid-year)\n`;
+    s += `              ${(100 * st.aboveTree).toFixed(0)}% of the ground is above the tree line, ` +
+         `${(100 * st.aboveSnow).toFixed(1)}% under snow` +
+         (st.peakM < st.treeM
+            ? '   <span class="warn">— nothing reaches the tree line; raise the height or the floor</span>'
+            : st.aboveSnow < 0.001 && st.peakM < st.snowM
+              ? '   <i>— no peak reaches the snow line</i>'
+              : '') + '\n';
+    }
     if (st.baseShare > 0 || st.coverage < 0.999) {
       s += `two layers    swell ${st.baseKm} km at ${(100 * st.baseShare).toFixed(0)}% of the ` +
            `amplitude, ${(acrossKm / st.baseKm).toFixed(1)} across the view\n`;
@@ -710,7 +768,7 @@ function step(dx, dz) {
 function wireControls() {
   for (const id of ['seed', 'oct', 'H', 'widest', 'k', 'res', 'ck', 'cx', 'cz',
                     'wire', 'domeasure', 'st', 'wp', 'ht', 'pin', 'soft',
-                    'bk', 'bs', 'cov', 'fh'])
+                    'bk', 'bs', 'cov', 'fh', 'base', 'tree', 'snow'])
     $(id).addEventListener('change', build);
   $('st').addEventListener('input', () => { $('st-val').textContent = (+$('st').value).toFixed(1); });
   $('wp').addEventListener('input', () => { $('wp-val').textContent = (+$('wp').value).toFixed(1); });
@@ -719,12 +777,26 @@ function wireControls() {
   $('bs').addEventListener('input', () => { $('bs-val').textContent = (+$('bs').value).toFixed(2); });
   $('cov').addEventListener('input', () => { $('cov-val').textContent = (+$('cov').value).toFixed(2); });
   $('fh').addEventListener('input', () => { $('fh-val').textContent = (+$('fh').value).toFixed(2); });
+  $('base').addEventListener('input', () => {
+    $('base-val').textContent = $('base').value;
+    view.paint(); view.place(); report();          // colour only, no rebuild
+  });
+  // Latitude RESETS both lines, so it acts as a preset; typing over either holds.
+  $('lat').addEventListener('input', () => {
+    const lat = +$('lat').value;
+    $('lat-val').textContent = lat;
+    $('tree').value = Math.round(treeLineM(lat));
+    $('snow').value = Math.round(snowLineM(lat));
+    view.paint(); view.place(); report();
+  });
   $('H').addEventListener('input', () => { $('H-val').textContent = (+$('H').value).toFixed(2); });
   $('widest').addEventListener('input', () => { $('widest-val').textContent = $('widest').value; });
   $('ck').addEventListener('input', () => { $('ck-val').textContent = $('ck').value; });
   $('vx').addEventListener('input', () => {
     $('vx-val').textContent = (+$('vx').value).toFixed(2);
-    view.rescale(); report();
+    // Height changes the altitude of every point, so the alpine scheme has to
+    // repaint as well as rescale — the snow line moves down the mountain.
+    view.rescale(); view.paint(); view.place(); report();
   });
   $('bands').addEventListener('input', () => {
     $('bands-val').textContent = $('bands').value; view.paint(); view.place();

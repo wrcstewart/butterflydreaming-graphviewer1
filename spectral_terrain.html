@@ -210,6 +210,7 @@
         <option value="whiteolive">white on greeny brown</option>
         <option value="sea">blue-green sea against sky</option>
         <option value="spectrum">ELEVATION SPECTRUM &mdash; red low to blue high</option>
+        <option value="alpine">alpine &mdash; green to brown, snow above the line</option>
       </select>
       <label>spectrum bands <span id="bands-val">0</span></label>
       <input id="bands" type="range" min="0" max="40" value="0" step="1">
@@ -258,8 +259,8 @@ import { fbm2d } from './fbm2d.js';
 import { hurstFromVariogram, hurstFromSpectrum, directionalPower, calibrate,
          EXCESS_NOTE, relief as reliefOf, bumps, summits,
          curvature } from './terrain_metrics.js';
-import { makeViewer, frameShare, verticalFor,
-         reliefMetres } from './terrain_view.js';
+import { makeViewer, frameShare, verticalFor, reliefMetres,
+         METRES_PER_UNIT, treeLineM, snowLineM } from './terrain_view.js';
 
 const $ = id => document.getElementById(id);
 
@@ -271,6 +272,10 @@ const read = () => ({
   vx: verticalFor(+$('vx').value, +$('km').value),
   sun: +$('sun').value, sunaz: +$('sunaz').value,
   wire: $('wire').checked, km: +$('km').value,
+  // Enough for the shared alpine scheme to work here too. The noise page has
+  // the full controls; these pages take a 46-degree default, which is the Alps.
+  altitude: { baseM: 400, mPerUnit: (+$('vx').value) * METRES_PER_UNIT,
+              treeM: treeLineM(46), snowM: snowLineM(46) },
 });
 
 function fail(msg) {

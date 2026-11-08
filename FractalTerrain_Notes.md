@@ -1015,3 +1015,65 @@ And refactoring `0.85 * sum / norm` into `0.85 * (sum/norm)` **broke the
 bit-identity claim by exactly one ulp**, 2.2e-16: the original associates as
 `(0.85 * sum) / norm`, and the rounding differs. The expression, not just the
 value, is what has to be preserved on a path claiming identity.
+
+#### Real altitudes, a tree line and a snow line (2026-11-08)
+
+*"Can you work out the hights in metres and define a tree line and a snow line -
+mid year say. Then have green merging to brown above tree line with a fairly
+sharp above snow line in white."*
+
+**A datum was needed first.** The field is dimensionless, so no tree line means
+anything until something fixes where zero is. The valley floor of the view is
+that datum and `mountain height` sets the metres above it, so altitude is
+`baseM + (h − lo) × mPerUnit` — which works on any of the three pages, including
+the two whose fields are not in [0, 1].
+
+**Mid-year means summer**, so these are SUMMER lines: the snow line is the
+regional one, the altitude above which snow survives the melt season and the
+highest it reaches in the year. A winter snow line sits roughly a kilometre
+lower and would bury every scene here, so the assumption is stated on the panel
+rather than buried in the code.
+
+**Latitude drives both lines far more than anything else**, so latitude is the
+control and the values are interpolated from observed figures, not a formula.
+A cosine law was tried first and is wrong in the subtropics: it misses that the
+snow line *peaks* around 20–25°, where the dry subtropical highs leave the Andes
+and Himalaya snow-free above 5,000 m — higher than at the equator.
+
+| latitude | tree | snow | check |
+|---|---|---|---|
+| 0° | 3900 | 4900 | equatorial Andes |
+| 20° | 4000 | 5300 | subtropical, driest |
+| 46° | 2120 | 2820 | Alps, observed ~2200 / ~2900 |
+| 60° | 1100 | 1500 | southern Norway, observed ~1100 / ~1500 |
+| 73° | 140 | 560 | tree line reaching zero |
+
+The snow line is held at least 150 m above the tree line at every latitude —
+trees cannot grow above permanent snow, and an inverted pair would paint a brown
+band on top of a white one.
+
+**GREEN TO BROWN IS A HUE DISTINCTION AND SO NOT ENOUGH ON ITS OWN**, given the
+author's colour vision. Every stop therefore also steps up in relative
+luminance, monotonically and checked by assertion:
+
+    0.042 → 0.085 → 0.139 → 0.219 → 0.296 → 0.421 → 0.909
+    ratios  2.03   1.64    1.57    1.36    1.42    2.16
+
+22:1 end to end, so altitude is legible twice over — by hue for the eye that has
+it, and by brightness for the ordering. The first attempt stalled across the
+tree line at 0.139 → 0.151, a 1.09× step, which would have made the one boundary
+he asked for the hardest to see; lightening the brown to #947e54 opened it to
+1.57×. The biggest ratio in the chain is the snow line, as it should be.
+
+**The snow transition is sharp but not a step.** It spans about 2% of the
+floor-to-snowline distance, a few tens of metres on these scenes: an abrupt step
+aliases into a ragged edge on a triangle mesh, and this reads as a snowline
+while staying smooth.
+
+At the new defaults — valley 1,000 m, latitude 46°, height 0.34 — the scene runs
+1,000 m to a 3,225 m peak with **13% of the ground above the tree line and 1.9%
+under snow**, which is a brown upper band with caps on the highest summits.
+Right for mid-year. The readout gives both percentages and says plainly when
+nothing reaches either line, which is the failure mode of the controls being
+left where they were: at the previous height the peaks reached 1,577 m and the
+whole scene would have been green with no hint why.

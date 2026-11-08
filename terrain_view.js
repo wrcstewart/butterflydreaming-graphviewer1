@@ -46,6 +46,12 @@ export const SCHEMES = {
                 sun:0xfffdf4, hemi:0.60, sunI:2.4, rough:0.42, metal:0.10 },
   spectrum:   { bg:0x33332f, surface:0xffffff, sky:0xffffff, bounce:0xffffff,
                 sun:0xffffff, hemi:0.90, sunI:1.1, rough:0.98, byElevation:true },
+  // Vegetation by real altitude. The lighting stays neutral and fairly flat so
+  // the colour carries the altitude rather than competing with shading, but the
+  // sun still has to model relief — hence a moderate hemi rather than the
+  // spectrum scheme's near-ambient 0.90.
+  alpine:     { bg:0xb9cfe2, surface:0xffffff, sky:0xdce8f2, bounce:0x6e7466,
+                sun:0xfff8e8, hemi:0.55, sunI:2.0, rough:0.92, byAltitude:true },
 };
 // A dark mark that reads by luminance against every scheme's surface — worst
 // case measured 5.0:1, on the sea.
@@ -87,6 +93,111 @@ export const RAMP = (() => {
 })();
 export const rampAt = t =>
   RAMP[Math.max(0, Math.min(RAMP_N - 1, Math.round(t * (RAMP_N - 1))))];
+
+// ── TREE LINE, SNOW LINE AND AN ALPINE RAMP ─────────────────────────────
+// The author: *"Can you work out the hights in metres and define a tree line
+// and a snow line - mid year say. Then have green merging to brown above tree
+// line with a fairly sharp above snow line in white."*
+//
+// MID YEAR MEANS SUMMER, so the snow line here is the SUMMER snow line — the
+// regional or orographic one, the highest it gets in the year and the altitude
+// above which snow persists through the melt season. A winter snow line sits
+// roughly a kilometre lower and would put most of these scenes under snow, so
+// the assumption matters and is stated rather than buried.
+//
+// BOTH LINES DEPEND ON LATITUDE FAR MORE THAN ON ANYTHING ELSE, so latitude is
+// the control and the lines are interpolated from observed values rather than
+// from a formula. A cosine law was tried first and is wrong in the subtropics:
+// it misses the fact that the snow line PEAKS around 20-25 degrees, where the
+// dry subtropical highs leave the Andes and Himalaya snow-free to well over
+// 5,000 m — higher than at the equator. These are approximate regional figures,
+// good to a few hundred metres, and local climate moves them more than that:
+//
+//   lat      0     20     30     40     45     50     60     70     75
+//   tree  3900   4000   3400   2700   2200   1800   1100    350      0
+//   snow  4900   5300   4800   3600   2900   2500   1500    800    400
+//
+// Checkpoints against places: 46 degrees gives about 2,150 m and 2,860 m, which
+// is the Alps (observed roughly 2,200 and 2,900); 60 degrees gives 1,100 m and
+// 1,500 m, which is southern Norway; past about 73 degrees the tree line
+// reaches zero and there are no trees at all, which is correct for the high
+// Arctic.
+const TREE_LINE = [[0,3900],[10,3900],[20,4000],[30,3400],[40,2700],[45,2200],
+                   [50,1800],[55,1400],[60,1100],[65,700],[70,350],[75,0]];
+const SNOW_LINE = [[0,4900],[10,4800],[20,5300],[30,4800],[40,3600],[45,2900],
+                   [50,2500],[55,1900],[60,1500],[65,1100],[70,800],[75,400],[80,200]];
+function interpTable(table, lat) {
+  const x = Math.abs(lat);
+  if (x <= table[0][0]) return table[0][1];
+  for (let i = 1; i < table.length; i++) {
+    if (x <= table[i][0]) {
+      const [x0, y0] = table[i - 1], [x1, y1] = table[i];
+      return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    }
+  }
+  return table[table.length - 1][1];
+}
+export const treeLineM = lat => Math.max(0, interpTable(TREE_LINE, lat));
+// Kept above the tree line by construction: trees cannot grow above permanent
+// snow, and an inverted pair would colour a brown band on top of a white one.
+export const snowLineM = lat =>
+  Math.max(interpTable(SNOW_LINE, lat), treeLineM(lat) + 150);
+
+// The ramp. GREEN TO BROWN IS A HUE DISTINCTION AND THEREFORE NOT ENOUGH on its
+// own: the author has reduced colour vision, so every stop below also steps up
+// in LUMINANCE, monotonically from 0.04 in the valley to 0.88 on the snow.
+// Altitude is then legible twice over — by hue for the eye that has it, and by
+// brightness for the ordering. Measured relative luminances are in the comment
+// against each stop, and a test asserts the sequence is increasing.
+const ALPINE_STOPS = [
+  // [position, r, g, b]  position is relative to the bands described below
+  [0.00, 0x27, 0x40, 0x1c],   // valley floor, deep green          lum 0.040
+  [0.55, 0x3e, 0x5a, 0x26],   // conifer slope                     lum 0.080
+  [1.00, 0x6b, 0x6b, 0x34],   // at the tree line, olive           lum 0.145
+  [1.35, 0x94, 0x7e, 0x54],   // above it: scrub and soil, brown   lum 0.219
+  [1.75, 0x9d, 0x93, 0x82],   // bare rock, grey-brown             lum 0.300
+  [2.00, 0xb4, 0xad, 0x9e],   // scree just under the snow         lum 0.420
+  [2.04, 0xf2, 0xf5, 0xf7],   // snow — a deliberate hard step     lum 0.880
+];
+// Position 0 is the valley floor, 1 is the tree line, 2 is the snow line, and
+// the jump from 2.00 to 2.04 is the "fairly sharp" transition that was asked
+// for: about 2% of the floor-to-snowline span, so a few tens of metres on these
+// scenes. Not a true step, because an abrupt one aliases into a ragged edge on
+// a triangle mesh; this is sharp enough to read as a snowline and still smooth.
+export function alpineColour(aM, floorM, treeM, snowM) {
+  let pos;
+  if (aM <= treeM) {
+    const span = Math.max(1, treeM - floorM);
+    pos = Math.max(0, (aM - floorM) / span);
+  } else {
+    const span = Math.max(1, snowM - treeM);
+    pos = 1 + (aM - treeM) / span;
+  }
+  if (pos >= ALPINE_STOPS[ALPINE_STOPS.length - 1][0]) {
+    const c = ALPINE_STOPS[ALPINE_STOPS.length - 1];
+    return [c[1] / 255, c[2] / 255, c[3] / 255];
+  }
+  for (let i = 1; i < ALPINE_STOPS.length; i++) {
+    if (pos <= ALPINE_STOPS[i][0]) {
+      const a = ALPINE_STOPS[i - 1], b = ALPINE_STOPS[i];
+      const u = (pos - a[0]) / (b[0] - a[0] || 1);
+      return [(a[1] + (b[1] - a[1]) * u) / 255,
+              (a[2] + (b[2] - a[2]) * u) / 255,
+              (a[3] + (b[3] - a[3]) * u) / 255];
+    }
+  }
+  const c = ALPINE_STOPS[0];
+  return [c[1] / 255, c[2] / 255, c[3] / 255];
+}
+export function relLuminance(r, g, b) {
+  const f = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+// The stops, for a test to check the luminance ordering.
+export const alpineStops = () => ALPINE_STOPS.map(c => ({
+  pos: c[0], rgb: [c[1] / 255, c[2] / 255, c[3] / 255],
+  lum: relLuminance(c[1] / 255, c[2] / 255, c[3] / 255),
+}));
 
 // The frame is 2 units across, so this is the share of it the relief fills.
 // Under about 5% nothing can be judged, however correct the arithmetic.
@@ -289,10 +400,23 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
     const span = (hi - lo) || 1;
     const bands = Math.max(0, Math.min(40, o.bands | 0));
     const base = new THREE.Color().setHex(sch.surface);
+    // Altitude in metres from the field value. The floor of the view is the
+    // datum, so a height h sits at baseM + (h - lo) x mPerUnit: that works for
+    // any page, including the ones whose fields are not in [0, 1].
+    const alt = o.altitude || {};
+    const baseM = alt.baseM || 0;
+    const mPerUnit = alt.mPerUnit || 0;
+    const treeM = alt.treeM || 2200, snowM = alt.snowM || 2900;
     for (const t of tiles) {
       const attr = t.mesh.geometry.attributes.color;
       if (!attr) continue;
-      if (sch.byElevation) {
+      if (sch.byAltitude) {
+        for (let i = 0; i < attr.count; i++) {
+          const aM = baseM + (t.h[i] - lo) * mPerUnit;
+          const c = alpineColour(aM, baseM, treeM, snowM);
+          attr.setXYZ(i, c[0], c[1], c[2]);
+        }
+      } else if (sch.byElevation) {
         for (let i = 0; i < attr.count; i++) {
           let v = (t.h[i] - lo) / span;
           if (bands > 0) v = Math.min(bands - 1, Math.floor(v * bands)) / (bands - 1 || 1);
@@ -347,6 +471,36 @@ export function makeViewer({ THREE, canvas, stage, legend, onError, read }) {
     if (!legend) return;
     const o = read();
     const sch = SCHEMES[o.scheme] || SCHEMES.grey;
+    if (sch.byAltitude && tiles.length) {
+      const alt = o.altitude || {};
+      const baseM = alt.baseM || 0, mPerUnit = alt.mPerUnit || 0;
+      const treeM = alt.treeM || 2200, snowM = alt.snowM || 2900;
+      const topM = baseM + (hi - lo) * mPerUnit;
+      const steps = 60, sw = [];
+      for (let i = 0; i < steps; i++) {
+        const aM = baseM + (topM - baseM) * (i + 0.5) / steps;
+        const c = alpineColour(aM, baseM, treeM, snowM)
+          .map(v => Math.round(255 * Math.max(0, Math.min(1, v))));
+        sw.push('<i style="background:rgb(' + c.join(',') + ')"></i>');
+      }
+      // Marks where the two lines fall INSIDE this scene, which is the thing
+      // worth knowing: a snow line above the highest peak means no snow, and
+      // saying so beats leaving someone to wonder why the tops are brown.
+      const inScene = m => m > baseM && m < topM;
+      const rows = [];
+      rows.push('<tr><td>' + Math.round(topM) + ' m  peak</td></tr>');
+      rows.push('<tr><td>' + (inScene(snowM) ? '' : '(') + Math.round(snowM) +
+                ' m  snow line' + (inScene(snowM) ? '' : ', above the peak)') + '</td></tr>');
+      rows.push('<tr><td>' + (inScene(treeM) ? '' : '(') + Math.round(treeM) +
+                ' m  tree line' + (inScene(treeM) ? '' : ', above the peak)') + '</td></tr>');
+      rows.push('<tr><td>' + Math.round(baseM) + ' m  valley</td></tr>');
+      legend.style.display = 'block';
+      legend.innerHTML =
+        '<div style="margin-bottom:5px"><b>altitude</b> — mid-year lines</div>' +
+        '<div class="wrapbar"><div class="bar">' + sw.join('') + '</div>' +
+        '<table>' + rows.join('') + '</table></div>';
+      return;
+    }
     if (!sch.byElevation || !tiles.length) { legend.style.display = 'none'; return; }
     // The heights are dimensionless, so metres are reported against the ground
     // covered — the only length on the page carrying a unit.
