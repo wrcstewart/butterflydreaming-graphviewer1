@@ -26,6 +26,17 @@
 // output rather than silently producing something odd.
 
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+// --inline [dir]  writes SELF-CONTAINED copies, with guide.css pasted in as a
+// <style> block instead of linked. A guide that leaves this folder — mailed,
+// dropped in Dropbox, opened on a machine that has never seen the repo — must
+// not depend on a sibling stylesheet arriving with it. The served copies keep
+// the <link>, so the house style stays in one editable place; the standalone
+// copies are a distribution format, made on demand and not committed.
+const args = process.argv.slice(2);
+const INLINE = args.includes('--inline');
+const OUTDIR = INLINE ? (args[args.indexOf('--inline') + 1] || '.') : '.';
 
 const GUIDES = readdirSync('.').filter(f => /Guide\.md$/.test(f));
 
@@ -163,10 +174,12 @@ function convert(md, sourceName) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title>
-<link rel="stylesheet" href="guide.css">
+${INLINE ? '<style>\n' + readFileSync('guide.css', 'utf8') + '</style>'
+         : '<link rel="stylesheet" href="guide.css">'}
 <!--
   GENERATED FILE — do not edit.
-  Source: ${sourceName}.  Rebuild with: node build_guides.mjs
+  Source: ${sourceName} in the butterflydreaming_graphviewer1 repo.
+  Rebuild with: node build_guides.mjs${INLINE ? ' --inline <dir>' : ''}
 -->
 <main>
 <h1>${inline(title)}</h1>
@@ -190,8 +203,12 @@ for (const src of GUIDES) {
     .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
     .toLowerCase() + '.html';
   const html = convert(readFileSync(src, 'utf8'), src);
-  writeFileSync(out, html);
-  console.log(`  ${src}  ->  ${out}   ${html.length.toLocaleString()} bytes`);
+  const dest = join(OUTDIR, out);
+  writeFileSync(dest, html);
+  console.log(`  ${src}  ->  ${dest}   ${html.length.toLocaleString()} bytes` +
+              (INLINE ? '   (self-contained)' : ''));
   n++;
 }
-console.log(`  ${n} guide${n === 1 ? '' : 's'} built. Served at http://localhost:8080/<name>.html`);
+console.log(INLINE
+  ? `  ${n} self-contained guide${n === 1 ? '' : 's'}. No stylesheet needed alongside.`
+  : `  ${n} guide${n === 1 ? '' : 's'} built. Served at http://localhost:8080/<name>.html`);
