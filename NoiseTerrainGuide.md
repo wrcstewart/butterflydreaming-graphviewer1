@@ -16,7 +16,14 @@ any claim here still holds, run `node terrain_selftest.mjs`.
 **There is no stored map. Height is a function.**
 
 ```
-height01(xKm, zKm)  →  a number in [0, 1]
+height01(xKm, zKm)  →  height
+
+  xKm, zKm   where in the world, in KILOMETRES from an arbitrary origin.
+             Any real values. There is no range and no edge.
+  returns    one number in [0, 1]. A NORMALISED height, not metres — §2.6
+             turns it into an altitude.
+  seed       NOT a parameter. It is bound when the terrain object is made,
+             so one terrain object is one world.
 ```
 
 It is a *pure* function of world position and seed: the same coordinates always
@@ -45,10 +52,20 @@ Six steps, in order.
 
 ### 2.1 Chunks, generated independently
 
-The page asks the terrain for `k × k` chunks, each `chunkKm` across, each
-sampled on a `res × res` grid — so `(res+1)²` heights per chunk, the extra row
-and column being the shared edge. The default 2×2 of 4 km at 64 cells is 8 km of
-ground in 16,900 samples.
+```
+chunk(cx, cz, { chunkKm, res })  →  Float32Array
+
+  cx, cz     WHICH chunk, as integer chunk coordinates — not kilometres.
+             Chunk (3, −2) starts at world (3·chunkKm, −2·chunkKm).
+  chunkKm    the width of one chunk, in km
+  res        cells per side
+  returns    (res+1)² heights in [0, 1], row-major, index j·(res+1)+i.
+             The extra row and column are the edge SHARED with the next
+             chunk, so adjacent chunks each hold a copy of it.
+```
+
+The page asks the terrain for `k × k` chunks and assembles them. The default
+2×2 of 4 km at 64 cells is 8 km of ground in 16,900 samples.
 
 Each chunk comes from its own `chunk(cx, cz)` call. **That is deliberate**: it is
 the method's central claim under test, so the page gets its geometry the same way
@@ -72,10 +89,11 @@ crack would open where they meet, and a single stitched surface would hide it.
 
 ### 2.4 Normals from an apron, not from the mesh
 
-This is the one part that cannot be done per-chunk. `computeVertexNormals()`
-averages only the triangles of *its own* geometry, so a vertex on a tile boundary
-takes its normal from one side while its twin in the next tile takes a different
-one. The heights match perfectly and the shading still creases — it showed as
+This is the one part that cannot be done per-chunk. three.js's
+`computeVertexNormals()` takes no arguments and rewrites a geometry's normal
+attribute in place, averaging only the triangles of *its own* geometry — which is the whole problem. A vertex on a tile boundary takes
+its normal from one side only, while its twin in the next tile takes a different
+one from the other side. The heights match perfectly and the shading still creases — it showed as
 *two stitch lines dividing the scene into four*.
 
 So each chunk also carries a **one-cell apron**: the heights just *outside* its
@@ -150,6 +168,11 @@ sum = Σ  aₒ · wₒ · simplex( rotateₒ(x/su, z/sv) · fₒ + offsetₒ )
       fₒ = (1/widest) · 2ᵒ          amplitude  aₒ = (2^−H)ᵒ
 ```
 
+where `simplex(u, v) → a number in about [−1, 1]` is one sample of the seeded
+2D simplex lattice, `rotateₒ` turns the sample point by `0.83·o` radians, and
+`offsetₒ` shifts it by `(17.3o, −9.1o)`. `wₒ` is the hetero weight, 1 unless
+that control is on.
+
 - **`f₀ = 1/widest`, with coordinates in kilometres.** So the lowest octave's
   wavelength *is* the widest feature, and the finest detail is
   `widest / 2^(octaves−1)`. What governs the look is the **ratio of widest to
@@ -221,9 +244,16 @@ They are not interchangeable, and two of them cost something:
 height = baseShare·swell  +  (1 − baseShare)·beltMask(swell)·mountains
 ```
 
-The swell is two octaves of its own noise at wavelength `baseKm`, sampled at the
-**unwarped, unstretched** position so the regional shape is not dragged about by
-controls meant for the mountains.
+```
+slowAt(xKm, zKm)  →  a number in about [−1, 1]
+
+  xKm, zKm   the UNWARPED, UNSTRETCHED world position, so the regional shape
+             is not dragged about by controls meant for the mountains
+  returns    the regional swell: two octaves of its own lattice at
+             wavelengths baseKm and baseKm/2, normalised
+```
+
+The swell has its own noise lattice, independent of the mountains'.
 
 It is used twice: as the gentle rolling ground *and* as the mask deciding where
 mountains grow. So ranges stand on the high ground of the swell, its flanks carry
@@ -231,13 +261,29 @@ low-amplitude mountains — which is what a foothill is — and it keeps rolling
 across the lows where no mountains grow at all. That also gets the geology right
 for nothing: real ranges sit on uplifted ground rather than scattered at random.
 
-The mask is a smoothstep: `u = (swell01 − (1−coverage))/foothills + 0.5`, clamped,
-then `u²(3−2u)`. Smoothstep because it is flat at both ends, so the belt has no
+```
+beltMask(swell01)  →  a factor in [0, 1]
+
+  swell01    the slow layer's value mapped to [0, 1] — how high this ground
+             stands on the regional swell
+  returns    the share of the mountain amplitude that survives here:
+             1 well inside the belt, 0 well outside, smoothstepped between
+```
+
+It is `u = (swell01 − (1−coverage))/foothills + 0.5`, clamped to [0, 1], then
+`u²(3−2u)`. Smoothstep because it is flat at both ends, so the belt has no
 crease at its edge.
 
 ### 3.4 The squash
 
-`0.5 + 0.85·combined` is finally forced into [0, 1]. The original method uses a
+```
+squash(v)  →  a number in [0, 1]
+
+  v          the combined height, near [0, 1] but free to overshoot either rail
+  returns    v clamped hard, or eased through a knee if SOFT CEILING is on
+```
+
+`0.5 + 0.85·combined` is finally passed through it. The original method uses a
 **hard clamp**, and where a broad swell overshoots it the whole top is sheared off
 into a dead-flat mesa — measured, 5.3% of the grid as a single region in one
 corner at widest 16 km over 3 octaves. **Soft ceiling** replaces the corner with
@@ -382,7 +428,32 @@ yet — a walk-through would.
 
 ---
 
-## 8. Settings worth trying
+## 8. Function reference
+
+Everything named above, in one place. All are pure: same inputs, same outputs,
+nothing remembered. `seed` is never a parameter — it is bound when the terrain
+object is made, so one terrain object is one world.
+
+| function | parameters | returns |
+|---|---|---|
+| `height01(xKm, zKm)` | world position in **km** from an arbitrary origin, any real values | one height in **[0, 1]**, normalised and not metres |
+| `chunk(cx, cz, {chunkKm, res})` | integer **chunk** coordinates, the chunk width in km, cells per side | `Float32Array` of `(res+1)²` heights, row-major, including the shared edge |
+| `slowAt(xKm, zKm)` | the **unwarped, unstretched** world position in km | the regional swell, about **[−1, 1]** |
+| `beltMask(swell01)` | the swell mapped to [0, 1] | the share of mountain amplitude surviving here, **[0, 1]** |
+| `squash(v)` | the combined height, free to overshoot either rail | a height in **[0, 1]**, clamped hard or eased through a knee |
+| `simplex(u, v)` | a point on the seeded 2D lattice | one sample, about **[−1, 1]** |
+| `computeVertexNormals()` | none — three.js, acts on one geometry | nothing; rewrites that geometry's normal attribute in place |
+
+And the two commands:
+
+| command | what it does |
+|---|---|
+| `node build_guides.mjs` | rebuilds this page from `NoiseTerrainGuide.md` |
+| `node terrain_selftest.mjs` | checks 29 invariants; exits non-zero if any fails |
+
+---
+
+## 9. Settings worth trying
 
 | what you want | set |
 |---|---|

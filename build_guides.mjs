@@ -11,6 +11,14 @@
 // scan that got tested instead of the code. So the MARKDOWN IS THE SOURCE, the
 // HTML is generated, and the generated file says so in its footer.
 //
+// A CONVENTION FOR EVERY GUIDE IN THIS COLLECTION, from the author: *"you
+// should define the parameters and output of any function briefly even if
+// further explained later"*. So the FIRST time a guide names a function, it
+// gives a fenced block with the signature, each parameter, and what comes back
+// — including what is NOT a parameter where that is the surprise, as `seed` is
+// for height01. A guide that names five functions and defines none makes the
+// reader hold five unknowns while reading about something else.
+//
 // It handles only the markdown this collection actually uses — headings,
 // paragraphs, tables, fenced code, lists, rules, bold, italic, inline code and
 // links. That is a deliberate limit rather than an oversight: a general markdown
