@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noise terrain — how the scene is built, and what every control does</title>
+<link rel="stylesheet" href="guide.css">
+<!--
+  GENERATED FILE — do not edit.
+  Source: NoiseTerrainGuide.md.  Rebuild with: node build_guides.mjs
+-->
+<main>
+<h1>Noise terrain — how the scene is built, and what every control does</h1>
+<p><strong>2026-11-09.</strong> A guide to <code>noise_terrain.html</code>, served at <code>http://localhost:8080/noise_terrain.html</code>. This is Method C from <code>AV/fractal-terrain-methods.md</code> plus four mechanisms and a second layer added on top of it, and it is the best of the three terrain pages.</p>
+<nav class="toc"><b>Contents</b><ul><li><a href="#1-the-one-idea">1. The one idea</a></li><li><a href="#2-how-the-scene-is-constructed">2. How the scene is constructed</a></li><li><a href="#3-how-the-noise-is-generated">3. How the noise is generated</a></li><li><a href="#4-the-controls">4. The controls</a></li><li><a href="#5-reading-the-readout">5. Reading the readout</a></li><li><a href="#6-things-that-look-like-faults-and-are-not">6. Things that look like faults and are not</a></li><li><a href="#7-the-zoom-ceiling-and-the-lod-path">7. The zoom ceiling, and the LOD path</a></li><li><a href="#8-settings-worth-trying">8. Settings worth trying</a></li></ul></nav>
+<p>For the measured findings and the faults found along the way, see <code>FractalTerrain_Notes.md</code> — its top section is the current state. To check that any claim here still holds, run <code>node terrain_selftest.mjs</code>.</p>
+<hr>
+<h2 id="1-the-one-idea">1. The one idea</h2>
+<p><strong>There is no stored map. Height is a function.</strong></p>
+<pre><code>height01(xKm, zKm)  →  a number in [0, 1]</code></pre>
+<p>It is a <em>pure</em> function of world position and seed: the same coordinates always return the same height, with nothing remembered between calls. Everything the page can do follows from that single property:</p>
+<ul><li><strong>The world has no edge.</strong> Chunk (0,0) and chunk (10000, −7000) are the same amount of work. Walking away and back returns the identical ground, asserted by the self-test.</li><li><strong>Chunks need no stitching.</strong> Two patches generated independently agree <em>exactly</em> where they meet, because both evaluate the same function at the same coordinates. The readout measures this at <strong>max difference 0</strong>, not "within a tolerance".</li><li><strong>Detail can be added without moving anything.</strong> More octaves is more detail at the same place — which is a working level-of-detail path (§7).</li></ul>
+<p>The cost is that the function must be evaluated for every vertex drawn, every time. That is why the page is quick at 2×2 chunks and deliberate about going larger.</p>
+<hr>
+<h2 id="2-how-the-scene-is-constructed">2. How the scene is constructed</h2>
+<p>Six steps, in order.</p>
+<h3 id="2-1-chunks-generated-independently">2.1 Chunks, generated independently</h3>
+<p>The page asks the terrain for <code>k × k</code> chunks, each <code>chunkKm</code> across, each sampled on a <code>res × res</code> grid — so <code>(res+1)²</code> heights per chunk, the extra row and column being the shared edge. The default 2×2 of 4 km at 64 cells is 8 km of ground in 16,900 samples.</p>
+<p>Each chunk comes from its own <code>chunk(cx, cz)</code> call. <strong>That is deliberate</strong>: it is the method's central claim under test, so the page gets its geometry the same way a real streaming world would, rather than slicing up one big grid afterwards and proving nothing.</p>
+<h3 id="2-2-the-edge-test">2.2 The edge test</h3>
+<p>Before drawing, every pair of adjacent chunks is compared along its shared boundary — <code>k=2</code> gives 4 pairs, <code>k=3</code> gives 12. The result appears on the <strong>shared edges</strong> line. It reads exactly 0 with every control engaged.</p>
+<p>At <code>k=1</code> there are no adjacent pairs, so the line says <strong>not tested</strong> rather than reporting a pass from a test that never ran.</p>
+<h3 id="2-3-one-mesh-per-chunk">2.3 One mesh per chunk</h3>
+<p>Each chunk becomes its own <code>THREE.PlaneGeometry</code>, placed so the set tiles a frame 2 units wide. Separate meshes, again deliberately: if the heights disagreed, a crack would open where they meet, and a single stitched surface would hide it.</p>
+<h3 id="2-4-normals-from-an-apron-not-from-the-mesh">2.4 Normals from an apron, not from the mesh</h3>
+<p>This is the one part that cannot be done per-chunk. <code>computeVertexNormals()</code> averages only the triangles of <em>its own</em> geometry, so a vertex on a tile boundary takes its normal from one side while its twin in the next tile takes a different one. The heights match perfectly and the shading still creases — it showed as <em>two stitch lines dividing the scene into four</em>.</p>
+<p>So each chunk also carries a <strong>one-cell apron</strong>: the heights just <em>outside</em> its own edges. Normals come from the height gradient across that apron, so both tiles compute the same normal at a shared vertex — verified bit-identical. This is only possible because <code>height01</code> is defined everywhere, which is the same property the whole method rests on.</p>
+<h3 id="2-5-colour-in-a-vertex-attribute">2.5 Colour in a vertex attribute</h3>
+<p>The surface colour lives in a per-vertex attribute and the material stays white, because three.js <em>multiplies</em> material colour by vertex colour. Changing scheme refills the attribute and does not rebuild the field.</p>
+<p>One consequence matters: <strong>a lit vertex colour is <code>colour × (sun + hemi)</code>, and channels past 1.0 pin.</strong> At a gain of 2.55 a brown renders as 255,229,110 — pale cream — because red and green clip together and the result drifts yellow. The alpine scheme therefore runs a deliberately tame exposure (sun 0.75, hemi 0.40, gain 1.15). <strong>In the one scheme where colour carries information, exposure is set for colour fidelity, not for contrast.</strong></p>
+<h3 id="2-6-the-metre-scale">2.6 The metre scale</h3>
+<p>The field is dimensionless, so one fixed constant fixes everything else: <strong>one height unit is 10,000 m</strong>. From that:</p>
+<pre><code>metre relief  = relief × mountain height × 10,000        (independent of km)
+ground width  = chunks across × chunk size, in km
+altitude      = valley floor + (h − lowest) × mountain height × 10,000</code></pre>
+<p>Because height has a scale of its own, the two controls separate and both do something physical: <strong>mountain height</strong> sets how tall the mountains are in metres, <strong>chunk size and count</strong> set how much ground is in frame — so widening the ground flattens the view, as looking at more land does. The surface is drawn true to scale between them, so an on-screen grade is a real grade.</p>
+<hr>
+<h2 id="3-how-the-noise-is-generated">3. How the noise is generated</h2>
+<p><code>height01</code> runs the following in this order. Each stage is a control, so this is also the map of what affects what.</p>
+<pre><code>  (x, z) in km
+      │
+  1.  warp ............ displace the sample point by a second, slower noise field
+      │
+  2.  stretch ......... divide x and z unequally  (area-preserving)
+      │
+  3.  octave sum ...... the mountains: 7 rotated simplex samples at doubling
+      │                 frequency and 2^−H amplitude, each weighted by w
+      │
+  4.  ÷ norm .......... normalise to roughly [−1, 1]
+      │
+  5.  slow layer ...... a 2-octave swell, sampled at the UNWARPED position
+      │
+  6.  combine ......... baseShare·swell + (1−baseShare)·beltMask(swell)·mountains
+      │
+  7.  squash .......... hard clamp, or a soft knee, into [0, 1]
+      ▼
+  height in [0, 1]</code></pre>
+<h3 id="3-1-the-octave-sum-the-mountains">3.1 The octave sum — the mountains</h3>
+<pre><code>sum = Σ  aₒ · wₒ · simplex( rotateₒ(x/su, z/sv) · fₒ + offsetₒ )
+       o
+      fₒ = (1/widest) · 2ᵒ          amplitude  aₒ = (2^−H)ᵒ</code></pre>
+<ul><li><strong><code>f₀ = 1/widest</code>, with coordinates in kilometres.</strong> So the lowest octave's wavelength <em>is</em> the widest feature, and the finest detail is <code>widest / 2^(octaves−1)</code>. What governs the look is the <strong>ratio of widest to the ground in view</strong>: 4 km features across 8 km of ground gives two big features per side.</li><li><strong>Each octave is rotated by 0.83 radians</strong> and offset by <code>(17.3o, −9.1o)</code>. Simplex noise has a lattice, and both the rotation and the offsets exist to stop the octaves lining up on it. The readout's anisotropy figure is the check that this worked; it reads about 0.9, i.e. no detectable direction.</li><li><strong><code>gain = 2^−H</code></strong> is what makes the sum fractional Brownian motion. Note the H asked for is <em>not</em> the H delivered — see §6.</li><li><strong><code>norm = Σ gainᵒ</code></strong>, so the sum lands in roughly [−1, 1] whatever the octave count. With <strong>stable zoom</strong> on, that divisor is computed over a fixed budget instead, which is what makes adding octaves leave the coarse shape exactly where it was.</li></ul>
+<h3 id="3-2-the-four-modifiers">3.2 The four modifiers</h3>
+<p>Plain octave noise is statistically <strong>homogeneous</strong> — the same everywhere — so every patch is equally rough and nothing distinguishes a plain from a range. These break that, and they break <em>different</em> things:</p>
+<div class="tablewrap"><table>
+<thead><tr><th></th><th>what it breaks</th><th>how</th></tr></thead>
+<tbody>
+<tr><td><strong>warp</strong></td><td>uniformity of <em>placement</em></td><td>the sample point is displaced by a slower noise field before the octaves are summed, so ridges become sinuous and peaks stop being evenly scattered</td></tr>
+<tr><td><strong>stretch</strong></td><td><em>isotropy</em></td><td>x and z are scaled unequally, elongating every feature along one axis. <strong>Area-preserving</strong> — √r one way, 1/√r the other — because stretching one axis alone just lowers the frequency along it and smooths the whole surface</td></tr>
+<tr><td><strong>hetero</strong></td><td>uniformity of <em>roughness</em></td><td>each octave's weight <code>w</code> is modulated by the <strong>accumulated elevation</strong> so far, so detail appears where the ground is already high and dies in the lows: rough peaks over smooth plains</td></tr>
+<tr><td><strong>the slow layer</strong></td><td>the <em>scale</em></td><td>adds a swell much larger than any mountain, which also decides where mountains grow at all</td></tr>
+</tbody></table></div>
+<p><code>hetero</code>'s weight is normalised to average exactly 1 (<code>w = (1−h+h·elev)/(1−h/2)</code>), so it <em>redistributes</em> detail rather than removing it. Without that divisor the mean weight is <code>1−h/2</code> and the control simply smoothed the terrain.</p>
+<p><strong>All the figures quoted for these three are measured against plain noise with the slow layer OFF</strong>, and that matters, because the belt overlaps with hetero. The honest comparison is the correlation between a patch's roughness and its height — which is what "rough peaks over smooth plains" actually means:</p>
+<div class="tablewrap"><table>
+<thead><tr><th></th><th>roughness-to-height correlation</th></tr></thead>
+<tbody>
+<tr><td>plain noise</td><td><strong>0.008</strong> — none at all, every patch equally rough</td></tr>
+<tr><td>hetero 1, no belt</td><td>0.439</td></tr>
+<tr><td>the belt, hetero 0</td><td><strong>0.793</strong></td></tr>
+<tr><td>the belt and hetero 1</td><td>0.831</td></tr>
+</tbody></table></div>
+<p><strong>The belt is much the stronger mechanism</strong>, because mountains only grow on the swell's high ground, which ties roughness to height by construction. So at the page's defaults hetero adds little — reach for it when you want rough peaks <em>without</em> confining the mountains to a belt, which is a different landscape: mountains everywhere, but only the high ones rugged.</p>
+<h3 id="3-2a-which-mechanism-to-reach-for">3.2a Which mechanism to reach for</h3>
+<p>They are not interchangeable, and two of them cost something:</p>
+<ul><li>Want <strong>large-scale organisation</strong> — ranges here, plains there? The <strong>slow layer</strong>. Nothing else supplies structure bigger than one mountain.</li><li>Want <strong>lineation</strong>, ridge-and-valley country? <strong>Stretch</strong>. It is the only one that produces a direction, and it costs roughness (3.55 → 2.33 at 3:1) because a stretched axis has gentler gradients.</li><li>Want <strong>irregular placement</strong>, sinuous ridges, uneven spacing? <strong>Warp</strong>. It costs the grain if you also want stretch.</li><li>Want <strong>rough summits over smooth ground, with no belt</strong>? <strong>Hetero</strong>. Free of side effects — it keeps isotropy and does not reduce roughness.</li></ul>
+<h3 id="3-3-the-slow-layer-and-why-it-is-one-field-doing-two-jobs">3.3 The slow layer, and why it is one field doing two jobs</h3>
+<pre><code>height = baseShare·swell  +  (1 − baseShare)·beltMask(swell)·mountains</code></pre>
+<p>The swell is two octaves of its own noise at wavelength <code>baseKm</code>, sampled at the <strong>unwarped, unstretched</strong> position so the regional shape is not dragged about by controls meant for the mountains.</p>
+<p>It is used twice: as the gentle rolling ground <em>and</em> as the mask deciding where mountains grow. So ranges stand on the high ground of the swell, its flanks carry low-amplitude mountains — which is what a foothill is — and it keeps rolling across the lows where no mountains grow at all. That also gets the geology right for nothing: real ranges sit on uplifted ground rather than scattered at random.</p>
+<p>The mask is a smoothstep: <code>u = (swell01 − (1−coverage))/foothills + 0.5</code>, clamped, then <code>u²(3−2u)</code>. Smoothstep because it is flat at both ends, so the belt has no crease at its edge.</p>
+<h3 id="3-4-the-squash">3.4 The squash</h3>
+<p><code>0.5 + 0.85·combined</code> is finally forced into [0, 1]. The original method uses a <strong>hard clamp</strong>, and where a broad swell overshoots it the whole top is sheared off into a dead-flat mesa — measured, 5.3% of the grid as a single region in one corner at widest 16 km over 3 octaves. <strong>Soft ceiling</strong> replaces the corner with a knee over the outer 12%, approaching the rail asymptotically and never reaching zero gradient, so a swell stays curved however far it overshoots.</p>
+<hr>
+<h2 id="4-the-controls">4. The controls</h2>
+<p>In panel order, as they appear down the page. <code>id</code> is given because it is what the code and the self-test use.</p>
+<h3 id="surface-the-mountains-themselves">Surface — the mountains themselves</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>range</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>seed</strong></td><td><code>seed</code></td><td>integer ≥ 1</td><td>42</td><td>Picks the world. Same seed, same terrain, for ever. Change it to get a different landscape with identical statistics.</td></tr>
+<tr><td><strong>octaves</strong></td><td><code>oct</code></td><td>1–12</td><td>7</td><td>How many doublings of detail are summed. Sets the finest feature at <code>widest/2^(octaves−1)</code> — 62.5 m at the defaults. <strong>Few octaves make the clamp bite much harder</strong>, because less of the amplitude goes to detail that would break a flat top up.</td></tr>
+<tr><td><strong>Hurst exponent H</strong></td><td><code>H</code></td><td>0.30–0.95</td><td>0.75</td><td>Roughness. Sets the octave gain to 2^−H, so high H means each finer octave contributes more and the surface is smooth and rolling; low H is rough and Brownian. Fractal dimension is 3 − H.</td></tr>
+<tr><td><strong>widest feature</strong></td><td><code>widest</code></td><td>1–32 km</td><td>4</td><td>The lowest octave's wavelength, and so the size of the largest mountain. <strong>Judge it against the ground in view, not on its own.</strong> Raising it coarsens everything equally rather than adding large structure — which is what the slow layer is for.</td></tr>
+</tbody></table></div>
+<h3 id="two-layers-swell-and-mountain-belt">Two layers — swell and mountain belt</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>range</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>swell wavelength</strong></td><td><code>bk</code></td><td>2–60 km</td><td>8</td><td>The size of the regional uplift. Measured, <strong>about the width of the view works best</strong> — one belt in frame, continuing past the edge. At 40 km across an 8 km view it flattens into a ramp and the belt structure is lost.</td></tr>
+<tr><td><strong>swell share</strong></td><td><code>bs</code></td><td>0–0.80</td><td>0.35</td><td>How much of the total amplitude the swell takes. <strong>0 turns the layer off entirely</strong>, and with cover at 1 and soft ceiling off that reproduces the document's plain method bit for bit.</td></tr>
+<tr><td><strong>mountain cover</strong></td><td><code>cov</code></td><td>0.15–1</td><td>0.45</td><td>The share of ground carrying mountains; 1 puts them everywhere as before. Noise is bell-shaped rather than uniform, so <strong>this is a dial and not a guarantee</strong> — the readout measures what came out. It tracks well to about 0.3, below which the <em>measure</em> breaks before the control does.</td></tr>
+<tr><td><strong>foothills</strong></td><td><code>fh</code></td><td>0.05–0.80</td><td>0.30</td><td>Width of the transition into the belt. Wide gives long gentle approaches; narrow gives a wall rising straight off the plain.</td></tr>
+</tbody></table></div>
+<h3 id="break-up-the-uniformity">Break up the uniformity</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>range</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>stretch u:v</strong></td><td><code>st</code></td><td>1–4</td><td>1</td><td>Grain. Elongates features along one axis: ridge-and-valley country instead of a field of lumps. <strong>This one makes the terrain genuinely anisotropic on purpose</strong>, so the readout will report a direction — that is the control working, and the only place in this work where a direction is wanted.</td></tr>
+<tr><td><strong>warp</strong></td><td><code>wp</code></td><td>0–3 km</td><td>0</td><td>Sinuosity. Displaces the sample point so ridges bend and peak spacing becomes uneven. <strong>Warp fights stretch</strong>: 3:1 stretch alone gives a grain of 2.15, but warp at 1.5 km randomises the direction and the grain falls to 1.43. Keep it under ~0.5 km if you want grain.</td></tr>
+<tr><td><strong>hetero</strong></td><td><code>ht</code></td><td>0–1</td><td>0</td><td>Rough peaks over smooth plains, and the only one of the three that <strong>keeps isotropy</strong>. It bites above about 0.75 — +2% at 0.5, +13% at 0.75, +33% at 1.0 — because the weight only swings its full range at the top. <strong>Overlaps with the belt</strong>, which already ties roughness to height (correlation 0.793 against hetero's 0.439 alone), so at the page defaults this adds little; it is the mechanism for rough peaks <em>without</em> a belt.</td></tr>
+<tr><td><strong>soft ceiling</strong></td><td><code>soft</code></td><td>checkbox</td><td><strong>ON</strong></td><td>Replaces the hard clamp with a knee that never flattens. Leave it on unless you want the document's exact behaviour.</td></tr>
+<tr><td><strong>stable zoom</strong></td><td><code>pin</code></td><td>checkbox</td><td>off</td><td>Computes the amplitude divisor over a fixed octave budget, so <strong>adding octaves leaves the coarse shape exactly where it was</strong> instead of shifting it about half a percent. Off by default only because it changes the overall amplitude by 2.6%.</td></tr>
+</tbody></table></div>
+<h3 id="chunks-the-world-and-how-much-of-it">Chunks — the world, and how much of it</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>range</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>chunks across</strong></td><td><code>k</code></td><td>1, 2, 3, 4</td><td>2</td><td>How many chunks per side. More chunks means more ground in frame and so a flatter-looking view. At 1 the edge test cannot run.</td></tr>
+<tr><td><strong>cells per chunk</strong></td><td><code>res</code></td><td>32, 64, 96</td><td>64</td><td>Mesh resolution. Costs <code>k² × (res+1)²</code> samples — 4×4 at 96 is 160,000. Does <em>not</em> add detail below the finest octave (§7).</td></tr>
+<tr><td><strong>chunk size</strong></td><td><code>ck</code></td><td>1–16 km</td><td>4</td><td>Ground covered per chunk. With <code>k</code>, sets the view's width in km, which is half of the metre scale.</td></tr>
+<tr><td><strong>world position</strong></td><td><code>cx</code>, <code>cz</code></td><td>any integer</td><td>0, 0</td><td>Which chunk you are standing on. Try a few thousand out — it costs nothing and proves the point.</td></tr>
+<tr><td><strong>the walk pad</strong></td><td>—</td><td>↑ ← → ↓, home</td><td>—</td><td>Steps one chunk. Going east then west returns the identical terrain, which is the edge property felt by hand.</td></tr>
+</tbody></table></div>
+<h3 id="altitude-and-vegetation">Altitude and vegetation</h3>
+<p>The field is dimensionless, so a datum is needed before a tree line means anything. <strong>Mid-year is assumed</strong>, so the snow line is the <em>summer</em> one — the altitude above which snow survives the melt season. A winter line sits roughly a kilometre lower and would bury every scene here.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>range</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>valley floor</strong></td><td><code>base</code></td><td>0–3000 m</td><td>1000</td><td>The altitude of the lowest point in view — the datum everything else is measured from.</td></tr>
+<tr><td><strong>latitude</strong></td><td><code>lat</code></td><td>0–78°</td><td>46</td><td>Drives both lines, interpolated from observed figures rather than a formula: a cosine law is wrong in the subtropics, where dry highs push the snow line <em>above</em> its equatorial value. 46° is the Alps, 60° southern Norway, past 73° there are no trees.</td></tr>
+<tr><td><strong>tree line</strong></td><td><code>tree</code></td><td>metres</td><td>2120</td><td>Moving latitude resets this; type over it to hold a local climate.</td></tr>
+<tr><td><strong>snow line</strong></td><td><code>snow</code></td><td>metres</td><td>2820</td><td>As above. Held at least 150 m above the tree line, since trees cannot grow above permanent snow.</td></tr>
+</tbody></table></div>
+<h3 id="view">View</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>range</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>mountain height</strong></td><td><code>vx</code></td><td>0.01–1</td><td>0.45</td><td>Relief <strong>in metres</strong> — a fixed multiplier, never a per-field rescale, so H and the other controls still change the height by as much as they really do. Also moves every altitude, so the snow line slides down the mountain as you raise it.</td></tr>
+<tr><td><strong>colour</strong></td><td><code>scheme</code></td><td>6 schemes</td><td>alpine</td><td><code>alpine</code> is three flat bands by real altitude — light green, ordinary brown, white — with 11 m transitions. The other five are the shared schemes: grey, white-on-blue, white-on-greeny-brown, blue-green sea, and the luminance-monotone elevation spectrum.</td></tr>
+<tr><td><strong>spectrum bands</strong></td><td><code>bands</code></td><td>0–40</td><td>0</td><td>Elevation-spectrum scheme only. 0 is continuous; above 0 quantises into countable contours with a metre range in the legend.</td></tr>
+<tr><td><strong>sun elevation</strong></td><td><code>sun</code></td><td>2–80°</td><td>12</td><td><strong>The lever for shallow relief.</strong> Shading sensitivity goes as grade × cot(elevation), so 12° shows a grade an overhead sun flattens.</td></tr>
+<tr><td><strong>sun azimuth</strong></td><td><code>sunaz</code></td><td>0–359°</td><td>135</td><td>Which way the light comes from. Worth sweeping — relief that is invisible at one azimuth can be obvious at another.</td></tr>
+<tr><td><strong>wireframe</strong></td><td><code>wire</code></td><td>checkbox</td><td>off</td><td>Overlays the mesh, so resolution and chunk boundaries can be seen directly.</td></tr>
+</tbody></table></div>
+<h3 id="measure">Measure</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>control</th><th>id</th><th>default</th><th>purpose</th></tr></thead>
+<tbody>
+<tr><td><strong>measure on every build</strong></td><td><code>domeasure</code></td><td>ON</td><td>Runs H, anisotropy, uniformity and texture. Costs a 2D FFT plus eight synthetic nulls, so turn it off to drag sliders freely. <strong>The edge test is cheap and always runs.</strong></td></tr>
+</tbody></table></div>
+<h3 id="mouse">Mouse</h3>
+<p>Drag to orbit, wheel to zoom. Nothing else is bound.</p>
+<hr>
+<h2 id="5-reading-the-readout">5. Reading the readout</h2>
+<p>Bottom left, and every line is measured on the field actually drawn.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>line</th><th>what it tells you</th></tr></thead>
+<tbody>
+<tr><td><strong>chunks</strong></td><td>size, resolution and build time</td></tr>
+<tr><td><strong>world</strong></td><td>where you are standing, in km, and that there is no stored map</td></tr>
+<tr><td><strong>shared edges</strong></td><td>the method's central claim. <strong>Must read exactly 0.</strong></td></tr>
+<tr><td><strong>relief</strong></td><td>metres, the ground it spans, and the share of the frame it fills — under 5% nothing can be judged and it says so</td></tr>
+<tr><td><strong>feature scale</strong></td><td>widest and finest features, and metres per cell</td></tr>
+<tr><td><strong>clamp</strong></td><td>cells pinned flat at a rail, and the height range</td></tr>
+<tr><td><strong>flattest patch</strong></td><td>the largest <em>connected</em> flat region. <strong>Pinned at a rail means the clamp; large but unpinned beyond a belt is the design.</strong> A total percentage would hide both.</td></tr>
+<tr><td><strong>anisotropy</strong></td><td>measured against a matched isotropic null, as an excess where 1.0 means no direction. One reading carries ±0.4, so only past ~1.6 is it real. Knows whether stretch <em>asked</em> for a direction.</td></tr>
+<tr><td><strong>altitude</strong></td><td>valley to peak, both climate lines, and the share of ground in each colour band</td></tr>
+<tr><td><strong>two layers</strong></td><td>swell size and share, cover asked against <strong>cover measured</strong></td></tr>
+<tr><td><strong>uniformity</strong></td><td>local relief spread against the same settings with the controls off, so the figure is a gain over a matched baseline rather than an absolute to be remembered</td></tr>
+<tr><td><strong>texture</strong></td><td>bumps, summits, curvature — absolute, never a percentile ratio</td></tr>
+</tbody></table></div>
+<hr>
+<h2 id="6-things-that-look-like-faults-and-are-not">6. Things that look like faults and are not</h2>
+<ul><li><strong>The H asked for is not the H delivered.</strong> 0.50 gives 0.47, but 0.90 gives only 0.72. Discrete octave spacing and simplex's own spectral shape are not a true power law. This is the method's behaviour, and the readout shows both figures rather than implying they agree.</li><li><strong>Relief is always exactly 1.000 with the layer off.</strong> <code>height01</code> clamps to [0, 1], so the method normalises itself and relief is not a measure here. That is why metres come from the height control alone.</li><li><strong>The anisotropy figure is noisy</strong>, ±0.4 on one reading at this grid size, because a red spectrum puts nearly all its power where the grid has fewest samples per direction.</li><li><strong>Gentle ground outside a belt is the design</strong>, not the clamp. The readout distinguishes them.</li><li><strong>Stretch costs some roughness.</strong> A stretched axis has gentler gradients; even area-preserving, roughness falls from 3.55 to 2.33 at 3:1. Unavoidable.</li></ul>
+<hr>
+<h2 id="7-the-zoom-ceiling-and-the-lod-path">7. The zoom ceiling, and the LOD path</h2>
+<p><strong>Zooming in past the finest octave shows nothing new.</strong> The octave set is fixed, so detail stops at <code>widest / 2^(octaves−1)</code> — 62.5 m at the defaults. Sampling one 200 m patch from 28.6 m spacing down to 0.8 m gives relief 0.1975, 0.1976, 0.1975: a smoother interpolation of the same surface, no new ground. Raising <strong>cells per chunk</strong> does not help; raising <strong>octaves</strong> does.</p>
+<p>That is also the level-of-detail path, and it works because <code>height01</code> is a pure function: adding octaves while zooming leaves the coarse shape within half a percent, and <em>exactly</em> with <strong>stable zoom</strong> on. Far chunks few octaves, near chunks many, and the mountain does not move. Nothing in the page consumes this yet — a walk-through would.</p>
+<hr>
+<h2 id="8-settings-worth-trying">8. Settings worth trying</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>what you want</th><th>set</th></tr></thead>
+<tbody>
+<tr><td><strong>the document's plain method</strong></td><td>swell share 0, cover 1, soft ceiling off — bit-identical to <code>noise.js</code></td></tr>
+<tr><td><strong>a mountain range with foothills</strong></td><td>the defaults</td></tr>
+<tr><td><strong>ridge-and-valley country</strong></td><td>stretch 2.5–3, warp under 0.5, hetero 0.8</td></tr>
+<tr><td><strong>rough peaks, smooth plains, mountains everywhere</strong></td><td>swell share 0, cover 1, hetero 1.0 — the belt off, so hetero is doing the work</td></tr>
+<tr><td><strong>sinuous, uneven ranges</strong></td><td>warp 1.5–2.5, stretch 1</td></tr>
+<tr><td><strong>an isolated massif</strong></td><td>cover 0.20–0.25, foothills 0.5, swell 12–16 km</td></tr>
+<tr><td><strong>see the clamp artefact</strong></td><td>widest 8 km, octaves 2, soft ceiling <strong>off</strong></td></tr>
+<tr><td><strong>see the lattice question answered</strong></td><td>octaves 10, measure on, read the anisotropy line</td></tr>
+<tr><td><strong>snow on everything</strong></td><td>latitude 65, or valley floor 2200</td></tr>
+<tr><td><strong>prove the world is endless</strong></td><td>world position 5000, 5000 — then home</td></tr>
+</tbody></table></div>
+<footer>
+Generated from <code>NoiseTerrainGuide.md</code> by <code>build_guides.mjs</code> —
+edit the markdown, not this file. Claims here can be checked with
+<code>node terrain_selftest.mjs</code>.
+</footer>
+</main>
+</html>

@@ -1,0 +1,246 @@
+/* guide.css — 2026-11-09. The house style for the guide collection.
+ *
+ * ONE STYLESHEET FOR ALL GUIDES, so a second guide is a markdown file and
+ * nothing else. This repo has been bitten twice by duplication — two copies of
+ * music_module.html diverged, and a copy of the triangle scan was tested instead
+ * of the code — so the look lives in one place.
+ *
+ * WHAT IS DELIBERATE HERE:
+ *
+ *   NOTHING IS CARRIED BY HUE ALONE. The author has reduced colour vision. So
+ *   structure is carried by weight, size, rules and background tint, and the one
+ *   accent is a dark slate that reads as "darker" rather than as "blue". Links
+ *   are underlined, not merely coloured. Table emphasis is weight and a tinted
+ *   cell, never a coloured word.
+ *
+ *   SYSTEM FONTS, NO NETWORK. These pages may be uploaded, read offline, or
+ *   printed, so nothing is fetched. A serif for running prose because a
+ *   reference is read in long passes; a monospace for identifiers because an id
+ *   like `cov` has to be unmistakable in a sentence.
+ *
+ *   PRINT IS A REAL TARGET. Rules, not shadows; a print block that drops the
+ *   furniture and keeps the tables whole.
+ *
+ *   DARK MODE IS HONOURED but every colour is defined on bare :root first, so
+ *   the un-stamped default state is never left with one theme's text on the
+ *   other's ground.
+ */
+
+:root {
+  --ink:    #191916;
+  --body:   #2c2c27;
+  --dim:    #6b6b62;
+  --rule:   #d8d7ce;
+  --rule-2: #ebeae2;
+  --ground: #fcfbf8;
+  --panel:  #f5f4ee;
+  --accent: #2f4858;       /* dark slate: reads as darker, not as a hue */
+  --mark:   #fdf6d8;       /* a tint for an emphasised table cell */
+  --measure: 74ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink:    #f2f1ea;
+    --body:   #dedcd2;
+    --dim:    #9d9c91;
+    --rule:   #3a3a34;
+    --rule-2: #2a2a25;
+    --ground: #171715;
+    --panel:  #201f1c;
+    --accent: #a8c4d4;
+    --mark:   #312d1c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--body);
+  font: 17px/1.62 Charter, Georgia, "Iowan Old Style", "Times New Roman", serif;
+}
+
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 56px 28px 120px;
+}
+
+/* ── headings ───────────────────────────────────────────────────────── */
+h1, h2, h3 {
+  color: var(--ink);
+  line-height: 1.22;
+  text-wrap: balance;
+  font-weight: 600;
+}
+h1 {
+  font-size: 2.05rem;
+  margin: 0 0 .5rem;
+  letter-spacing: -0.012em;
+}
+h2 {
+  font-size: 1.32rem;
+  margin: 3.2rem 0 1rem;
+  padding-top: .9rem;
+  border-top: 2px solid var(--rule);
+}
+h3 {
+  font-size: 1.06rem;
+  margin: 2.1rem 0 .6rem;
+  color: var(--accent);
+}
+/* The subtitle paragraph straight after the h1. */
+h1 + p {
+  color: var(--dim);
+  font-size: 1.02rem;
+  margin-top: 0;
+  max-width: var(--measure);
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+li { margin: .3rem 0; }
+ul { padding-left: 1.3rem; }
+
+strong { color: var(--ink); font-weight: 650; }
+em { font-style: italic; }
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+a:hover { text-decoration-thickness: 2px; }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 2.6rem 0;
+}
+/* The source puts a --- before each section AND the h2 draws its own rule, so
+   the two stacked up as a double line. The heading's rule is the one to keep,
+   because it stays attached to the heading when a section breaks across a
+   printed page. */
+hr + h2 { border-top: 0; padding-top: 0; margin-top: 0; }
+
+/* ── code and identifiers ───────────────────────────────────────────── */
+code {
+  font: 0.88em/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--panel);
+  border: 1px solid var(--rule-2);
+  border-radius: 3px;
+  padding: .08em .28em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+pre {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  padding: 14px 16px;
+  overflow-x: auto;            /* wide diagrams scroll, the page never does */
+  font: 13px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--ink);
+}
+pre code {
+  background: none; border: 0; padding: 0; white-space: pre;
+  font-size: inherit;
+}
+
+/* ── tables: the heart of a control reference ───────────────────────── */
+.tablewrap { overflow-x: auto; margin: 1.3rem 0 1.7rem; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule-2);
+}
+th {
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 13px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--rule);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 1px solid var(--rule); }
+/* An identifier column reads as code without needing backticks in the source. */
+td code { white-space: nowrap; }
+/* Numeric-looking cells line up. */
+td { font-variant-numeric: tabular-nums; }
+/* The control-name column gets the tint, and ONLY that column.
+   This was first written as `td > strong:only-child`, meaning to catch a cell
+   whose whole content is bold — but :only-child counts ELEMENT children and
+   ignores text nodes, so a cell reading "text <strong>x</strong> text" matched
+   too. Emphasised phrases mid-sentence in the purpose column were being turned
+   into tinted blocks that broke the sentence across three lines. Scoped by
+   position instead, which is deterministic. */
+td:first-child > strong { display: block; background: var(--mark);
+  margin: -2px -4px; padding: 2px 4px; border-radius: 2px; }
+
+/* ── the contents block ─────────────────────────────────────────────── */
+nav.toc {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 16px 20px;
+  margin: 2.2rem 0 2.6rem;
+  font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  max-width: var(--measure);
+}
+nav.toc b {
+  display: block;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: .5rem;
+}
+nav.toc ul { margin: 0; padding: 0; list-style: none; }
+nav.toc li { margin: .15rem 0; }
+nav.toc a { text-decoration: none; }
+nav.toc a:hover { text-decoration: underline; }
+
+/* A quiet footer line naming the source, so nobody edits the generated file. */
+footer {
+  margin-top: 4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  color: var(--dim);
+  font-size: .88rem;
+  max-width: var(--measure);
+}
+
+/* ── narrow screens ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  main { padding: 32px 18px 80px; }
+  h1 { font-size: 1.7rem; }
+  table { font-size: 14px; }
+  th, td { padding: 7px 9px; }
+}
+
+/* ── print ──────────────────────────────────────────────────────────── */
+@media print {
+  :root {
+    --ground: #fff; --panel: #f4f4f0; --ink: #000; --body: #111;
+    --rule: #999; --rule-2: #ccc; --accent: #000; --mark: #f0f0e4;
+  }
+  body { font-size: 10.5pt; }
+  main { max-width: none; padding: 0; }
+  nav.toc { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  table, pre { break-inside: avoid; }
+  tr { break-inside: avoid; }
+  a { text-decoration: none; }
+}
