@@ -108,29 +108,115 @@ The surface colour lives in a per-vertex attribute and the material stays white,
 because three.js *multiplies* material colour by vertex colour. Changing scheme
 refills the attribute and does not rebuild the field.
 
-One consequence matters: **a lit vertex colour is `colour × (sun + hemi)`, and
-channels past 1.0 pin.** At a gain of 2.55 a brown renders as 255,229,110 — pale
-cream — because red and green clip together and the result drifts yellow. The
-alpine scheme therefore runs a deliberately tame exposure (sun 0.75, hemi 0.40,
-gain 1.15). **In the one scheme where colour carries information, exposure is set
-for colour fidelity, not for contrast.**
+**Why the alpine colours are lit dimly: clipping.**
 
-### 2.6 The metre scale
+Two terms first.
 
-The field is dimensionless, so one fixed constant fixes everything else: **one
-height unit is 10,000 m**. From that:
+- **Channel.** A screen colour is three numbers — **red, green, blue** — each
+  from 0 (none) to 255 (full). Each of the three is a *channel*. The brown used
+  here is `139, 90, 43`: a fair amount of red, less green, little blue. Inside
+  the renderer the same channels run from **0.0 to 1.0** instead of 0 to 255;
+  it is the same scale, divided by 255.
+- **Clipping.** A channel cannot go above full. If a calculation asks for red
+  at 1.4, the screen shows 1.0. The excess is not stored anywhere — it is simply
+  lost. (The code comments call this *pinning*. It has nothing to
+  do with the **stable zoom** checkbox, whose id happens to be `pin`.)
+
+The renderer works out how bright each point is like this:
 
 ```
-metre relief  = relief × mountain height × 10,000        (independent of km)
-ground width  = chunks across × chunk size, in km
-altitude      = valley floor + (h − lowest) × mountain height × 10,000
+shown colour  =  surface colour  ×  light
+
+  surface colour   the scheme's colour for that point — e.g. brown 139, 90, 43.
+  light            sun × (how squarely the slope faces the sun, 0 to 1)
+                   + hemi.
+  sun, hemi        the two lights' strengths, set per scheme. sun is the
+                   directional light; hemi is the even sky-and-ground light
+                   that reaches every slope, so shadowed sides are not black.
+  returns          one value per channel, CLIPPED at full (1.0, i.e. 255).
 ```
 
-Because height has a scale of its own, the two controls separate and both do
-something physical: **mountain height** sets how tall the mountains are in
-metres, **chunk size and count** set how much ground is in frame — so widening
-the ground flattens the view, as looking at more land does. The surface is drawn
-true to scale between them, so an on-screen grade is a real grade.
+The brightest any point can be lit is a slope facing the sun squarely, where
+`light = sun + hemi`. Call that the **gain**. Everything comes down to it:
+
+- **Gain at or below about 1.15: colours survive.** Each channel is multiplied by
+  the same amount and none goes far over full, so the *ratios* between red,
+  green and blue stay put — and the ratios are what make a colour brown rather
+  than cream.
+- **Gain well above that: colours break.** The alpine scheme once ran sun 2.0
+  with hemi 0.55, a gain of 2.55. Brown `139, 90, 43` × 2.55 asks for
+  about `354, 229, 110`. Red clips at 255 and green nearly does, so the sunlit side
+  shows `255, 229, 110` — a **pale cream**. The red-to-green ratio that made it
+  brown, 1.55, has collapsed to 1.11. Green suffered the same way and showed as
+  near-white.
+
+So the alpine scheme now runs **sun 0.75, hemi 0.40 — a gain of 1.15** — the
+most that keeps all three of its colours clean. Its sunlit brown is
+`164, 106, 51`, still brown. That is why it looks dimmer and flatter-lit than the
+other schemes: **in the one scheme where colour carries information (green =
+below the tree line, brown = above it, white = above the snow line), exposure is
+set to keep the colours true, not for contrast.**
+
+### 2.6 The scales in play
+
+Four different scales meet in the scene. Most confusion about the page comes from
+mixing them, so here they are separately:
+
+| scale | unit | what sets it |
+|---|---|---|
+| **ground** — across the land | kilometres | **chunk size** × **chunks across** = the width of land in view |
+| **field height** — what `height01` returns | none: a number in [0, 1] | the noise itself; it has no unit until one is chosen |
+| **real height** — relief and altitude | metres | **mountain height**, through one fixed constant (below) |
+| **screen** — what three.js draws | frame units | derived from the other three, so the picture is true to scale |
+
+**Turning the unitless height into metres.** `height01` gives a number between 0
+and 1 with no unit, so something has to say how many metres one unit is. The page
+fixes this once, for every setting:
+
+```
+one unit of field height  =  10,000 m      × mountain height
+
+  mountain height   the slider, 0.01 to 1 (default 0.45). So at the default,
+                    one unit of field height is 4,500 m.
+```
+
+From that, the two figures the readout reports:
+
+```
+relief    (hi − lo) × mountain height × 10,000      metres
+
+  hi, lo      the highest and lowest field heights in view, each in [0, 1].
+  returns     the height from valley bottom to top peak in METRES.
+              Note that chunk size does not appear: widening the view
+              does not change how tall the mountains are.
+  example     heights spanning 0.47, at mountain height 0.45:
+              0.47 × 0.45 × 10,000 = 2,115 m.
+
+altitude  valley floor + (h − lo) × mountain height × 10,000      metres
+
+  h           the field height at the point, in [0, 1].
+  valley floor   the control: the altitude of the LOWEST point in view,
+              default 1,000 m. It is a datum, so everything is measured
+              up from it.
+  returns     the point's height above sea level in METRES — the number
+              the tree line and snow line are compared against.
+```
+
+**Why it is done this way.** Because the metre scale is fixed and does not depend
+on the ground width, the two kinds of control do separate, physical things:
+
+- **mountain height** changes how tall the mountains are — in metres, and on
+  screen.
+- **chunk size and chunks across** change how much land is in view. Taking in
+  more land makes the same mountains look flatter, which is what happens when
+  you look at a wider landscape.
+
+The screen scale is then derived so that one metre up is drawn the same length as
+one metre across. **There is no vertical exaggeration**: a slope is drawn at its
+real steepness, so steep-looking ground really is steep (the camera's perspective
+still foreshortens what you see, as it would looking at real hills). (An earlier version derived metres *from* the
+ground width, so widening the view scaled both directions together and the
+picture never changed — the control could only relabel the axis.)
 
 ---
 
