@@ -63,10 +63,13 @@ would hit — both are local and need no network.
 
 ### Restarting it without dropping the site
 
-**Nothing supervises the process** — no launchd plist, no `launchctl` entry;
-it sits at PPID 1 because it was started with `nohup` from a terminal that has
-since gone. So it does **not** come back by itself after a reboot or a failed
-start, and whoever kills it owns bringing it back.
+**launchd supervises it since 2026-11-10** — job
+`uk.virtualfictions.bd.cloudflared` (source in repo `launchd/`, installed by
+`launchd/install.sh`), with the same arguments as below. It starts at login and
+is restarted if it exits, so **`kill` no longer stops it**; use
+`launchctl bootout gui/$UID/uk.virtualfictions.bd.cloudflared`. Until then it
+sat at PPID 1 from a `nohup`, and a crash on 2026-11-09 left the site down until
+it was restarted by hand.
 
 The zero-downtime method, used on 2026-10-23: **start the new instance first,
 let it register, then SIGTERM the old one.** One tunnel can hold several
@@ -77,7 +80,9 @@ stays up throughout. Measured: `graph.virtualfictions.uk` answered **HTTP 200 in
 It now writes to `~/.cloudflared/cloudflared.log` (`--logfile`), which it never
 did before — the old instance logged nowhere.
 
-**Outstanding:** a launchd job, so the tunnel survives a reboot. Not done.
+The same swap applies under launchd: `launchctl kickstart -k` drops the site
+for a few seconds, so for a zero-downtime change start a hand-run replica
+first, then kickstart, then stop the replica.
 
 ---
 
@@ -280,8 +285,8 @@ link was retired as a user-facing product on the same day.
 
 ## Open items
 
-- **launchd for `cloudflared`** — it currently dies on reboot and nothing brings
-  it back. Same question for `node server.js` (also PPID 1).
+- ~~launchd for `cloudflared` and `node server.js`~~ — **done 2026-11-10**, see
+  repo `launchd/`.
 - **`www.butterflydreaming.net`** is in ingress but has **no DNS record**; the
   name does not resolve.
 - **Whether `.org` should serve node URLs too**, so the promise is kept on the

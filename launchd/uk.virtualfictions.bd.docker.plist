@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>uk.virtualfictions.bd.docker</string>
+  <!-- Opens Docker Desktop in the background at login. memgraph-dev has
+       restart=unless-stopped, so the daemon brings Memgraph up by itself. -->
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/open</string><string>-g</string><string>-a</string><string>Docker</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+</dict></plist>

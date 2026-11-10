@@ -67,6 +67,7 @@ Keep this current when adding a doc. One line is enough.
 | file | what it is |
 |---|---|
 | **BackupNotes.md** | Restore procedures. Every DB-mutating `bd_tool.js` subcommand auto-backs-up into `backups/`. |
+| **launchd/** | The login jobs that bring Docker/Memgraph, `server.js` and the tunnel back after a reboot. `install.sh` (re)installs them; `start_bd_server.sh` waits for Memgraph before starting node. |
 | **CHANGELOG.md** | Running change log. |
 | **helper_messages.md** | **Source of truth** for the helper cards, driven into the DB by `bd_tool.js sync-helpers`. Edit here, not in the database. |
 | **bd_graph_schema_corrected.md** | Schema reference. Predates several 07/08 changes — cross-check against the live DB. |

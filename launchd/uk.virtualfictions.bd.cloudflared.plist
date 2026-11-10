@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>uk.virtualfictions.bd.cloudflared</string>
+  <!-- Same arguments the hand-started tunnel has always used. The tunnel is
+       LOCALLY managed: hostnames live in ~/.cloudflared/config.yml. -->
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/cloudflared</string><string>tunnel</string>
+    <string>--config</string><string>/Users/williamstewart2/.cloudflared/config.yml</string>
+    <string>--logfile</string><string>/Users/williamstewart2/.cloudflared/cloudflared.log</string>
+    <string>run</string><string>5e8eaf21-e707-4288-a31c-abf99852f36e</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/williamstewart2/.cloudflared</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/Users/williamstewart2/.cloudflared/cloudflared.stdout.log</string>
+  <key>StandardErrorPath</key><string>/Users/williamstewart2/.cloudflared/cloudflared.stdout.log</string>
+</dict></plist>

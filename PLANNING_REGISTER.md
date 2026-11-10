@@ -293,7 +293,7 @@ trigger already on record: iPhone load exceeding ~3 s.
 
 | Item | Why it matters | Status |
 |---|---|---|
-| **launchd for `cloudflared` and `node server.js`** | Both sit at PPID 1 with no supervisor, so the public site dies on reboot and nothing brings it back. | Not started |
+| **launchd for `cloudflared` and `node server.js`** | Login jobs in `launchd/` (plus Docker at login and `restart=unless-stopped` on `memgraph-dev`); server waits for port 7687, both restarted on exit. Installed and tested 2026-11-10: a killed server was back in ~2 s. Survival of a real reboot not yet observed. | **Built 2026-11-10** |
 | **Public read/write split review** | These URLs are about to be published. `curationCodeOk()` is the one gate and **every tunnel visitor arrives as `127.0.0.1`**, so nothing can be granted by address. | Not started — do before publishing widely |
 | **The development notice on arrival** | A visitor reaching a mid-corpus node is not told this is a development version until their first Local press (`rootIntroPending`). Deliberate, but worth revisiting now the links are public. | Decision open |
 | **`www.butterflydreaming.net`** | In ingress, but no DNS record exists, so the name does not resolve. | Not done |

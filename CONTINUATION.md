@@ -19,10 +19,15 @@ still the stable viewer.
 Everything below is on that branch and pushed. Merging to `main` is a deliberate
 act still to be taken — see §5.
 
-**To bring the site back up after a restart:**
-
-    cd ~/butterflydreaming_graphviewer1
-    node server.js                 # or: nohup node server.js > /private/tmp/bd_server.log 2>&1 &
+**After a restart the site comes back by itself** (since 2026-11-10). Three
+launchd login jobs in `launchd/` do it: Docker Desktop opens in the background,
+`memgraph-dev` has `restart=unless-stopped`, the server waits for Memgraph's
+port 7687 before starting, and `cloudflared` runs the tunnel. The server and
+the tunnel are restarted if they exit — **so `kill` restarts them; to stop one
+deliberately use** `launchctl bootout gui/$UID/uk.virtualfictions.bd.server`
+(or `.cloudflared`). To restart the server after a code change:
+`launchctl kickstart -k gui/$UID/uk.virtualfictions.bd.server`. After a restore
+onto a new machine: `launchd/install.sh`.
 
 Local `http://localhost:8080/`, public `https://graph.virtualfictions.uk/` via a
 long-running `cloudflared` tunnel. **Client console output is forwarded to
