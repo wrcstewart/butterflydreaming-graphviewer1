@@ -143,6 +143,16 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <input type="range" id="pathTurn" min="0" max="359" step="1" value="0">
       <p class="hint">Rotates the whole path around you. At 0 the afternoon sun is behind you to the left; at 90 it sets straight ahead, behind the ridges.</p>
     </div>
+    <div class="ctl">
+      <label for="lookUp">Look up <output id="lookUpOut"></output></label>
+      <input type="range" id="lookUp" min="0" max="70" step="1" value="0">
+      <p class="hint">Tilts the view above the ground you are looking at. Dragging alone cannot do this: the view always points at a spot on the ground ahead, so moving back only flattens the angle.</p>
+    </div>
+    <div class="ctl">
+      <label for="fov">Field of view <output id="fovOut"></output></label>
+      <input type="range" id="fov" min="25" max="100" step="1" value="45">
+      <p class="hint">How much of the scene fits top to bottom, in degrees: a wide-angle lens at the high end. Wider shows more sky and makes distant mountains smaller.</p>
+    </div>
     <div class="row">
       <label class="chk"><input type="checkbox" id="shadows" checked> Shadows</label>
       <label class="chk"><input type="checkbox" id="bodies" checked> Show sun &amp; moon</label>
@@ -159,7 +169,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
         <option value="red">Always red, as in ink painting</option>
         <option value="pale">Always pale</option>
       </select>
-      <p class="hint">Natural changes colour over the last 25° above the horizon: pale cream, then orange, then red at sunrise and sunset. A pale disc is faint against the paper by day.</p>
+      <p class="hint">Natural changes colour only in the last 10° above the horizon: pale cream, then amber, then a soft orange-red right at sunrise and sunset. A pale disc is faint against the paper by day.</p>
     </div>
     <div class="row">
       <button class="btn" id="fly" aria-pressed="true">Pause</button>
@@ -216,7 +226,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1, opacity: 1,
-                time: 15, flow: 0, pathHeight: 60, pathTurn: 0, shadows: true, bodies: true, soft: 2, discStyle: 'natural' };
+                time: 15, flow: 0, pathHeight: 60, pathTurn: 0, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 0, fov: 45 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -290,13 +300,25 @@ function dirOf(b, out) {
 // The visible discs: flat images that always face the viewer (sprites), drawn far off along
 // each body's direction. fog:false so the mist does not erase them; they still sit behind the
 // mountains, so the sun can set behind a ridge.
+// glowTexture(core) → a 128×128 image for a sprite.
+//   core   true: a solid disc with a soft rim. false: a faint glow fading to nothing at the edge.
+//   returns a texture that is pure WHITE in every pixel, with only the transparency (alpha)
+//           varying; the sprite's colour setting tints it.
+// Built pixel by pixel, NOT drawn on a canvas: a canvas stores colour already multiplied by
+// alpha, so where the glow is nearly transparent the colour comes back as rounding noise —
+// faint specks round the sun that travel with it, and a dark ring round the disc.
 function glowTexture(core) {
-  const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s;
-  const g = cv.getContext('2d'), gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  if (core) { gr.addColorStop(0, '#fff'); gr.addColorStop(0.44, '#fff'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); }
-  else { gr.addColorStop(0, 'rgba(255,255,255,0.5)'); gr.addColorStop(0.2, 'rgba(255,255,255,0.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); }
-  g.fillStyle = gr; g.fillRect(0, 0, s, s);
-  return new THREE.CanvasTexture(cv);
+  const s = 128, data = new Uint8Array(s * s * 4);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    const r = Math.hypot(x + 0.5 - s / 2, y + 0.5 - s / 2) / (s / 2);   // 0 at centre, 1 at edge
+    const a = core ? 1 - smooth(0.42, 0.5, r) : 0.5 * Math.pow(Math.max(0, 1 - r), 3.5);
+    const k = (y * s + x) * 4;
+    data[k] = data[k + 1] = data[k + 2] = 255; data[k + 3] = Math.round(255 * a);
+  }
+  const tex = new THREE.DataTexture(data, s, s, THREE.RGBAFormat);
+  tex.magFilter = tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
 }
 function makeSprite(core, size) {
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(core), fog: false, transparent: true, depthWrite: false }));
@@ -310,13 +332,15 @@ const C = hex => new THREE.Color(hex);
 const WHITE = C('#ffffff'), LOW_SUN = C('#ff9a60'), MOON_LIGHT = C('#b8ccff'), NIGHT_SKY = C('#7d8aa6');
 const NIGHT_TINT = C('#2a3446'), DUSK = C('#d8b49a');
 // Disc colour [high in the sky, on the horizon]; it moves from one to the other over the last
-// 25° of elevation. 'red' and 'pale' hold one colour throughout, by choice.
+// LOW_BAND degrees of elevation, and the sunlight warms over the same band so the two agree.
+// 'red' and 'pale' hold one colour throughout, by choice.
+const LOW_BAND = 10;
 const DISC = {
-  natural: [C('#fff1cf'), C('#c8402a')],
+  natural: [C('#fff1cf'), C('#e2683a')],
   red:     [C('#b8322a'), C('#b8322a')],
   pale:    [C('#fbf3e0'), C('#fbf3e0')],
 };
-const ORANGE = C('#f08a3c');
+const ORANGE = C('#f6b26b');            // a soft amber, passed halfway
 const MOON_DISC = C('#eef0f2');
 const sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3(), keyDir = new THREE.Vector3(0, 1, 0);
 let sunEl = 0, moonEl = 0;
@@ -332,7 +356,7 @@ function updateSky() {
   if (sb.el > -2) {                                          // sun is the key light
     keyDir.copy(sunDir);
     key.intensity = 0.9 * smooth(-2, 10, sb.el);
-    key.color.copy(LOW_SUN).lerp(WHITE, smooth(2, 25, sb.el));
+    key.color.copy(LOW_SUN).lerp(WHITE, smooth(0, LOW_BAND, sb.el));
   } else {                                                   // moon takes over
     keyDir.copy(moonDir);
     key.intensity = 0.22 * smooth(-2, 10, mb.el);
@@ -344,7 +368,7 @@ function updateSky() {
   scene.background.copy(night).lerp(paper, day).lerp(DUSK, 0.45 * dusk);
   scene.fog.color.copy(scene.background);
   // discs
-  const [high, low] = DISC[state.discStyle], lowness = 1 - smooth(0, 25, sb.el);
+  const [high, low] = DISC[state.discStyle], lowness = 1 - smooth(0, LOW_BAND, sb.el);
   const sunSeen = state.bodies ? smooth(-3, 1, sb.el) : 0;
   // pale → orange → red: orange is passed through halfway, so the change is not a straight
   // fade from cream to red, which would go through a dull pink.
@@ -498,6 +522,9 @@ function loop() {
     $('time').value = state.time; syncLabels();
   }
   updateSky(); placeKey();
+  // controls.update() re-aims the camera at the target every frame, so this extra upward tilt is
+  // applied fresh each frame and never accumulates. rotateX(+) turns the view up.
+  if (state.lookUp) camera.rotateX(state.lookUp * DEG);
   updateChunks();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
@@ -524,6 +551,8 @@ function syncLabels() {
   $('pathHeightOut').textContent = state.pathHeight + '°';
   $('pathTurnOut').textContent = state.pathTurn + '°';
   $('softOut').textContent = state.soft.toFixed(1);
+  $('lookUpOut').textContent = state.lookUp + '°';
+  $('fovOut').textContent = state.fov + '°';
 }
 let pending = null;
 function regenerate() { clearTimeout(pending); pending = setTimeout(() => { updateNorm(); clearChunks(); }, 80); }
@@ -534,7 +563,8 @@ bindRange('H', 'H'); bindRange('widest', 'widestKm'); bindRange('octaves', 'octa
 bindRange('speed', 'speed', false);
 $('palette').addEventListener('change', e => { state.palette = e.target.value; clearChunks(); });
 // Light controls change nothing in the terrain, so none of them rebuilds a chunk.
-for (const id of ['time', 'flow', 'pathHeight', 'pathTurn']) bindRange(id, id, false);
+for (const id of ['time', 'flow', 'pathHeight', 'pathTurn', 'lookUp']) bindRange(id, id, false);
+$('fov').addEventListener('input', e => { state.fov = +e.target.value; camera.fov = state.fov; camera.updateProjectionMatrix(); syncLabels(); });
 $('soft').addEventListener('input', e => { state.soft = +e.target.value; key.shadow.radius = state.soft; syncLabels(); });
 $('shadows').addEventListener('change', e => {
   state.shadows = e.target.checked;
