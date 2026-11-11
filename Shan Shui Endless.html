@@ -155,10 +155,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     <div class="ctl">
       <label for="discStyle">Sun disc</label>
       <select id="discStyle">
-        <option value="red" selected>Red, as in ink painting</option>
-        <option value="pale">Pale, like real sunlight</option>
+        <option value="natural" selected>Natural — pale when high, red when setting</option>
+        <option value="red">Always red, as in ink painting</option>
+        <option value="pale">Always pale</option>
       </select>
-      <p class="hint">A pale disc almost vanishes against the paper by day; a red one holds.</p>
+      <p class="hint">Natural changes colour over the last 25° above the horizon: pale cream, then orange, then red at sunrise and sunset. A pale disc is faint against the paper by day.</p>
     </div>
     <div class="row">
       <button class="btn" id="fly" aria-pressed="true">Pause</button>
@@ -215,7 +216,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1, opacity: 1,
-                time: 15, flow: 0, pathHeight: 60, pathTurn: 0, shadows: true, bodies: true, soft: 2, discStyle: 'red' };
+                time: 15, flow: 0, pathHeight: 60, pathTurn: 0, shadows: true, bodies: true, soft: 2, discStyle: 'natural' };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -308,7 +309,14 @@ const SKY_DIST = 30;                  // inside the camera's far limit of 40
 const C = hex => new THREE.Color(hex);
 const WHITE = C('#ffffff'), LOW_SUN = C('#ff9a60'), MOON_LIGHT = C('#b8ccff'), NIGHT_SKY = C('#7d8aa6');
 const NIGHT_TINT = C('#2a3446'), DUSK = C('#d8b49a');
-const DISC = { red: [C('#b8322a'), C('#c8502e')], pale: [C('#fbf3e0'), C('#ffb27a')] };   // [high, low]
+// Disc colour [high in the sky, on the horizon]; it moves from one to the other over the last
+// 25° of elevation. 'red' and 'pale' hold one colour throughout, by choice.
+const DISC = {
+  natural: [C('#fff1cf'), C('#c8402a')],
+  red:     [C('#b8322a'), C('#b8322a')],
+  pale:    [C('#fbf3e0'), C('#fbf3e0')],
+};
+const ORANGE = C('#f08a3c');
 const MOON_DISC = C('#eef0f2');
 const sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3(), keyDir = new THREE.Vector3(0, 1, 0);
 let sunEl = 0, moonEl = 0;
@@ -336,9 +344,12 @@ function updateSky() {
   scene.background.copy(night).lerp(paper, day).lerp(DUSK, 0.45 * dusk);
   scene.fog.color.copy(scene.background);
   // discs
-  const [high, low] = DISC[state.discStyle], lowness = 1 - smooth(0, 20, sb.el);
+  const [high, low] = DISC[state.discStyle], lowness = 1 - smooth(0, 25, sb.el);
   const sunSeen = state.bodies ? smooth(-3, 1, sb.el) : 0;
-  sunDisc.material.color.copy(high).lerp(low, lowness);
+  // pale → orange → red: orange is passed through halfway, so the change is not a straight
+  // fade from cream to red, which would go through a dull pink.
+  if (lowness < 0.5) sunDisc.material.color.copy(high).lerp(state.discStyle === 'natural' ? ORANGE : low, lowness * 2);
+  else sunDisc.material.color.copy(state.discStyle === 'natural' ? ORANGE : high).lerp(low, lowness * 2 - 1);
   sunGlow.material.color.copy(LOW_SUN).lerp(WHITE, 1 - lowness);
   sunDisc.material.opacity = sunSeen;
   sunGlow.material.opacity = sunSeen * (state.discStyle === 'red' ? 0.35 : 0.9);
