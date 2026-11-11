@@ -55,6 +55,8 @@ h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; 
 .ctl label { display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
 .ctl output { font-family: var(--mono); font-size: 12px; color: var(--ink); text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--ink); margin: 0; }
+/* 16px: anything smaller and iOS Safari zooms the page when the menu is tapped. */
+select { width: 100%; font: 16px var(--body); padding: 5px 8px; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 3px; }
 input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .seg { display: flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
@@ -102,11 +104,21 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <label for="relief">Relief <output id="reliefOut"></output></label>
       <input type="range" id="relief" min="0.1" max="1.0" step="0.05" value="0.45">
     </div>
+    <div class="ctl">
+      <label for="palette">Palette</label>
+      <select id="palette">
+        <option value="ink" selected>Ink — dark peaks</option>
+        <option value="inkInv">Ink inverted — pale peaks</option>
+        <option value="blue">Blue-green — dark peaks</option>
+        <option value="blueInv">Blue-green inverted — pale peaks</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label for="opacity">Opacity <output id="opacityOut"></output></label>
+      <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="1">
+      <p class="hint">Fades the whole picture toward what is behind it — the paper colour here, another image in a collage.</p>
+    </div>
     <div class="row">
-      <div class="seg" role="group" aria-label="Palette">
-        <button id="pInk" aria-pressed="true">Ink</button>
-        <button id="pBlue" aria-pressed="false">Blue-green</button>
-      </div>
       <button class="btn" id="fly" aria-pressed="true">Pause</button>
       <button class="btn" id="newSeed">New world</button>
     </div>
@@ -160,7 +172,7 @@ function simplex2(xin, yin) {
 // Octave o has frequency f0·2^o and amplitude 2^(−H·o): the same power law as the spectral method,
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
-const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1 };
+const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1, opacity: 1 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -212,7 +224,11 @@ function applyTheme() {
 
 const PALETTES = {
   ink:  [[0.0, '#c9ccc2'], [0.35, '#9ca29a'], [0.65, '#5e6661'], [1.0, '#22282a']],
-  blue: [[0.0, '#c8c3a4'], [0.3, '#8fa58a'], [0.6, '#3f7a74'], [0.85, '#2b5a72'], [1.0, '#2a3e4f']]
+  blue: [[0.0, '#c8c3a4'], [0.3, '#8fa58a'], [0.6, '#3f7a74'], [0.85, '#2b5a72'], [1.0, '#2a3e4f']],
+  // The same two ramps run backwards: each stop at height t moves to 1 − t, so the
+  // valleys take the dark ink and the peaks the pale wash.
+  inkInv:  [[0.0, '#22282a'], [0.35, '#5e6661'], [0.65, '#9ca29a'], [1.0, '#c9ccc2']],
+  blueInv: [[0.0, '#2a3e4f'], [0.15, '#2b5a72'], [0.4, '#3f7a74'], [0.7, '#8fa58a'], [1.0, '#c8c3a4']]
 };
 const tmpA = new THREE.Color(), tmpB = new THREE.Color();
 function ramp(stops, t, out) {
@@ -326,6 +342,7 @@ function syncLabels() {
   $('finest').textContent = finestM >= 1000 ? (finestM / 1000).toFixed(1) + ' km' : Math.round(finestM) + ' m';
   $('reliefOut').textContent = (state.relief * KM_PER_UNIT).toFixed(1) + ' km';
   $('speedOut').textContent = state.speed.toFixed(1) + '×';
+  $('opacityOut').textContent = Math.round(state.opacity * 100) + '%';
 }
 let pending = null;
 function regenerate() { clearTimeout(pending); pending = setTimeout(() => { updateNorm(); clearChunks(); }, 80); }
@@ -334,13 +351,11 @@ function bindRange(id, key, rebuild = true) {
 }
 bindRange('H', 'H'); bindRange('widest', 'widestKm'); bindRange('octaves', 'octaves'); bindRange('relief', 'relief');
 bindRange('speed', 'speed', false);
-function seg(onId, offId, apply) {
-  $(onId).addEventListener('click', () => {
-    $(onId).setAttribute('aria-pressed', 'true'); $(offId).setAttribute('aria-pressed', 'false'); apply(); clearChunks();
-  });
-}
-seg('pInk', 'pBlue', () => state.palette = 'ink');
-seg('pBlue', 'pInk', () => state.palette = 'blue');
+$('palette').addEventListener('change', e => { state.palette = e.target.value; clearChunks(); });
+// Opacity of the whole rendered picture, applied once to the finished image (the canvas),
+// not to the terrain's material: a see-through material would show far slopes through
+// near ones. Changes nothing in the scene, so no rebuild.
+$('opacity').addEventListener('input', e => { state.opacity = +e.target.value; canvas.style.opacity = state.opacity; syncLabels(); });
 $('fly').addEventListener('click', () => {
   state.flying = !state.flying;
   $('fly').textContent = state.flying ? 'Pause' : 'Travel';
