@@ -126,12 +126,17 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     <div class="ctl">
       <label for="time">Time of day <output id="timeOut"></output></label>
       <input type="range" id="time" min="0" max="24" step="0.05" value="15">
-      <p class="hint">The sun crosses the sky from 6:00 to 18:00; the moon takes the other half of the day.</p>
+      <p class="hint">The sun crosses the sky from 6:00 to 18:00. Where the moon is depends on the day of the lunar month, below.</p>
     </div>
     <div class="ctl">
       <label for="flow">Time flow <output id="flowOut"></output></label>
       <input type="range" id="flow" min="0" max="20" step="0.5" value="0">
       <p class="hint">Minutes of the day that pass each second. 0 holds the light still; 10 is a whole day in 2.4 minutes.</p>
+    </div>
+    <div class="ctl">
+      <label for="moonAge">Day of the lunar month <output id="moonAgeOut"></output></label>
+      <input type="range" id="moonAge" min="0" max="29.5" step="0.25" value="15">
+      <p class="hint">Days since new moon (a lunar month is 29.5 days). 0: new moon, beside the sun and unseen. About 7: half lit, up in the afternoon and evening. About 15: full, rising as the sun sets. About 22: half lit the other way, up after midnight and in the morning. The lit side always faces the sun. Time flow also advances this, one day per 24 hours.</p>
     </div>
     <div class="ctl">
       <label for="pathHeight">Highest sun <output id="pathHeightOut"></output></label>
@@ -165,11 +170,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     <div class="ctl">
       <label for="discStyle">Sun disc</label>
       <select id="discStyle">
-        <option value="natural" selected>Natural — pale when high, red when setting</option>
+        <option value="natural" selected>Natural — near white when high, warm cream when setting</option>
         <option value="red">Always red, as in ink painting</option>
         <option value="pale">Always pale</option>
       </select>
-      <p class="hint">Natural changes colour only in the last 10° above the horizon: pale cream, then amber, then a soft orange-red right at sunrise and sunset. A pale disc is faint against the paper by day.</p>
+      <p class="hint">Natural changes colour only in the last 10° above the horizon, from near white to a warm cream at sunrise and sunset. A pale disc is faint against the paper by day.</p>
     </div>
     <div class="row">
       <button class="btn" id="fly" aria-pressed="true">Pause</button>
@@ -226,7 +231,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1, opacity: 1,
-                time: 15, flow: 0, pathHeight: 60, pathTurn: 0, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 0, fov: 45 };
+                time: 15, flow: 0, pathHeight: 60, pathTurn: 0, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 0, fov: 45, moonAge: 15 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -286,12 +291,18 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 //   returns the sun's compass bearing az (degrees clockwise from north/ahead) and elevation
 //           el (degrees above the horizon; negative = below it). The sun rises in the east at
 //           6:00, is highest at 12:00 at state.pathHeight degrees, and sets in the west at 18:00;
-//           state.pathTurn rotates the whole path. The moon is bodyAt(hours + 12).
+//           state.pathTurn rotates the whole path. The moon is bodyAt(hours - moonLag()).
 function bodyAt(hours) {
   const f = (hours - 6) / 12;
   return { az: 90 + 180 * f + state.pathTurn, el: state.pathHeight * Math.sin(Math.PI * f) };
 }
 // dirOf(body, out) → out, a unit vector pointing from the ground TOWARD that body.
+// moonLag() → hours, how far the moon trails the sun on the same path.
+//   Uses state.moonAge: days since new moon, 0 … 29.5. The moon falls about 49 minutes further
+//   behind each day, so it trails by 24 × age / 29.53 hours: 0 at new moon (with the sun),
+//   12 at full moon (opposite it). There is no tilt between the two paths in this sky.
+const LUNAR_MONTH = 29.53;
+function moonLag() { return 24 * state.moonAge / LUNAR_MONTH; }
 function dirOf(b, out) {
   const a = b.az * DEG, e = b.el * DEG;
   return out.set(Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e));
@@ -326,21 +337,53 @@ function makeSprite(core, size) {
 }
 const sunGlow = makeSprite(false, 9), sunDisc = makeSprite(true, 1.6);
 const moonGlow = makeSprite(false, 5), moonDisc = makeSprite(true, 1.1);
+// The moon's disc gets its own image, redrawn each frame, showing only the part the sun lights.
+const MS = 64, moonData = new Uint8Array(MS * MS * 4).fill(255);
+const moonTex = new THREE.DataTexture(moonData, MS, MS, THREE.RGBAFormat);
+moonTex.magFilter = moonTex.minFilter = THREE.LinearFilter;
+moonDisc.material.map = moonTex;
+let moonLit = 1;                      // fraction of the visible disc that is lit, 0 … 1
+// drawMoonPhase() — fills moonTex with the lit shape: crescent, half, gibbous or full.
+// Treats the moon as a ball lit from the sun's direction. Each pixel of the disc is a point on
+// the half of the ball facing you; it is lit when that point faces the sun. The ball's frame is
+// built from the moon's direction and the camera's right-hand direction, because the disc image
+// is always drawn upright on the screen — so the lit side points at the sun wherever you look.
+// Dark part: alpha 0.06, a faint "earthshine" so a crescent's full round is just visible.
+const _mz = new THREE.Vector3(), _mx = new THREE.Vector3(), _my = new THREE.Vector3();
+function drawMoonPhase() {
+  _mz.copy(moonDir).negate();                                   // from the moon toward you
+  _mx.set(1, 0, 0).applyQuaternion(camera.quaternion);          // screen right
+  _mx.addScaledVector(_mz, -_mx.dot(_mz)).normalize();
+  _my.crossVectors(_mz, _mx);                                   // screen up
+  const sx = sunDir.dot(_mx), sy = sunDir.dot(_my), sz = sunDir.dot(_mz);
+  moonLit = (1 + sz) / 2;
+  for (let y = 0; y < MS; y++) for (let x = 0; x < MS; x++) {
+    const px = (x + 0.5) / MS * 2 - 1, py = (y + 0.5) / MS * 2 - 1;   // −1 … 1; row 0 is the bottom
+    const r = Math.hypot(px, py) * 1.25;                        // the disc fills 0.8 of the image
+    const k = (y * MS + x) * 4;
+    if (r >= 1) { moonData[k + 3] = 0; continue; }
+    const pz = Math.sqrt(1 - r * r), q = 1.25;                  // point on the ball facing you
+    const lit = smooth(-0.06, 0.06, (px * q * sx + py * q * sy + pz * sz));
+    const edge = 1 - smooth(0.92, 1, r);                        // soft rim
+    moonData[k + 3] = Math.round(255 * edge * (0.06 + 0.94 * lit));
+  }
+  moonTex.needsUpdate = true;
+}
 const SKY_DIST = 30;                  // inside the camera's far limit of 40
 
 const C = hex => new THREE.Color(hex);
-const WHITE = C('#ffffff'), LOW_SUN = C('#ff9a60'), MOON_LIGHT = C('#b8ccff'), NIGHT_SKY = C('#7d8aa6');
+const WHITE = C('#ffffff'), LOW_SUN = C('#fff1cf'), MOON_LIGHT = C('#b8ccff'), NIGHT_SKY = C('#7d8aa6');
 const NIGHT_TINT = C('#2a3446'), DUSK = C('#d8b49a');
 // Disc colour [high in the sky, on the horizon]; it moves from one to the other over the last
-// LOW_BAND degrees of elevation, and the sunlight warms over the same band so the two agree.
+// LOW_BAND degrees of elevation, and the sunlight (LOW_SUN at the horizon) warms over the same
+// band so the two agree. The horizon colour is deliberately mild: a cream, not orange or red.
 // 'red' and 'pale' hold one colour throughout, by choice.
 const LOW_BAND = 10;
 const DISC = {
-  natural: [C('#fff1cf'), C('#e2683a')],
+  natural: [C('#fffaf0'), C('#fff1cf')],   // near white → the warm cream seen at 15:18 before
   red:     [C('#b8322a'), C('#b8322a')],
   pale:    [C('#fbf3e0'), C('#fbf3e0')],
 };
-const ORANGE = C('#f6b26b');            // a soft amber, passed halfway
 const MOON_DISC = C('#eef0f2');
 const sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3(), keyDir = new THREE.Vector3(0, 1, 0);
 let sunEl = 0, moonEl = 0;
@@ -348,7 +391,7 @@ let sunEl = 0, moonEl = 0;
 // updateSky() — sets every light, the sky/mist colour and the discs from state.time.
 // The mist works because the fog colour IS the background colour, so the two always change together.
 function updateSky() {
-  const sb = bodyAt(state.time), mb = bodyAt(state.time + 12);
+  const sb = bodyAt(state.time), mb = bodyAt(state.time - moonLag());
   sunEl = sb.el; moonEl = mb.el;
   dirOf(sb, sunDir); dirOf(mb, moonDir);
   const day = smooth(-8, 8, sb.el);                          // 0 night … 1 day
@@ -359,7 +402,7 @@ function updateSky() {
     key.color.copy(LOW_SUN).lerp(WHITE, smooth(0, LOW_BAND, sb.el));
   } else {                                                   // moon takes over
     keyDir.copy(moonDir);
-    key.intensity = 0.22 * smooth(-2, 10, mb.el);
+    key.intensity = 0.22 * smooth(-2, 10, mb.el) * moonLit;  // a thin crescent gives little light
     key.color.copy(MOON_LIGHT);
   }
   hemi.intensity = 0.2 + 0.55 * day;                         // 0.75 at full day, as before
@@ -370,16 +413,13 @@ function updateSky() {
   // discs
   const [high, low] = DISC[state.discStyle], lowness = 1 - smooth(0, LOW_BAND, sb.el);
   const sunSeen = state.bodies ? smooth(-3, 1, sb.el) : 0;
-  // pale → orange → red: orange is passed through halfway, so the change is not a straight
-  // fade from cream to red, which would go through a dull pink.
-  if (lowness < 0.5) sunDisc.material.color.copy(high).lerp(state.discStyle === 'natural' ? ORANGE : low, lowness * 2);
-  else sunDisc.material.color.copy(state.discStyle === 'natural' ? ORANGE : high).lerp(low, lowness * 2 - 1);
+  sunDisc.material.color.copy(high).lerp(low, lowness);
   sunGlow.material.color.copy(LOW_SUN).lerp(WHITE, 1 - lowness);
   sunDisc.material.opacity = sunSeen;
   sunGlow.material.opacity = sunSeen * (state.discStyle === 'red' ? 0.35 : 0.9);
   const moonSeen = state.bodies ? smooth(-3, 1, mb.el) * (0.45 + 0.55 * (1 - day)) : 0;
   moonDisc.material.color.copy(MOON_DISC);
-  moonDisc.material.opacity = moonSeen; moonGlow.material.opacity = moonSeen * 0.6;
+  moonDisc.material.opacity = moonSeen; moonGlow.material.opacity = moonSeen * 0.6 * moonLit;
 }
 
 // placeKey() — aims the key light at the ground under the view, every frame.
@@ -518,13 +558,16 @@ function loop() {
   controls.target.y += (ground + 0.08 - controls.target.y) * Math.min(1, dt * 2);
   controls.update();
   if (state.flow > 0) {                     // minutes of day per second → hours this frame
-    state.time = (state.time + state.flow * dt / 60) % 24;
-    $('time').value = state.time; syncLabels();
+    const hours = state.flow * dt / 60;
+    state.time = (state.time + hours) % 24;
+    state.moonAge = (state.moonAge + hours / 24) % LUNAR_MONTH;
+    $('time').value = state.time; $('moonAge').value = state.moonAge; syncLabels();
   }
   updateSky(); placeKey();
   // controls.update() re-aims the camera at the target every frame, so this extra upward tilt is
   // applied fresh each frame and never accumulates. rotateX(+) turns the view up.
   if (state.lookUp) camera.rotateX(state.lookUp * DEG);
+  drawMoonPhase();                         // uses the camera's final direction, so after the tilt
   updateChunks();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
@@ -553,6 +596,13 @@ function syncLabels() {
   $('softOut').textContent = state.soft.toFixed(1);
   $('lookUpOut').textContent = state.lookUp + '°';
   $('fovOut').textContent = state.fov + '°';
+  $('moonAgeOut').textContent = 'day ' + state.moonAge.toFixed(1) + ' · ' + phaseName(state.moonAge);
+}
+// phaseName(age) → the usual name for a moon age in days since new moon.
+function phaseName(a) {
+  const n = [[1.5, 'new'], [6.4, 'waxing crescent'], [8.4, 'first quarter (half)'], [13.8, 'waxing gibbous'],
+             [15.8, 'full'], [21.1, 'waning gibbous'], [23.1, 'last quarter (half)'], [28, 'waning crescent'], [99, 'new']];
+  return n.find(([lim]) => a < lim)[1];
 }
 let pending = null;
 function regenerate() { clearTimeout(pending); pending = setTimeout(() => { updateNorm(); clearChunks(); }, 80); }
@@ -563,7 +613,7 @@ bindRange('H', 'H'); bindRange('widest', 'widestKm'); bindRange('octaves', 'octa
 bindRange('speed', 'speed', false);
 $('palette').addEventListener('change', e => { state.palette = e.target.value; clearChunks(); });
 // Light controls change nothing in the terrain, so none of them rebuilds a chunk.
-for (const id of ['time', 'flow', 'pathHeight', 'pathTurn', 'lookUp']) bindRange(id, id, false);
+for (const id of ['time', 'flow', 'pathHeight', 'pathTurn', 'lookUp', 'moonAge']) bindRange(id, id, false);
 $('fov').addEventListener('input', e => { state.fov = +e.target.value; camera.fov = state.fov; camera.updateProjectionMatrix(); syncLabels(); });
 $('soft').addEventListener('input', e => { state.soft = +e.target.value; key.shadow.radius = state.soft; syncLabels(); });
 $('shadows').addEventListener('change', e => {
