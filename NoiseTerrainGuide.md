@@ -553,3 +553,190 @@ And the two commands:
 | **see the lattice question answered** | octaves 10, measure on, read the anisotropy line |
 | **snow on everything** | latitude 65, or valley floor 2200 |
 | **prove the world is endless** | world position 5000, 5000 — then home |
+
+---
+
+## Appendix A. Light, layers and blend modes — terms explained
+
+This appendix is about where the terrain is going rather than how it is built:
+an aesthetic, possibly VR, scene with drifting mist and a moving sun and moon,
+often shown at low opacity as one layer of a collage. It collects the terms that
+discussion needs, each defined before it is used. Throughout, a colour channel
+runs from **0 (black) to 1 (white)** — the same scale as 0 to 255, divided by
+255 (§2.5 defines *channel* and *clipping*).
+
+### A.1 Fitting light to the screen
+
+§2.5 describes capping the light so no colour clips. That works when every light
+source is known in advance. With mist that thickens and thins and a sun that
+moves, the worst case cannot be known in advance, so a cap calculated ahead is
+either broken when the mist thickens or so cautious the scene is always dim. The
+only place the total light is known is **at the end, pixel by pixel**. So the
+recommended order is:
+
+**Step 1 — add up all the light with no ceiling**, in linear values (A.4). Sun,
+moon, sky and mist all contribute freely; nothing clips yet.
+
+**Step 2 — exposure as an artistic control.** Dusk should feel like dusk and
+night should be dark, so exposure is set by hand. If it adapts at all, slowly and
+partially — in VR a sudden brightness change is uncomfortable.
+
+**Step 3 — a soft shoulder on each pixel's largest channel** (A.4). If a pixel's
+largest channel would pass 1, all three channels are scaled down together, so the
+colour keeps its hue and only the brightest pixels are affected:
+
+```
+m = max(r, g, b)
+if m > 1:  (r, g, b) = (r, g, b) / m          the hard version
+
+  r, g, b   one pixel's channels in linear values, with no upper limit.
+  returns   the same pixel with its largest channel at most 1, and the
+            ratios between r, g and b unchanged — so the same hue.
+```
+
+The soft version starts compressing a little below 1 instead of cutting off at
+it, so bright mist rolls off into haze rather than flat white.
+
+**Step 4 — a colour grade**, if wanted: cooler for moonlight, warmer at dusk.
+
+**Clipping becomes a deliberate effect** in small doses — a sun glint allowed to
+bloom. What to avoid is *large flat areas*, blown out or crushed (A.4), because
+they carry no texture, and in a collage that matters more (A.3).
+
+### A.2 Blend modes
+
+**Blend mode.** When one image is laid over another, a blend mode is the rule
+for combining each pixel of the top image with the pixel directly beneath it. The
+ordinary rule, **normal**, is that the top covers the bottom; with lowered
+**opacity**, the bottom shows through in proportion. Other blend modes do
+arithmetic on the two pixels instead. Each rule is applied to red, green and blue
+separately.
+
+**Multiply.**
+
+```
+result = top × bottom
+
+  top, bottom   the two pixels' values for one channel, each in [0, 1].
+  returns       their product, in [0, 1]. Never lighter than either input.
+```
+
+- White on top (1) leaves the bottom unchanged — × 1 changes nothing.
+- Black on top (0) gives black — × 0 is 0.
+- Anything between **darkens**. Like two slides stacked on a light box: each can
+  only block light.
+
+Bottom at mid-grey 0.5: top 0.8 gives **0.4**, top 1 gives **0.5**, top 0 gives
+**0**.
+
+**Screen.**
+
+```
+result = 1 − (1 − top) × (1 − bottom)
+
+  top, bottom   as above, each in [0, 1].
+  returns       a value in [0, 1]. Never darker than either input.
+```
+
+The mirror image of multiply:
+
+- Black on top (0) leaves the bottom unchanged.
+- White on top (1) gives white.
+- Anything between **lightens**. Like two projectors shining on one screen: each
+  can only add light.
+
+Bottom at 0.5: top 0.8 gives **0.9**, top 0 gives **0.5**, top 1 gives **1**.
+
+**A rough guide to choosing:** multiply for what should *darken or shade* —
+terrain relief, texture, ink. Screen for what should *glow or lighten* — mist,
+light, the moon. Normal at low opacity for a gentle mix.
+
+### A.3 Why flat extremes spoil a collage
+
+At low opacity most of a layer's colour is diluted away, and what carries through
+is its **variation in brightness**. A flat region is a flat veil. The two blend
+modes make it sharper still:
+
+| blend mode | where the terrain is **blown out** to white (1) | where it is **crushed** to black (0) |
+|---|---|---|
+| **multiply** | × 1, so the image below shows unchanged — the terrain **vanishes** there, a hole | × 0, so the result is black — the image below is **blotted out** |
+| **screen** | the result is white — the image below is **burnt out** to a white patch | the image below shows unchanged — the terrain **vanishes** there |
+
+Either way, one extreme leaves a hole and the other a solid patch, and the
+terrain's own detail is gone in both. A terrain whose values spread through the
+middle range has something to contribute everywhere — which is what the soft
+shoulder in A.1 produces.
+
+### A.4 Glossary
+
+| term | meaning |
+|---|---|
+| **channel** | One of a colour's three numbers — red, green, blue (§2.5). |
+| **clipping** | A channel asked to go above full shows full; the excess is lost. The code comments call it *pinning* (§2.5). |
+| **blown out** | Clipping at the bright end over an area: shades that should differ all become flat white. |
+| **crushed black** | The same at the dark end: dark greys that should differ all become exactly 0, flat black with no detail. |
+| **gain** | The most a surface can be brightened by the lights, `sun + hemi` (§2.5). |
+| **linear values** | Brightness numbers proportional to the actual amount of light — twice the number is twice the light. Light is added and multiplied in these. |
+| **gamma encoding** | How screen values (0–255) are stored: squeezed so the dark end gets more steps. Not proportional to light, so converted only at the very end. |
+| **exposure** | One overall brightness setting applied to the whole image, as on a camera. |
+| **auto-exposure** | Exposure that adjusts itself to the scene, as a camera's does. Here it would cancel the mood — dusk lifted to daylight. |
+| **tone mapping** | The final step fitting brightness with no upper limit into the screen's 0–1 range. |
+| **soft shoulder** | A tone-mapping curve straight through the middle and bending over gradually near the top, so bright values approach white smoothly rather than hitting it. |
+| **hue-preserving** | Changing a colour's brightness without changing which colour it is — by scaling all three channels together, keeping their ratios. |
+| **colour grade** | A deliberate overall colour adjustment of the finished image, as film-makers do — cooler for night, warmer for dusk. |
+| **bloom** | A glow drawn round very bright points, imitating how bright lights flare in an eye or a lens. |
+| **sprite** | A flat image always turned to face the viewer. Many soft translucent ones layered make cheap mist. |
+| **opacity** | How much a layer covers what is below: 1 covers fully, 0 is invisible, 0.3 keeps 70% of what was below. |
+| **blend mode** | The rule combining a layer's pixel with the pixel below it — normal, multiply, screen and others (A.2). |
+
+### A.5 Three or more layers
+
+Blend modes apply to **any number of layers**. Layers are stacked bottom to top,
+and **each layer has its own blend mode and its own opacity**. A layer's mode does
+not combine it with one particular other layer: it combines it with **the result
+of everything below it**. The work goes upward:
+
+```
+running = layer 1          the bottom: nothing is below it, so its mode is ignored
+running = blend(layer 2 onto running, by layer 2's mode and opacity)
+running = blend(layer 3 onto running, by layer 3's mode and opacity)
+  …
+final   = running
+```
+
+One pixel, worked through:
+
+| layer | value | its mode | result so far |
+|---|---|---|---|
+| 1, bottom — a photo | 0.6 | — | 0.6 |
+| 2 — the terrain | 0.5 | multiply | 0.6 × 0.5 = **0.30** |
+| 3, top — mist | 0.4 | screen | 1 − (1 − 0.4) × (1 − 0.30) = **0.58** |
+
+The terrain darkened the photo; the mist then lightened the result.
+
+**Order matters — except within one mode.**
+
+- **All multiply, or all screen:** order makes no difference. Three multiply
+  layers give `a × b × c` in any order, as slides on a light box block the same
+  light however they are stacked.
+- **Mixed modes:** order changes the result. Swap the top two layers above —
+  mist multiplied first, terrain screened on top — and the pixel is 0.62, not
+  0.58.
+- **Opacity** is applied as each layer goes on: a layer at 30% gives 30% of its
+  blended result and keeps 70% of what was below.
+
+**How the mode is chosen.** It is set **per layer**, by whoever builds the
+picture; nothing chooses it automatically.
+
+| where | how each layer's mode is set |
+|---|---|
+| **image editors** (Photoshop, GIMP, Affinity) | a drop-down beside each layer's opacity slider in the layers panel |
+| **a web page** | one style setting per element — `mix-blend-mode: multiply` or `screen` |
+| **drawing in code on a canvas** | set `globalCompositeOperation = 'multiply'` before drawing that layer |
+| **inside a 3D scene (three.js)** | each material's blending setting; multiply is built in, screen needs a short custom rule |
+
+**In BD, as of 2026-11-11:** the collage uses no blend modes — every layer is
+drawn normal. Adding them is one per-layer setting, most simply a
+`mix-blend-mode` on each layer's frame. The question to settle first is who
+chooses it: the person assembling the collage, through a control, or the
+module's script.
