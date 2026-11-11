@@ -1,0 +1,362 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Shan Shui Endless</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* Layout: full-bleed 3D scene; one floating control sheet (bottom-left desktop, bottom sheet on phones). */
+:root {
+  --paper: #e3e5dc;
+  --ink: #1d2422;
+  --ink-soft: #5b6560;
+  --sheet: rgba(240, 242, 236, 0.9);
+  --rule: #c3c8bd;
+  --seal: #a8322a;
+  --display: "Zen Old Mincho", "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161a19; --ink: #e2e5de; --ink-soft: #9aa49e;
+    --sheet: rgba(28, 33, 31, 0.9); --rule: #39413d; --seal: #d0574c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #161a19; --ink: #e2e5de; --ink-soft: #9aa49e;
+  --sheet: rgba(28, 33, 31, 0.9); --rule: #39413d; --seal: #d0574c;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); overflow: hidden; }
+#scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+
+.sheet {
+  position: fixed;
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: 300px; max-width: calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  background: var(--sheet); backdrop-filter: blur(6px);
+  border: 1px solid var(--rule); border-radius: 4px;
+  padding: 16px 18px; display: grid; gap: 14px;
+}
+.head { display: flex; align-items: center; gap: 10px; }
+.seal {
+  width: 30px; height: 30px; flex: none; border-radius: 3px;
+  background: var(--seal); color: #fff;
+  font-family: var(--display); font-weight: 700; font-size: 17px;
+  display: grid; place-items: center; line-height: 1;
+}
+h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: 0.02em; text-wrap: balance; }
+.sub { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
+.body { display: grid; gap: 14px; }
+.ctl { display: grid; gap: 4px; }
+.ctl label { display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+.ctl output { font-family: var(--mono); font-size: 12px; color: var(--ink); text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--ink); margin: 0; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.seg { display: flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+.seg button { font: 500 12px var(--body); padding: 6px 10px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.btn { font: 500 12px var(--body); padding: 6px 12px; border: 1px solid var(--ink); border-radius: 3px; background: transparent; color: var(--ink); cursor: pointer; }
+.btn:hover { background: var(--ink); color: var(--paper); }
+.hint { font-size: 11px; color: var(--ink-soft); margin: 0; }
+.stats { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+#toggle { display: none; }
+@media (max-width: 560px) {
+  .sheet { left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); width: auto; max-width: none; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding: 12px 14px; gap: 10px; }
+  .sheet.collapsed .body { display: none; }
+  #toggle { display: inline-block; margin-left: auto; }
+}
+</style>
+
+<canvas id="scene" aria-label="3D view of an endless generated mountain landscape. Drag to orbit, scroll or pinch to zoom."></canvas>
+
+<section class="sheet" id="sheet">
+  <div class="head">
+    <div class="seal" aria-hidden="true">遊</div>
+    <div>
+      <h1>Shan Shui Endless</h1>
+      <p class="sub">Chunked simplex fBm, built as you travel</p>
+    </div>
+    <button class="btn" id="toggle" aria-expanded="true">Hide</button>
+  </div>
+  <div class="body">
+    <div class="ctl">
+      <label for="H">Hurst exponent H <output id="Hout"></output></label>
+      <input type="range" id="H" min="0.1" max="0.95" step="0.05" value="0.75">
+      <p class="hint">Each octave's amplitude falls by 2<sup>−H</sup>.</p>
+    </div>
+    <div class="ctl">
+      <label for="widest">Widest mountain <output id="widestOut"></output></label>
+      <input type="range" id="widest" min="1" max="12" step="0.5" value="4">
+    </div>
+    <div class="ctl">
+      <label for="octaves">Octaves <output id="octOut"></output></label>
+      <input type="range" id="octaves" min="2" max="9" step="1" value="7">
+      <p class="hint">Finest detail ≈ <span class="stats" id="finest"></span>. Fewer octaves look smoother.</p>
+    </div>
+    <div class="ctl">
+      <label for="relief">Relief <output id="reliefOut"></output></label>
+      <input type="range" id="relief" min="0.1" max="1.0" step="0.05" value="0.45">
+    </div>
+    <div class="row">
+      <div class="seg" role="group" aria-label="Palette">
+        <button id="pInk" aria-pressed="true">Ink</button>
+        <button id="pBlue" aria-pressed="false">Blue-green</button>
+      </div>
+      <button class="btn" id="fly" aria-pressed="true">Pause</button>
+      <button class="btn" id="newSeed">New world</button>
+    </div>
+    <div class="ctl">
+      <label for="speed">Travel speed <output id="speedOut"></output></label>
+      <input type="range" id="speed" min="0.2" max="4" step="0.1" value="1">
+    </div>
+    <p class="hint stats" id="status"></p>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ---------- Seeded generator (same as fbm2d.js) ----------
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------- 2D simplex noise (after Gustavson's public-domain reference) ----------
+// A pure function of (x, y) and the seed's permutation table: that is what makes chunks join seamlessly.
+const GRAD = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
+let perm = new Uint8Array(512);
+function seedNoise(seed) {
+  const r = mulberry32(seed), p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = p[i]; p[i] = p[j]; p[j] = t; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+}
+function simplex2(xin, yin) {
+  const s = (xin + yin) * F2, i = Math.floor(xin + s), j = Math.floor(yin + s);
+  const t = (i + j) * G2, x0 = xin - (i - t), y0 = yin - (j - t);
+  const i1 = x0 > y0 ? 1 : 0, j1 = 1 - i1;
+  const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2, x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+  const ii = i & 255, jj = j & 255;
+  let n = 0, tt, g;
+  tt = 0.5 - x0*x0 - y0*y0; if (tt > 0) { g = GRAD[perm[ii + perm[jj]] & 7]; tt *= tt; n += tt*tt*(g[0]*x0 + g[1]*y0); }
+  tt = 0.5 - x1*x1 - y1*y1; if (tt > 0) { g = GRAD[perm[ii+i1 + perm[jj+j1]] & 7]; tt *= tt; n += tt*tt*(g[0]*x1 + g[1]*y1); }
+  tt = 0.5 - x2*x2 - y2*y2; if (tt > 0) { g = GRAD[perm[ii+1 + perm[jj+1]] & 7]; tt *= tt; n += tt*tt*(g[0]*x2 + g[1]*y2); }
+  return 70 * n;                                   // roughly in [-1, 1]
+}
+
+// ---------- fBm by octave summation ----------
+// Octave o has frequency f0·2^o and amplitude 2^(−H·o): the same power law as the spectral method,
+// but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
+const KM_PER_UNIT = 4;
+const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1 };
+const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
+let ampNorm = 1;
+function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
+function height01(x, z) {
+  const f0 = KM_PER_UNIT / state.widestKm;       // cycles per scene unit for the widest feature
+  let sum = 0, f = f0, a = 1;
+  const gain = Math.pow(2, -state.H);
+  for (let o = 0; o < state.octaves; o++) {
+    const [c, s, ox, oy] = ROT[o];
+    const u = (x * c - z * s) * f + ox, v = (x * s + z * c) * f + oy;
+    sum += a * simplex2(u, v);
+    f *= 2; a *= gain;
+  }
+  const h = 0.5 + 0.85 * sum / ampNorm;
+  return Math.min(1, Math.max(0, h));
+}
+
+// ---------- Scene ----------
+const $ = id => document.getElementById(id);
+const canvas = $('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 40);
+camera.position.set(0, 1.1, 2.6);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.target.set(0, 0.15, 0);
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 0.4; controls.maxDistance = 6;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x6d7570, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(-1.5, 1.2, 0.6);
+scene.add(sun);
+
+const CHUNK = 1;          // scene units per chunk (4 km)
+const RES = 64;           // segments per chunk side (~62 m per sample)
+const RADIUS = 6;         // chunks kept around the viewer
+const BUILD_PER_FRAME = 2;
+const chunks = new Map(); // "cx,cz" -> mesh
+const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+function cssColor(name) { return new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(name).trim()); }
+function applyTheme() {
+  const bg = cssColor('--paper');
+  scene.background = bg;
+  scene.fog = new THREE.Fog(bg, RADIUS * CHUNK * 0.35, RADIUS * CHUNK * 0.95);   // hides the chunk edge
+}
+
+const PALETTES = {
+  ink:  [[0.0, '#c9ccc2'], [0.35, '#9ca29a'], [0.65, '#5e6661'], [1.0, '#22282a']],
+  blue: [[0.0, '#c8c3a4'], [0.3, '#8fa58a'], [0.6, '#3f7a74'], [0.85, '#2b5a72'], [1.0, '#2a3e4f']]
+};
+const tmpA = new THREE.Color(), tmpB = new THREE.Color();
+function ramp(stops, t, out) {
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0] || i === stops.length - 1) {
+      const [t0, c0] = stops[i-1], [t1, c1] = stops[i];
+      const f = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+      return out.copy(tmpA.set(c0)).lerp(tmpB.set(c1), f);
+    }
+  }
+}
+
+// One chunk: heights, normals by finite differences of the global function (so lighting matches across
+// seams), and colours by height with steep slopes darkened.
+function buildChunk(cx, cz) {
+  const n = RES + 1, step = CHUNK / RES;
+  const x0 = cx * CHUNK, z0 = cz * CHUNK;
+  const pos = new Float32Array(n * n * 3), nor = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
+  const relief = state.relief, stops = PALETTES[state.palette], c = new THREE.Color();
+  const e = step;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const x = x0 + i * step, z = z0 + j * step, k = (j * n + i) * 3;
+    const h = height01(x, z);
+    pos[k] = x; pos[k+1] = h * relief; pos[k+2] = z;
+    const dx = (height01(x + e, z) - height01(x - e, z)) * relief / (2 * e);
+    const dz = (height01(x, z + e) - height01(x, z - e)) * relief / (2 * e);
+    const len = Math.hypot(dx, 1, dz);
+    const ny = 1 / len;
+    nor[k] = -dx / len; nor[k+1] = ny; nor[k+2] = -dz / len;
+    ramp(stops, h, c);
+    c.multiplyScalar(1 - 0.45 * Math.min(1, (1 - ny) * 1.6));
+    col[k] = c.r; col[k+1] = c.g; col[k+2] = c.b;
+  }
+  const idx = new Uint32Array(RES * RES * 6);
+  let p = 0;
+  for (let j = 0; j < RES; j++) for (let i = 0; i < RES; i++) {
+    const a = j * n + i, b = a + 1, d = a + n, f = d + 1;
+    idx[p++] = a; idx[p++] = d; idx[p++] = b;
+    idx[p++] = b; idx[p++] = d; idx[p++] = f;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeBoundingSphere();
+  return new THREE.Mesh(geo, material);
+}
+
+function clearChunks() {
+  for (const m of chunks.values()) { scene.remove(m); m.geometry.dispose(); }
+  chunks.clear();
+}
+
+// Keep the set of chunks within RADIUS of the viewer: build missing ones nearest-first, drop far ones.
+function updateChunks() {
+  const ccx = Math.floor(controls.target.x / CHUNK), ccz = Math.floor(controls.target.z / CHUNK);
+  const wanted = [];
+  for (let dz = -RADIUS; dz <= RADIUS; dz++) for (let dx = -RADIUS; dx <= RADIUS; dx++) {
+    const d2 = dx*dx + dz*dz;
+    if (d2 > RADIUS * RADIUS) continue;
+    const key = (ccx + dx) + ',' + (ccz + dz);
+    if (!chunks.has(key)) wanted.push([d2, ccx + dx, ccz + dz, key]);
+  }
+  wanted.sort((a, b) => a[0] - b[0]);
+  for (let w = 0; w < Math.min(BUILD_PER_FRAME, wanted.length); w++) {
+    const [, cx, cz, key] = wanted[w];
+    const m = buildChunk(cx, cz); scene.add(m); chunks.set(key, m);
+  }
+  for (const [key, m] of chunks) {
+    const [cx, cz] = key.split(',').map(Number);
+    if ((cx - ccx) ** 2 + (cz - ccz) ** 2 > (RADIUS + 1) ** 2) { scene.remove(m); m.geometry.dispose(); chunks.delete(key); }
+  }
+  $('status').textContent = chunks.size + ' chunks live · built ' + built + ' · position ' +
+    (controls.target.z * -KM_PER_UNIT).toFixed(1) + ' km';
+}
+let built = 0;
+const _build = buildChunk;
+buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
+
+// ---------- Travel ----------
+// The viewer glides toward −z; the camera and its orbit target move together so dragging still works.
+const clock = new THREE.Clock();
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (state.flying) {
+    const dz = -0.12 * state.speed * dt;
+    camera.position.z += dz; controls.target.z += dz;
+  }
+  // Keep the view above the ground under the target.
+  const ground = height01(controls.target.x, controls.target.z) * state.relief;
+  controls.target.y += (ground + 0.08 - controls.target.y) * Math.min(1, dt * 2);
+  controls.update();
+  updateChunks();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// ---------- Controls ----------
+function syncLabels() {
+  $('Hout').textContent = state.H.toFixed(2);
+  $('widestOut').textContent = '≈ ' + state.widestKm + ' km';
+  $('octOut').textContent = state.octaves;
+  const finestM = state.widestKm * 1000 / Math.pow(2, state.octaves - 1);
+  $('finest').textContent = finestM >= 1000 ? (finestM / 1000).toFixed(1) + ' km' : Math.round(finestM) + ' m';
+  $('reliefOut').textContent = (state.relief * KM_PER_UNIT).toFixed(1) + ' km';
+  $('speedOut').textContent = state.speed.toFixed(1) + '×';
+}
+let pending = null;
+function regenerate() { clearTimeout(pending); pending = setTimeout(() => { updateNorm(); clearChunks(); }, 80); }
+function bindRange(id, key, rebuild = true) {
+  $(id).addEventListener('input', e => { state[key] = +e.target.value; syncLabels(); if (rebuild) regenerate(); });
+}
+bindRange('H', 'H'); bindRange('widest', 'widestKm'); bindRange('octaves', 'octaves'); bindRange('relief', 'relief');
+bindRange('speed', 'speed', false);
+function seg(onId, offId, apply) {
+  $(onId).addEventListener('click', () => {
+    $(onId).setAttribute('aria-pressed', 'true'); $(offId).setAttribute('aria-pressed', 'false'); apply(); clearChunks();
+  });
+}
+seg('pInk', 'pBlue', () => state.palette = 'ink');
+seg('pBlue', 'pInk', () => state.palette = 'blue');
+$('fly').addEventListener('click', () => {
+  state.flying = !state.flying;
+  $('fly').textContent = state.flying ? 'Pause' : 'Travel';
+  $('fly').setAttribute('aria-pressed', String(state.flying));
+});
+$('newSeed').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); seedNoise(state.seed); clearChunks(); });
+$('toggle').addEventListener('click', () => {
+  const s = $('sheet'), collapsed = s.classList.toggle('collapsed');
+  $('toggle').textContent = collapsed ? 'Show' : 'Hide';
+  $('toggle').setAttribute('aria-expanded', String(!collapsed));
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+if (reduceMotion) { state.flying = false; $('fly').textContent = 'Travel'; $('fly').setAttribute('aria-pressed', 'false'); }
+seedNoise(state.seed); updateNorm(); syncLabels(); applyTheme(); resize(); loop();
+</script>
+
+</body></html>
