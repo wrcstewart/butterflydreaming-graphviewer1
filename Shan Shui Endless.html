@@ -174,6 +174,15 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <label class="chk"><input type="checkbox" id="bodies" checked> Show sun &amp; moon</label>
     </div>
     <div class="ctl">
+      <label for="sunSize">Sun size <output id="sunSizeOut"></output></label>
+      <input type="range" id="sunSize" min="0.3" max="3" step="0.1" value="1">
+    </div>
+    <div class="ctl">
+      <label for="moonSize">Moon size <output id="moonSizeOut"></output></label>
+      <input type="range" id="moonSize" min="0.3" max="3" step="0.1" value="1">
+      <p class="hint">1.0 is the size they open at, already about 3× the real sun and moon (both about half a degree across). 0.3 is close to true size. The angle shown is the disc's width on the sky; how big it looks on screen also depends on the field of view.</p>
+    </div>
+    <div class="ctl">
       <label for="stars">Stars <output id="starsOut"></output></label>
       <input type="range" id="stars" min="0" max="2.5" step="0.1" value="2.5">
       <p class="hint">Brightness and size of the stars and the Milky Way: the 2,887 stars brighter than magnitude 5.5, in their real places (Yale Bright Star Catalogue). They come out as the sun goes 3–15° below the horizon; a bright moon hides the faint ones. Raise this for overlays at low opacity, where single-pixel stars vanish.</p>
@@ -261,7 +270,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.9, widestKm: 10, octaves: 9, relief: 0.4, seed: 42, palette: 'ink', flying: true, speed: 0.2, opacity: 1,
-                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 22.75 };
+                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, sunSize: 1, moonSize: 1, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 22.75 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -385,6 +394,14 @@ function makeSprite(core, size) {
 }
 const sunGlow = makeSprite(false, 9), sunDisc = makeSprite(true, 1.6);
 const moonGlow = makeSprite(false, 5), moonDisc = makeSprite(true, 1.1);
+// applySizes() — scales each body's disc and glow by state.sunSize / state.moonSize (1 = the sizes
+// above). discDegrees(spriteSize, fill) → the disc's width on the sky in degrees, where fill is the
+// fraction of the sprite image the disc covers (sun 0.46, moon 0.8) and SKY_DIST the distance drawn at.
+const discDegrees = (size, fill) => 2 * Math.atan(size * fill / 2 / SKY_DIST) / DEG;
+function applySizes() {
+  sunDisc.scale.setScalar(1.6 * state.sunSize); sunGlow.scale.setScalar(9 * state.sunSize);
+  moonDisc.scale.setScalar(1.1 * state.moonSize); moonGlow.scale.setScalar(5 * state.moonSize);
+}
 // The moon's disc gets its own image, redrawn each frame, showing only the part the sun lights.
 const MS = 64, moonData = new Uint8Array(MS * MS * 4).fill(255);
 const moonTex = new THREE.DataTexture(moonData, MS, MS, THREE.RGBAFormat);
@@ -762,6 +779,9 @@ function syncLabels() {
   $('dayOut').textContent = new Date(2025, 0, Math.floor(state.day)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   $('latOut').textContent = Math.abs(state.lat) + '° ' + (state.lat >= 0 ? 'N' : 'S');
   $('headingOut').textContent = state.heading + '° ' + ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(state.heading / 45) % 8];
+  const sizeLabel = (k, size, fill) => { const d = discDegrees(size * k, fill); return k.toFixed(1) + ' · ' + d.toFixed(1) + '° (' + (d / 0.52).toFixed(1) + '× real)'; };
+  $('sunSizeOut').textContent = sizeLabel(state.sunSize, 1.6, 0.46);
+  $('moonSizeOut').textContent = sizeLabel(state.moonSize, 1.1, 0.8);
   $('starsOut').textContent = Math.round(state.stars * 100) + '%';
   $('softOut').textContent = state.soft.toFixed(1);
   $('lookUpOut').textContent = state.lookUp + '°';
@@ -784,6 +804,7 @@ bindRange('speed', 'speed', false);
 $('palette').addEventListener('change', e => { state.palette = e.target.value; clearChunks(); });
 // Light controls change nothing in the terrain, so none of them rebuilds a chunk.
 for (const id of ['time', 'flow', 'day', 'lat', 'heading', 'stars', 'lookUp', 'moonAge']) bindRange(id, id, false);
+for (const id of ['sunSize', 'moonSize']) $(id).addEventListener('input', e => { state[id] = +e.target.value; applySizes(); syncLabels(); });
 $('fov').addEventListener('input', e => { state.fov = +e.target.value; camera.fov = state.fov; camera.updateProjectionMatrix(); syncLabels(); });
 $('soft').addEventListener('input', e => { state.soft = +e.target.value; key.shadow.radius = state.soft; syncLabels(); });
 $('shadows').addEventListener('change', e => {

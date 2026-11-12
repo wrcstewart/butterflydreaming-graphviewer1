@@ -120,6 +120,16 @@ with `grep SHANSHUI /private/tmp/bd_server.log | tail -1`. It loads BD's own
 after 0.5 s (while connected it counts as one BD user). It also copies the line
 and shows it in a box, for when the server cannot be reached.
 
+## Sun and moon size (added 2026-11-12)
+
+Two sliders, **Sun size** and **Moon size**, 0.3–3.0, default 1.0 = the sizes
+first drawn (disc+glow sprites 1.6/9 and 1.1/5 at SKY_DIST 30). The label gives
+the multiplier, the disc's width on the sky and its multiple of the real
+~0.52°: moon 1.0 → 1.7° (3.2× real), 0.3 → 0.5° (true), 3.0 → 5.0° (9.7×);
+sun 1.0 → 1.4° (2.7×). The author found the moon small at fov 80 on an iPad
+(about 16 px); it was already 3× real — the small look is the wide field of view
+and the moon illusion. `applySizes()`, `discDegrees(size, fill)`.
+
 ## The sky does not follow dark mode (fixed 2026-11-12)
 
 The original artifact took the daytime sky from `--paper`, which dark mode sets
