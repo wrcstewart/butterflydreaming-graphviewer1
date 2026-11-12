@@ -151,6 +151,13 @@ the core still low in the SW after dusk.
 - Vega hand-checked: 15 Oct 20:30 at 26°N → 45° up in WNW, matches the real sky.
 - Moon phases at ages 3, 7.4, 11, 15, 22, 26: crescent, straight-terminator half,
   gibbous, full, waning on the opposite side.
+- **The half moon tips over through the night, and that is CORRECT** (checked
+  2026-11-12 after the author asked). Its lit side faces the sun, so it is
+  sideways at sunset (96° from straight up, 15 Oct 26°N) and turns toward the
+  horizon as the sun sinks (130° at 20:00, 159° at 23:00; London only reaches
+  ~130°). An independent Python calculation and page renders aimed at the moon
+  agree. The author chose to keep it true rather than add a "stylised sideways"
+  option.
 - Full-moon night: only bright stars, no Milky Way. Inverted palette night:
   identical sky (night colour derives from paper either way).
 
