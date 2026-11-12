@@ -204,8 +204,8 @@
     }
     .step-btn {
       background: #0f0f18;
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      
       padding: 0;
@@ -894,7 +894,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
 
     // Bump on every change to this file, with the stepper-button colour in the
     // stylesheet (the module's canary): red → green → blue.
-    const SS_BUILD = '2026-11-12a';
+    const SS_BUILD = '2026-11-12b';
 
     // ── THE CONTROLS — ONE TABLE ────────────────────────────────────────────
     // Each entry: the directive name (as written after %%bd_ / %%bd_p_), the
@@ -1357,9 +1357,10 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
     // camera sits where the page opens it: offset from the point it looks at by
     // (−1.841 west, 0.964 south) scene units, at a FIXED height of 0.676 units
     // (2.7 km). The point looked at glides north and rises and falls with the
-    // ground; the camera height does not — which is what the page's orbit
-    // control did too, since it never moved the camera when only the target
-    // changed height. look_up then tilts the view, and fov sets how much shows.
+    // ground... it did until 2026-11-12, and that bobbed the view; now both the
+    // camera (0.676) and the point it looks at (0.15) keep fixed heights, so
+    // the view's tilt never changes in flight. look_up then tilts the view,
+    // and fov sets how much shows.
     // (CAM_OFF_X, CAM_OFF_Z and CAM_Y are declared beside the renderer, above.)
 
     // ── Size: a square in BD's preview, the whole box in View ───────────────
@@ -1436,8 +1437,10 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
       const dt = Math.min(ssClock.getDelta(), 0.1);
       const moving = state.speed > 0 || state.flow > 0;
       if (state.speed > 0) controls.target.z -= 0.12 * state.speed * dt;   // glide north (−z)
-      const groundY = height01(controls.target.x, controls.target.z) * state.relief + 0.08;
-      controls.target.y += (groundY - controls.target.y) * Math.min(1, dt * 2);
+      // The point looked at stays at a FIXED height (0.15, where it starts).
+      // It used to follow the ground under it, and with the camera at a fixed
+      // height that tilted the whole view up and down over every ridge — the
+      // stars bounced with it (reported 2026-11-12). Fixed aim, steady view.
       controls.update();
       if (state.flow > 0) {                // minutes of day per second → hours this frame
         const hours = state.flow * dt / 60;
@@ -1464,7 +1467,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
       drawMoonPhase();                     // after the tilt: it uses the final direction
       updateChunks();
       renderer.render(scene, camera);
-      const settling = Math.abs(groundY - controls.target.y) > 1e-4 || chunksPending();
+      const settling = chunksPending();
       if (moving || settling) rafId = requestAnimationFrame(frame);
     }
     function stopLoop() {
@@ -1549,7 +1552,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
       }
     });
 
-    console.log('[shanshui] bd_V_ShanShuiV1 build ' + SS_BUILD + ' — the stepper +/- buttons are RED #c0392b.');
+    console.log('[shanshui] bd_V_ShanShuiV1 build ' + SS_BUILD + ' — the stepper +/- buttons are GREEN #27ae60.');
     try { document.body.dataset.ssBuild = SS_BUILD; } catch (_) {}
     postToParent({ type: 'BD_READY' });
 

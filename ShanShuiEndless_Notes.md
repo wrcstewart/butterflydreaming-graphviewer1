@@ -371,3 +371,8 @@ Decisions:
 - **Not yet:** Device (AV) — needs an entry in `AV/kolam.html`'s renderers; no
   published Standalone page. The module's canary is its stepper colour (red,
   build 2026-11-12a).
+- **The bob (fixed 2026-11-12, module build b + this page):** the point the camera
+  looks at followed the ground while the camera's height stayed fixed, so the
+  view tilted over every ridge, stars and all. The aim point now keeps a fixed
+  height (0.15). MEASURED in the module: tilt −5.204° on every one of 30 frames
+  over 5.6 km of travel.

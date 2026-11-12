@@ -750,9 +750,9 @@ function loop() {
     const dz = -0.12 * state.speed * dt;
     camera.position.z += dz; controls.target.z += dz;
   }
-  // Keep the view above the ground under the target.
-  const ground = height01(controls.target.x, controls.target.z) * state.relief;
-  controls.target.y += (ground + 0.08 - controls.target.y) * Math.min(1, dt * 2);
+  // The orbit target keeps a FIXED height. It used to follow the ground under it, and with the
+  // camera's height fixed that tilted the whole view up and down over every ridge — stars and
+  // all (reported 2026-11-12).
   controls.update();
   if (state.flow > 0) {                     // minutes of day per second → hours this frame
     const hours = state.flow * dt / 60;
