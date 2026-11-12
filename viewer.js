@@ -2492,7 +2492,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-12a' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-12b' };
 
 let bdViewTitleText = '';
 
@@ -10139,7 +10139,13 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
 
     // 2026-07-31 — first-time helper: user just arrived at the title-node
     // + text-node layout for the first time this session; orient them.
-    if (!gatewayHelperShown) {
+    //
+    // 2026-11-12 — ONLY when this view actually holds a grey title node. A
+    // module gateway (ShanShui, Kolam3D…) has none, so the card described
+    // nodes that were not there — and was spoken. Not shown there, the flag
+    // stays false, so the first real text work still gets it.
+    const viewHasTitle = cy.nodes(':visible').some(n => n.data('section_title') === true);
+    if (!gatewayHelperShown && viewHasTitle) {
       prependSystemCard(
         'The grey nodes are title nodes — click once to see any ' +
         'comments on the particular work and again to see the complete ' +
