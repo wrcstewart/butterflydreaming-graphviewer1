@@ -1691,6 +1691,13 @@ function speechTextFrom(raw) {
   t = t.replace(/^[ \t]*%%bd_pause[ \t]+([\d.]+)[ \t]*$/gm,
                 (_m, secs) => PAUSE_MARK + Math.round(parseFloat(secs) * 1000) + PAUSE_MARK);
   t = t.replace(/^%%bd_\w*.*$/gm, '');
+  // 2026-11-12 — an underscore joining two word characters is spoken as a
+  // space: `ShanShui_001` → `ShanShui 001`. The lexicon matches WHOLE words and
+  // `_` counts as a word character, so `ShanShui_001` was one unknown word and
+  // the entry for ShanShui never applied. AFTER the directive strip above, which
+  // still needs the `%%bd_` lines intact to find them. "001" is left as the
+  // voice reads it — the author's choice.
+  t = t.replace(/([A-Za-z0-9])_(?=[A-Za-z0-9])/g, '$1 ');
   t = t.replace(/<<([a-z]+)>>([\s\S]*?)<<\/>>/g, '$2');
   // 2026-09-04 — a SPACED dash is a pause; a word-internal hyphen is not.
   //
@@ -2485,7 +2492,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-10-28a' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-12a' };
 
 let bdViewTitleText = '';
 
