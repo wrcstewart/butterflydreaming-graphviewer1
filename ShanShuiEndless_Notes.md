@@ -1,15 +1,38 @@
 # Shan Shui Endless — notes (2026-11-11/12)
 
-**Read this first after any break in the Shan Shui work.** It describes what the
-page is, every control, how the sky is computed, why each choice was made (most
-were the author's corrections), how to test it headless, and what is open.
+**Read this first after any break in the Shan Shui work.** It covers BOTH the
+standalone page and the BD module made from it: what each is, every control,
+how the sky is computed, why each choice was made (most were the author's
+corrections), how to test headless, and what is open.
 
-**File:** `Shan Shui Endless.html` (repo root, one self-contained page; three.js
-r128 and OrbitControls from jsDelivr).
-**URLs:** http://localhost:8080/Shan%20Shui%20Endless.html and
-https://butterflydreaming.net/Shan%20Shui%20Endless.html
-**Branch:** `remote-graph-view`. **State: WORKING, the author's verdict "its good"**
-— the next step is TUNING, then clouds.
+## Where things stand (end of 2026-11-12) — START HERE
+
+**Two products, one landscape:**
+
+| | Standalone page | BD module `bd_V_ShanShuiV1` |
+|---|---|---|
+| File | `Shan Shui Endless.html` (repo root) | `V_ShanShui/index.html` (relay) + `V_ShanShui/visual_module.html` |
+| URL | `/Shan%20Shui%20Endless.html`, also https://butterflydreaming.net/Shan%20Shui%20Endless.html | `/bd_V_ShanShuiV1/` — loaded by BD in its player iframe |
+| Controls | its own sidebar of sliders (Hide/Show) | BD stepper column, from `%%bd_p_` lines |
+| Camera | drag to orbit (OrbitControls) | no drag: fixed at the page's opening offset |
+| Status | the place to explore | **WORKING in BD, author: "very nice"** — tweaking next |
+
+**In the graph:** Cluster **Mountain/Water** (under SubFamilies Graphics AND
+Landscapes) → gateway **ShanShui** → node **ShanShui_001** (seq 1,
+`hasModuleScript: bd_V_ShanShuiV1`), holding the agreed script (section
+"Module script, agreed" near the end). Created by `bd_v_shanshui_ingest.js`.
+No "Endless" in any graph name — the author's choice; it is a concept here.
+
+**Canaries:** BD green (build 2026-11-12c). The module's own canary is its
+stepper-button colour: GREEN, `SS_BUILD` 2026-11-12b. Rotate both on change.
+
+**Next (the author, 2026-11-13):** tweaking in BD; then a "documentation and
+ranging" section for the controls. Full open list: "Open" near the end.
+
+**The scene code exists TWICE.** The module's landscape script is a copy of the
+page's (up to its Travel section). A change to the landscape must be made in
+both — or made in the page and the module re-assembled (see "The BD module").
+The bob fix (below) was made in both by hand.
 
 ## History
 
@@ -163,26 +186,30 @@ toward the same colour on every device. The panel still follows dark mode.
 
 ## Controls (defaults)
 
-**Defaults are the author's own, sent 2026-11-12 10:53** with the Send settings
-button: H 0.9 · Widest 10 km · Octaves 9 · Relief 0.4 · Travel speed 0.2 ·
-Time 06:30 · Moon day 22.75 (waning half) · Stars 250% · Look up 9° · Field of
-view 80° · camera offset (−1.841, 0.526, 0.964) from the orbit target, i.e. off
-to the west and a little raised. (Superseded his 10:49 send: 16:21, full moon,
-camera to the east.)
-Everything else as below. (The list below gives the ORIGINAL defaults where
-these differ.)
+**In the BD module the controls are DIRECTIVES**, and the definitive list —
+name, range, step, default — is the `CONTROLS` table at the top of the glue
+script in `V_ShanShui/visual_module.html`. Names (the author's relabels):
+travel_speed (0–4, 0.2; 0 is the pause) · smoothing (= H) · detail (= octaves)
+· relief · widest_mountain · shadow_softness · fov · look_up · opacity · mist ·
+time_of_day · minutes_per_second · stars · palette (a word: ink, inkInv, blue,
+blueInv; an unknown word is ignored) · world_seed (1–100, default 42 — the
+number IS the seed) · moon_phase · direction_of_travel · date (day of year) ·
+latitude · sun_size · moon_size · star_size. The first fifteen are `_p_`
+(stepper shown); the last seven are fixed by the script. No tick-box
+directives: shadows and sun-&-moon are always on. Ranges are still the page's
+slider ranges, pending the ranging section.
 
-Terrain: Hurst exponent H 0.75 · Widest mountain 4 km · Octaves 7 · Relief
-0.45 (1.8 km) · Palette ink · Opacity 100% (applied to the canvas, not the
-material, so near slopes do not show far ones through them).
-
-Sun, moon & shadows: Time of day 15:00 (local sun time) · Time flow 0 ("still";
-minutes of day per second; also advances moon age and date) · Day of the lunar
-month 15 (full) · Date 15 Oct (day 288) · Latitude 26°N · Direction of travel
-0° N · Look up 0° · Field of view 45° · Shadows on · Show sun & moon on ·
-Stars 100% (0–250%; raise for low-opacity overlays) · Shadow softness 2.
-**The Sun disc selector was REMOVED 2026-11-12** (its red "ink painting" sun is a
-Mao-era motif; the author asked for natural only).
+**The page's sliders and their defaults** (the author's own settings, sent
+2026-11-12 10:53 with the Send settings button):
+H 0.9 · Widest mountain 10 km · Octaves 9 · Relief 0.4 (1.6 km) · Palette ink ·
+Opacity 100% · Mist 1 · Time 06:30 · Time flow 0 · Day of the lunar month 22.75
+(waning half) · Date 15 Oct (day 288) · Latitude 26°N · Direction 0° (N) · Look
+up 9° · Field of view 80° · Shadows on · Show sun & moon on · Sun size 1 · Moon
+size 1 · Stars 2.5 (250%) · Star size 1 · Shadow softness 2 · Travel speed 0.2 ·
+seed 42 · camera offset (−1.841, 0.526, 0.964) from the orbit target (off to
+the west, a little raised). Mist, Sun/Moon size and Star size have their own
+sections above. **The Sun disc selector was REMOVED 2026-11-12** (its red
+"ink painting" sun is a Mao-era motif; the author asked for natural only).
 
 **Why 15 Oct:** in SW China May–Oct is the monsoon (cloudy) and Nov–Apr is
 clear, while the Milky Way's bright core is an evening sight in summer and a
@@ -203,6 +230,16 @@ the core still low in the SW after dusk.
    colour; amber/orange removed entirely.
 6. Define every term — in chat as well as in docs (see memory
    `feedback-define-signatures-first`).
+7. No red sun at all — the red disc is a Mao-era motif → natural sun only, the
+   selector removed.
+8. Control names say what they do: H → **smoothing**, octaves → **detail**
+   (the first proposals, Peakiness / Peak Smoothing, ran opposite to their names).
+9. No "Endless" in any graph name; it is a concept for the documentation.
+   Names short enough for a breadcrumb chip (~14 characters): `ShanShui_001`.
+10. "Shui" is spoken "shway" — the speech lexicon has Shui / Shan Shui / ShanShui,
+    and speech reads `_` between word characters as a space.
+11. "The image bounces a little up and down as it travels … even the stars" →
+    the aim point keeps a fixed height; the view's tilt never changes in flight.
 
 ## Verified (headless Chrome, swiftshader)
 
@@ -258,17 +295,38 @@ split on `<DATA>`/`<END>`, fields are `|`-separated in the order of the
 `line[1]` header; keep `ra`, `dec`, `vmag`, `bv_color` (default 0.6 if blank)
 for vmag ≤ 5.5, sort by vmag, round to 0.1.
 
-## Open — tuning (next), then clouds
+## Open (as of 2026-11-12, evening)
 
-- **Tuning** the author has asked for next; nothing specified yet. Candidates:
-  dusk sky tint; star size/brightness; Milky Way strength and width; night-sky
-  colour; moonlight wash.
-- **Clouds** (agreed design, not built): a "Cloud cover" slider — 0 clear (stars
-  and Milky Way), 1 overcast, between = gaps with stars through them and the
-  moon sliding in and out; a high drifting noise layer separate from the ground
-  mist; silver edges where the moon or sun is behind (needs a shader).
+- **Tweaking in BD** — the author, from 2026-11-13. Unspecified.
+- **Documentation and ranging** — the author's next section of these notes: what
+  each control means, and its range. Ranges live in `CONTROLS` (module) and the
+  slider attributes (page) — change both, or say why they differ.
+- **Camera vs relief.** The camera flies at a fixed 0.676 units (2.7 km); peaks
+  reach relief × 4 km, so above relief ≈ 0.65 it can fly THROUGH mountains (in
+  both the page and the module — it always could). A camera that rises over high
+  ground would bring back slow vertical movement; decide with the ranging.
+- **Kolam3D squashes its figure** when height binds — found while building this
+  (see "The BD module"). Not fixed; it would change how existing Kolam figures
+  look, so it is the author's call. The 2D Kolam probably shares it.
+- **Device (AV) for ShanShui** — needs a renderer entry in `AV/kolam.html` and
+  the id in `AV_VIEWER_MODULES` (viewer.js). Until then Device falls back.
+- **The glide is not in the script,** so two screens fly different stretches of
+  land. Fine for now; matters only if Device / a partner should see the same.
+- **A wider-than-square picture in a collage** would be a BD layout change
+  (`--bd-collage-side` in style.css), not a module one.
+- **Phone frame rate** — NOT measured, in View especially (full screen at up to
+  2 device pixels per screen pixel).
+- **Tuning candidates** (earlier list): dusk sky tint; star size/brightness;
+  Milky Way strength and width; night-sky colour; moonlight wash.
+- **Clouds** (agreed design, not built): a "Cloud cover" control — 0 clear, 1
+  overcast, between = gaps with stars through them and the moon sliding in and
+  out; a high drifting layer separate from the ground mist; silver edges where
+  the moon or sun is behind (needs a shader).
 - Offered earlier, not requested: soft ceiling for the flat black tops; lower
   gain for inverted palettes; Dropbox copy (needs internet for three.js).
+
+## Migration to a BD module — the author's mappings (2026-11-12)
+
 **MIGRATION MAPPINGS**
 all begin %%bd unless stated otherwise
 _p_ directives
@@ -300,7 +358,15 @@ New World ->World Seed.  ( make integer 1 to 100 default 1)
  No tick boxed - leave as currently defaulted.
 
  ------Claude's version ----
-Module script, agreed 2026-11-12. A `_p_` directive gets a control in BD (a
+
+*(Where the agreed script below differs from the list above, the script wins:
+smoothing / detail replaced Peakiness / Peak Smoothing; travel_speed defaults
+to 0.2, as now; world_seed defaults to 42; star_size was added as a fixed
+directive; palette stays a word, from a selector.)*
+
+### Module script, agreed 2026-11-12
+
+A `_p_` directive gets a control in BD (a
 stepper — the +/− pair — for numbers, a selector box for words); one without
 `_p_` is fixed by the script and has no control.
 
@@ -346,7 +412,24 @@ Decisions:
 - No camera drag in BD for now; drag-style controls can be added later if
   wanted. The opening view is the page's default camera.
 
-## The BD module — BUILT 2026-11-12 (`V_ShanShui/`, served at `/bd_V_ShanShuiV1/`)
+## The BD module — BUILT 2026-11-12
+
+**Rebuilding it.** The module file was ASSEMBLED by a script (kept only in the
+session scratchpad, so treat the module file as the source now): Kolam3D's
+stylesheet (lines 33–690), its console forwarder, parser, `setDirectiveValue`
+and stepper block, all with comments stripped; the page's lines from the STARS
+script to just before "// ---------- Travel"; and the glue. To carry a landscape
+change across, edit the same lines in the module's middle script by hand.
+
+**Testing it headless.** BD's server serves the repo root, so a test page at
+`/zz_<name>.html` can iframe `/V_ShanShui/index.html`, wait for `BD_READY`, and
+post `{type: 'bd_script_update', script}` — NOT `BD_INIT`, which the relay does
+not pass down. Listen for `bd_module_log`, `bd_av_state` and `BD_ERROR`. For View
+send `{type: 'bd_ui_config', outputOnly: true, hideControls: true, hostChrome:
+false}` first. In `--dump-dom` runs no animation frame fires: drive frames from
+the test page with `w.eval('rafId=0; frame()')` on a timer. Delete `zz_` files.
+
+### Details (`V_ShanShui/`, served at `/bd_V_ShanShuiV1/`)
 
 - **`V_ShanShui/visual_module.html`** was ASSEMBLED, not hand-written: V_Kolam3D's
   stylesheet, `%%bd_` parser, `setDirectiveValue` and stepper machinery

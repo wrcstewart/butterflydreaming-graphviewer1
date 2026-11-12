@@ -664,3 +664,18 @@ from date and latitude (default 15 Oct, 26°N). Last commit `0b7bd6d`; the
 author called it good. **Next: a tuning pass he will direct, then clouds.**
 Open it at http://localhost:8080/Shan%20Shui%20Endless.html .
 
+## Added 2026-11-12 (evening) — Shan Shui is a BD module
+
+Read **`ShanShuiEndless_Notes.md`**, section "Where things stand — START HERE".
+In one paragraph: the landscape page became module **`bd_V_ShanShuiV1`**
+(`V_ShanShui/`, served at `/bd_V_ShanShuiV1/`), built from Kolam3D's stepper
+column and square plus the page's landscape code, driven by one `CONTROLS`
+table. It is in the graph as Cluster Mountain/Water (under Graphics and
+Landscapes) → gateway ShanShui → node ShanShui_001. Square in BD's preview, the
+whole box in View. The time of day moves like Kolam3D's camera clock and is
+written back to the script. The bob in flight is fixed in module and page.
+Also today: the speech lexicon says "Shui" as "shway"; speech reads `_` as a
+space; the "grey nodes are title nodes" helper card now appears only where
+there are title nodes. Found and NOT fixed: V_Kolam3D squashes its figure when
+height binds. Next: the author tweaks in BD (2026-11-13), then a ranging section.
+
