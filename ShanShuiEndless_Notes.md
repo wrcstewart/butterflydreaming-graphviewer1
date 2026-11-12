@@ -130,6 +130,18 @@ sun 1.0 → 1.4° (2.7×). The author found the moon small at fov 80 on an iPad
 (about 16 px); it was already 3× real — the small look is the wide field of view
 and the moon illusion. `applySizes()`, `discDegrees(size, fill)`.
 
+## Stars as points, not discs (2026-11-12)
+
+The author: on iPad, especially landscape, "way too many big disks". Cause: at
+Stars 250% every star was 2.4–7.1 CSS px with a flat bright core (the slider
+also scaled size by its square root). Now: size 1.8–4.2 CSS px rising as
+bright^1.5 (most of the ~2,000 stars fainter than mag 4.5 stay points), a
+Gaussian profile, a minimum of 2 device px, and ×(innerHeight/1000) clamped to
+0.6–1 so short (landscape) screens draw them smaller. **Stars** is now
+brightness only; a new **Star size** slider (0.3–3, default 1) is size.
+Judge star renders at 1:1 device pixels — a downscaled screenshot averages
+points away and reads far too faint (cost one round).
+
 ## Mist slider (added 2026-11-12)
 
 **Mist**, 0–3, default 1 = the original fog (begins 8.4 km, solid 22.8 km).
