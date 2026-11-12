@@ -652,3 +652,15 @@ Worth knowing, because in each case a number was reassuring and wrong.
 - No visible brown in an alpine scheme, for two independent reasons — a graded
   ramp put only 6.6% of the ground in its pure-brown window, and the lighting
   gain of 2.55 clipped the brown to pale cream.
+
+## Added 2026-11-12 — Shan Shui Endless, and its real night sky
+
+**`ShanShuiEndless_Notes.md` is the entry point.** The author supplied a Claude
+chat artifact, `Shan Shui Endless.html` (endless misty ink mountains), and asked
+for it to be developed as an aesthetic, possibly VR, collage layer. It now has
+palettes incl. inverted, opacity, sun/moon/shadows, look-up and field of view,
+moon phases, and a real sky: 2,887 catalogue stars, a Milky Way, sun and moon
+from date and latitude (default 15 Oct, 26°N). Last commit `0b7bd6d`; the
+author called it good. **Next: a tuning pass he will direct, then clouds.**
+Open it at http://localhost:8080/Shan%20Shui%20Endless.html .
+
