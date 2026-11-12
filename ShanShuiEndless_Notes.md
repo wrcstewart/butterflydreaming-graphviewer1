@@ -269,3 +269,79 @@ for vmag ≤ 5.5, sort by vmag, round to 0.1.
   mist; silver edges where the moon or sun is behind (needs a shader).
 - Offered earlier, not requested: soft ceiling for the flat black tops; lower
   gain for inverted palettes; Dropbox copy (needs internet for three.js).
+**MIGRATION MAPPINGS**
+all begin %%bd unless stated otherwise
+_p_ directives
+Travel Speed  (let slider go to 0 theerfore no pause button, default 1)
+Hurst Exponent H -> Peakiness
+Octaves ->Peak Smoothing
+Relief
+Widest Mountain
+Shadows Softness
+FOV
+Look Up
+Opacity
+Mist
+Time of Day
+Time Flow ->Minutes per Second
+Stars
+Palette
+New World ->World Seed.  ( make integer 1 to 100 default 1)
+
+
+ not _p_
+ Day of the Lunar Month ->Moon Phase
+ Direction of Travel
+ Date
+ Latitude
+ Sun Size
+ Moon Size
+
+ No tick boxed - leave as currently defaulted.
+
+ ------Claude's version ----
+Module script, agreed 2026-11-12. A `_p_` directive gets a control in BD (a
+stepper — the +/− pair — for numbers, a selector box for words); one without
+`_p_` is fixed by the script and has no control.
+
+```
+%%bd_module bd_V_ShanShuiV1
+%%bd_p_travel_speed 0.2
+%%bd_p_smoothing 0.9
+%%bd_p_detail 9
+%%bd_p_relief 0.4
+%%bd_p_widest_mountain 10
+%%bd_p_shadow_softness 2
+%%bd_p_fov 80
+%%bd_p_look_up 9
+%%bd_p_opacity 1
+%%bd_p_mist 1
+%%bd_p_time_of_day 6.5
+%%bd_p_minutes_per_second 0
+%%bd_p_stars 2.5
+%%bd_p_palette ink
+%%bd_p_world_seed 42
+%%bd_moon_phase 22.75
+%%bd_direction_of_travel 0
+%%bd_date 288
+%%bd_latitude 26
+%%bd_sun_size 1
+%%bd_moon_size 1
+%%bd_star_size 1
+```
+
+Decisions:
+- **travel_speed** — default 0.2 (as now); range now starts at 0, so 0 is the
+  pause and the Pause button goes.
+- **smoothing** = H (Hurst exponent; higher = smoother land, fewer sharp peaks).
+  **detail** = octaves (layers of detail; higher = more fine detail). Both now
+  run the way their names say.
+- **world_seed** 1–100, integer, default 42 — the seed the defaults were tuned
+  on. The number IS the seed: no hidden mapping.
+- **palette** stays a word, chosen from a selector: ink, inkInv, blue, blueInv.
+  A word in the script that is not one of these is ignored and the palette
+  keeps its current value.
+- **star_size** fixed by the script (no control).
+- Shadows and Show sun & moon: no directives, both stay on.
+- No camera drag in BD for now; drag-style controls can be added later if
+  wanted. The opening view is the page's default camera.
