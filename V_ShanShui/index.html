@@ -1,0 +1,105 @@
+<!-- ButterflyDreaming Visual Module — bd_V_ShanShuiV1 — index.html — iframe relay.
+     Copied from V_Kolam3D/index.html on 2026-11-12; the relay sets are
+     identical, and a new message type must be added in BOTH files. -->
+<!-- Loaded by the graphviewer's #visual-iframe at /bd_V_ShanShuiV1/. Thin wrapper
+     around visual_module.html: relays bd_script_* postMessages between the
+     grandparent viewer and the inner module iframe.
+
+     A RELAYED MESSAGE NEEDS THREE SITES: the sender, the relay whitelist, and
+     the receiver. Two of the three fails SILENTLY — the relay logs a delivery,
+     the handler is fine, and nothing happens. That has cost a day twice
+     (bd_av_state 2026-09-14, bd_module_log 2026-09-16), both times at exactly
+     the two Set literals below. Adding a message type means editing this file. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Shan Shui</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      /* TRANSPARENT, not #0a0a0f. This shell is a relay with a full-size
+         iframe in it, so the inner module always paints its own background and
+         this one never shows — except when the module is deliberately
+         see-through (%%bd_background transparent), where an opaque shell here
+         would hide whatever the host put behind and nothing would say why.
+         The third of four stacked backgrounds; see the render path in
+         visual_module.html. */
+      background: transparent;
+      overflow: hidden;
+    }
+    #module-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="module-frame"
+          src="visual_module.html"
+          title="ButterflyDreaming — Shan Shui">
+  </iframe>
+
+  <script>
+    'use strict';
+
+    // Two-way postMessage relay:
+    //   grandparent (viewer) ↔ this iframe (index.html) ↔ inner iframe (visual_module.html)
+
+    // bd_ui_config is here and is NOT in the 2D wrapper's set (2026-09-27).
+    // That module is only ever asked to hide its controls by a viewer, and a
+    // viewer loads visual_module.html directly with no wrapper in between — so
+    // the gap has never shown. It is a gap all the same, and leaving it in a
+    // new file to match an old one would be copying a bug forward.
+    // bd_collage_layout (2026-10-11): the host tells this module to stop its
+    // stepper column short, because another module's steppers go beneath it in
+    // a collage. A NEW TYPE, not a new field, so it needs THIS SITE as well as
+    // a sender and a receiver — and a whitelist makes an unlisted type vanish
+    // here in silence.
+    //
+    // It was missed, and the proof was in the log: BD reported `lane 130x543`
+    // so it was measuring and sending, and the module never printed a receipt.
+    // Two sites of three, which is precisely the trap this project has a note
+    // about, met for the third time.
+    const RELAY_DOWN = new Set(['bd_script_update', 'bd_script_request', 'bd_param_update',
+                                'bd_ui_config', 'BD_STOP', 'bd_collage_layout']);
+
+    // BD_ERROR is here and is NOT in the 2D wrapper's set, for a reason
+    // specific to this module: it depends on three.js arriving from a CDN, and
+    // the one thing that must never be silent is "the library did not load".
+    // Without BD_ERROR in this whitelist that sentence would stop at the
+    // wrapper and BD would show an empty square with no explanation.
+    const RELAY_UP   = new Set(['bd_script_response', 'bd_param_update', 'BD_READY',
+                                'bd_av_state', 'bd_module_log', 'BD_ERROR']);
+
+    const moduleFrame = document.getElementById('module-frame');
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      // Message from inner module iframe → forward up to viewer.
+      if (event.source === moduleFrame.contentWindow) {
+        if (RELAY_UP.has(data.type)) {
+          window.parent.postMessage(data, '*');
+        }
+        return;
+      }
+
+      // Message from grandparent viewer → forward down to inner module.
+      if (event.source === window.parent && RELAY_DOWN.has(data.type)) {
+        moduleFrame.contentWindow.postMessage(data, '*');
+      }
+    });
+  </script>
+</body>
+</html>

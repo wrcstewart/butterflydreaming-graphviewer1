@@ -345,3 +345,29 @@ Decisions:
 - Shadows and Show sun & moon: no directives, both stay on.
 - No camera drag in BD for now; drag-style controls can be added later if
   wanted. The opening view is the page's default camera.
+
+## The BD module — BUILT 2026-11-12 (`V_ShanShui/`, served at `/bd_V_ShanShuiV1/`)
+
+- **`V_ShanShui/visual_module.html`** was ASSEMBLED, not hand-written: V_Kolam3D's
+  stylesheet, `%%bd_` parser, `setDirectiveValue` and stepper machinery
+  (comments stripped — read them in V_Kolam3D), plus this page's landscape code
+  up to its Travel section, plus the module's own glue script. The scene code is
+  therefore a COPY: a change to the landscape here must be carried across.
+- **One table, `CONTROLS`,** in the glue: every directive's name, range, step and
+  default. The stepper rows, the script reader and the script writer are all
+  built from it — a range is written once.
+- **Square in BD's preview, whole box in View/collage** (`outputOnly`). In a
+  collage BD already sizes the picture's box above the 110px music strip.
+- **Clock values (time, moon, date) are written back** into the script every
+  200 ms while `minutes_per_second` > 0, labelled `fromDrift`, with the hand
+  winning — Kolam3D's camera-clock pattern. The glide is not written back.
+- **The loop stops when nothing moves** (travel and clock at 0, all land built).
+- **No drag**: the camera sits at the page's opening offset, fixed height 0.676.
+- **BD finds the square by `data-bd-square`** (`moduleSquareIn()` in viewer.js);
+  Kolam's is still found by its id.
+- **Found while building: V_Kolam3D squashes its figure** whenever height binds —
+  it sizes the square to the wrapper INCLUDING its 44/52px padding, so a 760x520
+  frame gave a 520x520 picture shown 520x468. Fixed in ShanShui only.
+- **Not yet:** Device (AV) — needs an entry in `AV/kolam.html`'s renderers; no
+  published Standalone page. The module's canary is its stepper colour (red,
+  build 2026-11-12a).

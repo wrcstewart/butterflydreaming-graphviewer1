@@ -306,6 +306,19 @@ app.use('/bd_V_Kolam3D', express.static('./V_Kolam3D', {
   }
 }));
 
+// bd_V_ShanShuiV1 — the endless shan shui landscape (2026-11-12). Served path
+// /bd_V_ShanShuiV1/ maps to on-disk V_ShanShui/. No-cache on HTML for the same
+// reason as Kolam3D: it pulls three.js from a CDN.
+app.use('/bd_V_ShanShuiV1', express.static('./V_ShanShui', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 // bd_M_ABC music module bundle. Served path /bd_M_ABC/ maps to on-disk
 // M_Music/ directory, matching the V_Kolam served-path / on-disk-dir split.
 app.use('/bd_M_ABC', express.static('./M_Music', {

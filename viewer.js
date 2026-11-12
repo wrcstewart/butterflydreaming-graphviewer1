@@ -2492,7 +2492,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-12b' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-12c' };
 
 let bdViewTitleText = '';
 
@@ -3360,6 +3360,13 @@ const MODULES = {
     embedded:   '/bd_V_Kolam3D/index.html',
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-Kolam3D/',
   },
+  // 2026-11-12 — the endless shan shui landscape. No `standalone` (nothing
+  // receives a script by URL) and no `page` yet: `Shan Shui Endless.html` is
+  // an exploration page served by BD, not a published Standalone repo.
+  'bd_V_ShanShuiV1': {
+    kind:       'visual',
+    embedded:   '/bd_V_ShanShuiV1/index.html',
+  },
   'bd_M_ABC': {
     kind:       'music',
     embedded:   '/bd_M_ABC/index.html',
@@ -3382,6 +3389,15 @@ const MODULES = {
     page:       'https://wrcstewart.github.io/ButterflyDreaming-Standalone-DroneFrac/',
   },
 };
+
+// THE MODULE'S SQUARE — the picture BD lays its arrows and Extension strip
+// round. Kolam and Kolam3D are found by their id, which predates this; a newer
+// module marks its canvas `data-bd-square` instead of borrowing a name that
+// would say "kolam" (2026-11-12, bd_V_ShanShuiV1). A MARKER, not a list of
+// module ids, so the next visual module needs no change here.
+function moduleSquareIn(doc) {
+  return (doc && (doc.getElementById('kolam-canvas') || doc.querySelector('[data-bd-square]'))) || null;
+}
 
 function getModuleUrl(moduleId) {
   return (MODULES[moduleId] && MODULES[moduleId].embedded) || null;
@@ -13695,7 +13711,7 @@ async function init() {
       // so it must reach the under-canvas branch below rather than returning
       // here. Returning was what flipped the panel to the vertical right-edge
       // default as soon as the window passed 1024.
-      const kolamHere = innerDoc && innerDoc.getElementById('kolam-canvas');
+      const kolamHere = innerDoc && moduleSquareIn(innerDoc);
       if (window.innerWidth > 1024 && !kolamHere) {
         panel.classList.remove('under-canvas', 'in-slot');
         panel.style.top = ''; panel.style.left = ''; panel.style.right = '';
@@ -13715,7 +13731,7 @@ async function init() {
         // square: Kolam (#kolam-canvas) and ABC (#piece-title). Fractal keeps
         // the left-gutter #abc-pane path above. Horizontal strip centred just
         // BELOW the square.
-        const kolamCanvas = innerDoc && innerDoc.getElementById('kolam-canvas');
+        const kolamCanvas = innerDoc && moduleSquareIn(innerDoc);
         const abcSquare   = innerDoc && innerDoc.getElementById('piece-title');
         const square = kolamCanvas || abcSquare;
         if (square) {
