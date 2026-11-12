@@ -202,15 +202,6 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <input type="range" id="soft" min="1" max="8" step="0.5" value="2">
       <p class="hint">Mountains cast shadows onto the ground on their far side from the light. Softness blurs the shadows' edges.</p>
     </div>
-    <div class="ctl">
-      <label for="discStyle">Sun disc</label>
-      <select id="discStyle">
-        <option value="natural" selected>Natural — near white when high, warm cream when setting</option>
-        <option value="red">Always red, as in ink painting</option>
-        <option value="pale">Always pale</option>
-      </select>
-      <p class="hint">Natural changes colour only in the last 10° above the horizon, from near white to a warm cream at sunrise and sunset. A pale disc is faint against the paper by day.</p>
-    </div>
     <div class="row">
       <button class="btn" id="fly" aria-pressed="true">Pause</button>
       <button class="btn" id="newSeed">New world</button>
@@ -280,7 +271,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.9, widestKm: 10, octaves: 9, relief: 0.4, seed: 42, palette: 'ink', flying: true, speed: 0.2, opacity: 1,
-                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, starSize: 1, sunSize: 1, moonSize: 1, mist: 1, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 22.75 };
+                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, starSize: 1, sunSize: 1, moonSize: 1, mist: 1, shadows: true, bodies: true, soft: 2, lookUp: 9, fov: 80, moonAge: 22.75 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -563,13 +554,10 @@ const NIGHT_TINT = C('#2a3446'), DUSK = C('#d8b49a');
 // Disc colour [high in the sky, on the horizon]; it moves from one to the other over the last
 // LOW_BAND degrees of elevation, and the sunlight (LOW_SUN at the horizon) warms over the same
 // band so the two agree. The horizon colour is deliberately mild: a cream, not orange or red.
-// 'red' and 'pale' hold one colour throughout, by choice.
+// (A red 'ink painting' disc and an always-pale one were options until 2026-11-12; removed at the
+// author's request, as the red sun over mountains is a Mao-era motif.)
 const LOW_BAND = 10;
-const DISC = {
-  natural: [C('#fffaf0'), C('#fff1cf')],   // near white → the warm cream seen at 15:18 before
-  red:     [C('#b8322a'), C('#b8322a')],
-  pale:    [C('#fbf3e0'), C('#fbf3e0')],
-};
+const SUN_HIGH = C('#fffaf0'), SUN_LOW = C('#fff1cf');   // near white → the warm cream seen at 15:18 before
 const MOON_DISC = C('#eef0f2');
 const sunEq = new THREE.Vector3(), sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3(), keyDir = new THREE.Vector3(0, 1, 0);
 let sunEl = 0, moonEl = 0;
@@ -602,12 +590,12 @@ function updateSky() {
   scene.background.copy(night).lerp(paper, day).lerp(DUSK, 0.45 * dusk);
   scene.fog.color.copy(scene.background);
   // discs
-  const [high, low] = DISC[state.discStyle], lowness = 1 - smooth(0, LOW_BAND, sb.el);
+  const high = SUN_HIGH, low = SUN_LOW, lowness = 1 - smooth(0, LOW_BAND, sb.el);
   const sunSeen = state.bodies ? smooth(-3, 1, sb.el) : 0;
   sunDisc.material.color.copy(high).lerp(low, lowness);
   sunGlow.material.color.copy(LOW_SUN).lerp(WHITE, 1 - lowness);
   sunDisc.material.opacity = sunSeen;
-  sunGlow.material.opacity = sunSeen * (state.discStyle === 'red' ? 0.35 : 0.9);
+  sunGlow.material.opacity = sunSeen * 0.9;
   const moonSeen = state.bodies ? smooth(-3, 1, mb.el) * (0.45 + 0.55 * (1 - day)) : 0;
   moonDisc.material.color.copy(MOON_DISC);
   moonDisc.material.opacity = moonSeen; moonGlow.material.opacity = moonSeen * 0.6 * moonLit;
@@ -841,7 +829,6 @@ $('shadows').addEventListener('change', e => {
   material.needsUpdate = true;              // the shader is rebuilt with or without shadow code
 });
 $('bodies').addEventListener('change', e => { state.bodies = e.target.checked; });
-$('discStyle').addEventListener('change', e => { state.discStyle = e.target.value; });
 // Opacity of the whole rendered picture, applied once to the finished image (the canvas),
 // not to the terrain's material: a see-through material would show far slopes through
 // near ones. Changes nothing in the scene, so no rebuild.

@@ -94,7 +94,8 @@ the sun sinks 3–15° below the horizon. `wash = moonLit × smooth(−2, 10, mo
 lowers the faintest magnitude from 6.0 to 3.8 and dims the Milky Way by 85%.
 Stars and Milky Way are hidden entirely by day.
 
-**Sun disc.** Sprites with `fog: false`. Glow textures are built pixel by pixel
+**Sun disc.** (Natural colouring only — the red and pale options were removed
+2026-11-12.) Sprites with `fog: false`. Glow textures are built pixel by pixel
 as a `DataTexture`, white with only alpha varying — **not on a canvas**: a canvas
 stores colour premultiplied by alpha, and reading it back gave faint specks
 round the sun and a dark ring. Disc colour "natural": near white `#fffaf0` high,
@@ -179,8 +180,9 @@ Sun, moon & shadows: Time of day 15:00 (local sun time) · Time flow 0 ("still";
 minutes of day per second; also advances moon age and date) · Day of the lunar
 month 15 (full) · Date 15 Oct (day 288) · Latitude 26°N · Direction of travel
 0° N · Look up 0° · Field of view 45° · Shadows on · Show sun & moon on ·
-Stars 100% (0–250%; raise for low-opacity overlays) · Shadow softness 2 · Sun
-disc Natural.
+Stars 100% (0–250%; raise for low-opacity overlays) · Shadow softness 2.
+**The Sun disc selector was REMOVED 2026-11-12** (its red "ink painting" sun is a
+Mao-era motif; the author asked for natural only).
 
 **Why 15 Oct:** in SW China May–Oct is the monsoon (cloudy) and Nov–Apr is
 clear, while the Milky Way's bright core is an evening sight in summer and a
