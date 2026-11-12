@@ -122,10 +122,12 @@ and shows it in a box, for when the server cannot be reached.
 
 ## Controls (defaults)
 
-**Defaults are the author's own, sent 2026-11-12 10:49** with the Send settings
+**Defaults are the author's own, sent 2026-11-12 10:53** with the Send settings
 button: H 0.9 · Widest 10 km · Octaves 9 · Relief 0.4 · Travel speed 0.2 ·
-Time 16:21 · Stars 250% · Look up 9° · Field of view 80° · camera offset
-(1.934, 0.273, 0.712) from the orbit target, i.e. off to the east and low.
+Time 06:30 · Moon day 22.75 (waning half) · Stars 250% · Look up 9° · Field of
+view 80° · camera offset (−1.841, 0.526, 0.964) from the orbit target, i.e. off
+to the west and a little raised. (Superseded his 10:49 send: 16:21, full moon,
+camera to the east.)
 Everything else as below. (The list below gives the ORIGINAL defaults where
 these differ.)
 

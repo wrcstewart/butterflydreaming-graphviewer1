@@ -126,7 +126,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     <p class="group">Sun, moon &amp; shadows</p>
     <div class="ctl">
       <label for="time">Time of day <output id="timeOut"></output></label>
-      <input type="range" id="time" min="0" max="24" step="0.05" value="16.35">
+      <input type="range" id="time" min="0" max="24" step="0.05" value="6.5">
       <p class="hint">Local sun time: the sun is highest at 12:00. When it rises and sets depends on the date and latitude below.</p>
     </div>
     <div class="ctl">
@@ -136,7 +136,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     </div>
     <div class="ctl">
       <label for="moonAge">Day of the lunar month <output id="moonAgeOut"></output></label>
-      <input type="range" id="moonAge" min="0" max="29.5" step="0.25" value="15">
+      <input type="range" id="moonAge" min="0" max="29.5" step="0.25" value="22.75">
       <p class="hint">Days since new moon (a lunar month is 29.5 days). 0: new moon, beside the sun and unseen. About 7: half lit, up in the afternoon and evening. About 15: full, rising as the sun sets. About 22: half lit the other way, up after midnight and in the morning. The lit side always faces the sun. Time flow also advances this, one day per 24 hours. The moon travels close to the sun's yearly path through the stars, so a full moon runs high in winter and low in summer.</p>
     </div>
     <div class="ctl">
@@ -256,7 +256,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.9, widestKm: 10, octaves: 9, relief: 0.4, seed: 42, palette: 'ink', flying: true, speed: 0.2, opacity: 1,
-                time: 16.35, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 15 };
+                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 22.75 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -281,9 +281,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(state.fov, 1, 0.01, 40);
-// Default view: the author's, sent 2026-11-12 — off to the side (east) and low, offset from the
-// orbit target (0, 0.15, 0) by (1.934, 0.273, 0.712).
-camera.position.set(1.934, 0.423, 0.712);
+// Default view: the author's, sent 2026-11-12 10:53 — off to the west and a little raised, offset
+// from the orbit target (0, 0.15, 0) by (−1.841, 0.526, 0.964).
+camera.position.set(-1.841, 0.676, 0.964);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.target.set(0, 0.15, 0);
