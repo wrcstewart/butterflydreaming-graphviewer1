@@ -120,6 +120,17 @@ with `grep SHANSHUI /private/tmp/bd_server.log | tail -1`. It loads BD's own
 after 0.5 s (while connected it counts as one BD user). It also copies the line
 and shows it in a box, for when the server cannot be reached.
 
+## The sky does not follow dark mode (fixed 2026-11-12)
+
+The original artifact took the daytime sky from `--paper`, which dark mode sets
+to `#161a19`. An iPad that had switched to dark mode in the evening therefore
+showed a **black sky at midday** — reported as "after night, the day sky stays
+black" (the stars were correctly off). The scene now reads `--sky`, which no
+theme overrides; the body background uses it too, so the opacity slider fades
+toward the same colour on every device. The panel still follows dark mode.
+**Test dark mode headless with** `--force-dark-mode
+--blink-settings=preferredColorScheme=0`.
+
 ## Controls (defaults)
 
 **Defaults are the author's own, sent 2026-11-12 10:53** with the Send settings
