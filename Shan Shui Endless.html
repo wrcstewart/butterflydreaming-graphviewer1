@@ -69,6 +69,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
 .btn { font: 500 12px var(--body); padding: 6px 12px; border: 1px solid var(--ink); border-radius: 3px; background: transparent; color: var(--ink); cursor: pointer; }
 .btn:hover { background: var(--ink); color: var(--paper); }
 .hint { font-size: 11px; color: var(--ink-soft); margin: 0; }
+#settingsText { width: 100%; box-sizing: border-box; font: 16px/1.3 ui-monospace, monospace; height: 9em; margin-top: 6px; background: transparent; color: var(--ink); border: 1px solid var(--ink-soft); border-radius: 3px; }
 .stats { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 #toggle { display: none; }
 @media (max-width: 560px) {
@@ -195,6 +196,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <input type="range" id="speed" min="0.2" max="4" step="0.1" value="1">
     </div>
     <p class="hint stats" id="status"></p>
+    <div class="ctl">
+      <button class="btn" id="sendSettings">Send settings to Claude</button>
+      <p class="hint" id="sendResult">Records every slider and choice, and the current camera view, in the server's log for Claude to read. Also copies them, and shows them below.</p>
+      <textarea id="settingsText" readonly hidden aria-label="Current settings"></textarea>
+    </div>
   </div>
 </section>
 
@@ -788,6 +794,50 @@ $('fly').addEventListener('click', () => {
   state.flying = !state.flying;
   $('fly').textContent = state.flying ? 'Pause' : 'Travel';
   $('fly').setAttribute('aria-pressed', String(state.flying));
+});
+// ---------- Send settings to Claude ----------
+// settingsSnapshot() → a plain object: every field of `state` (numbers rounded to 3 places), plus
+//   `camera`: the camera's offset from the point it orbits (scene units; x east, y up, z south
+//   when heading is 0) — that offset IS the view the user has dragged to.
+function settingsSnapshot() {
+  const r = v => typeof v === 'number' ? Math.round(v * 1000) / 1000 : v;
+  const out = {};
+  for (const k of Object.keys(state)) out[k] = r(state[k]);
+  const o = camera.position.clone().sub(controls.target);
+  out.camera = { dx: r(o.x), dy: r(o.y), dz: r(o.z) };
+  return out;
+}
+// sendLine(line) → Promise<boolean>. Sends ONE log line through BD's own socket, which the server
+//   writes to /private/tmp/bd_server.log. Connects only for this, then disconnects: while
+//   connected the page counts as one more BD user. Resolves false if the server cannot be reached
+//   (e.g. the page was opened as a file).
+function sendLine(line) {
+  return new Promise(resolve => {
+    const go = () => {
+      let done = false;
+      const sock = io({ transports: ['websocket', 'polling'], reconnection: false });
+      const finish = ok => { if (done) return; done = true; setTimeout(() => sock.disconnect(), 500); resolve(ok); };
+      sock.on('connect', () => { sock.emit('msg', { type: 'client_log', level: 'info', line }); finish(true); });
+      sock.on('connect_error', () => finish(false));
+      setTimeout(() => finish(false), 6000);
+    };
+    if (window.io) return go();
+    const sc = document.createElement('script');
+    sc.src = '/socket.io/socket.io.min.js';
+    sc.onload = go; sc.onerror = () => resolve(false);
+    document.head.appendChild(sc);
+  });
+}
+$('sendSettings').addEventListener('click', () => {
+  const snap = settingsSnapshot(), line = 'SHANSHUI_SETTINGS ' + JSON.stringify(snap);
+  const box = $('settingsText'); box.hidden = false; box.value = JSON.stringify(snap, null, 1);
+  try { navigator.clipboard.writeText(line).catch(() => {}); } catch (e) {}   // inside the click, before any await
+  $('sendResult').textContent = 'Sending…';
+  sendLine(line).then(ok => {
+    $('sendResult').textContent = ok
+      ? 'Sent at ' + new Date().toTimeString().slice(0, 5) + '. Tell Claude, and these become the defaults if you want.'
+      : 'Could not reach the server. The settings are copied and shown below: paste them to Claude instead.';
+  });
 });
 $('newSeed').addEventListener('click', () => { state.seed = 1 + Math.floor(Math.random() * 99999); seedNoise(state.seed); clearChunks(); });
 $('toggle').addEventListener('click', () => {

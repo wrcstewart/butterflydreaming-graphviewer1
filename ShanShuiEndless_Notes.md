@@ -110,6 +110,16 @@ reads as "red" at sunset — a tuning candidate.
 raise the view. After `controls.update()` each frame, `camera.rotateX(lookUp)` —
 re-applied fresh every frame, never accumulating.
 
+## Reading the author's settings
+
+**Send settings to Claude** (bottom of the panel) writes one line to
+`/private/tmp/bd_server.log`: `SHANSHUI_SETTINGS {json}` — every `state` field
+plus `camera` (offset of the camera from its orbit target, scene units). Read it
+with `grep SHANSHUI /private/tmp/bd_server.log | tail -1`. It loads BD's own
+`/socket.io/socket.io.min.js`, sends a `client_log` message, and disconnects
+after 0.5 s (while connected it counts as one BD user). It also copies the line
+and shows it in a box, for when the server cannot be reached.
+
 ## Controls (defaults)
 
 Terrain: Hurst exponent H 0.75 · Widest mountain 4 km · Octaves 7 · Relief
