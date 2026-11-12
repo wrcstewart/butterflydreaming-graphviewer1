@@ -122,6 +122,13 @@ and shows it in a box, for when the server cannot be reached.
 
 ## Controls (defaults)
 
+**Defaults are the author's own, sent 2026-11-12 10:49** with the Send settings
+button: H 0.9 · Widest 10 km · Octaves 9 · Relief 0.4 · Travel speed 0.2 ·
+Time 16:21 · Stars 250% · Look up 9° · Field of view 80° · camera offset
+(1.934, 0.273, 0.712) from the orbit target, i.e. off to the east and low.
+Everything else as below. (The list below gives the ORIGINAL defaults where
+these differ.)
+
 Terrain: Hurst exponent H 0.75 · Widest mountain 4 km · Octaves 7 · Relief
 0.45 (1.8 km) · Palette ink · Opacity 100% (applied to the canvas, not the
 material, so near slopes do not show far ones through them).

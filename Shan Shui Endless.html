@@ -93,21 +93,21 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
   <div class="body">
     <div class="ctl">
       <label for="H">Hurst exponent H <output id="Hout"></output></label>
-      <input type="range" id="H" min="0.1" max="0.95" step="0.05" value="0.75">
+      <input type="range" id="H" min="0.1" max="0.95" step="0.05" value="0.9">
       <p class="hint">Each octave's amplitude falls by 2<sup>−H</sup>.</p>
     </div>
     <div class="ctl">
       <label for="widest">Widest mountain <output id="widestOut"></output></label>
-      <input type="range" id="widest" min="1" max="12" step="0.5" value="4">
+      <input type="range" id="widest" min="1" max="12" step="0.5" value="10">
     </div>
     <div class="ctl">
       <label for="octaves">Octaves <output id="octOut"></output></label>
-      <input type="range" id="octaves" min="2" max="9" step="1" value="7">
+      <input type="range" id="octaves" min="2" max="9" step="1" value="9">
       <p class="hint">Finest detail ≈ <span class="stats" id="finest"></span>. Fewer octaves look smoother.</p>
     </div>
     <div class="ctl">
       <label for="relief">Relief <output id="reliefOut"></output></label>
-      <input type="range" id="relief" min="0.1" max="1.0" step="0.05" value="0.45">
+      <input type="range" id="relief" min="0.1" max="1.0" step="0.05" value="0.4">
     </div>
     <div class="ctl">
       <label for="palette">Palette</label>
@@ -126,7 +126,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     <p class="group">Sun, moon &amp; shadows</p>
     <div class="ctl">
       <label for="time">Time of day <output id="timeOut"></output></label>
-      <input type="range" id="time" min="0" max="24" step="0.05" value="15">
+      <input type="range" id="time" min="0" max="24" step="0.05" value="16.35">
       <p class="hint">Local sun time: the sun is highest at 12:00. When it rises and sets depends on the date and latitude below.</p>
     </div>
     <div class="ctl">
@@ -156,12 +156,12 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     </div>
     <div class="ctl">
       <label for="lookUp">Look up <output id="lookUpOut"></output></label>
-      <input type="range" id="lookUp" min="0" max="70" step="1" value="0">
+      <input type="range" id="lookUp" min="0" max="70" step="1" value="9">
       <p class="hint">Tilts the view above the ground you are looking at. Dragging alone cannot do this: the view always points at a spot on the ground ahead, so moving back only flattens the angle.</p>
     </div>
     <div class="ctl">
       <label for="fov">Field of view <output id="fovOut"></output></label>
-      <input type="range" id="fov" min="25" max="100" step="1" value="45">
+      <input type="range" id="fov" min="25" max="100" step="1" value="80">
       <p class="hint">How much of the scene fits top to bottom, in degrees: a wide-angle lens at the high end. Wider shows more sky and makes distant mountains smaller.</p>
     </div>
     <div class="row">
@@ -170,7 +170,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     </div>
     <div class="ctl">
       <label for="stars">Stars <output id="starsOut"></output></label>
-      <input type="range" id="stars" min="0" max="2.5" step="0.1" value="1">
+      <input type="range" id="stars" min="0" max="2.5" step="0.1" value="2.5">
       <p class="hint">Brightness and size of the stars and the Milky Way: the 2,887 stars brighter than magnitude 5.5, in their real places (Yale Bright Star Catalogue). They come out as the sun goes 3–15° below the horizon; a bright moon hides the faint ones. Raise this for overlays at low opacity, where single-pixel stars vanish.</p>
     </div>
     <div class="ctl">
@@ -193,7 +193,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
     </div>
     <div class="ctl">
       <label for="speed">Travel speed <output id="speedOut"></output></label>
-      <input type="range" id="speed" min="0.2" max="4" step="0.1" value="1">
+      <input type="range" id="speed" min="0.2" max="4" step="0.1" value="0.2">
     </div>
     <p class="hint stats" id="status"></p>
     <div class="ctl">
@@ -255,8 +255,8 @@ function simplex2(xin, yin) {
 // Octave o has frequency f0·2^o and amplitude 2^(−H·o): the same power law as the spectral method,
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
-const state = { H: 0.75, widestKm: 4, octaves: 7, relief: 0.45, seed: 42, palette: 'ink', flying: true, speed: 1, opacity: 1,
-                time: 15, flow: 0, day: 288, lat: 26, heading: 0, stars: 1, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 0, fov: 45, moonAge: 15 };
+const state = { H: 0.9, widestKm: 10, octaves: 9, relief: 0.4, seed: 42, palette: 'ink', flying: true, speed: 0.2, opacity: 1,
+                time: 16.35, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 15 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -280,8 +280,10 @@ const canvas = $('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 40);
-camera.position.set(0, 1.1, 2.6);
+const camera = new THREE.PerspectiveCamera(state.fov, 1, 0.01, 40);
+// Default view: the author's, sent 2026-11-12 — off to the side (east) and low, offset from the
+// orbit target (0, 0.15, 0) by (1.934, 0.273, 0.712).
+camera.position.set(1.934, 0.423, 0.712);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.target.set(0, 0.15, 0);
