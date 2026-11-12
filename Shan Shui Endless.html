@@ -128,6 +128,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="1">
       <p class="hint">Fades the whole picture toward what is behind it — the paper colour here, another image in a collage.</p>
     </div>
+    <div class="ctl">
+      <label for="mist">Mist <output id="mistOut"></output></label>
+      <input type="range" id="mist" min="0" max="3" step="0.05" value="1">
+      <p class="hint">How close the mist starts and where it hides the land completely, in km from the camera. 1 is the opening value. Higher brings it in closer and thicker. Lower starts it further out, but it always closes in by 23 km, the edge of the land built so far, so the edge never shows.</p>
+    </div>
     <p class="group">Sun, moon &amp; shadows</p>
     <div class="ctl">
       <label for="time">Time of day <output id="timeOut"></output></label>
@@ -270,7 +275,7 @@ function simplex2(xin, yin) {
 // but only over the octaves summed. A per-octave rotation and offset hide the noise lattice's axis alignment.
 const KM_PER_UNIT = 4;
 const state = { H: 0.9, widestKm: 10, octaves: 9, relief: 0.4, seed: 42, palette: 'ink', flying: true, speed: 0.2, opacity: 1,
-                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, sunSize: 1, moonSize: 1, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 22.75 };
+                time: 6.5, flow: 0, day: 288, lat: 26, heading: 0, stars: 2.5, sunSize: 1, moonSize: 1, mist: 1, shadows: true, bodies: true, soft: 2, discStyle: 'natural', lookUp: 9, fov: 80, moonAge: 22.75 };
 const ROT = Array.from({ length: 12 }, (_, o) => { const a = o * 0.83; return [Math.cos(a), Math.sin(a), o * 17.3, o * -9.1]; });
 let ampNorm = 1;
 function updateNorm() { ampNorm = 0; for (let o = 0; o < state.octaves; o++) ampNorm += Math.pow(2, -state.H * o); }
@@ -633,6 +638,16 @@ function cssColor(name) { return new THREE.Color(getComputedStyle(document.docum
 let paper = new THREE.Color();
 scene.background = new THREE.Color();
 scene.fog = new THREE.Fog(new THREE.Color(), RADIUS * CHUNK * 0.35, RADIUS * CHUNK * 0.95);   // hides the chunk edge
+// applyMist() — sets the mist from state.mist (0 … 3; 1 = the original values).
+//   fog.near: distance (scene units, 4 km each) where the mist begins; fog.far: where it is solid.
+//   Thicker (k > 1): near = 2.1 / k, far = 5.7 / k^0.6. Thinner (k < 1): far stays at 5.7 — it must,
+//   to hide the edge of the built chunks — and near moves out toward it, reaching it at k = 0.
+const MIST_NEAR = RADIUS * CHUNK * 0.35, MIST_FAR = RADIUS * CHUNK * 0.95;
+function applyMist() {
+  const k = state.mist;
+  scene.fog.far = k > 1 ? MIST_FAR / Math.pow(k, 0.6) : MIST_FAR;
+  scene.fog.near = k >= 1 ? MIST_NEAR / k : MIST_NEAR + (1 - k) * (MIST_FAR - 0.05 - MIST_NEAR);
+}
 function applyTheme() {
   paper = cssColor('--sky');     // the daytime sky and mist; updateSky() darkens and tints it
   updateSky();
@@ -772,6 +787,7 @@ function syncLabels() {
   $('finest').textContent = finestM >= 1000 ? (finestM / 1000).toFixed(1) + ' km' : Math.round(finestM) + ' m';
   $('reliefOut').textContent = (state.relief * KM_PER_UNIT).toFixed(1) + ' km';
   $('speedOut').textContent = state.speed.toFixed(1) + '×';
+  $('mistOut').textContent = state.mist.toFixed(2) + ' · from ' + (scene.fog.near * KM_PER_UNIT).toFixed(0) + ' km, solid at ' + (scene.fog.far * KM_PER_UNIT).toFixed(0) + ' km';
   $('opacityOut').textContent = Math.round(state.opacity * 100) + '%';
   const hh = Math.floor(state.time), mm = Math.floor((state.time - hh) * 60);
   $('timeOut').textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
@@ -804,6 +820,7 @@ bindRange('speed', 'speed', false);
 $('palette').addEventListener('change', e => { state.palette = e.target.value; clearChunks(); });
 // Light controls change nothing in the terrain, so none of them rebuilds a chunk.
 for (const id of ['time', 'flow', 'day', 'lat', 'heading', 'stars', 'lookUp', 'moonAge']) bindRange(id, id, false);
+$('mist').addEventListener('input', e => { state.mist = +e.target.value; applyMist(); syncLabels(); });
 for (const id of ['sunSize', 'moonSize']) $(id).addEventListener('input', e => { state[id] = +e.target.value; applySizes(); syncLabels(); });
 $('fov').addEventListener('input', e => { state.fov = +e.target.value; camera.fov = state.fov; camera.updateProjectionMatrix(); syncLabels(); });
 $('soft').addEventListener('input', e => { state.soft = +e.target.value; key.shadow.radius = state.soft; syncLabels(); });

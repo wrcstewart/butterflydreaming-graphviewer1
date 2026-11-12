@@ -130,6 +130,13 @@ sun 1.0 → 1.4° (2.7×). The author found the moon small at fov 80 on an iPad
 (about 16 px); it was already 3× real — the small look is the wide field of view
 and the moon illusion. `applySizes()`, `discDegrees(size, fill)`.
 
+## Mist slider (added 2026-11-12)
+
+**Mist**, 0–3, default 1 = the original fog (begins 8.4 km, solid 22.8 km).
+`applyMist()`: k > 1 → near = 2.1/k, far = 5.7/k^0.6 units (k = 3: 3 km / 12 km);
+k < 1 → far stays 5.7 (it must hide the chunk edge) and near moves out to it
+(k = 0: no mist until the edge). Label shows both distances in km.
+
 ## The sky does not follow dark mode (fixed 2026-11-12)
 
 The original artifact took the daytime sky from `--paper`, which dark mode sets
