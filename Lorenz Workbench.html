@@ -1,0 +1,398 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lorenz Workbench</title>
+<!--
+  Lorenz Workbench (2026-11-13) — a three.js bench for the attractor of
+  Lorenz's 1963 convection equations ("Deterministic Nonperiodic Flow"):
+
+      dx/dt = σ (y − x)
+      dy/dt = x (ρ − z) − y
+      dz/dt = x y − β z
+
+  Lorenz's values σ = 10, ρ = 28, β = 8/3 give the two-winged "butterfly".
+  Same shape as `Shan Shui Endless.html`: a full-bleed scene and one floating
+  control sheet. Every camera control is ALSO a slider (drag moves them too),
+  because a BD module has no drag — these become steppers if it is ported.
+  Colour is deliberately plain: the author decides colour control later.
+
+  CANARY: the Restart button's border + LW_BUILD (shown in the readout and the
+  console). Rotates red → green → blue IN STEP with BD's canaries.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+:root {
+  --scene: #0e1211;           /* the space the trace is drawn in — dark in both themes, for contrast */
+  --trace: #d9ddd4;           /* plain for now; colour control comes later */
+  --paper: #e3e5dc;
+  --ink: #1d2422;
+  --ink-soft: #5b6560;
+  --sheet: rgba(240, 242, 236, 0.9);
+  --rule: #c3c8bd;
+  --seal: #a8322a;
+  --canary: #27ae60;          /* CANARY — green, build 2026-11-13l */
+  --display: "Zen Old Mincho", "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161a19; --ink: #e2e5de; --ink-soft: #9aa49e;
+    --sheet: rgba(28, 33, 31, 0.9); --rule: #39413d; --seal: #d0574c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #161a19; --ink: #e2e5de; --ink-soft: #9aa49e;
+  --sheet: rgba(28, 33, 31, 0.9); --rule: #39413d; --seal: #d0574c;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+body { background: var(--scene); color: var(--ink); font-family: var(--body); overflow: hidden; }
+#scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+
+.sheet {
+  position: fixed;
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: 300px; max-width: calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  background: var(--sheet); backdrop-filter: blur(6px);
+  border: 1px solid var(--rule); border-radius: 4px;
+  padding: 16px 18px; display: grid; gap: 14px; box-sizing: border-box;
+  max-height: calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
+}
+.head { display: flex; align-items: center; gap: 10px; }
+.seal {
+  width: 30px; height: 30px; flex: none; border-radius: 3px;
+  background: var(--seal); color: #fff;
+  font-family: var(--display); font-weight: 700; font-size: 17px;
+  display: grid; place-items: center; line-height: 1;
+}
+h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: 0.02em; }
+.sub { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
+.body { display: grid; gap: 14px; }
+.group { margin: 4px 0 -6px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; }
+.ctl { display: grid; gap: 4px; }
+.ctl label { display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+/* Symbols keep their case: uppercase turned σ ρ β into Σ P B and x₀ into X₀. */
+.ctl label.sym { text-transform: none; font-size: 13px; letter-spacing: 0; }
+.ctl output { font-family: var(--mono); font-size: 12px; color: var(--ink); text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--ink); margin: 0; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn { font: 500 12px var(--body); padding: 6px 12px; border: 1px solid var(--ink); border-radius: 3px; background: transparent; color: var(--ink); cursor: pointer; }
+.btn:hover { background: var(--ink); color: var(--paper); }
+#restart { border: 2px solid var(--canary); }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); cursor: pointer; }
+.chk input { margin: 0; accent-color: var(--ink); }
+.hint { font-size: 11px; color: var(--ink-soft); margin: 0; }
+.eq { font-family: var(--mono); font-size: 12px; line-height: 1.5; margin: 0; }
+.stats { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; margin: 0; white-space: pre; }
+#toggle { margin-left: auto; }
+.sheet.collapsed .body { display: none; }
+@media (max-width: 560px) {
+  .sheet { left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); width: auto; max-width: none;
+           bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding: 12px 14px; max-height: 55%; }
+}
+</style>
+</head><body>
+
+<canvas id="scene" aria-label="3D view of the Lorenz attractor being traced. Drag to orbit, scroll or pinch to zoom."></canvas>
+
+<section class="sheet" id="sheet">
+  <div class="head">
+    <div class="seal" aria-hidden="true">蝶</div>
+    <div>
+      <h1>Lorenz Workbench</h1>
+      <p class="sub">The 1963 convection equations, traced</p>
+    </div>
+    <button class="btn" id="toggle" aria-expanded="true">Hide</button>
+  </div>
+  <div class="body">
+    <p class="eq">dx/dt = σ(y − x)<br>dy/dt = x(ρ − z) − y<br>dz/dt = xy − βz</p>
+    <p class="stats" id="readout"></p>
+    <div class="row">
+      <button class="btn" id="restart">Restart</button>
+      <button class="btn" id="pause">Pause</button>
+    </div>
+
+    <div class="group">Starting point</div>
+    <div class="ctl"><label class="sym" for="x0">x₀ <output id="x0Out"></output></label>
+      <input type="range" id="x0" min="-30" max="30" step="0.01" value="1"></div>
+    <div class="ctl"><label class="sym" for="y0">y₀ <output id="y0Out"></output></label>
+      <input type="range" id="y0" min="-30" max="30" step="0.01" value="1"></div>
+    <div class="ctl"><label class="sym" for="z0">z₀ <output id="z0Out"></output></label>
+      <input type="range" id="z0" min="-10" max="50" step="0.01" value="1"></div>
+    <p class="hint">Any change restarts the trace. Arrow keys on a focused slider step by 0.01 — small enough to see the butterfly effect: two starts this close soon follow different paths.</p>
+
+    <div class="group">Constants</div>
+    <div class="ctl"><label class="sym" for="sigma">σ <output id="sigmaOut"></output></label>
+      <input type="range" id="sigma" min="0.1" max="30" step="0.1" value="10"></div>
+    <div class="ctl"><label class="sym" for="rho">ρ <output id="rhoOut"></output></label>
+      <input type="range" id="rho" min="0" max="100" step="0.1" value="28"></div>
+    <div class="ctl"><label class="sym" for="beta">β <output id="betaOut"></output></label>
+      <input type="range" id="beta" min="0.1" max="6" step="0.001" value="2.667"></div>
+    <p class="hint">Lorenz used σ 10, ρ 28, β 8/3. Below ρ ≈ 24.74 the trace settles onto one of the two fixed points; above it, the butterfly. Below ρ 1 everything falls to the origin.</p>
+    <div class="row"><button class="btn" id="classic">Lorenz's values</button></div>
+
+    <div class="group">Tracing</div>
+    <div class="ctl"><label for="dt">Time step <output id="dtOut"></output></label>
+      <input type="range" id="dt" min="0.001" max="0.02" step="0.001" value="0.005"></div>
+    <div class="ctl"><label for="spf">Steps per frame <output id="spfOut"></output></label>
+      <input type="range" id="spf" min="1" max="60" step="1" value="6"></div>
+    <div class="ctl"><label for="trail">Trail length <output id="trailOut"></output></label>
+      <input type="range" id="trail" min="500" max="60000" step="500" value="20000"></div>
+    <p class="hint">A smaller time step is more accurate; steps per frame sets how fast it draws. The oldest points drop off once the trail is full.</p>
+
+    <div class="group">Camera</div>
+    <div class="ctl"><label for="az">Azimuth <output id="azOut"></output></label>
+      <input type="range" id="az" min="0" max="359" step="1" value="40"></div>
+    <div class="ctl"><label for="el">Elevation <output id="elOut"></output></label>
+      <input type="range" id="el" min="-89" max="89" step="1" value="15"></div>
+    <div class="ctl"><label for="dist">Distance <output id="distOut"></output></label>
+      <input type="range" id="dist" min="20" max="250" step="1" value="95"></div>
+    <div class="ctl"><label for="spin">Spin <output id="spinOut"></output></label>
+      <input type="range" id="spin" min="-30" max="30" step="1" value="0"></div>
+    <label class="chk"><input type="checkbox" id="axes" checked> Axes and the two fixed points</label>
+    <p class="hint">Dragging the view moves these sliders too. Spin turns the camera round the vertical (z) axis, in degrees per second.</p>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+'use strict';
+const LW_BUILD = '2026-11-13l';
+console.log('[lorenz] Lorenz Workbench build ' + LW_BUILD + ' — the Restart button border is GREEN #27ae60.');
+const $ = (id) => document.getElementById(id);
+const DEG = Math.PI / 180;
+
+// ── State: one object, and every slider writes into it ──────────────────────
+const state = {
+  x0: 1, y0: 1, z0: 1,
+  sigma: 10, rho: 28, beta: 8 / 3,     // β held EXACT until the slider is moved
+  dt: 0.005, spf: 6, trail: 20000,
+  az: 40, el: 15, dist: 95, spin: 0,
+  axes: true, paused: false,
+};
+
+// ── THE EQUATIONS, integrated by 4th-order Runge–Kutta ──────────────────────
+// RK4 rather than Euler: Euler drifts visibly at the time steps a browser can
+// afford, and on a chaotic system drift is not just error — it is a different
+// trajectory. RK4 at dt 0.005 keeps the shape honest.
+function deriv(x, y, z, out) {
+  out[0] = state.sigma * (y - x);
+  out[1] = x * (state.rho - z) - y;
+  out[2] = x * y - state.beta * z;
+}
+const k1 = [0, 0, 0], k2 = [0, 0, 0], k3 = [0, 0, 0], k4 = [0, 0, 0];
+function rk4(p, h) {
+  const [x, y, z] = p;
+  deriv(x, y, z, k1);
+  deriv(x + h / 2 * k1[0], y + h / 2 * k1[1], z + h / 2 * k1[2], k2);
+  deriv(x + h / 2 * k2[0], y + h / 2 * k2[1], z + h / 2 * k2[2], k3);
+  deriv(x + h * k3[0], y + h * k3[1], z + h * k3[2], k4);
+  p[0] = x + h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+  p[1] = y + h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+  p[2] = z + h / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+}
+
+// ── Scene ───────────────────────────────────────────────────────────────────
+// Lorenz's z is the vertical (it is temperature departure in the convection
+// roll, and the butterfly's wings stand on it), so equation (x, y, z) is drawn
+// at three.js (x, z, −y): three.js keeps y for up. The view centres on z = 25,
+// the middle of the wings at Lorenz's values.
+const CENTRE = new THREE.Vector3(0, 25, 0);
+const toWorld = (x, y, z, arr, i) => { arr[i] = x; arr[i + 1] = z; arr[i + 2] = -y; };
+
+const canvas = $('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const css = getComputedStyle(document.documentElement);
+scene.background = new THREE.Color(css.getPropertyValue('--scene').trim());
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.copy(CENTRE);
+controls.enableDamping = false;
+controls.minDistance = 20; controls.maxDistance = 250;
+
+// The trace: one buffer allocated for the LONGEST trail, drawn up to `count`.
+const MAX_POINTS = 60000;
+const positions = new Float32Array(MAX_POINTS * 3);
+const traceGeo = new THREE.BufferGeometry();
+traceGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+traceGeo.setDrawRange(0, 0);
+const traceMat = new THREE.LineBasicMaterial({ color: new THREE.Color(css.getPropertyValue('--trace').trim()) });
+const trace = new THREE.Line(traceGeo, traceMat);
+trace.frustumCulled = false;            // the bounding sphere is never recomputed as it grows
+scene.add(trace);
+
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+scene.add(head);
+
+// Axes through the origin, and the two fixed points C± — where the trace would
+// rest if it could: (±√(β(ρ−1)), ±√(β(ρ−1)), ρ−1). Its wings wind round them.
+const guides = new THREE.Group();
+scene.add(guides);
+function buildGuides() {
+  guides.clear();
+  const mat = new THREE.LineBasicMaterial({ color: 0x55605a });
+  const axis = (a, b) => {
+    const g = new THREE.BufferGeometry();
+    const arr = new Float32Array(6);
+    toWorld(...a, arr, 0); toWorld(...b, arr, 3);
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    guides.add(new THREE.Line(g, mat));
+  };
+  axis([-30, 0, 0], [30, 0, 0]);       // x
+  axis([0, -30, 0], [0, 30, 0]);       // y
+  axis([0, 0, 0], [0, 0, 55]);         // z
+  if (state.rho > 1) {
+    const c = Math.sqrt(state.beta * (state.rho - 1));
+    for (const s of [1, -1]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), new THREE.MeshBasicMaterial({ color: 0xa8322a }));
+      const arr = [0, 0, 0]; toWorld(s * c, s * c, state.rho - 1, arr, 0);
+      m.position.set(arr[0], arr[1], arr[2]);
+      guides.add(m);
+    }
+  }
+  guides.visible = state.axes;
+}
+
+// ── The trajectory ──────────────────────────────────────────────────────────
+const p = [0, 0, 0];
+let count = 0, t = 0;
+function restart() {
+  p[0] = state.x0; p[1] = state.y0; p[2] = state.z0;
+  count = 0; t = 0;
+  push();
+  buildGuides();
+}
+function push() {
+  if (count >= state.trail) {
+    // Drop the oldest. copyWithin is a memmove: cheap at these sizes.
+    const drop = count - state.trail + 1;
+    positions.copyWithin(0, drop * 3, count * 3);
+    count -= drop;
+  }
+  toWorld(p[0], p[1], p[2], positions, count * 3);
+  count++;
+}
+function step(n) {
+  for (let i = 0; i < n; i++) {
+    rk4(p, state.dt);
+    t += state.dt;
+    // A trace that has run away (ρ or σ pushed to extremes with a large step)
+    // would fill the buffer with Infinity and NaN; stop rather than draw that.
+    if (!isFinite(p[0] + p[1] + p[2]) || Math.abs(p[0]) + Math.abs(p[1]) + Math.abs(p[2]) > 1e5) {
+      state.paused = true; $('pause').textContent = 'Resume';
+      $('readout').textContent = 'The trace ran away — try a smaller time step.';
+      return false;
+    }
+    push();
+  }
+  return true;
+}
+
+// ── Camera from the sliders, and the sliders from a drag ────────────────────
+let placing = false;   // true while WE move the camera, so the drag handler ignores it
+function placeCamera() {
+  const az = state.az * DEG, el = state.el * DEG;
+  placing = true;
+  camera.position.set(
+    CENTRE.x + state.dist * Math.cos(el) * Math.sin(az),
+    CENTRE.y + state.dist * Math.sin(el),
+    CENTRE.z + state.dist * Math.cos(el) * Math.cos(az));
+  controls.target.copy(CENTRE);
+  controls.update();
+  placing = false;
+}
+controls.addEventListener('change', () => {
+  if (placing) return;
+  const v = camera.position.clone().sub(controls.target);
+  const d = v.length();
+  state.dist = Math.round(d);
+  state.el = Math.round(Math.asin(v.y / d) / DEG);
+  state.az = Math.round(((Math.atan2(v.x, v.z) / DEG) % 360 + 360) % 360);
+  // A drag may also pan the target; the sliders describe an orbit round the
+  // centre, so bring the target back rather than let the two disagree.
+  controls.target.copy(CENTRE);
+  for (const k of ['az', 'el', 'dist']) $(k).value = state[k];
+  syncLabels();
+});
+controls.enablePan = false;
+
+// ── Sliders ─────────────────────────────────────────────────────────────────
+const fmt = {
+  x0: (v) => v.toFixed(2), y0: (v) => v.toFixed(2), z0: (v) => v.toFixed(2),
+  sigma: (v) => v.toFixed(1), rho: (v) => v.toFixed(1),
+  beta: (v) => Math.abs(v - 8 / 3) < 1e-9 ? '8/3' : v.toFixed(3),
+  dt: (v) => v.toFixed(3), spf: (v) => String(v), trail: (v) => v.toLocaleString('en-GB'),
+  az: (v) => v + '°', el: (v) => v + '°', dist: (v) => String(v), spin: (v) => v + '°/s',
+};
+function syncLabels() { for (const k in fmt) $(k + 'Out').textContent = fmt[k](state[k]); }
+const RESTARTS = new Set(['x0', 'y0', 'z0', 'sigma', 'rho', 'beta']);
+for (const k in fmt) {
+  $(k).addEventListener('input', () => {
+    state[k] = parseFloat($(k).value);
+    if (RESTARTS.has(k)) restart();
+    if (k === 'trail' && count > state.trail) {
+      const drop = count - state.trail;
+      positions.copyWithin(0, drop * 3, count * 3);
+      count -= drop;
+    }
+    if (k === 'az' || k === 'el' || k === 'dist') placeCamera();
+    syncLabels();
+  });
+}
+$('axes').addEventListener('change', () => { state.axes = $('axes').checked; guides.visible = state.axes; });
+$('restart').addEventListener('click', () => { restart(); if (state.paused) togglePause(); });
+function togglePause() { state.paused = !state.paused; $('pause').textContent = state.paused ? 'Resume' : 'Pause'; }
+$('pause').addEventListener('click', togglePause);
+$('classic').addEventListener('click', () => {
+  state.sigma = 10; state.rho = 28; state.beta = 8 / 3;
+  $('sigma').value = 10; $('rho').value = 28; $('beta').value = 2.667;
+  restart(); syncLabels();
+});
+$('toggle').addEventListener('click', () => {
+  const c = $('sheet').classList.toggle('collapsed');
+  $('toggle').textContent = c ? 'Show' : 'Hide';
+  $('toggle').setAttribute('aria-expanded', String(!c));
+});
+
+// ── Loop ────────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (!state.paused) step(state.spf);
+  traceGeo.attributes.position.needsUpdate = true;
+  traceGeo.setDrawRange(0, count);
+  const i = (count - 1) * 3;
+  head.position.set(positions[i], positions[i + 1], positions[i + 2]);
+  if (state.spin) {
+    state.az = ((state.az + state.spin * dt) % 360 + 360) % 360;
+    $('az').value = Math.round(state.az);
+    placeCamera();
+    $('azOut').textContent = Math.round(state.az) + '°';
+  }
+  if (!state.paused || !$('readout').textContent.startsWith('The trace ran away')) {
+    $('readout').textContent =
+      't ' + t.toFixed(2).padStart(8) + '   points ' + count.toLocaleString('en-GB') + '\n' +
+      'x ' + p[0].toFixed(3).padStart(8) + '   y ' + p[1].toFixed(3).padStart(8) + '   z ' + p[2].toFixed(3).padStart(8) + '\n' +
+      'build ' + LW_BUILD;
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+resize(); syncLabels(); placeCamera(); restart();
+requestAnimationFrame(loop);
+</script>
+</body></html>
