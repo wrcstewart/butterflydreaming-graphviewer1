@@ -458,19 +458,28 @@ const starGeo = new THREE.BufferGeometry();
   starGeo.setAttribute('mag', new THREE.BufferAttribute(mag, 1));
   starGeo.setAttribute('tint', new THREE.BufferAttribute(tint, 3));
 }
-// uLim: faintest magnitude shown (6 on a dark night). uFade: overall 0 … 1+. uScale: size factor.
+// uLim: faintest magnitude shown (6 on a dark night). uFade: twilight, 0 (day) … 1 (full dark).
+// uGain: the Stars control, 0 … 2.5 — see the magnitude levels below. uScale: size factor.
 // uPx: device pixels per CSS pixel, so stars are the same size on a retina screen.
 const starMat = new THREE.ShaderMaterial({
-  uniforms: { uLim: { value: 6 }, uFade: { value: 0 }, uScale: { value: 1 }, uPx: { value: 1 } },
+  uniforms: { uLim: { value: 6 }, uFade: { value: 0 }, uGain: { value: 1 }, uScale: { value: 1 }, uPx: { value: 1 } },
   vertexShader: `
     attribute float mag; attribute vec3 tint;
-    uniform float uLim, uScale, uPx;
+    uniform float uLim, uScale, uPx, uGain;
     varying float vA; varying vec3 vC;
     void main() {
       vec4 wp = modelMatrix * vec4(position, 1.0);
       float alt = normalize(wp.xyz - cameraPosition).y;          // sine of the height above the horizon
       float bright = clamp((4.5 - mag) / 5.5, 0.0, 1.0);          // 1 for the brightest stars
-      vA = smoothstep(uLim + 0.2, uLim - 0.8, mag) * mix(0.65, 1.0, bright) * smoothstep(0.0, 0.26, alt);
+      // MAGNITUDE LEVELS (the author's scheme, 2026-11-13): brighter than 0 at full; magnitudes 0,
+      // 1 and 2 a step down each; 3 and fainter just visible. The old ramp ran only 0.65 … 1 and
+      // the Stars control MULTIPLIED it — at the default 2.5 every star passed 1 and clipped to
+      // white, so magnitude showed nothing. Now the control below 1 dims everything evenly, and
+      // above 1 lifts the levels toward full by a power (level^(1/gain)), which keeps their order
+      // and never clips: at 2.5 they show as 1, 0.79, 0.66, 0.53, 0.36.
+      float lv = mag < 0.0 ? 1.0 : mag < 1.0 ? 0.55 : mag < 2.0 ? 0.35 : mag < 3.0 ? 0.2 : 0.08;
+      lv = min(uGain, 1.0) * pow(lv, 1.0 / max(uGain, 1.0));
+      vA = smoothstep(uLim + 0.2, uLim - 0.8, mag) * lv * smoothstep(0.0, 0.26, alt);
       vC = tint;
       // Size goes mostly to the brightest stars (bright^1.5): of 2,887 stars about 2,000 are fainter than
       // magnitude 4.5 and stay single points; only ~160 brighter than 3 grow noticeably. CSS px
@@ -602,7 +611,8 @@ function updateSky() {
   // stars: out as the sun sinks from 3° to 15° below the horizon; a lit moon above the horizon
   // brightens the sky and hides the fainter ones (it lowers the faintest magnitude shown).
   const dark = smooth(-3, -15, sb.el), wash = moonLit * smooth(-2, 10, mb.el);
-  starMat.uniforms.uFade.value = dark * state.stars;
+  starMat.uniforms.uFade.value = dark;
+  starMat.uniforms.uGain.value = state.stars;   // brightness by magnitude level, in the shader
   starMat.uniforms.uLim.value = 6.0 - 2.2 * wash;
   starMat.uniforms.uScale.value = state.starSize;           // the Stars slider is brightness only
   milkyMat.uniforms.uFade.value = dark * (1 - 0.85 * wash) * state.stars;
