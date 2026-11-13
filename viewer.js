@@ -1896,6 +1896,19 @@ function speechActive() {
   return speakBusy || speakQueue.length > 0;
 }
 
+// View's Speak button reads "Stop" while speech is running (the author,
+// 2026-11-13). Set FROM THE SPEECH STATE, at the three places it changes —
+// speak() queues, playNextSpeech starts or finds the queue empty, stopSpeech —
+// rather than by the button's own press, because View also reads aloud on its
+// own (auto-read when Speak is ticked, a collage's text as it appears) and the
+// word must be right then too. The swap itself is CSS on `.speaking`.
+function syncViewSpeakBtn() {
+  try {
+    const b = document.getElementById('bd-view-speak');
+    if (b) b.classList.toggle('speaking', speechActive());
+  } catch (_) { /* a label is never a reason to break speech */ }
+}
+
 // `fast` starts the track already low instead of sliding down from full. A
 // 250ms slide is right when the music is playing and the voice arrives; it is
 // wrong when the music arrives during speech, because the first quarter-second
@@ -2221,8 +2234,9 @@ function playNextSpeech() {
   if (speakBusy) return;
   const next = speakQueue.shift();
   // Nothing left to say — let the music back up.
-  if (!next) { unduckMedia(); return; }
+  if (!next) { unduckMedia(); syncViewSpeakBtn(); return; }
   speakBusy = true;
+  syncViewSpeakBtn();
   duckMedia();
   const gen = speakGen;
 
@@ -2515,7 +2529,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-13h' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-13i' };
 
 let bdViewTitleText = '';
 
@@ -2634,6 +2648,7 @@ function speak(raw, { interrupt = false } = {}) {
     }
   }
 
+  syncViewSpeakBtn();      // queued counts as speaking — the label must not lag a lead gap
   if (leadGapMs > 0 && speakQueue.length) {
     // Generation-checked, like prepareUtterance: an interrupt during the lead
     // silence must not be followed by this timer starting the reading it
@@ -2654,6 +2669,7 @@ function stopSpeech() {
   speakQueue.length = 0;
   if (speakEls) for (const el of speakEls) { try { el.pause(); el.currentTime = 0; } catch (_) {} }
   speakBusy = false;
+  syncViewSpeakBtn();
 }
 
 // Reassemble one card body into chunk source, restoring the %%bd_center split.

@@ -17,7 +17,7 @@
      "css build (none — pre-marker)" while painting the NEW canary colour,
      which is a combination that cannot happen and so could only mean the
      property was not being read. The check caught its own installation.  */
-  --bd-css-build: "2026-11-13h";
+  --bd-css-build: "2026-11-13i";
   /* 2026-08-27 — BD's system gold, desaturated from #FFD700 (100 sat) to
      50. Designer feedback singled out the top-row buttons and the helper
      card header as the loudest thing on screen.
@@ -2129,7 +2129,7 @@ body.edit-active #sr-wrap-btn    { display: inline-block; }
   z-index: 10;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
-  border: 2px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 2px solid #27ae60;             /* CANARY — green (was red) */
   border-radius: 0;
   font-family: sans-serif;
   font-size: 11px;
@@ -3489,6 +3489,17 @@ body.view-active > #copy-link-fallback { z-index: 70; }
 }
 #bd-view-speak:hover { background: #20202a; color: #fff; }
 #bd-view-speak.speaking { border-color: #8d7900; color: #fff; }
+/* SPEAK / STOP (2026-11-13). Both words sit in ONE grid cell and only their
+   visibility swaps, so the button keeps the width of the longer word and the
+   view bar — measured to the pixel on a phone — never shifts when it flips.
+   The class is set from the speech state itself (syncViewSpeakBtn), so the
+   word is right however reading started: this button, View's auto-read, or a
+   collage reading its text. */
+#bd-view-speak:not([hidden]) { display: inline-grid; place-items: center; }
+#bd-view-speak > span { grid-area: 1 / 1; }
+#bd-view-speak .lbl-stop,
+#bd-view-speak.speaking .lbl-speak { visibility: hidden; }
+#bd-view-speak.speaking .lbl-stop { visibility: visible; }
 /* Copy, in the view bar (2026-10-23). Same language as #bd-view-speak but
    10px of side padding rather than 14, because the bar is measured: at 390px
    with Back + Speak + the hint there are about 35 pixels to find. */
@@ -3498,7 +3509,7 @@ body.view-active > #copy-link-fallback { z-index: 70; }
      button carries the same colour, to be checked without leaving View. It
      rotates WITH the #copy-link-btn border, same commit, same hex. 1px, not
      2px: the view bar is measured to the pixel (see the note below). */
-  border: 1px solid #c0392b;             /* CANARY — red (was blue) */
+  border: 1px solid #27ae60;             /* CANARY — green (was red) */
   color: #d8d8d0;
   /* TWO LINES AND SMALLER TYPE, so the full name costs LESS width than the
      one-word version did: "Copy" at 10px is ~24px of glyphs against ~32px at
