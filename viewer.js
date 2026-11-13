@@ -2515,7 +2515,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-13g' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-13h' };
 
 let bdViewTitleText = '';
 
@@ -17824,6 +17824,22 @@ async function init() {
         // never for someone operating BD from the keyboard, who needs the focus
         // to stay where they put it.
         if (ev && ev.detail > 0) { try { bdViewSpeakBtn.blur(); } catch (_) {} }
+        // ── A TOGGLE (the author, 2026-11-13) ──────────────────────────────
+        // Pressed while speech is running — queued, synthesising or audible —
+        // it STOPS; pressed while silent it starts from the top. It used to
+        // restart from the top on every press, so there was no way to stop
+        // reading in View short of leaving it. "Running" is the same test the
+        // poll below uses to take the highlight off, so the button's look and
+        // its action cannot disagree.
+        if (speakQueue.length > 0 || speakBusy) {
+          stopSpeech();
+          bdViewSpeakBtn.classList.remove('speaking');
+          if (bdViewSpeakPoll) { clearInterval(bdViewSpeakPoll); bdViewSpeakPoll = null; }
+          const t = document.getElementById('bd-view-title');
+          if (t && t.textContent === 'preparing…') t.textContent = bdViewTitleText;
+          console.log('[view] Speak pressed while speaking — stopped');
+          return;
+        }
         if (!bdViewProse) return;
         // ── CONSENT, ASKED HERE (2026-10-09) ──────────────────────────
         // Speech is gated on the Speak toggle, and ticking that toggle is where
@@ -17854,8 +17870,8 @@ async function init() {
         // A click IS a gesture, which is what audio unlocking needs — the same
         // reasoning as "ticking is itself a gesture" beside the Speak box.
         audioUnlocked = true;
-        // interrupt:true stops whatever is playing and starts again from the
-        // top, which is what was asked for. speak() does the stopping itself.
+        // interrupt:true clears anything left over before starting from the
+        // top. (A press while speaking no longer reaches here — see the toggle.)
         speak(bdViewProse, { interrupt: true });
         bdViewSpeakBtn.classList.add('speaking');
         // stopSpeech() empties the queue and clears speakBusy, and so does
