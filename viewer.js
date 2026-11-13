@@ -2175,6 +2175,44 @@ function synthOne(text, scale) {
 // one utterance AHEAD — that is the expensive part and it never touches an audio
 // element.
 let speakEls = null;
+// ── THE VOICE: CONSENT, UNLOCK, WARM-UP (factored out 2026-11-13) ──────────
+// Shared by the Speak tick box and View's Speak button, which are now
+// INDEPENDENT (the author: pressing Speak in View was ticking the box in BD).
+// Returns false if the download is declined. Must run INSIDE the user's
+// gesture: the confirm and the silent play() that unlocks iOS audio both need
+// it, and the gesture does not survive an await — so nothing here awaits.
+//
+// The ~31 MB first-use download must NOT begin because a control was pressed
+// out of curiosity. Asked once, then remembered (bd_speak_dl). A browser
+// confirm() is blunt, and deliberately so: unambiguous, works on every device,
+// and cannot be dismissed by accident.
+const SILENT_WAV_URI = 'data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+function prepareVoice() {
+  let agreed = false;
+  try { agreed = localStorage.getItem('bd_speak_dl') === '1'; } catch (_) {}
+  if (!agreed) {
+    const ok = window.confirm(
+      'Read node text aloud?\n\n' +
+      'This downloads about ' + SPEAK_DOWNLOAD_MB + ' MB to your device the first ' +
+      'time, then works offline. Best on wi-fi.');
+    if (!ok) return false;
+    try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
+  }
+  audioUnlocked = true;   // pressing or ticking is itself a gesture
+  // Unlock a reusable element now, before any model download. One element,
+  // matching speakElement(), and a clip with REAL silence in it — a
+  // zero-length WAV is one WebKit may fail to load, and an element that never
+  // loaded is not an element that got unlocked.
+  try {
+    const el = speakElement();
+    el.src = SILENT_WAV_URI;
+    el.play().catch(() => {});
+  } catch (_) {}
+  // Warm the model now, so the wait lands on this press rather than later.
+  speakReady().catch(err => console.warn('[BD] voice load failed', err));
+  return true;
+}
+
 function speakElement() {
   if (!speakEls) speakEls = [new Audio()];
   return speakEls[0];
@@ -2544,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-13k' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-13l' };
 
 let bdViewTitleText = '';
 
@@ -2606,8 +2644,11 @@ let audioUnlocked = false;
 // immediately after; the accepted branch then speaks deliberately.
 let speechSuppressed = false;
 
-function speak(raw, { interrupt = false } = {}) {
-  if (!speakEnabled) return;
+function speak(raw, { interrupt = false, force = false } = {}) {
+  // `force`: View's Speak button, a direct request to hear THIS text, which
+  // the author wants independent of the Speak box (2026-11-13). Everything
+  // else — node taps, arriving cards, auto-read — still follows the box.
+  if (!speakEnabled && !force) return;
   // Queue nothing until audio can actually play. Dropping it is right: this is
   // text the user has not asked for yet, and it will be spoken properly on the
   // tap that follows.
@@ -14788,39 +14829,15 @@ async function init() {
       // unambiguous, works on every device, and cannot be dismissed by
       // accident. Worth replacing with something in BD's own idiom once the
       // rest is settled.
-      if (box.checked) {
-        let agreed = false;
-        try { agreed = localStorage.getItem('bd_speak_dl') === '1'; } catch (_) {}
-        if (!agreed) {
-          const ok = window.confirm(
-            'Read node text aloud?\n\n' +
-            'This downloads about ' + SPEAK_DOWNLOAD_MB + ' MB to your device the first ' +
-            'time, then works offline. Best on wi-fi.');
-          if (!ok) { box.checked = false; return; }
-          try { localStorage.setItem('bd_speak_dl', '1'); } catch (_) {}
-        }
-      }
+      // The consent, the audio unlock and the warm-up are prepareVoice()'s,
+      // shared with View's Speak button — one place for the download question.
+      if (box.checked && !prepareVoice()) { box.checked = false; return; }
       speakEnabled = box.checked;
-      audioUnlocked = true;   // ticking is itself a gesture
       // Deliberately NOT persisted: the box holds THIS visit's answer, and the
       // dialog puts the question again next time.
       // Un-ticking must silence what is already playing, not merely stop the
       // next one — otherwise the control appears not to work for a paragraph.
       if (!speakEnabled) { stopSpeech(); return; }
-      // Ticking IS the user gesture iOS requires before audio may play, and the
-      // chain is broken by the first await. Unlock a reusable element here,
-      // synchronously in spirit, before any model download begins.
-      try {
-        // One element, matching speakElement(). And a clip with REAL silence in
-        // it — the zero-length WAV used before is one WebKit may fail to load,
-        // and an element that never loaded is not an element that got unlocked.
-        const el = speakElement();
-        el.src = 'data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-        el.play().catch(() => {});
-      } catch (_) {}
-      // Warm the model now rather than on the first tap, so the wait lands on
-      // the tick the user just made instead of on a node they were reading.
-      speakReady().catch(err => console.warn('[BD] voice load failed', err));
 
       // ── AND READ WHAT IS ALREADY ON SCREEN (author, 2026-10-23) ────────
       // *"If the speak button is off and it is ticked on then at the moment it
@@ -17874,38 +17891,16 @@ async function init() {
           return;
         }
         if (!bdViewProse) return;
-        // ── CONSENT, ASKED HERE (2026-10-09) ──────────────────────────
-        // Speech is gated on the Speak toggle, and ticking that toggle is where
-        // the ~31 MB first-use download is consented to. An earlier cut said
-        // "tick Speak in BD first" and sent the user back out of View to find
-        // a checkbox — which is a worse answer than asking the question where
-        // the user is.
-        //
-        // So it TRIGGERS the real control rather than reimplementing it: tick
-        // the box and dispatch its change event, and the existing handler puts
-        // the confirm, records the answer in bd_speak_dl, unlocks audio and
-        // loads the voice. Copying that flow would have put the download
-        // figure and the consent key in a second place to keep in step, and
-        // this file has a note about exactly that: a renderer needs its
-        // inverse BESIDE it, not somewhere else.
-        //
-        // The handler is async but everything that matters here — the confirm
-        // and `speakEnabled = box.checked` — runs before its first await, so
-        // speakEnabled is already settled when dispatchEvent returns. A
-        // decline leaves it false and this stops.
-        if (!speakEnabled) {
-          const box = document.getElementById('speak-toggle');
-          if (!box) return;
-          box.checked = true;
-          box.dispatchEvent(new Event('change', { bubbles: true }));
-          if (!speakEnabled) return;      // declined at the dialog
-        }
-        // A click IS a gesture, which is what audio unlocking needs — the same
-        // reasoning as "ticking is itself a gesture" beside the Speak box.
-        audioUnlocked = true;
+        // ── INDEPENDENT OF THE SPEAK BOX (the author, 2026-11-13) ─────────
+        // This used to TICK the box in BD and dispatch its change event, to
+        // reach the consent dialog without copying it — so one press in View
+        // left speech switched on for all of BD afterwards. The consent now
+        // lives in prepareVoice(), shared, and this press only reads THIS text:
+        // speak(..., force) passes the box without changing it.
+        if (!prepareVoice()) return;      // declined at the dialog
         // interrupt:true clears anything left over before starting from the
-        // top. (A press while speaking no longer reaches here — see the toggle.)
-        speak(bdViewProse, { interrupt: true });
+        // top. (A press while speaking never reaches here — see the toggle.)
+        speak(bdViewProse, { interrupt: true, force: true });
         syncViewSpeakBtn();   // from the state: speak() can decline (suppressed, empty text)
         // stopSpeech() empties the queue and clears speakBusy, and so does
         // reaching the end naturally — so one condition covers both the user

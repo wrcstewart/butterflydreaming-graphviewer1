@@ -204,8 +204,8 @@
     }
     .step-btn {
       background: #0f0f18;
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      
       padding: 0;
@@ -906,7 +906,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
 
     // Bump on every change to this file, with the stepper-button colour in the
     // stylesheet (the module's canary): red → green → blue.
-    const SS_BUILD = '2026-11-13k';
+    const SS_BUILD = '2026-11-13l';
 
     // ── THE CONTROLS — ONE TABLE ────────────────────────────────────────────
     // Each entry: the directive name (as written after %%bd_ / %%bd_p_), the
@@ -1564,7 +1564,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
       }
     });
 
-    console.log('[shanshui] bd_V_ShanShuiV1 build ' + SS_BUILD + ' — the stepper +/- buttons are RED #c0392b, in step with BD, Kolam3D and DroneFrac.');
+    console.log('[shanshui] bd_V_ShanShuiV1 build ' + SS_BUILD + ' — the stepper +/- buttons are GREEN #27ae60, in step with BD, Kolam3D and DroneFrac.');
     try { document.body.dataset.ssBuild = SS_BUILD; } catch (_) {}
     postToParent({ type: 'BD_READY' });
 
