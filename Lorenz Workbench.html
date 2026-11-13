@@ -29,7 +29,7 @@
   --sheet: rgba(240, 242, 236, 0.9);
   --rule: #c3c8bd;
   --seal: #a8322a;
-  --canary: #27ae60;          /* CANARY — green, build 2026-11-13l */
+  --canary: #2980b9;          /* CANARY — blue, build 2026-11-13m */
   --display: "Zen Old Mincho", "Songti SC", "Noto Serif CJK SC", Georgia, serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -142,7 +142,9 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
       <input type="range" id="spf" min="1" max="60" step="1" value="6"></div>
     <div class="ctl"><label for="trail">Trail length <output id="trailOut"></output></label>
       <input type="range" id="trail" min="500" max="60000" step="500" value="20000"></div>
-    <p class="hint">A smaller time step is more accurate; steps per frame sets how fast it draws. The oldest points drop off once the trail is full.</p>
+    <div class="ctl"><label for="opacity">Opacity <output id="opacityOut"></output></label>
+      <input type="range" id="opacity" min="0.02" max="1" step="0.01" value="1"></div>
+    <p class="hint">A smaller time step is more accurate; steps per frame sets how fast it draws. The oldest points drop off once the trail is full. Below full opacity, places the path passes many times show brighter, so the density of the orbit becomes visible.</p>
 
     <div class="group">Camera</div>
     <div class="ctl"><label for="az">Azimuth <output id="azOut"></output></label>
@@ -162,8 +164,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 'use strict';
-const LW_BUILD = '2026-11-13l';
-console.log('[lorenz] Lorenz Workbench build ' + LW_BUILD + ' — the Restart button border is GREEN #27ae60.');
+const LW_BUILD = '2026-11-13m';
+console.log('[lorenz] Lorenz Workbench build ' + LW_BUILD + ' — the Restart button border is BLUE #2980b9.');
 const $ = (id) => document.getElementById(id);
 const DEG = Math.PI / 180;
 
@@ -171,7 +173,7 @@ const DEG = Math.PI / 180;
 const state = {
   x0: 1, y0: 1, z0: 1,
   sigma: 10, rho: 28, beta: 8 / 3,     // β held EXACT until the slider is moved
-  dt: 0.005, spf: 6, trail: 20000,
+  dt: 0.005, spf: 6, trail: 20000, opacity: 1,
   az: 40, el: 15, dist: 95, spin: 0,
   axes: true, paused: false,
 };
@@ -223,7 +225,11 @@ const positions = new Float32Array(MAX_POINTS * 3);
 const traceGeo = new THREE.BufferGeometry();
 traceGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
 traceGeo.setDrawRange(0, 0);
-const traceMat = new THREE.LineBasicMaterial({ color: new THREE.Color(css.getPropertyValue('--trace').trim()) });
+// Opacity: transparent, and depthWrite off so EVERY overlapping pass of the
+// line blends (with depth writes on, a nearer segment would hide the farther
+// ones and the overlaps would not add up).
+const traceMat = new THREE.LineBasicMaterial({ color: new THREE.Color(css.getPropertyValue('--trace').trim()),
+  transparent: true, opacity: 1, depthWrite: false });
 const trace = new THREE.Line(traceGeo, traceMat);
 trace.frustumCulled = false;            // the bounding sphere is never recomputed as it grows
 scene.add(trace);
@@ -328,7 +334,7 @@ const fmt = {
   x0: (v) => v.toFixed(2), y0: (v) => v.toFixed(2), z0: (v) => v.toFixed(2),
   sigma: (v) => v.toFixed(1), rho: (v) => v.toFixed(1),
   beta: (v) => Math.abs(v - 8 / 3) < 1e-9 ? '8/3' : v.toFixed(3),
-  dt: (v) => v.toFixed(3), spf: (v) => String(v), trail: (v) => v.toLocaleString('en-GB'),
+  dt: (v) => v.toFixed(3), spf: (v) => String(v), trail: (v) => v.toLocaleString('en-GB'), opacity: (v) => v.toFixed(2),
   az: (v) => v + '°', el: (v) => v + '°', dist: (v) => String(v), spin: (v) => v + '°/s',
 };
 function syncLabels() { for (const k in fmt) $(k + 'Out').textContent = fmt[k](state[k]); }
@@ -343,6 +349,7 @@ for (const k in fmt) {
       count -= drop;
     }
     if (k === 'az' || k === 'el' || k === 'dist') placeCamera();
+    if (k === 'opacity') traceMat.opacity = state.opacity;
     syncLabels();
   });
 }
