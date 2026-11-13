@@ -2515,7 +2515,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-13f' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-13g' };
 
 let bdViewTitleText = '';
 
@@ -12542,6 +12542,7 @@ async function init() {
         let tries = 0;
         collageTextRetry = setInterval(() => {
           if (!document.body.classList.contains('collage-preview-text') ||
+              document.body.classList.contains('view-active') ||
               ++tries > 30 || tryPlaceText()) {
             clearInterval(collageTextRetry);
             collageTextRetry = null;
@@ -12553,13 +12554,16 @@ async function init() {
       // square after this pass, and after a return from View it has a long way
       // to settle. Sets only this layer's own properties, so it cannot drive
       // another layout pass and cannot loop.
+      // Same stand-down in View as the music overlay's deferred passes below.
+      const textLive = () => document.body.classList.contains('collage-preview-text') &&
+                             !document.body.classList.contains('view-active');
       requestAnimationFrame(() => {
-        if (!document.body.classList.contains('collage-preview-text')) return;
+        if (!textLive()) return;
         const m2 = collageModuleRects(iframeEl);
         if (placeText(m2 && m2.canvas)) tl.hidden = false;
         collageNudgeVisual(iframeEl);
         requestAnimationFrame(() => {
-          if (!document.body.classList.contains('collage-preview-text')) return;
+          if (!textLive()) return;
           const m3 = collageModuleRects(iframeEl);
           if (placeText(m3 && m3.canvas)) tl.hidden = false;
         });
@@ -12698,8 +12702,19 @@ async function init() {
         // this pass, so a rect read once is read while it is still settling.
         // Sets only the overlay's clip and sends a message, so it cannot drive
         // another layout pass and cannot loop.
+        // ── AND NOT ONCE VIEW HAS OPENED (2026-11-13) ─────────────────────
+        // These deferred passes outlive the pass that queued them, and
+        // `collage-bar` stays on the body in View — so a View pressed within
+        // two frames of a preview pass (exactly what a ?mode=create&view=1
+        // link does) had them land AFTER bdViewEnter cleared the frame: they
+        // put the preview's clip back — inset(174px) on a 110px strip, i.e.
+        // nothing visible — and sent the module the preview's bar rect. No
+        // Play/Stop. positionCyEl itself stands down in View; its deferred
+        // halves now do too. Measured with a probe, not inferred.
+        const previewLive = () => document.body.classList.contains('collage-bar') &&
+                                  !document.body.classList.contains('view-active');
         requestAnimationFrame(() => {
-          if (!document.body.classList.contains('collage-bar')) return;
+          if (!previewLive()) return;
           const m2 = collageModuleRects(iframeEl);
           apply(m2 && m2.canvas, m2 && m2.column);
           try {
@@ -12718,7 +12733,7 @@ async function init() {
           } catch (_) {}
           collageNudgeVisual(iframeEl);
           requestAnimationFrame(() => {
-            if (!document.body.classList.contains('collage-bar')) return;
+            if (!previewLive()) return;
             const m3 = collageModuleRects(iframeEl);
             apply(m3 && m3.canvas, m3 && m3.column);
           });
@@ -13055,6 +13070,54 @@ async function init() {
   const COLLAGE_BAR_H   = 52;
   const COLLAGE_BAR_GAP = 0;
   let currentBarModuleId = null;
+  // ── THE LAST CALLER DECIDES, EVEN BEFORE THE FRAME IS READY (2026-11-13) ──
+  // Two loaders share this frame: the preview's (loadCollagePlaybar) and
+  // View's (loadCollageViewPlayer), with different flags. A ?mode=create&view=1
+  // link calls BOTH within a second: Create's swap path sets the src and waits
+  // for BD_READY; View then saw the module id already set, took the FAST path
+  // and posted its flags into a page that was not listening yet — lost — and
+  // ~3 s later the preview's BD_READY listener posted the PREVIEW's flags. View
+  // got an overlay-mode drone and no Play/Stop. Reported by the author:
+  // "entering via the view URL did not display the play stop button".
+  //
+  // So the BD_READY handler no longer carries its own script and flags; it
+  // posts whatever `barPending` holds when the frame actually answers, and a
+  // fast path taken before then REPLACES barPending instead of posting.
+  let barReady   = false;   // has the frame's current page said BD_READY?
+  let barPending = null;    // { script, flags, who } — delivered on BD_READY
+  function barSend(bf, moduleId, script, flags, who) {
+    if (!barReady) {
+      barPending = { script, flags, who };
+      console.log('[collage] ' + who + ': ' + moduleId + ' still loading — queued for its BD_READY');
+      return;
+    }
+    try { bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*'); } catch (_) {}
+    flags();
+  }
+  function barLoad(bf, url, moduleId, script, flags, who) {
+    currentBarModuleId = moduleId;
+    barReady = false;
+    barPending = { script, flags, who };
+    const onReady = (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== 'BD_READY') return;
+      // THE SOURCE MUST BE CHECKED: two module frames are alive, so a
+      // BD_READY from the other one would otherwise satisfy this listener.
+      if (e.source !== bf.contentWindow) return;
+      window.removeEventListener('message', onReady);
+      barReady = true;
+      const p = barPending; barPending = null;
+      if (!p) return;
+      try {
+        bf.contentWindow.postMessage({ type: 'bd_script_update', script: p.script }, '*');
+      } catch (err) { console.warn('[collage] playbar postMessage failed', err); }
+      p.flags();
+      console.log('[collage] ' + p.who + ' BD_READY — ' + moduleId +
+                  ' iterations=' + ((p.script.match(/^%%bd_p_iterations (\S+)/m) || [])[1] || '-'));
+    };
+    window.addEventListener('message', onReady);
+    bf.src = url;
+  }
 
   function loadCollagePlaybar(moduleId, script) {
     const bf = document.getElementById('collage-playbar');
@@ -13079,35 +13142,12 @@ async function init() {
     if (moduleId === currentBarModuleId) {
       console.log('[collage] playbar fast path, posting script to ' + moduleId +
                   ', length=' + script.length);
-      try {
-        bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
-      } catch (_) {}
-      flags();
+      barSend(bf, moduleId, script, flags, 'playbar');
       return;
     }
     console.log('[collage] playbar swap path, src=' + url + ', script length=' + script.length);
-    currentBarModuleId = moduleId;
     collageNudged = false;   // a new load gets a fresh second measure
-    const onReady = (e) => {
-      const d = e && e.data;
-      if (!d || d.type !== 'BD_READY') return;
-      // THE SOURCE MUST BE CHECKED, unlike in the single-frame loaders: two
-      // module frames are alive now, so a BD_READY from the other one would
-      // otherwise satisfy this listener and the script would go to a frame
-      // that is not ready, or to the wrong module entirely.
-      if (e.source !== bf.contentWindow) return;
-      window.removeEventListener('message', onReady);
-      try {
-        bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*');
-        console.log('[collage] PUSH to playbar (BD_READY, loadCollagePlaybar) ' + moduleId +
-                    ' iterations=' + ((script.match(/^%%bd_p_iterations (\S+)/m) || [])[1] || '-'));
-      } catch (err) {
-        console.warn('[collage] playbar postMessage failed', err);
-      }
-      flags();
-    };
-    window.addEventListener('message', onReady);
-    bf.src = url;
+    barLoad(bf, url, moduleId, script, flags, 'playbar');
   }
 
   // ── THE SECOND MEASURE, ONCE PER LOAD (2026-10-10) ────────────────────
@@ -13156,25 +13196,11 @@ async function init() {
       } catch (_) {}
     };
     if (moduleId === currentBarModuleId) {
-      try { bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*'); } catch (_) {}
-      flags();
       console.log('[collage] View player fast path — ' + moduleId);
+      barSend(bf, moduleId, script, flags, 'View player');
       return;
     }
-    currentBarModuleId = moduleId;
-    const onReady = (e) => {
-      const d = e && e.data;
-      if (!d || d.type !== 'BD_READY') return;
-      // e.source checked: two module frames are alive, so the other one's
-      // announcement would otherwise satisfy this listener.
-      if (e.source !== bf.contentWindow) return;
-      window.removeEventListener('message', onReady);
-      try { bf.contentWindow.postMessage({ type: 'bd_script_update', script }, '*'); } catch (_) {}
-      flags();
-      console.log('[collage] View player BD_READY — ' + moduleId);
-    };
-    window.addEventListener('message', onReady);
-    bf.src = url;
+    barLoad(bf, url, moduleId, script, flags, 'View player');
   }
 
   function stopCollagePlaybar() {
