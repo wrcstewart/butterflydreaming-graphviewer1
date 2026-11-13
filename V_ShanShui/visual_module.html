@@ -204,8 +204,8 @@
     }
     .step-btn {
       background: #0f0f18;
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      
       padding: 0;
@@ -681,7 +681,7 @@ const milkyMat = new THREE.ShaderMaterial({
       float lane = radians(2.0) + radians(3.5) * (fbm(d * 5.0 + 3.0) - 0.5);
       float depth = smoothstep(0.35, 0.65, fbm(d * 8.0 + 11.0));
       float rift = 1.0 - 0.8 * depth * exp(-pow((b - lane) / radians(1.8), 2.0)) * smoothstep(-0.3, 0.1, l) * smoothstep(1.8, 1.2, l);
-      float a = band * patchy * rift * uFade * 0.16 * smoothstep(0.0, 0.3, vAlt);
+      float a = band * patchy * rift * uFade * 0.11 * smoothstep(0.0, 0.3, vAlt);   // 0.16 until 2026-11-13: dimmed so the stars stand out
       gl_FragColor = vec4(vec3(0.86, 0.9, 1.0) * a, 1.0);
     }`,
   side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -738,7 +738,9 @@ function updateSky() {
   }
   hemi.intensity = 0.2 + 0.55 * day;                         // 0.75 at full day, as before
   hemi.color.copy(NIGHT_SKY).lerp(WHITE, day);
-  const night = paper.clone().multiplyScalar(0.25).lerp(NIGHT_TINT, 0.6);
+  // × 0.7 (2026-11-13, the author): a darker night sky for more contrast with the stars.
+  // The mist takes the sky's colour (fog below), so distant ridges darken with it.
+  const night = paper.clone().multiplyScalar(0.25).lerp(NIGHT_TINT, 0.6).multiplyScalar(0.7);
   scene.background.copy(night).lerp(paper, day).lerp(DUSK, 0.45 * dusk);
   scene.fog.color.copy(scene.background);
   // discs
@@ -904,7 +906,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
 
     // Bump on every change to this file, with the stepper-button colour in the
     // stylesheet (the module's canary): red → green → blue.
-    const SS_BUILD = '2026-11-13b';
+    const SS_BUILD = '2026-11-13c';
 
     // ── THE CONTROLS — ONE TABLE ────────────────────────────────────────────
     // Each entry: the directive name (as written after %%bd_ / %%bd_p_), the
@@ -1562,7 +1564,7 @@ buildChunk = (cx, cz) => { built++; return _build(cx, cz); };
       }
     });
 
-    console.log('[shanshui] bd_V_ShanShuiV1 build ' + SS_BUILD + ' — the stepper +/- buttons are RED #c0392b, in step with BD, Kolam3D and DroneFrac.');
+    console.log('[shanshui] bd_V_ShanShuiV1 build ' + SS_BUILD + ' — the stepper +/- buttons are GREEN #27ae60, in step with BD, Kolam3D and DroneFrac.');
     try { document.body.dataset.ssBuild = SS_BUILD; } catch (_) {}
     postToParent({ type: 'BD_READY' });
 
