@@ -991,6 +991,28 @@ const NODE_URL_VIEW = (() => {
   catch (_) { return false; }
 })();
 
+// ?mode=create — ARRIVE IN CREATE (the author's request, 2026-11-13). The
+// second bounded flag, read here AT LOAD for the same reason as ?view=1 above:
+// syncAddressBar rewrites the bar during the open. A bare link stays Browse.
+// It grants nothing: Create shows the whole script, but SAVING still needs the
+// curation code, which the server checks.
+const NODE_URL_CREATE = (() => {
+  try { return new URLSearchParams(location.search).get('mode') === 'create'; }
+  catch (_) { return false; }
+})();
+
+// The flags a node link carries, from the LIVE state: ?mode=create while the
+// radio says Create, ?view=1 while View is open — BOTH when View was entered
+// from Create, so the recipient sees the graphic first and Back lands them in
+// Create (agreed 2026-11-13). Order is fixed so the same state is always the
+// same link. 21 characters at most, far under the 659 ceiling.
+function nodeLinkQuery(view, create) {
+  const q = [];
+  if (create) q.push('mode=create');
+  if (view)   q.push('view=1');
+  return q.length ? '?' + q.join('&') : '';
+}
+
 // The uuid out of a node's stored url — the LAST path segment, for the
 // host-independence reason above.
 function nodeUuid(node) {
@@ -1017,7 +1039,7 @@ function canonicalUrlFromStored(storedUrl, opts) {
   const m = storedUrl.match(UUID_AT_END);
   if (!m) return null;
   return window.location.origin + '/n/' + m[1].toLowerCase() +
-         (opts && opts.view ? '?view=1' : '');
+         nodeLinkQuery(!!(opts && opts.view), !!(opts && opts.create));
 }
 
 // The link a reader can copy, in the host they are ACTUALLY using — built from
@@ -1034,7 +1056,8 @@ function canonicalNodeUrl(node) {
   // person — the whole point of a permanent URL. So the bar carries the flag
   // while View is open and drops it on the way out.
   const view = document.body.classList.contains('view-active');
-  return window.location.origin + '/n/' + id + (view ? '?view=1' : '');
+  return window.location.origin + '/n/' + id +
+         nodeLinkQuery(view, bdViewMode === 'create');
 }
 
 // ── IS WHAT YOU ARE LOOKING AT STILL THE SAVED NODE? ────────────────────────
@@ -2492,7 +2515,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-12c' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-13a' };
 
 let bdViewTitleText = '';
 
@@ -18126,7 +18149,8 @@ async function init() {
       copyLinkBtn.addEventListener('click', () => {
         const { payload } = buildExternalWebsiteUrl();
         const url = canonicalUrlFromStored(payload && payload.node_url,
-                      { view: document.body.classList.contains('view-active') });
+                      { view: document.body.classList.contains('view-active'),
+                        create: bdViewMode === 'create' });
         if (!url) {
           // A node with no `url` cannot be linked at all. The corpus has 218 of
           // 218 TextNodes covered, so this is the 84 label-less orphan edge
@@ -18173,7 +18197,8 @@ async function init() {
       viewCopyBtn.addEventListener('click', () => {
         const { payload } = buildExternalWebsiteUrl();
         const url = canonicalUrlFromStored(payload && payload.node_url,
-                      { view: document.body.classList.contains('view-active') });
+                      { view: document.body.classList.contains('view-active'),
+                        create: bdViewMode === 'create' });
         if (!url) {
           console.warn('[view-copy] this node carries no url — nothing to copy');
           viewCopyBtn.textContent = 'No URL';
@@ -18560,6 +18585,20 @@ async function init() {
   // itself view-active has not been toggled yet, so reading it now would give
   // the state we are leaving rather than the one we are entering. This also
   // covers the ?view=1 arrival, which presses the same button.
+  // The Browse/Create radio changes the link too (?mode=create), so it
+  // re-syncs the bar the same way. A switch made by CODE rather than the radio
+  // (Join presses Create) is not caught here; Copy Link reads the live state,
+  // so what is copied is right regardless, and the next node tap fixes the bar.
+  document.querySelectorAll('#view-mode-toggle input[type="radio"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      requestAnimationFrame(() => {
+        try {
+          const n = cy.getElementById(getLastReadNodeId() || '');
+          if (n && n.length) syncAddressBar(n);
+        } catch (err) { console.warn('[/n] could not re-sync the bar for the mode', err); }
+      });
+    });
+  });
   ['jump-to-ext-btn', 'bd-view-exit'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -18626,6 +18665,18 @@ async function init() {
 
     console.log('[/n] arriving at ' + (target.data('name') || target.id()));
     openNodeAsTap(target, { fresh: true });
+
+    // ?mode=create — PRESS the Create radio, as ?view=1 presses View below, so
+    // the arrival takes the same path as a person's press (a module node brings
+    // its module up beside the script). Before View, so a link carrying both
+    // opens View from Create and Back returns to Create.
+    if (NODE_URL_CREATE) {
+      const cr = document.querySelector('#view-mode-toggle input[value="create"]');
+      if (cr && !cr.checked) {
+        console.log('[/n] ?mode=create — pressing Create');
+        cr.click();
+      } else if (!cr) console.warn('[/n] ?mode=create — no Create radio to press');
+    }
 
     // ?view=1 — ARRIVE WITH THE GRAPHIC SHOWING, and only then. A bare node
     // link is always text in Browse; the flag is the opt-in.
