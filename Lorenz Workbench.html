@@ -30,7 +30,7 @@
   --sheet: rgba(240, 242, 236, 0.9);
   --rule: #c3c8bd;
   --seal: #a8322a;
-  --canary: #c0392b;          /* CANARY — red, build 2026-11-13n */
+  --canary: #27ae60;          /* CANARY — green, build 2026-11-13o */
   --display: "Zen Old Mincho", "Songti SC", "Noto Serif CJK SC", Georgia, serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -166,8 +166,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--seal); outl
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 'use strict';
-const LW_BUILD = '2026-11-13n';
-console.log('[lorenz] Lorenz Workbench build ' + LW_BUILD + ' — the Restart button border is RED #c0392b.');
+const LW_BUILD = '2026-11-13o';
+console.log('[lorenz] Lorenz Workbench build ' + LW_BUILD + ' — the Restart button border is GREEN #27ae60.');
 const $ = (id) => document.getElementById(id);
 const DEG = Math.PI / 180;
 
@@ -236,7 +236,9 @@ const trace = new THREE.Line(traceGeo, traceMat);
 trace.frustumCulled = false;            // the bounding sphere is never recomputed as it grows
 scene.add(trace);
 
-const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+// The head follows the Opacity slider too (transparent, set in the slider handler).
+const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), headMat);
 scene.add(head);
 
 // The PROJECTION onto Lorenz's xy plane (z = 0): the SAME geometry, drawn by a
@@ -252,11 +254,13 @@ projLine.frustumCulled = false;
 projGroup.add(projLine);
 // The newest point's shadow, and a dropped line joining the point to it, so the
 // projection can be watched as it happens.
-const projHead = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), new THREE.MeshBasicMaterial({ color: projMat.color }));
+const projHeadMat = new THREE.MeshBasicMaterial({ color: projMat.color, transparent: true, opacity: 1, depthWrite: false });
+const projHead = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), projHeadMat);
 projGroup.add(projHead);
 const dropGeo = new THREE.BufferGeometry();
 dropGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
-const dropLine = new THREE.Line(dropGeo, new THREE.LineBasicMaterial({ color: projMat.color, transparent: true, opacity: 0.5 }));
+const dropMat = new THREE.LineBasicMaterial({ color: projMat.color, transparent: true, opacity: 0.5 });   // half the slider's value
+const dropLine = new THREE.Line(dropGeo, dropMat);
 dropLine.frustumCulled = false;
 projGroup.add(dropLine);
 projGroup.visible = state.proj;
@@ -374,7 +378,10 @@ for (const k in fmt) {
       count -= drop;
     }
     if (k === 'az' || k === 'el' || k === 'dist') placeCamera();
-    if (k === 'opacity') traceMat.opacity = projMat.opacity = state.opacity;
+    if (k === 'opacity') {
+      traceMat.opacity = projMat.opacity = headMat.opacity = projHeadMat.opacity = state.opacity;
+      dropMat.opacity = 0.5 * state.opacity;
+    }
     syncLabels();
   });
 }
