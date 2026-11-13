@@ -1901,11 +1901,26 @@ function speechActive() {
 // speak() queues, playNextSpeech starts or finds the queue empty, stopSpeech —
 // rather than by the button's own press, because View also reads aloud on its
 // own (auto-read when Speak is ticked, a collage's text as it appears) and the
-// word must be right then too. The swap itself is CSS on `.speaking`.
+// word must be right then too.
+//
+// THE WORD IS SET HERE, NOT IN CSS. The first cut put both words in the button
+// and let the stylesheet hide one; style.css is the most cacheable file BD has
+// (Cloudflare keeps it for hours), and a stale copy showed "SpeakStop" — read
+// by the author as speech running when it was not. viewer.js is no-store, so
+// what it writes is always current. The width is pinned to the "Speak" width
+// the first time the button is laid out, so the view bar does not shift.
 function syncViewSpeakBtn() {
   try {
     const b = document.getElementById('bd-view-speak');
-    if (b) b.classList.toggle('speaking', speechActive());
+    if (!b) return;
+    const on = speechActive();
+    b.classList.toggle('speaking', on);
+    if (!b.style.minWidth && !on && b.offsetWidth > 0) {
+      b.textContent = 'Speak';
+      b.style.minWidth = b.offsetWidth + 'px';
+    }
+    const word = on ? 'Stop' : 'Speak';
+    if (b.textContent !== word) b.textContent = word;
   } catch (_) { /* a label is never a reason to break speech */ }
 }
 
@@ -2529,7 +2544,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-13j' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-13k' };
 
 let bdViewTitleText = '';
 
@@ -16983,6 +16998,7 @@ async function init() {
 
           const sb = document.getElementById('bd-view-speak');
           if (sb) sb.hidden = !bdViewProse;
+          syncViewSpeakBtn();   // the word from the REAL speech state on entry — Speak unless reading is running
           console.log('[collage] v' + collage.version + ' — ' +
             collage.blocks.map((bl) => bl.kind + ':' + bl.moduleId).join(', '));
           // STARTED LAST, after every slot is loaded and the layout is settled:
@@ -17086,6 +17102,7 @@ async function init() {
           bdViewProse = (bodyEl && bodyEl.textContent) || '';
           const sb = document.getElementById('bd-view-speak');
           if (sb) sb.hidden = !bdViewProse;
+          syncViewSpeakBtn();   // the word from the REAL speech state on entry — Speak unless reading is running
           // ── READ IT, IF SPEAK IS TICKED (author, 2026-10-14) ───────────
           // For consistency with a collage's text, which now reads itself as it
           // comes on screen: *"yes it should for consistency work that way for
@@ -17840,6 +17857,7 @@ async function init() {
         // never for someone operating BD from the keyboard, who needs the focus
         // to stay where they put it.
         if (ev && ev.detail > 0) { try { bdViewSpeakBtn.blur(); } catch (_) {} }
+        syncViewSpeakBtn();   // on screen now, so this pins the width while it still reads Speak
         // ── A TOGGLE (the author, 2026-11-13) ──────────────────────────────
         // Pressed while speech is running — queued, synthesising or audible —
         // it STOPS; pressed while silent it starts from the top. It used to
@@ -17848,8 +17866,7 @@ async function init() {
         // poll below uses to take the highlight off, so the button's look and
         // its action cannot disagree.
         if (speakQueue.length > 0 || speakBusy) {
-          stopSpeech();
-          bdViewSpeakBtn.classList.remove('speaking');
+          stopSpeech();           // calls syncViewSpeakBtn itself
           if (bdViewSpeakPoll) { clearInterval(bdViewSpeakPoll); bdViewSpeakPoll = null; }
           const t = document.getElementById('bd-view-title');
           if (t && t.textContent === 'preparing…') t.textContent = bdViewTitleText;
@@ -17889,7 +17906,7 @@ async function init() {
         // interrupt:true clears anything left over before starting from the
         // top. (A press while speaking no longer reaches here — see the toggle.)
         speak(bdViewProse, { interrupt: true });
-        bdViewSpeakBtn.classList.add('speaking');
+        syncViewSpeakBtn();   // from the state: speak() can decline (suppressed, empty text)
         // stopSpeech() empties the queue and clears speakBusy, and so does
         // reaching the end naturally — so one condition covers both the user
         // pressing again and the reading simply finishing.
@@ -17934,7 +17951,7 @@ async function init() {
             t.textContent = bdViewTitleText;
           }
           if (!working) {
-            bdViewSpeakBtn.classList.remove('speaking');
+            syncViewSpeakBtn();
             if (t.textContent === 'preparing…') t.textContent = bdViewTitleText;
             clearInterval(bdViewSpeakPoll);
             bdViewSpeakPoll = null;
