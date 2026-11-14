@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-14d' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-14e' };
 
 let bdViewTitleText = '';
 
@@ -17890,16 +17890,19 @@ async function init() {
       // firing anyway, and every other authoring control in that row
       // (#chat-send-btn, #chat-new-card-btn, #sr-mic-btn, the arrows) is
       // gated in CSS alone because none of them WRITES on a single press.
-      const collageModeOk = () =>
-        document.body.classList.contains('edit-active') ||
-        document.body.classList.contains('player-active');
+      // 2026-11-14 — CREATE ONLY, whatever the layout (author agreed). It also
+      // allowed `player-active`, so in Browse with a module node open the
+      // button reappeared and wrote into the card stack: an authoring action
+      // offered to a reader. The stylesheet rule beside #collage-btn says the
+      // same; both change together.
+      const collageModeOk = () => document.body.classList.contains('edit-active');
 
       if (collageBtnEl) collageBtnEl.addEventListener('click', () => {
         if (!collageModeOk()) {
           // EVERY EXIT SAYS SO — the file's own rule, and the third silent
           // guard here cost a round.
-          console.log('[collage] v2 press declined: Browse mode has no visible ' +
-                      'card to write a collage into. Switch to Create first.');
+          console.log('[collage] v2 press declined: Collage is a Create-mode ' +
+                      'action. Switch to Create first.');
           return;
         }
         // ══ COLLAGE v2 STEPS 4 AND 5 — ONE PRESS, FIVE THINGS ════════════
