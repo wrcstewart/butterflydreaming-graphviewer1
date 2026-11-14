@@ -1525,3 +1525,16 @@ Detail, traps and tuning in `Lorenz_Notes.md`.
 | **Root node — live Lorenz butterfly** | `viewer.js` `startRootButterfly`, `Lorenz_Notes.md` | **BUILT 2026-11-14 (`32e4406`), author: "Thats good".** Canvas behind `#cy` following the root; motion proven by canvas-pixel hash at 8 s vs 12 s. **Phone frame rate NOT measured.** |
 | **Lorenz colour control** | `Lorenz Workbench.html` | **NOT BUILT — author to decide** what it should be. |
 | **yz projection; two neighbouring starts side by side** | `Lorenz Workbench.html` | **NOT BUILT, not yet offered.** The second would show the butterfly effect directly. |
+
+## BUILT 2026-11-14 — the user journey: guidance for a first-time reader
+
+Detail and the author's words in `UserJourney_Notes.md`.
+
+| item | where | state |
+|---|---|---|
+| **Root card: "Tap once more" removed** | `getChunkHint` | **BUILT (`cae2669`).** |
+| **The route already taken goes quiet** | `applySeqSignals`, `edge.route-taken` | **BUILT (`3490228`).** General: any CONTAINS edge into the centred node. |
+| **Journey arrows** | `JOURNEY_ARROWS`, `edge.jh-target` / `jh-source` | **BUILT (`c1ca0e0`, `8dcea92`).** Conversations and Music. A new hub is one table line. |
+| **Gateways' line grey** | DESCENDS_FROM colouring loop | **BUILT (`3490228`).** Width was already equal; white read thicker. |
+| **Collage Create-only** | `style.css` `#collage-btn` rule + `collageModeOk` | **BUILT (`169c3ab`).** The player-active exception removed from both. |
+| **Retrace reminder at Conversations** | `retraceHintFor`, `#retrace-hint` | **BUILT (`f21621f`).** Retired after Local is pressed (my choice; one line to change). Not yet seen on a phone. |
