@@ -1514,3 +1514,14 @@ chronological and superseded.
 | **A BD module** | — | **NOT BUILT.** All three are standalone benches. They render through three.js, which satisfies the standing rule, but none is wired into BD's four registries. |
 | **The alpine colour scheme** | `terrain_view.js` | **BUILT as a deliberate test state** — three flat bands, the author's *"We will take from there"*. A graded seven-stop version is in git history. |
 | **The document's two `fbm2d`s** | `AV/fractal-terrain-methods.md` | **OPEN, in the document not the code.** §11.1 has no `k0` cutoff; its own demo page does, and §3 describes that cutoff as one of the method's controls. They should be made one. |
+
+## BUILT 2026-11-13/14 — Lorenz: the Workbench, and the butterfly on the root node
+
+Detail, traps and tuning in `Lorenz_Notes.md`.
+
+| item | where | state |
+|---|---|---|
+| **Lorenz Workbench** | `Lorenz Workbench.html`, `Lorenz_Notes.md` | **BUILT 2026-11-13 (`8a08063` … `1484562`).** Opacity, xy + xz projections added on request. **Open: colour control (author to decide).** Tested headless only. |
+| **Root node — live Lorenz butterfly** | `viewer.js` `startRootButterfly`, `Lorenz_Notes.md` | **BUILT 2026-11-14 (`32e4406`), author: "Thats good".** Canvas behind `#cy` following the root; motion proven by canvas-pixel hash at 8 s vs 12 s. **Phone frame rate NOT measured.** |
+| **Lorenz colour control** | `Lorenz Workbench.html` | **NOT BUILT — author to decide** what it should be. |
+| **yz projection; two neighbouring starts side by side** | `Lorenz Workbench.html` | **NOT BUILT, not yet offered.** The second would show the butterfly effect directly. |
