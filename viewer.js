@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-14f' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-14g' };
 
 let bdViewTitleText = '';
 
@@ -3358,7 +3358,7 @@ function computeBlendedColours(cy) {
                        : (topFamily.data('colour') || '#444444');
     edge.style('line-color', parentColour);
     // Recorded so a stylesheet arrowhead can match: this inline line-color is a
-    // bypass, which a stylesheet mapper cannot read back (see edge.move-on).
+    // bypass, which a stylesheet mapper cannot read back (see edge.jh-target / jh-source).
     edge.data('lineColour', parentColour);
   });
 
@@ -5722,19 +5722,30 @@ function buildStyle() {
         'opacity': 0.45,
       }
     },
-    // `move-on`: at Conversations, its edges OUT to the six family circles and
-    // Gateways carry arrowheads, "to invite the user to move on". Each head
-    // wears its own line's colour.
+    // JOURNEY ARROWS (2026-11-14): arrowheads that suggest which way to go,
+    // per hub, from the JOURNEY_ARROWS table (see applySeqSignals). The
+    // head goes on whichever END the table asks for, and an edge's own
+    // source/target come from the database, so there are two classes: head at
+    // the edge's target, or at its source.
     //
-    // The LINE colours are set inline by the DESCENDS_FROM colouring loop (which
-    // also makes Gateways' line grey rather than white — all seven are 2.5px,
-    // and the white one read as thicker); it records each in data.lineColour.
+    // Each head wears its own line's colour. The LINE colours are set inline by
+    // the DESCENDS_FROM colouring loop (which also makes Gateways' line grey
+    // rather than white — all seven at Conversations are 2.5px, and the white
+    // one read as thicker); it records each in data.lineColour.
     {
-      selector: 'edge.move-on',
+      selector: 'edge.jh-target',
       style: {
         'target-arrow-shape': 'triangle',
         'arrow-scale': 0.9,
         'target-arrow-color': function(e) { return e.data('lineColour') || '#cccccc'; },
+      }
+    },
+    {
+      selector: 'edge.jh-source',
+      style: {
+        'source-arrow-shape': 'triangle',
+        'arrow-scale': 0.9,
+        'source-arrow-color': function(e) { return e.data('lineColour') || '#cccccc'; },
       }
     },
   ];
@@ -5793,10 +5804,31 @@ function retraceHintFor(centralNode) {
   }, RETRACE_HINT_DELAY_MS);
 }
 
+// ── JOURNEY ARROWS (2026-11-14) ────────────────────────────────────────────
+// The author, helping the reader's journey: arrowheads at a hub that say which
+// way the usual route runs. Keyed by the CENTRED node's name; each entry says,
+// for that hub's DESCENDS_FROM neighbours (by name):
+//   away:   arrow from the hub OUT to these ('*' = every neighbour)
+//   toward: '*' = every other neighbour gets an arrow pointing IN to the hub
+//   except: neighbours left plain — the parent you arrived from, typically
+//
+//   Conversations — out to the six family circles and Gateways, "to invite
+//     the user to move on".
+//   Music — out to Drone, Fractal and Scores; the theme clusters point IN,
+//     "indicating the most common route is from them towards the Music node".
+//     Arts is Music's parent, the way in, so it stays plain.
+// Neighbour names are the nodes' `name`, not their display_name (which can
+// carry line breaks).
+const JOURNEY_ARROWS = {
+  Conversations: { away: '*' },
+  Music:         { away: ['Drone', 'Fractal', 'Scores'], toward: '*', except: ['Arts'] },
+};
+
 function applySeqSignals(cy, centralNode, suppress) {
   retraceHintFor(suppress ? null : centralNode);
   cy.edges('.route-taken').removeClass('route-taken');
-  cy.edges('.move-on').removeClass('move-on');
+  cy.edges('.jh-target').removeClass('jh-target');
+  cy.edges('.jh-source').removeClass('jh-source');
   cy.edges('.seq-edge').removeClass('seq-edge');
   cy.nodes('.seq-successor').removeClass('seq-successor');
   cy.edges('.title-edge').removeClass('title-edge');
@@ -5807,15 +5839,24 @@ function applySeqSignals(cy, centralNode, suppress) {
   if (suppress) return;
   if (!centralNode || !centralNode.length) return;
   // 2026-11-14 — the route already taken goes quiet; at Conversations the ways
-  // on get arrowheads. Styles and reasons at `edge.route-taken` / `edge.move-on`.
+  // on get arrowheads. Styles and reasons at `edge.route-taken` and JOURNEY_ARROWS.
   // Before the TextNode-only return below: these are for hubs too.
   centralNode.connectedEdges('edge[type="CONTAINS"]')
     .filter(e => e.target().id() === centralNode.id())
     .addClass('route-taken');
-  if (centralNode.data('type') === 'Entry' && centralNode.data('name') === 'Conversations') {
-    centralNode.connectedEdges('edge[type="DESCENDS_FROM"]')
-      .filter(e => e.source().id() === centralNode.id() && e.target().visible())
-      .addClass('move-on');
+  const journey = JOURNEY_ARROWS[centralNode.data('name')];
+  if (journey) {
+    centralNode.connectedEdges('edge[type="DESCENDS_FROM"]').forEach(e => {
+      const other = e.source().id() === centralNode.id() ? e.target() : e.source();
+      if (!other.visible()) return;
+      const name = other.data('name');
+      if ((journey.except || []).includes(name)) return;
+      const away = journey.away === '*' || (journey.away || []).includes(name);
+      const toward = !away && journey.toward === '*';
+      if (!away && !toward) return;
+      const headOn = away ? other : centralNode;          // where the arrow points
+      e.addClass(headOn.id() === e.target().id() ? 'jh-target' : 'jh-source');
+    });
   }
   if (centralNode.data('type') !== 'TextNode' || centralNode.data('gateway')) return;
   const fwd = centralNode.connectedEdges('edge[type="CHILD"]').filter(e =>
