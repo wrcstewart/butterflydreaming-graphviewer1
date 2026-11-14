@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-13p' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-14a' };
 
 let bdViewTitleText = '';
 
@@ -4724,6 +4724,49 @@ function inkModeOverrides() {
 
 // --- Cytoscape stylesheet ---
 
+// ── THE ROOT'S BUTTERFLY (2026-11-14) ──────────────────────────────────────
+// Lorenz's 1963 attractor, seen face on in its xz plane — the "classic"
+// two-lobed picture, as on the Lorenz Workbench's back wall — drawn as the
+// root node's background image, under its label. Computed HERE, in the
+// browser, once per page (the client-derives rule): integrate, project, and
+// write an SVG path; no file, no request.
+//   Equations: dx/dt = σ(y − x), dy/dt = x(ρ − z) − y, dz/dt = xy − βz,
+//   with Lorenz's σ 10, ρ 28, β 8/3, started at (1, 1, 1), stepped by
+//   4th-order Runge–Kutta with dt 0.005 (the Workbench's defaults).
+//   The first SKIP steps (the run-in from the start point) are left out, then
+//   KEEP steps are drawn, every EVERY-th one (decimated: the SVG stays ~40 KB).
+// Returns a data: URI. Cytoscape rasterises an SVG at its OWN width/height
+// attributes and then scales the bitmap, so those are set large (SIZE) to stay
+// sharp when the graph is zoomed in.
+// `ink`: on ?ink=1 the root's body is transparent on a dark ground, so the
+// strokes go gold there instead of dark.
+let _rootButterflyUri = null;
+function rootButterflyUri() {
+  if (_rootButterflyUri) return _rootButterflyUri;
+  const S = 10, R = 28, B = 8 / 3, DT = 0.005, SKIP = 400, KEEP = 9000, EVERY = 2, SIZE = 600;
+  const f = (x, y, z) => [S * (y - x), x * (R - z) - y, x * y - B * z];
+  let x = 1, y = 1, z = 1;
+  const pts = [];
+  for (let n = 0; n < SKIP + KEEP; n++) {
+    const [a1, b1, c1] = f(x, y, z);
+    const [a2, b2, c2] = f(x + a1 * DT / 2, y + b1 * DT / 2, z + c1 * DT / 2);
+    const [a3, b3, c3] = f(x + a2 * DT / 2, y + b2 * DT / 2, z + c2 * DT / 2);
+    const [a4, b4, c4] = f(x + a3 * DT, y + b3 * DT, z + c3 * DT);
+    x += DT / 6 * (a1 + 2 * a2 + 2 * a3 + a4);
+    y += DT / 6 * (b1 + 2 * b2 + 2 * b3 + b4);
+    z += DT / 6 * (c1 + 2 * c2 + 2 * c3 + c4);
+    if (n >= SKIP && (n - SKIP) % EVERY === 0) pts.push(x.toFixed(2) + ' ' + (-z).toFixed(2));   // SVG y runs down, so −z
+  }
+  // viewBox in Lorenz units: x about ±20, z about 2..48. Square, centred on
+  // the figure (x 0, z 25), and 65 units across where the figure needs ~52,
+  // so it fills 80% of the node: at 100% the wing tips touched the circle.
+  const stroke = INK_MODE ? '#FFD700' : '#000000';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="-32.5 -57.5 65 65">` +
+    `<path d="M${pts.join('L')}" fill="none" stroke="${stroke}" stroke-opacity="0.38" stroke-width="0.27" stroke-linejoin="round"/></svg>`;
+  _rootButterflyUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  return _rootButterflyUri;
+}
+
 function buildStyle() {
   const base = [
     {
@@ -4775,6 +4818,14 @@ function buildStyle() {
         'text-max-width': '100px',
         'border-width': 5,
         'border-color': '#90EE90',
+        // The Lorenz butterfly, under the label — see rootButterflyUri().
+        // 'contain' fits the WHOLE image to the node, and overrides
+        // background-width/-height (measured: 80% there changed nothing), so
+        // the margin that keeps the wing tips off the circle's edge is in the
+        // SVG's own viewBox instead.
+        'background-image': rootButterflyUri(),
+        'background-fit': 'contain',
+        'background-image-opacity': 1,
       }
     },
     {
