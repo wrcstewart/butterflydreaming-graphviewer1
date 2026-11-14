@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-14b' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-14c' };
 
 let bdViewTitleText = '';
 
@@ -2809,7 +2809,12 @@ function getChunkHint(isLast, hasDescendants, node, isRoot) {
           : 'Try the Player (below right) or tap once more to see connected nodes.';
       }
     }
-    return oneTap ? '' : CHUNK_HINT_NAVIGATE;
+    // Not on Root either (2026-11-14, author: "not needed"): Root's last
+    // message already reveals its children by itself — the
+    // `(isRoot || isArriving) && isLast && hasNavDescendants` block in
+    // advanceOrNavigate — so "tap once more" asked for a tap that does nothing
+    // new. Root's "Tap for next message" (CHUNK_HINT_MORE) is unaffected.
+    return (oneTap || isRoot) ? '' : CHUNK_HINT_NAVIGATE;
   }
   // A dead end is a fact about the graph rather than an instruction to tap, so
   // this one survives the change unaltered.
