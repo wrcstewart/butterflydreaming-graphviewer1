@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-14c' };
+const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-14d' };
 
 let bdViewTitleText = '';
 
@@ -3351,8 +3351,15 @@ function computeBlendedColours(cy) {
     const topFamily = FAMILY_COLOURS[src.data('name')] ? src
                     : FAMILY_COLOURS[tgt.data('name')] ? tgt
                     : (src.data('type') === 'Family' ? src : tgt);
-    const parentColour = topFamily.data('colour') || '#444444';
+    // 2026-11-14 — Conversations -> Gateways resolves to Gateways' own WHITE,
+    // which at the families' 2.5px read as the thick line. A grey of about the
+    // families' luminance (relative luminance ~0.25) makes all seven read equal.
+    const parentColour = topFamily.data('name') === 'Gateways' ? '#8c8c8c'
+                       : (topFamily.data('colour') || '#444444');
     edge.style('line-color', parentColour);
+    // Recorded so a stylesheet arrowhead can match: this inline line-color is a
+    // bypass, which a stylesheet mapper cannot read back (see edge.move-on).
+    edge.data('lineColour', parentColour);
   });
 
   // Colour CLUSTER_REL edges from their target Cluster's blended colour
@@ -5695,6 +5702,41 @@ function buildStyle() {
         'opacity': 0.45,
       }
     },
+    // ── THE ROUTE ALREADY TAKEN, AND THE WAYS ON (2026-11-14) ───────────────
+    // Classes set by applySeqSignals on every view.
+    //
+    // `route-taken`: a main-route (CONTAINS) edge INTO the centred node. The
+    // author: at Conversations, "there should not be a thick white arrow line
+    // to it — the user has already taken that route so doesn't need
+    // reminding". Drawn exactly as an aside (the Settling edge's look),
+    // keeping its arrowhead small and grey. Leaving the node, the same edge is
+    // the way ON and keeps its bright route look.
+    {
+      selector: 'edge.route-taken',
+      style: {
+        'line-style': 'dotted',
+        'line-color': '#6a6a72',
+        'target-arrow-color': '#6a6a72',
+        'arrow-scale': 0.65,
+        'width': 1,
+        'opacity': 0.45,
+      }
+    },
+    // `move-on`: at Conversations, its edges OUT to the six family circles and
+    // Gateways carry arrowheads, "to invite the user to move on". Each head
+    // wears its own line's colour.
+    //
+    // The LINE colours are set inline by the DESCENDS_FROM colouring loop (which
+    // also makes Gateways' line grey rather than white — all seven are 2.5px,
+    // and the white one read as thicker); it records each in data.lineColour.
+    {
+      selector: 'edge.move-on',
+      style: {
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.9,
+        'target-arrow-color': function(e) { return e.data('lineColour') || '#cccccc'; },
+      }
+    },
   ];
   // Later rules win in cytoscape, so the experiment is an APPEND and touches
   // none of the above. Switching it off is switching off one flag.
@@ -5710,6 +5752,8 @@ function buildStyle() {
 // passes = the tapped node). Cleared first so a prior view's mark doesn't
 // linger. No-op unless the central node is a content TextNode (not a gateway).
 function applySeqSignals(cy, centralNode, suppress) {
+  cy.edges('.route-taken').removeClass('route-taken');
+  cy.edges('.move-on').removeClass('move-on');
   cy.edges('.seq-edge').removeClass('seq-edge');
   cy.nodes('.seq-successor').removeClass('seq-successor');
   cy.edges('.title-edge').removeClass('title-edge');
@@ -5719,6 +5763,17 @@ function applySeqSignals(cy, centralNode, suppress) {
   // the next verse is a different conversation happening over the top of it.
   if (suppress) return;
   if (!centralNode || !centralNode.length) return;
+  // 2026-11-14 — the route already taken goes quiet; at Conversations the ways
+  // on get arrowheads. Styles and reasons at `edge.route-taken` / `edge.move-on`.
+  // Before the TextNode-only return below: these are for hubs too.
+  centralNode.connectedEdges('edge[type="CONTAINS"]')
+    .filter(e => e.target().id() === centralNode.id())
+    .addClass('route-taken');
+  if (centralNode.data('type') === 'Entry' && centralNode.data('name') === 'Conversations') {
+    centralNode.connectedEdges('edge[type="DESCENDS_FROM"]')
+      .filter(e => e.source().id() === centralNode.id() && e.target().visible())
+      .addClass('move-on');
+  }
   if (centralNode.data('type') !== 'TextNode' || centralNode.data('gateway')) return;
   const fwd = centralNode.connectedEdges('edge[type="CHILD"]').filter(e =>
     e.source().id() === centralNode.id() &&
