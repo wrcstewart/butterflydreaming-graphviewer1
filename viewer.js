@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-14g' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-14h' };
 
 let bdViewTitleText = '';
 
@@ -5814,14 +5814,14 @@ function retraceHintFor(centralNode) {
 //
 //   Conversations — out to the six family circles and Gateways, "to invite
 //     the user to move on".
-//   Music — out to Drone, Fractal and Scores; the theme clusters point IN,
-//     "indicating the most common route is from them towards the Music node".
-//     Arts is Music's parent, the way in, so it stays plain.
+//   Music — out to Drone, Fractal and Scores; every other neighbour points
+//     IN, "indicating the most common route is from them towards the Music
+//     node" — Arts (its parent) included, at the author's word.
 // Neighbour names are the nodes' `name`, not their display_name (which can
 // carry line breaks).
 const JOURNEY_ARROWS = {
   Conversations: { away: '*' },
-  Music:         { away: ['Drone', 'Fractal', 'Scores'], toward: '*', except: ['Arts'] },
+  Music:         { away: ['Drone', 'Fractal', 'Scores'], toward: '*' },
 };
 
 function applySeqSignals(cy, centralNode, suppress) {
