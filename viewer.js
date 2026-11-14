@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-14a' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-14b' };
 
 let bdViewTitleText = '';
 
@@ -4740,6 +4740,13 @@ function inkModeOverrides() {
 // sharp when the graph is zoomed in.
 // `ink`: on ?ink=1 the root's body is transparent on a dark ground, so the
 // strokes go gold there instead of dark.
+//
+// 2026-11-14 (later) — the butterfly is now DRAWN LIVE (startRootButterfly,
+// below), and this still image is only the fallback for a device that asks
+// for reduced motion (prefers-reduced-motion). buildStyle uses it only then.
+const ROOT_BUTTERFLY_STILL = (() => {
+  try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
+})();
 let _rootButterflyUri = null;
 function rootButterflyUri() {
   if (_rootButterflyUri) return _rootButterflyUri;
@@ -4765,6 +4772,100 @@ function rootButterflyUri() {
     `<path d="M${pts.join('L')}" fill="none" stroke="${stroke}" stroke-opacity="0.38" stroke-width="0.27" stroke-linejoin="round"/></svg>`;
   _rootButterflyUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   return _rootButterflyUri;
+}
+
+// ── THE ROOT'S BUTTERFLY, DRAWN LIVE (2026-11-14) ───────────────────────────
+// The same curve as rootButterflyUri, but the integration never stops: each
+// frame advances STEPS_PER_FRAME steps and redraws the newest TRAIL points, so
+// the path keeps being drawn and the oldest of it fades out.
+//   Where: a canvas of its own (#root-butterfly), fixed, BEHIND #cy
+//   (z-index 0 under #cy's 1; cytoscape's canvases are transparent), so the
+//   root's label draws OVER it. pointer-events none: taps go to the graph.
+//   Following the node: every frame it is re-placed on the root's rendered
+//   position and size, so pan, zoom, layout animation and drag all carry it.
+//   It hides when there is no root, the root is hidden, or #cy is.
+//   Why not the node's background image: a new image every frame would have
+//   to LOAD before cytoscape draws it, and blank while it loads — a flicker.
+//   Fade: the trail is stroked in BANDS chunks, oldest faintest (alpha rising
+//   linearly to ALPHA_MAX on the newest), with no head marker.
+// Lorenz's σ 10, ρ 28, β 8/3, from (1, 1, 1), RK4, dt 0.005 — as the
+// Workbench. Projection: x across, z up (the classic xz view).
+function startRootButterfly(cy) {
+  if (ROOT_BUTTERFLY_STILL) return;
+  if (document.getElementById('root-butterfly')) return;   // once per page
+  const S = 10, R = 28, B = 8 / 3, DT = 0.005, SKIP = 2000;   // t = 10: well onto the attractor
+  const STEPS_PER_FRAME = 5;     // ~1.5 Lorenz time units a second at 60 fps
+  const TRAIL = 4000;            // points shown: ~20 time units, ~13 s of drawing
+  const BANDS = 24, ALPHA_MAX = 0.6;
+  const FILL = 0.8;              // the figure's ~52 units fill 80% of the node
+  const colour = INK_MODE ? '255, 215, 0' : '0, 0, 0';
+  const f = (x, y, z) => [S * (y - x), x * (R - z) - y, x * y - B * z];
+  let x = 1, y = 1, z = 1;
+  const step = () => {
+    const [a1, b1, c1] = f(x, y, z);
+    const [a2, b2, c2] = f(x + a1 * DT / 2, y + b1 * DT / 2, z + c1 * DT / 2);
+    const [a3, b3, c3] = f(x + a2 * DT / 2, y + b2 * DT / 2, z + c2 * DT / 2);
+    const [a4, b4, c4] = f(x + a3 * DT, y + b3 * DT, z + c3 * DT);
+    x += DT / 6 * (a1 + 2 * a2 + 2 * a3 + a4);
+    y += DT / 6 * (b1 + 2 * b2 + 2 * b3 + b4);
+    z += DT / 6 * (c1 + 2 * c2 + 2 * c3 + c4);
+  };
+  for (let n = 0; n < SKIP; n++) step();
+  // Ring buffer of projected points (x, z), newest at `head - 1`.
+  const px = new Float32Array(TRAIL), pz = new Float32Array(TRAIL);
+  let head = 0, filled = 0;
+  const push = () => { px[head] = x; pz[head] = z; head = (head + 1) % TRAIL; if (filled < TRAIL) filled++; };
+  // Start with the whole trail already drawn, so the butterfly is there on
+  // the first frame and then carries on.
+  for (let n = 0; n < TRAIL; n++) { step(); push(); }
+
+  const canvas = document.createElement('canvas');
+  canvas.id = 'root-butterfly';
+  canvas.style.cssText = 'position:fixed;z-index:0;pointer-events:none;left:0;top:0;width:0;height:0;';
+  const cyEl = cy.container();
+  cyEl.parentNode.insertBefore(canvas, cyEl);
+  const ctx = canvas.getContext('2d');
+
+  const frame = () => {
+    requestAnimationFrame(frame);
+    for (let n = 0; n < STEPS_PER_FRAME; n++) { step(); push(); }
+    const root = cy.nodes('[type="root"]').first();
+    const rect = cyEl.getBoundingClientRect();
+    if (!root.length || !root.visible() || rect.width === 0 || cyEl.classList.contains('hidden')) {
+      if (canvas.style.display !== 'none') canvas.style.display = 'none';
+      return;
+    }
+    const d = root.renderedWidth();                  // CSS px across the node
+    const p = root.renderedPosition();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const side = Math.max(1, Math.round(d * dpr));
+    if (canvas.width !== side) { canvas.width = side; canvas.height = side; }
+    canvas.style.display = '';
+    canvas.style.width = d + 'px'; canvas.style.height = d + 'px';
+    canvas.style.left = (rect.left + p.x - d / 2) + 'px';
+    canvas.style.top  = (rect.top  + p.y - d / 2) + 'px';
+    canvas.style.opacity = String(root.effectiveOpacity());
+    ctx.clearRect(0, 0, side, side);
+    const k = side * FILL / 52;                       // canvas px per Lorenz unit
+    const cx = side / 2, cz = side / 2 + 25 * k;      // figure centred on (x 0, z 25)
+    ctx.lineWidth = Math.max(0.6, 0.27 * k);
+    ctx.lineJoin = 'round';
+    const start = (head - filled + TRAIL) % TRAIL;
+    const per = Math.ceil(filled / BANDS);
+    for (let b = 0; b < BANDS; b++) {
+      const i0 = b * per, i1 = Math.min(filled - 1, (b + 1) * per);  // bands share an end point, so no gaps
+      if (i0 >= i1) break;
+      ctx.strokeStyle = `rgba(${colour}, ${(ALPHA_MAX * (b + 1) / BANDS).toFixed(3)})`;
+      ctx.beginPath();
+      for (let i = i0; i <= i1; i++) {
+        const j = (start + i) % TRAIL;
+        const X = cx + px[j] * k, Y = cz - pz[j] * k;
+        if (i === i0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+      }
+      ctx.stroke();
+    }
+  };
+  requestAnimationFrame(frame);
 }
 
 function buildStyle() {
@@ -4823,8 +4924,8 @@ function buildStyle() {
         // background-width/-height (measured: 80% there changed nothing), so
         // the margin that keeps the wing tips off the circle's edge is in the
         // SVG's own viewBox instead.
-        'background-image': rootButterflyUri(),
-        'background-fit': 'contain',
+        // Only for reduced motion; otherwise startRootButterfly draws it live.
+        ...(ROOT_BUTTERFLY_STILL ? { 'background-image': rootButterflyUri(), 'background-fit': 'contain' } : {}),
         'background-image-opacity': 1,
       }
     },
@@ -12307,6 +12408,7 @@ async function init() {
   // Debug hook: viewer.js loads as a module so `cy` isn't automatically on
   // window. Expose the main cy instance for browser-console diagnostics.
   window.cy = cy;
+  startRootButterfly(cy);   // the live Lorenz butterfly behind the root node
 
   computeBlendedColours(cy);
   cy.elements().hide();
