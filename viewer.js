@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-14e' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-14f' };
 
 let bdViewTitleText = '';
 
@@ -5751,7 +5751,50 @@ function buildStyle() {
 // node's hops. `centralNode` is runLayout's parentNode (what expandToNode
 // passes = the tapped node). Cleared first so a prior view's mark doesn't
 // linger. No-op unless the central node is a content TextNode (not a gateway).
+// ── THE RETRACE REMINDER (2026-11-14) ─────────────────────────────────────
+// Author: at Conversations, "a little reminder to appear about 10 seconds
+// after arriving there ... in the buttons bar to the right of the Local
+// button": #retrace-hint, "◀ Hint: Press here to retrace your steps."
+//   Called from applySeqSignals with every view's centre. Only a CHANGE of
+//   centre counts as arriving, because a re-layout of the same view also
+//   passes through there and must not restart the ten seconds.
+//   Leaving Conversations cancels a pending reminder and hides a shown one.
+//   Once Local has been pressed (retraceHintUsed, set in its click handler)
+//   the reader has found it, and the reminder is not shown again this visit
+//   to the page.
+//   It shows only if Local itself is on screen (.visible) — a hint pointing
+//   at a button that is not there would be worse than none.
+const RETRACE_HINT_DELAY_MS = 10000;
+let retraceHintTimer = null, retraceHintCentre = null, retraceHintUsed = false;
+function retraceHintHide() {
+  clearTimeout(retraceHintTimer); retraceHintTimer = null;
+  const el = document.getElementById('retrace-hint');
+  if (el) el.hidden = true;
+}
+function retraceHintFor(centralNode) {
+  const id = (centralNode && centralNode.length) ? centralNode.id() : null;
+  if (id === retraceHintCentre) return;
+  retraceHintCentre = id;
+  retraceHintHide();
+  const isConversations = !!id && centralNode.data('type') === 'Entry' &&
+                          centralNode.data('name') === 'Conversations';
+  if (!isConversations || retraceHintUsed) return;
+  retraceHintTimer = setTimeout(() => {
+    retraceHintTimer = null;
+    const el = document.getElementById('retrace-hint');
+    const local = document.getElementById('back-btn');
+    if (!el || retraceHintUsed || retraceHintCentre !== id) return;
+    if (!local || !local.classList.contains('visible')) {
+      console.log('[retrace-hint] not shown: the Local button is not on screen');
+      return;
+    }
+    el.hidden = false;
+    console.log('[retrace-hint] shown at Conversations');
+  }, RETRACE_HINT_DELAY_MS);
+}
+
 function applySeqSignals(cy, centralNode, suppress) {
+  retraceHintFor(suppress ? null : centralNode);
   cy.edges('.route-taken').removeClass('route-taken');
   cy.edges('.move-on').removeClass('move-on');
   cy.edges('.seq-edge').removeClass('seq-edge');
@@ -10097,7 +10140,11 @@ function setupInteractions(cy, wsRef, addBadge, youCy, buddyCy, pairingState) {
   // (jumpToNode in handleReturnFromStandalone), so there is a trail to walk and
   // no special case is needed here. Root's opening is attached to Root, in
   // restoreState, rather than to this button.
-  backBtn.addEventListener('click', () => { restoreState(); });
+  backBtn.addEventListener('click', () => {
+    // Local found: the retrace reminder has done its job (retraceHintFor).
+    retraceHintUsed = true; retraceHintHide();
+    restoreState();
+  });
 
   // Expand
 

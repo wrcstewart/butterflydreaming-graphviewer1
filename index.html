@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ButterflyDreaming — Graph Viewer</title>
-  <link rel="stylesheet" href="/style.css?v=2026-11-14e">
+  <link rel="stylesheet" href="/style.css?v=2026-11-14f">
 </head>
 <body>
   <!-- Small-viewport landscape overlay. Displayed via CSS media query on
@@ -258,6 +258,10 @@
        positionPnBtn and its live-rect measurement along with it. -->
   <div id="bd-toppanel">
     <button id="back-btn">←</button>
+    <!-- 2026-11-14 — a reminder that Local retraces your steps, shown ten
+         seconds after arriving at Conversations. Right of Local, arrow
+         pointing at it. Driven by retraceHintFor() in viewer.js. -->
+    <span id="retrace-hint" hidden><span class="rh-arrow">◀</span> Hint: Press here to retrace your steps.</span>
     <!-- 2026-08-27 — the partner's position as a CORNER CONTROL (corner_controls_plan.md
          step 4), replacing the blue-haloed graph node parked bottom-right. A cytoscape
          node has one position and so could never be both in the graph and in a corner;
@@ -483,6 +487,6 @@
   <!-- JSP wire table — authored here, copied to the standalones by
        sync_module_tables.sh. Must load before viewer.js. -->
   <script src="/module_wire_tables.js"></script>
-  <script type="module" src="/viewer.js?v=2026-11-14e"></script>
+  <script type="module" src="/viewer.js?v=2026-11-14f"></script>
 </body>
 </html>
