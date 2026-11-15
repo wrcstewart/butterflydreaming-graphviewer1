@@ -1,0 +1,1189 @@
+<!-- ButterflyDreaming Visual Module — V_Lorenz/visual_module.html — bd_V_LorenzV1 -->
+<!--
+  Lorenz's 1963 attractor in three dimensions, as a BD module (2026-11-15).
+
+  Assembled from three sources, and each part says where it came from:
+    · The stylesheet, the %%bd_ parser, setDirectiveValue and the stepper
+      machinery are V_ShanShui's (themselves V_Kolam3D's, comments removed —
+      read them there). Same column, same square, so BD's measurements hold.
+    · The scene (equations, trace, projections, guides) is the script of
+      `Lorenz Workbench.html` with its DOM wiring removed. The Workbench stays
+      the place to explore; Lorenz_Notes.md is the design record for both.
+    · The last script — the glue — is cut down from V_ShanShui's.
+  A plain three.js scene with no post-processing, so it is a good first
+  candidate for WebXR (the author, 2026-11-15).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyDreaming — Lorenz</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      height: 100%;
+      overflow: hidden;                  
+    }
+    body.transparent-bg { background: transparent !important; }
+    body {
+      background: #0a0a0f;
+      color: #e8e8e0;
+      font-family: Georgia, 'Times New Roman', serif;
+      display: flex;
+      flex-direction: column;
+      gap: 0;                            
+      padding: 0;                        
+      box-sizing: border-box;
+    }
+    #status {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      z-index: 10;
+      font-size: 0.7rem;
+      font-style: italic;
+      color: #9e9e90;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      background: rgba(10, 10, 15, 0.6);
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+    .controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    button {
+      background: #0f0f18;
+      border: 1px solid #4a9b8e;
+      color: #4a9b8e;
+      cursor: pointer;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      padding: 0.45rem 1.1rem;
+      text-transform: uppercase;
+    }
+    button:hover {
+      background: #1a2a28;
+    }
+    button:active {
+      background: #243f3b;
+    }
+    .module-layout {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      gap: 0;
+      min-height: 0;
+      min-width: 0;
+    }
+    .canvas-wrapper {
+      flex: 1 1 auto;                    
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding-right: 44px;
+      padding-bottom: 52px;
+    }
+    @media (max-width: 500px) {
+      .module-layout { padding-left: 88px; }
+      .canvas-wrapper { justify-content: center; align-items: flex-end; padding-bottom: 52px;
+                        padding-right: 0; }   
+      .canvas-wrapper canvas { transform: translateX(calc(-15% - 20px)); }
+      .control-panel {
+        flex: 0 0 140px !important;
+        margin-right: -32px;
+        background-color: var(--panel-amber) !important;
+      }
+      .control-row { width: 100px; }
+    }
+    .strip-title {
+      flex: 0 0 auto;
+      width: 100%;
+      padding: 0 2px 3px;
+      margin-bottom: 3px;
+      border-bottom: 1px solid rgba(74, 155, 142, 0.35);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      color: #cbbf8a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .control-panel {
+      max-height: var(--bd-col-max, none);
+      flex: 0 0 162px;
+      position: relative;
+      right: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;             
+      gap: 2px;                            
+      --panel-amber: rgba(75, 54, 0, 0.9);
+      background-color: var(--panel-amber);
+      background-image:
+        linear-gradient(var(--panel-amber) 35%, rgba(75, 54, 0, 0)),
+        linear-gradient(rgba(75, 54, 0, 0), var(--panel-amber) 65%),
+        radial-gradient(farthest-side at 50% 0,    rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)),
+        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)),
+        linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16));
+      background-position: 50% 0, 50% 100%, 50% 0, 50% 100%, right 28px top;
+      background-repeat: no-repeat;
+      background-size: 100% 22px, 100% 22px, 100% 9px, 100% 9px, 1px 100%;
+      background-attachment: local, local, scroll, scroll, scroll;
+      border: 1px solid rgba(74, 155, 142, 0.2);
+      padding: 6px 4px 6px 7px;
+      border-radius: 0.4rem;
+      min-height: 0;
+      min-width: 0;
+      overflow-y: scroll;
+      scrollbar-color: rgba(255, 255, 255, 0.45) rgba(0, 0, 0, 0.30);
+    }
+    .control-panel::before {
+      content: 'scroll';
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      align-self: flex-end;
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.55);
+      pointer-events: none;
+    }
+    .control-panel > * {
+      max-width: 100%;
+      min-width: 0;
+    }
+    .control-panel::-webkit-scrollbar { width: 12px; }
+    .control-panel::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.30);
+      border-radius: 6px;
+    }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.45);
+      border-radius: 6px;
+      min-height: 32px;
+    }
+    .control-panel::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.70); }
+    body.sharing-lane .control-panel { border: 1px solid #fff; }
+    .control-row[hidden] { display: none !important; }
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;                            
+      flex: 0 0 auto;
+      width: 102px;
+      margin-bottom: 3px;                  
+    }
+    .control-row label {
+      font-size: 0.7rem;
+      letter-spacing: 0.02em;
+      color: #4a9b8e;
+      text-align: center;
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;      
+    }
+    .stepper {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 2px;                            
+    }
+    .step-btn {
+      background: #0f0f18;
+      border: 1px solid #2980b9;
+      color: #2980b9;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1.25rem;                      
+      padding: 0;
+      width: 34px;                             
+      height: 34px;                            
+      line-height: 1;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      border-radius: 3px;
+      flex: 0 0 auto;
+      touch-action: manipulation;              
+      user-select: none;
+      -webkit-user-select: none;               
+      -webkit-touch-callout: none;             
+      -webkit-tap-highlight-color: transparent;
+    }
+    .step-btn:hover  { background: #1a2a28; }
+    .step-btn:active { background: #243f3b; }
+    .step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .stepper-value--wide { font-size: 0.56rem; letter-spacing: -0.02em; }
+    .stepper-value {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.7rem;                       
+      color: #e8e8e0;
+      background: #0f0f18;
+      border: 1px solid #2a2a3a;
+      padding: 1px;                            
+      border-radius: 3px;
+      min-width: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .stepper-source {
+      display: none;
+    }
+    body.controls-hidden .control-panel { display: none; }
+    body.controls-hidden .canvas-wrapper { flex: 1 1 auto; }
+    body.no-host-chrome .canvas-wrapper canvas { transform: none; }
+    body.no-host-chrome .module-layout  { padding-left: 0; padding-right: 0; }
+    body.no-host-chrome .canvas-wrapper {
+      justify-content: center;
+      align-items: center;
+      padding-bottom: 0;
+      padding-right: 0;
+    }
+    .control-panel select {
+      width: 100%;
+      background: #0f0f18;
+      color: #e8e8e0;
+      border: 1px solid #2a2a3a;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.9rem;          
+      padding: 4px;
+      accent-color: #4a9b8e;
+      outline: none;
+    }
+    .control-panel select:focus {
+      border-color: #4a9b8e;
+    }
+    canvas {
+      border: 1px solid #4a9b8e;
+      border-opacity: 0.3;
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1 / 1;
+    }
+    #waiting {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      text-align: center;
+      font-style: italic;
+      font-size: 1.05rem;
+      color: #9e9e90;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #waiting[hidden] { display: none !important; }
+    #waiting.fatal { color: #e0b0b0; font-style: normal; pointer-events: auto; }
+    .canvas-wrapper { position: relative; }
+    #waiting { white-space: pre-line; }
+    body.output-only #status { display: none; }
+    body.output-only { overflow: hidden; }
+
+    /* ── bd_V_LorenzV1 additions ──────────────────────────────────────────
+       Everything above is V_Kolam3D's stylesheet with its comments removed,
+       by way of V_ShanShui, so this module presents the same column and
+       square that BD measures for Kolam. The stepper buttons' colour is THIS
+       module's canary: red -> green -> blue on every change to this file, with
+       LZ_BUILD in the script. */
+    :root {
+      --scene: #0e1211;   /* the space the trace is drawn in (the Workbench's) */
+      --trace: #d9ddd4;   /* the trace: plain for now, colour control is open */
+      --proj:  #8c968f;   /* the projections: dimmer, so they differ in brightness, not hue */
+    }
+    body.output-only canvas { border: 0; }
+    /* 16px: below that, iOS zooms the page when the list is opened. */
+    .control-row select { font-size: 16px; padding: 2px; }
+  </style>
+</head>
+<body>
+  <div id="status"></div>
+  <div class="module-layout">
+    <div class="canvas-wrapper">
+      <!-- data-bd-square: how BD finds the picture to place its arrows and
+           Extension strip round (Kolam's is found by its id). -->
+      <canvas id="lorenz-canvas" data-bd-square></canvas>
+      <div id="waiting">Waiting for script…</div>
+    </div>
+    <div class="control-panel">
+      <div class="strip-title">bd_V_LorenzV1</div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+    // Installed FIRST, before anything that can throw, so a failure is reported.
+    const postToParent = (message) => { window.parent.postMessage(message, '*'); };
+    (function forwardModuleConsole() {
+      const send = (level, args) => {
+        try {
+          const line = Array.prototype.map.call(args, (a) => {
+            if (typeof a === 'string') return a;
+            if (a instanceof Error) return a.message + (a.stack ? ' | ' + a.stack.split('\n')[1] : '');
+            try { return JSON.stringify(a); } catch (_) { return String(a); }
+          }).join(' ');
+          postToParent({ type: 'bd_module_log', level: level, line: line.slice(0, 600) });
+        } catch (_) {}
+      };
+      ['log', 'warn', 'error'].forEach((level) => {
+        const original = console[level].bind(console);
+        console[level] = function () { send(level, arguments); original.apply(console, arguments); };
+      });
+      window.addEventListener('error', (e) => {
+        send('error', ['uncaught: ' + (e && e.message) + ' @ ' + (e && e.lineno)]);
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        send('error', ['unhandled rejection: ' + (e && e.reason && (e.reason.message || e.reason))]);
+      });
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script>const HAVE_THREE = (typeof THREE !== 'undefined');</script>
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// THE SCENE — Lorenz's 1963 attractor. Taken from `Lorenz Workbench.html`
+// (2026-11-15) with its DOM wiring removed: no sliders, no OrbitControls, no
+// readout. The glue script below owns all of that. A change to how the trace
+// is drawn should be made in the Workbench too (see Lorenz_Notes.md).
+// ════════════════════════════════════════════════════════════════════════════
+const DEG = Math.PI / 180;
+
+// ── State: one object; the glue's CONTROLS table reads and writes it ────────
+const state = {
+  x0: 1, y0: 1, z0: 1,
+  sigma: 10, rho: 28, beta: 8 / 3,
+  dt: 0.005, spf: 6, trail: 20000, opacity: 1,
+  az: 40, el: 15, dist: 95, spin: 0,
+  axes: 1, projection: 'none',
+};
+// β is shown as 8/3 and integrated as EXACTLY 8/3 while the script says 2.667
+// (the Workbench's rule): a stored 2.667 is a rounding of 8/3, not a choice.
+const betaUsed = () => Math.abs(state.beta - 8 / 3) < 0.001 ? 8 / 3 : state.beta;
+
+// ── THE EQUATIONS, integrated by 4th-order Runge–Kutta ──────────────────────
+// dx/dt = σ(y − x),  dy/dt = x(ρ − z) − y,  dz/dt = xy − βz.
+// RK4 rather than Euler: on a chaotic system Euler's drift is not just error,
+// it is a different trajectory.
+let B = 8 / 3;
+function deriv(x, y, z, out) {
+  out[0] = state.sigma * (y - x);
+  out[1] = x * (state.rho - z) - y;
+  out[2] = x * y - B * z;
+}
+const k1 = [0, 0, 0], k2 = [0, 0, 0], k3 = [0, 0, 0], k4 = [0, 0, 0];
+function rk4(p, h) {
+  const [x, y, z] = p;
+  deriv(x, y, z, k1);
+  deriv(x + h / 2 * k1[0], y + h / 2 * k1[1], z + h / 2 * k1[2], k2);
+  deriv(x + h / 2 * k2[0], y + h / 2 * k2[1], z + h / 2 * k2[2], k3);
+  deriv(x + h * k3[0], y + h * k3[1], z + h * k3[2], k4);
+  p[0] = x + h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+  p[1] = y + h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+  p[2] = z + h / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+}
+
+// ── Scene ───────────────────────────────────────────────────────────────────
+// Lorenz's z is drawn UP: equation (x, y, z) is three.js (x, z, −y), because
+// three.js keeps y for up. The view centres on z = 25, the middle of the wings.
+const CENTRE = new THREE.Vector3(0, 25, 0);
+const toWorld = (x, y, z, arr, i) => { arr[i] = x; arr[i + 1] = z; arr[i + 2] = -y; };
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const canvas = document.getElementById('lorenz-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(cssVar('--scene'));
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+
+// The trace: one buffer allocated for the LONGEST trail, drawn up to `count`.
+const MAX_POINTS = 60000;
+const positions = new Float32Array(MAX_POINTS * 3);
+const traceGeo = new THREE.BufferGeometry();
+traceGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+traceGeo.setDrawRange(0, 0);
+// transparent + depthWrite off: every overlapping pass blends, so the places
+// the orbit visits often show brighter.
+const traceMat = new THREE.LineBasicMaterial({ color: new THREE.Color(cssVar('--trace')),
+  transparent: true, opacity: 1, depthWrite: false });
+const trace = new THREE.Line(traceGeo, traceMat);
+trace.frustumCulled = false;            // the bounding sphere is never recomputed as it grows
+scene.add(trace);
+
+const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), headMat);
+scene.add(head);
+
+// PROJECTIONS share the trace's geometry, squashed flat along one world axis.
+//   xy — onto Lorenz's z = 0, the floor (world y = 0).
+//   xz — the CLASSIC butterfly, on a back wall at Lorenz y = +XZ_WALL.
+const XZ_WALL = 35;
+const projColor = new THREE.Color(cssVar('--proj'));
+const projMats = [];      // every projection material follows opacity, scaled by k
+function makeProjection(axis, at) {     // axis: the world axis flattened; at: where its plane sits
+  const lineMat = new THREE.LineBasicMaterial({ color: projColor, transparent: true, opacity: 1, depthWrite: false });
+  const dotMat  = new THREE.MeshBasicMaterial({ color: projColor, transparent: true, opacity: 1, depthWrite: false });
+  const dropMat = new THREE.LineBasicMaterial({ color: projColor, transparent: true, opacity: 0.5 });
+  projMats.push({ m: lineMat, k: 1 }, { m: dotMat, k: 1 }, { m: dropMat, k: 0.5 });
+  const group = new THREE.Group();
+  const line = new THREE.Line(traceGeo, lineMat);
+  line.scale[axis] = 0; line.position[axis] = at; line.frustumCulled = false;
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), dotMat);
+  const dropGeo = new THREE.BufferGeometry();
+  dropGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+  const drop = new THREE.Line(dropGeo, dropMat); drop.frustumCulled = false;
+  group.add(line, dot, drop);
+  group.visible = false;
+  scene.add(group);
+  return {
+    group,
+    follow(px, py, pz) {
+      dot.position.set(px, py, pz); dot.position[axis] = at;
+      const d = dropGeo.attributes.position.array;
+      d[0] = px; d[1] = py; d[2] = pz;
+      d[3] = dot.position.x; d[4] = dot.position.y; d[5] = dot.position.z;
+      dropGeo.attributes.position.needsUpdate = true;
+    },
+  };
+}
+const projections = { xy: makeProjection('y', 0), xz: makeProjection('z', -XZ_WALL) };
+function applyProjection() {
+  projections.xy.group.visible = state.projection === 'xy' || state.projection === 'both';
+  projections.xz.group.visible = state.projection === 'xz' || state.projection === 'both';
+}
+function applyOpacity() {
+  traceMat.opacity = headMat.opacity = state.opacity;
+  for (const m of projMats) m.m.opacity = m.k * state.opacity;
+}
+
+// Axes through the origin, and the fixed points C± = (±√(β(ρ−1)), ±√(β(ρ−1)), ρ−1).
+const guides = new THREE.Group();
+scene.add(guides);
+const guideMat = new THREE.LineBasicMaterial({ color: 0x55605a });
+const fixedMat = new THREE.MeshBasicMaterial({ color: 0xa8322a });
+const fixedGeo = new THREE.SphereGeometry(0.6, 12, 8);
+function buildGuides() {
+  for (const o of guides.children) if (o.geometry && o.geometry !== fixedGeo) o.geometry.dispose();
+  guides.clear();
+  const axis = (a, b) => {
+    const g = new THREE.BufferGeometry();
+    const arr = new Float32Array(6);
+    toWorld(...a, arr, 0); toWorld(...b, arr, 3);
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    guides.add(new THREE.Line(g, guideMat));
+  };
+  axis([-30, 0, 0], [30, 0, 0]);
+  axis([0, -30, 0], [0, 30, 0]);
+  axis([0, 0, 0], [0, 0, 55]);
+  if (state.rho > 1) {
+    const c = Math.sqrt(B * (state.rho - 1));
+    for (const s of [1, -1]) {
+      const m = new THREE.Mesh(fixedGeo, fixedMat);
+      const arr = [0, 0, 0]; toWorld(s * c, s * c, state.rho - 1, arr, 0);
+      m.position.set(arr[0], arr[1], arr[2]);
+      guides.add(m);
+    }
+  }
+  guides.visible = !!state.axes;
+}
+
+// ── The trajectory ──────────────────────────────────────────────────────────
+const p = [0, 0, 0];
+let count = 0, t = 0, ranAway = false;
+function restart() {
+  B = betaUsed();
+  p[0] = state.x0; p[1] = state.y0; p[2] = state.z0;
+  count = 0; t = 0; ranAway = false;
+  push();
+  buildGuides();
+}
+function push() {
+  if (count >= state.trail) {
+    const drop = count - state.trail + 1;          // drop the oldest (copyWithin is a memmove)
+    positions.copyWithin(0, drop * 3, count * 3);
+    count -= drop;
+  }
+  toWorld(p[0], p[1], p[2], positions, count * 3);
+  count++;
+}
+function trimTrail() {                              // the trail was shortened: drop the excess now
+  if (count > state.trail) {
+    const drop = count - state.trail;
+    positions.copyWithin(0, drop * 3, count * 3);
+    count -= drop;
+  }
+}
+// Returns false if the trace ran away (extreme constants with a large step),
+// which would otherwise fill the buffer with Infinity and NaN.
+function step(n) {
+  for (let i = 0; i < n; i++) {
+    rk4(p, state.dt);
+    t += state.dt;
+    if (!isFinite(p[0] + p[1] + p[2]) || Math.abs(p[0]) + Math.abs(p[1]) + Math.abs(p[2]) > 1e5) {
+      ranAway = true;
+      return false;
+    }
+    push();
+  }
+  return true;
+}
+// Draw what is in the buffer: the trace, the head, the projections' dots.
+function syncTrace() {
+  traceGeo.attributes.position.needsUpdate = true;
+  traceGeo.setDrawRange(0, count);
+  if (count < 1) return;
+  const i = (count - 1) * 3;
+  head.position.set(positions[i], positions[i + 1], positions[i + 2]);
+  for (const k in projections) if (projections[k].group.visible) projections[k].follow(positions[i], positions[i + 1], positions[i + 2]);
+}
+
+// ── The camera: an orbit round the centre, set by three numbers ─────────────
+function placeCamera() {
+  const az = state.az * DEG, el = state.el * DEG;
+  camera.position.set(
+    CENTRE.x + state.dist * Math.cos(el) * Math.sin(az),
+    CENTRE.y + state.dist * Math.sin(el),
+    CENTRE.z + state.dist * Math.cos(el) * Math.cos(az));
+  camera.lookAt(CENTRE);
+}
+</script>
+  <script>
+    'use strict';
+    // ════════════════════════════════════════════════════════════════════════
+    // bd_V_LorenzV1 — THE GLUE between BD's %%bd_ script and the attractor.
+    // The attractor itself is the script above this one. Everything here is
+    // what makes it a BD module: the stepper column, reading and writing the
+    // script, the animation loop, and the messages to and from BD. Copied from
+    // V_ShanShui's glue (2026-11-15) and cut down to what this scene needs.
+    // ════════════════════════════════════════════════════════════════════════
+
+    // Bump on every change to this file, with the stepper-button colour in the
+    // stylesheet (the module's canary): red → green → blue.
+    const LZ_BUILD = '2026-11-15a';
+
+    // ── THE CONTROLS — ONE TABLE ────────────────────────────────────────────
+    // Each entry: the directive name (as written after %%bd_ / %%bd_p_), the
+    // key in the scene's `state`, its range and step, its default, and how it
+    // is shown. The stepper rows, the script reader and the script writer are
+    // ALL built from this table, so a range is written once.
+    //   restart: true — changing it starts the trace again from (x0, y0, z0).
+    //   wrap:    true — stepping past the top comes round to the bottom.
+    //   dp             — decimals written to the script, where the step's own
+    //                    are not enough (β's 8/3 is written 2.667).
+    //   choices        — a word, picked from a list, not a number.
+    // Ranges are the Workbench's slider ranges, except speed (steps per frame),
+    // which starts at 0: 0 is the pause, so there is no Pause button.
+    // ORDER is the column's order: the equations' constants first, then the
+    // starting point, then how it is drawn, then where it is seen from.
+    const CONTROLS = [
+      { name: 'sigma',      key: 'sigma',      min: 0.5,   max: 30,    step: 0.5,   def: 10,    restart: true },
+      { name: 'rho',        key: 'rho',        min: 0.5,   max: 100,   step: 0.5,   def: 28,    restart: true },
+      { name: 'beta',       key: 'beta',       min: 0.1,   max: 8,     step: 0.05,  def: 2.667, restart: true, dp: 3, show: 'beta' },
+      { name: 'x0',         key: 'x0',         min: -30,   max: 30,    step: 0.01,  def: 1,     restart: true },
+      { name: 'y0',         key: 'y0',         min: -30,   max: 30,    step: 0.01,  def: 1,     restart: true },
+      { name: 'z0',         key: 'z0',         min: -10,   max: 50,    step: 0.01,  def: 1,     restart: true },
+      { name: 'speed',      key: 'spf',        min: 0,     max: 30,    step: 1,     def: 6 },
+      { name: 'trail',      key: 'trail',      min: 500,   max: 60000, step: 500,   def: 20000, show: 'k' },
+      { name: 'opacity',    key: 'opacity',    min: 0.02,  max: 1,     step: 0.02,  def: 1 },
+      { name: 'projection', key: 'projection', choices: ['none', 'xy', 'xz', 'both'], def: 'none' },
+      { name: 'azimuth',    key: 'az',         min: 0,     max: 359,   step: 1,     def: 40,    wrap: true },
+      { name: 'elevation',  key: 'el',         min: -89,   max: 89,    step: 1,     def: 15 },
+      { name: 'distance',   key: 'dist',       min: 20,    max: 250,   step: 1,     def: 95 },
+      { name: 'spin',       key: 'spin',       min: -30,   max: 30,    step: 1,     def: 0 },
+      // Fixed by the script (no %%bd_p_ in the stored node): no row shows.
+      { name: 'time_step',  key: 'dt',         min: 0.001, max: 0.02,  step: 0.001, def: 0.005 },
+      { name: 'axes',       key: 'axes',       min: 0,     max: 1,     step: 1,     def: 1 },
+    ];
+    // The hidden input behind each row. `-slider` / `-select` because that is
+    // the id BD's bd_param_update handler looks for (kebab-case + suffix).
+    const inputIdOf = (c) => c.name.replace(/_/g, '-') + (c.choices ? '-select' : '-slider');
+    // Decimal places a value is written with: the step's own (0.05 → 2).
+    const decimalsOf = (c) => { const s = String(c.step); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
+
+    // ── Build the stepper column from the table ─────────────────────────────
+    // The convention every BD media module uses: − value + on top, the
+    // directive's own name underneath. Rows are built BEFORE the stepper
+    // machinery below runs, because it attaches to every .step-btn it finds.
+    const controlPanel = document.querySelector('.control-panel');
+    for (const c of CONTROLS) {
+      const row = document.createElement('div');
+      row.className = 'control-row';
+      row.dataset.name = c.name;
+      const id = inputIdOf(c);
+      if (c.choices) {
+        row.innerHTML =
+          `<select id="${id}">` + c.choices.map(w => `<option value="${w}">${w}</option>`).join('') + `</select>` +
+          `<label for="${id}">${c.name}</label>`;
+      } else {
+        row.innerHTML =
+          `<div class="stepper">` +
+            `<button class="step-btn" type="button" data-target="${id}" data-delta="-1">−</button>` +
+            `<span class="stepper-value" data-target="${id}"></span>` +
+            `<button class="step-btn" type="button" data-target="${id}" data-delta="1">+</button>` +
+          `</div>` +
+          `<label>${c.name}</label>` +
+          `<input id="${id}" class="stepper-source" type="number" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.def}"` +
+          (c.wrap ? ' data-wrap="1"' : '') + `>`;
+      }
+      controlPanel.appendChild(row);
+      c.input = row.querySelector('#' + id);
+    }
+
+    // ── %%bd_ parser — V_Kolam3D's. %%bd_p_<name> marks a directive as
+    // wanting a control; the mark is stripped and remembered in __marked.
+    const BD_MARK = 'p_';
+    function parseBD(text) {
+      const directives = {};
+      const marked = new Set();
+      const lines = text.split('\n');
+      let state = 'text';
+      let currentDirective = null;
+      let currentLines = [];
+      for (const line of lines) {
+        if (state === 'text') {
+          if (line.startsWith('%%bd_')) {
+            const spaceIdx = line.indexOf(' ');
+            if (spaceIdx === -1) continue;
+            let name = line.slice(5, spaceIdx);
+            if (name.startsWith(BD_MARK)) {
+              name = name.slice(BD_MARK.length);
+              marked.add(name);
+            }
+            const value = line.slice(spaceIdx + 1).trim();
+            if (value === '[') {
+              currentDirective = name;
+              currentLines = [];
+              state = 'bracket';
+            } else {
+              directives[name] = value;
+            }
+          }
+        } else if (state === 'bracket') {
+          if (line.trim() === '%%bd_]') {
+            directives[currentDirective] = currentLines.join('\n');
+            state = 'text';
+          } else {
+            currentLines.push(line);
+          }
+        }
+      }
+      Object.defineProperty(directives, '__marked', { value: marked, enumerable: false });
+      return directives;
+    }
+    // ── setDirectiveValue — V_Kolam3D's. Replaces a directive's value in
+    // place (marked or not), or adds it at the end if it is absent.
+    function setDirectiveValue(nodeText, name, value) {
+      const lines  = nodeText.split('\n');
+      const plain  = `%%bd_${name}`;
+      const marked = `%%bd_${BD_MARK}${name}`;
+      let replaced = false;
+      const updated = lines.map((line) => {
+        if (line.startsWith(`${marked} `)) { replaced = true; return `${marked} ${value}`; }
+        if (line.startsWith(`${plain} `))  { replaced = true; return `${plain} ${value}`;  }
+        return line;
+      });
+      if (!replaced) {
+        const insertAt = updated.findIndex((line) => line.trim() === '%%bd_score [');
+        updated.splice(insertAt === -1 ? updated.length : insertAt, 0, `${plain} ${value}`);
+      }
+      return updated.join('\n');
+    }
+    // ── Stepper (+/−) buttons — V_Kolam3D's: tap, press-and-hold repeat.
+    function tapStep(input, cur, delta) {
+      const step   = parseFloat(input.step) || 1;
+      const above  = parseFloat(input.dataset.coarseAbove);
+      const coarse = parseFloat(input.dataset.coarseStep);
+      if (!Number.isFinite(above) || !Number.isFinite(coarse)) return step;
+      const inCoarse = delta > 0 ? cur >= above : cur > above;
+      return inCoarse ? coarse : step;
+    }
+    function stepControl(input, delta, magnitude) {
+      const min  = parseFloat(input.min);
+      const max  = parseFloat(input.max);
+      const step = parseFloat(input.step) || 1;
+      const cur  = parseFloat(input.value);
+      if (!Number.isFinite(cur)) return;
+      const prop = parseFloat(input.dataset.proportional);
+      if (Number.isFinite(prop) && prop > 0 && min > 0) {
+        const presses = (Number.isFinite(magnitude) && magnitude > 0) ? magnitude : 1;
+        let next = cur * Math.pow(1 + prop, delta * presses);
+        next = Math.min(Math.max(next, min), max);
+        next = parseFloat(next.toPrecision(3));
+        const strVal = String(next);
+        if (input.value === strVal) return;
+        input.value = strVal;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      const tap  = tapStep(input, cur, delta);
+      const move = Number.isFinite(magnitude) && magnitude > 0 ? magnitude : tap;
+      let next = cur + delta * move;
+      if (input.dataset.wrap && Number.isFinite(min) && Number.isFinite(max)) {
+        const span = (max - min) + step;          // max is inclusive, so 0..359 spans 360
+        next = min + ((((next - min) % span) + span) % span);
+      } else {
+        if (Number.isFinite(min)) next = Math.max(min, next);
+        if (Number.isFinite(max)) next = Math.min(max, next);
+      }
+      if (Number.isFinite(tap) && tap > 0) next = Math.round(next / tap) * tap;
+      next = parseFloat(next.toFixed(4));
+      const strVal = String(next);
+      if (input.value === strVal) return;      // hit min/max — no-op
+      input.value = strVal;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    const REPEAT_MS        = 60;    // gap between repeats while held
+    const HOLD_MS          = 400;   // press-and-hold before repeating starts
+    const START_STEP_MS    = 260;   // at the START of a hold, one step per this
+    const FULL_TRAVERSE_MS = 7000;  // target time to cross a whole range
+    const RAMP_MS          = 1400;  // time to reach full speed
+    function repeatMagnitude(input, ticks) {
+      const min  = parseFloat(input.min);
+      const max  = parseFloat(input.max);
+      const prop = parseFloat(input.dataset.proportional);
+      const propRange = (Number.isFinite(prop) && prop > 0 && min > 0 && max > min)
+        ? Math.log(max / min) / Math.log(1 + prop) : null;
+      const step = (propRange !== null) ? 1 : (parseFloat(input.step) || 1);
+      const slowest = step * (REPEAT_MS / START_STEP_MS);
+      const span = (propRange !== null) ? propRange
+                 : ((Number.isFinite(min) && Number.isFinite(max)) ? (max - min) : null);
+      const fastest = (span !== null)
+        ? Math.max(slowest, span / (FULL_TRAVERSE_MS / REPEAT_MS))
+        : slowest;
+      const ramp = Math.min(1, (ticks * REPEAT_MS) / RAMP_MS);
+      return slowest + (fastest - slowest) * ramp;
+    }
+    document.querySelectorAll('.step-btn').forEach((btn) => {
+      let holdTimer   = null;
+      let repeatTimer = null;
+      let repeatTicks = 0;
+      let repeatCarry = 0;
+      const doStep = (magnitude) => {
+        const input = document.getElementById(btn.dataset.target);
+        const delta = parseFloat(btn.dataset.delta);
+        if (!input || input.disabled) return;
+        stepControl(input, delta, magnitude);
+      };
+      const start = (ev) => {
+        if (btn.disabled) return;
+        ev.preventDefault();
+        try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
+        repeatTicks = 0;
+        repeatCarry = 0;
+        doStep();
+        holdTimer = setTimeout(() => {
+          repeatTimer = setInterval(() => {
+            const input = document.getElementById(btn.dataset.target);
+            if (!input) return;
+            const step = parseFloat(input.step) || 1;
+            repeatCarry += repeatMagnitude(input, repeatTicks);
+            repeatTicks += 1;
+            if (repeatCarry >= step) {
+              const whole = Math.floor(repeatCarry / step) * step;
+              repeatCarry = Math.max(0, repeatCarry - whole);
+              doStep(whole);
+            }
+          }, REPEAT_MS);
+        }, HOLD_MS);
+      };
+      const stop = () => {
+        if (holdTimer)   { clearTimeout(holdTimer);   holdTimer   = null; }
+        if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+        repeatTicks = 0;
+        repeatCarry = 0;
+      };
+      btn.addEventListener('pointerdown',   start);
+      btn.addEventListener('pointerup',     stop);
+      btn.addEventListener('pointercancel', stop);
+      btn.addEventListener('pointerleave',  stop);
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Everything below needs the scene. If three.js did not arrive from the
+    // CDN, the scene script above stopped at its first use of THREE, and the
+    // one thing this module must still do is SAY so — never a silent square.
+    // ════════════════════════════════════════════════════════════════════════
+    const statusEl      = document.getElementById('status');
+    const waitingEl     = document.getElementById('waiting');
+    const canvasEl      = document.getElementById('lorenz-canvas');
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    const moduleLayout  = document.querySelector('.module-layout');
+    const setStatus = (msg) => { statusEl.textContent = msg; };
+    function showWaiting(msg, fatal) {
+      waitingEl.textContent = msg;
+      waitingEl.classList.toggle('fatal', !!fatal);
+      waitingEl.hidden = false;
+    }
+    function hideWaiting() { waitingEl.hidden = true; waitingEl.classList.remove('fatal'); }
+
+    let SCENE_OK = false;
+    try { SCENE_OK = HAVE_THREE && typeof renderer !== 'undefined' && typeof restart === 'function'; } catch (_) { SCENE_OK = false; }
+
+    let storedText = '';                 // the script as this module last read or wrote it
+    let renderingFromDrift = false;      // true while announcing a change SPIN made, not a person
+    let waitingForFirstScript = true;
+    let outputOnly = false;              // View / collage: fill the whole box, not a square
+
+    // ── Value shown in each stepper ─────────────────────────────────────────
+    function shownValue(c) {
+      const v = state[c.key];
+      if (c.show === 'beta' && Math.abs(v - 8 / 3) < 0.005) return '8/3';
+      if (c.show === 'k') return (v >= 1000 ? parseFloat((v / 1000).toFixed(1)) + 'k' : String(v));
+      // Leading zero dropped (.05, not 0.05) so a value fits the narrow box.
+      return String(parseFloat(Number(v).toFixed(c.dp || decimalsOf(c)))).replace(/^(-?)0\./, '$1.');
+    }
+    function updateValueDisplays() {
+      for (const c of CONTROLS) {
+        if (c.choices) continue;
+        const span = document.querySelector(`.stepper-value[data-target="${inputIdOf(c)}"]`);
+        if (!span) continue;
+        span.textContent = shownValue(c);
+        span.classList.toggle('stepper-value--wide', span.textContent.length > 3);
+      }
+    }
+    function syncInputsFromState() {
+      for (const c of CONTROLS) {
+        c.input.value = c.choices ? state[c.key]
+                                  : String(parseFloat(Number(state[c.key]).toFixed((c.dp || decimalsOf(c)) + 2)));
+      }
+      updateValueDisplays();
+    }
+
+    // ── Which rows a script asks for ────────────────────────────────────────
+    // %%bd_p_<name> marks a directive as wanting a control. A script with NO
+    // mark at all shows every row; once anything is marked, only those show.
+    function applyControlVisibility(marked) {
+      const anyMarked = marked && marked.size > 0;
+      for (const c of CONTROLS) {
+        const row = c.input.closest('.control-row');
+        if (row) row.hidden = anyMarked && !marked.has(c.name);
+      }
+    }
+
+    // ── Reading a script into `state` ───────────────────────────────────────
+    // An ABSENT directive takes its default, so the script alone decides the
+    // picture. A projection word that is not one of the four is IGNORED (the
+    // Shan Shui rule, so a typo cannot blank the picture).
+    const clampTo = (c, v) => Math.min(Math.max(v, c.min), c.max);
+    const wrapTo = (c, v) => {
+      const span = (c.max - c.min) + c.step;
+      return c.min + ((((v - c.min) % span) + span) % span);
+    };
+    // What this module last wrote for azimuth while spinning. A script coming
+    // back carrying exactly that number is our own echo, and must not snap the
+    // smooth internal angle back to its rounded copy.
+    const written = { az: null };
+    function readScriptIntoState(directives) {
+      for (const c of CONTROLS) {
+        const raw = directives[c.name];
+        if (c.choices) {
+          if (raw === undefined) { state[c.key] = c.def; continue; }
+          const word = String(raw).trim();
+          if (c.choices.includes(word)) state[c.key] = word;
+          else console.warn('[lorenz] %%bd_' + c.name + ' "' + word + '" is not one of ' +
+                            c.choices.join(', ') + ' — keeping ' + state[c.key]);
+          continue;
+        }
+        let v = raw === undefined ? c.def : parseFloat(raw);
+        if (!Number.isFinite(v)) {
+          console.warn('[lorenz] %%bd_' + c.name + ' "' + raw + '" is not a number — using ' + c.def);
+          v = c.def;
+        }
+        if (c.key in written && written[c.key] !== null && v === written[c.key]) continue;   // our own echo
+        v = c.wrap ? wrapTo(c, v) : clampTo(c, v);
+        if (c.step === 1) v = Math.round(v);
+        state[c.key] = v;
+      }
+    }
+
+    // ── Writing `state` back into the script ────────────────────────────────
+    function formatForScript(c) {
+      if (c.choices) return state[c.key];
+      if (c.show === 'beta' && Math.abs(state[c.key] - 8 / 3) < 0.005) return '2.667';
+      const d = c.dp || Math.max(decimalsOf(c), 2);
+      return String(parseFloat(Number(state[c.key]).toFixed(d)));
+    }
+    function applyControlDirectives(text) {
+      let out = text;
+      for (const c of CONTROLS) out = setDirectiveValue(out, c.name, formatForScript(c));
+      return out;
+    }
+    // Tell BD the script changed. fromDrift says SPIN did it, so BD can record
+    // it without forwarding it to another screen that spins on its own.
+    function announce() {
+      try { postToParent({ type: 'bd_av_state', text: storedText, fromDrift: renderingFromDrift }); } catch (_) {}
+    }
+
+    // ── Applying `state` to the scene ───────────────────────────────────────
+    // A change to a constant or the starting point RESTARTS the trace: it is a
+    // different trajectory, and drawing it on from the old one's last point
+    // would show neither. Everything else applies to the trace already drawn.
+    let restartSig = '';
+    const restartSignature = () => CONTROLS.filter(c => c.restart).map(c => state[c.key]).join('|');
+    let ranAwayReported = false;
+    function applyState() {
+      if (!SCENE_OK) return;
+      const sig = restartSignature();
+      if (sig !== restartSig) {
+        restartSig = sig;
+        restart();
+        if (ranAwayReported) { ranAwayReported = false; setStatus(''); }
+      }
+      trimTrail();
+      applyOpacity();
+      applyProjection();
+      guides.visible = !!state.axes;
+      placeCamera();
+      syncTrace();
+      requestFrame();
+    }
+
+    // ── A script arrives (from BD, on open or after an edit) ────────────────
+    function render(text) {
+      try {
+        storedText = typeof text === 'string' ? text : '';
+        const d = parseBD(storedText);
+        applyControlVisibility(d.__marked);
+        readScriptIntoState(d);
+        syncInputsFromState();
+        if (!SCENE_OK) throw new Error('three.js did not load from the CDN');
+        applyState();
+        announce();
+        if (!ranAwayReported) setStatus('');
+      } catch (err) {
+        setStatus('Error: ' + err.message);
+        postToParent({ type: 'BD_ERROR', payload: { message: err.message } });
+        console.error('[lorenz] render error:', err);
+      }
+    }
+    function renderFromScript(text) {
+      if (waitingForFirstScript) {
+        waitingForFirstScript = false;
+        hideWaiting();
+        enableControls();
+      }
+      stopped = false;
+      try {
+        const d = parseBD(text || '');
+        const keys = Object.keys(d);
+        console.log('[lorenz] script in: ' + (text || '').length + ' chars, ' + keys.length + ' directives' +
+                    (keys.length ? '' : '  <-- NONE PARSED; every value will be a default'));
+      } catch (_) {}
+      render(text);
+    }
+
+    // ── A stepper or the projection is changed by hand ──────────────────────
+    // For azimuth while spinning this REPLACES the smooth internal angle: the
+    // hand wins, and the spin carries on from what was set.
+    function handleControlChange(ev) {
+      const c = CONTROLS.find(x => x.input === ev.target);
+      if (!c) return;
+      if (c.choices) {
+        if (c.choices.includes(c.input.value)) state[c.key] = c.input.value;
+      } else {
+        const v = parseFloat(c.input.value);
+        if (!Number.isFinite(v)) return;
+        state[c.key] = v;
+        if (c.key in written) written[c.key] = null;
+      }
+      updateValueDisplays();
+      applyState();
+      if (!storedText) return;
+      storedText = applyControlDirectives(storedText);
+      announce();
+    }
+    for (const c of CONTROLS) {
+      c.input.addEventListener('input', handleControlChange);
+      if (c.choices) c.input.addEventListener('change', handleControlChange);
+    }
+
+    function disableControls() {
+      document.querySelectorAll('.control-panel input, .control-panel select, .control-panel .step-btn')
+        .forEach(el => { el.disabled = true; });
+    }
+    function enableControls() {
+      document.querySelectorAll('.control-panel input, .control-panel select, .control-panel .step-btn')
+        .forEach(el => { el.disabled = false; });
+    }
+
+    // ── Size: a square in BD's preview, the whole box in View ───────────────
+    // Shan Shui's rule, and its fix: size to the space INSIDE the wrapper's
+    // padding (the 44px for BD's arrows, 52px for the Extension strip), or the
+    // square is taller than its room and gets squeezed.
+    function alignStepperTop() {
+      if (window.innerWidth > 500) { controlPanel.style.marginTop = ''; return; }
+      const offset = Math.max(0, Math.round(
+        canvasEl.getBoundingClientRect().top - moduleLayout.getBoundingClientRect().top));
+      controlPanel.style.marginTop = offset + 'px';
+    }
+    function updateCanvasSize() {
+      if (!SCENE_OK) return;
+      const cs = getComputedStyle(canvasWrapper);
+      const w = canvasWrapper.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const h = canvasWrapper.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
+      let W, H;
+      if (outputOnly) { W = Math.floor(w); H = Math.floor(h); }
+      else { W = H = Math.floor(h > 0 ? Math.min(w, h) : w); }
+      if (W > 0 && H > 0) {
+        renderer.setSize(W, H);
+        camera.aspect = W / H;
+        camera.updateProjectionMatrix();
+      }
+      alignStepperTop();
+      requestFrame();
+    }
+
+    // ── THE ANIMATION LOOP ──────────────────────────────────────────────────
+    // Runs every frame while the trace is being drawn (speed > 0) or the view
+    // is spinning. At speed 0 and spin 0 it STOPS — the figure stays as drawn
+    // and costs nothing — and a stepper press or a script draws one frame.
+    let rafId = 0, stopped = false;
+    const lzClock = SCENE_OK ? new THREE.Clock() : null;
+    function requestFrame() {
+      if (!SCENE_OK || stopped || waitingForFirstScript || rafId) return;
+      lzClock.getDelta();                // forget the idle gap: no jump on waking
+      rafId = requestAnimationFrame(frame);
+    }
+    // How often a spinning azimuth is written back into the script.
+    const WRITE_MS = 200;
+    let lastWrite = 0;
+    function frame() {
+      rafId = 0;
+      if (stopped) return;
+      const dt = Math.min(lzClock.getDelta(), 0.1);
+      const drawing = state.spf > 0 && !ranAway;
+      if (drawing && !step(state.spf) && !ranAwayReported) {
+        ranAwayReported = true;
+        setStatus('The trace ran away — try a smaller time step or gentler constants.');
+        console.warn('[lorenz] trace ran away at t=' + t.toFixed(3) + ' (sigma ' + state.sigma +
+                     ', rho ' + state.rho + ', beta ' + state.beta + ', dt ' + state.dt + ')');
+      }
+      if (state.spin) {
+        state.az = ((state.az + state.spin * dt) % 360 + 360) % 360;
+        placeCamera();
+        const now = performance.now();
+        if (now - lastWrite >= WRITE_MS) {
+          lastWrite = now;
+          const c = CONTROLS.find(x => x.key === 'az');
+          c.input.value = formatForScript(c);
+          updateValueDisplays();
+          if (storedText) {
+            storedText = applyControlDirectives(storedText);
+            written.az = parseFloat(formatForScript(c));
+            renderingFromDrift = true;
+            try { announce(); } finally { renderingFromDrift = false; }
+          }
+        }
+      }
+      syncTrace();
+      renderer.render(scene, camera);
+      if ((state.spf > 0 && !ranAway) || state.spin) rafId = requestAnimationFrame(frame);
+    }
+    function stopLoop() {
+      stopped = true;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    }
+
+    // ── Boot ────────────────────────────────────────────────────────────────
+    disableControls();
+    syncInputsFromState();
+    if (!SCENE_OK) {
+      showWaiting('Cannot draw: three.js did not load.\nCheck the connection and reload.', true);
+      setStatus('Error: three.js missing');
+      console.error('[lorenz] three.js did not load — the module cannot render');
+      try { postToParent({ type: 'BD_ERROR', payload: { message: 'three.js did not load from the CDN' } }); } catch (_) {}
+    } else {
+      showWaiting('Waiting for script…', false);
+      requestAnimationFrame(() => requestAnimationFrame(updateCanvasSize));
+    }
+    if (typeof ResizeObserver === 'function') new ResizeObserver(updateCanvasSize).observe(canvasWrapper);
+    window.addEventListener('resize', updateCanvasSize);
+
+    // ── Messages from BD ────────────────────────────────────────────────────
+    window.addEventListener('message', (event) => {
+      try {
+        const data = event.data || {};
+        const { type, payload, script } = data;
+        switch (type) {
+          case 'bd_collage_layout': {
+            // Another module's steppers share this column in a collage: stop short.
+            const cmh = data.columnMaxHeight;
+            const sharing = (typeof cmh === 'number' && cmh > 0);
+            document.documentElement.style.setProperty('--bd-col-max', sharing ? Math.round(cmh) + 'px' : 'none');
+            document.body.classList.toggle('sharing-lane', sharing);
+            break;
+          }
+          case 'bd_script_update':
+            renderFromScript(typeof script === 'string' ? script : '');
+            break;
+          case 'bd_script_request':
+            window.parent.postMessage({ type: 'bd_script_response', script: storedText }, '*');
+            break;
+          case 'BD_INIT': {
+            const raw = payload && payload.text;
+            renderFromScript(typeof raw === 'string' ? raw : raw == null ? '' : String(raw));
+            break;
+          }
+          case 'BD_STOP':
+            stopLoop();
+            setStatus('Stopped');
+            break;
+          case 'BD_REQUEST_UPDATE':
+            postToParent({ type: 'BD_UPDATE', payload: { text: storedText } });
+            break;
+          case 'bd_ui_config': {
+            outputOnly = data.outputOnly === true;
+            const hide = outputOnly || data.hideControls === true;
+            document.body.classList.toggle('output-only', outputOnly);
+            document.body.classList.toggle('controls-hidden', hide);
+            document.body.classList.toggle('no-host-chrome', hide || data.hostChrome === false);
+            updateCanvasSize();
+            break;
+          }
+          case 'bd_param_update': {
+            const name = data.name, value = data.value;
+            if (typeof name !== 'string') break;
+            const c = CONTROLS.find(x => x.name === name);
+            if (c) {
+              c.input.value = String(value);
+              c.input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      } catch (err) {
+        console.error('[lorenz] error handling postMessage', err);
+      }
+    });
+
+    console.log('[lorenz] bd_V_LorenzV1 build ' + LZ_BUILD + ' — the stepper +/- buttons are BLUE #2980b9, in step with BD, ShanShui, Kolam3D and DroneFrac.');
+    try { document.body.dataset.lzBuild = LZ_BUILD; } catch (_) {}
+    postToParent({ type: 'BD_READY' });
+
+  </script>
+</body>
+</html>

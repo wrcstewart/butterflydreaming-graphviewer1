@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-14h' };
+const BD_CANARY_EXPECTED = { hex: '#2980b9', rgb: 'rgb(41, 128, 185)', build: '2026-11-15a' };
 
 let bdViewTitleText = '';
 
@@ -3473,6 +3473,16 @@ const MODULES = {
   'bd_V_ShanShuiV1': {
     kind:       'visual',
     embedded:   '/bd_V_ShanShuiV1/index.html',
+  },
+  // 2026-11-15 — Lorenz's attractor in 3D (V_Lorenz/, from the Workbench).
+  // Served by the ROOT static route at its on-disk path, not a /bd_V_… alias
+  // like the others: an alias is an app.use in server.js, which takes effect
+  // only on a server restart, and the server is not restarted while the author
+  // works. The root route already sends HTML no-cache, so nothing is lost.
+  // An alias can be added later; change this line with it.
+  'bd_V_LorenzV1': {
+    kind:       'visual',
+    embedded:   '/V_Lorenz/index.html',
   },
   'bd_M_ABC': {
     kind:       'music',

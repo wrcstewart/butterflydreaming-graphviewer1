@@ -1,4 +1,4 @@
-# Lorenz — notes (2026-11-13/14)
+# Lorenz — notes (2026-11-13/14/15)
 
 Two things built from Lorenz's 1963 convection equations:
 
@@ -168,6 +168,113 @@ canvas is never made.
 | `ALPHA_MAX` | 0.6 | brightness of the newest stretch |
 | `BANDS` | 24 | smoothness of the fade |
 | `FILL` | 0.8 | size inside the node |
+
+---
+
+## 3. The BD module `bd_V_LorenzV1` and its node (2026-11-15)
+
+The author: "create a node off Graphics called LorenzEqu and the normal route
+through to a node for the 3D Lorenz equations ... Put the sliders as you think
+fit using the standard positions as per Kolam3D etc. ... when I get the VR going
+this will be a good node to test on as the graphic is not too complicated."
+
+### In the graph
+
+SubFamily **Graphics** → Cluster **LorenzEqu** → gateway **Lorenz3D** → node
+**Lorenz3D_001** (seq 1, `hasModuleScript: bd_V_LorenzV1`). Created by
+`bd_v_lorenz_ingest.js` (Shan Shui's ingest, renamed; backup taken first).
+
+- **Why the gateway is not also "LorenzEqu":** a Cluster and a gateway with
+  one name make name lookups ambiguous (the reason Shan Shui's cluster is
+  Mountain/Water).
+- **Permanent link:** `/n/9efd37f7-cf61-45f2-b839-155e67079015` (Lorenz3D_001).
+  Gateway `7d235e44-…`, cluster `9333cbbf-…`.
+- **Speech:** `_` between word characters is spoken as a space, so the node is
+  read "Lorenz3D 001". The lexicon matches WHOLE words (`\b…\b`), so if the
+  voice gets it wrong, the entry to add to `speech_lexicon.json` is
+  **`Lorenz3D`** (an entry for plain `Lorenz` would not match inside it).
+
+### The module (`V_Lorenz/`)
+
+- **Files:** `V_Lorenz/index.html` (the relay, Shan Shui's renamed) and
+  `V_Lorenz/visual_module.html`, ASSEMBLED from:
+  - Shan Shui's stylesheet, parser, `setDirectiveValue` and stepper machinery;
+  - the Workbench's scene with its DOM wiring removed;
+  - a glue script cut down from Shan Shui's.
+- **Served at `/V_Lorenz/index.html` by the ROOT static route**, not a
+  `/bd_V_…` alias like the other modules. An alias is an `app.use` in
+  `server.js` and needs a server restart, which is not done while the author
+  works. `MODULES` in `viewer.js` says so beside the entry.
+- **The script (stored in Lorenz3D_001):**
+
+```
+%%bd_module bd_V_LorenzV1
+%%bd_p_sigma 10
+%%bd_p_rho 28
+%%bd_p_beta 2.667
+%%bd_p_x0 1
+%%bd_p_y0 1
+%%bd_p_z0 1
+%%bd_p_speed 6
+%%bd_p_trail 20000
+%%bd_p_opacity 1
+%%bd_p_projection none
+%%bd_p_azimuth 40
+%%bd_p_elevation 15
+%%bd_p_distance 95
+%%bd_p_spin 0
+%%bd_time_step 0.005
+%%bd_axes 1
+```
+
+- **The column, top to bottom** (my choice, the author to adjust): the
+  constants σ ρ β; the start x0 y0 z0; how it is drawn (speed, trail, opacity,
+  projection); where it is seen from (azimuth, elevation, distance, spin).
+  Ranges are the Workbench's, in the module's one `CONTROLS` table.
+  - **speed** is RK4 steps per frame, 0–30; **0 is the pause**, so there is no
+    Pause button (Shan Shui's travel_speed rule).
+  - **beta** is shown "8/3" and integrated as exactly 8/3 while the script says
+    2.667, and written back as 2.667.
+  - **trail** is shown in thousands ("20k").
+  - **projection** is a word from a selector: none, xy (floor), xz (back wall,
+    the classic view), both. A word not in the list is ignored.
+  - **time_step** and **axes** (axes and the two fixed points, 1 or 0) are
+    fixed by the script: no `_p_`, no row.
+- **A change to σ, ρ, β or the start RESTARTS the trace**, since it is a
+  different trajectory. Every other control applies to what is drawn.
+- **Spin turns the azimuth and writes it back into the script** every 200 ms,
+  marked `fromDrift`, with the hand winning: Shan Shui's clock pattern.
+- **The loop stops** at speed 0 and spin 0; the figure stays as drawn.
+- **Run-away** (extreme constants) stops the drawing and says so in the status
+  line and the log; a restart clears it.
+- **No drag**, as in Shan Shui: the camera is the three orbit numbers.
+- **Canary:** the stepper buttons' colour plus `LZ_BUILD`, rotated with the
+  others.
+- **VR:** a plain three.js scene (lines, three spheres, no shadows, no
+  post-processing), so it is a light first test for WebXR. Nothing VR-specific
+  is built yet.
+
+### Tested (headless)
+
+- **The module alone:** a test page iframed `/V_Lorenz/index.html` and posted
+  the script. Results:
+  - 14 rows shown;
+  - β exact;
+  - the xz shadow visible;
+  - spin wrote `%%bd_p_azimuth` back;
+  - the square was 468×468 in a 760×520 frame.
+- **In BD:** opened `/n/9efd37f7-…` and pressed View. The server log read:
+  `loadModuleForNode: swap path, setting src= /V_Lorenz/index.html script
+  length= 288`, then the module's BLUE build line, then `script in: 288
+  chars, 17 directives`. The axes, the fixed points and the start of the trace
+  drew full screen. A TAP alone does not open a module in Browse; that is the
+  same for ShanShui_001, checked side by side.
+
+### Not yet
+
+- Device (AV) rendering, as for Shan Shui.
+- A published Standalone page.
+- A `/bd_V_LorenzV1/` alias in `server.js`.
 
 ---
 
