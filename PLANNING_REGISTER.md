@@ -1525,8 +1525,8 @@ Detail, traps and tuning in `Lorenz_Notes.md`.
 | **Root node — live Lorenz butterfly** | `viewer.js` `startRootButterfly`, `Lorenz_Notes.md` | **BUILT 2026-11-14 (`32e4406`), author: "Thats good".** Canvas behind `#cy` following the root; motion proven by canvas-pixel hash at 8 s vs 12 s. **Phone frame rate NOT measured.** |
 | **Lorenz colour control** | `Lorenz Workbench.html` | **NOT BUILT — author to decide** what it should be. |
 | **yz projection; two neighbouring starts side by side** | `Lorenz Workbench.html` | **NOT BUILT, not yet offered.** The second would show the butterfly effect directly. |
-| **BD module `bd_V_LorenzV1` + node Lorenz3D_001** | `V_Lorenz/`, `bd_v_lorenz_ingest.js`, `Lorenz_Notes.md` §3 | **BUILT 2026-11-15.** Graphics → Cluster LorenzEqu → gateway Lorenz3D → Lorenz3D_001. 14 steppers (σ ρ β, start, speed/trail/opacity, projection, camera + spin). Served at `/V_Lorenz/` by the root route (no server restart). Author: a first WebXR test node. |
-| **Lorenz module: Device (AV), Standalone page, `/bd_V_LorenzV1/` alias, lexicon entry `Lorenz3D` if the voice needs it** | `AV/kolam.html`, `server.js`, `speech_lexicon.json` | **NOT BUILT.** |
+| **BD module `bd_V_LorenzV1` + node Lorenz3D_001** | `V_Lorenz/`, `bd_v_lorenz_ingest.js`, `Lorenz_Notes.md` §3 | **BUILT 2026-11-15.** Graphics → Cluster LorenzEqu → gateway Lorenz3D → Lorenz3D_001. 14 steppers (σ ρ β, start, speed/trail/opacity, projection, camera + spin). Served at `/bd_V_LorenzV1/` (alias added after a restart, 2026-11-15). Author: a first WebXR test node. |
+| **Lorenz module: Device (AV), Standalone page, lexicon entry `Lorenz3D` if the voice needs it** | `AV/kolam.html`, `speech_lexicon.json` | **NOT BUILT.** |
 
 ## BUILT 2026-11-14 — the user journey: guidance for a first-time reader
 

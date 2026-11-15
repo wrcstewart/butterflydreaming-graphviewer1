@@ -201,10 +201,14 @@ SubFamily **Graphics** → Cluster **LorenzEqu** → gateway **Lorenz3D** → no
   - Shan Shui's stylesheet, parser, `setDirectiveValue` and stepper machinery;
   - the Workbench's scene with its DOM wiring removed;
   - a glue script cut down from Shan Shui's.
-- **Served at `/V_Lorenz/index.html` by the ROOT static route**, not a
-  `/bd_V_…` alias like the other modules. An alias is an `app.use` in
-  `server.js` and needs a server restart, which is not done while the author
-  works. `MODULES` in `viewer.js` says so beside the entry.
+- **Served at `/bd_V_LorenzV1/`**, mapped to `V_Lorenz/` by an `app.use` in
+  `server.js`, as for the other modules. For its first few hours it ran from
+  `/V_Lorenz/` through the root route, because an alias needs a server restart.
+  The author then allowed a restart (2026-11-15), and the alias went in.
+  Checked after the restart:
+  - 200, locally and at butterflydreaming.net;
+  - HTML no-cache;
+  - BD's log shows `setting src= /bd_V_LorenzV1/index.html`.
 - **The script (stored in Lorenz3D_001):**
 
 ```
@@ -274,7 +278,6 @@ SubFamily **Graphics** → Cluster **LorenzEqu** → gateway **Lorenz3D** → no
 
 - Device (AV) rendering, as for Shan Shui.
 - A published Standalone page.
-- A `/bd_V_LorenzV1/` alias in `server.js`.
 
 ---
 

@@ -319,6 +319,20 @@ app.use('/bd_V_ShanShuiV1', express.static('./V_ShanShui', {
   }
 }));
 
+// bd_V_LorenzV1 — Lorenz's attractor in 3D (2026-11-15). Served path
+// /bd_V_LorenzV1/ maps to on-disk V_Lorenz/, as for the other modules. It ran
+// from /V_Lorenz/ via the root route for its first day, before this alias
+// existed. No-cache on HTML: it pulls three.js from a CDN.
+app.use('/bd_V_LorenzV1', express.static('./V_Lorenz', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 // bd_M_ABC music module bundle. Served path /bd_M_ABC/ maps to on-disk
 // M_Music/ directory, matching the V_Kolam served-path / on-disk-dir split.
 app.use('/bd_M_ABC', express.static('./M_Music', {
