@@ -34,7 +34,9 @@ long-running `cloudflared` tunnel. **Client console output is forwarded to
 `/private/tmp/bd_server.log`** — that log is the primary diagnostic and has
 settled arguments that days of reasoning did not.
 
-Current served versions: `viewer.js?v=798`, `style.css?v=480`, canary **green**.
+Current served versions and canary: **read them, never trust a copy here**:
+`grep -n "?v=" index.html` and `grep -n BD_CANARY_EXPECTED viewer.js`. (A fixed
+value was written here once, and it went stale within days.)
 
 ---
 
@@ -679,3 +681,31 @@ space; the "grey nodes are title nodes" helper card now appears only where
 there are title nodes. Found and NOT fixed: V_Kolam3D squashes its figure when
 height binds. Next: the author tweaks in BD (2026-11-13), then a ranging section.
 
+## Added 2026-11-13/14 — Lorenz Workbench, the root butterfly, the user journey
+
+- **`Lorenz_Notes.md`** covers:
+  - `Lorenz Workbench.html`, a three.js bench for the 1963 attractor;
+  - the classic xz butterfly drawn LIVE behind BD's root node, on a canvas
+    behind `#cy`. The author: "Thats good".
+- **`UserJourney_Notes.md`** covers the first-reader guidance:
+  - `JOURNEY_ARROWS` (arrowheads at Conversations and Music);
+  - the route already taken drawn dotted;
+  - Gateways' line grey;
+  - Collage in Create only;
+  - the retrace reminder beside Local.
+
+## Added 2026-11-15 — Lorenz is a BD module
+
+Read **`Lorenz_Notes.md` §3**.
+
+- **The module:** `bd_V_LorenzV1` (`V_Lorenz/`, served at `/bd_V_LorenzV1/`).
+  It was assembled from Shan Shui's module shell and the Workbench's scene,
+  with one `CONTROLS` table and 14 steppers.
+- **In the graph:** Graphics → Cluster LorenzEqu → gateway Lorenz3D → node
+  Lorenz3D_001 (`/n/9efd37f7-cf61-45f2-b839-155e67079015`).
+- **The author's verdict:** "Its good".
+- **The author's next use for it:** the first WebXR test node.
+- **Not built:**
+  - Device (AV) rendering;
+  - a Standalone page;
+  - a lexicon entry `Lorenz3D` (only if the voice needs it).

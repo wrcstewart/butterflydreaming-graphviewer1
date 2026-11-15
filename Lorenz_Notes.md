@@ -1,14 +1,16 @@
 # Lorenz — notes (2026-11-13/14/15)
 
-Two things built from Lorenz's 1963 convection equations:
+Three things built from Lorenz's 1963 convection equations:
 
 1. **`Lorenz Workbench.html`**: a three.js bench for investigating the
    attractor, at `/Lorenz%20Workbench.html`.
 2. **The root node's butterfly**: the classic xz projection, drawn live
    behind BD's root node on the home page (`viewer.js`).
+3. **The BD module `bd_V_LorenzV1`** and its node Lorenz3D_001 (§3).
 
 Author's verdicts: the bench additions were asked for one at a time and accepted
-as they came. The live root butterfly drew "Thats good" (2026-11-14).
+as they came. The live root butterfly drew "Thats good" (2026-11-14), and the BD
+module (§3) "Its good" (2026-11-15).
 
 ---
 
@@ -292,3 +294,5 @@ SubFamily **Graphics** → Cluster **LorenzEqu** → gateway **Lorenz3D** → no
 | `1484562` | classic xz projection (back wall), `makeProjection()` |
 | `1da4142` | root node: still SVG butterfly |
 | `32e4406` | root node: live canvas butterfly |
+| `47f502b` | BD module `bd_V_LorenzV1` + node Lorenz3D_001 (served at `/V_Lorenz/`) |
+| `93a3f4f` | served at `/bd_V_LorenzV1/` like the other modules (server restarted) |
