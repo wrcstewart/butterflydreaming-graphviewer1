@@ -203,8 +203,8 @@
     }
     .step-btn {
       background: #0f0f18;
-      border: 1px solid #c0392b;
-      color: #c0392b;
+      border: 1px solid #27ae60;
+      color: #27ae60;
       font-family: 'Courier New', Courier, monospace;
       font-size: 1.25rem;                      
       padding: 0;
@@ -581,7 +581,7 @@ function placeCamera() {
 
     // Bump on every change to this file, with the stepper-button colour in the
     // stylesheet (the module's canary): red → green → blue.
-    const LZ_BUILD = '2026-11-15b';
+    const LZ_BUILD = '2026-11-19a';
 
     // ── THE CONTROLS — ONE TABLE ────────────────────────────────────────────
     // Each entry: the directive name (as written after %%bd_ / %%bd_p_), the
@@ -1180,7 +1180,7 @@ function placeCamera() {
       }
     });
 
-    console.log('[lorenz] bd_V_LorenzV1 build ' + LZ_BUILD + ' — the stepper +/- buttons are RED #c0392b, in step with BD, ShanShui, Kolam3D and DroneFrac.');
+    console.log('[lorenz] bd_V_LorenzV1 build ' + LZ_BUILD + ' — the stepper +/- buttons are GREEN #27ae60, in step with BD, ShanShui, Kolam3D and DroneFrac.');
     try { document.body.dataset.lzBuild = LZ_BUILD; } catch (_) {}
     postToParent({ type: 'BD_READY' });
 

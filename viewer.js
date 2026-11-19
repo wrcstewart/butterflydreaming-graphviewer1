@@ -2582,7 +2582,7 @@ function showSpeechIntro() {
 // `ok` is computed from the COLOUR alone. So a readout that was telling the
 // truth was contradicting itself in the same line, and I read the half that
 // agreed with me. `ok` now takes the build into account too.
-const BD_CANARY_EXPECTED = { hex: '#c0392b', rgb: 'rgb(192, 57, 43)', build: '2026-11-15b' };
+const BD_CANARY_EXPECTED = { hex: '#27ae60', rgb: 'rgb(39, 174, 96)', build: '2026-11-19a' };
 
 let bdViewTitleText = '';
 
@@ -5379,6 +5379,40 @@ function buildStyle() {
         'line-color': '#5a6472',
         'target-arrow-color': '#5a6472',
         'opacity': 0.4,
+      }
+    },
+    // ── STANDING ROUTE MARKS (2026-11-19) ─────────────────────────────────
+    // The author: make the edges from Information out to Methods and
+    // Development Status "thinner and grey so as to discourage those direct
+    // routes and encourage routing through Aims", and "a new strong arrow from
+    // Aims out to Methods" (a CONTAINS edge added for it).
+    //
+    // Unlike reader_route above, these hold in EVERY view the edge appears in,
+    // not only when its source is centred: the Aims->Methods arrow has to read
+    // as strong at Information, where it is a sibling edge, not an out-edge.
+    // Again a property on the edge, so the next one is a `SET`, no code:
+    //   route_faint  — thinner (1.8 -> 0.9), smaller head, grey by LUMINANCE
+    //   route_strong — the reader-route look: twice the width, bigger head
+    // `route-taken` (the dotted "you came this way") is later and still wins.
+    {
+      selector: 'edge[type="CONTAINS"][?route_faint]',
+      style: {
+        'width': 0.9,
+        'arrow-scale': 0.5,
+        'line-color': '#5a6472',
+        'target-arrow-color': '#5a6472',
+        'opacity': 0.5,
+      }
+    },
+    {
+      selector: 'edge[type="CONTAINS"][?route_strong]',
+      style: {
+        'width': 3.6,
+        'arrow-scale': 1.3,
+        'line-color': '#f5f5f5',
+        'target-arrow-color': '#f5f5f5',
+        'opacity': 1,
+        'z-index': 20,
       }
     },
     // 2026-09-01 — the faint Settling->Gateways side-door rule is gone with the

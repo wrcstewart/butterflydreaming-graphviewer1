@@ -182,6 +182,33 @@ iframes BD and reads `window.cy`, computed styles and DOM state.
   occur on a headless arrival. The Collage CSS was tested by setting that state
   on `<body>` directly.
 
+## 8. Information routes through Aims (2026-11-19)
+
+The author: make the edges from Information out to Methods and Development
+Status "thinner and grey so as to discourage those direct routes and encourage
+routing through Aims. Also put a new strong arrow from Aims out to Methods".
+
+- **Database** (after `node bd_tool.js backup`):
+  - `route_faint = 1` on CONTAINS Information->Methods and Information->Development Status;
+  - a NEW edge CONTAINS Aims->Methods with `route_strong = 1`.
+- **viewer.js** has two stylesheet rules keyed on those properties. They apply in
+  every view the edge is drawn in, unlike `reader_route`, which applies only when
+  its source node is centred:
+  - `route_faint`: width 1.8 -> 0.9, arrow-scale 0.5, grey `#5a6472` at opacity 0.5.
+    The difference is in brightness, so it does not rely on hue.
+  - `route_strong`: the reader-route look (3.6 px, arrow-scale 1.3, near-white).
+- The next such mark is a single `SET` on an edge, with no code change.
+- **Consequences of the new edge:**
+  - Aims now has a descendant, so tapping it navigates into an Aims view that
+    shows Methods.
+  - Methods has two parents, and its view shows both Information and Aims.
+- **Seen where:** the one-hop view at Information draws only Information's own
+  edges, so the strong arrow appears at Aims, not at Information.
+- **Measured headless, at Information:**
+  - Aims: 1.8 px, rgb(224,224,224);
+  - Methods and Development Status: 0.9 px, rgb(90,100,114), opacity 0.5.
+- **Measured headless, at Aims:** Aims->Methods is 3.6 px, rgb(245,245,245).
+
 ---
 
 ## Commits
